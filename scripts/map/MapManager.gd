@@ -602,7 +602,8 @@ func get_infrastructure_repair_rate(province_id: int) -> float:
 func get_engineer_brigades_in_province(province_id: int, country_tag: String = "") -> float:
 	## Engineer detection for repair bonus.
 	## Properly uses the CombatPresenceRegistry (via SupplyManager) which is populated when
-	## formations/divisions are present in the province via SupplyManager.register_division_presence()
+	## Engineer divisions stationed via SupplyManager.deploy_engineer_formation_to_province()
+	## (division_deployments + register_division_presence).
 	## (or add_unit paths). DivisionTemplate.count_engineer_brigade_equivalent() identifies
 	## "engineer" / "combat_engineer" sustainment and subunits. Only friendly (controlling country)
 	## engineers contribute to repair (strategic: station your own engineers in threatened provinces).
@@ -619,6 +620,18 @@ func get_engineer_brigades_in_province(province_id: int, country_tag: String = "
 	return SupplyManager.get_engineer_brigades_in_province(province_id, tag)
 
 
+func get_engineer_divisions_at_province(province_id: int, country_tag: String = "") -> Array[Dictionary]:
+	if typeof(SupplyManager) == TYPE_NIL:
+		return []
+	return SupplyManager.get_formations_stationed_at_province(province_id, country_tag)
+
+
+func get_engineer_capable_divisions(country_tag: String = "") -> Array[Dictionary]:
+	if typeof(SupplyManager) == TYPE_NIL:
+		return []
+	return SupplyManager.get_engineer_capable_formations(country_tag)
+
+
 func _repair_country_tag(province: Province) -> String:
 	if province == null:
 		return ""
@@ -626,6 +639,66 @@ func _repair_country_tag(province: Province) -> String:
 	if tag.is_empty():
 		tag = province.owner_tag.strip_edges().to_upper()
 	return tag
+
+
+func project_engineer_repair_bonus(brigade_equiv: float) -> float:
+	return _engineer_repair_bonus(brigade_equiv)
+
+
+## Repair rate if exactly `brigade_equiv` engineer brigades were on station (replaces current engineer count).
+func get_repair_rate_with_engineer_brigades(province_id: int, brigade_equiv: float) -> float:
+	var bd := get_infrastructure_repair_breakdown(province_id)
+	var without := maxf(0.01, float(bd.get("total", 0.0)) - float(bd.get("engineer_bonus", 0.0)))
+	return without + project_engineer_repair_bonus(maxf(0.0, brigade_equiv))
+
+
+## Snapshot for map UI: guidance level, duel context, projected rates at 0/1/2 brigades.
+func get_engineer_assignment_snapshot(province_id: int) -> Dictionary:
+	var bd := get_infrastructure_repair_breakdown(province_id)
+	var p := get_province(province_id)
+	var tag := str(bd.get("country_tag", ""))
+	var eng_n := float(bd.get("engineer_brigades", 0.0))
+	var rate := float(bd.get("total", 0.0))
+	var without_eng := maxf(0.01, rate - float(bd.get("engineer_bonus", 0.0)))
+	var chip := 0
+	if p != null and typeof(ProvinceInsight) != TYPE_NIL:
+		chip = ProvinceInsight.estimate_daily_infra_chip_damage(p)
+	var under_sab := bool(bd.get("under_infra_sabotage", false))
+	var winner := ""
+	if p != null and typeof(ProvinceInsight) != TYPE_NIL:
+		winner = ProvinceInsight.daily_infra_duel_winner(p, bd)
+	var level := "none"
+	if p != null and not tag.is_empty():
+		var owned := ProvinceInsight.province_benefits_country(p, tag)
+		if not owned:
+			level = "foreign"
+		elif eng_n >= 0.05:
+			if under_sab and winner == "sabotage":
+				level = "present_insufficient"
+			else:
+				level = "present"
+		elif under_sab:
+			if winner == "sabotage" or chip > int(floor(rate)):
+				level = "critical"
+			else:
+				level = "recommended"
+		elif int(bd.get("infrastructure", 0)) < 45:
+			level = "recommended"
+	return {
+		"country_tag": tag,
+		"engineer_brigades": eng_n,
+		"repair_total": rate,
+		"repair_without_engineers": without_eng,
+		"engineer_bonus": float(bd.get("engineer_bonus", 0.0)),
+		"chip_damage_per_day": chip,
+		"under_infra_sabotage": under_sab,
+		"duel_winner": winner,
+		"guidance_level": level,
+		"rate_at_0_brigades": without_eng,
+		"rate_at_1_brigade": get_repair_rate_with_engineer_brigades(province_id, 1.0),
+		"rate_at_2_brigades": get_repair_rate_with_engineer_brigades(province_id, 2.0),
+		"engineer_cap": INFRA_REPAIR_ENGINEER_CAP,
+	}
 
 
 func _engineer_repair_bonus(engineer_brigades: float) -> float:

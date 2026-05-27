@@ -549,11 +549,23 @@ func _fire_acquisition_toast(country_tag: String, design_id: String, source_nati
 
 
 func design_row_search_blob(country_tag: String, design_id: String) -> String:
-	var parts: PackedStringArray = [design_id.to_lower()]
+	var parts: PackedStringArray = [design_id.to_lower(), design_id.replace("_", " ").to_lower()]
 	if GameData.design_data != null:
 		var template: UnitTemplate = GameData.design_data.get_template(design_id)
-		if template != null and not template.display_name.is_empty():
-			parts.append(template.display_name.to_lower())
+		if template != null:
+			if not template.display_name.is_empty():
+				parts.append(template.display_name.to_lower())
+			for extra in [
+				template.base_type,
+				template.production_category,
+				template.lifecycle_role,
+				template.lifecycle_category,
+				template.design_family,
+				template.design_domain,
+			]:
+				var s := str(extra).strip_edges().to_lower()
+				if not s.is_empty():
+					parts.append(s.replace("_", " "))
 	var badge := format_origin_badge(country_tag, design_id).to_lower()
 	parts.append(badge)
 	if is_design_foreign_for(country_tag, design_id):

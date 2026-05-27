@@ -1,0 +1,71 @@
+[gd_scene load_steps=2 format=3 uid="uid://trade_market_view"]
+
+[ext_resource type="Script" path="res://scripts/ui/TradeMarketView.gd" id="1_xxxxx"]
+
+[node name="TradeMarketView" type="Window"]
+title = "Trade Market"
+initial_position = 1
+size = Vector2i(1100, 700)
+visible = false
+script = ExtResource("1_xxxxx")
+
+[node name="Background" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.1, 0.1, 0.18, 1)
+
+[node name="Margin" type="MarginContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 20
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 20
+theme_override_constants/margin_bottom = 20
+
+[node name="MainVBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="Margin/MainVBox"]
+layout_mode = 2
+text = "Trade Market"
+horizontal_alignment = 1
+
+[node name="ModeHBox" type="HBoxContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="PublicButton" type="Button" parent="Margin/MainVBox/ModeHBox"]
+layout_mode = 2
+text = "Public Market"
+
+[node name="BlackButton" type="Button" parent="Margin/MainVBox/ModeHBox"]
+layout_mode = 2
+text = "Black Market"
+
+[node name="HSeparator" type="HSeparator" parent="Margin/MainVBox"]
+layout_mode = 2
+
+[node name="ListScroll" type="ScrollContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="ListVBox" type="VBoxContainer" parent="Margin/MainVBox/ListScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 4
+
+[node name="ButtonHBox" type="HBoxContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+alignment = 2
+
+[node name="RefreshButton" type="Button" parent="Margin/MainVBox/ButtonHBox"]
+layout_mode = 2
+text = "Refresh"
+
+[node name="CloseButton" type="Button" parent="Margin/MainVBox/ButtonHBox"]
+layout_mode = 2
+text = "Close"

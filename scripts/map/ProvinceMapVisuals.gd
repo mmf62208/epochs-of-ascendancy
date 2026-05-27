@@ -2,6 +2,26 @@ class_name ProvinceMapVisuals
 extends RefCounted
 
 ## Retrowave-style province outline helpers for MapRenderer.
+## Outline / pulses draw above province `Polygon2D` fills.
+## Terrain tone uses smooth zoom + bucketed fills; mid-bucket drift refresh avoids sticky tone while zoom lerps (MapRenderer.fill_zoom_*).
+## Dev warmth/lighten eases toward `development_close_zoom_multiplier` across tactical zoom (smooth ramp on `terrain_zoom_near_thresh`; see MapRenderer `_tactical_character_blend`).
+##
+## Intended draw order within a province node (before container-level siblings):
+##   Polygon2D fill (default z=0)
+##   Map glyphs (`Z_MAP_GLYPH*` — stars / features, **strictly below** `Z_COMPARE_CANDIDATE` so compare rings never tie)
+##   Compare / hover / selection polished outlines (`Z_COMPARE_CANDIDATE` … `Z_SELECT`)
+##   Supply + engineer / infra overlays (`Z_SUPPLY`; trade transit glow one step behind at `Z_SUPPLY - 1`)
+## Siblings on `ProvinceContainers`: military/trade routes (`MapRenderer.supply_route_layer_z_order`) sit above
+## province subtrees but below floating name Labels (`province_name_label_z_index*`).
+##
+## Pulse: `apply_pulse_to_polished` scales phase by each style’s `pulse_speed` and adds +0.15 width amplitude on the glow line.
+## MapRenderer drives a shared `_outline_pulse_phase` (~4.5 rad/s) + per-province offsets; Supply roles use `_pulse_amount_for_supply_role`;
+## engineer assignment flash re-pulses the same `NODE_SUPPLY` after supply pass (skipped for flashing provinces).
+
+## Stars / feature icons inside the province node: below compare & supply rings so logistics rings stay authoritative.
+const Z_MAP_GLYPH := 8
+## Must stay **below** `Z_COMPARE_CANDIDATE` (11) to avoid z-fighting with compare-mode neighbors.
+const Z_MAP_GLYPH_SUPPLY_OVERLAY := 10
 
 const OUTLINE_HOVER := Color(0.45, 0.88, 1.0, 0.95)
 const OUTLINE_HOVER_GLOW := Color(0.25, 0.55, 0.95, 0.35)
@@ -51,16 +71,25 @@ const OUTLINE_INFRA_SABOTAGE := Color(1.0, 0.18, 0.22, 1.0)
 const OUTLINE_INFRA_SABOTAGE_GLOW := Color(1.0, 0.05, 0.05, 0.78)
 const OUTLINE_INFRA_REPAIR := Color(0.12, 0.98, 0.82, 0.98)
 const OUTLINE_INFRA_REPAIR_GLOW := Color(0.05, 0.78, 0.62, 0.6)
+const OUTLINE_INFRA_REPAIR_ENGINEERS := Color(0.35, 1.0, 0.88, 0.98)
+const OUTLINE_INFRA_REPAIR_ENGINEERS_GLOW := Color(0.2, 0.85, 0.72, 0.55)
+const OUTLINE_ENGINEERS_STATIONED := Color(0.55, 0.92, 1.0, 0.82)
+const OUTLINE_ENGINEERS_STATIONED_GLOW := Color(0.28, 0.62, 0.88, 0.35)
+const OUTLINE_ENGINEERS_NEEDED := Color(1.0, 0.72, 0.28, 0.98)
+const OUTLINE_ENGINEERS_NEEDED_GLOW := Color(0.95, 0.42, 0.08, 0.55)
 const OUTLINE_DEPOT_SABOTAGE := Color(1.0, 0.62, 0.12, 0.96)
 const OUTLINE_DEPOT_SABOTAGE_GLOW := Color(0.88, 0.38, 0.02, 0.48)
 const OUTLINE_SUPPLY_PRESSURE := Color(1.0, 0.48, 0.08, 0.98)
 const OUTLINE_SUPPLY_PRESSURE_GLOW := Color(0.95, 0.28, 0.0, 0.5)
-
-const Z_SUPPLY := 10
+## Soft ring for provinces on an active trade corridor (secondary to military ◇ hub / — route).
+const OUTLINE_TRADE_TRANSIT := Color(0.84, 0.705, 0.37, 0.40)
+const OUTLINE_TRADE_TRANSIT_GLOW := Color(0.48, 0.36, 0.09, 0.11)
 const Z_COMPARE_CANDIDATE := 11
 const Z_COMPARE := 13
 const Z_HOVER := 14
 const Z_SELECT := 16
+## Supply / engineer / infra rings drawn on provinces (ordering within the province node's subtree).
+const Z_SUPPLY := 20
 
 const NODE_HOVER := "HoverOutline"
 const NODE_HOVER_GLOW := "HoverOutlineGlow"
@@ -210,7 +239,7 @@ static func get_supply_outline_style(role: String) -> Dictionary:
 				"width": 2.4,
 				"glow_extra": 2.8,
 				"z_index": Z_SUPPLY,
-				"pulse_speed": 2.4,
+				"pulse_speed": 2.05,
 			}
 		"route":
 			return {
@@ -228,7 +257,7 @@ static func get_supply_outline_style(role: String) -> Dictionary:
 				"width": 3.6,
 				"glow_extra": 4.8,
 				"z_index": Z_SUPPLY,
-				"pulse_speed": 2.35,
+				"pulse_speed": 2.05,
 			}
 		"infra_repair":
 			return {
@@ -238,6 +267,51 @@ static func get_supply_outline_style(role: String) -> Dictionary:
 				"glow_extra": 2.0,
 				"z_index": Z_SUPPLY,
 				"pulse_speed": 0.42,
+			}
+		"infra_repair_engineers":
+			return {
+				"color": OUTLINE_INFRA_REPAIR_ENGINEERS,
+				"glow": OUTLINE_INFRA_REPAIR_ENGINEERS_GLOW,
+				"width": 3.0,
+				"glow_extra": 2.8,
+				"z_index": Z_SUPPLY,
+				"pulse_speed": 0.55,
+			}
+		"engineers_stationed":
+			return {
+				"color": OUTLINE_ENGINEERS_STATIONED,
+				"glow": OUTLINE_ENGINEERS_STATIONED_GLOW,
+				"width": 2.2,
+				"glow_extra": 2.4,
+				"z_index": Z_SUPPLY,
+				"pulse_speed": 0.35,
+			}
+		"engineers_needed":
+			return {
+				"color": OUTLINE_ENGINEERS_NEEDED,
+				"glow": OUTLINE_ENGINEERS_NEEDED_GLOW,
+				"width": 3.4,
+				"glow_extra": 4.0,
+				"z_index": Z_SUPPLY,
+				"pulse_speed": 1.18,
+			}
+		"engineers_recommended":
+			return {
+				"color": OUTLINE_ENGINEERS_NEEDED.lerp(OUTLINE_INFRA_REPAIR, 0.35),
+				"glow": OUTLINE_ENGINEERS_NEEDED_GLOW.lerp(OUTLINE_INFRA_REPAIR_GLOW, 0.3),
+				"width": 2.8,
+				"glow_extra": 2.8,
+				"z_index": Z_SUPPLY,
+				"pulse_speed": 0.85,
+			}
+		"engineers_insufficient":
+			return {
+				"color": OUTLINE_ENGINEERS_STATIONED.lerp(OUTLINE_ENGINEERS_NEEDED, 0.55),
+				"glow": OUTLINE_ENGINEERS_STATIONED_GLOW.lerp(OUTLINE_ENGINEERS_NEEDED_GLOW, 0.45),
+				"width": 3.0,
+				"glow_extra": 3.2,
+				"z_index": Z_SUPPLY,
+				"pulse_speed": 1.05,
 			}
 		"infra_duel_even":
 			return {
@@ -264,7 +338,16 @@ static func get_supply_outline_style(role: String) -> Dictionary:
 				"width": 2.6,
 				"glow_extra": 3.0,
 				"z_index": Z_SUPPLY,
-				"pulse_speed": 1.35,
+				"pulse_speed": 1.2,
+			}
+		"trade_transit":
+			return {
+				"color": OUTLINE_TRADE_TRANSIT,
+				"glow": OUTLINE_TRADE_TRANSIT_GLOW,
+				"width": 1.25,
+				"glow_extra": 1.32,
+				"z_index": Z_SUPPLY - 1,
+				"pulse_speed": 0.28,
 			}
 		_:
 			return {
@@ -273,5 +356,5 @@ static func get_supply_outline_style(role: String) -> Dictionary:
 				"width": 1.8,
 				"glow_extra": 2.0,
 				"z_index": Z_SUPPLY,
-				"pulse_speed": 0.65,
+				"pulse_speed": 0.55,
 			}

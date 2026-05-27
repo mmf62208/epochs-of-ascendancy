@@ -21,6 +21,42 @@ extends Node2D
 @export var btn_national_spirits: Button
 @export var btn_close: Button
 
+#region Terrain / readability (fill characterization layered under overlays)
+## Cohesion: terrain strength, `terrain_tone_close_zoom_multiplier`, and `development_close_zoom_multiplier`
+## all key off `terrain_zoom_near_thresh` (map container scale). Labels/glyphs use `province_detail_min_zoom`
+## for visibility — intentionally separate gates (detail vs characterization).
+## RGB multiplier applied after political coloring so terrain reads at a glance without hiding ownership.
+@export_range(0.0, 0.35, 0.01) var terrain_tone_strength: float = 0.145
+## Terrain reads more strongly when zoomed out (province fills can otherwise look homogeneous).
+@export_range(1.0, 1.4, 0.02) var terrain_tone_far_zoom_boost: float = 1.24
+## Slightly tame terrain modulation when zoomed fully in so overlays dominate.
+@export_range(0.82, 1.0, 0.01) var terrain_tone_near_zoom_factor: float = 0.94
+@export_range(0.06, 0.45, 0.02) var terrain_zoom_far_thresh: float = 0.24
+@export_range(0.7, 2.5, 0.05) var terrain_zoom_near_thresh: float = 1.22
+## As scale enters tactical zoom (`terrain_zoom_near_thresh`), ease terrain modulation toward × this — smooth ramp (see `_tactical_character_blend`; ~88–100% thresh band).
+@export_range(0.78, 1.0, 0.01) var terrain_tone_close_zoom_multiplier: float = 0.93
+## Extra brighten toward developed provinces (normalized ~0–9 gameplay band).
+@export_range(0.0, 0.12, 0.005) var development_visual_lighten: float = 0.058
+## Very subtle warmth on high-development land (paired with lighten; keeps overlays legible).
+@export_range(0.0, 0.09, 0.005) var development_visual_warmth: float = 0.028
+## How strongly sea provinces blend toward deep water vs trace political hue.
+@export_range(0.05, 0.55, 0.01) var sea_political_trace: float = 0.26
+## With Supply overlay (L), pull terrain/dev characterization back toward political color before depot tint —
+## keeps reds/greens/teals readable and avoids muddy stacking.
+@export_range(0.34, 1.0, 0.02) var supply_overlay_base_character_blend: float = 0.78
+## How strongly depot health tints province fills while L is on (political→terrain/dev applied first).
+@export_range(0.18, 0.52, 0.01) var supply_depot_fill_blend: float = 0.34
+## Extra outline thickness for province name labels when L is visible (helps on tinted fills).
+@export_range(0, 5, 1) var province_name_outline_boost_supply_overlay: int = 2
+## Regenerate province fill colors when `abs(container.scale)` crosses this width (same units as drift below).
+## Typical play ~0.15–6 scale → ~20–40 repaints across the zoom range at default 0.05.
+@export_range(0.028, 0.11, 0.002) var fill_zoom_bucket_size: float = 0.05
+## Repaint once drift inside the current bucket exceeds `fill_zoom_bucket_size * this` (avoids stale tone while zoom lerps).
+@export_range(0.22, 0.58, 0.02) var fill_zoom_intra_bucket_drift: float = 0.38
+## Towards tactical zoom (`terrain_zoom_near_thresh`), ease dev lighten/warmth toward this × full strength (smooth ramp).
+@export_range(0.82, 1.0, 0.01) var development_close_zoom_multiplier: float = 0.91
+#endregion
+
 #region Province names (visible at lower zoom when enabled)
 @export var show_province_names: bool = false
 @export var province_name_font_size: int = 11
@@ -33,13 +69,27 @@ extends Node2D
 #endregion
 
 #region Feature markers
+## --- Map canvas stacking (ProvinceContainers scale; typical z values, low → high) ---
+## -1  ConflictOverlayLayer (fills under provinces)
+##  0  `Prov_*` Polygon2D + `Z_MAP_GLYPH*` Labels (8 / 10 with L), then compare/hover/select Line2D (11–16),
+##     then supply/engineer Line2D (`Z_SUPPLY` 20; `trade_transit` glow at 19). Trade corridor **rings** match
+##     soft amber underlay in `SupplyMapLayer` (`OUTLINE_TRADE_TRANSIT`).
+##  6  AgentNetworkLayer
+## ~58 Military + trade **polylines** (`supply_route_layer_z_order`; `SupplyMapLayer` draws trade first, thinner).
+## 82/100 Floating province **name** Labels (higher index while L held — `province_name_label_z_index*`).
 @export var feature_icon_ring_radius: float = 28.0
 @export var province_detail_min_zoom: float = 0.8
+## Keep name labels above drawn supply/trade polylines (see `SupplyMapLayer`).
+@export_range(30, 140, 2) var province_name_label_z_index: int = 82
+@export_range(40, 160, 2) var province_name_label_z_index_supply_overlay: int = 100
+## Polylines layer z (under name labels, above default province fills at 0).
+@export_range(12, 90, 2) var supply_route_layer_z_order: int = 58
+## Gentle dim for route lines while L is on so fills + rings win the first read.
+@export_range(0.55, 1.0, 0.02) var supply_route_layer_modulate_with_overlay: float = 0.91
 #endregion
 
 #region Debug
 @export var debug_draw_province_centroids: bool = false
-#endregion
 #endregion
 
 #region Camera Controls
@@ -105,6 +155,9 @@ var _legend_tracked_day: int = -1
 var _map_time_pulse_bbcode: String = ""
 var _map_time_pulse_kind: String = ""
 var _map_time_pulse_until_msec: int = 0
+var _engineer_assign_flash_by_province: Dictionary[int, Dictionary] = {}
+const _ENGINEER_ASSIGN_FLASH_MS := 2400
+var _engineer_deploy_pick_index: int = 0
 
 #region Supply overlay
 @export var supply_overlay_panel: SupplyMenuPanel
@@ -113,6 +166,13 @@ var supply_mode: bool = false
 var _supply_reroute_active: bool = false
 var _supply_overlay_legend: RichTextLabel = null
 #endregion
+
+const META_MAP_GLYPH_PX := &"_map_glyph_px"
+const META_MAP_GLYPH_CAPITAL := &"_map_glyph_capital"
+const META_MAP_GLYPH_OFFS := &"_map_glyph_offs"
+var _zoom_fill_characterization_scale: float = 1.0
+var _fill_color_zoom_bucket: int = -2000000000
+var _fill_zoom_at_last_paint: float = -10.0
 
 #region Conflict overlay
 @export var show_conflict_overlay: bool = true
@@ -123,6 +183,8 @@ var _conflict_layer: ConflictOverlayLayer = null
 @export var show_agent_overlay: bool = true
 var _agent_layer: AgentNetworkLayer = null
 #endregion
+
+var _btn_station_engineers: Button = null
 
 
 func _ready():
@@ -149,6 +211,7 @@ func _ready():
 	_setup_inspector_extras()
 	_connect_time_manager_signals()
 	_connect_map_manager_signals()
+	_connect_trade_manager_signals_for_map_layers()
 	_init_legend_calendar_tracking()
 	set_process(true)
 	print("MapRenderer _ready() completed")
@@ -170,7 +233,7 @@ func _connect_map_manager_signals() -> void:
 
 
 func _on_map_province_data_changed(province_id: int, what: String) -> void:
-	if what not in ["effects", "infrastructure", "owner", "controller", "all"]:
+	if what not in ["effects", "development", "infrastructure", "owner", "controller", "all"]:
 		return
 	if provinces.has(province_id):
 		_refresh_single_province_fill(province_id)
@@ -178,7 +241,90 @@ func _on_map_province_data_changed(province_id: int, what: String) -> void:
 		_apply_hover_fill(province_id, true)
 
 
-func _connect_time_manager_signals() -> void:
+func _connect_trade_manager_signals_for_map_layers() -> void:
+	## Lightweight map refresh when TradeFlows get real routes — avoids stale polylines / rings.
+	if typeof(TradeManager) == TYPE_NIL:
+		return
+	if not TradeManager.trade_flow_created.is_connected(_on_trade_flow_supply_map_refresh):
+		TradeManager.trade_flow_created.connect(_on_trade_flow_supply_map_refresh)
+	if not TradeManager.trade_flow_rerouted.is_connected(_on_trade_flow_map_rerouted):
+		TradeManager.trade_flow_rerouted.connect(_on_trade_flow_map_rerouted)
+	if not TradeManager.trade_flow_suspended.is_connected(_on_trade_flow_map_suspended):
+		TradeManager.trade_flow_suspended.connect(_on_trade_flow_map_suspended)
+	if not TradeManager.trade_flow_interdicted.is_connected(_on_trade_flow_map_interdicted):
+		TradeManager.trade_flow_interdicted.connect(_on_trade_flow_map_interdicted)
+
+
+func _on_trade_flow_supply_map_refresh(
+	flow_id: String, from: String, to: String, _itype: String, _qty: float,
+) -> void:
+	_try_refresh_trade_supply_map_layers()
+	_maybe_toast_player_trade_route_event("activated", flow_id, from, to, "")
+
+
+func _on_trade_flow_map_rerouted(flow_id: String, _new_plan_id: String) -> void:
+	_try_refresh_trade_supply_map_layers()
+	var flow := TradeManager.get_trade_flow(flow_id) if typeof(TradeManager) != TYPE_NIL else null
+	if flow != null:
+		_maybe_toast_player_trade_route_event("rerouted", flow_id, flow.from_tag, flow.to_tag, "")
+
+
+func _on_trade_flow_map_suspended(flow_id: String, reason: String) -> void:
+	_try_refresh_trade_supply_map_layers()
+	var flow := TradeManager.get_trade_flow(flow_id) if typeof(TradeManager) != TYPE_NIL else null
+	if flow == null:
+		return
+	## Interdict→suspend is already announced by TradeManager for meaningful losses; avoid double toasts.
+	if reason.strip_edges().begins_with("interdicted_"):
+		return
+	_maybe_toast_player_trade_route_event("suspended", flow_id, flow.from_tag, flow.to_tag, reason)
+
+
+## Refresh polylines / rings when convoy risk or throughput changes (no extra toast — TradeManager toasts big hits).
+func _on_trade_flow_map_interdicted(
+	_flow_id: String, _interdictor_type: String, _loss_fraction: float, _metadata: Dictionary,
+) -> void:
+	_try_refresh_trade_supply_map_layers()
+
+
+func _try_refresh_trade_supply_map_layers() -> void:
+	if not is_inside_tree():
+		return
+	_refresh_supply_routes()
+	if supply_mode:
+		_refresh_supply_highlights()
+		_update_supply_legend_text()
+	if _hover_province != null and hover_tooltip != null and hover_tooltip.visible:
+		_refresh_hover_tooltip(_hover_province)
+
+
+## Optional feedback when trade geometry changes — skips noise for spectators.
+func _maybe_toast_player_trade_route_event(
+	kind: String,
+	_flow_id: String,
+	from: String,
+	to: String,
+	detail: String = "",
+) -> void:
+	if typeof(LeaderEventUI) == TYPE_NIL or not LeaderEventUI.has_method("show_toast"):
+		return
+	var p := _player_tag().strip_edges().to_upper()
+	var a := from.strip_edges().to_upper()
+	var b := to.strip_edges().to_upper()
+	if p.is_empty() or (p != a and p != b):
+		return
+	var pair := "%s ↔ %s" % [a, b]
+	var msg := ""
+	match kind:
+		"suspended":
+			msg = "Trade corridor paused — %s" % pair
+			if not detail.is_empty():
+				msg += " · %s" % detail
+		"rerouted":
+			msg = "Trade corridor updated — %s" % pair
+		_:
+			msg = "Trade corridor on map — %s (L overlay)" % pair
+	LeaderEventUI.show_toast(msg, 2.6)
 	if typeof(TimeManager) == TYPE_NIL:
 		return
 	if not TimeManager.game_day_advanced.is_connected(_on_game_day_advanced_legend):
@@ -296,6 +442,7 @@ func _setup_inspector_extras() -> void:
 		btn_national_spirits = get_node_or_null("UI/InfoPanel/BtnNationalSpirits") as Button
 		if btn_national_spirits and not btn_national_spirits.pressed.is_connected(_on_open_national_spirits_pressed):
 			btn_national_spirits.pressed.connect(_on_open_national_spirits_pressed)
+	_ensure_station_engineers_button()
 
 
 func _setup_hover_tooltip() -> void:
@@ -334,6 +481,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		if pid >= 0 and provinces.has(pid):
 			var resolved_province: Province = provinces[pid] as Province
 			var resolved_node: Node2D = _province_node(pid)
+			if event is InputEventMouseButton and event.shift_pressed:
+				if _try_station_engineers_at_province(resolved_province):
+					get_viewport().set_input_as_handled()
+					return
 			if supply_mode and _handle_supply_province_click(resolved_province):
 				_select_province(resolved_province, resolved_node)
 				get_viewport().set_input_as_handled()
@@ -446,18 +597,183 @@ func _refresh_province_detail_visibility() -> void:
 
 	var current_zoom := absf(container.scale.x)
 	var show_details := current_zoom > province_detail_min_zoom
+	_zoom_fill_characterization_scale = current_zoom
+	# Bucket boundaries + drift are in the same space as `container.scale` length.
+	var q := clampf(fill_zoom_bucket_size, 0.028, 0.14)
+	var b := int(floor((current_zoom + 0.0001) / q))
+	var bucket_changed := b != _fill_color_zoom_bucket
+	var drift_frac := clampf(fill_zoom_intra_bucket_drift, 0.15, 0.65)
+	var drift := (
+		_fill_zoom_at_last_paint >= 0.0
+		and absf(current_zoom - _fill_zoom_at_last_paint) >= q * drift_frac
+	)
+	if bucket_changed or drift:
+		if bucket_changed:
+			_fill_color_zoom_bucket = b
+		_refresh_province_fill_colors()
 
 	for id in _province_name_labels:
 		var lbl: Variant = _province_name_labels[id]
 		if lbl is Label and is_instance_valid(lbl):
 			(lbl as Label).visible = show_province_names and show_details
+			if show_province_names and show_details:
+				var l2 := lbl as Label
+				l2.z_index = _map_province_name_label_z_index()
+				l2.add_theme_font_size_override("font_size", _scale_province_name_font(current_zoom, true))
+				_apply_province_name_label_readability_styles(l2, current_zoom)
 
 	for pid in province_nodes:
 		var node: Variant = province_nodes[pid]
 		if node is Node2D and is_instance_valid(node):
 			for child in (node as Node2D).get_children():
-				if child is Label:
+				if child is Label and not (child as Label).has_meta(META_MAP_GLYPH_PX):
 					(child as Label).visible = show_details
+			_layout_zoomed_map_glyphs_for_province_node(int(pid), current_zoom, show_details)
+
+
+## Smooth 0→1 ramp as map scale enters tactical band (relative to `terrain_zoom_near_thresh`).
+func _tactical_character_blend(zoom_scale: float, band_start_frac: float, band_end_frac: float) -> float:
+	var zn := maxf(terrain_zoom_near_thresh, 0.05)
+	var span := zn * maxf(band_end_frac - band_start_frac, 0.03)
+	var z0 := zn * band_start_frac
+	var z1 := z0 + span
+	var zz := maxf(zoom_scale, 0.02)
+	var u := clampf(inverse_lerp(z0, z1, zz), 0.0, 1.0)
+	return u * u * (3.0 - 2.0 * u)
+
+
+func _province_name_outline_zoom_extra(zoom_metric: float) -> int:
+	var zmt := zoom_metric
+	if zmt <= province_detail_min_zoom:
+		return 0
+	return mini(2, int((zmt - province_detail_min_zoom) * 2.0))
+
+
+## Shared smooth ramp + cap for province names and map glyphs so tactical zoom scales read as one system.
+func _zoom_detail_scale_smooth(zoom_metric: float, cap: float = 1.8) -> float:
+	var denom := maxf(province_detail_min_zoom, 0.05)
+	var raw := clampf(zoom_metric / denom, 1.0, cap)
+	var span := maxf(cap - 1.0, 0.001)
+	var u := clampf((raw - 1.0) / span, 0.0, 1.0)
+	var smooth_u := u * u * (3.0 - 2.0 * u)
+	return lerpf(1.0, raw, smooth_u)
+
+
+func _apply_province_name_label_readability_styles(
+	label: Label,
+	outline_zoom_hint: float = -1.0,
+) -> void:
+	var fc := province_name_color
+	if supply_mode:
+		fc.a = minf(0.92, fc.a + 0.035)
+	label.add_theme_color_override("font_color", fc)
+	var zz := outline_zoom_hint
+	if zz <= 0.0001:
+		zz = absf(container.scale.x) if container != null else 1.0
+	var zex := _province_name_outline_zoom_extra(zz)
+	var sup_boost := clampi(province_name_outline_boost_supply_overlay, 0, 5) if supply_mode else 0
+	var ol_cap := 7 if supply_mode else 9
+	var ol := clampi(3 + sup_boost + zex, 2, ol_cap)
+	label.add_theme_constant_override("outline_size", ol)
+	var oa := 0.72 if supply_mode else 0.62
+	if zz >= province_detail_min_zoom * 1.05:
+		oa = minf(0.82, oa + 0.038)
+	if supply_mode and zz >= province_detail_min_zoom * 1.18:
+		oa = maxf(0.62, oa - 0.048)
+	elif (not supply_mode) and zz >= province_detail_min_zoom * 1.32:
+		oa = maxf(0.64, oa - 0.035)
+	label.add_theme_color_override("font_outline_color", Color(0.015, 0.035, 0.065, oa))
+	var sh_a := 0.84 if supply_mode else 0.8
+	if zz >= province_detail_min_zoom * 1.35:
+		sh_a = clampf(sh_a - 0.045, 0.68, 0.88)
+	var sh := Color(0, 0.03, 0.08, sh_a)
+	label.add_theme_color_override("font_shadow_color", sh)
+	label.add_theme_constant_override("shadow_offset_x", 2 if supply_mode else 1)
+	label.add_theme_constant_override("shadow_offset_y", 2 if supply_mode else 1)
+
+
+func _scale_province_name_font(current_zoom: float, for_visible_names: bool) -> int:
+	if not for_visible_names:
+		return province_name_font_size
+	var z := _zoom_detail_scale_smooth(current_zoom, 1.8)
+	return clampi(int(round(float(province_name_font_size) * z)), 9, 26)
+
+
+func _apply_static_map_glyph_outline(lbl: Label) -> void:
+	lbl.add_theme_color_override("font_outline_color", Color(0.04, 0.065, 0.1, 0.62))
+	lbl.add_theme_constant_override("outline_size", 2)
+	lbl.add_theme_color_override("font_shadow_color", Color(0, 0.02, 0.06, 0.5))
+	lbl.add_theme_constant_override("shadow_offset_x", 1)
+	lbl.add_theme_constant_override("shadow_offset_y", 1)
+
+
+func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, show_glyphs: bool) -> void:
+	var node: Variant = province_nodes.get(pid)
+	if node == null or not (node is Node2D):
+		return
+	var ctr := province_centroids.get(pid, Vector2.ZERO)
+	var nd := node as Node2D
+	for child in nd.get_children():
+		if child is Label and (child as Label).has_meta(META_MAP_GLYPH_PX):
+			var lbl := child as Label
+			var base_px := int(lbl.get_meta(META_MAP_GLYPH_PX))
+			lbl.visible = show_glyphs
+			if show_glyphs:
+				var zsc := _zoom_detail_scale_smooth(zoom_metric, 1.8)
+				var fs := clampi(int(round(float(base_px) * zsc)), maxi(8, base_px - 6), 40)
+				lbl.add_theme_font_size_override("font_size", fs)
+			else:
+				lbl.add_theme_font_size_override("font_size", base_px)
+			var gzx := 0
+			if zoom_metric > province_detail_min_zoom:
+				gzx = mini(2, int((zoom_metric - province_detail_min_zoom) * 2.2))
+			var g_ol_max := 5 if supply_mode else 7
+			var g_ol := clampi(2 + (2 if supply_mode else 0) + gzx, 1, g_ol_max)
+			var goa := 0.71 if supply_mode else 0.62
+			if zoom_metric >= province_detail_min_zoom * 1.08:
+				goa = minf(0.88, goa + 0.065)
+			if supply_mode and zoom_metric >= province_detail_min_zoom * 1.18:
+				goa = maxf(0.58, goa - 0.065)
+			elif (not supply_mode) and zoom_metric >= province_detail_min_zoom * 1.32:
+				goa = maxf(0.58, goa - 0.04)
+			var goa_cap := 0.78 if supply_mode else 0.88
+			lbl.add_theme_color_override(
+				"font_outline_color",
+				Color(0.038, 0.06, 0.096, clampf(goa, 0.52, goa_cap)),
+			)
+			lbl.add_theme_constant_override("outline_size", g_ol)
+			var g_glyph_a := clampf((0.94 if supply_mode else 0.90) + 0.025 * zoom_metric / maxf(province_detail_min_zoom, 0.08), 0.82, 0.97)
+			lbl.add_theme_color_override("font_color", Color(1.0, 1.0, 1.0, g_glyph_a))
+			lbl.z_index = (
+				ProvinceMapVisuals.Z_MAP_GLYPH_SUPPLY_OVERLAY
+				if supply_mode
+				else ProvinceMapVisuals.Z_MAP_GLYPH
+			)
+			lbl.reset_size()
+			var ms := lbl.get_minimum_size()
+			if lbl.has_meta(META_MAP_GLYPH_CAPITAL):
+				lbl.position = ctr - ms * 0.5
+			elif lbl.has_meta(META_MAP_GLYPH_OFFS):
+				var ofs: Variant = lbl.get_meta(META_MAP_GLYPH_OFFS)
+				if ofs is Vector2:
+					lbl.position = ctr + ofs as Vector2 - ms * 0.5
+
+
+func _terrain_tone_strength_for_current_zoom() -> float:
+	var base := clampf(terrain_tone_strength, 0.0, 0.42)
+	var z := maxf(_zoom_fill_characterization_scale, 0.07)
+	var raw_t := clampf(
+		inverse_lerp(terrain_zoom_near_thresh, terrain_zoom_far_thresh, z),
+		0.0,
+		1.0,
+	)
+	var t := raw_t * raw_t * (3.0 - 2.0 * raw_t)
+	var mul := lerpf(terrain_tone_near_zoom_factor, terrain_tone_far_zoom_boost, t)
+	var out := clampf(base * mul, 0.0, 0.48)
+	var tactical_damp := _tactical_character_blend(z, 0.88, 1.0)
+	var close_mul := clampf(terrain_tone_close_zoom_multiplier, 0.75, 1.0)
+	out *= lerpf(1.0, close_mul, tactical_damp)
+	return out
 
 
 func initialize(p_provinces: Dictionary, p_geometry: Dictionary, p_adjacency: AdjacencySystem, p_countries: Dictionary = {}):
@@ -492,6 +808,8 @@ func render_provinces():
 		container.add_child(node)
 		province_nodes[id] = node
 
+	_fill_color_zoom_bucket = -2000000000
+	_fill_zoom_at_last_paint = -10.0
 	_refresh_province_detail_visibility()
 	_setup_supply_layer()
 	_setup_conflict_layer()
@@ -546,8 +864,14 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 		var star := Label.new()
 		star.text = "⭐"
 		star.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		star.z_index = ProvinceMapVisuals.Z_MAP_GLYPH
 		star.add_theme_font_size_override("font_size", 22)
-		star.position = center - Vector2(11, 11)
+		star.set_meta(META_MAP_GLYPH_PX, 22)
+		star.set_meta(META_MAP_GLYPH_CAPITAL, true)
+		_apply_static_map_glyph_outline(star)
+		star.reset_size()
+		var sms := star.get_minimum_size()
+		star.position = center - sms * 0.5
 		node.add_child(star)
 
 	var icon_dirs := _feature_icon_offsets_radial(_count_special_icons(province), feature_icon_ring_radius)
@@ -556,12 +880,18 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 		var fk := str(feature)
 		if fk == "capital" or icon_i >= icon_dirs.size():
 			continue
+		var offs: Vector2 = icon_dirs[icon_i]
 		var icon := Label.new()
 		icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		icon.text = _get_feature_icon(fk)
+		icon.z_index = ProvinceMapVisuals.Z_MAP_GLYPH
 		icon.add_theme_font_size_override("font_size", 15)
-		var offs: Vector2 = icon_dirs[icon_i]
-		icon.position = center + offs - Vector2(7, 7)
+		icon.set_meta(META_MAP_GLYPH_PX, 15)
+		icon.set_meta(META_MAP_GLYPH_OFFS, offs)
+		_apply_static_map_glyph_outline(icon)
+		icon.reset_size()
+		var ims := icon.get_minimum_size()
+		icon.position = center + offs - ims * 0.5
 		node.add_child(icon)
 		icon_i += 1
 
@@ -574,6 +904,9 @@ func _create_or_update_province_name_label(province: Province, center: Vector2) 
 	if not show_province_names or container == null:
 		return
 
+	var current_zoom := absf(container.scale.x)
+	var show_details_zoom := current_zoom > province_detail_min_zoom
+
 	var label: Label
 	if _province_name_labels.has(province.id):
 		label = _province_name_labels[province.id]
@@ -584,15 +917,15 @@ func _create_or_update_province_name_label(province: Province, center: Vector2) 
 	if label == null:
 		label = Label.new()
 		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.z_index = 48
 		container.add_child(label)
 		_province_name_labels[province.id] = label
 
-	label.add_theme_font_size_override("font_size", province_name_font_size)
-	label.add_theme_color_override("font_color", province_name_color)
-	label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.7))
-
-	label.text = province.name
+	label.z_index = _map_province_name_label_z_index()
+	label.add_theme_font_size_override(
+		"font_size",
+		_scale_province_name_font(current_zoom, show_details_zoom),
+	)
+	_apply_province_name_label_readability_styles(label, current_zoom)
 	label.reset_size()
 	var ms := label.get_minimum_size()
 	label.position = center - Vector2(ms.x * 0.5, 8)
@@ -664,25 +997,105 @@ func _calculate_centroid(points: PackedVector2Array) -> Vector2:
 
 
 func _get_province_color(province: Province) -> Color:
-	var fallback := Color(0.35, 0.35, 0.4, 0.85)
+	var base := _political_province_base_color(province)
+	return _characterize_province_fill(base, province, _overlay_base_character_blend())
+
+
+func _overlay_base_character_blend() -> float:
+	if supply_mode:
+		return clampf(supply_overlay_base_character_blend, 0.3, 1.0)
+	return 1.0
+
+
+func _supply_depot_mix_amount() -> float:
+	return clampf(supply_depot_fill_blend, 0.12, 0.55)
+
+
+func _political_province_base_color(province: Province) -> Color:
+	var land_fallback := Color(0.34, 0.34, 0.41, 0.86)
+	var sea_fallback := Color(0.16, 0.33, 0.47, 0.88)
 	if province.owner_tag.is_empty() or not countries.has(province.owner_tag):
-		return fallback
+		return sea_fallback if province.is_sea else land_fallback
 	var nation: Variant = countries[province.owner_tag]
 	if nation is Country:
 		var c := nation as Country
 		var col := c.color
-		col.a = 0.85
+		col.a = clampf(col.a if col.a > 0.05 else 0.85, 0.72, 0.93)
 		return col
 	if typeof(nation) == TYPE_DICTIONARY:
 		var d: Dictionary = nation
 		if d.has("color"):
 			var co: Variant = d["color"]
+			var cc: Color
 			if typeof(co) == TYPE_COLOR:
-				var cc := co as Color
-				cc.a = 0.85
-				return cc
-			return Color(String(co))
-	return fallback
+				cc = co as Color
+			else:
+				cc = Color(String(co))
+			cc.a = clampf(cc.a if cc.a > 0.05 else 0.85, 0.72, 0.93)
+			return cc
+	return land_fallback
+
+
+## Terrain + development hues sit on top of political color; overlays tint afterward.
+## `character_blend` pulls toward raw political fills when < 1 (used under Supply / heavy tinting).
+func _characterize_province_fill(base: Color, province: Province, character_blend: float = 1.0) -> Color:
+	var cb := clampf(character_blend, 0.2, 1.0)
+	if province.is_sea:
+		var sea_col := _shade_sea_province_fill(base)
+		return base.lerp(sea_col, cb)
+	var mul := _terrain_palette_multipliers(province.terrain)
+	var toned := Color(
+		clampf(base.r * mul.x, 0.02, 1.0),
+		clampf(base.g * mul.y, 0.02, 1.0),
+		clampf(base.b * mul.z, 0.02, 1.0),
+		base.a,
+	)
+	var k := _terrain_tone_strength_for_current_zoom() * cb
+	var col := base.lerp(toned, k)
+	var z := maxf(_zoom_fill_characterization_scale, 0.07)
+	var dev_blend := _tactical_character_blend(z, 0.82, 1.04)
+	var dev_mul := clampf(development_close_zoom_multiplier, 0.78, 1.0)
+	var dev_near := lerpf(1.0, dev_mul, dev_blend)
+	var dev_n := clampf(float(clampi(province.development_level, 0, 50)) / 9.0, 0.0, 1.0)
+	dev_n = sqrt(dev_n)
+	var lighten := clampf(development_visual_lighten, 0.0, 0.2) * dev_n * cb * dev_near
+	col = col.lightened(lighten)
+	var warmth := clampf(development_visual_warmth, 0.0, 0.12) * cb * dev_near
+	if warmth > 0.0005:
+		col = col.lerp(col * Color(1.028, 1.012, 0.992, 1.0), dev_n * warmth)
+	return col
+
+
+func _shade_sea_province_fill(base: Color) -> Color:
+	var deep := Color(0.05, 0.20, 0.34, clampf(base.a * 1.02, 0.74, 0.94))
+	var mix := clampf(sea_political_trace, 0.0, 0.9)
+	var col := deep.lerp(base, mix)
+	col.r = clampf(col.r * 1.05, 0.0, 1.0)
+	col.g = clampf(col.g * 1.03, 0.0, 1.0)
+	return col
+
+
+func _terrain_palette_multipliers(terrain_key: String) -> Vector3:
+	var key := terrain_key.strip_edges().to_lower()
+	match key:
+		"hills":
+			return Vector3(0.93, 0.89, 0.82)
+		"mountains", "mountain":
+			return Vector3(0.86, 0.88, 0.93)
+		"desert", "arid":
+			return Vector3(1.05, 0.98, 0.87)
+		"tundra", "arctic":
+			return Vector3(0.93, 0.96, 1.06)
+		"urban":
+			return Vector3(0.94, 0.95, 1.03)
+		"coastal", "coast", "harbor", "port":
+			return Vector3(0.90, 0.97, 1.03)
+		"forest", "woods", "jungle":
+			return Vector3(0.88, 0.97, 0.90)
+		"marsh", "swamp":
+			return Vector3(0.88, 0.93, 0.94)
+		"plains", _:
+			return Vector3(0.97, 0.99, 0.93)
 
 
 # ====================== INTERACTION ======================
@@ -712,6 +1125,29 @@ func _clear_selection() -> void:
 	_refresh_compare_candidate_outlines()
 	_update_supply_legend_text()
 	_update_compare_hint_label()
+
+
+## Select a province and pan the map camera to it (used by production / relocate UI).
+func focus_province_by_id(province_id: int) -> bool:
+	if province_id < 0 or typeof(MapManager) == TYPE_NIL:
+		return false
+	var province: Province = MapManager.get_province(province_id)
+	if province == null:
+		return false
+	var node := _province_node(province_id)
+	if node == null:
+		return false
+	_select_province(province, node)
+	var cam := get_node_or_null("MapCamera") as Camera2D
+	if cam != null:
+		var pos: Vector2 = province_centroids.get(province_id, Vector2.ZERO)
+		if pos == Vector2.ZERO:
+			pos = MapManager.get_province_centroid(province_id)
+		if pos != Vector2.ZERO:
+			cam.global_position = pos
+	show_info_panel(province)
+	MapManager.province_selected.emit(province_id)
+	return true
 
 
 func _select_province(province: Province, node: Node2D) -> void:
@@ -782,16 +1218,25 @@ func _refresh_hover_tooltip(province: Province) -> void:
 	var p_tag := _player_tag()
 	if p_tag.is_empty():
 		p_tag = ProvinceInsight.country_tag_for_province(province)
-	var has_tech := (
-		typeof(TechnologyManager) != TYPE_NIL
-		and not p_tag.is_empty()
-		and TechnologyManager.get_active_research_count(p_tag) > 0
-	)
 	var has_radio := (
 		not p_tag.is_empty()
 		and ProvinceInsight.province_benefits_country(province, p_tag)
 		and MapTechnologyContext.has_support_radio_bonuses(p_tag)
 	)
+	var has_tech := has_radio
+	if not has_tech and typeof(TechnologyManager) != TYPE_NIL and not p_tag.is_empty():
+		has_tech = TechnologyManager.get_active_research_count(p_tag) > 0
+	if not has_tech and not p_tag.is_empty():
+		var prod_note := MapTechnologyContext.build_province_production_tech_bbcode(province, p_tag)
+		has_tech = not prod_note.is_empty() and "need" in prod_note.to_lower()
+	if not has_tech and not p_tag.is_empty():
+		var elig_glance := MapTechnologyContext.build_build_eligibility_glance_bbcode(province, p_tag)
+		has_tech = not elig_glance.is_empty() and (
+			"lock" in elig_glance.to_lower()
+			or "📉" in elig_glance
+			or "🏔" in elig_glance
+			or "↗" in elig_glance
+		)
 	var text := ProvinceInsight.build_hover_tooltip(
 		province, selected_province_id, counterpart, supply_mode, hover_role,
 		is_candidate, contested, has_agent,
@@ -810,12 +1255,28 @@ func _refresh_hover_tooltip(province: Province) -> void:
 				agent_pressure = "repair"
 			elif ProvinceInsight.daily_infra_duel_winner(province, hover_bd) == "even":
 				agent_pressure = "stalemate"
-	elif hover_role in ["infra_repair", "infra_duel_even"]:
-		agent_pressure = "repair" if hover_role == "infra_repair" else "stalemate"
+	elif hover_role in [
+		"infra_repair", "infra_repair_engineers", "infra_duel_even",
+		"engineers_stationed", "engineers_needed", "engineers_recommended", "engineers_insufficient",
+	]:
+		agent_pressure = (
+			"repair"
+			if hover_role in ["infra_repair", "infra_repair_engineers", "engineers_stationed"]
+			else "stalemate"
+		)
+		if hover_role in ["engineers_needed", "engineers_recommended", "engineers_insufficient"]:
+			agent_pressure = "sabotage"
 	elif hover_role == "depot_sabotage":
 		agent_pressure = "depot"
 	elif hover_role == "supply_pressure":
 		agent_pressure = "disrupt"
+	var hover_bd_eng: Dictionary = {}
+	var has_engineers := false
+	var engineers_needed := false
+	if typeof(MapManager) != TYPE_NIL:
+		hover_bd_eng = MapManager.get_infrastructure_repair_breakdown(province.id)
+		has_engineers = ProvinceInsight.has_engineers_stationed(hover_bd_eng)
+		engineers_needed = ProvinceInsight.province_needs_engineer_assignment(province, hover_bd_eng)
 	hover_tooltip.show_text(
 		text,
 		mouse,
@@ -832,6 +1293,8 @@ func _refresh_hover_tooltip(province: Province) -> void:
 		dual and not compare_active,
 		agent_activity,
 		agent_pressure,
+		has_engineers and supply_mode and not compare_active,
+		engineers_needed and supply_mode and not compare_active,
 	)
 	_set_conflict_highlight(province.id if ProvinceInsight.is_province_contested(province) else -1)
 	_set_agent_highlight(province.id if ProvinceInsight.has_active_agent_network(province) else -1)
@@ -966,11 +1429,270 @@ func show_info_panel(province: Province):
 	info_special.text = "Special: " + (", ".join(special_list) if special_list.size() > 0 else "None")
 
 	info_panel.visible = true
+	_update_station_engineers_button(province)
 
 
 func hide_info_panel():
 	if info_panel:
 		info_panel.visible = false
+
+
+func _ensure_station_engineers_button() -> void:
+	if info_panel == null:
+		return
+	if _btn_station_engineers != null and is_instance_valid(_btn_station_engineers):
+		return
+	_btn_station_engineers = Button.new()
+	_btn_station_engineers.name = "BtnStationEngineers"
+	_btn_station_engineers.text = "Station engineers"
+	_btn_station_engineers.tooltip_text = (
+		"Move an engineer-capable division here (same as a move-to-province order).\n"
+		+ "Each click cycles which division moves; Shift+click picks the best match on the map.\n"
+		+ "Supply overlay (L) shows URGENT / recommended / weak rings."
+	)
+	_btn_station_engineers.layout_mode = Control.LAYOUT_MODE_ANCHORS
+	_btn_station_engineers.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_btn_station_engineers.offset_left = 210.0
+	_btn_station_engineers.offset_top = 8.0
+	_btn_station_engineers.offset_right = 340.0
+	_btn_station_engineers.offset_bottom = 32.0
+	_btn_station_engineers.visible = false
+	if not _btn_station_engineers.pressed.is_connected(_on_station_engineers_pressed):
+		_btn_station_engineers.pressed.connect(_on_station_engineers_pressed)
+	info_panel.add_child(_btn_station_engineers)
+
+
+func _update_station_engineers_button(province: Province) -> void:
+	_ensure_station_engineers_button()
+	if _btn_station_engineers == null:
+		return
+	if province == null:
+		_btn_station_engineers.visible = false
+		return
+	var bd: Dictionary = {}
+	if typeof(MapManager) != TYPE_NIL:
+		bd = MapManager.get_infrastructure_repair_breakdown(province.id)
+	var level := ProvinceInsight.get_engineer_guidance_level(province, bd)
+	var can_station := ProvinceInsight.province_accepts_player_engineers(province, bd)
+	var p_tag := _player_tag()
+	if p_tag.is_empty():
+		p_tag = ProvinceInsight.country_tag_for_province(province)
+	var next_name := _next_engineer_deploy_label(p_tag)
+	var roster_n := 0
+	if typeof(SupplyManager) != TYPE_NIL:
+		roster_n = SupplyManager.get_engineer_capable_formations(p_tag).size()
+	_btn_station_engineers.visible = can_station and roster_n > 0 and level != "present"
+	match level:
+		"critical":
+			_btn_station_engineers.text = "Deploy %s (URGENT)" % next_name if not next_name.is_empty() else "Deploy engineers (URGENT)"
+			_btn_station_engineers.tooltip_text = (
+				"Sabotage is winning the daily duel here.\n"
+				+ "Moves an engineer-capable division here (Shift+click on map).\n"
+				+ "Amber pulsing ring on Supply overlay (L)."
+			)
+		"recommended":
+			_btn_station_engineers.text = "Deploy %s" % next_name if not next_name.is_empty() else "Deploy engineers"
+			_btn_station_engineers.tooltip_text = (
+				"Repair is weak — engineers recommended before sabotage escalates.\n"
+				+ "Shift+click province · softer amber ring on L overlay."
+			)
+		"present_insufficient":
+			_btn_station_engineers.text = "Deploy %s (+more)" % next_name if not next_name.is_empty() else "Deploy more engineers"
+			_btn_station_engineers.tooltip_text = (
+				"Engineers are present but repair still loses (or barely holds).\n"
+				+ "Cycle another division here or clear the ◎ agent network."
+			)
+		_:
+			if ProvinceInsight.has_engineers_stationed(bd) and roster_n > 1:
+				_btn_station_engineers.text = "Reassign %s" % next_name if not next_name.is_empty() else "Reassign engineers"
+				_btn_station_engineers.visible = can_station
+				_btn_station_engineers.tooltip_text = (
+					"Engineers are holding repair — cycle a different division to this province."
+				)
+			else:
+				_btn_station_engineers.text = "Deploy engineers"
+				_btn_station_engineers.visible = false
+	if can_station and typeof(SupplyManager) != TYPE_NIL:
+		var tip_lines: PackedStringArray = [
+			"Move an engineer-capable division here (updates repair at origin and destination).",
+			"Shift+click on the map picks the best division; this button cycles divisions.",
+		]
+		for entry in SupplyManager.get_engineer_capable_formations(p_tag):
+			var label := str(entry.get("display_name", "?"))
+			var pid := int(entry.get("stationed_province_id", -1))
+			var loc := "unassigned"
+			if pid >= 0 and provinces.has(pid):
+				var sp: Province = provinces[pid] as Province
+				if sp != null:
+					loc = sp.name
+			tip_lines.append("· %s — %s" % [label, loc])
+		_btn_station_engineers.tooltip_text = "\n".join(tip_lines)
+
+
+func _next_engineer_deploy_label(country_tag: String) -> String:
+	if typeof(SupplyManager) == TYPE_NIL:
+		return "engineers"
+	var formations := SupplyManager.get_engineer_capable_formations(country_tag)
+	if formations.is_empty():
+		return ""
+	_engineer_deploy_pick_index = _engineer_deploy_pick_index % formations.size()
+	var entry: Dictionary = formations[_engineer_deploy_pick_index]
+	var name := str(entry.get("display_name", ""))
+	if name.length() > 22:
+		name = name.substr(0, 20) + "…"
+	return name if not name.is_empty() else "engineers"
+
+
+func _formation_id_for_deploy(country_tag: String, province: Province, use_cycle: bool) -> String:
+	if typeof(SupplyManager) == TYPE_NIL:
+		return ""
+	if use_cycle:
+		var formations := SupplyManager.get_engineer_capable_formations(country_tag)
+		if formations.is_empty():
+			return ""
+		_engineer_deploy_pick_index = _engineer_deploy_pick_index % formations.size()
+		var fid := str(formations[_engineer_deploy_pick_index].get("formation_id", ""))
+		_engineer_deploy_pick_index += 1
+		return fid
+	return SupplyManager.pick_formation_for_engineer_deployment(country_tag, province.id)
+
+
+func _try_station_engineers_at_province(
+	province: Province,
+	_brigade_equiv: float = 1.0,
+	use_cycle: bool = false,
+) -> bool:
+	if province == null or typeof(SupplyManager) == TYPE_NIL:
+		return false
+	var tag := _player_tag()
+	if tag.is_empty():
+		tag = ProvinceInsight.country_tag_for_province(province)
+	var bd_before: Dictionary = {}
+	if typeof(MapManager) != TYPE_NIL:
+		bd_before = MapManager.get_infrastructure_repair_breakdown(province.id)
+	var level_before := ProvinceInsight.get_engineer_guidance_level(province, bd_before)
+	var fid := _formation_id_for_deploy(tag, province, use_cycle)
+	var result: Dictionary = FormationMovement.move_engineer_formation_to_province(
+		fid, province.id, tag,
+	)
+	if not bool(result.get("ok", false)):
+		var err := str(result.get("error", "Could not station engineers"))
+		var msg := ProvinceInsight.build_engineer_assignment_toast_message(
+			province, false, level_before, "", 0.0, err, result,
+		)
+		_trigger_engineer_assignment_flash(province.id, false)
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast(msg, 3.5, true)
+		return false
+	var bd_after: Dictionary = bd_before
+	if typeof(MapManager) != TYPE_NIL:
+		bd_after = MapManager.get_infrastructure_repair_breakdown(province.id)
+	var level_after := str(result.get("guidance_after", ""))
+	if level_after.is_empty():
+		level_after = ProvinceInsight.get_engineer_guidance_level(province, bd_after)
+	var eng := float(result.get("engineer_brigades", 0.0))
+	_trigger_engineer_assignment_flash(province.id, true, "arrived")
+	_refresh_supply_highlights()
+	_refresh_single_province_fill(province.id)
+	var moved_from_pid := int(result.get("moved_from_province_id", -1))
+	if moved_from_pid >= 0 and moved_from_pid != province.id:
+		_trigger_engineer_assignment_flash(moved_from_pid, true, "departed")
+		_refresh_single_province_fill(moved_from_pid)
+		if _hover_province != null and _hover_province.id == moved_from_pid:
+			_refresh_hover_tooltip(_hover_province)
+		if selected_province_id == moved_from_pid:
+			var origin_p: Province = MapManager.get_province(moved_from_pid) if typeof(MapManager) != TYPE_NIL else null
+			if origin_p != null:
+				show_info_panel(origin_p)
+	if _hover_province != null and _hover_province.id == province.id:
+		_refresh_hover_tooltip(province)
+	if selected_province_id == province.id:
+		show_info_panel(province)
+		_select_province(province, _province_node(province.id))
+	var msg_ok := ProvinceInsight.build_engineer_assignment_toast_message(
+		province, true, level_before, level_after, eng, "", result,
+	)
+	if not supply_mode:
+		msg_ok += " · Press L for Supply overlay rings"
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast(msg_ok, 4.0)
+	return true
+
+
+func _trigger_engineer_assignment_flash(
+	province_id: int,
+	success: bool,
+	kind: String = "arrived",
+) -> void:
+	_engineer_assign_flash_by_province[province_id] = {
+		"until_msec": Time.get_ticks_msec() + _ENGINEER_ASSIGN_FLASH_MS,
+		"success": success,
+		"kind": kind,
+	}
+	var node := _province_node(province_id)
+	if node == null:
+		return
+	var role := "engineers_stationed" if success else "engineers_needed"
+	if kind == "departed":
+		role = "engineers_recommended"
+	var style: Dictionary = ProvinceMapVisuals.get_supply_outline_style(role)
+	ProvinceMapVisuals.ensure_polished_outline(
+		node,
+		_province_polygon(node),
+		ProvinceMapVisuals.NODE_SUPPLY,
+		style["color"],
+		style["width"],
+		style["glow"],
+		style["glow_extra"],
+		style["z_index"],
+	)
+
+
+func _apply_engineer_assignment_flash_pulses() -> void:
+	var now := Time.get_ticks_msec()
+	var expired: Array[int] = []
+	for pid in _engineer_assign_flash_by_province.keys():
+		var flash: Dictionary = _engineer_assign_flash_by_province[pid]
+		if now > int(flash.get("until_msec", 0)):
+			expired.append(pid)
+			continue
+		var node := _province_node(int(pid))
+		if node == null:
+			continue
+		var success := bool(flash.get("success", true))
+		var kind := str(flash.get("kind", "arrived"))
+		var col := ProvinceMapVisuals.OUTLINE_ENGINEERS_STATIONED
+		var glow := ProvinceMapVisuals.OUTLINE_ENGINEERS_STATIONED_GLOW
+		var pulse_amt := 0.62
+		if not success:
+			col = ProvinceMapVisuals.OUTLINE_INFRA_SABOTAGE
+			glow = ProvinceMapVisuals.OUTLINE_INFRA_SABOTAGE_GLOW
+			pulse_amt = 0.44
+		elif kind == "departed":
+			pulse_amt = 0.30
+		var boost := 0.48 + 0.28 * sin(_outline_pulse_phase * 5.25 + float(pid) * 0.4)
+		ProvinceMapVisuals.apply_pulse_to_polished(
+			node,
+			ProvinceMapVisuals.NODE_SUPPLY,
+			col,
+			3.05 + boost,
+			glow,
+			5.1 + boost * 1.75,
+			_outline_pulse_phase + float(pid) * 0.2,
+			pulse_amt,
+			1.38,
+		)
+	for pid in expired:
+		_engineer_assign_flash_by_province.erase(pid)
+	if not expired.is_empty():
+		_refresh_supply_highlights()
+
+
+func _on_station_engineers_pressed() -> void:
+	if selected_province_id < 0 or not provinces.has(selected_province_id):
+		return
+	var province: Province = provinces[selected_province_id] as Province
+	_try_station_engineers_at_province(province, 1.0, true)
 
 
 #region Overlay layer infrastructure (preparing for M3 gameplay overlays)
@@ -1065,6 +1787,22 @@ func setup_demo_agent_overlay() -> void:
 
 
 #region Supply map layer
+## Polylines: trade corridors share hue with province `trade_transit` rings; drawn first beneath military routes — see `SupplyMapLayer`.
+func _map_province_name_label_z_index() -> int:
+	return province_name_label_z_index_supply_overlay if supply_mode else province_name_label_z_index
+
+
+func _sync_supply_route_canvas_stack() -> void:
+	if supply_map_layer == null or not is_instance_valid(supply_map_layer):
+		return
+	supply_map_layer.z_index = clampi(supply_route_layer_z_order, -40, 120)
+	var lm := clampf(supply_route_layer_modulate_with_overlay, 0.5, 1.0)
+	if supply_mode and supply_map_layer.visible:
+		supply_map_layer.self_modulate = Color(lm, lm, lm, 1.0)
+	else:
+		supply_map_layer.self_modulate = Color.WHITE
+
+
 func _setup_supply_layer() -> void:
 	if container == null:
 		return
@@ -1077,6 +1815,7 @@ func _setup_supply_layer() -> void:
 		supply_map_layer.setup(province_centroids, sm.rules)
 	_ensure_supply_overlay_panel()
 	_refresh_supply_routes()
+	_sync_supply_route_canvas_stack()
 
 
 func _ensure_supply_overlay_panel() -> void:
@@ -1169,6 +1908,7 @@ func _toggle_supply_overlay() -> void:
 	else:
 		_end_supply_reroute()
 	_refresh_province_fill_colors()
+	_refresh_province_detail_visibility()
 	_refresh_supply_highlights()
 	_update_supply_overlay_legend()
 	_refresh_compare_candidate_outlines()
@@ -1177,6 +1917,7 @@ func _toggle_supply_overlay() -> void:
 	if supply_overlay_panel:
 		if not supply_mode:
 			supply_overlay_panel.hide_panel()
+	_sync_supply_route_canvas_stack()
 
 
 func _refresh_supply_routes() -> void:
@@ -1185,6 +1926,7 @@ func _refresh_supply_routes() -> void:
 		return
 	supply_map_layer.set_routes(sm.get_all_routes())
 	supply_map_layer.visible = supply_mode
+	_sync_supply_route_canvas_stack()
 	_refresh_supply_highlights()
 
 
@@ -1269,6 +2011,8 @@ func _end_supply_reroute() -> void:
 
 
 func _refresh_province_fill_colors() -> void:
+	if container != null:
+		_zoom_fill_characterization_scale = absf(container.scale.x)
 	for pid in province_nodes.keys():
 		var node: Variant = province_nodes[pid]
 		if not (node is Node2D) or not is_instance_valid(node):
@@ -1283,10 +2027,11 @@ func _refresh_province_fill_colors() -> void:
 		if supply_mode:
 			var fill := ProvinceInsight.depot_fill_ratio(int(pid))
 			if fill >= 0.0:
-				col = col.lerp(_supply_depot_tint_color(fill), 0.38)
+				col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
 		col = _apply_agent_pressure_base_tint(col, province)
 		poly.color = col
 	_refresh_supply_highlights()
+	_fill_zoom_at_last_paint = _zoom_fill_characterization_scale
 
 
 func _province_polygon(node: Node2D) -> PackedVector2Array:
@@ -1386,9 +2131,41 @@ func _hover_outline_colors(province_id: int) -> Dictionary:
 				colors["glow"] = colors["glow"].lerp(ProvinceMapVisuals.OUTLINE_INFRA_SABOTAGE_GLOW, 0.22)
 			elif role == "supply_pressure":
 				colors["color"] = colors["color"].lerp(ProvinceMapVisuals.OUTLINE_SUPPLY_PRESSURE, 0.16)
-			elif role == "infra_repair":
-				colors["color"] = colors["color"].lerp(ProvinceMapVisuals.OUTLINE_INFRA_REPAIR, 0.14)
-				colors["glow"] = colors["glow"].lerp(ProvinceMapVisuals.OUTLINE_INFRA_REPAIR_GLOW, 0.12)
+			elif role in [
+				"infra_repair", "infra_repair_engineers", "engineers_stationed", "engineers_needed",
+				"engineers_recommended", "engineers_insufficient",
+			]:
+				var eng_col := ProvinceMapVisuals.OUTLINE_INFRA_REPAIR
+				var eng_glow := ProvinceMapVisuals.OUTLINE_INFRA_REPAIR_GLOW
+				var lerp_amt := 0.18
+				match role:
+					"infra_repair_engineers":
+						eng_col = ProvinceMapVisuals.OUTLINE_INFRA_REPAIR_ENGINEERS
+						eng_glow = ProvinceMapVisuals.OUTLINE_INFRA_REPAIR_ENGINEERS_GLOW
+					"engineers_stationed":
+						eng_col = ProvinceMapVisuals.OUTLINE_ENGINEERS_STATIONED
+						eng_glow = ProvinceMapVisuals.OUTLINE_ENGINEERS_STATIONED_GLOW
+					"engineers_needed":
+						eng_col = ProvinceMapVisuals.OUTLINE_ENGINEERS_NEEDED
+						eng_glow = ProvinceMapVisuals.OUTLINE_ENGINEERS_NEEDED_GLOW
+						lerp_amt = 0.26
+					"engineers_recommended":
+						eng_col = ProvinceMapVisuals.OUTLINE_ENGINEERS_NEEDED.lerp(
+							ProvinceMapVisuals.OUTLINE_INFRA_REPAIR, 0.35,
+						)
+						eng_glow = ProvinceMapVisuals.OUTLINE_ENGINEERS_NEEDED_GLOW.lerp(
+							ProvinceMapVisuals.OUTLINE_INFRA_REPAIR_GLOW, 0.3,
+						)
+					"engineers_insufficient":
+						eng_col = ProvinceMapVisuals.OUTLINE_ENGINEERS_STATIONED.lerp(
+							ProvinceMapVisuals.OUTLINE_ENGINEERS_NEEDED, 0.5,
+						)
+						eng_glow = ProvinceMapVisuals.OUTLINE_ENGINEERS_STATIONED_GLOW.lerp(
+							ProvinceMapVisuals.OUTLINE_ENGINEERS_NEEDED_GLOW, 0.4,
+						)
+						lerp_amt = 0.22
+				colors["color"] = colors["color"].lerp(eng_col, lerp_amt)
+				colors["glow"] = colors["glow"].lerp(eng_glow, lerp_amt * 0.9)
 			elif role == "depot_sabotage":
 				colors["color"] = colors["color"].lerp(ProvinceMapVisuals.OUTLINE_DEPOT_SABOTAGE, 0.14)
 	return colors
@@ -1496,6 +2273,8 @@ func _update_compare_preview_outline(hover_province: Province, counterpart: Prov
 
 
 func _refresh_single_province_fill(province_id: int) -> void:
+	if container != null:
+		_zoom_fill_characterization_scale = absf(container.scale.x)
 	if not provinces.has(province_id):
 		return
 	var node := _province_node(province_id)
@@ -1509,7 +2288,7 @@ func _refresh_single_province_fill(province_id: int) -> void:
 	if supply_mode:
 		var fill := ProvinceInsight.depot_fill_ratio(province_id)
 		if fill >= 0.0:
-			col = col.lerp(_supply_depot_tint_color(fill), 0.38)
+			col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
 	col = _apply_agent_pressure_base_tint(col, province)
 	col = _apply_recovering_fill_tint(col, province_id)
 	col = _apply_support_radio_fill_tint(col, province)
@@ -1542,8 +2321,32 @@ func _apply_recovering_fill_tint(col: Color, province_id: int) -> Color:
 	if not supply_mode:
 		return col
 	var role := str(_supply_role_by_province.get(province_id, ""))
-	if role == "infra_repair":
-		return col.lerp(ProvinceMapVisuals.FILL_INFRA_RECOVERING, 0.44)
+	if role in [
+		"infra_repair", "infra_repair_engineers", "engineers_stationed", "engineers_needed",
+		"engineers_recommended", "engineers_insufficient",
+	]:
+		var strength := 0.44
+		match role:
+			"infra_repair_engineers":
+				strength = 0.48
+			"engineers_stationed":
+				strength = 0.22
+			"engineers_needed":
+				strength = 0.32
+				return col.lerp(ProvinceMapVisuals.FILL_AGENT_DISRUPT_BASE, 0.14).lerp(
+					ProvinceMapVisuals.FILL_INFRA_RECOVERING, strength,
+				)
+			"engineers_recommended":
+				strength = 0.26
+				return col.lerp(ProvinceMapVisuals.FILL_AGENT_DISRUPT_BASE, 0.08).lerp(
+					ProvinceMapVisuals.FILL_INFRA_RECOVERING, strength,
+				)
+			"engineers_insufficient":
+				strength = 0.30
+				return col.lerp(ProvinceMapVisuals.FILL_AGENT_DISRUPT_BASE, 0.11).lerp(
+					ProvinceMapVisuals.FILL_INFRA_RECOVERING, strength,
+				)
+		return col.lerp(ProvinceMapVisuals.FILL_INFRA_RECOVERING, strength)
 	if role == "infra_sabotage":
 		return col.lerp(ProvinceMapVisuals.FILL_INFRA_SABOTAGE_ACTIVE, 0.34)
 	if role == "infra_duel_even":
@@ -1590,7 +2393,7 @@ func _apply_hover_fill(province_id: int, active: bool) -> void:
 	if supply_mode:
 		var fill := ProvinceInsight.depot_fill_ratio(province_id)
 		if fill >= 0.0:
-			col = col.lerp(_supply_depot_tint_color(fill), 0.38)
+			col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
 	col = _apply_agent_pressure_base_tint(col, province)
 	col = _apply_recovering_fill_tint(col, province_id)
 	col = _apply_support_radio_fill_tint(col, province)
@@ -1655,16 +2458,16 @@ func _update_outline_pulse() -> void:
 				)
 				if ProvinceInsight.agent_has_today_pressure_tick(hp):
 					hover_w += 0.35
-					pulse_amp += 0.12
-					pulse_speed += 0.6
+					pulse_amp += 0.12 if not supply_mode else 0.085
+					pulse_speed += 0.60 if not supply_mode else 0.42
 				elif ProvinceInsight.agent_applies_daily_pressure(hp):
 					hover_w += 0.2
-					pulse_amp += 0.06
+					pulse_amp += 0.06 if not supply_mode else 0.045
 				if dual_hover:
 					hover_w += 0.25
-					pulse_amp += 0.08
+					pulse_amp += 0.08 if not supply_mode else 0.055
 					if supply_mode:
-						pulse_amp += 0.05
+						pulse_amp += 0.035
 			var hoc: Dictionary = _hover_outline_colors(_hover_outline_province_id)
 			ProvinceMapVisuals.apply_pulse_to_polished(
 				node,
@@ -1757,6 +2560,7 @@ func _update_outline_pulse() -> void:
 		)
 	if supply_mode:
 		_pulse_supply_outlines()
+	_apply_engineer_assignment_flash_pulses()
 
 
 func _refresh_compare_candidate_outlines() -> void:
@@ -1846,6 +2650,8 @@ func _supply_highlight_roles() -> Dictionary[int, String]:
 		if not (plan_var is SupplyRoutePlan):
 			continue
 		var plan := plan_var as SupplyRoutePlan
+		if plan.represents_trade_flow:
+			continue
 		for pid_var in plan.province_path:
 			var pid := int(pid_var)
 			if str(roles.get(pid, "")) == "active":
@@ -1857,6 +2663,19 @@ func _supply_highlight_roles() -> Dictionary[int, String]:
 	for pid in preview_pids.keys():
 		if str(roles.get(pid, "")) != "active":
 			roles[pid] = "preview"
+	# Trade corridors: soft ring on path provinces that are not already primary logistics / depots.
+	for plan_var in sm.get_all_routes():
+		if not (plan_var is SupplyRoutePlan):
+			continue
+		var tplan := plan_var as SupplyRoutePlan
+		if not tplan.represents_trade_flow or tplan.province_path.size() < 2:
+			continue
+		for pid_var in tplan.province_path:
+			var pid2 := int(pid_var)
+			var cur := str(roles.get(pid2, ""))
+			if cur in ["active", "preview", "route", "hub"]:
+				continue
+			roles[pid2] = "trade_transit"
 	_apply_infra_pressure_overlay_roles(roles)
 	return roles
 
@@ -1875,14 +2694,9 @@ func _apply_infra_pressure_overlay_roles(roles: Dictionary[int, String]) -> void
 		if p == null:
 			continue
 		var bd: Dictionary = MapManager.get_infrastructure_repair_breakdown(pid)
-		if bool(bd.get("under_infra_sabotage", false)):
-			match ProvinceInsight.daily_infra_duel_winner(p, bd):
-				"repair":
-					roles[pid] = "infra_repair"
-				"even":
-					roles[pid] = "infra_duel_even"
-				_:
-					roles[pid] = "infra_sabotage"
+		var eng_role := ProvinceInsight.get_engineer_supply_overlay_role(p, bd)
+		if not eng_role.is_empty():
+			roles[pid] = eng_role
 			continue
 		if ProvinceInsight.agent_pressure_focus_kind(p) == "disrupt":
 			roles[pid] = "supply_pressure"
@@ -1891,17 +2705,17 @@ func _apply_infra_pressure_overlay_roles(roles: Dictionary[int, String]) -> void
 		if depot_sab > 0.12:
 			roles[pid] = "depot_sabotage"
 			continue
-		var infra := int(bd.get("infrastructure", p.infrastructure))
-		if infra < 45 and float(bd.get("total", 0.0)) > 0.0:
-			roles[pid] = "infra_repair"
 
 
 func _pulse_supply_outlines() -> void:
 	for pid in _supply_role_by_province.keys():
+		if _engineer_assign_flash_by_province.has(pid):
+			continue  # `_apply_engineer_assignment_flash_pulses` owns NODE_SUPPLY for this province.
 		var role: String = str(_supply_role_by_province[pid])
 		if role not in [
-			"active", "preview", "infra_sabotage", "infra_repair", "infra_duel_even",
-			"depot_sabotage", "supply_pressure",
+			"active", "preview", "route", "infra_sabotage", "infra_repair", "infra_repair_engineers",
+			"infra_duel_even", "depot_sabotage", "supply_pressure", "engineers_stationed",
+			"engineers_needed", "engineers_recommended", "engineers_insufficient", "trade_transit",
 		]:
 			continue
 		var node := _province_node(int(pid))
@@ -1924,20 +2738,38 @@ func _pulse_supply_outlines() -> void:
 
 func _pulse_amount_for_supply_role(role: String) -> float:
 	match role:
+		"active":
+			return 0.21
+		"preview":
+			return 0.26
+		"route":
+			return 0.15
 		"infra_sabotage":
-			return 0.78
+			return 0.66
 		"infra_duel_even":
-			return 0.48
+			return 0.42
 		"supply_pressure":
-			return 0.5
+			return 0.42
 		"depot_sabotage":
-			return 0.38
-		"infra_repair":
-			return 0.16
-		"hub":
-			return 0.22
-		_:
 			return 0.32
+		"infra_repair":
+			return 0.14
+		"infra_repair_engineers":
+			return 0.24
+		"engineers_stationed":
+			return 0.12
+		"engineers_needed":
+			return 0.58
+		"engineers_recommended":
+			return 0.35
+		"engineers_insufficient":
+			return 0.48
+		"trade_transit":
+			return 0.038
+		"hub":
+			return 0.17
+		_:
+			return 0.28
 
 
 func _refresh_supply_highlights() -> void:

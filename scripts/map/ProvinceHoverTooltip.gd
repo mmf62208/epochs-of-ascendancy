@@ -17,6 +17,8 @@ var _conflict_accent: bool = false
 var _agent_accent: bool = false
 var _tech_accent: bool = false
 var _support_accent: bool = false
+var _engineer_accent: bool = false
+var _engineers_needed_accent: bool = false
 var _agent_activity_accent: bool = false
 var _agent_pressure_kind: String = ""
 
@@ -39,6 +41,8 @@ func _ready() -> void:
 	_rich.scroll_active = true
 	_rich.custom_minimum_size = Vector2(max_width - 20.0, 0)
 	_rich.add_theme_font_size_override("normal_font_size", font_size)
+	_rich.meta_clicked.connect(_on_meta_clicked)
+	_rich.mouse_filter = Control.MOUSE_FILTER_STOP
 	margin.add_child(_rich)
 
 	_panel_style = StyleBoxFlat.new()
@@ -102,6 +106,20 @@ func set_support_accent(active: bool) -> void:
 	_apply_panel_style()
 
 
+func set_engineer_accent(active: bool) -> void:
+	if _engineer_accent == active:
+		return
+	_engineer_accent = active
+	_apply_panel_style()
+
+
+func set_engineers_needed_accent(active: bool) -> void:
+	if _engineers_needed_accent == active:
+		return
+	_engineers_needed_accent = active
+	_apply_panel_style()
+
+
 func set_agent_activity_accent(active: bool) -> void:
 	if _agent_activity_accent == active:
 		return
@@ -134,6 +152,12 @@ func _apply_panel_style() -> void:
 		_panel_style.bg_color = Color(0.14, 0.08, 0.09, 0.95)
 	elif _agent_accent:
 		_panel_style.bg_color = Color(0.1, 0.09, 0.16, 0.95)
+	elif _engineers_needed_accent and _supply_accent:
+		_panel_style.bg_color = Color(0.12, 0.09, 0.08, 0.96)
+	elif _engineer_accent and (_supply_accent or _agent_accent):
+		_panel_style.bg_color = Color(0.07, 0.12, 0.16, 0.96)
+	elif _engineer_accent:
+		_panel_style.bg_color = Color(0.06, 0.14, 0.14, 0.95)
 	elif _tech_accent or _support_accent:
 		_panel_style.bg_color = Color(0.08, 0.11, 0.18, 0.95)
 	elif _selected_accent:
@@ -206,6 +230,21 @@ func _apply_panel_style() -> void:
 	elif _support_accent and (_conflict_accent or _agent_accent or _supply_accent):
 		_panel_style.border_color = Color(0.4, 0.85, 1.0, 0.92)
 		_panel_style.shadow_color = Color(0.15, 0.32, 0.5, 0.36)
+	elif _engineers_needed_accent and _supply_accent:
+		_panel_style.border_color = Color(1.0, 0.68, 0.28, 0.96).lerp(Color(0.4, 0.92, 0.82, 0.35), 0.25)
+		_panel_style.shadow_color = Color(0.55, 0.32, 0.08, 0.42)
+	elif _engineer_accent and _supply_accent and _agent_pressure_kind == "repair":
+		_panel_style.border_color = Color(0.35, 0.95, 0.78, 0.96).lerp(Color(0.5, 0.88, 1.0, 0.35), 0.35)
+		_panel_style.shadow_color = Color(0.12, 0.42, 0.38, 0.4)
+	elif _engineer_accent and _supply_accent:
+		_panel_style.border_color = Color(0.4, 0.92, 0.82, 0.94)
+		_panel_style.shadow_color = Color(0.14, 0.38, 0.35, 0.38)
+	elif _engineer_accent:
+		_panel_style.border_color = Color(0.45, 0.98, 0.82, 0.92)
+		_panel_style.shadow_color = Color(0.15, 0.45, 0.35, 0.36)
+	elif _support_accent and _tech_accent:
+		_panel_style.border_color = Color(0.5, 0.9, 1.0, 0.96)
+		_panel_style.shadow_color = Color(0.18, 0.38, 0.55, 0.4)
 	elif _tech_accent:
 		_panel_style.border_color = Color(0.45, 0.82, 1.0, 0.9)
 		_panel_style.shadow_color = Color(0.15, 0.35, 0.55, 0.35)
@@ -255,7 +294,7 @@ func _apply_panel_style() -> void:
 		border_w = 2
 	elif (_conflict_accent and _agent_accent) or (_selected_accent and _conflict_accent and _agent_accent):
 		border_w = 3
-	elif _conflict_accent or _agent_accent or _tech_accent or _support_accent:
+	elif _conflict_accent or _agent_accent or _tech_accent or _support_accent or _engineer_accent or _engineers_needed_accent:
 		border_w = 2
 	elif _selected_accent:
 		border_w = 2
@@ -277,6 +316,8 @@ func show_text(
 	agent_accent: bool = false,
 	tech_accent: bool = false,
 	support_accent: bool = false,
+	engineer_accent: bool = false,
+	engineers_needed_accent: bool = false,
 	dual_situation_accent: bool = false,
 	agent_activity_accent: bool = false,
 	agent_pressure_kind: String = "",
@@ -299,6 +340,8 @@ func show_text(
 	)
 	set_tech_accent(tech_accent and not compare_active and not candidate_accent)
 	set_support_accent(support_accent and not compare_active and not candidate_accent)
+	set_engineer_accent(engineer_accent and not compare_active and not candidate_accent)
+	set_engineers_needed_accent(engineers_needed_accent and not compare_active and not candidate_accent)
 	if use_bbcode:
 		_rich.bbcode_enabled = true
 		_rich.text = text
@@ -329,6 +372,16 @@ func show_text(
 	if pos.y + size.y > viewport_size.y - 8.0:
 		pos.y = screen_pos.y - size.y - 12.0
 	position = pos
+
+
+func _on_meta_clicked(meta: Variant) -> void:
+	var key := str(meta).strip_edges()
+	if not key.begins_with("focus_province:"):
+		return
+	var pid := int(key.substr("focus_province:".length()))
+	if pid < 0 or typeof(MapTechnologyContext) == TYPE_NIL:
+		return
+	MapTechnologyContext.focus_province_on_map(pid)
 
 
 func hide_tooltip() -> void:

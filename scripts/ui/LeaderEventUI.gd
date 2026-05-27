@@ -52,6 +52,58 @@ func _ensure_toast_layer() -> void:
 	_toast_layer.add_child(_toast_container)
 
 
+## Simple toast for save/menu/system feedback (non-news).
+func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = false) -> void:
+	_ensure_toast_layer()
+	var entry := {
+		"title": "Notice" if not is_error else "Error",
+		"body": message,
+		"category": "error" if is_error else "system",
+	}
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size = Vector2(380, 0)
+	if is_error:
+		var err_style := StyleBoxFlat.new()
+		err_style.bg_color = Color("#2a1520")
+		err_style.border_color = RetrowaveTheme.WARNING
+		err_style.set_border_width_all(2)
+		err_style.set_corner_radius_all(4)
+		panel.add_theme_stylebox_override("panel", err_style)
+	else:
+		RetrowaveTheme.style_detail_panel(panel)
+
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_bottom", 8)
+	panel.add_child(margin)
+
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 4)
+	margin.add_child(vbox)
+
+	var title_label := Label.new()
+	title_label.text = str(entry.get("title", "Notice"))
+	RetrowaveTheme.style_column_header(title_label)
+	if is_error:
+		title_label.add_theme_color_override("font_color", RetrowaveTheme.WARNING)
+	vbox.add_child(title_label)
+
+	var body_label := Label.new()
+	body_label.text = str(entry.get("body", ""))
+	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	RetrowaveTheme.style_body_label(body_label)
+	vbox.add_child(body_label)
+
+	_toast_container.add_child(panel)
+	while _toast_container.get_child_count() > 4:
+		_dismiss_toast(_toast_container.get_child(0) as PanelContainer)
+
+	var timer := get_tree().create_timer(maxf(1.0, duration_sec))
+	timer.timeout.connect(_on_toast_timer_expired.bind(panel), CONNECT_ONE_SHOT)
+
+
 func post_news(title: String, body: String, category: String = "general") -> void:
 	var entry := {
 		"title": title,

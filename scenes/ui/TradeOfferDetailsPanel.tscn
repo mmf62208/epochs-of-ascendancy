@@ -1,0 +1,72 @@
+[gd_scene load_steps=2 format=3 uid="uid://trade_offer_details_panel"]
+
+[ext_resource type="Script" path="res://scripts/ui/TradeOfferDetailsPanel.gd" id="1_xxxxx"]
+
+[node name="TradeOfferDetailsPanel" type="Window"]
+title = "Offer Details"
+initial_position = 1
+size = Vector2i(800, 600)
+visible = false
+script = ExtResource("1_xxxxx")
+
+[node name="Margin" type="MarginContainer" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 24
+theme_override_constants/margin_top = 20
+theme_override_constants/margin_right = 24
+theme_override_constants/margin_bottom = 20
+
+[node name="MainVBox" type="VBoxContainer" parent="Margin"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TitleLabel" type="Label" parent="Margin/MainVBox"]
+layout_mode = 2
+text = "Offer Details"
+horizontal_alignment = 1
+
+[node name="PartiesLabel" type="Label" parent="Margin/MainVBox"]
+layout_mode = 2
+horizontal_alignment = 1
+
+[node name="RiskLabel" type="Label" parent="Margin/MainVBox"]
+layout_mode = 2
+horizontal_alignment = 1
+
+[node name="ExpiryLabel" type="Label" parent="Margin/MainVBox"]
+layout_mode = 2
+horizontal_alignment = 1
+
+[node name="ItemsVBox" type="VBoxContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 6
+
+[node name="FairnessLabel" type="Label" parent="Margin/MainVBox"]
+layout_mode = 2
+
+[node name="RecommendationLabel" type="Label" parent="Margin/MainVBox"]
+layout_mode = 2
+autowrap_mode = 3
+
+[node name="ButtonHBox" type="HBoxContainer" parent="Margin/MainVBox"]
+layout_mode = 2
+alignment = 1
+
+[node name="AcceptButton" type="Button" parent="Margin/MainVBox/ButtonHBox"]
+layout_mode = 2
+text = "Accept"
+
+[node name="RejectButton" type="Button" parent="Margin/MainVBox/ButtonHBox"]
+layout_mode = 2
+text = "Reject"
+
+[node name="CounterButton" type="Button" parent="Margin/MainVBox/ButtonHBox"]
+layout_mode = 2
+text = "Counter"
+
+[node name="CloseButton" type="Button" parent="Margin/MainVBox/ButtonHBox"]
+layout_mode = 2
+text = "Close"

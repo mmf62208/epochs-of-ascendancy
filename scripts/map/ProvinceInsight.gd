@@ -24,7 +24,7 @@ const COLOR_EFFECTIVE := "[color=#7dffb2]"
 const COLOR_NATIONAL := "[color=#e8a0ff]"
 const COLOR_WARN := "[color=#ff9a6e]"
 const COLOR_MUTED := "[color=#8899aa]"
-const COLOR_PROVINCE := "[color=#a8c4e8]"
+const COLOR_PROVINCE := "[color=#a8c4e8]"  ## Map chips: align with soft tech / trade readability
 const COLOR_DIVIDER := "[color=#4a5568]"
 const COLOR_TECH := "[color=#6ec8ff]"
 
@@ -72,6 +72,23 @@ static func build_hover_tooltip(
 		)
 	):
 		chip_limit = 6
+	if (
+		province_benefits_country(province, tag)
+		and MapTechnologyContext.country_has_map_technology(tag)
+	):
+		chip_limit = maxi(chip_limit, 6)
+	if province != null and typeof(FactoryManager) != TYPE_NIL:
+		if FactoryManager.get_factories_in_province(province.id).size() > 0:
+			chip_limit = maxi(chip_limit, 7)
+			var overlay_busy := supply_overlay_active and (
+				bool(report.get("is_contested", false)) and bool(report.get("has_agent_network", false))
+			)
+			if overlay_busy:
+				chip_limit = maxi(chip_limit, 8)
+			elif supply_overlay_active and (
+				bool(report.get("is_contested", false)) or bool(report.get("has_agent_network", false))
+			):
+				chip_limit = maxi(chip_limit, 7)
 	var chip := build_tooltip_mode_chip_for_state(
 		supply_overlay_active,
 		other_province != null,
@@ -85,6 +102,11 @@ static func build_hover_tooltip(
 		province,
 	)
 	var body := format_report_tooltip(report)
+	var strategic := MapTechnologyContext.build_province_build_strategic_tooltip_bbcode(
+		province, tag,
+	)
+	if not strategic.is_empty():
+		body = body + "\n\n" + strategic if not body.is_empty() else strategic
 	if chip.is_empty():
 		return body
 	return chip + "\n" + body
@@ -122,23 +144,22 @@ static func build_inspector_full_bbcode(
 		if not infra_inspector.is_empty():
 			lines.append("")
 		lines.append(pressure_inspector)
-	if not infra_inspector.is_empty() or not pressure_inspector.is_empty():
-		lines.append("")
 	var tag := str(report.get("country_tag", ""))
-	if (
-		_province_matches_country(province, tag)
-		and MapTechnologyContext.has_support_radio_bonuses(tag)
-		and (not infra_inspector.is_empty() or not pressure_inspector.is_empty())
-	):
-		var tech_glance := MapTechnologyContext.build_support_radio_glance_bbcode(tag)
-		if not tech_glance.is_empty():
-			lines.append(tech_glance)
-			lines.append("")
+	var tech_early_added := false
+	var build_elig_added := false
+	var inspector_tech := append_technology_section_after_pressure(
+		lines, province, tag, infra_inspector, pressure_inspector, false,
+	)
+	if not inspector_tech.is_empty():
+		tech_early_added = true
+		lines.append("")
+		if not append_build_eligibility_section_after_technology(lines, province, tag, false).is_empty():
+			build_elig_added = true
 	var dual_glance := build_dual_situation_glance_bbcode(province)
 	if not dual_glance.is_empty():
 		lines.append("%sSituation: %s[/color]" % [COLOR_HEADER, dual_glance])
 	else:
-		var nat_header := build_national_situation_one_liner(province, pe)
+		var nat_header := build_national_situation_one_liner(province, pe, tech_early_added)
 		if not nat_header.is_empty():
 			lines.append(nat_header)
 	var glance := build_province_glance_bbcode(province, pe, 5, not dual_glance.is_empty())
@@ -153,9 +174,21 @@ static func build_inspector_full_bbcode(
 		lines.append(situation_sec)
 		lines.append("")
 	var tech_sec := build_inspector_technology_section(province, str(report.get("country_tag", "")))
-	if not tech_sec.is_empty():
+	if not tech_sec.is_empty() and not tech_early_added:
 		lines.append(tech_sec)
 		lines.append("")
+	elif tech_early_added:
+		lines.append(
+			"%sOpen Technology screen for research slots and build unlocks.[/color]" % COLOR_MUTED
+		)
+		lines.append("")
+	if not build_elig_added:
+		var build_sec := build_inspector_build_eligibility_section(
+			province, str(report.get("country_tag", "")),
+		)
+		if not build_sec.is_empty():
+			lines.append(build_sec)
+			lines.append("")
 	lines.append("%s── Logistics & supply ──[/color]" % COLOR_HEADER)
 	lines.append(_stat_column_legend_bbcode())
 	for row in report.get("logistics_rows", []) as Array:
@@ -164,6 +197,9 @@ static func build_inspector_full_bbcode(
 	var routes := build_routes_through_province_bbcode(province.id, str(report.get("country_tag", "")))
 	if not routes.is_empty():
 		lines.append(routes)
+	var trade_inspector := build_trade_flow_map_section_bbcode(province.id, "", 6)
+	if not trade_inspector.is_empty():
+		lines.append(trade_inspector)
 	lines.append("")
 	lines.append(build_inspector_national_section(province, pe))
 	lines.append("")
@@ -347,6 +383,119 @@ static func _bbcode_inner(text: String) -> String:
 	return t.strip_edges()
 
 
+static func _tokens_contain_tech_marker(tokens: PackedStringArray) -> bool:
+	for tok in tokens:
+		if "📡" in tok or "🔬" in tok:
+			return true
+	return false
+
+
+static func _append_radio_chip_if_missing(tokens: PackedStringArray, country_tag: String) -> void:
+	if _tokens_contain_tech_marker(tokens):
+		return
+	var chip := MapTechnologyContext.build_support_radio_compact_chip(country_tag)
+	if not chip.is_empty():
+		tokens.append(chip)
+
+
+static func _ensure_technology_chip_in_tokens(
+	tokens: PackedStringArray,
+	country_tag: String,
+	province: Province,
+	max_tokens: int,
+	prefer_compact: bool,
+) -> void:
+	if country_tag.is_empty():
+		return
+	if province != null and not province_benefits_country(province, country_tag):
+		if typeof(TechnologyManager) == TYPE_NIL:
+			return
+		if TechnologyManager.get_active_research_count(country_tag) <= 0:
+			return
+	var merged := MapTechnologyContext.build_technology_hover_chip(country_tag)
+	if merged.is_empty():
+		return
+	if _tokens_contain_tech_marker(tokens):
+		return
+	if prefer_compact or tokens.size() < max_tokens:
+		tokens.append(merged)
+
+
+static func _reserve_technology_chip_in_shown(
+	shown: PackedStringArray,
+	ordered: PackedStringArray,
+	max_tokens: int,
+	country_tag: String,
+) -> void:
+	if country_tag.is_empty() or not MapTechnologyContext.country_has_map_technology(country_tag):
+		return
+	for tok in shown:
+		if "📡" in tok or "🔬" in tok:
+			return
+	var chip := MapTechnologyContext.build_technology_hover_chip(country_tag)
+	if chip.is_empty():
+		return
+	for i in range(ordered.size() - 1, -1, -1):
+		var tok := ordered[i]
+		if "📡" in tok or "🔬" in tok:
+			chip = tok
+			break
+	if shown.size() < max_tokens:
+		shown.append(chip)
+		return
+	var replace_idx := shown.size() - 1
+	while replace_idx >= 0 and ("📅" in shown[replace_idx] or "+%d" in shown[replace_idx]):
+		replace_idx -= 1
+	if replace_idx < 0:
+		replace_idx = shown.size() - 1
+	shown[replace_idx] = chip
+
+
+static func append_technology_section_after_pressure(
+	lines: PackedStringArray,
+	province: Province,
+	country_tag: String,
+	infra_block: String,
+	pressure_block: String,
+	compact: bool,
+) -> String:
+	var tech := MapTechnologyContext.build_province_technology_tooltip_section(
+		province, country_tag, compact,
+	)
+	if tech.is_empty():
+		return ""
+	if not infra_block.is_empty() or not pressure_block.is_empty():
+		lines.append("")
+	lines.append(tech)
+	return tech
+
+
+static func append_build_eligibility_section_after_technology(
+	lines: PackedStringArray,
+	province: Province,
+	country_tag: String,
+	compact: bool,
+) -> String:
+	var block := MapTechnologyContext.build_province_build_eligibility_bbcode(
+		province, country_tag, compact,
+	)
+	if block.is_empty():
+		return ""
+	if not lines.is_empty():
+		lines.append("")
+	lines.append(block)
+	return block
+
+
+static func build_inspector_build_eligibility_section(
+	province: Province,
+	country_tag: String = "",
+) -> String:
+	return MapTechnologyContext.build_province_build_eligibility_inspector_section(
+		province, country_tag,
+	)
+
+
 static func build_tooltip_mode_chip_for_state(
 	supply_overlay: bool,
 	compare_active: bool,
@@ -429,7 +578,9 @@ static func build_tooltip_mode_chip_for_state(
 		pressure_chip_added = true
 	if not supply_role.is_empty() and tokens.size() < max_tokens:
 		var skip_role_label := pressure_chip_added and supply_role in [
-			"infra_sabotage", "supply_pressure", "infra_repair", "infra_duel_even", "depot_sabotage",
+			"infra_sabotage", "supply_pressure", "infra_repair", "infra_repair_engineers",
+			"infra_duel_even", "depot_sabotage", "engineers_stationed", "engineers_needed",
+			"engineers_recommended", "engineers_insufficient", "trade_transit",
 		]
 		if not skip_role_label:
 			tokens.append("%s%s[/color]" % [COLOR_MUTED, _supply_role_label(supply_role)])
@@ -452,6 +603,36 @@ static func build_tooltip_mode_chip_for_state(
 			tokens.append("%s⛟ Depot hit[/color]" % COLOR_WARN)
 		elif int(bd.get("infrastructure", province.infrastructure)) < 50:
 			tokens.append("%s⚙ Repairing[/color]" % COLOR_TECH)
+	if (
+		supply_overlay
+		and province != null
+		and tokens.size() < max_tokens
+	):
+		var bd_chip := _infra_repair_breakdown(province)
+		if province_shows_engineer_map_chip(province, bd_chip):
+			var assign_chip := build_engineer_map_chip_bbcode(province, bd_chip)
+			if not assign_chip.is_empty():
+				var has_eng_tok := false
+				for tok in tokens:
+					if "🔧" in tok or "STATION" in tok or " div" in tok:
+						has_eng_tok = true
+						break
+				if not has_eng_tok:
+					tokens.append(assign_chip)
+	if (
+		supply_overlay
+		and province != null
+		and tokens.size() < max_tokens
+	):
+		var tr_chip := build_trade_flow_hover_chip_bbcode(province, country_tag)
+		if not tr_chip.is_empty():
+			var has_tr := false
+			for tok in tokens:
+				if _is_trade_flow_hover_chip(tok):
+					has_tr = true
+					break
+			if not has_tr:
+				tokens.append(tr_chip)
 	if supply_overlay and tokens.size() < max_tokens:
 		var skip_date := (
 			province != null
@@ -472,10 +653,55 @@ static func build_tooltip_mode_chip_for_state(
 	):
 		tokens.append("%s◎ TODAY[/color]" % COLOR_WARN)
 	var pressure_ui := province != null and province_needs_infrastructure_ui(province)
-	var defer_tech := pressure_ui or is_contested or has_agent_network
+	var multi_busy := pressure_ui or is_contested or has_agent_network
+	var defer_tech := multi_busy and not supply_overlay
 	var allow_bonus_slot := max_tokens >= 6 and supply_overlay and province != null
-	var allow_radio_slot := allow_bonus_slot and not country_tag.is_empty()
-	var allow_tech_slot := allow_bonus_slot and not country_tag.is_empty() and pressure_ui
+	if province != null and tokens.size() < max_tokens:
+		var reloc_chip := MapTechnologyContext.build_relocate_prominence_chip(
+			province, country_tag,
+		)
+		if not reloc_chip.is_empty():
+			tokens.append(reloc_chip)
+		elif tokens.size() < max_tokens:
+			var choice_chip := MapTechnologyContext.build_invest_reloc_choice_chip(
+				province, country_tag,
+			)
+			if not choice_chip.is_empty():
+				tokens.append(choice_chip)
+			elif tokens.size() < max_tokens:
+				var split_chip := MapTechnologyContext.build_retool_reloc_split_chip(
+					province, country_tag,
+				)
+				if not split_chip.is_empty():
+					tokens.append(split_chip)
+	if province != null and tokens.size() < max_tokens:
+		var elig_chip := MapTechnologyContext.build_build_eligibility_hover_chip(
+			province, country_tag,
+		)
+		if not elig_chip.is_empty():
+			tokens.append(elig_chip)
+		if tokens.size() < max_tokens and province.development_level < 5:
+			var dev_chip := MapTechnologyContext.build_development_tier_chip(
+				province, country_tag,
+			)
+			if not dev_chip.is_empty():
+				var has_dev_tok := false
+				for tok in tokens:
+					if "📈" in tok or "dev " in tok.to_lower():
+						has_dev_tok = true
+						break
+				if not has_dev_tok:
+					tokens.append(dev_chip)
+		if tokens.size() < max_tokens:
+			var profile_chip := MapTechnologyContext.build_province_production_profile_chip(province)
+			if not profile_chip.is_empty():
+				var has_profile := false
+				for tok in tokens:
+					if "✓" in tok or "✗" in tok or "Good:" in tok or "Good for:" in tok:
+						has_profile = true
+						break
+				if not has_profile:
+					tokens.append(profile_chip)
 	if not country_tag.is_empty() and tokens.size() < max_tokens and not defer_tech:
 		var tech_chip := MapTechnologyContext.build_technology_status_chip(country_tag)
 		if not tech_chip.is_empty():
@@ -488,40 +714,19 @@ static func build_tooltip_mode_chip_for_state(
 		and tokens.size() < max_tokens
 		and not defer_tech
 	):
-		var has_radio_token := false
-		for tok in tokens:
-			if "📡" in tok:
-				has_radio_token = true
-				break
-		if not has_radio_token:
-			var local_radio := MapTechnologyContext.build_support_radio_compact_chip(country_tag)
-			if not local_radio.is_empty():
-				tokens.append(local_radio)
+		_append_radio_chip_if_missing(tokens, country_tag)
 	if (
-		allow_radio_slot
+		allow_bonus_slot
 		and province_benefits_country(province, country_tag)
-		and MapTechnologyContext.has_support_radio_bonuses(country_tag)
 		and tokens.size() < max_tokens
 	):
-		var has_radio := false
-		for tok in tokens:
-			if "📡" in tok:
-				has_radio = true
-				break
-		if not has_radio:
-			var radio_slot := MapTechnologyContext.build_support_radio_compact_chip(country_tag)
-			if not radio_slot.is_empty():
-				tokens.append(radio_slot)
-	if allow_tech_slot and tokens.size() < max_tokens:
-		var tech_slot := MapTechnologyContext.build_technology_status_chip(country_tag)
-		if not tech_slot.is_empty():
-			var has_tech := false
-			for tok in tokens:
-				if "🔬" in tok or "research" in tok.to_lower():
-					has_tech = true
-					break
-			if not has_tech:
-				tokens.append(tech_slot)
+		_ensure_technology_chip_in_tokens(
+			tokens, country_tag, province, max_tokens, true,
+		)
+	elif multi_busy and tokens.size() < max_tokens and not country_tag.is_empty():
+		_ensure_technology_chip_in_tokens(
+			tokens, country_tag, province, max_tokens, supply_overlay,
+		)
 	if tokens.is_empty():
 		return ""
 	if tokens.size() <= max_tokens:
@@ -538,11 +743,42 @@ static func build_tooltip_mode_chip_for_state(
 			or "WINNING" in tok
 			or "SUPPLY" in tok
 			or "DEPOT" in tok
-			or 			"📦 L" in tok
+			or "📦 L" in tok
+			or "✓" in tok
+			or "✗" in tok
 			or "⚑" in tok
 			or "◎" in tok
 			or "Compare" in tok
 			or "Selected" in tok
+			or "📡" in tok
+			or "🔬" in tok
+			or "🔧" in tok
+			or "URGENT" in tok
+			or "weak" in tok
+			or "STATION" in tok
+			or "div" in tok
+			or "🔒" in tok
+			or "locked" in tok
+			or "📉" in tok
+			or "🏔" in tok
+			or "🏭" in tok
+			or "tier" in tok.to_lower()
+			or "lock[/color]" in tok
+			or "↗" in tok
+			or "Good:" in tok
+			or "Good for:" in tok
+			or "Weak:" in tok
+			or "Weak for:" in tok
+			or "Grow dev" in tok
+			or "↻" in tok
+			or "INVEST" in tok
+			or "RELOCATE" in tok
+			or "Recommended" in tok
+			or "Split strategy" in tok
+			or "★" in tok
+			or "○" in tok
+			or "unlock" in tok.to_lower()
+			or _is_trade_flow_hover_chip(tok)
 		):
 			priority.append(tok)
 		else:
@@ -557,7 +793,301 @@ static func build_tooltip_mode_chip_for_state(
 		shown.append(ordered[i])
 	if ordered.size() > max_tokens:
 		shown.append("%s+%d[/color]" % [COLOR_MUTED, ordered.size() - max_tokens])
+	_reserve_technology_chip_in_shown(shown, ordered, max_tokens, country_tag)
+	_reserve_relocate_chip_in_shown(shown, ordered, max_tokens, province, country_tag)
+	_reserve_invest_reloc_choice_chip_in_shown(shown, ordered, max_tokens, province, country_tag)
+	_reserve_retool_split_chip_in_shown(shown, ordered, max_tokens, province, country_tag)
+	_reserve_build_eligibility_chip_in_shown(shown, ordered, max_tokens, province, country_tag)
+	_reserve_development_tier_chip_in_shown(shown, ordered, max_tokens, province, country_tag)
+	_reserve_production_profile_chip_in_shown(shown, ordered, max_tokens, province)
+	_reserve_trade_flow_chip_in_shown(shown, ordered, max_tokens, province, country_tag)
+	_reserve_engineer_assignment_chip_in_shown(shown, ordered, max_tokens, province)
 	return "  ·  ".join(shown)
+
+
+static func _reserve_relocate_chip_in_shown(
+	shown: PackedStringArray,
+	ordered: PackedStringArray,
+	max_tokens: int,
+	province: Province,
+	country_tag: String,
+) -> void:
+	if province == null:
+		return
+	var chip := MapTechnologyContext.build_relocate_prominence_chip(province, country_tag)
+	if chip.is_empty():
+		return
+	for tok in shown:
+		if "↗" in tok:
+			return
+	for i in range(ordered.size() - 1, -1, -1):
+		if "↗" in ordered[i]:
+			chip = ordered[i]
+			break
+	if shown.size() < max_tokens:
+		shown.append(chip)
+	elif shown.size() > 0:
+		var replace_idx := shown.size() - 1
+		while replace_idx >= 0 and (
+			"📅" in shown[replace_idx]
+			or "+%d" in shown[replace_idx]
+			or "Compare" in shown[replace_idx]
+			or "Selected" in shown[replace_idx]
+			or "🔧" in shown[replace_idx]
+			or ("📡" in shown[replace_idx] and "↗" in chip)
+			or ("🔬" in shown[replace_idx] and "↗" in chip)
+		):
+			replace_idx -= 1
+		if replace_idx < 0:
+			replace_idx = 0
+		shown[replace_idx] = chip
+
+
+static func _reserve_invest_reloc_choice_chip_in_shown(
+	shown: PackedStringArray,
+	ordered: PackedStringArray,
+	max_tokens: int,
+	province: Province,
+	country_tag: String,
+) -> void:
+	if province == null:
+		return
+	var chip := MapTechnologyContext.build_invest_reloc_choice_chip(province, country_tag)
+	if chip.is_empty():
+		return
+	for tok in shown:
+		if "★" in tok and ("Invest" in tok or "RELOCATE" in tok or "Split" in tok or "↗" in tok):
+			return
+	for i in range(ordered.size() - 1, -1, -1):
+		if "★" in ordered[i] and "Recommended" in ordered[i]:
+			chip = ordered[i]
+			break
+	if shown.size() < max_tokens:
+		shown.append(chip)
+	elif shown.size() > 0 and "↗" not in str(shown[0]):
+		shown[0] = chip
+
+
+static func _reserve_retool_split_chip_in_shown(
+	shown: PackedStringArray,
+	ordered: PackedStringArray,
+	max_tokens: int,
+	province: Province,
+	country_tag: String,
+) -> void:
+	if province == null:
+		return
+	var chip := MapTechnologyContext.build_retool_reloc_split_chip(province, country_tag)
+	if chip.is_empty():
+		return
+	for tok in shown:
+		if "↻" in tok and "↗" in tok:
+			return
+	if shown.size() < max_tokens:
+		shown.append(chip)
+	elif shown.size() > 0 and "↗" not in str(shown[shown.size() - 1]):
+		shown[shown.size() - 1] = chip
+
+
+static func _reserve_production_profile_chip_in_shown(
+	shown: PackedStringArray,
+	ordered: PackedStringArray,
+	max_tokens: int,
+	province: Province,
+) -> void:
+	if province == null:
+		return
+	var chip := MapTechnologyContext.build_province_production_profile_chip(province)
+	if chip.is_empty():
+		return
+	for tok in shown:
+		if "✓" in tok or "✗" in tok or "Good:" in tok or "Good for:" in tok:
+			return
+	for i in range(ordered.size() - 1, -1, -1):
+		if "✓" in ordered[i] or "✗" in ordered[i]:
+			chip = ordered[i]
+			break
+	if shown.size() < max_tokens:
+		shown.append(chip)
+	elif shown.size() > 0:
+		var replace_idx := shown.size() - 1
+		while replace_idx >= 0 and (
+			"📅" in shown[replace_idx]
+			or "+%d" in shown[replace_idx]
+			or "Compare" in shown[replace_idx]
+			or "Selected" in shown[replace_idx]
+			or ("📡" in shown[replace_idx] and "↗" not in chip)
+		):
+			replace_idx -= 1
+		if replace_idx >= 0:
+			shown[replace_idx] = chip
+
+
+static func _reserve_development_tier_chip_in_shown(
+	shown: PackedStringArray,
+	ordered: PackedStringArray,
+	max_tokens: int,
+	province: Province,
+	country_tag: String,
+) -> void:
+	if province == null or province.development_level >= 5:
+		return
+	var chip := MapTechnologyContext.build_development_tier_chip(province, country_tag)
+	if chip.is_empty():
+		return
+	for tok in shown:
+		if "📈" in tok:
+			return
+	if shown.size() < max_tokens:
+		shown.append(chip)
+	elif shown.size() > 0:
+		var replace_idx := shown.size() - 1
+		while replace_idx >= 0 and ("📅" in shown[replace_idx] or "+%d" in shown[replace_idx]):
+			replace_idx -= 1
+		if replace_idx >= 0:
+			shown[replace_idx] = chip
+
+
+static func _reserve_build_eligibility_chip_in_shown(
+	shown: PackedStringArray,
+	ordered: PackedStringArray,
+	max_tokens: int,
+	province: Province,
+	country_tag: String,
+) -> void:
+	if province == null:
+		return
+	var snap := MapTechnologyContext.collect_province_build_eligibility(province, country_tag)
+	var has_locked := not (snap.get("locked_lines", []) as Array).is_empty()
+	var chip := MapTechnologyContext.build_build_eligibility_hover_chip(province, country_tag)
+	if chip.is_empty():
+		return
+	var is_warn := (
+		"lock" in chip.to_lower()
+		or "📉" in chip
+		or "🏔" in chip
+		or "🔒" in chip
+	)
+	if not is_warn and "OK" in chip and not has_locked:
+		return
+	for tok in shown:
+		if (
+			"🔒" in tok
+			or "lock[/color]" in tok
+			or "📉" in tok
+			or "🏔" in tok
+			or "↗" in tok
+			or "Good:" in tok
+		):
+			return
+	for i in range(ordered.size() - 1, -1, -1):
+		var tok := ordered[i]
+		if (
+			"🔒" in tok
+			or "📉" in tok
+			or "🏔" in tok
+			or "lock[/color]" in tok
+			or "↗" in tok
+			or "Good:" in tok
+		):
+			chip = tok
+			break
+	if shown.size() < max_tokens:
+		shown.append(chip)
+	elif shown.size() > 0:
+		var replace_idx := shown.size() - 1
+		while replace_idx >= 0 and (
+			"📅" in shown[replace_idx]
+			or "+%d" in shown[replace_idx]
+			or "Compare" in shown[replace_idx]
+			or "Selected" in shown[replace_idx]
+			or ("📡" in shown[replace_idx] and is_warn)
+			or ("🔬" in shown[replace_idx] and is_warn)
+		):
+			replace_idx -= 1
+		if replace_idx < 0:
+			replace_idx = shown.size() - 1
+		shown[replace_idx] = chip
+
+
+static func _reserve_engineer_assignment_chip_in_shown(
+	shown: PackedStringArray,
+	ordered: PackedStringArray,
+	max_tokens: int,
+	province: Province,
+) -> void:
+	if province == null:
+		return
+	var bd := _infra_repair_breakdown(province)
+	if not province_shows_engineer_map_chip(province, bd):
+		return
+	for tok in shown:
+		if "🔧" in tok:
+			return
+	var chip := build_engineer_map_chip_bbcode(province, bd)
+	if chip.is_empty():
+		return
+	for i in range(ordered.size() - 1, -1, -1):
+		var tok := ordered[i]
+		if "🔧" in tok:
+			chip = tok
+			break
+	if shown.size() < max_tokens:
+		shown.append(chip)
+	elif shown.size() > 0:
+		var replace_idx := shown.size() - 1
+		while replace_idx >= 0 and (
+			"📅" in shown[replace_idx]
+			or "+%d" in shown[replace_idx]
+			or "Compare" in shown[replace_idx]
+			or ("📡" in shown[replace_idx] and "🔧" not in shown[replace_idx])
+		):
+			replace_idx -= 1
+		if replace_idx < 0:
+			replace_idx = shown.size() - 1
+		shown[replace_idx] = chip
+
+
+static func _reserve_trade_flow_chip_in_shown(
+	shown: PackedStringArray,
+	ordered: PackedStringArray,
+	max_tokens: int,
+	province: Province,
+	country_tag: String,
+) -> void:
+	if province == null or typeof(TradeManager) == TYPE_NIL:
+		return
+	var chip := build_trade_flow_hover_chip_bbcode(province, country_tag)
+	if chip.is_empty():
+		return
+	var listed := false
+	for tok in ordered:
+		if _is_trade_flow_hover_chip(tok):
+			listed = true
+			break
+	if not listed:
+		return
+	for tok in shown:
+		if _is_trade_flow_hover_chip(tok):
+			return
+	for i in range(ordered.size() - 1, -1, -1):
+		if _is_trade_flow_hover_chip(ordered[i]):
+			chip = ordered[i]
+			break
+	if shown.size() < max_tokens:
+		shown.append(chip)
+	elif shown.size() > 0:
+		var replace_idx := shown.size() - 1
+		while replace_idx >= 0 and (
+			"📅" in shown[replace_idx]
+			or "+%d" in shown[replace_idx]
+			or "Compare" in shown[replace_idx]
+			or ("📡" in shown[replace_idx] and "trade" not in shown[replace_idx])
+		):
+			replace_idx -= 1
+		if replace_idx < 0:
+			replace_idx = shown.size() - 1
+		shown[replace_idx] = chip
 
 
 static func _supply_role_label(role: String) -> String:
@@ -574,12 +1104,24 @@ static func _supply_role_label(role: String) -> String:
 			return "⚙ ring: sabotage winning"
 		"supply_pressure":
 			return "⛟ ring: supply pressure"
+		"trade_transit":
+			return "◇ soft ring: trade corridor"
 		"infra_repair":
 			return "⚙ ring: repair winning"
+		"infra_repair_engineers":
+			return "⚙ repair winning · 🔧 engineers"
 		"infra_duel_even":
 			return "⚙ ring: duel even"
 		"depot_sabotage":
 			return "⛟ ring: depot hit"
+		"engineers_stationed":
+			return "🔧 engineers on station"
+		"engineers_needed":
+			return "🔧 engineers URGENT (sabotage winning)"
+		"engineers_recommended":
+			return "🔧 engineers recommended"
+		"engineers_insufficient":
+			return "🔧 engineers weak (add more)"
 		_:
 			return role
 
@@ -604,12 +1146,24 @@ static func _supply_role_icon(role: String) -> String:
 			return "⚙"
 		"supply_pressure":
 			return "⛟"
+		"trade_transit":
+			return "◇"
 		"infra_repair":
 			return "⚙"
+		"infra_repair_engineers":
+			return "⚙🔧"
 		"infra_duel_even":
 			return "⚙"
 		"depot_sabotage":
 			return "⛟"
+		"engineers_stationed":
+			return "🔧"
+		"engineers_needed":
+			return "🔧!"
+		"engineers_recommended":
+			return "🔧◎"
+		"engineers_insufficient":
+			return "🔧+"
 		_:
 			return "·"
 
@@ -789,6 +1343,8 @@ static func build_map_supply_mode_hint_plain(
 		bits.append("⚔ compare via ○ neighbors")
 	if not country_tag.is_empty() and MapTechnologyContext.has_support_radio_bonuses(country_tag):
 		bits.append("📡 Support/Radio on routes")
+	bits.append("🔧 engineers on L rings")
+	bits.append("🏭 build locks on factory provinces (📉 dev · 🏔 terrain · 🔒 tech)")
 	var date_compact := GameDateDisplay.format_map_date_compact()
 	if not date_compact.is_empty():
 		bits.append("📅 %s" % date_compact)
@@ -796,23 +1352,7 @@ static func build_map_supply_mode_hint_plain(
 
 
 static func build_inspector_technology_section(province: Province, country_tag: String = "") -> String:
-	var block := MapTechnologyContext.build_province_technology_bbcode(province, country_tag)
-	if block.is_empty():
-		return ""
-	var lines: PackedStringArray = []
-	lines.append("%s── Technology / production ──[/color]" % COLOR_HEADER)
-	lines.append(block)
-	var tag := country_tag.strip_edges().to_upper()
-	if tag.is_empty():
-		tag = country_tag_for_province(province)
-	if _province_matches_country(province, tag):
-		var support_block := MapTechnologyContext.build_support_radio_inspector_block(tag)
-		if not support_block.is_empty():
-			lines.append(support_block)
-	lines.append(
-		"%sOpen Technology screen for research slots and build unlocks.[/color]" % COLOR_MUTED
-	)
-	return "\n".join(lines)
+	return MapTechnologyContext.build_province_technology_inspector_section(province, country_tag)
 
 
 static func build_province_situation_tags(province: Province) -> String:
@@ -854,6 +1394,18 @@ static func build_province_situation_tags(province: Province) -> String:
 		elif radio:
 			var chip := MapTechnologyContext.build_support_radio_compact_chip(tag)
 			tags.append(chip if not chip.is_empty() else "%s📡[/color]" % COLOR_TECH)
+		var bd_tag := _infra_repair_breakdown(province)
+		if has_engineers_stationed(bd_tag):
+			var eng_n := float(bd_tag.get("engineer_brigades", 0.0))
+			tags.append("%s🔧%.1f[/color]" % [COLOR_TECH, eng_n])
+		elif province_shows_engineer_assignment_chip(province, bd_tag):
+			var lvl := get_engineer_guidance_level(province, bd_tag)
+			if lvl == "critical":
+				tags.append("%s🔧![/color]" % COLOR_WARN)
+			elif lvl == "present_insufficient":
+				tags.append("%s🔧weak[/color]" % COLOR_WARN)
+			elif lvl == "recommended":
+				tags.append("%s🔧assign[/color]" % COLOR_TECH)
 	return "".join(tags)
 
 
@@ -1021,9 +1573,12 @@ static func build_supply_legend_bbcode(
 		"[color=#9eb8d8]L on[/color]  "
 		+ "[color=#8899aa]● fill[/color] "
 		+ "[color=#7dffb2]high[/color]/[color=#e8c04a]mid[/color]/[color=#ff9a6e]low[/color]  "
-		+ "[color=#8899aa]◇ hub · — route · ~ preview · ◆ selected[/color]"
+		+ "[color=#8899aa]◇ hub · — military route · ~ preview · ◆ selected · soft gold ◇ = trade corridor[/color]"
 	)
-	lines.append("[color=#8899aa]L rings[/color] — pulse speed shows who wins the daily duel:")
+	lines.append(
+		"[color=#8899aa]Base map[/color]: "
+		+ "terrain shading + brighter fill -> higher development — eased while L tint is active"
+	)
 	lines.append(
 		"  [color=#ff4d48][b]⚙ red · fast pulse[/b][/color] = sabotage winning (chip damage > repair)"
 	)
@@ -1059,6 +1614,28 @@ static func build_supply_legend_bbcode(
 		+ "[color=#5ae6b8]⬆ RECOVERING[/color] · "
 		+ "[color=#ff9428]⬇ SUPPLY[/color]  "
 		+ "(chips: SAB WIN / REP WIN · meter −N or +N/day)"
+	)
+	lines.append(
+		"[color=#8899aa]Tech chips: [/color]"
+		+ "[color=#6ec8ff]📡[/color] Support/Radio (planning/recon on routes) · "
+		+ "[color=#6ec8ff]🔬[/color] active research — reserved in crowded overlays"
+	)
+	lines.append(
+		"[color=#8899aa]Engineers: [/color]"
+		+ "[color=#5ae6b8]🔧[/color] = brigades boosting repair · "
+		+ "[color=#ff9a6e]🔧 URGENT[/color] = sabotage winning · "
+		+ "[color=#6ec8ff]🔧 assign[/color] = recommended · "
+		+ "[color=#ffb85a]🔧 weak[/color] = present but insufficient · "
+		+ "Shift+click moves an engineer division · inspector Deploy cycles divisions"
+	)
+	lines.append(
+		"[color=#8899aa]Build: [/color]"
+		+ "[color=#ffb85a]📉[/color] dev tier · "
+		+ "[color=#ffb85a]🏔[/color] terrain · "
+		+ "[color=#ffb85a]🔒[/color] tech · "
+		+ "[color=#ffb85a]🏭[/color] factory · "
+		+ "[color=#ffb85a]↗ Name[/color] = recommended relocate province · "
+		+ "chips stay visible on L / agent / contested overlays"
 	)
 	lines.append(
 		"[color=#8899aa]Action: [/color]"
@@ -1508,6 +2085,600 @@ static func _duel_winner_headline(winner: String, emphasize: bool = false) -> St
 			return ""
 
 
+static func has_engineers_stationed(bd: Dictionary) -> bool:
+	return float(bd.get("engineer_brigades", 0.0)) >= 0.05
+
+
+static func province_accepts_player_engineers(province: Province, bd: Dictionary) -> bool:
+	if province == null or bd.is_empty():
+		return false
+	var tag := str(bd.get("country_tag", country_tag_for_province(province))).strip_edges().to_upper()
+	return not tag.is_empty() and province_benefits_country(province, tag)
+
+
+static func get_engineer_assignment_snapshot(province: Province) -> Dictionary:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return {}
+	return MapManager.get_engineer_assignment_snapshot(province.id)
+
+
+static func get_engineer_guidance_level(province: Province, bd: Dictionary) -> String:
+	if province == null or bd.is_empty():
+		return "none"
+	if not province_accepts_player_engineers(province, bd):
+		return "foreign"
+	var snap := get_engineer_assignment_snapshot(province)
+	if not snap.is_empty():
+		return str(snap.get("guidance_level", "none"))
+	var eng_n := float(bd.get("engineer_brigades", 0.0))
+	if eng_n >= 0.05:
+		return "present"
+	if _pressure_status_label(province, bd) == "UNDER SABOTAGE":
+		if _daily_infra_duel_winner(province, bd) == "sabotage":
+			return "critical"
+		return "recommended"
+	if int(bd.get("infrastructure", province.infrastructure)) < 45:
+		return "recommended"
+	return "none"
+
+
+static func engineer_guidance_level_title(level: String) -> String:
+	match level:
+		"critical":
+			return "Urgent — sabotage winning"
+		"recommended":
+			return "Recommended — weak repair"
+		"present_insufficient":
+			return "Present but insufficient"
+		"present":
+			return "Engineers on station"
+		"foreign":
+			return "Not your province"
+		_:
+			return ""
+
+
+static func province_needs_engineer_assignment(province: Province, bd: Dictionary = {}) -> bool:
+	var breakdown := bd if not bd.is_empty() else _infra_repair_breakdown(province)
+	var level := get_engineer_guidance_level(province, breakdown)
+	return level in ["critical", "recommended", "present_insufficient"]
+
+
+static func province_shows_engineer_assignment_chip(province: Province, bd: Dictionary = {}) -> bool:
+	return province_needs_engineer_assignment(province, bd)
+
+
+static func province_shows_engineer_map_chip(province: Province, bd: Dictionary = {}) -> bool:
+	if province == null:
+		return false
+	var breakdown := bd if not bd.is_empty() else _infra_repair_breakdown(province)
+	if not should_show_engineer_map_ui(province, breakdown):
+		return false
+	return (
+		province_needs_engineer_assignment(province, breakdown)
+		or has_engineers_stationed(breakdown)
+	)
+
+
+static func build_engineer_map_chip_bbcode(province: Province, bd: Dictionary) -> String:
+	if province == null or bd.is_empty():
+		return ""
+	var chip := build_engineer_assignment_chip_bbcode(province, bd)
+	if chip.is_empty():
+		chip = build_engineer_hover_chip_bbcode(province, bd)
+	if chip.is_empty() and province_needs_engineer_assignment(province, bd):
+		chip = "%s🔧 no engineers[/color]" % COLOR_WARN
+	return chip
+
+
+static func get_engineer_supply_overlay_role(province: Province, bd: Dictionary) -> String:
+	## Supply overlay ring role from guidance level (L overlay).
+	if province == null or bd.is_empty():
+		return ""
+	if not province_accepts_player_engineers(province, bd):
+		return ""
+	var level := get_engineer_guidance_level(province, bd)
+	var eng_n := float(bd.get("engineer_brigades", 0.0))
+	var under_sab := bool(bd.get("under_infra_sabotage", false))
+	match level:
+		"critical":
+			return "engineers_needed"
+		"recommended":
+			return "engineers_recommended"
+		"present_insufficient":
+			return "engineers_insufficient"
+		"present":
+			if eng_n >= 0.05:
+				if under_sab:
+					var winner := daily_infra_duel_winner(province, bd)
+					if winner == "repair":
+						return "infra_repair_engineers"
+					if winner == "even":
+						return "infra_duel_even"
+				return "engineers_stationed"
+		_:
+			pass
+	if under_sab:
+		match daily_infra_duel_winner(province, bd):
+			"repair":
+				return "infra_repair_engineers" if eng_n >= 0.05 else "infra_repair"
+			"even":
+				return "infra_duel_even"
+			_:
+				return "infra_sabotage"
+	var infra := int(bd.get("infrastructure", province.infrastructure))
+	if infra < 45 and float(bd.get("total", 0.0)) > 0.0:
+		return "infra_repair_engineers" if eng_n >= 0.05 else "infra_repair"
+	if eng_n >= 0.05:
+		return "engineers_stationed"
+	return ""
+
+
+static func build_engineer_repair_scenario_bbcode(province: Province, bd: Dictionary, compact: bool = true) -> String:
+	if province == null or bd.is_empty() or not province_accepts_player_engineers(province, bd):
+		return ""
+	var snap := get_engineer_assignment_snapshot(province)
+	if snap.is_empty():
+		return ""
+	var r0 := float(snap.get("rate_at_0_brigades", repair_rate_without_engineers(bd)))
+	var r1 := float(snap.get("rate_at_1_brigade", r0))
+	var r2 := float(snap.get("rate_at_2_brigades", r1))
+	var cur := float(snap.get("repair_total", r0))
+	var eng_n := float(snap.get("engineer_brigades", 0.0))
+	var chip := int(snap.get("chip_damage_per_day", 0))
+	var lines: PackedStringArray = []
+	if compact:
+		lines.append(
+			"%s  Repair/day: [b]0 brg[/b] +%.2f  ·  [b]1 brg[/b] +%.2f  ·  [b]2 brg[/b] +%.2f[/color]"
+			% [COLOR_MUTED, r0, r1, r2]
+		)
+		if chip > 0:
+			lines.append(
+				"%s  Sabotage chip ~%d/day — need repair > chip to recover infra[/color]"
+				% [COLOR_WARN if r0 < float(chip) else COLOR_MUTED, chip]
+			)
+	else:
+		lines.append("%s  Projected repair rate by engineer presence:[/color]" % COLOR_MUTED)
+		lines.append("%s    0 brigades: +%.2f/day%s[/color]" % [
+			COLOR_MUTED,
+			r0,
+			"  ← current" if eng_n < 0.05 else "",
+		])
+		lines.append("%s    1 brigade:  +%.2f/day%s[/color]" % [
+			COLOR_TECH,
+			r1,
+			"  ← current" if eng_n >= 0.45 and eng_n < 1.25 else "",
+		])
+		lines.append("%s    2 brigades: +%.2f/day%s[/color]" % [
+			COLOR_TECH,
+			r2,
+			"  ← current" if eng_n >= 1.25 else "",
+		])
+		if eng_n >= 0.05:
+			lines.append("%s    Now (%.1f brg): +%.2f/day[/color]" % [COLOR_TECH, eng_n, cur])
+	return "\n".join(lines)
+
+
+static func build_engineer_assignment_guidance_bbcode(
+	province: Province,
+	bd: Dictionary,
+	compact: bool = true,
+) -> String:
+	if province == null or bd.is_empty():
+		return ""
+	var level := get_engineer_guidance_level(province, bd)
+	if level in ["none", "foreign", "present"]:
+		return ""
+	var snap := get_engineer_assignment_snapshot(province)
+	var chip := int(snap.get("chip_damage_per_day", 0))
+	var rate := float(snap.get("repair_total", float(bd.get("total", 0.0))))
+	var r1 := float(snap.get("rate_at_1_brigade", rate))
+	var r2 := float(snap.get("rate_at_2_brigades", r1))
+	var lines: PackedStringArray = []
+	lines.append(
+		"%s  [b]Guidance: %s[/b][/color]"
+		% [_guidance_level_color(level), engineer_guidance_level_title(level)]
+	)
+	match level:
+		"critical":
+			if compact:
+				lines.append(
+					"%s  [b]Critical[/b] = sabotage chips are beating repair today. Station engineers before infra drops further.[/color]"
+					% COLOR_MUTED
+				)
+			else:
+				lines.append(
+					"%s  [b]Critical[/b] — the daily duel favors sabotage. Without engineers, repair cannot outpace chip damage.[/color]"
+					% COLOR_MUTED
+				)
+			if chip > 0:
+				lines.append(
+					"%s  Now: repair +%.2f/day vs sabotage ~%d/day — need repair > chip to recover.[/color]"
+					% [COLOR_WARN, rate, chip]
+				)
+				if r1 > float(chip):
+					lines.append(
+						"%s  +1 brigade projects +%.2f/day (likely flips the duel).[/color]" % [COLOR_TECH, r1]
+					)
+				else:
+					lines.append(
+						"%s  +1 brigade → +%.2f/day; +2 → +%.2f/day — may still need more or clear ◎ agents.[/color]"
+						% [COLOR_MUTED, r1, r2]
+					)
+		"recommended":
+			if compact:
+				lines.append(
+					"%s  [b]Recommended[/b] = repair runs but engineers would materially help (low infra or sabotage pressure).[/color]"
+					% COLOR_MUTED
+				)
+			else:
+				lines.append(
+					"%s  [b]Recommended[/b] — not losing the duel yet, but repair is thin. Assign before sabotage escalates.[/color]"
+					% COLOR_MUTED
+				)
+			if chip > 0:
+				lines.append(
+					"%s  Sabotage ~%d/day vs repair +%.2f/day — engineers widen the margin.[/color]"
+					% [COLOR_MUTED, chip, rate]
+				)
+			elif int(bd.get("infrastructure", province.infrastructure)) < 45:
+				lines.append(
+					"%s  Infrastructure below 45 — engineer bonus speeds recovery.[/color]" % COLOR_MUTED
+				)
+		"present_insufficient":
+			var eng_n := float(snap.get("engineer_brigades", float(bd.get("engineer_brigades", 0.0))))
+			if compact:
+				lines.append(
+					"%s  [b]Present but insufficient[/b] = engineers are here but repair still loses (or barely holds) the duel.[/color]"
+					% COLOR_MUTED
+				)
+			else:
+				lines.append(
+					"%s  [b]Present but insufficient[/b] — %.1f brigade-equiv on station is not enough while sabotage chips remain.[/color]"
+					% [COLOR_MUTED, eng_n]
+				)
+			if chip > 0:
+				lines.append(
+					"%s  Now +%.2f/day vs chip ~%d/day — add brigades (+2 → +%.2f/day) or break the ◎ network.[/color]"
+					% [COLOR_WARN, rate, chip, r2]
+				)
+			else:
+				lines.append(
+					"%s  Add brigades or clear agents — current station does not stop pressure.[/color]" % COLOR_MUTED
+				)
+	var scenario := build_engineer_repair_scenario_bbcode(province, bd, compact)
+	if not scenario.is_empty():
+		lines.append(scenario)
+	if province_accepts_player_engineers(province, bd):
+		var assign_hint := "Shift+click deploys nearest engineer division"
+		if compact:
+			assign_hint += " · inspector button cycles divisions"
+		else:
+			assign_hint += (
+				" on the map (L overlay recommended), or use Deploy engineers in the inspector"
+			)
+		lines.append("%s  [b]Assign:[/b] %s.[/color]" % [COLOR_MUTED, assign_hint])
+		var roster := build_engineer_capable_divisions_hint_bbcode(
+			str(bd.get("country_tag", country_tag_for_province(province))), compact,
+		)
+		if not roster.is_empty():
+			lines.append(roster)
+	return "\n".join(lines)
+
+
+static func _guidance_level_color(level: String) -> String:
+	match level:
+		"critical", "present_insufficient":
+			return COLOR_WARN
+		"recommended", "present":
+			return COLOR_TECH
+		_:
+			return COLOR_MUTED
+
+
+static func build_engineer_assignment_chip_bbcode(province: Province, bd: Dictionary) -> String:
+	var level := get_engineer_guidance_level(province, bd)
+	match level:
+		"critical":
+			return "%s🔧 URGENT[/color]" % COLOR_WARN
+		"recommended":
+			return "%s🔧 assign[/color]" % COLOR_TECH
+		"present_insufficient":
+			return "%s🔧 weak[/color]" % COLOR_WARN
+		"present":
+			return build_engineer_hover_chip_bbcode(province, bd)
+		_:
+			return ""
+
+
+static func _engineer_repair_rate_line(
+	label: String,
+	before: Dictionary,
+	after: Dictionary,
+) -> String:
+	if before.is_empty() and after.is_empty():
+		return ""
+	var rate_before := float(before.get("repair_total", 0.0))
+	var rate_after := float(after.get("repair_total", 0.0))
+	if absf(rate_before - rate_after) < 0.005:
+		return ""
+	return "%s repair +%.2f→+%.2f/day" % [label, rate_before, rate_after]
+
+
+static func build_engineer_assignment_toast_message(
+	province: Province,
+	success: bool,
+	level_before: String,
+	level_after: String,
+	engineer_brigades: float,
+	error_text: String = "",
+	deploy_result: Dictionary = {},
+) -> String:
+	if province == null:
+		return ""
+	if not success:
+		if not error_text.is_empty():
+			return error_text
+		return "Could not deploy engineers to %s" % province.name
+	var div_name := str(deploy_result.get("division_name", "")).strip_edges()
+	var eng_equiv := float(deploy_result.get("engineer_equiv", 0.0))
+	var moved_from := str(deploy_result.get("moved_from_name", "")).strip_edges()
+	var title := engineer_guidance_level_title(level_after)
+	if title.is_empty():
+		title = "Engineers on station"
+	var delta := ""
+	if level_before != level_after and not level_before.is_empty():
+		delta = " (%s → %s)" % [
+			engineer_guidance_level_title(level_before),
+			engineer_guidance_level_title(level_after),
+		]
+	var who := "Engineers"
+	if not div_name.is_empty():
+		who = div_name
+	var move_bit := ""
+	if not moved_from.is_empty():
+		move_bit = " — moved from %s" % moved_from
+	var brg_note := "%.1f brg-equiv at province" % engineer_brigades
+	if eng_equiv > 0.05 and absf(eng_equiv - engineer_brigades) > 0.05:
+		brg_note = "%.1f brg-equiv (division %.1f)" % [engineer_brigades, eng_equiv]
+	var base := "✓ %s → %s%s — %s · %s%s" % [
+		who, province.name, move_bit, brg_note, title, delta,
+	]
+	var repair_bits: PackedStringArray = []
+	var dest_before: Dictionary = deploy_result.get("destination_before", {}) as Dictionary
+	var dest_after: Dictionary = deploy_result.get("destination_after", {}) as Dictionary
+	var dest_line := _engineer_repair_rate_line(province.name, dest_before, dest_after)
+	if not dest_line.is_empty():
+		repair_bits.append(dest_line)
+	var origin_name := str(
+		(deploy_result.get("origin_before", {}) as Dictionary).get("province_name", moved_from)
+	).strip_edges()
+	if origin_name.is_empty():
+		origin_name = moved_from
+	var origin_before: Dictionary = deploy_result.get("origin_before", {}) as Dictionary
+	var origin_after: Dictionary = deploy_result.get("origin_after", {}) as Dictionary
+	if not origin_name.is_empty():
+		var origin_line := _engineer_repair_rate_line(origin_name, origin_before, origin_after)
+		if not origin_line.is_empty():
+			repair_bits.append(origin_line)
+	if repair_bits.is_empty():
+		return base
+	return "%s · %s" % [base, " · ".join(repair_bits)]
+
+
+static func build_engineer_divisions_at_province_bbcode(
+	province: Province,
+	country_tag: String,
+	compact: bool = true,
+) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = country_tag_for_province(province)
+	var divs: Array[Dictionary] = MapManager.get_engineer_divisions_at_province(province.id, tag)
+	if divs.is_empty():
+		return ""
+	var lines: PackedStringArray = []
+	if compact:
+		var names: PackedStringArray = []
+		for entry in divs:
+			names.append(str(entry.get("display_name", entry.get("formation_id", "?"))))
+		lines.append(
+			"%s  🔧 Divisions on station: %s[/color]" % [COLOR_TECH, ", ".join(names)]
+		)
+	else:
+		lines.append("%s  🔧 Engineer divisions in this province[/color]" % COLOR_TECH)
+		for entry in divs:
+			var eng := float(entry.get("engineer_brigades", 0.0))
+			lines.append(
+				"%s    · %s (%.1f engineer brg-equiv)[/color]"
+				% [COLOR_MUTED, str(entry.get("display_name", "?")), eng]
+			)
+	return "\n".join(lines)
+
+
+static func build_engineer_roster_inspector_bbcode(
+	country_tag: String,
+	highlight_province_id: int = -1,
+) -> String:
+	if typeof(MapManager) == TYPE_NIL:
+		return ""
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		return ""
+	var divs: Array[Dictionary] = MapManager.get_engineer_capable_divisions(tag)
+	if divs.is_empty():
+		return "%s  No engineer-capable divisions for %s.[/color]" % [COLOR_WARN, tag]
+	var stationed := 0
+	var free := 0
+	for entry in divs:
+		if int(entry.get("stationed_province_id", -1)) < 0:
+			free += 1
+		else:
+			stationed += 1
+	var lines: PackedStringArray = []
+	lines.append(
+		"%s  Engineer divisions — %d total (%d stationed · %d free)[/color]"
+		% [COLOR_TECH, divs.size(), stationed, free]
+	)
+	for entry in divs:
+		var label := str(entry.get("display_name", entry.get("formation_id", "?")))
+		var pid := int(entry.get("stationed_province_id", -1))
+		var eng := float(entry.get("engineer_brigades", 0.0))
+		var where := "unassigned"
+		if pid >= 0:
+			var p: Province = MapManager.get_province(pid)
+			where = p.name if p != null else "#%d" % pid
+			if pid == highlight_province_id:
+				where = "[b]%s[/b] (here)" % where
+		lines.append(
+			"%s    · %s @ %s (%.1f eng brg)[/color]" % [COLOR_MUTED, label, where, eng]
+		)
+	lines.append(
+		"%s  Shift+click province or Deploy button to move a division (same as movement order).[/color]"
+		% COLOR_MUTED
+	)
+	return "\n".join(lines)
+
+
+static func build_engineer_capable_divisions_hint_bbcode(country_tag: String, compact: bool = true) -> String:
+	if typeof(MapManager) == TYPE_NIL:
+		return ""
+	var divs: Array[Dictionary] = MapManager.get_engineer_capable_divisions(country_tag)
+	if divs.is_empty():
+		return "%s  No engineer-capable divisions registered for your country.[/color]" % COLOR_WARN
+	var unassigned := 0
+	var stationed := 0
+	var parts: PackedStringArray = []
+	for entry in divs:
+		var pid := int(entry.get("stationed_province_id", -1))
+		var label := str(entry.get("display_name", "?"))
+		if pid < 0:
+			unassigned += 1
+			if compact and parts.size() < 2:
+				parts.append("%s (free)" % label)
+		else:
+			stationed += 1
+			if not compact:
+				var p: Province = MapManager.get_province(pid)
+				var where := p.name if p != null else "#%d" % pid
+				parts.append("%s @ %s" % [label, where])
+	if compact:
+		if not parts.is_empty():
+			return "%s  Divisions: %s · %d/%d stationed (%d free)[/color]" % [
+				COLOR_MUTED, " · ".join(parts), stationed, divs.size(), unassigned,
+			]
+		return "%s  %d engineer divisions (%d stationed · %d free)[/color]" % [
+			COLOR_MUTED, divs.size(), stationed, unassigned,
+		]
+	return "%s  Engineer divisions: %s[/color]" % [COLOR_MUTED, " · ".join(parts)]
+
+
+static func engineer_repair_share_percent(bd: Dictionary) -> float:
+	var total := maxf(0.001, float(bd.get("total", 0.0)))
+	return clampf(100.0 * float(bd.get("engineer_bonus", 0.0)) / total, 0.0, 100.0)
+
+
+static func repair_rate_without_engineers(bd: Dictionary) -> float:
+	return maxf(0.01, float(bd.get("total", 0.0)) - float(bd.get("engineer_bonus", 0.0)))
+
+
+static func should_show_engineer_map_ui(province: Province, bd: Dictionary) -> bool:
+	if province == null or bd.is_empty():
+		return false
+	if has_engineers_stationed(bd):
+		return true
+	if province_needs_infrastructure_ui(province):
+		return _pressure_status_label(province, bd) in ["UNDER SABOTAGE", "RECOVERING", "DEPOT SABOTAGED"]
+	return false
+
+
+static func build_engineer_hover_chip_bbcode(province: Province, bd: Dictionary) -> String:
+	if province == null or bd.is_empty() or not has_engineers_stationed(bd):
+		return ""
+	var eng_n := float(bd.get("engineer_brigades", 0.0))
+	var bonus := float(bd.get("engineer_bonus", 0.0))
+	var share := int(round(engineer_repair_share_percent(bd)))
+	var tag := str(bd.get("country_tag", country_tag_for_province(province)))
+	var div_n := 0
+	if typeof(MapManager) != TYPE_NIL:
+		div_n = MapManager.get_engineer_divisions_at_province(province.id, tag).size()
+	if div_n > 0:
+		if share >= 8:
+			return "%s🔧 %d div · +%.2f/d (%d%%)[/color]" % [COLOR_TECH, div_n, bonus, share]
+		return "%s🔧 %d div · +%.2f/d[/color]" % [COLOR_TECH, div_n, bonus]
+	return "%s🔧 %.1f eng · +%.2f/d (%d%%)[/color]" % [COLOR_TECH, eng_n, bonus, share]
+
+
+static func build_engineer_presence_section_bbcode(
+	province: Province,
+	bd: Dictionary,
+	compact: bool = true,
+) -> String:
+	if province == null or bd.is_empty() or not should_show_engineer_map_ui(province, bd):
+		return ""
+	var eng_n := float(bd.get("engineer_brigades", 0.0))
+	var eng_bonus := float(bd.get("engineer_bonus", 0.0))
+	var total := float(bd.get("total", 0.0))
+	var without := repair_rate_without_engineers(bd)
+	var cap := MapManager.INFRA_REPAIR_ENGINEER_CAP if typeof(MapManager) != TYPE_NIL else 0.28
+	var lines: PackedStringArray = []
+	lines.append("%s── 🔧 Engineers ──[/color]" % COLOR_HEADER)
+	var div_block := build_engineer_divisions_at_province_bbcode(
+		province, str(bd.get("country_tag", country_tag_for_province(province))), compact,
+	)
+	if not div_block.is_empty():
+		lines.append(div_block)
+	if has_engineers_stationed(bd):
+		var share := int(round(engineer_repair_share_percent(bd)))
+		if compact:
+			lines.append(
+				"%s  %.1f brigade-equiv → [b]+%.2f/day[/b] repair (%d%% of +%.2f)[/color]"
+				% [COLOR_TECH, eng_n, eng_bonus, share, total]
+			)
+			lines.append(
+				"%s  Without engineers: +%.2f/day → with station: +%.2f/day[/color]"
+				% [COLOR_MUTED, without, total]
+			)
+		else:
+			lines.append(
+				"%s  [b]%.1f[/b] engineer brigade-equivalent on station[/color]" % [COLOR_TECH, eng_n]
+			)
+			lines.append(
+				"%s  Repair contribution: +%.2f/day (%d%% of total +%.2f/day) · cap ~%.2f from engineers[/color]"
+				% [COLOR_MUTED, eng_bonus, share, total, cap]
+			)
+			lines.append(
+				"%s  Rate without engineers: +%.2f/day → current +%.2f/day[/color]"
+				% [COLOR_MUTED, without, total]
+			)
+	else:
+		lines.append("%s  No engineer brigades detected in this province.[/color]" % COLOR_WARN)
+		lines.append(
+			"%s  Repair +%.2f/day — station engineers for up to +%.2f/day bonus (scales with brigades).[/color]"
+			% [COLOR_MUTED, total, cap]
+		)
+		if _pressure_status_label(province, bd) == "UNDER SABOTAGE":
+			lines.append(
+				"%s  Sabotage duel: engineers often decide whether repair beats daily chip damage.[/color]"
+				% COLOR_WARN
+			)
+	var guidance := build_engineer_assignment_guidance_bbcode(province, bd, compact)
+	if not guidance.is_empty():
+		lines.append(guidance)
+	elif has_engineers_stationed(bd):
+		var scenario := build_engineer_repair_scenario_bbcode(province, bd, compact)
+		if not scenario.is_empty():
+			lines.append(scenario)
+		if province_accepts_player_engineers(province, bd):
+			lines.append(
+				"%s  [b]Assign:[/b] Shift+click province · inspector Deploy cycles divisions.[/color]"
+				% COLOR_MUTED
+			)
+	return "\n".join(lines)
+
+
 ## One-line repair boosts (engineers / stability / technology) when they matter.
 static func build_repair_contributions_glance_bbcode(bd: Dictionary) -> String:
 	if bd.is_empty():
@@ -1518,7 +2689,8 @@ static func build_repair_contributions_glance_bbcode(bd: Dictionary) -> String:
 	var stab := float(bd.get("stability_bonus", 0.0))
 	var tech := float(bd.get("tech_focus_bonus", 0.0))
 	if eng > 0.001:
-		parts.append("engineers +%.2f (%.1f brg)" % [eng, eng_n])
+		var share := int(round(engineer_repair_share_percent(bd)))
+		parts.append("🔧 +%.2f (%.1f brg, %d%%)" % [eng, eng_n, share])
 	if absf(stab) > 0.001:
 		parts.append("stability %+.2f" % stab)
 	if tech > 0.001:
@@ -1635,11 +2807,17 @@ static func build_pressure_status_chip_row_bbcode(province: Province) -> String:
 					maxi(1, chip - int(floor(rate))),
 				]
 			if winner == "repair":
+				var eng_n := float(bd.get("engineer_brigades", 0.0))
+				if eng_n >= 0.05:
+					return "%s⬆ REP WIN · +%.1f/d · 🔧%.0f[/color]" % [COLOR_TECH, rate, eng_n]
 				return "%s⬆ REP WIN · +%.1f/d[/color]" % [COLOR_TECH, rate]
 			if chip > 0:
 				return "%s⚖ EVEN · 0/d[/color]" % COLOR_TECH
 			return "%s⬇ SABOTAGE[/color]" % COLOR_WARN
 		"RECOVERING":
+			var eng_r := float(bd.get("engineer_brigades", 0.0))
+			if eng_r >= 0.05:
+				return "%s⬆ RECOVERING · +%.1f/d · 🔧%.0f[/color]" % [COLOR_TECH, rate, eng_r]
 			return "%s⬆ RECOVERING · +%.1f/d[/color]" % [COLOR_TECH, rate]
 		"SUPPLY PRESSURE":
 			var fill := depot_fill_ratio(province.id)
@@ -2015,9 +3193,10 @@ static func build_infra_repair_breakdown_bbcode(province: Province, detailed: bo
 			% [COLOR_MUTED, " · ".join(parts), total]
 		)
 	if eng > 0.0 and detailed:
-		lines.append("%s  Engineers on station: %.1f brigade-equiv[/color]" % [COLOR_TECH, eng])
-	elif eng > 0.0 and not detailed:
-		lines.append("%s  %.1f engineer brigade-equiv on station[/color]" % [COLOR_TECH, eng])
+		var share := int(round(engineer_repair_share_percent(bd)))
+		lines.append(
+			"%s  Engineers: %.1f brg → +%.2f/day (%d%% of repair)[/color]" % [COLOR_TECH, eng, eng_bonus, share]
+		)
 	return "\n".join(lines)
 
 
@@ -2048,11 +3227,35 @@ static func build_province_infrastructure_card_bbcode(
 	var duel := build_sabotage_repair_duel_bbcode(province, bd, compact)
 	if not duel.is_empty():
 		lines.append(duel)
+	var engineer_sec := build_engineer_presence_section_bbcode(province, bd, compact)
+	if not engineer_sec.is_empty():
+		lines.append(engineer_sec)
+	var tag := country_tag_for_province(province)
+	if _province_matches_country(province, tag):
+		if compact:
+			var div_hint := build_engineer_divisions_at_province_bbcode(province, tag, true)
+			if not div_hint.is_empty() and div_hint not in engineer_sec:
+				lines.append(div_hint)
+			var roster_hint := build_engineer_capable_divisions_hint_bbcode(tag, true)
+			if (
+				not roster_hint.is_empty()
+				and engineer_sec.is_empty()
+				and province_needs_engineer_assignment(province, bd)
+			):
+				lines.append(roster_hint)
+		else:
+			var roster := build_engineer_roster_inspector_bbcode(tag, province.id)
+			if not roster.is_empty():
+				lines.append(roster)
 	var eng_pre := float(bd.get("engineer_brigades", 0.0))
 	var stab_pre := float(bd.get("stability_bonus", 0.0))
 	var tech_pre := float(bd.get("tech_focus_bonus", 0.0))
 	var has_repair_contrib_pre := eng_pre > 0.0 or absf(stab_pre) > 0.001 or tech_pre > 0.001
-	if compact and (has_repair_contrib_pre or status == "UNDER SABOTAGE"):
+	if compact and has_repair_contrib_pre and engineer_sec.is_empty():
+		var glance_pre := build_repair_contributions_glance_for_province(province, bd)
+		if not glance_pre.is_empty():
+			lines.append(glance_pre)
+	elif compact and status == "UNDER SABOTAGE" and engineer_sec.is_empty():
 		var glance_pre := build_repair_contributions_glance_for_province(province, bd)
 		if not glance_pre.is_empty():
 			lines.append(glance_pre)
@@ -2313,15 +3516,9 @@ static func build_province_radio_overlay_line_bbcode(province: Province, country
 		return ""
 	if not _province_matches_country(province, country_tag):
 		return ""
-	var compact := MapTechnologyContext.build_support_radio_compact_chip(country_tag)
-	if compact.is_empty():
-		return ""
-	var routes := MapTechnologyContext.build_support_route_summary_plain(country_tag)
-	if routes.is_empty():
-		return "%s📡 This province benefits from Support/Radio (%s).[/color]" % [
-			COLOR_TECH, compact,
-		]
-	return "%s📡 Support/Radio here: %s · %s[/color]" % [COLOR_TECH, compact, routes]
+	return MapTechnologyContext.build_support_radio_province_block_bbcode(
+		province, country_tag, true,
+	)
 
 
 static func agent_pressure_focus_kind(province: Province) -> String:
@@ -2648,6 +3845,9 @@ static func build_province_glance_bbcode(
 	var prod := MapTechnologyContext.build_province_production_tech_bbcode(province, tag)
 	if not prod.is_empty():
 		parts.append(prod)
+	var elig_glance := MapTechnologyContext.build_build_eligibility_glance_bbcode(province, tag)
+	if not elig_glance.is_empty():
+		parts.append(elig_glance)
 	if _province_matches_country(province, tag) and not omit_support:
 		var support := MapTechnologyContext.build_support_radio_compact_chip(tag)
 		if not support.is_empty():
@@ -2817,18 +4017,18 @@ static func format_report_tooltip(report: Dictionary) -> String:
 			lines.append("")
 		lines.append(pressure_sec)
 	var tag_early := str(report.get("country_tag", ""))
-	if _province_matches_country(p, tag_early) and MapTechnologyContext.has_support_radio_bonuses(tag_early):
-		var radio_line := build_province_radio_overlay_line_bbcode(p, tag_early)
-		var prov_tech := MapTechnologyContext.build_province_support_benefit_bbcode(p, tag_early)
-		var show_prov_tech := (
-			not prov_tech.is_empty()
-			and (agent_applies_daily_pressure(p) or bool(report.get("supply_overlay_active", false)))
-			and prov_tech != radio_line
-		)
-		if show_prov_tech:
-			if not infra_card.is_empty() or not pressure_sec.is_empty():
-				lines.append("")
-			lines.append(prov_tech)
+	var tech_section := append_technology_section_after_pressure(
+		lines, p, tag_early, infra_card, pressure_sec, true,
+	)
+	append_build_eligibility_section_after_technology(lines, p, tag_early, true)
+	if infra_card.is_empty():
+		var bd_eng := _infra_repair_breakdown(p)
+		if should_show_engineer_map_ui(p, bd_eng):
+			var eng_block := build_engineer_presence_section_bbcode(p, bd_eng, true)
+			if not eng_block.is_empty():
+				if not lines.is_empty():
+					lines.append("")
+				lines.append(eng_block)
 	var banner := build_tooltip_context_banner(report)
 	if not banner.is_empty():
 		lines.append(banner)
@@ -2840,25 +4040,53 @@ static func format_report_tooltip(report: Dictionary) -> String:
 			lines.append(dual)
 	var tag := str(report.get("country_tag", ""))
 	var radio_overlay := build_province_radio_overlay_line_bbcode(p, tag)
-	var nat_line := build_national_situation_one_liner(p, pe)
+	var nat_line := build_national_situation_one_liner(p, pe, not tech_section.is_empty())
 	if not nat_line.is_empty():
 		lines.append(nat_line)
 	var dual_has_support := not dual.is_empty() and _province_matches_country(p, tag)
 	var omit_support_in_glance := (
-		MapTechnologyContext.has_support_radio_bonuses(tag)
-		and province_benefits_country(p, tag)
-		and (not nat_line.is_empty() or dual_has_support or not radio_overlay.is_empty())
+		not tech_section.is_empty()
+		or (
+			MapTechnologyContext.has_support_radio_bonuses(tag)
+			and province_benefits_country(p, tag)
+			and (not nat_line.is_empty() or dual_has_support or not radio_overlay.is_empty())
+		)
 	)
+	if not tech_section.is_empty() and omit_support_in_glance:
+		radio_overlay = ""
 	if not radio_overlay.is_empty() and omit_support_in_glance:
 		lines.append(radio_overlay)
 	var skip_dual_glance := not infra_card.is_empty()
 	var glance := build_province_glance_bbcode(p, pe, 4, skip_dual_glance, omit_support_in_glance)
 	if not glance.is_empty():
 		lines.append(glance)
+	var bd_dev := _infra_repair_breakdown(p)
+	var dev_extra := ""
+	if has_engineers_stationed(bd_dev):
+		dev_extra = " · %s🔧 %.1f eng[/color]" % [
+			COLOR_TECH,
+			float(bd_dev.get("engineer_brigades", 0.0)),
+		]
 	lines.append(
-		"%sDev %d  ·  Infra %d  ·  VP %d  ·  %s[/color]"
-		% [COLOR_MUTED, p.development_level, p.infrastructure, p.victory_points, p.terrain.capitalize()]
+		"%sDev %d  ·  Infra %d  ·  VP %d  ·  %s%s[/color]"
+		% [
+			COLOR_MUTED,
+			p.development_level,
+			p.infrastructure,
+			p.victory_points,
+			p.terrain.capitalize(),
+			dev_extra,
+		]
 	)
+	if not infra_card.is_empty() and has_engineers_stationed(bd_dev):
+		lines.append(
+			"%sRepair +%.2f/day — engineers add +%.2f (see Sabotage & repair card)[/color]"
+			% [
+				COLOR_MUTED,
+				float(bd_dev.get("total", 0.0)),
+				float(bd_dev.get("engineer_bonus", 0.0)),
+			]
+		)
 	if pe != null:
 		lines.append(build_compact_effective_summary(pe))
 		if bool(report.get("supply_overlay_active", false)):
@@ -2866,7 +4094,8 @@ static func format_report_tooltip(report: Dictionary) -> String:
 			if not log_line.is_empty():
 				lines.append(log_line)
 		elif (
-			MapTechnologyContext.has_support_radio_bonuses(tag)
+			tech_section.is_empty()
+			and MapTechnologyContext.has_support_radio_bonuses(tag)
 			and province_benefits_country(p, tag)
 			and nat_line.is_empty()
 		):
@@ -2874,6 +4103,17 @@ static func format_report_tooltip(report: Dictionary) -> String:
 			if not radio.is_empty():
 				lines.append(radio)
 	lines.append(_depot_bbcode_line(p.id))
+	if not bool(report.get("supply_overlay_active", false)) and typeof(TradeManager) != TYPE_NIL:
+		var tn := TradeManager.count_trade_flows_on_map_province(p.id, "")
+		if tn > 0:
+			var player_t := ""
+			if typeof(SupplyManager) != TYPE_NIL:
+				player_t = str(SupplyManager.player_tag).strip_edges().to_upper()
+			if TradeManager.collect_trade_flow_summaries_for_map_province(p.id, player_t, 1).size() > 0:
+				lines.append(
+					"%s◇ %d active trade corridor%s · L shows route[/color]"
+					% [COLOR_TECH, tn, "s" if tn != 1 else ""]
+				)
 	if bool(report.get("supply_overlay_active", false)):
 		var layer_sum := build_compact_layers_summary_bbcode(
 			true,
@@ -2885,6 +4125,11 @@ static func format_report_tooltip(report: Dictionary) -> String:
 		if not layer_sum.is_empty():
 			lines.append(layer_sum)
 		lines.append(build_supply_map_hint_bbcode(p.id))
+		var tf_line := build_trade_flow_map_section_bbcode(p.id, "", 3)
+		if not tf_line.is_empty():
+			if not lines.is_empty() and lines[lines.size() - 1] != "":
+				lines.append("")
+			lines.append(tf_line)
 		var role := str(report.get("hover_supply_role", ""))
 		if not role.is_empty():
 			lines.append(build_supply_role_hint_bbcode(p.id, role))
@@ -3162,13 +4407,17 @@ static func build_supply_logistics_one_liner(pe: ProvinceEffects, country_tag: S
 	return line
 
 
-static func build_national_situation_one_liner(province: Province, pe: ProvinceEffects = null) -> String:
+static func build_national_situation_one_liner(
+	province: Province,
+	pe: ProvinceEffects = null,
+	omit_support: bool = false,
+) -> String:
 	if province == null:
 		return ""
 	var tag := country_tag_for_province(province)
 	var support := ""
-	if _province_matches_country(province, tag):
-		support = MapTechnologyContext.build_national_support_line_bbcode(tag)
+	if not omit_support and _province_matches_country(province, tag):
+		support = MapTechnologyContext.build_national_support_line_bbcode(tag, true)
 	var badge := build_national_sources_badge(province)
 	var impact := ""
 	if pe != null:
@@ -3352,6 +4601,86 @@ static func build_inspector_compare_header(
 	return "%s⚔ Comparing with %s — battle preview below.[/color]" % [COLOR_WARN, other.name]
 
 
+static func _is_trade_flow_hover_chip(tok: String) -> bool:
+	var t := tok.to_lower()
+	return "◇" in tok and ("trade" in t or "routes" in t or "×" in tok)
+
+
+static func build_trade_flow_map_section_bbcode(
+	province_id: int,
+	viewer_country_tag: String,
+	max_entries: int = 3,
+) -> String:
+	if typeof(TradeManager) == TYPE_NIL:
+		return ""
+	var tag := viewer_country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		var sm := _supply_manager()
+		if sm != null:
+			tag = str(sm.player_tag).strip_edges().to_upper()
+	var total := TradeManager.count_trade_flows_on_map_province(province_id, tag)
+	var entries := TradeManager.collect_trade_flow_summaries_for_map_province(
+		province_id, tag, clampi(max_entries, 1, 8),
+	)
+	if entries.is_empty():
+		return ""
+	var lines: PackedStringArray = []
+	lines.append(
+		"%sTrade corridors · %d[/color]"
+		% [COLOR_HEADER, total],
+	)
+	for e in entries:
+		var role := str(e.get("role", "transit"))
+		var from := str(e.get("from", "?"))
+		var to := str(e.get("to", "?"))
+		var cargo := str(e.get("cargo_line", ""))
+		var risk := int(e.get("risk_pct", -1))
+		var mode := str(e.get("mode", ""))
+		var verb := ""
+		match role:
+			"export_hub":
+				verb = "Export hub → %s" % to
+			"export_transit":
+				verb = "Transit → %s" % to
+			"import_hub":
+				verb = "Import hub ← %s" % from
+			"import_transit":
+				verb = "Transit ← %s" % from
+			_:
+				if tag == from:
+					verb = "Toward %s" % to
+				elif tag == to:
+					verb = "From %s" % from
+				else:
+					verb = "%s ⟶ %s" % [from, to]
+		var tail := cargo
+		if risk >= 6:
+			tail += " · ~%d%% route risk" % risk
+		if not mode.is_empty() and mode != "land":
+			tail += " · %s" % mode
+		lines.append("%s  • %s — %s[/color]" % [COLOR_TECH, verb, tail])
+	if total > entries.size():
+		lines.append("%s  +%d more deal%s[/color]" % [COLOR_MUTED, total - entries.size(), "s" if total - entries.size() != 1 else ""])
+	return "\n".join(lines)
+
+
+static func build_trade_flow_hover_chip_bbcode(province: Province, viewer_country_tag: String) -> String:
+	if province == null or typeof(TradeManager) == TYPE_NIL:
+		return ""
+	var tag := viewer_country_tag.strip_edges().to_upper()
+	if tag.is_empty() and typeof(SupplyManager) != TYPE_NIL:
+		tag = str(SupplyManager.player_tag).strip_edges().to_upper()
+	if tag.is_empty():
+		tag = country_tag_for_province(province)
+	var n := TradeManager.count_trade_flows_on_map_province(province.id, tag)
+	if n <= 0:
+		return ""
+	# Quieter than primary logistics chips; truncation merge looks for _is_trade_flow_hover_chip.
+	if n > 1:
+		return "%s◇ trade ×%d[/color]" % [COLOR_PROVINCE, n]
+	return "%s◇ trade[/color]" % COLOR_PROVINCE
+
+
 static func build_supply_map_hint_bbcode(province_id: int) -> String:
 	var fill := depot_fill_ratio(province_id)
 	var sm := _supply_manager()
@@ -3364,14 +4693,33 @@ static func build_supply_map_hint_bbcode(province_id: int) -> String:
 		else:
 			role = "healthy depot"
 	var route_note := ""
+	var trade_note := ""
 	if sm != null:
 		for plan_var in sm.get_all_routes():
-			if plan_var is SupplyRoutePlan and province_id in (plan_var as SupplyRoutePlan).province_path:
-				route_note = " · on active supply route"
-				break
+			if not (plan_var is SupplyRoutePlan):
+				continue
+			var pl := plan_var as SupplyRoutePlan
+			if not province_id in pl.province_path:
+				continue
+			if pl.represents_trade_flow:
+				trade_note = " · trade corridor (gold line)"
+			else:
+				route_note = " · on military supply route"
+	if trade_note.is_empty() and route_note.is_empty() and sm != null and typeof(TradeManager) != TYPE_NIL:
+		var ptag := str(sm.player_tag).strip_edges().to_upper()
+		if TradeManager.count_trade_flows_on_map_province(province_id, ptag) > 0:
+			trade_note = " · trade corridor"
+	var route_bits := route_note + trade_note
+	var geo := ""
+	if typeof(MapManager) != TYPE_NIL:
+		var gp: Province = MapManager.get_province(province_id)
+		if gp != null:
+			var tr := str(gp.terrain).strip_edges()
+			if not tr.is_empty():
+				geo = " · %s" % tr.capitalize()
 	return (
-		"%s📦 Tint: %s (%d%%)%s  |  ◇ hub  — route  ◆ selected  · ~ preview[/color]"
-		% [COLOR_MUTED, role, int(round(maxf(fill, 0.0) * 100.0)), route_note]
+		"%s📦 Tint: %s (%d%%)%s%s  |  ◇ hub  — route  ◆ selected  · ~ preview[/color]"
+		% [COLOR_MUTED, role, int(round(maxf(fill, 0.0) * 100.0)), route_bits, geo]
 	)
 
 

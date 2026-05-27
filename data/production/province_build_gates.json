@@ -1,0 +1,112 @@
+{
+  "development": {
+    "min_by_era": {
+      "ww1": 1,
+      "interwar": 2,
+      "ww2": 3,
+      "early_cold_war": 4,
+      "late_cold_war": 5,
+      "modern": 6,
+      "future": 7
+    },
+    "min_by_domain": {
+      "air": 4,
+      "space": 7,
+      "naval": 3,
+      "land": 1,
+      "support": 2
+    },
+    "min_by_factory_type": {
+      "standard": 1,
+      "shipyard": 3,
+      "aircraft_factory": 4,
+      "tank_plant": 3
+    }
+  },
+  "terrain": {
+    "blocked_domains": {
+      "mountain": ["naval"],
+      "desert": ["naval"],
+      "jungle": ["space"],
+      "arctic": ["naval", "air"],
+      "tundra": ["naval"]
+    },
+    "blocked_all_except_domains": {
+      "sea": ["naval"]
+    },
+    "domain_min_development_bonus": {
+      "mountain": { "air": 1, "land": 1 },
+      "jungle": { "land": 1, "armor": 1 },
+      "desert": { "air": 1 }
+    },
+    "requires_port_domains": ["naval"],
+    "impossible_on_sea_except_domains": ["naval"]
+  },
+  "messages": {
+    "development_short": "Needs development %d (province %d)",
+    "development_action": "Raise province development — industry projects, occupation stability, and infrastructure investment increase build capacity.",
+    "development_investment_hint": "Development gates advanced lines: factories and infrastructure raise local dev over time; dedicated investment projects are planned.",
+    "development_gap_action": "Need development %d (have %d, +%d) — prioritize industry and infrastructure here, or move the line to a higher-dev province.",
+    "terrain_domain_blocked": "%s terrain cannot host %s production",
+    "terrain_sea_land": "Land production is not possible in open sea provinces",
+    "terrain_port_required": "Naval production requires a coastal province with port access",
+    "terrain_dev_bonus": "%s terrain raises the development bar for %s by +%d (need %d, have %d)",
+    "retool_vs_reloc_tech": "Research lock — finish required tech before retooling; changing province won't help.",
+    "retool_vs_reloc_dev": "Development lock — relocate line to %s (Production → new design, retooling downtime) or invest in dev here.",
+    "retool_vs_reloc_terrain": "Geography lock — move production to %s; retooling cannot fix terrain or missing port.",
+    "retool_vs_reloc_factory": "Factory mismatch — retool plant type, pick a design this factory supports, or move line to a province with the right plant.",
+    "retool_in_place": "Same province: assign a new design in Production; retooling cost and recovery still apply.",
+    "relocate_priority": "Strategic: relocating blocked lines often beats waiting for development in unsuitable provinces.",
+    "dev_growth_factories": "Active factories in the province gradually increase development while lines run.",
+    "dev_growth_infra": "Higher infrastructure (build/repair) improves local industry and unlocks faster recovery.",
+    "decision_relocate_now": "↗ Move blocked lines to %s — faster than raising dev here.",
+    "decision_invest_here": "📈 Invest here (+{gap} dev to reach {need}) — worth it if you want a long-term hub.",
+    "decision_retool_here": "↻ Retool in place — change design or factory type on the Production screen.",
+    "decision_research_first": "🔬 Research first — relocation and retooling won't bypass missing tech.",
+    "decision_split_retool_reloc": "↻ Retool here (hub) · ↗ {target} (output now)",
+    "blocked_relocate_to": "Blocked here — run at {target} instead",
+    "dev_tier_chip": "dev {cur} → {next} unlocks {unlock}",
+    "production_assign_action": "Production: assign this design at {target} (retooling applies)",
+    "production_invest_action": "Production: keep lines here · repair infra · add factories to raise dev",
+    "actions_header": "What to do next",
+    "next_dev_unlock": "At development {next}: unlock {unlock}",
+    "retool_if": "↻ Retool here if: keeping a long-term industrial hub, same factory type works, or dev gap is only +1 with {factories} factories already.",
+    "relocate_if": "↗ Relocate to {target} if: terrain/port blocks you, dev gap ≥2, or you need output before local dev catches up.",
+    "profile_chip_good": "✓ {items}",
+    "profile_chip_weak": "✗ {items}",
+    "development_growth_short": "Grow dev: {factories} factories + infra {infra} → dev {next} unlocks {unlock}",
+    "development_unlocks_production": "Higher development unlocks factory types and era lines — invest here or ↗ relocate for output now.",
+    "relocate_chip_action": "Production: assign at {target}",
+    "picker_strong_domain": "Filtered {domain}: strong province for this domain",
+    "picker_weak_domain": "Filtered {domain}: weak here — use ↗ rows or another province",
+    "production_ready_action": "Production: assign here when ready",
+    "profile_weak_hint": "Weak domains need higher dev, ports, or different terrain — invest or ↗ relocate.",
+    "decision_relocate_no_target": "↗ Relocate blocked lines — open Production at a stronger province",
+    "relocate_map_hint": "Select on map: province #{id}",
+    "picker_empty_relocate": "Nothing buildable here — try ↗ {target} or raise development",
+    "invest_panel_invest": "↻ INVEST HERE: keep {factories} factories running + repair infra (+{gap} dev to reach {need}) — next tier unlocks {unlock}",
+    "invest_panel_reloc": "↗ RELOCATE to {target}: assign in Production for output now",
+    "invest_panel_or_reloc": "↗ OR relocate to {target} if you need output before local dev catches up",
+    "comparison_header": "Invest here vs relocate",
+    "development_picker_hint": "Dev {cur}: {factories} factories + infra {infra} raise industry here · dev {next} unlocks {unlock}",
+    "focus_map_toast": "Map focused on {name} (#{id}) — assign production there",
+    "recommend_strong": "★ Recommended",
+    "recommend_viable": "○ Viable alternative",
+    "invest_reloc_headline_reloc": "Move production to {target} for output now",
+    "invest_reloc_headline_invest": "Invest in this province as your industrial hub",
+    "invest_reloc_headline_split": "Split strategy: output now vs hub here",
+    "invest_line_strong": "{badge}: ↻ Invest here (+{gap} dev → unlocks {unlock})",
+    "invest_line_viable": "{badge}: ↻ Invest here ({factories} factories, infra {infra})",
+    "invest_detail_short": "— long-term hub: higher dev unlocks more factory types",
+    "reloc_line_strong": "{badge}: ↗ {target} (assign in Production)",
+    "reloc_line_viable": "{badge}: ↗ {target} (output before local dev catches up)",
+    "reloc_detail_terrain": "— terrain or port blocks builds here",
+    "reloc_detail_dev": "— need +{gap} more dev for current lines",
+    "development_long_term": "Higher development unlocks more factory types and era-appropriate production.",
+    "development_unlock_ladder": "Unlock ladder: dev {cur} → {next} ({unlock})",
+    "development_section_header": "Development",
+    "panel_compact_summary": "{headline} · {secondary}",
+    "focus_map_toast_strong": "★ Map focused on {name} — assign production there",
+    "focus_map_toast_plain": "Map focused on {name} (#{id})"
+  }
+}

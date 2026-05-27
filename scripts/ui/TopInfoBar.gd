@@ -18,6 +18,7 @@ extends Control
 @onready var diplomacy_button: Button = $ContentRow/CenterContainer/DiplomacyButton
 @onready var agents_button: Button = $ContentRow/CenterContainer/AgentsButton
 @onready var map_button: Button = $ContentRow/CenterContainer/MapButton
+var trade_button: Button   # Added dynamically for quick Trade access
 
 @onready var steel_label: Label = $ContentRow/RightContainer/ResourcesContainer/SteelLabel
 @onready var aluminum_label: Label = $ContentRow/RightContainer/ResourcesContainer/AluminumLabel
@@ -69,6 +70,16 @@ func _apply_theme() -> void:
 		map_button,
 	]:
 		RetrowaveTheme.style_nav_button(btn)
+
+	# Quick Trade access button (lightweight addition)
+	if trade_button == null:
+		trade_button = Button.new()
+		trade_button.text = "Trade"
+		trade_button.custom_minimum_size = Vector2(70, 28)
+		$ContentRow/CenterContainer.add_child(trade_button)
+		RetrowaveTheme.style_nav_button(trade_button)
+		# Place it after Diplomacy for logical grouping
+		$ContentRow/CenterContainer.move_child(trade_button, diplomacy_button.get_index() + 1)
 	RetrowaveTheme.style_primary_button(production_button)
 	RetrowaveTheme.style_primary_button(leaders_button)
 	for btn in [save_button, load_button, settings_button, help_button, pause_button]:
@@ -88,6 +99,9 @@ func _connect_buttons() -> void:
 	diplomacy_button.pressed.connect(_on_diplomacy_pressed)
 	agents_button.pressed.connect(_on_agents_pressed)
 	map_button.pressed.connect(_on_map_pressed)
+
+	if trade_button:
+		trade_button.pressed.connect(_on_trade_pressed)
 
 	save_button.pressed.connect(_on_menu_pressed)  # Open main menu for immersion (Save/Load now behind menu)
 	load_button.pressed.connect(_on_menu_pressed)
@@ -260,7 +274,13 @@ func _on_technology_pressed() -> void:
 
 
 func _on_diplomacy_pressed() -> void:
-	print("Open Diplomacy Screen (TODO)")
+	var packed := load("res://scenes/ui/DiplomacyView.tscn")
+	if packed:
+		var view = packed.instantiate()
+		get_tree().root.add_child(view)
+		# DiplomacyView handles its own popup_centered in _ready
+	else:
+		_toast("Diplomacy screen not available yet.", 2.5, true)
 
 
 func _on_agents_pressed() -> void:
@@ -280,6 +300,18 @@ func _on_agents_pressed() -> void:
 
 func _on_map_pressed() -> void:
 	_close_overlay_screens()
+
+func _on_trade_pressed() -> void:
+	var packed := load("res://scenes/ui/TradeMarketView.tscn")
+	if packed:
+		var view = packed.instantiate()
+		get_tree().root.add_child(view)
+		if view.has_method("show_market"):
+			view.show_market("PUBLIC")
+		else:
+			view.popup_centered(Vector2i(1100, 700))
+	else:
+		_toast("Trade Market not available.", 2.5, true)
 
 
 func _close_screen(screen_name: String) -> void:
@@ -536,7 +568,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			_show_save_manager_popup()
 			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_ESCAPE:
-			_show_main_menu_popup_fallback()
+			_on_menu_pressed()
 			get_viewport().set_input_as_handled()
 
 ## Helper to populate the Save Manager list inside the main menu with rich metadata.

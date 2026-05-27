@@ -36,9 +36,8 @@
 ##     ]
 ##   },
 ##   "supply": {
-##     "depots": {
-##       "42": { "stockpile": 1234.5, "throughput_capacity": 180.0, "sabotage_level": 0.25, ... }
-##     }
+##     "depots": { "42": { "stockpile": ..., "sabotage_level": ... } },
+##     "division_deployments": { "german_infantry_...": { "province_id": 5, "country_tag": "GER" } }
 ##   },
 ##   "national_modifiers": {
 ##     "country_modifiers": { "GER": [ {effect dicts with remaining_months etc.}, ... ] }
@@ -89,7 +88,8 @@
 ## - Technology (full country research state + active progress)
 ## - Agents + Networks (full resources + daily effect trackers)
 ## - Map provinces (owner/controller, development, infrastructure)
-## - Supply depots (stockpile, throughput, sabotage_level)
+## - Supply depots (stockpile, throughput, sabotage_level) + division_deployments
+## - Leader formations (stationed_province_id per division)
 ## - NationalModifierManager temporary effects
 ## - Scenario metadata (scenario_id captured on save via ScenarioLoader.get_current_scenario_name(); richer metadata added in 0.2-dev: last_played, game_version)
 ## - Production (stance, national stockpiles/equipment, per-line progress/retooling/shortage state)
@@ -101,7 +101,7 @@
 ##   timestamp, scenario_id, player_tag, last_played, game_version, play_time_seconds (0 for now)
 ##
 ## === LIMITATIONS / WHAT IS NOT SAVED YET ===
-## - Full combat/formation presence, routes, intel caches, attrition (will partially rebuild)
+## - Full combat/formation presence beyond division_deployments (routes, intel caches, attrition)
 ## - Most NationalSpirit / doctrine beyond Tech
 ## - UI caches, camera, selection state
 ## - Mod or highly transient data
@@ -404,9 +404,9 @@ func _apply_save_data(data: Dictionary) -> void:
 	if data.has("map") and typeof(MapManager) != TYPE_NIL:
 		_apply_map_state(data["map"])
 
-	# 3. Supply depots (stockpile, sabotage_level, throughput) — after hubs exist
+	# 3. Supply depots only (deployments after leaders — step 7b)
 	if data.has("supply") and typeof(SupplyManager) != TYPE_NIL:
-		_apply_supply_state(data["supply"])
+		_apply_supply_depots_state(data["supply"])
 
 	# 4. National modifiers (daily agent sabotage effects etc.)
 	if data.has("national_modifiers") and typeof(NationalModifierManager) != TYPE_NIL:
@@ -420,9 +420,13 @@ func _apply_save_data(data: Dictionary) -> void:
 	if data.has("agents") and typeof(AgentManager) != TYPE_NIL:
 		_apply_agent_state(data["agents"])
 
-	# 7. Leaders (before or after agents; positions reference leaders)
+	# 7. Leaders (formations include stationed_province_id)
 	if data.has("leaders") and typeof(LeaderManager) != TYPE_NIL:
 		_apply_leader_state(data["leaders"])
+
+	# 7b. Division map deployments (after leaders; syncs CombatPresenceRegistry engineers)
+	if data.has("supply") and typeof(SupplyManager) != TYPE_NIL:
+		_apply_supply_deployments_state(data["supply"])
 
 	# 8. Production + Factories (factories feed lines; apply after map provinces)
 	if data.has("factories") and typeof(FactoryManager) != TYPE_NIL:
@@ -626,7 +630,9 @@ func _apply_map_state(m: Dictionary) -> void:
 ## --- Supply depots ---
 
 func _serialize_supply_state() -> Dictionary:
-	var out := { "depots": {} }
+	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("get_save_data"):
+		return SupplyManager.get_save_data()
+	var out := { "depots": {}, "division_deployments": {} }
 	if typeof(SupplyManager) == TYPE_NIL:
 		return out
 
@@ -640,9 +646,37 @@ func _serialize_supply_state() -> Dictionary:
 			"sabotage_level": depot.sabotage_level,
 			# inbound/outbound are transient; usually not worth persisting
 		}
+	if SupplyManager.has("division_deployments"):
+		for fid in SupplyManager.division_deployments.keys():
+			out["division_deployments"][str(fid)] = (
+				SupplyManager.division_deployments[fid] as Dictionary
+			).duplicate(true)
 	return out
 
-func _apply_supply_state(s: Dictionary) -> void:
+func _apply_supply_depots_state(s: Dictionary) -> void:
+	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("apply_save_data"):
+		SupplyManager.apply_save_data(s, true, false)
+		return
+	_apply_supply_depots_legacy(s)
+
+
+func _apply_supply_deployments_state(s: Dictionary) -> void:
+	if typeof(SupplyManager) == TYPE_NIL:
+		return
+	var slice: Dictionary = s as Dictionary
+	if not slice.has("division_deployments"):
+		return
+	if SupplyManager.has_method("apply_save_data"):
+		SupplyManager.apply_save_data(slice, false, true)
+		return
+	SupplyManager.division_deployments = (
+		slice.get("division_deployments", {}) as Dictionary
+	).duplicate(true)
+	if SupplyManager.has_method("resync_division_deployments_to_registry"):
+		SupplyManager.resync_division_deployments_to_registry()
+
+
+func _apply_supply_depots_legacy(s: Dictionary) -> void:
 	var depots: Dictionary = s.get("depots", {}) as Dictionary
 	var restored := 0
 	for pid_str in depots.keys():

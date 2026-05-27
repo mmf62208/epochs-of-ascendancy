@@ -39,6 +39,11 @@ theme_override_constants/separation = 10
 layout_mode = 2
 text = "Select New Production Design"
 
+[node name="ContextLabel" type="Label" parent="MarginContainer/VBoxContainer"]
+layout_mode = 2
+autowrap_mode = 3
+text = ""
+
 [node name="FilterRow" type="HBoxContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
 theme_override_constants/separation = 12
@@ -56,6 +61,7 @@ text = "Show older designs"
 layout_mode = 2
 custom_minimum_size = Vector2(0, 36)
 placeholder_text = "Search designs..."
+clear_button_enabled = true
 
 [node name="LegendLabel" type="Label" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2

@@ -22,6 +22,9 @@ var uses_spaceport: bool = false
 var cargo_tons_per_day: float = 0.0
 var routing_mode: String = "land"
 var is_player_override: bool = false
+## When true, this plan models an ongoing TradeFlow corridor (lighter map draw + trade_transit rings).
+## Interdiction / Diplomacy UIs can key off this without inferring from route_id prefixes.
+var represents_trade_flow: bool = false
 
 
 func path_length() -> int:

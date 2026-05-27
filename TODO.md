@@ -137,7 +137,8 @@ After the recent heavy investment in the National Modifier/Spirit system and Age
   - Full offer/evaluation/accept backend with PUBLIC vs BLACK visibility.
   - Fairness weighting (extensible), quality_modifier on designs, direct integration with DesignManager.grant_acquired_design.
   - Comprehensive architecture docs + extension points for intel/tech/province/black-market events.
-  - Next: UI, AI proposers, SaveLoad, full item type execution.
+  - Trade UI fully functional: TradeMarketView (Public/Black/My Offers tabs, search/sort), Offer Details + rich counter editor (per-item editing, color-coded diffs, bulk scales, presets with save/load custom templates, tooltips, expanded SENT/RECEIVED My Offers with badges, stronger new-counter highlighting).
+  - Audit of prior "claimed but incomplete" items closed with the above nice-to-haves (May 2026).
 
 ### Smart Production Advisor
 - Tool that suggests which factories to assign when trying to build equipment for a new division/unit, with time-to-completion estimates.
@@ -177,7 +178,7 @@ After the recent heavy investment in the National Modifier/Spirit system and Age
 ### Outstanding
 - Wire spirit modifiers more deeply into Combat (full battle resolution) and leader systems
 - National focus / event sources for temporary effects
-- Diplomacy screen
+- Diplomacy screen (foundation stub created: DiplomacyView + TopInfoBar wiring + bilateral Trade integration via new hooks)
 - Rich persistent province-based Agent Networks (see "Agent & Espionage System" section below)
 
 ### Recently Completed (Major)

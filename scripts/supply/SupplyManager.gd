@@ -16,6 +16,8 @@ var player_tag: String = "USA"
 
 var player_depot_province_ids: Array[int] = []
 var force_registry: CombatPresenceRegistry = CombatPresenceRegistry.new()
+## formation_id -> {province_id, country_tag} — source of truth for player division map presence.
+var division_deployments: Dictionary = {}
 var attrition_ledger: AttritionReplenishmentLedger = AttritionReplenishmentLedger.new()
 var division_templates: DivisionTemplateLoader = DivisionTemplateLoader.new()
 
@@ -432,6 +434,43 @@ func get_route(route_key: String) -> SupplyRoutePlan:
 func get_all_routes() -> Array:
 	return _routes.values()
 
+## Finds a suitable route for a TradeFlow between two countries.
+## This is the primary integration point for TradeManager to get a SupplyRoutePlan for a trade deal.
+## Uses capitals/main hubs when available and general cargo profile.
+func find_route_for_trade(from_tag: String, to_tag: String, cargo_tons: float = 100.0) -> SupplyRoutePlan:
+	var source := _get_main_hub_for_tag(from_tag)
+	var target := _get_main_hub_for_tag(to_tag)
+	if source < 0 or target < 0 or source == target:
+		return null
+
+	var old_cargo := active_cargo
+	active_cargo = SupplyCargoProfile.general_supplies(cargo_tons)
+
+	var plan := _plan_route(source, target, [], false)  # non-player override
+	if plan and plan.path_length() >= 2:
+		plan.owner_tag = from_tag
+		plan.route_id = "trade_%s_%s" % [from_tag, to_tag]
+		plan.represents_trade_flow = true
+		# Register so MapRenderer / SupplyMapLayer can draw alongside military supply routes.
+		# Future: namespace per-flow_id once TradeFlows can diverge bilateral paths.
+		_routes[plan.route_id] = plan
+		# Note: interdiction estimation inside _plan_route uses player_tag currently.
+		# For cross-country trade this is an approximation; future work can improve it.
+
+	active_cargo = old_cargo
+	return plan
+
+## Internal helper to find a main hub (capital preferred) for any country tag.
+func _get_main_hub_for_tag(tag: String) -> int:
+	for hub: ProvinceSupplyHub in hubs.values():
+		if hub.owner_tag == tag and hub.has_kind(ProvinceSupplyHub.DepotKind.CAPITAL):
+			return hub.province_id
+	# Fallback to any hub owned by the tag
+	for hub: ProvinceSupplyHub in hubs.values():
+		if hub.owner_tag == tag:
+			return hub.province_id
+	return -1
+
 
 func _generate_local_supply_from_development(days: float) -> void:
 	if days <= 0.0 or typeof(Province) == TYPE_NIL:
@@ -487,30 +526,339 @@ func toggle_overlay() -> void:
 	overlay_toggled.emit(overlay_visible)
 
 
+func ensure_division_formations_for_country(country_tag: String) -> void:
+	if typeof(LeaderManager) != TYPE_NIL:
+		LeaderManager.register_division_formations_for_country(country_tag)
+
+
+func get_engineer_capable_formations(country_tag: String) -> Array[Dictionary]:
+	## Divisions with engineer subunits/sustainment, including map location.
+	var tag := country_tag.strip_edges().to_upper()
+	var out: Array[Dictionary] = []
+	if tag.is_empty():
+		return out
+	ensure_division_formations_for_country(tag)
+	division_templates.load_all()
+	if typeof(LeaderManager) == TYPE_NIL:
+		return out
+	for formation in LeaderManager.get_formations_for_country(tag):
+		if formation == null or formation.formation_type != Formation.TYPE_DIVISION:
+			continue
+		var div_id := formation.formation_id
+		var template: DivisionTemplate = division_templates.get_division(div_id)
+		if template == null:
+			continue
+		var eng := template.count_engineer_brigade_equivalent()
+		if eng < 0.05:
+			continue
+		var stationed := formation.stationed_province_id
+		if division_deployments.has(div_id):
+			stationed = int((division_deployments[div_id] as Dictionary).get("province_id", stationed))
+		var display := formation.name
+		if display.is_empty():
+			display = template.display_name if not template.display_name.is_empty() else div_id
+		out.append({
+			"formation_id": div_id,
+			"display_name": display,
+			"engineer_brigades": eng,
+			"stationed_province_id": stationed,
+		})
+	return out
+
+
+func get_formations_stationed_at_province(province_id: int, country_tag: String = "") -> Array[Dictionary]:
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = player_tag
+	var out: Array[Dictionary] = []
+	for entry in get_engineer_capable_formations(tag):
+		if int(entry.get("stationed_province_id", -1)) == province_id:
+			out.append(entry)
+	return out
+
+
+func _formation_engineer_equiv(formation_id: String) -> float:
+	division_templates.load_all()
+	var template: DivisionTemplate = division_templates.get_division(formation_id)
+	if template == null:
+		return 0.0
+	return template.count_engineer_brigade_equivalent()
+
+
+func _recalculate_engineers_at_province(province_id: int, country_tag: String) -> void:
+	var tag := country_tag.strip_edges().to_upper()
+	var total := 0.0
+	for fid in division_deployments.keys():
+		var dep: Dictionary = division_deployments[fid] as Dictionary
+		if int(dep.get("province_id", -1)) != province_id:
+			continue
+		if str(dep.get("country_tag", "")).strip_edges().to_upper() != tag:
+			continue
+		total += _formation_engineer_equiv(str(fid))
+	var report := force_registry.get_report(province_id)
+	report.set_engineers(tag, total)
+
+
+func _sort_engineer_deploy_candidates(entries: Array[Dictionary]) -> void:
+	entries.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var eng_a := float(a.get("engineer_brigades", 0.0))
+		var eng_b := float(b.get("engineer_brigades", 0.0))
+		if eng_a != eng_b:
+			return eng_a > eng_b
+		return str(a.get("display_name", "")) < str(b.get("display_name", ""))
+	)
+
+
+func pick_formation_for_engineer_deployment(country_tag: String, target_province_id: int) -> String:
+	## Prefer a division already at the province, else strongest free division, then strongest remote.
+	var tag := country_tag.strip_edges().to_upper()
+	var candidates := get_engineer_capable_formations(tag)
+	if candidates.is_empty():
+		return ""
+	for entry in candidates:
+		if int(entry.get("stationed_province_id", -1)) == target_province_id:
+			return str(entry.get("formation_id", ""))
+	var unassigned: Array[Dictionary] = []
+	var remote: Array[Dictionary] = []
+	for entry in candidates:
+		var pid := int(entry.get("stationed_province_id", -1))
+		if pid < 0:
+			unassigned.append(entry)
+		elif pid != target_province_id:
+			remote.append(entry)
+	if not unassigned.is_empty():
+		_sort_engineer_deploy_candidates(unassigned)
+		return str(unassigned[0].get("formation_id", ""))
+	if not remote.is_empty():
+		_sort_engineer_deploy_candidates(remote)
+		return str(remote[0].get("formation_id", ""))
+	return str(candidates[0].get("formation_id", ""))
+
+
+func _province_engineer_snapshot(province_id: int, country_tag: String) -> Dictionary:
+	var snap := {
+		"engineer_brigades": 0.0,
+		"repair_total": 0.0,
+		"guidance_level": "none",
+		"province_name": "",
+	}
+	if typeof(MapManager) == TYPE_NIL:
+		return snap
+	var p: Province = MapManager.get_province(province_id)
+	if p != null:
+		snap["province_name"] = p.name
+	var bd: Dictionary = MapManager.get_infrastructure_repair_breakdown(province_id)
+	snap["engineer_brigades"] = float(bd.get("engineer_brigades", 0.0))
+	snap["repair_total"] = float(bd.get("total", 0.0))
+	if p != null and typeof(ProvinceInsight) != TYPE_NIL:
+		snap["guidance_level"] = ProvinceInsight.get_engineer_guidance_level(p, bd)
+	return snap
+
+
+func move_formation_to_province(
+	formation_id: String,
+	province_id: int,
+	country_tag: String = "",
+) -> Dictionary:
+	## General division movement order — deployment, formation location, and map presence.
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = player_tag
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		return {"ok": false, "error": "No division specified"}
+	if tag.is_empty() or not provinces.has(province_id):
+		return {"ok": false, "error": "Invalid province or country"}
+	var province: Province = provinces[province_id] as Province
+	if province == null or _ctrl(province) != tag:
+		return {"ok": false, "error": "Province not controlled by %s" % tag}
+	division_templates.load_all()
+	var template: DivisionTemplate = division_templates.get_division(fid)
+	if template == null:
+		return {"ok": false, "error": "Unknown division: %s" % fid}
+	ensure_division_formations_for_country(tag)
+	var moved_from := -1
+	if division_deployments.has(fid):
+		moved_from = int((division_deployments[fid] as Dictionary).get("province_id", -1))
+	var dest_before := _province_engineer_snapshot(province_id, tag)
+	var origin_before: Dictionary = {}
+	if moved_from >= 0 and moved_from != province_id:
+		origin_before = _province_engineer_snapshot(moved_from, tag)
+	division_deployments[fid] = {
+		"province_id": province_id,
+		"country_tag": tag,
+		"order_type": FormationMovement.ORDER_MOVE_TO_PROVINCE,
+	}
+	if typeof(LeaderManager) != TYPE_NIL:
+		var formation: Formation = LeaderManager.get_formation(fid)
+		if formation != null:
+			formation.stationed_province_id = province_id
+	if moved_from >= 0 and moved_from != province_id:
+		_recalculate_engineers_at_province(moved_from, tag)
+	register_division_presence(province_id, tag, template, 1.0)
+	_recalculate_engineers_at_province(province_id, tag)
+	var dest_after := _province_engineer_snapshot(province_id, tag)
+	var origin_after: Dictionary = {}
+	if moved_from >= 0 and moved_from != province_id:
+		origin_after = _province_engineer_snapshot(moved_from, tag)
+	return {
+		"ok": true,
+		"order_type": FormationMovement.ORDER_MOVE_TO_PROVINCE,
+		"province_id": province_id,
+		"formation_id": fid,
+		"division_name": template.display_name if not template.display_name.is_empty() else fid,
+		"engineer_brigades": float(dest_after.get("engineer_brigades", 0.0)),
+		"engineer_equiv": template.count_engineer_brigade_equivalent(),
+		"guidance_before": str(dest_before.get("guidance_level", "none")),
+		"guidance_after": str(dest_after.get("guidance_level", "none")),
+		"moved_from_province_id": moved_from,
+		"moved_from_name": str(origin_before.get("province_name", "")),
+		"origin_before": origin_before,
+		"origin_after": origin_after,
+		"destination_before": dest_before,
+		"destination_after": dest_after,
+	}
+
+
+func deploy_engineer_formation_to_province(
+	formation_id: String,
+	province_id: int,
+	country_tag: String = "",
+) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = player_tag
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		fid = pick_formation_for_engineer_deployment(tag, province_id)
+	if fid.is_empty():
+		return {"ok": false, "error": "No engineer-capable division available"}
+	division_templates.load_all()
+	var template: DivisionTemplate = division_templates.get_division(fid)
+	if template == null:
+		return {"ok": false, "error": "Unknown division: %s" % fid}
+	if template.count_engineer_brigade_equivalent() < 0.05:
+		return {"ok": false, "error": "%s has no engineer brigades" % fid}
+	var result := move_formation_to_province(fid, province_id, tag)
+	if not bool(result.get("ok", false)):
+		return result
+	result["engineer_equiv"] = template.count_engineer_brigade_equivalent()
+	return result
+
+
+## Map assignment: move an engineer-capable division to a province (replaces demo-only registration).
+func station_engineer_brigades_at(
+	province_id: int,
+	country_tag: String = "",
+	_brigade_equiv: float = 1.0,
+	formation_id: String = "",
+) -> Dictionary:
+	return deploy_engineer_formation_to_province(formation_id, province_id, country_tag)
+
+
 func seed_demo_engineer_presence(country_tag: String = "") -> void:
 	var tag := country_tag.strip_edges().to_upper()
 	if tag.is_empty():
 		tag = player_tag
 	if tag.is_empty():
 		return
-	division_templates.load_all()
-	var division: DivisionTemplate = division_templates.get_division(
-		"german_infantry_division_1943_mixed",
-	)
-	if division == null:
-		for div_id in division_templates.get_all_division_ids():
-			var candidate: DivisionTemplate = division_templates.get_division(div_id)
-			if candidate != null and candidate.count_engineer_brigade_equivalent() > 0.0:
-				division = candidate
-				break
-	if division == null:
-		return
+	ensure_division_formations_for_country(tag)
+	var target_pid := -1
 	for pid_var in provinces:
 		var province: Province = provinces[pid_var] as Province
 		if province == null or _ctrl(province) != tag:
 			continue
-		register_division_presence(province.id, tag, division, 1.0)
+		if typeof(MapManager) != TYPE_NIL and typeof(ProvinceInsight) != TYPE_NIL:
+			var bd := MapManager.get_infrastructure_repair_breakdown(province.id)
+			if ProvinceInsight.province_needs_engineer_assignment(province, bd):
+				target_pid = province.id
+				break
+		if target_pid < 0:
+			target_pid = province.id
+	if target_pid < 0:
 		return
+	deploy_engineer_formation_to_province("", target_pid, tag)
+
+
+func resync_division_deployments_to_registry() -> void:
+	## Rebuild engineer totals and division presence from division_deployments (after load).
+	if division_deployments.is_empty():
+		return
+	var tags_seen: Dictionary = {}
+	var provinces_seen: Dictionary = {}
+	for fid in division_deployments.keys():
+		var dep: Dictionary = division_deployments[fid] as Dictionary
+		var tag := str(dep.get("country_tag", "")).strip_edges().to_upper()
+		var pid := int(dep.get("province_id", -1))
+		if tag.is_empty() or pid < 0:
+			continue
+		tags_seen[tag] = true
+		provinces_seen[pid] = true
+		division_templates.load_all()
+		var template: DivisionTemplate = division_templates.get_division(str(fid))
+		if template == null:
+			continue
+		if typeof(LeaderManager) != TYPE_NIL:
+			var formation: Formation = LeaderManager.get_formation(str(fid))
+			if formation != null:
+				formation.stationed_province_id = pid
+		register_division_presence(pid, tag, template, 1.0)
+	for pid in provinces_seen.keys():
+		for tag in tags_seen.keys():
+			_recalculate_engineers_at_province(int(pid), str(tag))
+
+
+## === Save/Load (division_deployments + depots via SaveLoadManager supply section) ===
+func get_save_data() -> Dictionary:
+	var depots := {}
+	for pid in depot_states.keys():
+		var depot: ProvinceDepotState = depot_states[pid]
+		if depot == null:
+			continue
+		depots[str(pid)] = {
+			"stockpile": depot.stockpile,
+			"throughput_capacity": depot.throughput_capacity,
+			"sabotage_level": depot.sabotage_level,
+		}
+	var deployments := {}
+	for fid in division_deployments.keys():
+		deployments[str(fid)] = (division_deployments[fid] as Dictionary).duplicate(true)
+	return {
+		"version": 1,
+		"depots": depots,
+		"division_deployments": deployments,
+	}
+
+
+func apply_save_data(
+	data: Dictionary,
+	restore_depots: bool = true,
+	restore_deployments: bool = true,
+) -> void:
+	if typeof(data) != TYPE_DICTIONARY:
+		return
+	if restore_depots:
+		var depots: Dictionary = data.get("depots", {}) as Dictionary
+		for pid_str in depots.keys():
+			var pid := int(pid_str)
+			var entry: Dictionary = depots[pid_str] as Dictionary
+			var depot: ProvinceDepotState = depot_states.get(pid)
+			if depot != null and typeof(entry) == TYPE_DICTIONARY:
+				depot.stockpile = float(entry.get("stockpile", depot.stockpile))
+				if entry.has("throughput_capacity"):
+					depot.throughput_capacity = float(entry["throughput_capacity"])
+				if entry.has("sabotage_level"):
+					depot.sabotage_level = float(entry["sabotage_level"])
+	if restore_deployments and data.has("division_deployments"):
+		division_deployments.clear()
+		var saved_deps: Dictionary = data.get("division_deployments", {}) as Dictionary
+		for fid in saved_deps.keys():
+			var dep: Dictionary = saved_deps[fid] as Dictionary
+			if typeof(dep) != TYPE_DICTIONARY:
+				continue
+			division_deployments[str(fid)] = dep.duplicate(true)
+		resync_division_deployments_to_registry()
+		print("SupplyManager: restored %d division deployments" % division_deployments.size())
 
 
 func seed_demo_enemy_forces(sample_tags: Array[String] = []) -> void:

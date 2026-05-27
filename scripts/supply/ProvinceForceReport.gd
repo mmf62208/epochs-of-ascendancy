@@ -48,3 +48,11 @@ func add_engineers(tag: String, brigade_equiv: float) -> void:
 
 func total_engineers(tag: String) -> float:
 	return float(engineers_by_tag.get(tag.strip_edges().to_upper(), 0.0))
+
+
+func set_engineers(tag: String, amount: float) -> void:
+	var t := tag.strip_edges().to_upper()
+	if amount <= 0.001:
+		engineers_by_tag.erase(t)
+	else:
+		engineers_by_tag[t] = amount

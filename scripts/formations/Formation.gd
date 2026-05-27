@@ -29,6 +29,8 @@ const CATEGORY_SPACE := "space"
 @export var parent_formation_id: String = ""
 @export var is_training: bool = false
 @export var is_in_combat: bool = false
+## Map province where this formation is stationed (division movement / engineer repair).
+@export var stationed_province_id: int = -1
 
 var assigned_leader: Leader = null
 

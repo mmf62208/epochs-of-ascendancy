@@ -2668,8 +2668,25 @@ func get_save_data() -> Dictionary:
 		if l != null:
 			leaders_data[lid] = inst_to_dict(l)
 
+	var formations_data := {}
+	for fid in formations.keys():
+		var f: Formation = formations[fid] as Formation
+		if f == null:
+			continue
+		formations_data[str(fid)] = {
+			"formation_id": f.formation_id,
+			"name": f.name,
+			"formation_type": f.formation_type,
+			"country_tag": f.country_tag,
+			"leader_id": f.leader_id,
+			"stationed_province_id": f.stationed_province_id,
+			"is_training": f.is_training,
+			"is_in_combat": f.is_in_combat,
+		}
+
 	return {
 		"leaders": leaders_data,
+		"formations": formations_data,
 		"country_positions": country_positions.duplicate(true),
 		"officer_training_leader_id": officer_training_leader_id.duplicate(true),
 		"pending_retirements": pending_retirements.duplicate(true),
@@ -2734,6 +2751,24 @@ func apply_save_data(data: Dictionary) -> void:
 		pending_leader_replacements = (data["pending_leader_replacements"] as Array).duplicate(true)
 	if data.has("player_country_tag"):
 		player_country_tag = str(data["player_country_tag"])
+
+	if data.has("formations"):
+		var fdata: Dictionary = data["formations"] as Dictionary
+		for fid in fdata.keys():
+			var fd: Dictionary = fdata[fid] as Dictionary
+			if typeof(fd) != TYPE_DICTIONARY:
+				continue
+			var f := Formation.new()
+			f.formation_id = str(fd.get("formation_id", fid))
+			f.name = str(fd.get("name", ""))
+			f.formation_type = str(fd.get("formation_type", Formation.TYPE_DIVISION))
+			f.country_tag = str(fd.get("country_tag", ""))
+			f.leader_id = str(fd.get("leader_id", ""))
+			f.stationed_province_id = int(fd.get("stationed_province_id", -1))
+			f.is_training = bool(fd.get("is_training", false))
+			f.is_in_combat = bool(fd.get("is_in_combat", false))
+			formations[f.formation_id] = f
+		print("LeaderManager: Restored %d formation locations" % fdata.size())
 
 	print("LeaderManager: Restored %d leaders + positions" % leaders.size())
 
