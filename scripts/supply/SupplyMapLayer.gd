@@ -19,6 +19,8 @@ extends Node2D
 @export_range(0.0, 0.95, 0.05) var trade_corridor_underglow_alpha_mul: float = 0.42
 var _centroids: Dictionary = {}
 var _rules: SupplyRules = null
+## Extra dim for trade polylines while Supply overlay (L) is on — military routes use layer `self_modulate` only.
+var trade_corridor_supply_dim: float = 1.0
 
 
 func setup(centroids: Dictionary, rules: SupplyRules) -> void:
@@ -65,9 +67,13 @@ func _draw_single_route(plan: SupplyRoutePlan, colors_cfg: Dictionary, is_trade_
 	var color := _color_for_plan(plan, colors_cfg)
 	var w := line_width
 	if is_trade_corridor:
-		# Muted amber: reads as commerce, not tactical green/purple logistics.
-		var base_a := clampf(trade_corridor_alpha, 0.1, 0.5)
-		color = Color(0.84, 0.72, 0.44, base_a)
+		var base_a := clampf(
+			trade_corridor_alpha * clampf(trade_corridor_supply_dim, 0.55, 1.0),
+			0.08,
+			0.5,
+		)
+		color = ProvinceMapVisuals.COLOR_TRADE_CORRIDOR
+		color.a = base_a
 		w = maxf(1.0, line_width * clampf(trade_corridor_width_scale, 0.22, 0.52))
 	var points: PackedVector2Array = PackedVector2Array()
 	for pid in plan.province_path:

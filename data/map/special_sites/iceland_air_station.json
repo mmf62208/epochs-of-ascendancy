@@ -1,0 +1,31 @@
+{
+  "id": "iceland_air_station",
+  "site_type": "airfield",
+  "tier": 2,
+  "name": "Iceland Air Station",
+  "description": "Forward air operations hub in the North Atlantic. Critical for convoy protection, maritime patrol, and transatlantic reinforcement routes.",
+  "visual": {
+    "icon": "✈",
+    "color": "#4a90d9",
+    "scale": 1.1
+  },
+  "effects": {
+    "air_operations_efficiency": 0.22,
+    "air_recon_bonus": 0.35,
+    "naval_interdiction_reduction": 0.12
+  },
+  "construction": {
+    "required_infra_level": 2,
+    "base_days": 95,
+    "base_pp": 165,
+    "required_terrain": ["coastal"],
+    "required_features": []
+  },
+  "damage": {
+    "max_damage_level": 3,
+    "repair_days_per_level": 18
+  },
+  "upgrade": {
+    "target_id": "iceland_air_station_tier3"
+  }
+}

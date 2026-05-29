@@ -2043,9 +2043,9 @@ static func build_infra_progress_meter_bbcode(
 		bar += "█" if i < filled else "░"
 	var bar_color := COLOR_TECH if infra >= 35 else (COLOR_WARN if infra <= 15 else COLOR_MUTED)
 	if sabotage_winning:
-		bar_color = Color("#ff8888")
+		bar_color = "[color=#ff8888]"
 	elif repair_winning:
-		bar_color = Color("#5ae6b8")
+		bar_color = "[color=#5ae6b8]"
 	var suffix := ""
 	if sabotage_winning and net_loss_per_day > 0:
 		suffix = "  ·  −%d/day" % net_loss_per_day
@@ -3271,7 +3271,6 @@ static func build_province_infrastructure_card_bbcode(
 			)
 		else:
 			lines.append("%s⛟ Daily supply disruption on this province[/color]" % COLOR_WARN)
-		var tag := country_tag_for_province(province)
 		if _province_matches_country(province, tag):
 			var radio_hint := MapTechnologyContext.build_support_recovery_hint_bbcode(tag)
 			if not radio_hint.is_empty():
@@ -3293,6 +3292,11 @@ static func build_province_infrastructure_card_bbcode(
 				infra, 10, sabotage_winning, net_loss, repair_winning, net_gain,
 			)
 		)
+
+	# === Active provincial investment project (new Phase A integration) ===
+	var project_line := _build_active_investment_project_line(province, tag)
+	if not project_line.is_empty():
+		lines.append(project_line)
 		if not compact:
 			lines.append(
 				"%sInfra %d / 50  ·  Repair rate +%.2f/day[/color]" % [accent, infra, rate]
@@ -3369,7 +3373,62 @@ static func province_needs_infrastructure_ui(province: Province) -> bool:
 
 
 static func build_province_infrastructure_section_bbcode(province: Province) -> String:
-	return build_province_infrastructure_card_bbcode(province, false)
+	var base := build_province_infrastructure_card_bbcode(province, false)
+
+	# Add special sites summary if present
+	if province != null and province.special_sites.size() > 0:
+		var ss_lines: PackedStringArray = []
+		for site in province.special_sites:
+			if site == null:
+				continue
+			var state := "✓" if site.is_completed() else "🚧" if site.is_under_construction() else "⚠"
+			ss_lines.append("%s %s (T%d)" % [state, site.id, site.tier])
+		if ss_lines.size() > 0:
+			base += "\n[color=#a0c0ff]Special Sites:[/color] " + " · ".join(ss_lines)
+
+	return base
+
+
+## Shows active "Invest in Infrastructure" project status in hover tooltips and inspector.
+static func _build_active_investment_project_line(province: Province, country_tag: String) -> String:
+	if province == null:
+		return ""
+	var mgr := _get_infra_mgr_for_insight()
+	if mgr == null or not mgr.has_method("has_active_project"):
+		return ""
+	if not mgr.has_active_project(province.id):
+		return ""
+
+	var st: Dictionary = {}
+	if mgr.has_method("get_project_status"):
+		st = mgr.get_project_status(province.id)
+	if st.is_empty():
+		return ""
+
+	var pct := int(round(float(st.get("progress", 0.0))))
+	var eta := int(st.get("eta_days", 0))
+	var target := int(st.get("target_level", province.infrastructure + 1))
+	var sabotaged := bool(st.get("is_sabotaged", false))
+
+	var color := COLOR_TECH
+	var icon := "🚧"
+	if sabotaged:
+		color = COLOR_WARN
+		icon = "⚠"
+
+	var sab := " (under sabotage)" if sabotaged else ""
+	return "%s%s Infra Investment → Lv.%d  %d%%%s (ETA %dd)[/color]" % [
+		color, icon, target, pct, sab, eta
+	]
+
+
+static func _get_infra_mgr_for_insight() -> Object:
+	if typeof(InfrastructureDevelopmentManager) != TYPE_NIL:
+		return InfrastructureDevelopmentManager
+	# Soft fallback
+	if Engine.has_singleton("InfrastructureDevelopmentManager"):
+		return Engine.get_singleton("InfrastructureDevelopmentManager")
+	return null
 
 
 static func build_supply_pressure_recovery_bbcode(province: Province) -> String:

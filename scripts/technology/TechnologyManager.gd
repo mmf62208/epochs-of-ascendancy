@@ -305,7 +305,20 @@ func get_effective_reconnaissance(country_tag: String) -> float:
 	if typeof(NationalModifierManager) == TYPE_NIL:
 		return 0.0
 	var mods := NationalModifierManager.get_combat_modifiers(country_tag)
-	return float(mods.get("reconnaissance", 0.0))
+	var base := float(mods.get("reconnaissance", 0.0))
+
+	# Airfield special sites provide additional reconnaissance (Phase 2)
+	if typeof(MapManager) != TYPE_NIL:
+		var air_recon := 0.0
+		for pid in MapManager.get_provinces_by_owner(country_tag):
+			var p := MapManager.get_province(pid)
+			if p and p.has_special_site_of_type(SpecialSite.SiteType.AIRFIELD):
+				var pe := MapManager.get_province_effects(pid, country_tag) if MapManager.has_method("get_province_effects") else null
+				if pe and pe.has_method("get_special_site_air_recon_bonus"):
+					air_recon += pe.get_special_site_air_recon_bonus()
+		base += air_recon * 0.01  # Scale to match other recon values
+
+	return base
 
 
 ## Public helper for map, production, and other systems to query tech unlocks without
@@ -514,6 +527,18 @@ func get_daily_rp(country_tag: String) -> float:
 	total += float(state.get("tech_intel_rp_bonus", 0.0))
 	if typeof(NationalModifierManager) != TYPE_NIL:
 		total += NationalModifierManager.get_national_modifier(tag, "research_speed")
+
+	# Special Project sites give research speed (Phase 2)
+	if typeof(MapManager) != TYPE_NIL:
+		var special_bonus := 0.0
+		for pid in MapManager.get_provinces_by_owner(tag):
+			var p := MapManager.get_province(pid)
+			if p:
+				for site in p.special_sites:
+					if site != null and site.is_completed() and site.site_type == SpecialSite.SiteType.SPECIAL_PROJECT:
+						special_bonus += 5.0 * site.tier   # Tier 1 = +5 RP/day, Tier 2 = +10, etc.
+		total += special_bonus
+
 	return maxf(total, 0.1)
 
 

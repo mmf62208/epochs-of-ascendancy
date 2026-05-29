@@ -35,6 +35,9 @@ extends Resource
 ## Feature tag -> numeric level (0 omits feature; booleans coerce to 1).
 @export var special_features: Dictionary = {}
 @export var tags: Array[String] = []
+
+## Special sites (ports, airfields, special projects, fortifications, etc.)
+@export var special_sites: Array[SpecialSite] = []
 #endregion
 
 
@@ -147,6 +150,28 @@ func get_interdiction_resistance_modifier() -> float:
 	var dev := float(clampi(development_level, 0, 50))
 	# Base 1.0, up to ~1.6 for max infra+dev
 	return 1.0 + (infra * 0.008) + (dev * 0.012)
+
+
+# === Special Sites Helpers ===
+func has_special_site_of_type(site_type: SpecialSite.SiteType) -> bool:
+	for site in special_sites:
+		if site != null and site.site_type == site_type and site.is_completed():
+			return true
+	return false
+
+
+func get_special_sites_of_type(site_type: SpecialSite.SiteType) -> Array[SpecialSite]:
+	var result: Array[SpecialSite] = []
+	for site in special_sites:
+		if site != null and site.site_type == site_type:
+			result.append(site)
+	return result
+
+
+func add_special_site(site: SpecialSite) -> void:
+	if site != null:
+		special_sites.append(site)
+		site.province_id = id
 
 
 func _base_terrain_movement_multiplier() -> float:

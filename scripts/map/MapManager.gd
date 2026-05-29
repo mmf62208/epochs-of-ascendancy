@@ -668,8 +668,8 @@ func get_engineer_assignment_snapshot(province_id: int) -> Dictionary:
 	if p != null and typeof(ProvinceInsight) != TYPE_NIL:
 		winner = ProvinceInsight.daily_infra_duel_winner(p, bd)
 	var level := "none"
-	if p != null and not tag.is_empty():
-		var owned := ProvinceInsight.province_benefits_country(p, tag)
+	if p != null and not tag.is_empty() and typeof(ProvinceInsight) != TYPE_NIL:
+		var owned: bool = ProvinceInsight.province_benefits_country(p, tag)
 		if not owned:
 			level = "foreign"
 		elif eng_n >= 0.05:

@@ -1,0 +1,31 @@
+{
+  "id": "special_project_heavy_water",
+  "site_type": "special_project",
+  "tier": 2,
+  "name": "Heavy Water Facility",
+  "description": "A critical strategic site for advanced nuclear research and plutonium production.",
+  
+  "visual": {
+    "icon": "special_project_heavy_water",
+    "size_scale": 1.6,
+    "has_construction_state": true,
+    "has_damaged_state": true
+  },
+
+  "effects": {
+    "research_bonus_nuclear": 40,
+    "strategic_deterrence": 25,
+    "enemy_intel_difficulty": 15
+  },
+
+  "construction": {
+    "base_days": 90,
+    "political_power_cost": 150,
+    "required_infra_level": 4
+  },
+
+  "damage": {
+    "max_damage_level": 4,
+    "repair_days_per_level": 20
+  }
+}

@@ -1,0 +1,725 @@
+{
+  "version": 1,
+  "provinces": {
+    "73_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "73_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "73_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "97_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "97_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "97_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "82_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "82_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "82_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "58_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "58_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "58_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "94_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "94_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "94_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "35_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "35_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "35_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "93_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "93_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "93_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "47_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "47_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "47_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "66_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "66_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "66_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "87_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "87_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "87_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "71_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "71_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "71_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "51_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "51_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "51_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "65_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "65_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "65_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "77_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "77_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "77_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "60_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "60_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "60_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "78_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "78_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "78_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "80_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "80_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "80_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "96_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "96_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "96_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "98_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "98_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "98_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "74_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "74_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "74_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "95_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "95_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "95_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "75_c0": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "75_c1": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "75_c2": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "11_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "11_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "11_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "12_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "12_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "12_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "14_c0": {
+      "terrain": "desert",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "14_c1": {
+      "terrain": "desert",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "14_c2": {
+      "terrain": "desert",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "16_c0": {
+      "terrain": "hills",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "16_c1": {
+      "terrain": "hills",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "16_c2": {
+      "terrain": "hills",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "17_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "17_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "17_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "20_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "20_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "20_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "23_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "23_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "23_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "24_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "24_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "24_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "26_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "26_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "26_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "28_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "28_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "28_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "29_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "29_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "29_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "32_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "32_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "32_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "36_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "36_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "36_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "38_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "38_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "38_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "40_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "40_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "40_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "41_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "41_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "41_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "42_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "42_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "42_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "46_c0": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "46_c1": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "46_c2": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    }
+  }
+}

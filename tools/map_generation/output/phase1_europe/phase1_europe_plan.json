@@ -1,0 +1,274 @@
+{
+  "phase": "1_europe",
+  "target_province_count": "350-450",
+  "seed_province_count": 100,
+  "naval_analysis": {
+    "coastal": 23,
+    "chokepoints": 54,
+    "protected_straits": 63,
+    "island_groups": 16
+  },
+  "subdivision": {
+    "candidates_ranked": 40,
+    "children_proposed": 120,
+    "unique_parents_subdivided": 40
+  },
+  "high_priority_candidates": [
+    {
+      "province_id": 73,
+      "priority_score": 8.176,
+      "suggested_splits": 3,
+      "naval_importance": 2.17,
+      "is_coastal": true,
+      "is_chokepoint": true
+    },
+    {
+      "province_id": 97,
+      "priority_score": 7.56,
+      "suggested_splits": 3,
+      "naval_importance": 1.95,
+      "is_coastal": true,
+      "is_chokepoint": true
+    },
+    {
+      "province_id": 82,
+      "priority_score": 7.532,
+      "suggested_splits": 3,
+      "naval_importance": 1.94,
+      "is_coastal": true,
+      "is_chokepoint": true
+    },
+    {
+      "province_id": 58,
+      "priority_score": 7.476,
+      "suggested_splits": 3,
+      "naval_importance": 1.92,
+      "is_coastal": true,
+      "is_chokepoint": true
+    },
+    {
+      "province_id": 94,
+      "priority_score": 7.476,
+      "suggested_splits": 3,
+      "naval_importance": 1.92,
+      "is_coastal": true,
+      "is_chokepoint": true
+    },
+    {
+      "province_id": 35,
+      "priority_score": 7.448,
+      "suggested_splits": 3,
+      "naval_importance": 1.91,
+      "is_coastal": true,
+      "is_chokepoint": true
+    },
+    {
+      "province_id": 93,
+      "priority_score": 5.824,
+      "suggested_splits": 3,
+      "naval_importance": 1.33,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 47,
+      "priority_score": 5.6,
+      "suggested_splits": 3,
+      "naval_importance": 1.25,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 66,
+      "priority_score": 5.46,
+      "suggested_splits": 3,
+      "naval_importance": 1.2,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 87,
+      "priority_score": 5.404,
+      "suggested_splits": 3,
+      "naval_importance": 1.18,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 71,
+      "priority_score": 5.376,
+      "suggested_splits": 3,
+      "naval_importance": 1.17,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 51,
+      "priority_score": 5.292,
+      "suggested_splits": 3,
+      "naval_importance": 1.14,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 65,
+      "priority_score": 5.292,
+      "suggested_splits": 3,
+      "naval_importance": 1.14,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 77,
+      "priority_score": 5.264,
+      "suggested_splits": 3,
+      "naval_importance": 1.13,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 60,
+      "priority_score": 5.236,
+      "suggested_splits": 3,
+      "naval_importance": 1.12,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 78,
+      "priority_score": 5.236,
+      "suggested_splits": 3,
+      "naval_importance": 1.12,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 80,
+      "priority_score": 5.236,
+      "suggested_splits": 3,
+      "naval_importance": 1.12,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 96,
+      "priority_score": 5.236,
+      "suggested_splits": 3,
+      "naval_importance": 1.12,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 98,
+      "priority_score": 5.236,
+      "suggested_splits": 3,
+      "naval_importance": 1.12,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 74,
+      "priority_score": 5.208,
+      "suggested_splits": 3,
+      "naval_importance": 1.11,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 95,
+      "priority_score": 5.208,
+      "suggested_splits": 3,
+      "naval_importance": 1.11,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 75,
+      "priority_score": 5.18,
+      "suggested_splits": 3,
+      "naval_importance": 1.1,
+      "is_coastal": true,
+      "is_chokepoint": false
+    },
+    {
+      "province_id": 11,
+      "priority_score": 4.64,
+      "suggested_splits": 3,
+      "naval_importance": 1.3,
+      "is_coastal": false,
+      "is_chokepoint": true
+    },
+    {
+      "province_id": 12,
+      "priority_score": 4.64,
+      "suggested_splits": 3,
+      "naval_importance": 1.3,
+      "is_coastal": false,
+      "is_chokepoint": true
+    },
+    {
+      "province_id": 14,
+      "priority_score": 4.64,
+      "suggested_splits": 3,
+      "naval_importance": 1.3,
+      "is_coastal": false,
+      "is_chokepoint": true
+    }
+  ],
+  "top_naval_importance": [
+    {
+      "id": 39,
+      "score": 3.07,
+      "coastal": true
+    },
+    {
+      "id": 10,
+      "score": 2.45,
+      "coastal": false
+    },
+    {
+      "id": 13,
+      "score": 2.45,
+      "coastal": false
+    },
+    {
+      "id": 15,
+      "score": 2.45,
+      "coastal": false
+    },
+    {
+      "id": 18,
+      "score": 2.45,
+      "coastal": false
+    },
+    {
+      "id": 19,
+      "score": 2.45,
+      "coastal": false
+    },
+    {
+      "id": 21,
+      "score": 2.45,
+      "coastal": false
+    },
+    {
+      "id": 22,
+      "score": 2.45,
+      "coastal": false
+    }
+  ],
+  "output_files": [
+    "proposed_children_geometry.json",
+    "generated_terrain_phase1.json",
+    "generated_resources_phase1.json",
+    "generated_economy_phase1.json",
+    "special_site_candidates_phase1.json",
+    "merge_instructions_phase1.json",
+    "phase1_europe_plan.json"
+  ],
+  "notes": [
+    "Geometric splitting now uses densify + radial-arc + bisection for usable child polygons even from 6-pt input.",
+    "Attribute inheritance pulls from the real 840-province base catalog.",
+    "Next high-leverage work: Godot visualization of proposed splits + adjacency repair logic."
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "id": "skagerrak_fortress",
+  "site_type": "fortress",
+  "tier": 2,
+  "name": "Skagerrak Coastal Fortress",
+  "description": "Heavy coastal artillery and naval observation post controlling the entrance to the Baltic and the Skagerrak choke.",
+  "visual": {
+    "icon": "🛡️",
+    "color": "#8b5e3c",
+    "scale": 1.0
+  },
+  "effects": {
+    "naval_interdiction_bonus": 0.18,
+    "local_supply_generation": 6,
+    "fortification_bonus": 0.25
+  },
+  "construction": {
+    "required_infra_level": 2,
+    "base_days": 110,
+    "base_pp": 185,
+    "required_terrain": ["coastal"],
+    "required_features": []
+  },
+  "damage": {
+    "max_damage_level": 3,
+    "repair_days_per_level": 22
+  },
+  "upgrade": {
+    "target_id": "skagerrak_fortress_tier3"
+  }
+}

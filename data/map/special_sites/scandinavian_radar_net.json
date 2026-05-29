@@ -1,0 +1,28 @@
+{
+  "id": "scandinavian_radar_net",
+  "site_type": "radar_station",
+  "tier": 2,
+  "name": "Scandinavian Early Warning Net",
+  "description": "A networked radar system providing coverage over the Baltic and northern approaches.",
+
+  "visual": {
+    "icon": "radar_2",
+    "size_scale": 1.2
+  },
+
+  "effects": {
+    "air_detection_bonus": 28,
+    "interdiction_resistance": 9
+  },
+
+  "construction": {
+    "base_days": 35,
+    "political_power_cost": 65,
+    "required_infra_level": 3
+  },
+
+  "damage": {
+    "max_damage_level": 2,
+    "repair_days_per_level": 10
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "orkney_naval_station",
+  "site_type": "naval_shipyard",
+  "tier": 1,
+  "name": "Orkney Naval Station",
+  "description": "A forward naval base in the Orkney Islands controlling key North Atlantic approaches.",
+
+  "visual": {
+    "icon": "naval_base_1",
+    "size_scale": 1.2
+  },
+
+  "effects": {
+    "naval_repair_bonus": 10,
+    "local_naval_supply": 15,
+    "interdiction_resistance": 6
+  },
+
+  "construction": {
+    "base_days": 38,
+    "political_power_cost": 70,
+    "required_infra_level": 3
+  },
+
+  "damage": {
+    "max_damage_level": 2,
+    "repair_days_per_level": 11
+  }
+}

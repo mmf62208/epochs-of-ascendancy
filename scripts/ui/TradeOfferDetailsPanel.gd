@@ -196,6 +196,20 @@ func _populate_from_data(data: Dictionary) -> void:
 		fairness_label.hide()
 		recommendation_label.hide()
 
+	# Special Site Trade Capacity context (makes ports etc. feel impactful)
+	var trade_bonus := float(data.get("trade_capacity_bonus", 0.0))
+	if trade_bonus > 0.0:
+		var trade_label := Label.new()
+		trade_label.text = "Your Special Sites Trade Bonus: +%d" % int(trade_bonus)
+		trade_label.add_theme_font_size_override("font_size", 11)
+		trade_label.modulate = Color(0.5, 0.85, 0.6)
+		trade_label.tooltip_text = "Developed ports and special sites increase your effective trade capacity and deal quality."
+		# Insert after fairness if possible
+		if fairness_label.get_parent():
+			fairness_label.get_parent().add_child(trade_label)
+		else:
+			add_child(trade_label)
+
 	# Enable/disable action buttons based on status
 	var is_proposed := data.get("status") == "PROPOSED"
 	accept_btn.disabled = not is_proposed

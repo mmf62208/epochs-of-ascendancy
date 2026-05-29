@@ -25,7 +25,7 @@ var from_tag: String = ""
 var to_tag: String = ""
 
 # The goods being delivered on this flow
-var item_type: String = ""          # e.g. TradeItemType.RESOURCE, .EQUIPMENT
+var item_type: int = 0  # TradeManager.TradeItemType enum value
 var item_id: String = ""            # "steel", "rubber", specific equipment_id, etc.
 var quantity_per_turn: float = 0.0  # How much moves per game turn (or month)
 

@@ -1,0 +1,27 @@
+{
+  "id": "airfield_tier_3",
+  "site_type": "airfield",
+  "tier": 3,
+  "name": "Major International Airport",
+  "description": "A large, modern airport capable of supporting heavy air traffic, strategic airlift, and advanced air operations.",
+
+  "visual": {
+    "icon": "airfield_3"
+  },
+
+  "effects": {
+    "air_recon_bonus": 30,
+    "interdiction_resistance": 18,
+    "air_operations_efficiency": 12
+  },
+
+  "construction": {
+    "base_days": 75,
+    "political_power_cost": 160,
+    "required_infra_level": 6
+  },
+
+  "damage": {
+    "max_damage_level": 3
+  }
+}

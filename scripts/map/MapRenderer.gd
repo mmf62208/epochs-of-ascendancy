@@ -21,6 +21,14 @@ extends Node2D
 @export var btn_national_spirits: Button
 @export var btn_close: Button
 
+# Dynamically created infrastructure investment UI (MVP — matches engineers button pattern)
+var _btn_invest_infra: Button = null
+var _label_invest_status: Label = null
+
+# Dynamically created Special Sites section in InfoPanel
+var _label_special_sites_header: Label = null
+var _special_sites_container: VBoxContainer = null
+
 #region Terrain / readability (fill characterization layered under overlays)
 ## Cohesion: terrain strength, `terrain_tone_close_zoom_multiplier`, and `development_close_zoom_multiplier`
 ## all key off `terrain_zoom_near_thresh` (map container scale). Labels/glyphs use `province_detail_min_zoom`
@@ -86,6 +94,8 @@ extends Node2D
 @export_range(12, 90, 2) var supply_route_layer_z_order: int = 58
 ## Gentle dim for route lines while L is on so fills + rings win the first read.
 @export_range(0.55, 1.0, 0.02) var supply_route_layer_modulate_with_overlay: float = 0.91
+## Additional alpha scale for trade corridor polylines only while L is on (secondary logistics read).
+@export_range(0.72, 1.0, 0.02) var trade_corridor_supply_overlay_dim: float = 0.86
 #endregion
 
 #region Debug
@@ -233,10 +243,13 @@ func _connect_map_manager_signals() -> void:
 
 
 func _on_map_province_data_changed(province_id: int, what: String) -> void:
-	if what not in ["effects", "development", "infrastructure", "owner", "controller", "all"]:
+	if what not in ["effects", "development", "infrastructure", "owner", "controller", "all", "infrastructure_project"]:
 		return
 	if provinces.has(province_id):
 		_refresh_single_province_fill(province_id)
+		# If the info panel is open on this province, refresh the investment section live
+		if info_panel and info_panel.visible and selected_province_id == province_id:
+			show_info_panel(provinces[province_id])
 	if _hover_fill_province_id == province_id:
 		_apply_hover_fill(province_id, true)
 
@@ -325,6 +338,9 @@ func _maybe_toast_player_trade_route_event(
 		_:
 			msg = "Trade corridor on map — %s (L overlay)" % pair
 	LeaderEventUI.show_toast(msg, 2.6)
+
+
+func _connect_time_manager_signals() -> void:
 	if typeof(TimeManager) == TYPE_NIL:
 		return
 	if not TimeManager.game_day_advanced.is_connected(_on_game_day_advanced_legend):
@@ -711,7 +727,7 @@ func _layout_zoomed_map_glyphs_for_province_node(pid: int, zoom_metric: float, s
 	var node: Variant = province_nodes.get(pid)
 	if node == null or not (node is Node2D):
 		return
-	var ctr := province_centroids.get(pid, Vector2.ZERO)
+	var ctr: Vector2 = province_centroids.get(pid, Vector2.ZERO) as Vector2
 	var nd := node as Node2D
 	for child in nd.get_children():
 		if child is Label and (child as Label).has_meta(META_MAP_GLYPH_PX):
@@ -1292,9 +1308,9 @@ func _refresh_hover_tooltip(province: Province) -> void:
 		has_radio and not compare_active,
 		dual and not compare_active,
 		agent_activity,
-		agent_pressure,
 		has_engineers and supply_mode and not compare_active,
 		engineers_needed and supply_mode and not compare_active,
+		agent_pressure,
 	)
 	_set_conflict_highlight(province.id if ProvinceInsight.is_province_contested(province) else -1)
 	_set_agent_highlight(province.id if ProvinceInsight.has_active_agent_network(province) else -1)
@@ -1419,6 +1435,13 @@ func show_info_panel(province: Province):
 		res_text += "None"
 	info_resources.text = res_text.strip_edges()
 
+	# Quick visibility for special site economic impact
+	var ssm = _get_special_site_manager()
+	if ssm != null and typeof(TradeManager) != TYPE_NIL and TradeManager.has_method("get_national_special_site_trade_capacity_bonus"):
+		var nat_bonus := TradeManager.get_national_special_site_trade_capacity_bonus(province.owner_tag)
+		if nat_bonus > 0 and info_resources != null:
+			info_resources.text += "  |  Trade Cap +%d (Special Sites)" % int(nat_bonus)
+
 	info_core.text = "Core For: " + (", ".join(province.core_for) if province.core_for.size() > 0 else "None")
 
 	var special_list := []
@@ -1430,6 +1453,8 @@ func show_info_panel(province: Province):
 
 	info_panel.visible = true
 	_update_station_engineers_button(province)
+	_update_infrastructure_investment_ui(province)
+	_update_special_sites_ui(province)
 
 
 func hide_info_panel():
@@ -1450,7 +1475,6 @@ func _ensure_station_engineers_button() -> void:
 		+ "Each click cycles which division moves; Shift+click picks the best match on the map.\n"
 		+ "Supply overlay (L) shows URGENT / recommended / weak rings."
 	)
-	_btn_station_engineers.layout_mode = Control.LAYOUT_MODE_ANCHORS
 	_btn_station_engineers.set_anchors_preset(Control.PRESET_TOP_LEFT)
 	_btn_station_engineers.offset_left = 210.0
 	_btn_station_engineers.offset_top = 8.0
@@ -1527,6 +1551,390 @@ func _update_station_engineers_button(province: Province) -> void:
 					loc = sp.name
 			tip_lines.append("· %s — %s" % [label, loc])
 		_btn_station_engineers.tooltip_text = "\n".join(tip_lines)
+
+
+# ====================== INFRASTRUCTURE INVESTMENT UI (Phase A) ======================
+
+func _ensure_infrastructure_investment_ui() -> void:
+	if info_panel == null:
+		return
+	if _btn_invest_infra != null and is_instance_valid(_btn_invest_infra):
+		return
+
+	# Status label (shows "In Progress — 68% (ETA 9 days)" or current effective values)
+	_label_invest_status = Label.new()
+	_label_invest_status.name = "LabelInvestStatus"
+	_label_invest_status.text = ""
+	_label_invest_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_label_invest_status.custom_minimum_size = Vector2(280, 0)
+	_label_invest_status.add_theme_font_size_override("font_size", 11)
+	info_panel.add_child(_label_invest_status)
+
+	# Invest button
+	_btn_invest_infra = Button.new()
+	_btn_invest_infra.name = "BtnInvestInfrastructure"
+	_btn_invest_infra.text = "Invest in Infrastructure"
+	_btn_invest_infra.tooltip_text = "Start a provincial development project. Raises infrastructure over time, improving supply, combat width, and unlocking advanced factory types. Cost scales with current level."
+	_btn_invest_infra.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_btn_invest_infra.offset_left = 8.0
+	_btn_invest_infra.offset_top = 178.0   # Positioned below existing content (tune as needed)
+	_btn_invest_infra.offset_right = 195.0
+	_btn_invest_infra.offset_bottom = 200.0
+	_btn_invest_infra.visible = false
+	if not _btn_invest_infra.pressed.is_connected(_on_invest_infrastructure_pressed):
+		_btn_invest_infra.pressed.connect(_on_invest_infrastructure_pressed)
+	info_panel.add_child(_btn_invest_infra)
+
+
+func _update_infrastructure_investment_ui(province: Province) -> void:
+	_ensure_infrastructure_investment_ui()
+	if _btn_invest_infra == null or _label_invest_status == null:
+		return
+	if province == null:
+		_btn_invest_infra.visible = false
+		_label_invest_status.visible = false
+		return
+
+	var mgr = _get_infra_manager()
+	if mgr == null:
+		_btn_invest_infra.visible = false
+		_label_invest_status.visible = false
+		return
+
+	var player_tag := _player_tag()
+	var show_ui: bool = (
+		mgr.should_show_investment_button(province.id, player_tag)
+		if mgr.has_method("should_show_investment_button")
+		else true
+	)
+	if not show_ui:
+		_btn_invest_infra.visible = false
+		_label_invest_status.visible = false
+		return
+
+	_label_invest_status.visible = true
+	_btn_invest_infra.visible = true
+
+	var status: Dictionary = (
+		mgr.get_project_status(province.id) if mgr.has_method("get_project_status") else {}
+	)
+	var has_project: bool = bool(status.get("active", false))
+
+	if has_project:
+		var pct := int(round(float(status.get("progress", 0.0))))
+		var eta := int(status.get("eta_days", 0))
+		var sabotaged := bool(status.get("is_sabotaged", false))
+		var sab_note := " ⚠ Sabotage slowing progress" if sabotaged else ""
+		_label_invest_status.text = "Infra Project: %d%% → Lv.%d (ETA %d days)%s" % [
+			pct, int(status.get("target_level", province.infrastructure + 1)), eta, sab_note
+		]
+		_label_invest_status.modulate = Color(1.0, 0.85, 0.4) if sabotaged else Color(0.6, 0.95, 0.85)
+		_btn_invest_infra.text = "Project Active"
+		_btn_invest_infra.disabled = true
+	else:
+		_label_invest_status.text = "Infra: %d  ·  Dev: %d  (Invest to raise)" % [
+			province.infrastructure, province.development_level
+		]
+		_label_invest_status.modulate = Color(0.85, 0.9, 0.95)
+		_btn_invest_infra.text = "Invest in Infrastructure"
+		_btn_invest_infra.disabled = false
+
+
+func _on_invest_infrastructure_pressed() -> void:
+	if selected_province_id < 0:
+		return
+	var mgr = _get_infra_manager()
+	if mgr == null:
+		print("InfrastructureDevelopmentManager not available yet.")
+		return
+
+	var player := _player_tag()
+	var result: Dictionary = {}
+	if mgr.has_method("try_start_infrastructure_investment"):
+		result = mgr.try_start_infrastructure_investment(selected_province_id, player)
+	else:
+		# Fallback to older API — target current + 1
+		var target := 0
+		if provinces.has(selected_province_id):
+			target = provinces[selected_province_id].infrastructure + 1
+		var proj: RefCounted = (
+			mgr.start_infrastructure_project(selected_province_id, target if target > 0 else 5, player)
+			if mgr.has_method("start_infrastructure_project")
+			else null
+		)
+		result = {"success": proj != null, "reason": "started via legacy call" if proj else "manager missing method"}
+
+	if result.get("success", false):
+		var eta := int(result.get("eta_days", 18))
+		print("Infrastructure project started on province %d — ETA ~%d days" % [selected_province_id, eta])
+		# Refresh the panel so the button immediately shows "Project Active"
+		if provinces.has(selected_province_id):
+			show_info_panel(provinces[selected_province_id])
+	else:
+		print("Cannot start infrastructure investment: %s" % result.get("reason", "unknown"))
+
+	# TODO (Phase B): Show a proper toast / confirmation popup instead of print
+
+
+# ====================== SPECIAL SITES UI (InfoPanel) ======================
+
+func _update_special_sites_ui(province: Province) -> void:
+	_ensure_special_sites_ui()
+	if _label_special_sites_header == null or _special_sites_container == null:
+		return
+	if province == null:
+		_label_special_sites_header.visible = false
+		_special_sites_container.visible = false
+		return
+
+	var sites := province.special_sites
+	if sites.is_empty():
+		_label_special_sites_header.visible = true
+		_label_special_sites_header.text = "Special Sites (None)"
+		_special_sites_container.visible = true
+
+		# Clear previous
+		for child in _special_sites_container.get_children():
+			child.queue_free()
+
+		# === Real Site Construction Picker ===
+		var ssm = _get_special_site_manager()
+		if ssm != null and ssm.has_method("get_constructible_sites_for_province"):
+			var available := ssm.get_constructible_sites_for_province(province) as Array
+			if available.size() > 0:
+				var header := Label.new()
+				header.text = "Available Constructions:"
+				header.add_theme_font_size_override("font_size", 11)
+				_special_sites_container.add_child(header)
+
+				for site_id_var in available:
+					var site_id := str(site_id_var)
+					var def: Dictionary = (
+						ssm.get_site_definition(site_id) if ssm.has_method("get_site_definition") else {}
+					)
+					var name := str(def.get("name", site_id)) if def else site_id
+
+					var cons := def.get("construction", {}) as Dictionary if def else {}
+					var req_infra := int(cons.get("required_infra_level", 1))
+					var days := int(cons.get("base_days", 30))
+					var pp := int(cons.get("political_power_cost", 50))
+
+					var row := HBoxContainer.new()
+					_special_sites_container.add_child(row)
+
+					var info_label := Label.new()
+					info_label.text = "%s (Infra %d, %d days, %d PP)" % [name, req_infra, days, pp]
+					info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+					row.add_child(info_label)
+
+					# Effects summary from JSON
+					var effects := def.get("effects", {}) as Dictionary if def else {}
+					var eff_parts := []
+					for k in effects:
+						var val: Variant = effects[k]
+						if val is float or val is int:
+							if val > 0:
+								eff_parts.append("+%d %s" % [int(val), str(k).replace("_", " ").capitalize()])
+					if eff_parts.size() > 0:
+						var eff_label := Label.new()
+						eff_label.text = "  " + " · ".join(eff_parts)
+						eff_label.add_theme_font_size_override("font_size", 9)
+						eff_label.modulate = Color(0.6, 0.9, 0.7)
+						row.add_child(eff_label)
+
+					var btn := Button.new()
+					btn.text = "Build"
+					btn.custom_minimum_size = Vector2(70, 24)
+					btn.pressed.connect(_on_construct_special_site_pressed.bind(province.id, site_id))
+					row.add_child(btn)
+			else:
+				var note := Label.new()
+				note.text = "No special sites available at current infrastructure level."
+				note.add_theme_font_size_override("font_size", 10)
+				_special_sites_container.add_child(note)
+		else:
+			# Fallback
+			var build_btn := Button.new()
+			build_btn.text = "Construct New Special Site (Port)"
+			build_btn.pressed.connect(_on_start_special_site_construction_pressed.bind(province.id))
+			_special_sites_container.add_child(build_btn)
+		return
+
+	_label_special_sites_header.visible = true
+	_special_sites_container.visible = true
+
+	# Clear previous
+	for child in _special_sites_container.get_children():
+		child.queue_free()
+
+	_label_special_sites_header.text = "Special Sites (%d)" % sites.size()
+
+	# Show national trade capacity bonus from special sites (makes the economic impact visible)
+	var ssm = _get_special_site_manager()
+	if ssm != null and typeof(TradeManager) != TYPE_NIL and TradeManager.has_method("get_national_special_site_trade_capacity_bonus"):
+		var bonus := TradeManager.get_national_special_site_trade_capacity_bonus(province.owner_tag)
+		if bonus > 0:
+			var bonus_label := Label.new()
+			bonus_label.text = "National Trade Capacity +%d from special sites" % int(bonus)
+			bonus_label.add_theme_font_size_override("font_size", 10)
+			bonus_label.modulate = Color(0.6, 0.9, 0.7)
+			_special_sites_container.add_child(bonus_label)
+
+	for site in sites:
+		if site == null:
+			continue
+
+		var row := HBoxContainer.new()
+		_special_sites_container.add_child(row)
+
+		var name_label := Label.new()
+		var state_icon := "✓" if site.is_completed() else "🚧" if site.is_under_construction() else "⚠"
+		var dmg := " [Dmg %d]" % site.damage_level if site.is_damaged() else ""
+		name_label.text = "%s %s (T%d)%s" % [state_icon, site.id, site.tier, dmg]
+		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(name_label)
+
+		if site.is_damaged():
+			var repair_btn := Button.new()
+			repair_btn.text = "Repair"
+			repair_btn.custom_minimum_size = Vector2(60, 24)
+			repair_btn.pressed.connect(_on_repair_special_site_pressed.bind(province.id, site))
+			row.add_child(repair_btn)
+
+		if site.can_be_upgraded():
+			var target_def := {}
+			if ssm != null and ssm.has_method("get_site_definition"):
+				target_def = ssm.get_site_definition(site.get_upgrade_target_id())
+
+			var cons := target_def.get("construction", {}) as Dictionary if target_def else {}
+			var up_days := int(cons.get("base_days", 60))
+			var up_pp := int(cons.get("political_power_cost", 100))
+
+			var upgrade_btn := Button.new()
+			upgrade_btn.text = "Upgrade → T%d (%d days, %d PP)" % [site.tier + 1, up_days, up_pp]
+			upgrade_btn.custom_minimum_size = Vector2(160, 24)
+			upgrade_btn.pressed.connect(_on_upgrade_special_site_pressed.bind(province.id, site))
+			row.add_child(upgrade_btn)
+
+		# Show key effects
+		var effects_label := Label.new()
+		var eff_text := ""
+		if site.supply_bonus > 0:
+			eff_text += "+%d Supply " % int(site.supply_bonus)
+		if site.trade_capacity > 0:
+			eff_text += "+%d Trade" % int(site.trade_capacity)
+		effects_label.text = eff_text.strip_edges()
+		effects_label.add_theme_font_size_override("font_size", 10)
+		row.add_child(effects_label)
+
+
+func _ensure_special_sites_ui() -> void:
+	if info_panel == null:
+		return
+	if _label_special_sites_header != null and is_instance_valid(_label_special_sites_header):
+		return
+
+	_label_special_sites_header = Label.new()
+	_label_special_sites_header.name = "LabelSpecialSitesHeader"
+	_label_special_sites_header.text = "Special Sites"
+	_label_special_sites_header.add_theme_font_size_override("font_size", 12)
+	info_panel.add_child(_label_special_sites_header)
+
+	_special_sites_container = VBoxContainer.new()
+	_special_sites_container.name = "SpecialSitesContainer"
+	_special_sites_container.add_theme_constant_override("separation", 4)
+	info_panel.add_child(_special_sites_container)
+
+
+func _on_repair_special_site_pressed(province_id: int, site: SpecialSite) -> void:
+	if site == null or not site.is_damaged():
+		return
+
+	var repair_amount := 1
+
+	# Sophisticated repair: engineers present give bonus repair
+	var mgr = _get_infra_manager()
+	if mgr != null and mgr.has_method("get_engineer_brigades_in_province"):
+		var engineers: float = float(mgr.get_engineer_brigades_in_province(province_id))
+		if engineers > 0.5:
+			repair_amount += 1   # engineers speed up special site repair too
+
+	site.repair_damage(repair_amount)
+
+	# Notify systems
+	if typeof(MapManager) != TYPE_NIL:
+		MapManager.notify_province_changed(province_id, "special_site")
+
+	# Refresh the panel
+	if provinces.has(province_id):
+		show_info_panel(provinces[province_id])
+
+	print("Repaired special site %s in province %d (amount %d)" % [site.id, province_id, repair_amount])
+
+
+func _on_upgrade_special_site_pressed(province_id: int, site: SpecialSite) -> void:
+	if site == null or not site.can_be_upgraded():
+		return
+
+	var mgr = _get_infra_manager()
+	if mgr == null or not mgr.has_method("start_special_site_upgrade_project"):
+		# Fallback: instant upgrade for debug
+		site.complete_upgrade()
+		if typeof(MapManager) != TYPE_NIL:
+			MapManager.notify_province_changed(province_id, "special_site")
+		if provinces.has(province_id):
+			show_info_panel(provinces[province_id])
+		print("Instant upgraded special site (fallback)")
+		return
+
+	var player := _player_tag()
+	var proj: RefCounted = mgr.start_special_site_upgrade_project(province_id, site, player)
+	if proj:
+		print("Started upgrade project for special site %s in province %d" % [site.id, province_id])
+		if provinces.has(province_id):
+			show_info_panel(provinces[province_id])
+	else:
+		print("Could not start upgrade project")
+
+
+func _on_start_special_site_construction_pressed(province_id: int) -> void:
+	var mgr = _get_infra_manager()
+	if mgr == null or not mgr.has_method("debug_start_special_site_project"):
+		return
+
+	var player := _player_tag()
+	mgr.debug_start_special_site_project(province_id, "port_tier_1", player)   # MVP: starts real project for basic port
+
+	if provinces.has(province_id):
+		show_info_panel(provinces[province_id])
+
+
+func _on_construct_special_site_pressed(province_id: int, site_id: String) -> void:
+	var mgr = _get_infra_manager()
+	if mgr == null or not mgr.has_method("start_special_site_project"):
+		print("Cannot start special site project - manager missing method")
+		return
+
+	var player := _player_tag()
+	var proj: RefCounted = mgr.start_special_site_project(province_id, site_id, player)
+	if proj:
+		print("Started real special site construction project: %s in province %d" % [site_id, province_id])
+	else:
+		print("Failed to start special site project for %s" % site_id)
+
+	if provinces.has(province_id):
+		show_info_panel(provinces[province_id])
+
+
+func _get_special_site_manager() -> Object:
+	return get_node_or_null("/root/SpecialSiteManager")
+
+
+func _get_infra_manager() -> Object:
+	if typeof(InfrastructureDevelopmentManager) != TYPE_NIL:
+		return InfrastructureDevelopmentManager
+	# Fallback for early boot / tests
+	return get_node_or_null("/root/InfrastructureDevelopmentManager")
 
 
 func _next_engineer_deploy_label(country_tag: String) -> String:
@@ -1792,6 +2200,29 @@ func _map_province_name_label_z_index() -> int:
 	return province_name_label_z_index_supply_overlay if supply_mode else province_name_label_z_index
 
 
+## Slows outline pulses while L is on so hover / supply / engineer rings do not compete visually.
+func _map_overlay_pulse_speed_scale() -> float:
+	return 0.82 if supply_mode else 1.0
+
+
+func _sync_map_label_glyph_stack(zoom_metric: float = -1.0) -> void:
+	var zz := zoom_metric
+	if zz <= 0.0001 and container != null:
+		zz = absf(container.scale.x)
+	if zz <= 0.0001:
+		zz = 1.0
+	var show_glyphs := zz > province_detail_min_zoom
+	for id in _province_name_labels:
+		var lbl: Variant = _province_name_labels[id]
+		if lbl is Label and is_instance_valid(lbl):
+			var l2 := lbl as Label
+			l2.z_index = _map_province_name_label_z_index()
+			if show_province_names and show_glyphs:
+				_apply_province_name_label_readability_styles(l2, zz)
+	for pid in province_nodes:
+		_layout_zoomed_map_glyphs_for_province_node(int(pid), zz, show_glyphs)
+
+
 func _sync_supply_route_canvas_stack() -> void:
 	if supply_map_layer == null or not is_instance_valid(supply_map_layer):
 		return
@@ -1799,8 +2230,12 @@ func _sync_supply_route_canvas_stack() -> void:
 	var lm := clampf(supply_route_layer_modulate_with_overlay, 0.5, 1.0)
 	if supply_mode and supply_map_layer.visible:
 		supply_map_layer.self_modulate = Color(lm, lm, lm, 1.0)
+		supply_map_layer.trade_corridor_supply_dim = clampf(trade_corridor_supply_overlay_dim, 0.72, 1.0)
 	else:
 		supply_map_layer.self_modulate = Color.WHITE
+		supply_map_layer.trade_corridor_supply_dim = 1.0
+	_sync_map_label_glyph_stack()
+	supply_map_layer.queue_redraw()
 
 
 func _setup_supply_layer() -> void:
@@ -2350,10 +2785,8 @@ func _apply_recovering_fill_tint(col: Color, province_id: int) -> Color:
 	if role == "infra_sabotage":
 		return col.lerp(ProvinceMapVisuals.FILL_INFRA_SABOTAGE_ACTIVE, 0.34)
 	if role == "infra_duel_even":
-		return col.lerp(
-			ProvinceMapVisuals.FILL_AGENT_DISRUPT_BASE,
-			ProvinceMapVisuals.FILL_INFRA_RECOVERING,
-			0.18,
+		return col.lerp(ProvinceMapVisuals.FILL_AGENT_DISRUPT_BASE, 0.09).lerp(
+			ProvinceMapVisuals.FILL_INFRA_RECOVERING, 0.18,
 		)
 	if str(_supply_role_by_province.get(province_id, "")) == "supply_pressure":
 		return col.lerp(ProvinceMapVisuals.FILL_AGENT_DISRUPT_BASE, 0.14)
@@ -2449,7 +2882,9 @@ func _update_outline_pulse() -> void:
 		if node != null:
 			var hover_w := 3.0 if hover_on_selection else 2.5
 			var pulse_amp := 0.4 if hover_on_selection else 0.35
-			var pulse_speed := 5.5 if hover_on_selection else 4.5
+			var pulse_speed := (5.5 if hover_on_selection else 4.5) * _map_overlay_pulse_speed_scale()
+			if supply_mode:
+				pulse_amp = minf(pulse_amp, 0.36 if hover_on_selection else 0.32)
 			if provinces.has(_hover_outline_province_id):
 				var hp: Province = provinces[_hover_outline_province_id] as Province
 				var dual_hover := (
@@ -2519,7 +2954,7 @@ func _update_outline_pulse() -> void:
 				7.5,
 				_outline_pulse_phase + 0.8,
 				0.3,
-				3.2,
+				3.2 * _map_overlay_pulse_speed_scale(),
 			)
 	if _compare_preview_province_id >= 0:
 		var cmp_node := _province_node(_compare_preview_province_id)
@@ -2533,7 +2968,7 @@ func _update_outline_pulse() -> void:
 				5.8,
 				_outline_pulse_phase + 1.6,
 				0.45,
-				5.0,
+				5.0 * _map_overlay_pulse_speed_scale(),
 			)
 	for pid in _compare_candidate_ids:
 		if pid == _compare_preview_province_id:
@@ -2556,7 +2991,7 @@ func _update_outline_pulse() -> void:
 			4.1,
 			_outline_pulse_phase + float(pid % 5) * 0.4,
 			0.22 if emph else 0.12,
-			3.0 if emph else 2.0,
+			(3.0 if emph else 2.0) * _map_overlay_pulse_speed_scale(),
 		)
 	if supply_mode:
 		_pulse_supply_outlines()
@@ -2711,6 +3146,8 @@ func _pulse_supply_outlines() -> void:
 	for pid in _supply_role_by_province.keys():
 		if _engineer_assign_flash_by_province.has(pid):
 			continue  # `_apply_engineer_assignment_flash_pulses` owns NODE_SUPPLY for this province.
+		if int(pid) == _hover_outline_province_id:
+			continue  # Hover outline already pulses this province; avoids stacked ring flicker.
 		var role: String = str(_supply_role_by_province[pid])
 		if role not in [
 			"active", "preview", "route", "infra_sabotage", "infra_repair", "infra_repair_engineers",

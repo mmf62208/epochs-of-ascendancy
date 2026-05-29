@@ -13,6 +13,8 @@ var outbound_per_day: float = 0.0
 ## Decays slowly over days in SupplyManager; counter-intel sweeps can zero it immediately via clear_daily_sabotage_effects.
 ## Makes per-province supply disruption "targeted" and visible in state (beyond one-shot temp hits).
 var sabotage_level: float = 0.0
+## Local fuel from oil refineries (simplified depot-side tracking).
+var fuel_stockpile: float = 0.0
 
 
 func _init(pid: int = -1, capacity: float = 0.0) -> void:

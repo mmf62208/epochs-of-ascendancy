@@ -1,0 +1,32 @@
+{
+  "id": "kiel_canal_control",
+  "site_type": "naval_base",
+  "tier": 2,
+  "name": "Kiel Canal Control Complex",
+  "description": "The single most important artificial waterway in Northern Europe. Whoever holds this site dramatically shortens Baltic-North Sea transits and gains major naval mobility.",
+  "visual": {
+    "icon": "⚓",
+    "color": "#1e3a5f",
+    "scale": 1.15
+  },
+  "effects": {
+    "naval_range_bonus": 0.32,
+    "trade_capacity_bonus": 0.18,
+    "local_supply_generation": 8,
+    "movement_time_reduction": 0.25
+  },
+  "construction": {
+    "required_infra_level": 3,
+    "base_days": 140,
+    "base_pp": 240,
+    "required_terrain": ["coastal"],
+    "required_features": ["canal"]
+  },
+  "damage": {
+    "max_damage_level": 3,
+    "repair_days_per_level": 28
+  },
+  "upgrade": {
+    "target_id": "kiel_canal_control_tier3"
+  }
+}

@@ -361,6 +361,9 @@ func advance_supply_day(days: float = 1.0) -> void:
 	# === Province Infrastructure & Development: Local Supply Generation ===
 	_generate_local_supply_from_development(days)
 
+	# Naval recon from fleets in sea zones (1 chance per day per seazone presence)
+	_process_naval_recon(days)
+
 	var attrition := get_attrition_cargo_summary()
 	var attrition_tons := float(attrition.get("total_tons", 0.0)) * days
 	for key in _routes:
@@ -498,16 +501,30 @@ func _generate_local_supply_from_development(days: float) -> void:
 			continue
 
 		# Use ProvinceEffects when available (dev + national modifiers for local supply)
-		var local_gen := province.get_local_supply_generation_modifier()
+		var pe: ProvinceEffects = null
 		if typeof(ProvinceEffects) != TYPE_NIL:
-			var pe: ProvinceEffects = null
 			pe = _get_effects_safe(pid, _ctrl(province))
-			local_gen = pe.get_effective_local_supply_generation() if pe != null else province.get_local_supply_generation_modifier()
+		var local_gen := (
+			pe.get_effective_local_supply_generation()
+			if pe != null
+			else province.get_local_supply_generation_modifier()
+		)
 		if local_gen <= 0.0:
 			continue
 
 		# Base local supply generation scaled by development + effects
+		# Special sites (ports, etc.) now contribute via ProvinceEffects.get_effective_local_supply_generation()
 		var daily_gen := 40.0 * local_gen * days
+
+		# Additional naval/port bonus from special sites (Phase 2)
+		var site_fx: Dictionary = pe.get_special_site_effects() if pe != null else {}
+		if site_fx.get("has_ports", false):
+			daily_gen *= 1.15  # Ports give 15% local supply efficiency bonus
+
+		# Oil Refinery fuel production bonus
+		if province.has_special_site_of_type(SpecialSite.SiteType.OIL_REFINERY):
+			# Add a small fuel stockpile or efficiency bonus (simplified)
+			state.fuel_stockpile += 8.0 * days
 
 		# Targeted daily sabotage from active supply_disruption networks in this specific province
 		if typeof(AgentManager) != TYPE_NIL:
@@ -524,6 +541,87 @@ func _generate_local_supply_from_development(days: float) -> void:
 func toggle_overlay() -> void:
 	overlay_visible = not overlay_visible
 	overlay_toggled.emit(overlay_visible)
+
+
+## Naval Recon System
+## Fleets in sea provinces provide daily recon rolls on adjacent land provinces.
+## Chance based on naval strength (proxy for #ships + value + recon planes).
+## 1 "attempt" per day per seazone presence.
+## Also handles spotting enemy fleets in the same seazone (not guaranteed).
+func _process_naval_recon(days: float = 1.0) -> void:
+	if days <= 0.0 or typeof(MapManager) == TYPE_NIL:
+		return
+
+	var sea_provinces: Array = []
+	if MapManager.has_method("get_provinces_by_terrain"):
+		sea_provinces = MapManager.get_provinces_by_terrain("sea")
+	if sea_provinces.is_empty():
+		# Fallback: scan all provinces for sea ones with naval presence
+		for pid in force_registry.all_province_ids():
+			var p: Province = MapManager.get_province(pid) as Province
+			if p != null and p.is_sea:
+				sea_provinces.append(pid)
+
+	var adjacency_sys: AdjacencySystem = null
+	if MapManager.has_method("get_adjacency_system"):
+		adjacency_sys = MapManager.get_adjacency_system()
+
+	for sea_pid in sea_provinces:
+		var naval_report := force_registry.get_report(sea_pid)
+		if naval_report.navy_total <= 0.0:
+			continue
+
+		# For each owner with naval presence in this seazone
+		for owner in naval_report.naval_strength:
+			var strength = float(naval_report.naval_strength[owner])
+			if strength <= 0.0:
+				continue
+
+			# Recon to adjacent land provinces (1 chance per day)
+			if adjacency_sys != null:
+				var land_neighbors = adjacency_sys.get_land_neighbors(sea_pid)
+				for land_pid in land_neighbors:
+					# Chance based on strength (stronger fleet = better chance)
+					# Base chance per day ~ strength / 20 , capped
+					var chance = minf(0.75, strength / 25.0)
+					if randf() < chance:
+						# Successful recon on land province
+						# For now, boost local recon or log; later feed to intel map or Province "scouted"
+						# Example: add temporary bonus to interdiction resistance or reveal to player
+						_add_naval_recon_intel(land_pid, owner, strength * 0.1)
+
+			# Enemy fleet spotting in same seazone
+			for other_owner in naval_report.naval_strength:
+				if other_owner == owner:
+					continue
+				# Simple hostility check (in real game, use diplomacy or at_war)
+				if _are_hostile(owner, other_owner):
+					var other_strength = float(naval_report.naval_strength[other_owner])
+					# Detection chance based on relative strength + recon value
+					var detect_chance = minf(0.6, (strength * 1.2) / (other_strength + 5.0))
+					if randf() < detect_chance:
+						# Enemy fleet detected in zone
+						_report_enemy_naval_detection(sea_pid, owner, other_owner, other_strength)
+
+
+func _add_naval_recon_intel(land_pid: int, owner: String, recon_value: float) -> void:
+	# Placeholder: in full system, this would add to a per-country intel map or trigger "province scouted" event
+	# For now, we can boost the province's temporary recon or feed to SupplyIntelBridge
+	if typeof(SupplyIntelBridge) != TYPE_NIL:
+		# Hypothetical hook
+		pass
+	# Debug / future: print("Naval recon: %s gained intel on province %d (value %.1f)" % [owner, land_pid, recon_value])
+
+
+func _report_enemy_naval_detection(sea_pid: int, spotter: String, spotted: String, strength: float) -> void:
+	# Placeholder for UI/AI notification: "Enemy fleet detected in seazone X"
+	# Can emit signal or add to intel
+	print("Naval detection: %s spotted %s fleet (str %.1f) in sea province %d" % [spotter, spotted, strength, sea_pid])
+
+
+func _are_hostile(a: String, b: String) -> bool:
+	# Simple placeholder; real version would check diplomacy/war state
+	return a != b  # Assume different tags are potentially hostile for recon purposes
 
 
 func ensure_division_formations_for_country(country_tag: String) -> void:
@@ -944,6 +1042,19 @@ func _plan_route(
 		if recon > 0.0:
 			# Better reconnaissance improves intel, reducing effective interdiction
 			plan.interdiction_chance *= maxf(0.55, 1.0 - recon * 1.2)   # 0.05 from radio_i → noticeable reduction
+
+		# Airfield special sites provide additional reconnaissance (Phase 2)
+		var air_recon := 0.0
+		if typeof(MapManager) != TYPE_NIL:
+			for pid in MapManager.get_provinces_by_owner(player_tag):
+				var p := MapManager.get_province(pid)
+				if p and p.has_special_site_of_type(SpecialSite.SiteType.AIRFIELD):
+					# Use ProvinceEffects if available
+					var pe := MapManager.get_province_effects(pid, player_tag) if MapManager.has_method("get_province_effects") else null
+					if pe and pe.has_method("get_special_site_air_recon_bonus"):
+						air_recon += pe.get_special_site_air_recon_bonus()
+		if air_recon > 0.0:
+			plan.interdiction_chance *= maxf(0.7, 1.0 - air_recon * 0.01)
 
 	plan.reinforcement_modifier = maxf(0.6, 1.0 + route_reinforce + nat_reinforce)
 

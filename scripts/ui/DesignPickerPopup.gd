@@ -606,13 +606,13 @@ func _update_summary_hint(catalog: Dictionary) -> void:
 		if arch > 0:
 			parts.append("%d archive" % arch)
 	var domain_label := _domain_filter_label()
+	var needle := search_edit.text.strip_edges() if _is_searching() else ""
 	var summary := "%s · %s" % [" · ".join(parts), domain_label]
-	if _is_searching():
-		var q := search_edit.text.strip_edges()
+	if not needle.is_empty():
 		if _visible_design_count == 0:
-			summary = "Search «%s» · no matches · %s" % [q, domain_label]
+			summary = "Search «%s» · no matches · %s" % [needle, domain_label]
 		else:
-			summary = "Search «%s» · %d shown · %s" % [q, _visible_design_count, domain_label]
+			summary = "Search «%s» · %d shown · %s" % [needle, _visible_design_count, domain_label]
 	lock_hint_label.text = summary
 	if not needle.is_empty() and _visible_design_count == 0:
 		lock_hint_label.add_theme_color_override("font_color", RetrowaveTheme.MAGENTA)

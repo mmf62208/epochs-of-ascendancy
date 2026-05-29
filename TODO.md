@@ -6,10 +6,13 @@
 
 ## High Priority (Next 1–2 Weeks)
 
-- [ ] Save / Load foundation (`TimeManager` + key province/agent/research state)
-- [ ] Map Build Eligibility (real `MapTechnologyContext` functionality)
-- [ ] Complete Repair System (Engineer presence + Stability bonuses)
-- [ ] Wire more systems to daily/monthly ticks (Production refinement, etc.)
+- [ ] **Province Infrastructure & Development System** — See new comprehensive design: `docs/DESIGN_InfrastructureDevelopmentSystem.md`
+  - Active player/AI investment projects to raise infrastructure and development levels
+  - Construction capacity, project daily ticks, sabotage interaction, tech gating payoff
+  - This is the highest-leverage missing loop (makes build eligibility, factory scaling, supply, and long-term strategy real)
+- [ ] Save / Load foundation (`TimeManager` + key province/agent/research state + now also active infra projects)
+- [ ] Map Build Eligibility (real `MapTechnologyContext` functionality — now with live dev/infra investment as the lever)
+- [ ] Wire more systems to daily/monthly ticks (Production refinement + new InfrastructureDevelopmentManager)
 - [ ] Structured testing plan + basic test harness expansion (see `docs/TESTING_PLAN.md`)
 
 ## Medium Priority
@@ -325,19 +328,28 @@ After the recent heavy investment in the National Modifier/Spirit system and Age
 - Technology System (good scaffold, needs deeper gameplay loops)
 - Diplomacy + National Focuses
 
-### Recommended Next Major Focus
+### Recommended Next Major Focus (Updated May 28, 2026)
 
-**Primary Recommendation: Deeper Combat Integration + Province Infrastructure**
+**Primary Recommendation: Province Infrastructure & Development System** (full design now available)
 
-**Why this over everything else right now?**
-- The National Modifier system is now powerful, but its effects are still somewhat "invisible" in actual battles.
-- Making national spirits and agent operations visibly change combat outcomes would be the single highest "wow, this matters" moment for the game.
-- Province Infrastructure is the missing foundation that would make Combat Width, Supply, movement, and factory efficiency all feel meaningful at the same time.
-- These two areas would immediately make the Agent and National Spirit work from the last several weeks feel complete and high-impact.
+**See:** `docs/DESIGN_InfrastructureDevelopmentSystem.md` — complete data model, ProvincialProject, construction capacity, daily tick integration, agent sabotage duel extension, Phase A–D roadmap, and ready-to-implement GDScript skeleton.
 
-Secondary options (if you want a change of pace):
-1. Rich persistent Agent Networks (the resistance ring vision) — very high fun factor.
-2. Push the Technology system to a playable vertical slice.
-3. Start the Diplomacy / National Focus layer (feeds the modifier system).
+**Why this is now the single highest-leverage next system:**
+- The passive effects (Province getters + ProvinceEffects + daily repair + sabotage) + build gates are already excellent and wired into Supply/Combat/Production/UI.
+- The missing piece is the **active lever**: players and AI must be able to deliberately develop provinces over time. Without it, "Invest here" tooltips are lies, tech-based build eligibility is a dead end, and long-term economic snowballing doesn't exist.
+- Closing this loop makes every other recent investment (agents, national modifiers, Support/Radio tech, leader engineering bonuses, production assignment) *visibly matter* on the map for weeks of play.
+- It is the classic "build once, benefits everywhere" foundation (supply, combat width, factory efficiency, movement, future factory slot unlocks).
 
-Current recommendation stands at **Combat depth + Province Infrastructure** as the next big coordinated push.
+**Implementation order after design lock:**
+1. Phase A skeleton (InfrastructureDevelopmentManager + basic project start + daily tick)
+2. InfoPanel + tooltip feedback (make the existing strings real)
+3. Save/Load + agent sabotage wiring
+4. Tech + passive factory-driven dev growth
+5. Visual construction state on map
+
+Secondary options (strong but lower foundational impact right now):
+1. Full Combat resolution (terrain, width math, actual casualties/org from all the modifiers we already calculate).
+2. Rich persistent Agent Networks (province rings + detection).
+3. Push Technology trees beyond the current slice + doctrine integration.
+
+**Current recommendation:** Execute the new `DESIGN_InfrastructureDevelopmentSystem.md` as the next major coordinated push. It will feel like the game "leveled up" in strategic depth.

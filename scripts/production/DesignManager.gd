@@ -414,7 +414,7 @@ func acquisition_icon(kind: String) -> String:
 func format_origin_badge(country_tag: String, design_id: String) -> String:
 	var tag := _norm_tag(country_tag)
 	if is_design_foreign_for(tag, design_id):
-		return _format_foreign_badge(tag, design_id, compact := true)
+		return _format_foreign_badge(tag, design_id, true)
 	var nation := get_design_nation_tag(design_id)
 	if nation.is_empty():
 		return "◇ Universal"
@@ -427,7 +427,7 @@ func format_origin_badge(country_tag: String, design_id: String) -> String:
 func format_origin_tooltip(country_tag: String, design_id: String) -> String:
 	var tag := _norm_tag(country_tag)
 	if is_design_foreign_for(tag, design_id):
-		return _format_foreign_badge(tag, design_id, compact := false)
+		return _format_foreign_badge(tag, design_id, false)
 	var nation := get_design_nation_tag(design_id)
 	if nation.is_empty():
 		return "Universal design — any nation may produce when unlocked."

@@ -1,0 +1,43 @@
+# Europe Phase 1 Configuration
+# Target: 350-450 high-quality provinces focused on Europe + immediate naval theater
+
+region:
+  name: "Europe_Phase1"
+  target_province_count: 400
+  min_province_count: 350
+  max_province_count: 450
+
+# Naval priority is high because the game emphasizes conflict and logistics
+naval:
+  protect_major_straits: true
+  major_straits:
+    - name: "English Channel"
+      importance: critical
+    - name: "Danish Straits"
+      importance: high
+    - name: "Gibraltar"
+      importance: critical
+    - name: "Bosporus"
+      importance: high
+  coastal_density_multiplier: 1.8   # Make coastal provinces denser
+  island_groups: true               # Treat island groups as higher priority for subdivision
+
+density_rules:
+  core_europe:  # Germany, France, Benelux, UK, Italy, etc.
+    target_density: high
+  periphery:    # Eastern Europe, Scandinavia edges, North Africa coast
+    target_density: medium
+  low_priority: # Very remote or low-strategic areas within the theater
+    target_density: low
+
+subdivision:
+  min_points_for_split: 20
+  max_splits_per_province: 4
+  prefer_terrain_variety: true
+  prefer_resource_variety: true
+  respect_strategic_regions: true
+
+output:
+  format: "layered_json"   # Must remain compatible with existing MapManager / Province loaders
+  include_naval_layer: true
+  include_special_site_candidates: true

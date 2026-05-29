@@ -18,12 +18,14 @@ func _init(p_province: Province, p_national_mods: Dictionary = {}):
 func get_effective_throughput_multiplier() -> float:
 	var base := province.get_supply_throughput_modifier() if province else 1.0
 	var nat := float(national_modifiers.get("supply_throughput", 0.0))
-	return base * (1.0 + nat)
+	var site_bonus := get_special_site_supply_bonus() * 0.005  # small throughput boost from ports etc.
+	return base * (1.0 + nat + site_bonus)
 
 func get_effective_local_supply_generation() -> float:
 	var base := province.get_local_supply_generation_modifier() if province else 0.0
 	var nat := float(national_modifiers.get("local_supply", 0.0))
-	return maxf(0.0, base + nat)
+	var site_bonus := get_special_site_supply_bonus() * 0.01  # treat as percentage-ish for now
+	return maxf(0.0, base + nat + site_bonus)
 
 # --- Combat ---
 func get_effective_combat_width_multiplier() -> float:
@@ -86,3 +88,46 @@ static func for_country_province(p_province: Province, country_tag: String) -> P
 				nat[k] = float(nat.get(k, 0.0)) + float(temp_combat[k])
 
 	return ProvinceEffects.new(p_province, nat)
+
+
+## === Special Site Effects (Phase 2 wiring) ===
+func get_special_site_supply_bonus() -> float:
+	if province == null or province.special_sites.is_empty():
+		return 0.0
+	var total := 0.0
+	for site in province.special_sites:
+		if site != null and site.is_completed():
+			total += site.supply_bonus
+	return total
+
+
+func get_special_site_trade_capacity() -> float:
+	if province == null or province.special_sites.is_empty():
+		return 0.0
+	var total := 0.0
+	for site in province.special_sites:
+		if site != null and site.is_completed():
+			total += site.trade_capacity
+	return total
+
+
+## Returns combined special site effects as a dictionary for easy consumption
+func get_special_site_effects() -> Dictionary:
+	return {
+		"supply_bonus": get_special_site_supply_bonus(),
+		"trade_capacity": get_special_site_trade_capacity(),
+		"has_ports": province.has_special_site_of_type(SpecialSite.SiteType.PORT) if province else false,
+		"has_airfields": province.has_special_site_of_type(SpecialSite.SiteType.AIRFIELD) if province else false,
+		"special_site_count": province.special_sites.filter(func(s): return s != null and s.is_completed()).size() if province else 0
+	}
+
+
+func get_special_site_air_recon_bonus() -> float:
+	if province == null or province.special_sites.is_empty():
+		return 0.0
+	var total := 0.0
+	for site in province.special_sites:
+		if site != null and site.is_completed() and site.site_type == SpecialSite.SiteType.AIRFIELD:
+			# Pull from definition if we had a live lookup, for now use hardcoded scaling
+			total += 8.0 * site.tier   # Tier 1 = +8 recon, Tier 2 = +16, etc.
+	return total

@@ -1,0 +1,28 @@
+{
+  "id": "heavy_water_plant",
+  "site_type": "special_project",
+  "tier": 2,
+  "name": "Heavy Water Production Facility",
+  "description": "Critical infrastructure for advanced nuclear research programs.",
+
+  "visual": {
+    "icon": "special_project_1",
+    "size_scale": 1.4
+  },
+
+  "effects": {
+    "research_bonus_nuclear": 35,
+    "strategic_value": 25
+  },
+
+  "construction": {
+    "base_days": 85,
+    "political_power_cost": 145,
+    "required_infra_level": 5
+  },
+
+  "damage": {
+    "max_damage_level": 4,
+    "repair_days_per_level": 22
+  }
+}

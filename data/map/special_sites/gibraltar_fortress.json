@@ -1,0 +1,28 @@
+{
+  "id": "gibraltar_fortress",
+  "site_type": "fortification",
+  "tier": 2,
+  "name": "Gibraltar Fortress",
+  "description": "A heavily fortified strategic position controlling the entrance to the Mediterranean.",
+
+  "visual": {
+    "icon": "fortress_2",
+    "size_scale": 1.5
+  },
+
+  "effects": {
+    "interdiction_resistance": 22,
+    "strategic_deterrence": 15
+  },
+
+  "construction": {
+    "base_days": 90,
+    "political_power_cost": 130,
+    "required_infra_level": 4
+  },
+
+  "damage": {
+    "max_damage_level": 4,
+    "repair_days_per_level": 20
+  }
+}

@@ -16,7 +16,8 @@ extends RefCounted
 ##
 ## Pulse: `apply_pulse_to_polished` scales phase by each style’s `pulse_speed` and adds +0.15 width amplitude on the glow line.
 ## MapRenderer drives a shared `_outline_pulse_phase` (~4.5 rad/s) + per-province offsets; Supply roles use `_pulse_amount_for_supply_role`;
-## engineer assignment flash re-pulses the same `NODE_SUPPLY` after supply pass (skipped for flashing provinces).
+## engineer assignment flash re-pulses `NODE_SUPPLY` after supply pass (skipped for flashing / hovered provinces).
+## While Supply (L) is on, MapRenderer scales hover/compare pulse speeds via `_map_overlay_pulse_speed_scale()`.
 
 ## Stars / feature icons inside the province node: below compare & supply rings so logistics rings stay authoritative.
 const Z_MAP_GLYPH := 8
@@ -84,6 +85,8 @@ const OUTLINE_SUPPLY_PRESSURE_GLOW := Color(0.95, 0.28, 0.0, 0.5)
 ## Soft ring for provinces on an active trade corridor (secondary to military ◇ hub / — route).
 const OUTLINE_TRADE_TRANSIT := Color(0.84, 0.705, 0.37, 0.40)
 const OUTLINE_TRADE_TRANSIT_GLOW := Color(0.48, 0.36, 0.09, 0.11)
+## Polyline hue matches rings; alpha applied in `SupplyMapLayer` (see `COLOR_TRADE_CORRIDOR`).
+const COLOR_TRADE_CORRIDOR := Color(0.84, 0.705, 0.37, 1.0)
 const Z_COMPARE_CANDIDATE := 11
 const Z_COMPARE := 13
 const Z_HOVER := 14
@@ -239,7 +242,7 @@ static func get_supply_outline_style(role: String) -> Dictionary:
 				"width": 2.4,
 				"glow_extra": 2.8,
 				"z_index": Z_SUPPLY,
-				"pulse_speed": 2.05,
+				"pulse_speed": 1.72,
 			}
 		"route":
 			return {

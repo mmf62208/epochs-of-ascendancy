@@ -30,7 +30,26 @@ extends Node
 ##     • get_offers_for_country(...) — full query with visibility filter.
 ## - Market generation:
 ##     • generate_public_market_offers(country_tag, count) — further expanded with more recurring everyday diplomatic flavor (medical/humanitarian supply pairs, pure small TECH_SHARE "doctrine consultation" packages, plus prior agricultural/construction surplus, joint training EQUIPMENT+TECH_SHARE, naval docking+TECH_SHARE cooperation, civilian surplus, and older resource/design mixes). Feels like ongoing, natural nation-to-nation trade activity over game time.
+
+## Returns total trade capacity bonus from all completed special sites (especially ports) owned by the country.
+func get_national_special_site_trade_capacity_bonus(country_tag: String) -> float:
+	var total := 0.0
+	if typeof(MapManager) == TYPE_NIL:
+		return 0.0
+
+	var provinces := MapManager.get_provinces_by_owner(country_tag)
+	for pid in provinces:
+		var p: Province = MapManager.get_province(pid)
+		if p == null:
+			continue
+		for site in p.special_sites:
+			if site != null and site.is_completed():
+				total += site.trade_capacity
+	return total
 ##     • generate_black_market_opportunity(country_tag, risk) — further strengthened with additional high-stakes combinations: logistics betrayal (restricted EQUIPMENT + supply chokepoint INTEL) and captured prototype + enemy depot vulnerability INTEL bundles, plus all prior ultra high-stakes PROVINCE+INTEL, triple DESIGN+EQUIPMENT+INTEL, mixed EQUIPMENT+DESIGN, etc. exposure_risk now also scales with total quantity/value of large deals (0.35–0.95 range, with extra territory and size penalties). Stronger rewards with clearer, escalating downside.
+
+## Special Site Trade Capacity Integration (Phase 2)
+## Ports and certain special sites increase a nation's effective trade capacity / offer quality.
 ##     • AgentManager integration points significantly expanded: smuggling/underworld missions can call the generator with high risk_level (3–5) for the newest logistics betrayal or prototype+supply intel packages; counter-intel sweeps on high exposure_risk BLACK offers can trigger scandals or spawn concrete missions ("Disrupt Black Market Deal", "Seize Smuggled Equipment", "Expose Province Concession", "Counter Black Market Design Leak", "Infiltrate Territorial Smuggling Ring", "Hunt Logistics Betrayal Network", etc.).
 ## - TradeVisibility: PUBLIC vs BLACK (architectural only in v1; BLACK offers are still stored
 ##   but can be filtered or hidden from normal diplomacy views).
@@ -735,23 +754,23 @@ func create_offer(
 ## Returns a rich fairness evaluation from the perspective of for_country.
 ## Safe to call repeatedly for "what if" analysis.
 func evaluate_fairness(offer_id: String, for_country: String) -> Dictionary:
-	var offer = _offers.get(offer_id, {})
+	var offer: Dictionary = _offers.get(offer_id, {})
 	if offer.is_empty():
 		return {"score": 0.0, "reason": "Offer not found", "value_offered": 0.0, "value_requested": 0.0}
 
 	var tag := _norm_tag(for_country)
-	var is_from := (tag == offer.from_tag)
+	var is_from: bool = tag == str(offer.get("from_tag", ""))
 
 	var offered_value := 0.0
 	var requested_value := 0.0
 	var breakdown := {}
 
-	for item in offer.offered:
+	for item in offer.get("offered", []):
 		var v := _calculate_item_value(item, tag)
 		offered_value += v
 		breakdown["offered_" + str(item.get("id", ""))] = v
 
-	for item in offer.requested:
+	for item in offer.get("requested", []):
 		var v := _calculate_item_value(item, tag)
 		requested_value += v
 		breakdown["requested_" + str(item.get("id", ""))] = v
@@ -763,6 +782,12 @@ func evaluate_fairness(offer_id: String, for_country: String) -> Dictionary:
 	var score := 1.0
 	if my_outgoing > 0.0:
 		score = my_incoming / my_outgoing
+
+	# === Special Site Trade Capacity Bonus ===
+	# Nations with strong port/special site networks get slight fairness advantage on public deals
+	var trade_cap_bonus := get_national_special_site_trade_capacity_bonus(tag)
+	if trade_cap_bonus > 0.0:
+		score *= (1.0 + minf(trade_cap_bonus / 200.0, 0.15))  # up to +15% fairness boost
 
 	var reason := "Fair deal"
 	var recommendation := "Fair"
@@ -777,7 +802,7 @@ func evaluate_fairness(offer_id: String, for_country: String) -> Dictionary:
 	# immediately useful for future Trade UI tooltips and decision panels.
 	var saw_province := false
 	var saw_intel := false
-	for item in offer.offered + offer.requested:
+	for item in offer.get("offered", []) + offer.get("requested", []):
 		var itype = item.get("type")
 		if itype == TradeItemType.PROVINCE:
 			saw_province = true
@@ -793,7 +818,7 @@ func evaluate_fairness(offer_id: String, for_country: String) -> Dictionary:
 
 	# Enrich breakdown for high-value items with extra context keys (still inside the same dict, fully UI-ready)
 	if saw_province:
-		for item in offer.offered + offer.requested:
+		for item in offer.get("offered", []) + offer.get("requested", []):
 			if item.get("type") == TradeItemType.PROVINCE:
 				var pid := str(item.get("id", ""))
 				if typeof(MapManager) != TYPE_NIL:
@@ -804,7 +829,7 @@ func evaluate_fairness(offer_id: String, for_country: String) -> Dictionary:
 						breakdown["province_has_port"] = "port" in str(prov.features).to_lower() or "naval" in str(prov.features).to_lower()
 				break
 	if saw_intel:
-		for item in offer.offered + offer.requested:
+		for item in offer.get("offered", []) + offer.get("requested", []):
 			if item.get("type") == TradeItemType.INTEL:
 				breakdown["intel_quantity"] = item.get("quantity", 1)
 				breakdown["intel_type"] = item.get("metadata", {}).get("type", "general")
@@ -818,7 +843,7 @@ func evaluate_fairness(offer_id: String, for_country: String) -> Dictionary:
 		"reason": reason,
 		"recommendation": recommendation,
 		"breakdown": breakdown,
-		"visibility": offer.visibility,
+		"visibility": offer.get("visibility", TradeVisibility.PUBLIC),
 		"is_from": is_from
 	}
 
@@ -827,35 +852,40 @@ func evaluate_fairness(offer_id: String, for_country: String) -> Dictionary:
 ## and EQUIPMENT using ProductionManager's safe helpers.
 ## Returns true on full success.
 func accept_offer(offer_id: String) -> bool:
-	var offer = _offers.get(offer_id, {})
-	if offer.is_empty() or offer.status != TradeStatus.PROPOSED:
+	var offer: Dictionary = _offers.get(offer_id, {})
+	if offer.is_empty() or int(offer.get("status", -1)) != TradeStatus.PROPOSED:
 		return false
 
-	var from := offer.from_tag
-	var to := offer.to_tag
+	var from: String = str(offer.get("from_tag", ""))
+	var to: String = str(offer.get("to_tag", ""))
 
 	# === Validation: offerer must have offered items; accepter must be able to pay requested ===
-	if not _country_can_supply_items(from, offer.offered):
+	if not _country_can_supply_items(from, offer.get("offered", [])):
 		return false
-	if not _country_can_supply_items(to, offer.requested):
+	if not _country_can_supply_items(to, offer.get("requested", [])):
 		return false
 
 	# Accepter (to) receives offered; pays requested. Offerer (from) gives offered; receives requested.
-	for item in offer.offered:
+	for item in offer.get("offered", []):
 		_execute_transfer(to, item)
 		_execute_transfer(from, item, true)
 
-	for item in offer.requested:
+	for item in offer.get("requested", []):
 		_execute_transfer(from, item)
 		_execute_transfer(to, item, true)
 
-	offer.status = TradeStatus.ACCEPTED
+	offer["status"] = TradeStatus.ACCEPTED
+	_offers[offer_id] = offer
 	_clean_indexes(offer_id)
 
 	deal_accepted.emit(offer_id, from, to)
 
 	# Richer signal for future Diplomacy / Relations layer
-	trade_deal_outcome.emit(offer_id, from, to, int(TradeStatus.ACCEPTED), offer.visibility, offer.get("metadata", {}).duplicate(true))
+	trade_deal_outcome.emit(
+		offer_id, from, to, int(TradeStatus.ACCEPTED),
+		offer.get("visibility", TradeVisibility.PUBLIC),
+		offer.get("metadata", {}).duplicate(true),
+	)
 
 	# === New: Create ongoing TradeFlows for appropriate items (lightweight transit foundation) ===
 	_create_trade_flows_for_accepted_offer(offer)
@@ -874,14 +904,14 @@ func _create_trade_flows_for_accepted_offer(offer: Dictionary) -> void:
 	if offer.is_empty():
 		return
 
-	var from := offer.from_tag
-	var to := offer.to_tag
-	var offer_id := offer.id
+	var from: String = str(offer.get("from_tag", ""))
+	var to: String = str(offer.get("to_tag", ""))
+	var offer_id: String = str(offer.get("id", ""))
 
 	# We create flows primarily from the "offered" side (the goods actually moving to the recipient)
-	for item in offer.offered:
-		var itype: String = item.get("type", "")
-		var iid: String = item.get("id", "")
+	for item in offer.get("offered", []):
+		var itype: int = int(item.get("type", TradeItemType.RESOURCE))
+		var iid: String = str(item.get("id", ""))
 		var qty: float = float(item.get("quantity", 0.0))
 
 		# Only certain item types make sense as ongoing flows
@@ -918,11 +948,11 @@ func _create_trade_flows_for_accepted_offer(offer: Dictionary) -> void:
 		_try_assign_supply_route_to_flow(flow)
 
 ## Returns whether this TradeItemType is expected to generate an ongoing delivery flow.
-func _item_type_supports_ongoing_flow(item_type: String) -> bool:
+func _item_type_supports_ongoing_flow(item_type: int) -> bool:
 	return item_type in [
 		TradeItemType.RESOURCE,
 		TradeItemType.EQUIPMENT,
-		TradeItemType.SUPPLY
+		TradeItemType.SUPPLY,
 	]
 
 ## Attempts to assign a real SupplyRoutePlan to a newly created TradeFlow using the Supply system's routing.
@@ -1119,7 +1149,7 @@ func _country_can_supply_items(country_tag: String, items: Array) -> bool:
 	if _is_abstract_trade_party(tag):
 		return true
 	for item in items:
-		var type = item.get("type", TradeItemType.RESOURCE)
+		var type: int = int(item.get("type", TradeItemType.RESOURCE))
 		var id := str(item.get("id", ""))
 		var qty := float(item.get("quantity", 0.0))
 		if qty <= 0:
@@ -1193,29 +1223,44 @@ func _uses_player_stockpile(country_tag: String) -> bool:
 
 ## Rejects a proposed offer. Returns true if the rejection was successful.
 func reject_offer(offer_id: String, reason: String = "") -> bool:
-	var offer = _offers.get(offer_id, {})
-	if offer.is_empty() or offer.status != TradeStatus.PROPOSED:
+	var offer: Dictionary = _offers.get(offer_id, {})
+	if offer.is_empty() or int(offer.get("status", -1)) != TradeStatus.PROPOSED:
 		return false
-	offer.status = TradeStatus.REJECTED
+	offer["status"] = TradeStatus.REJECTED
+	_offers[offer_id] = offer
 	_clean_indexes(offer_id)
-	deal_rejected.emit(offer_id, offer.from_tag, offer.to_tag, reason)
+	var from: String = str(offer.get("from_tag", ""))
+	var to: String = str(offer.get("to_tag", ""))
+	deal_rejected.emit(offer_id, from, to, reason)
 
 	# Richer signal for future Diplomacy / Relations layer
-	trade_deal_outcome.emit(offer_id, offer.from_tag, offer.to_tag, int(TradeStatus.REJECTED), offer.visibility, offer.get("metadata", {}).duplicate(true))
+	trade_deal_outcome.emit(
+		offer_id, from, to, int(TradeStatus.REJECTED),
+		offer.get("visibility", TradeVisibility.PUBLIC),
+		offer.get("metadata", {}).duplicate(true),
+	)
 	return true
 
 ## Expires a proposed offer (either because its expires_turn has passed or via forced expiry).
 ## Returns true if the offer was successfully expired.
 func expire_offer(offer_id: String) -> bool:
-	var offer = _offers.get(offer_id, {})
-	if offer.is_empty() or offer.status != TradeStatus.PROPOSED:
+	var offer: Dictionary = _offers.get(offer_id, {})
+	if offer.is_empty() or int(offer.get("status", -1)) != TradeStatus.PROPOSED:
 		return false
-	offer.status = TradeStatus.EXPIRED
+	offer["status"] = TradeStatus.EXPIRED
+	_offers[offer_id] = offer
 	_clean_indexes(offer_id)
 	offer_expired.emit(offer_id)
 
 	# Richer signal for future Diplomacy / Relations layer
-	trade_deal_outcome.emit(offer_id, offer.from_tag, offer.to_tag, int(TradeStatus.EXPIRED), offer.visibility, offer.get("metadata", {}).duplicate(true))
+	trade_deal_outcome.emit(
+		offer_id,
+		str(offer.get("from_tag", "")),
+		str(offer.get("to_tag", "")),
+		int(TradeStatus.EXPIRED),
+		offer.get("visibility", TradeVisibility.PUBLIC),
+		offer.get("metadata", {}).duplicate(true),
+	)
 	return true
 
 ## Returns only currently active (PROPOSED) offers involving this country.
@@ -1244,19 +1289,19 @@ func get_offers_for_country(country_tag: String, visibility_filter = null) -> Ar
 		for offer in _offers.values():
 			if offer.get("status") != TradeStatus.PROPOSED:
 				continue
-			if visibility_filter == null or offer.visibility == visibility_filter:
+			if visibility_filter == null or offer.get("visibility") == visibility_filter:
 				result.append(offer)
 		return result
 
 	if _offers_by_from.has(tag):
 		for id in _offers_by_from[tag]:
-			var o = _offers[id]
-			if visibility_filter == null or o.visibility == visibility_filter:
+			var o: Dictionary = _offers[id]
+			if visibility_filter == null or o.get("visibility") == visibility_filter:
 				result.append(o)
 	if _offers_by_to.has(tag):
 		for id in _offers_by_to[tag]:
-			var o = _offers[id]
-			if visibility_filter == null or o.visibility == visibility_filter:
+			var o: Dictionary = _offers[id]
+			if visibility_filter == null or o.get("visibility") == visibility_filter:
 				if o not in result: result.append(o)
 	return result
 
@@ -1278,12 +1323,14 @@ func get_offers_between(from_tag: String, to_tag: String, visibility_filter = nu
 		candidates.append_array(_offers_by_to[a])
 
 	for id in candidates:
-		var o = _offers.get(id, {})
+		var o: Dictionary = _offers.get(id, {})
 		if o.is_empty() or o.get("status") != TradeStatus.PROPOSED:
 			continue
-		var other := o.to_tag if o.from_tag == a else o.from_tag
+		var o_from: String = str(o.get("from_tag", ""))
+		var o_to: String = str(o.get("to_tag", ""))
+		var other := o_to if o_from == a else o_from
 		if other == b:
-			if visibility_filter == null or o.visibility == visibility_filter:
+			if visibility_filter == null or o.get("visibility") == visibility_filter:
 				result.append(o)
 
 	return result
@@ -1314,24 +1361,26 @@ func get_offers_between(from_tag: String, to_tag: String, visibility_filter = nu
 ##   "metadata": { "exposure_risk": 0.72, "generated_by": "black_market" }
 ## }
 func get_offer_display_data(offer_id: String, for_country: String = "") -> Dictionary:
-	var offer = _offers.get(offer_id, {})
+	var offer: Dictionary = _offers.get(offer_id, {})
 	if offer.is_empty():
 		return {"id": offer_id, "error": "Offer not found"}
 
 	var display := {}
 	display["id"] = offer_id
-	display["from_tag"] = offer.from_tag
-	display["to_tag"] = offer.to_tag
-	display["from_display"] = offer.from_tag   # TODO: Replace with proper country name lookup when available
-	display["to_display"] = offer.to_tag
-	display["visibility"] = offer.visibility
-	display["status"] = offer.status
+	var from_tag: String = str(offer.get("from_tag", ""))
+	var to_tag: String = str(offer.get("to_tag", ""))
+	display["from_tag"] = from_tag
+	display["to_tag"] = to_tag
+	display["from_display"] = from_tag   # TODO: Replace with proper country name lookup when available
+	display["to_display"] = to_tag
+	display["visibility"] = offer.get("visibility", TradeVisibility.PUBLIC)
+	display["status"] = offer.get("status", TradeStatus.PROPOSED)
 	display["created_turn"] = offer.get("created_turn", 0)
 	display["expires_turn"] = offer.get("expires_turn", -1)
 	display["is_expired"] = offer.get("expires_turn", -1) > 0 and _current_year >= offer.get("expires_turn", -1)
 
 	# Risk information (primarily for Black Market UI)
-	if offer.visibility == TradeVisibility.BLACK:
+	if int(offer.get("visibility", -1)) == TradeVisibility.BLACK:
 		var risk := float(offer.get("metadata", {}).get("exposure_risk", 0.0))
 		display["risk_level"] = risk
 		display["risk_category"] = _get_risk_category(risk)
@@ -1341,11 +1390,11 @@ func get_offer_display_data(offer_id: String, for_country: String = "") -> Dicti
 
 	# Formatted items (ready for ItemList / RichText)
 	display["offered"] = []
-	for item in offer.offered:
+	for item in offer.get("offered", []):
 		display["offered"].append(_format_trade_item_for_display(item))
 
 	display["requested"] = []
-	for item in offer.requested:
+	for item in offer.get("requested", []):
 		display["requested"].append(_format_trade_item_for_display(item))
 
 	# Full fairness evaluation if the caller wants it for the current player
@@ -1353,6 +1402,10 @@ func get_offer_display_data(offer_id: String, for_country: String = "") -> Dicti
 		display["fairness"] = evaluate_fairness(offer_id, for_country)
 
 	display["metadata"] = offer.get("metadata", {}).duplicate(true)
+
+	# Expose special site trade capacity bonus for UI (tooltips, headers, etc.)
+	if not for_country.is_empty():
+		display["trade_capacity_bonus"] = get_national_special_site_trade_capacity_bonus(for_country)
 
 	return display
 
@@ -1417,7 +1470,7 @@ func get_market_offers_display_data(country_tag: String = "", visibility_filter 
 
 	var display_list := []
 	for offer in raw_offers:
-		var disp := get_offer_display_data(offer.id, for_country_for_fairness)
+		var disp := get_offer_display_data(str(offer.get("id", "")), for_country_for_fairness)
 		display_list.append(disp)
 
 	# Simple client-side search (supports "involves:GER" or "with:GER" for diplomacy-style bilateral filtering)
@@ -1470,6 +1523,14 @@ func get_market_offers_display_data(country_tag: String = "", visibility_filter 
 						return sa < sb if ascending else sa > sb
 					)
 
+	# Attach national trade capacity context when a country is specified
+	if for_country_for_fairness != "":
+		var context := {
+			"trade_capacity_bonus": get_national_special_site_trade_capacity_bonus(for_country_for_fairness)
+		}
+		# We can't easily mutate the array, so callers can query it separately or we attach to first item if needed.
+		# For now, the per-offer "trade_capacity_bonus" from get_offer_display_data is the main hook.
+
 	return display_list
 
 ## =============================================================================
@@ -1490,22 +1551,26 @@ func reject_offer_from_ui(offer_id: String, reason: String = "Rejected by player
 ## Returns the new offer_id or "" on failure.
 func create_counter_offer(base_offer_id: String, new_offered: Array, new_requested: Array, expires_in_years: int = -1) -> String:
 	var base = _offers.get(base_offer_id, {})
-	if base.is_empty() or base.status != TradeStatus.PROPOSED:
+	if base.is_empty() or int(base.get("status", -1)) != TradeStatus.PROPOSED:
 		push_error("TradeManager: cannot counter non-existent or non-proposed offer " + base_offer_id)
 		return ""
 
 	# Swap direction for the counter
-	var new_from := base.to_tag
-	var new_to := base.from_tag
+	var new_from: String = str(base.get("to_tag", ""))
+	var new_to: String = str(base.get("from_tag", ""))
 
-	var new_id := create_offer(new_from, new_to, new_offered, new_requested, base.visibility, expires_in_years)
+	var new_id := create_offer(
+		new_from, new_to, new_offered, new_requested,
+		int(base.get("visibility", TradeVisibility.PUBLIC)),
+		expires_in_years,
+	)
 	if new_id != "":
 		# Stamp counter metadata so future Diplomacy/Relations systems can correlate offer chains
 		var new_offer = _offers.get(new_id, {})
 		if not new_offer.is_empty():
 			new_offer["metadata"]["is_counter"] = true
 			new_offer["metadata"]["counter_of"] = base_offer_id
-			new_offer["metadata"]["original_visibility"] = base.visibility
+			new_offer["metadata"]["original_visibility"] = base.get("visibility", TradeVisibility.PUBLIC)
 
 		counter_offer_requested.emit(base_offer_id, new_from, new_to)
 	return new_id
@@ -1711,15 +1776,15 @@ func count_trade_flows_on_map_province(province_id: int, viewer_country_tag: Str
 ## Future diplomacy code can use this to apply opinion deltas, update relationship history,
 ## or trigger events. The implementation here is a no-op stub that emits the signal.
 func notify_trade_diplomatic_outcome(offer_id: String) -> void:
-	var offer = _offers.get(offer_id, {})
+	var offer: Dictionary = _offers.get(offer_id, {})
 	if offer.is_empty():
 		return
 
-	var from := offer.from_tag
-	var to := offer.to_tag
+	var from: String = str(offer.get("from_tag", ""))
+	var to: String = str(offer.get("to_tag", ""))
 	var status := int(offer.get("status", -1))
-	var vis := offer.get("visibility", TradeVisibility.PUBLIC)
-	var meta := offer.get("metadata", {}).duplicate(true)
+	var vis: int = int(offer.get("visibility", TradeVisibility.PUBLIC))
+	var meta: Dictionary = (offer.get("metadata", {}) as Dictionary).duplicate(true)
 
 	# Emit the rich outcome signal (already also emitted from accept/reject/expire for convenience)
 	trade_deal_outcome.emit(offer_id, from, to, status, vis, meta)
@@ -1760,13 +1825,13 @@ func get_suggested_opinion_delta_for_deal(offer_id: String) -> float:
 	if offer.is_empty():
 		return 0.0
 
-	var status := offer.get("status", -1)
+	var status: int = int(offer.get("status", -1))
 	if status != TradeStatus.ACCEPTED:
 		return 0.0  # Only successful deals generate positive suggestion by default
 
 	# Very lightweight heuristic (future DiplomacyManager can do something much smarter)
 	var base := 0.04
-	if offer.visibility == TradeVisibility.BLACK:
+	if int(offer.get("visibility", -1)) == TradeVisibility.BLACK:
 		base *= 0.6  # Risky deals give less diplomatic goodwill
 
 	# High-value items (PROVINCE, major designs) could be worth more — left for caller to enrich
@@ -2014,11 +2079,16 @@ func generate_public_market_offers(country_tag: String, count: int = 2) -> Array
 	if tag.is_empty() or count <= 0:
 		return []
 
+	# === Special Site Trade Capacity Integration ===
+	# Higher capacity from developed ports etc. = more natural trade activity
+	var trade_capacity_bonus := get_national_special_site_trade_capacity_bonus(tag)
+	var effective_count := count + int(trade_capacity_bonus / 25.0)  # every 25 trade capacity = +1 offer
+
 	var created_ids: Array[String] = []
 
 	# Simple heuristic generation for natural-feeling offers
 	# Future: could query actual stockpiles, obsolete designs via DesignManager, etc.
-	for i in range(count):
+	for i in range(effective_count):
 		var offered := []
 		var requested := []
 
@@ -2319,7 +2389,8 @@ func _execute_transfer(country_tag: String, item: Dictionary, is_giver_side: boo
 		TradeItemType.DOCKING_RIGHTS:
 			if typeof(NationalModifierManager) != TYPE_NIL and qty > 0:
 				var duration := int(item.get("metadata", {}).get("duration_months", 12))
-				var modifiers := item.get("metadata", {}).get("modifiers", {"supply_throughput": 0.2, "port_access": 1.0})
+				var item_meta: Dictionary = item.get("metadata", {}) as Dictionary
+				var modifiers: Dictionary = item_meta.get("modifiers", {"supply_throughput": 0.2, "port_access": 1.0}) as Dictionary
 				var effect := {
 					"source": "trade_docking_rights",
 					"source_detail": id,
@@ -2332,7 +2403,8 @@ func _execute_transfer(country_tag: String, item: Dictionary, is_giver_side: boo
 		TradeItemType.INTEL:
 			if typeof(NationalModifierManager) != TYPE_NIL and qty > 0:
 				var duration := int(item.get("metadata", {}).get("duration_months", 6))
-				var modifiers := item.get("metadata", {}).get("modifiers", {"recon_bonus": qty * 0.1, "intel_visibility": 0.15})
+				var intel_meta: Dictionary = item.get("metadata", {}) as Dictionary
+				var modifiers: Dictionary = intel_meta.get("modifiers", {"recon_bonus": qty * 0.1, "intel_visibility": 0.15}) as Dictionary
 				var effect := {
 					"source": "trade_intel",
 					"source_detail": id,

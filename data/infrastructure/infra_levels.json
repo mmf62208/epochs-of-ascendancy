@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "meta": {
+    "description": "Infrastructure level breakpoints, names, and core modifiers for Epochs of Ascendancy. Used by InfrastructureDevelopmentManager and Province getters.",
+    "last_updated": "2026-05-28"
+  },
+  "era_max": {
+    "ww1": 6,
+    "interwar": 8,
+    "ww2": 12,
+    "early_cold_war": 15,
+    "late_cold_war": 18,
+    "modern": 22,
+    "future": 30
+  },
+  "levels": {
+    "1": {
+      "name": "Dirt Tracks & Trails",
+      "supply_throughput": 0.54,
+      "movement_cost_mult": 0.96,
+      "combat_width": 0.72,
+      "org_recovery": 0.62,
+      "interdiction_resistance": 1.00,
+      "repair_pride_per_day": 0.004,
+      "description": "Pre-industrial movement. Heavy attrition and slow supply."
+    },
+    "3": {
+      "name": "Gravel & Improved Local Roads",
+      "supply_throughput": 0.62,
+      "movement_cost_mult": 0.88,
+      "combat_width": 0.78,
+      "org_recovery": 0.70,
+      "interdiction_resistance": 1.04,
+      "repair_pride_per_day": 0.012,
+      "description": "Basic motor transport possible. Still vulnerable to weather and interdiction."
+    },
+    "6": {
+      "name": "Light Rail & Paved Roads",
+      "supply_throughput": 0.78,
+      "movement_cost_mult": 0.76,
+      "combat_width": 0.88,
+      "org_recovery": 0.82,
+      "interdiction_resistance": 1.12,
+      "repair_pride_per_day": 0.024,
+      "unlocks": ["motorized_logistics", "field_depot_upgrade"],
+      "description": "First real strategic mobility. Enables meaningful armored and motorized operations."
+    },
+    "9": {
+      "name": "Standard Rail Network",
+      "supply_throughput": 0.94,
+      "movement_cost_mult": 0.64,
+      "combat_width": 1.00,
+      "org_recovery": 0.94,
+      "interdiction_resistance": 1.22,
+      "repair_pride_per_day": 0.036,
+      "unlocks": ["heavy_rail", "advanced_supply_hub"],
+      "description": "Backbone of 20th-century industrial warfare. High throughput and rapid reinforcement."
+    },
+    "12": {
+      "name": "Heavy Rail + Early Motorways",
+      "supply_throughput": 1.12,
+      "movement_cost_mult": 0.55,
+      "combat_width": 1.12,
+      "org_recovery": 1.05,
+      "interdiction_resistance": 1.32,
+      "repair_pride_per_day": 0.048,
+      "unlocks": ["armored_trains", "airfield_expansion"],
+      "description": "Supports dense mechanized formations and rapid theater-wide redeployment."
+    },
+    "15": {
+      "name": "Integrated Transport Grid",
+      "supply_throughput": 1.30,
+      "movement_cost_mult": 0.48,
+      "combat_width": 1.22,
+      "org_recovery": 1.14,
+      "interdiction_resistance": 1.42,
+      "repair_pride_per_day": 0.060,
+      "unlocks": ["jet_airbase", "missile_bases"],
+      "description": "Modern combined-arms logistics. Extremely high resilience to interdiction."
+    },
+    "20": {
+      "name": "Network-Centric Logistics",
+      "supply_throughput": 1.55,
+      "movement_cost_mult": 0.40,
+      "combat_width": 1.35,
+      "org_recovery": 1.25,
+      "interdiction_resistance": 1.55,
+      "repair_pride_per_day": 0.080,
+      "unlocks": ["drone_logistics", "orbital_depot"],
+      "description": "Late 20th / early 21st century standard. Real-time tracking and hardened routes."
+    },
+    "25": {
+      "name": "Autonomous & High-Speed Grid",
+      "supply_throughput": 1.80,
+      "movement_cost_mult": 0.32,
+      "combat_width": 1.48,
+      "org_recovery": 1.36,
+      "interdiction_resistance": 1.70,
+      "repair_pride_per_day": 0.100,
+      "description": "Near-future hardened infrastructure. Massive surge capacity and drone/automation support."
+    }
+  }
+}

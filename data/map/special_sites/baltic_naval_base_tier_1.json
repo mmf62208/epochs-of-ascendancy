@@ -1,0 +1,29 @@
+{
+  "id": "baltic_naval_base_tier_1",
+  "site_type": "naval_shipyard",
+  "tier": 1,
+  "name": "Baltic Sea Naval Base",
+  "description": "A key naval installation for controlling access to the Baltic Sea.",
+
+  "visual": {
+    "icon": "naval_base_1",
+    "size_scale": 1.3
+  },
+
+  "effects": {
+    "naval_repair_bonus": 15,
+    "local_naval_supply": 12,
+    "interdiction_resistance": 7
+  },
+
+  "construction": {
+    "base_days": 42,
+    "political_power_cost": 75,
+    "required_infra_level": 3
+  },
+
+  "damage": {
+    "max_damage_level": 3,
+    "repair_days_per_level": 12
+  }
+}

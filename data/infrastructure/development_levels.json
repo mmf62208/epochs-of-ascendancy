@@ -1,0 +1,73 @@
+{
+  "version": 1,
+  "meta": {
+    "description": "Development level breakpoints and economic effects. Primary driver of factory eligibility, local supply generation, and long-term industrial output.",
+    "last_updated": "2026-05-28"
+  },
+  "era_min_for_advanced_factory": {
+    "aircraft_factory": 5,
+    "tank_plant": 4,
+    "shipyard": 3,
+    "spaceport": 9
+  },
+  "levels": {
+    "1": {
+      "name": "Rural / Frontier",
+      "local_supply_gen": 0.0,
+      "factory_efficiency": 0.70,
+      "build_speed": 0.80,
+      "max_standard_lines": 1,
+      "description": "Minimal industry. Suitable for light infantry and basic supply."
+    },
+    "3": {
+      "name": "Developing Agricultural-Industrial",
+      "local_supply_gen": 0.03,
+      "factory_efficiency": 0.85,
+      "build_speed": 0.92,
+      "max_standard_lines": 2,
+      "description": "First real factories. Good for early motorized and support equipment."
+    },
+    "5": {
+      "name": "Early Industrial Hub",
+      "local_supply_gen": 0.09,
+      "factory_efficiency": 1.00,
+      "build_speed": 1.00,
+      "max_standard_lines": 3,
+      "unlocks": ["tank_plant", "aircraft_factory"],
+      "description": "Core 1930s–1940s industrial province. Full range of mid-war production possible."
+    },
+    "7": {
+      "name": "Mature Industrial Base",
+      "local_supply_gen": 0.18,
+      "factory_efficiency": 1.12,
+      "build_speed": 1.10,
+      "max_standard_lines": 4,
+      "description": "High output and resilience. Excellent for sustained high-intensity warfare."
+    },
+    "10": {
+      "name": "Advanced Industrial Complex",
+      "local_supply_gen": 0.30,
+      "factory_efficiency": 1.25,
+      "build_speed": 1.22,
+      "max_standard_lines": 5,
+      "unlocks": ["advanced_shipyard", "electronics_plant"],
+      "description": "Late 20th century standard. Supports jet-era and early missile production at scale."
+    },
+    "14": {
+      "name": "High-Tech Industrial Center",
+      "local_supply_gen": 0.45,
+      "factory_efficiency": 1.38,
+      "build_speed": 1.35,
+      "max_standard_lines": 6,
+      "description": "Modern precision manufacturing + strong R&D base. Critical for 21st century systems."
+    },
+    "18": {
+      "name": "Strategic Megacomplex",
+      "local_supply_gen": 0.65,
+      "factory_efficiency": 1.50,
+      "build_speed": 1.50,
+      "unlocks": ["spaceport", "orbital_industry"],
+      "description": "Near-future peak. Enables megaprojects and off-world adjacent production."
+    }
+  }
+}

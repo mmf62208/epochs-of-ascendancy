@@ -1,0 +1,29 @@
+{
+  "id": "danish_straits_fortress",
+  "site_type": "fortification",
+  "tier": 2,
+  "name": "Danish Straits Fortress",
+  "description": "A heavily defended position controlling access between the North Sea and the Baltic.",
+
+  "visual": {
+    "icon": "fortress_2",
+    "size_scale": 1.4
+  },
+
+  "effects": {
+    "interdiction_resistance": 20,
+    "strategic_deterrence": 12,
+    "naval_repair_bonus": 8
+  },
+
+  "construction": {
+    "base_days": 70,
+    "political_power_cost": 115,
+    "required_infra_level": 4
+  },
+
+  "damage": {
+    "max_damage_level": 4,
+    "repair_days_per_level": 16
+  }
+}

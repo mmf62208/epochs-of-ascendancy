@@ -1,0 +1,18 @@
+{
+  "id": "factory_tier_1",
+  "site_type": "factory",
+  "tier": 1,
+  "name": "Light Factory",
+  "description": "Small industrial facility producing equipment and goods.",
+  "visual": { "icon": "factory_1" },
+  "effects": {
+    "production_efficiency": 8,
+    "local_supply_generation": 6
+  },
+  "construction": {
+    "base_days": 32,
+    "political_power_cost": 55,
+    "required_infra_level": 2
+  },
+  "damage": { "max_damage_level": 3 }
+}

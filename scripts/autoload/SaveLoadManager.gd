@@ -42,7 +42,9 @@
 ##   "national_modifiers": {
 ##     "country_modifiers": { "GER": [ {effect dicts with remaining_months etc.}, ... ] }
 ##   },
-##   "misc": {}   # Future expansion (production lines, leaders, etc.)
+##   "misc": {},   # Future expansion
+##   "infrastructure_projects": { "version": 1, "active_projects": { "42": {project dict}, ... } }
+## }
 ## }
 ##
 ## === EXTENSIBILITY CONTRACT (how other managers participate - REQUIRED READING) ===
@@ -96,6 +98,7 @@
 ## - Factories (full Factory resources: damage, owner, retooling, assigned lines, efficiencies)
 ## - Leaders (full Leader resources + XP/status/assignments/traits, national positions, officer training, pending retirements/replacements)
 ## - Design lifecycle (if DesignManager provides it)
+## - InfrastructureDevelopmentManager (active provincial investment projects only; dev/infra levels live under "map")
 ##
 ## Metadata structure (in every save root["metadata"]):
 ##   timestamp, scenario_id, player_tag, last_played, game_version, play_time_seconds (0 for now)
@@ -390,6 +393,13 @@ func _gather_save_data() -> Dictionary:
 		else:
 			data["leaders"] = {}
 
+	# --- Infrastructure Development (active projects only; levels are in "map") ---
+	if typeof(InfrastructureDevelopmentManager) != TYPE_NIL:
+		if InfrastructureDevelopmentManager.has_method("get_save_data"):
+			data["infrastructure_projects"] = InfrastructureDevelopmentManager.get_save_data()
+		else:
+			data["infrastructure_projects"] = {}
+
 	return data
 
 
@@ -403,6 +413,15 @@ func _apply_save_data(data: Dictionary) -> void:
 	# 2. Map provinces (owner/controller/dev/infra) — triggers province_data_changed
 	if data.has("map") and typeof(MapManager) != TYPE_NIL:
 		_apply_map_state(data["map"])
+
+	# 2b. Active infrastructure / development projects (must be after map provinces exist)
+	var infra_data := _get_infrastructure_save_data(data)
+	if infra_data != null and typeof(InfrastructureDevelopmentManager) != TYPE_NIL:
+		if InfrastructureDevelopmentManager.has_method("apply_loaded_data"):
+			InfrastructureDevelopmentManager.apply_loaded_data(infra_data)
+		# Explicit visual refresh pass after load (as requested for map overlays / InfoPanel)
+		if InfrastructureDevelopmentManager.has_method("refresh_all_project_visuals"):
+			InfrastructureDevelopmentManager.refresh_all_project_visuals()
 
 	# 3. Supply depots only (deployments after leaders — step 7b)
 	if data.has("supply") and typeof(SupplyManager) != TYPE_NIL:
@@ -599,6 +618,7 @@ func _serialize_map_state() -> Dictionary:
 			"controller_tag": p.controller_tag,
 			"development_level": p.development_level,
 			"infrastructure": p.infrastructure,
+			"special_sites": _serialize_special_sites(p),
 			# Add more mutables (factories, resources, special_features deltas, cores, etc.) as they gain runtime mutation.
 		})
 	return out
@@ -625,7 +645,59 @@ func _apply_map_state(m: Dictionary) -> void:
 		if e.has("infrastructure"):
 			MapManager.update_province_infrastructure(pid, int(e["infrastructure"]))
 
+		if e.has("special_sites"):
+			_apply_special_sites(pid, e["special_sites"])
+
 	print("SaveLoad: Applied province state to %d provinces (signals emitted)" % list.size())
+
+
+## Helper to serialize special sites on a province
+func _serialize_special_sites(p: Province) -> Array:
+	var out := []
+	if p == null or p.special_sites.is_empty():
+		return out
+	for site in p.special_sites:
+		if site == null:
+			continue
+		out.append({
+			"id": site.id,
+			"site_type": int(site.site_type),
+			"tier": site.tier,
+			"construction_state": int(site.construction_state),
+			"construction_progress": site.construction_progress,
+			"damage_level": site.damage_level,
+			"owner_tag": site.owner_tag,
+			"upgrade_target_id": site.upgrade_target_id if site.has_method("get_upgrade_target_id") or "upgrade_target_id" in site else ""
+		})
+	return out
+
+func _apply_special_sites(pid: int, sites_data: Array) -> void:
+	var province: Province = MapManager.get_province(pid) if typeof(MapManager) != TYPE_NIL else null
+	if province == null:
+		return
+
+	province.special_sites.clear()
+
+	for sdata in sites_data:
+		if typeof(sdata) != TYPE_DICTIONARY:
+			continue
+		var d: Dictionary = sdata
+
+		var site := SpecialSite.new()
+		site.id = d.get("id", "")
+		site.site_type = SpecialSite.SiteType.values()[int(d.get("site_type", 0))]
+		site.tier = int(d.get("tier", 1))
+		site.construction_state = SpecialSite.ConstructionState.values()[int(d.get("construction_state", 2))]
+		site.construction_progress = float(d.get("construction_progress", 1.0))
+		site.damage_level = int(d.get("damage_level", 0))
+		site.owner_tag = d.get("owner_tag", "")
+		site.upgrade_target_id = d.get("upgrade_target_id", "")
+
+		province.special_sites.append(site)
+
+	if not sites_data.is_empty():
+		MapManager.notify_province_changed(pid, "special_site")
+
 
 ## --- Supply depots ---
 
@@ -795,6 +867,59 @@ func _migrate_save_data(data: Dictionary) -> void:
 	#     # Provide defaults for new sections, fix shapes, etc.
 
 	data["save_version"] = SAVE_VERSION  # mark as upgraded
+
+## === Infrastructure migration support (added May 2026) ===
+## Handles old saves that pre-date the "infrastructure_projects" section.
+## Supports:
+##   - Modern key "infrastructure_projects"
+##   - Legacy key "infrastructure" (user sketch format or early experiments)
+##   - Per-province "active_project" entries
+func _get_infrastructure_save_data(save_root: Dictionary) -> Dictionary:
+	if save_root == null:
+		return null
+
+	# Preferred modern format
+	if save_root.has("infrastructure_projects"):
+		var d: Dictionary = save_root["infrastructure_projects"]
+		if typeof(d) == TYPE_DICTIONARY and d.has("active_projects"):
+			return d
+
+	# Legacy top-level "infrastructure" key (user's original sketch or early saves)
+	if save_root.has("infrastructure"):
+		var legacy: Dictionary = save_root["infrastructure"]
+		if typeof(legacy) == TYPE_DICTIONARY:
+			# Convert user's example shape into the real manager shape if needed
+			var converted := { "version": 1, "active_projects": {} }
+			for pid_str in legacy.keys():
+				var entry: Dictionary = legacy[pid_str] as Dictionary
+				if entry == null:
+					continue
+				var proj_data: Variant = entry.get("active_project", null)
+				if proj_data != null and typeof(proj_data) == TYPE_DICTIONARY:
+					converted["active_projects"][pid_str] = proj_data
+				elif entry.has("project"):  # alternative legacy shape
+					converted["active_projects"][pid_str] = entry["project"]
+			if not converted["active_projects"].is_empty():
+				print("SaveLoad: Migrated legacy 'infrastructure' section to infrastructure_projects format.")
+				return converted
+
+	# Also check inside "map" for any stray per-province project data (very old experiments)
+	if save_root.has("map"):
+		var map_section: Dictionary = save_root["map"]
+		if map_section.has("provinces") and typeof(map_section["provinces"]) == TYPE_ARRAY:
+			var converted2 := { "version": 1, "active_projects": {} }
+			for p in map_section["provinces"]:
+				if typeof(p) != TYPE_DICTIONARY:
+					continue
+				var pid := str(p.get("id", ""))
+				var proj := p.get("active_infra_project", null) or p.get("active_project", null)
+				if proj != null and typeof(proj) == TYPE_DICTIONARY:
+					converted2["active_projects"][pid] = proj
+			if not converted2["active_projects"].is_empty():
+				print("SaveLoad: Found stray per-province project data in map section — migrated.")
+				return converted2
+
+	return null
 
 ## Enhanced save with better error object (for future UI).
 func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:

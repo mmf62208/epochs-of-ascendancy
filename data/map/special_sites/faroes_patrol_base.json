@@ -1,0 +1,31 @@
+{
+  "id": "faroes_patrol_base",
+  "site_type": "naval_base",
+  "tier": 1,
+  "name": "Faroe Islands Patrol Base",
+  "description": "Remote but strategically vital forward operating location for Atlantic patrol craft, ASW, and convoy escort support.",
+  "visual": {
+    "icon": "🚢",
+    "color": "#2e5d8a",
+    "scale": 0.95
+  },
+  "effects": {
+    "naval_range_bonus": 0.28,
+    "trade_protection": 0.15,
+    "local_supply_generation": 4
+  },
+  "construction": {
+    "required_infra_level": 1,
+    "base_days": 72,
+    "base_pp": 125,
+    "required_terrain": ["coastal"],
+    "required_features": []
+  },
+  "damage": {
+    "max_damage_level": 2,
+    "repair_days_per_level": 16
+  },
+  "upgrade": {
+    "target_id": "faroes_patrol_base_tier2"
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "id": "northern_sea_chokepoint",
+  "site_type": "naval_shipyard",
+  "tier": 2,
+  "name": "Major Northern Sea Naval Base",
+  "description": "A strategically vital naval installation controlling key access routes in the North Sea and approaches to the Baltic.",
+
+  "visual": {
+    "icon": "naval_base_2",
+    "size_scale": 1.5
+  },
+
+  "effects": {
+    "naval_repair_bonus": 25,
+    "local_naval_supply": 18,
+    "interdiction_resistance": 10
+  },
+
+  "construction": {
+    "base_days": 65,
+    "political_power_cost": 120,
+    "required_infra_level": 4
+  },
+
+  "damage": {
+    "max_damage_level": 4,
+    "repair_days_per_level": 14
+  }
+}

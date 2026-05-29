@@ -89,3 +89,18 @@ func set_report(province_id: int, report: ProvinceForceReport) -> void:
 
 func all_province_ids() -> Array:
 	return _by_province.keys()
+
+
+# === Naval Recon Support ===
+# Naval presence in sea zones provides recon rolls on adjacent land provinces.
+# Strength contributes to detection chance.
+
+func get_naval_recon_strength(province_id: int, owner_tag: String = "") -> float:
+	var report = get_report(province_id)
+	if owner_tag.is_empty():
+		# Total for all
+		var total = 0.0
+		for tag in report.naval_strength:
+			total += float(report.naval_strength[tag])
+		return total
+	return float(report.naval_strength.get(owner_tag, 0.0))

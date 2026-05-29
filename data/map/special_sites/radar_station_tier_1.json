@@ -1,0 +1,18 @@
+{
+  "id": "radar_station_tier_1",
+  "site_type": "radar_station",
+  "tier": 1,
+  "name": "Early Warning Radar",
+  "description": "Basic radar installation for air and missile detection.",
+  "visual": { "icon": "radar_1" },
+  "effects": {
+    "air_detection_bonus": 15,
+    "interdiction_resistance": 8
+  },
+  "construction": {
+    "base_days": 22,
+    "political_power_cost": 40,
+    "required_infra_level": 2
+  },
+  "damage": { "max_damage_level": 2 }
+}

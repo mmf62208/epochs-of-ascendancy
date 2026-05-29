@@ -20,6 +20,11 @@ const MENU_OPTIONS: Array[Dictionary] = [
 	{"id": "exit", "label": "Exit to Desktop", "style": "danger"},
 ]
 
+# Debug-only options (only shown in debug builds or when a flag is set)
+const DEBUG_OPTIONS: Array[Dictionary] = [
+	{"id": "refresh_infra_visuals", "label": "🔧 Open Debug Overlay (F10)", "style": "muted"},
+]
+
 signal menu_closed
 
 var _previous_pause_state := false
@@ -118,7 +123,35 @@ func _build_menu_options() -> void:
 		var style := str(opt.get("style", "secondary"))
 		options_vbox.add_child(_make_menu_button(label, id, style))
 
+	# Debug tools section (very useful during active development)
+	_add_debug_section()
+
 	close_button.pressed.connect(_on_close_requested)
+
+
+func _add_debug_section() -> void:
+	# Only add in debug builds or when explicitly enabled (keeps release builds clean)
+	if not OS.is_debug_build():
+		return
+
+	var spacer := Control.new()
+	spacer.custom_minimum_size = Vector2(0, 12)
+	options_vbox.add_child(spacer)
+
+	var debug_header := Label.new()
+	debug_header.text = "DEBUG"
+	debug_header.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	options_vbox.add_child(debug_header)
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_column_header(debug_header)
+
+	for opt in DEBUG_OPTIONS:
+		var id := str(opt.get("id", ""))
+		var label := str(opt.get("label", id))
+		var style := str(opt.get("style", "muted"))
+		var btn := _make_menu_button(label, id, style)
+		btn.modulate = Color(0.85, 0.9, 1.0, 0.9)  # subtle cyan tint for debug items
+		options_vbox.add_child(btn)
 
 
 func _make_menu_button(text: String, option: String, style: String) -> Button:
@@ -359,6 +392,8 @@ func _handle_menu_option(option: String) -> void:
 			get_tree().quit()
 		"help":
 			_show_help_dialog()
+		"refresh_infra_visuals":
+			DebugOverlay.toggle()
 		_:
 			_set_status("Option: %s" % option)
 
@@ -376,6 +411,7 @@ func _do_quicksave() -> void:
 		var err := str(result.get("error", "Save failed"))
 		_set_status(err)
 		_toast(err, 3.0, true)
+
 
 func _open_trade_market() -> void:
 	var packed := load("res://scenes/ui/TradeMarketView.tscn")

@@ -30,6 +30,8 @@ var trade_button: Button   # Added dynamically for quick Trade access
 @onready var settings_button: Button = $ContentRow/RightContainer/MenuContainer/SettingsButton
 @onready var help_button: Button = $ContentRow/RightContainer/MenuContainer/HelpButton
 
+var debug_button: Button   # Only created in debug builds
+
 var current_speed: int = 1
 var is_paused: bool = false
 
@@ -85,6 +87,22 @@ func _apply_theme() -> void:
 	for btn in [save_button, load_button, settings_button, help_button, pause_button]:
 		RetrowaveTheme.style_secondary_button(btn)
 
+	# Debug overlay quick toggle (only in debug builds)
+	if OS.is_debug_build() and debug_button == null:
+		debug_button = Button.new()
+		debug_button.text = "DBG"
+		debug_button.tooltip_text = "Open Debug Overlay (F10 / Ctrl+Shift+R)"
+		debug_button.custom_minimum_size = Vector2(42, 28)
+		$ContentRow/RightContainer/MenuContainer.add_child(debug_button)
+		RetrowaveTheme.style_secondary_button(debug_button)
+		debug_button.pressed.connect(func(): DebugOverlay.toggle())
+
+		# Pre-create the overlay (hidden) so hotkeys and other systems can find it immediately
+		if DebugOverlay.instance == null:
+			var overlay := DebugOverlay.new()
+			add_child(overlay)
+			overlay.visible = false
+
 
 func _connect_buttons() -> void:
 	pause_button.pressed.connect(_on_pause_pressed)
@@ -116,6 +134,14 @@ func _on_tick() -> void:
 
 	_update_date_time()
 	_update_resources()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	# Global debug hotkey — now opens the dedicated Debug Overlay
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_F10 or (event.ctrl_pressed and event.shift_pressed and event.keycode == KEY_R):
+			DebugOverlay.toggle()
+			get_viewport().set_input_as_handled()
 
 
 func _set_game_speed(speed: int) -> void:
@@ -280,7 +306,7 @@ func _on_diplomacy_pressed() -> void:
 		get_tree().root.add_child(view)
 		# DiplomacyView handles its own popup_centered in _ready
 	else:
-		_toast("Diplomacy screen not available yet.", 2.5, true)
+		_show_toast("Diplomacy screen not available yet.", 2.5, true)
 
 
 func _on_agents_pressed() -> void:
@@ -311,7 +337,7 @@ func _on_trade_pressed() -> void:
 		else:
 			view.popup_centered(Vector2i(1100, 700))
 	else:
-		_toast("Trade Market not available.", 2.5, true)
+		_show_toast("Trade Market not available.", 2.5, true)
 
 
 func _close_screen(screen_name: String) -> void:
@@ -365,7 +391,7 @@ func _on_menu_pressed() -> void:
 		_show_main_menu_popup_fallback()
 		return
 
-	var menu := packed.instantiate()
+	var menu: Node = packed.instantiate()
 	menu.name = "MainMenu"
 	if menu.has_signal("menu_closed"):
 		menu.menu_closed.connect(func() -> void:
@@ -412,9 +438,6 @@ func _show_main_menu_popup_fallback() -> void:
 	panel.size = Vector2(620, 480)
 	panel.position = Vector2( (get_viewport().get_visible_rect().size.x - 620) / 2 , 80)
 	panel.z_index = 200
-
-	if has_node("/root/RetrowaveTheme"):
-		RetrowaveTheme.style_popup_root(panel)
 
 	var main_vbox := VBoxContainer.new()
 	main_vbox.size = panel.size - Vector2(20, 20)
@@ -600,8 +623,8 @@ func _populate_save_list(parent: VBoxContainer, owning_panel: Panel) -> void:
 			_update_resources()
 			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 				LeaderEventUI.show_toast("Game loaded: " + s.get("slot", ""), 2.5)
-			if panel and is_instance_valid(panel):
-				panel.queue_free()
+			if owning_panel and is_instance_valid(owning_panel):
+				owning_panel.queue_free()
 			_pause_for_menu(false)
 		)
 		h.add_child(load_btn)
@@ -612,8 +635,8 @@ func _populate_save_list(parent: VBoxContainer, owning_panel: Panel) -> void:
 			SaveLoadManager.delete_save(s.get("slot", ""))
 			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 				LeaderEventUI.show_toast("Save deleted: " + s.get("slot", ""), 2.0, true)
-			if panel and is_instance_valid(panel):
-				panel.queue_free()
+			if owning_panel and is_instance_valid(owning_panel):
+				owning_panel.queue_free()
 			_show_main_menu_popup_fallback()  # refresh
 		)
 		h.add_child(del_btn)
@@ -626,10 +649,17 @@ func _populate_save_list(parent: VBoxContainer, owning_panel: Panel) -> void:
 			print("Rename requested for " + s.get("slot", "") + " (use SaveLoadManager.rename_save in console for now)")
 			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 				LeaderEventUI.show_toast("Rename: use console for now (API ready)", 2.0)
-			if panel and is_instance_valid(panel):
-				panel.queue_free()
+			if owning_panel and is_instance_valid(owning_panel):
+				owning_panel.queue_free()
 			_show_main_menu_popup_fallback()
 		)
 		h.add_child(rename_btn)
 
 		parent.add_child(h)
+
+
+func _show_toast(message: String, duration: float = 2.5, is_error: bool = false) -> void:
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast(message, duration, is_error)
+	else:
+		push_warning(message)
