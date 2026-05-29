@@ -6,29 +6,37 @@
       "parent_id": 73,
       "points": [
         [
+          1254.9775,
+          896.64
+        ],
+        [
           1252.08,
           888.52
         ],
         [
-          1265.5949999999998,
-          883.785
+          1261.09,
+          885.3633333333333
+        ],
+        [
+          1270.1,
+          882.2066666666666
         ],
         [
           1279.11,
           879.05
         ],
         [
-          1287.795,
-          881.755
+          1290.6899999999998,
+          882.6566666666666
         ],
         [
-          1289.5857142857142,
-          900.12
+          1285.4073611111114,
+          902.7488888888888
         ]
       ],
       "center": [
-        1274.8331428571428,
-        886.646
+        1270.4935515873015,
+        888.1693650793651
       ],
       "suggested_attributes": {
         "terrain": "coastal",
@@ -39,19 +47,15 @@
         "special_features": [],
         "notes": "Phase 1 generated child \u2014 inherited + scaled from 840-province base catalog"
       },
-      "notes": "Densify + radial/bisect split. Parent area 2356.2 -> child area 411.7."
+      "notes": "Densify + radial/bisect. Area 2356.2\u2192590.7. (naval-aware densify)"
     },
     {
       "id": "73_c1",
       "parent_id": 73,
       "points": [
         [
-          1296.48,
-          884.46
-        ],
-        [
-          1305.165,
-          887.165
+          1302.27,
+          886.2633333333333
         ],
         [
           1313.85,
@@ -62,61 +66,25 @@
           900.02
         ],
         [
-          1289.5857142857142,
-          900.12
-        ]
-      ],
-      "center": [
-        1304.751142857143,
-        892.327
-      ],
-      "suggested_attributes": {
-        "terrain": "coastal",
-        "natural_resources": {
-          "oil": 176
-        },
-        "population_base": 1365000,
-        "special_features": [],
-        "notes": "Phase 1 generated child \u2014 inherited + scaled from 840-province base catalog"
-      },
-      "notes": "Densify + radial/bisect split. Parent area 2356.2 -> child area 302.5."
-    },
-    {
-      "id": "73_c2",
-      "parent_id": 73,
-      "points": [
-        [
           1323.5,
           910.17
+        ],
+        [
+          1317.2275,
+          914.5699999999999
         ],
         [
           1310.955,
           918.97
         ],
         [
-          1298.41,
-          927.77
-        ],
-        [
-          1281.04,
-          924.385
-        ],
-        [
-          1263.67,
-          921.0
-        ],
-        [
-          1257.875,
-          904.76
-        ],
-        [
-          1289.5857142857142,
-          900.12
+          1285.4073611111114,
+          902.7488888888888
         ]
       ],
       "center": [
-        1289.2908163265306,
-        915.3107142857143
+        1310.269265873016,
+        903.2303174603175
       ],
       "suggested_attributes": {
         "terrain": "coastal",
@@ -127,7 +95,55 @@
         "special_features": [],
         "notes": "Phase 1 generated child \u2014 inherited + scaled from 840-province base catalog"
       },
-      "notes": "Densify + radial/bisect split. Parent area 2356.2 -> child area 1145.9."
+      "notes": "Densify + radial/bisect. Area 2356.2\u2192690.9. (naval-aware densify)"
+    },
+    {
+      "id": "73_c2",
+      "parent_id": 73,
+      "points": [
+        [
+          1298.41,
+          927.77
+        ],
+        [
+          1286.8300000000002,
+          925.5133333333333
+        ],
+        [
+          1275.25,
+          923.2566666666667
+        ],
+        [
+          1263.67,
+          921.0
+        ],
+        [
+          1260.7725,
+          912.88
+        ],
+        [
+          1257.875,
+          904.76
+        ],
+        [
+          1285.4073611111114,
+          902.7488888888888
+        ]
+      ],
+      "center": [
+        1275.459265873016,
+        916.8469841269842
+      ],
+      "suggested_attributes": {
+        "terrain": "coastal",
+        "natural_resources": {
+          "oil": 176
+        },
+        "population_base": 1365000,
+        "special_features": [],
+        "notes": "Phase 1 generated child \u2014 inherited + scaled from 840-province base catalog"
+      },
+      "notes": "Densify + radial/bisect. Area 2356.2\u2192620.0. (naval-aware densify)"
     },
     {
       "id": "97_c0",
@@ -142,21 +158,29 @@
           1288.0
         ],
         [
-          778.0,
-          1282.0
+          772.0,
+          1284.0
+        ],
+        [
+          784.0,
+          1280.0
         ],
         [
           796.0,
           1276.0
         ],
         [
-          797.7142857142857,
-          1304.7142857142858
+          807.3333333333334,
+          1280.0
+        ],
+        [
+          797.1666666666666,
+          1305.0
         ]
       ],
       "center": [
-        779.1428571428571,
-        1289.6428571428573
+        782.9285714285714,
+        1287.2142857142858
       ],
       "suggested_attributes": {
         "terrain": "coastal",
@@ -167,15 +191,15 @@
         "special_features": [],
         "notes": "Phase 1 generated child \u2014 inherited + scaled from 840-province base catalog"
       },
-      "notes": "Densify + radial/bisect split. Parent area 3126.0 -> child area 672.9."
+      "notes": "Densify + radial/bisect. Area 3126.0\u2192833.5. (naval-aware densify)"
     },
     {
       "id": "97_c1",
       "parent_id": 97,
       "points": [
         [
-          813.0,
-          1282.0
+          818.6666666666666,
+          1284.0
         ],
         [
           830.0,
@@ -190,13 +214,21 @@
           1314.0
         ],
         [
-          797.7142857142857,
-          1304.7142857142858
+          827.0,
+          1324.0
+        ],
+        [
+          814.0,
+          1334.0
+        ],
+        [
+          797.1666666666666,
+          1305.0
         ]
       ],
       "center": [
-        823.1428571428571,
-        1297.9428571428573
+        823.1190476190476,
+        1307.142857142857
       ],
       "suggested_attributes": {
         "terrain": "coastal",
@@ -207,23 +239,23 @@
         "special_features": [],
         "notes": "Phase 1 generated child \u2014 inherited + scaled from 840-province base catalog"
       },
-      "notes": "Densify + radial/bisect split. Parent area 3126.0 -> child area 742.2."
+      "notes": "Densify + radial/bisect. Area 3126.0\u21921219.2. (naval-aware densify)"
     },
     {
       "id": "97_c2",
       "parent_id": 97,
       "points": [
         [
-          827.0,
-          1324.0
-        ],
-        [
-          814.0,
-          1334.0
+          804.5,
+          1332.0
         ],
         [
           795.0,
           1330.0
+        ],
+        [
+          785.5,
+          1328.0
         ],
         [
           776.0,
@@ -238,13 +270,13 @@
           1307.0
         ],
         [
-          797.7142857142857,
-          1304.7142857142858
+          797.1666666666666,
+          1305.0
         ]
       ],
       "center": [
-        792.8163265306122,
-        1320.3163265306123
+        785.452380952381,
+        1320.642857142857
       ],
       "suggested_attributes": {
         "terrain": "coastal",
@@ -255,36 +287,44 @@
         "special_features": [],
         "notes": "Phase 1 generated child \u2014 inherited + scaled from 840-province base catalog"
       },
-      "notes": "Densify + radial/bisect split. Parent area 3126.0 -> child area 1054.5."
+      "notes": "Densify + radial/bisect. Area 3126.0\u2192647.8. (naval-aware densify)"
     },
     {
       "id": "82_c0",
       "parent_id": 82,
       "points": [
         [
+          3157.245,
+          954.075
+        ],
+        [
           3154.3,
           945.82
         ],
         [
-          3168.045,
-          941.0050000000001
+          3163.4633333333336,
+          942.61
+        ],
+        [
+          3172.6266666666666,
+          939.4000000000001
         ],
         [
           3181.79,
           936.19
         ],
         [
-          3190.6275,
-          938.9425000000001
+          3193.5733333333333,
+          939.86
         ],
         [
-          3192.4521428571425,
-          957.615
+          3188.20125,
+          960.2872222222223
         ]
       ],
       "center": [
-        3177.4429285714286,
-        943.9145000000001
+        3173.028511904762,
+        945.4631746031746
       ],
       "suggested_attributes": {
         "terrain": "coastal",
@@ -295,19 +335,15 @@
         "special_features": [],
         "notes": "Phase 1 generated child \u2014 inherited + scaled from 840-province base catalog"
       },
-      "notes": "Densify + radial/bisect split. Parent area 2437.0 -> child area 425.8."
+      "notes": "Densify + radial/bisect. Area 2437.0\u2192610.9. (naval-aware densify)"
     },
     {
       "id": "82_c1",
       "parent_id": 82,
       "points": [
         [
-          3199.465,
-          941.695
-        ],
-        [
-          3208.3025,
-          944.4475
+          3205.3566666666666,
+          943.5300000000001
         ],
         [
           3217.14,
@@ -318,13 +354,25 @@
           957.52
         ],
         [
-          3192.4521428571425,
-          957.615
+          3226.96,
+          967.84
+        ],
+        [
+          3220.5775,
+          972.31
+        ],
+        [
+          3214.1949999999997,
+          976.78
+        ],
+        [
+          3188.20125,
+          960.2872222222223
         ]
       ],
       "center": [
-        3207.8819285714285,
-        949.6955
+        3213.4972023809523,
+        960.7810317460317
       ],
       "suggested_attributes": {
         "terrain": "coastal",
@@ -335,7 +383,7 @@
         "special_features": [],
         "notes": "Phase 1 generated child \u2014 inherited + scaled from 840-province base catalog"
       },
-      "notes": "Densify + radial/bisect split. Parent area 2437.0 -> child area 313.0."
+      "notes": "Densify + radial/bisect. Area 2437.0\u2192714.6. (naval-aware densify)"
     }
   ]
 }

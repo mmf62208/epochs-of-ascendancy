@@ -1,0 +1,4925 @@
+{
+  "version": 1,
+  "provinces": {
+    "1": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "2": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "3": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "4": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "5": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "6": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "7": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "8": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "9": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "10": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "11": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "12": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "13": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "14": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "15": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "16": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "17": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "18": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "19": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "20": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "21": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "22": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "23": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "24": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "25": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "26": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "27": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "28": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "29": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "30": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "31": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "32": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "33": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "34": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "35": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "36": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "37": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "38": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "39": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "40": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "41": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "42": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "43": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "44": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "45": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "46": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "47": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "48": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "49": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "50": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "51": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "52": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "53": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "54": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "55": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "56": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "57": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "58": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "59": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "60": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "61": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "62": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "63": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "64": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "65": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "66": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "67": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "68": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "69": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "70": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "71": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "72": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "73": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "74": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "75": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "76": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "77": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "78": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "79": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "80": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "81": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "82": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "83": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "84": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "85": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "86": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "87": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "88": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "89": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "90": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "91": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "92": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "93": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "94": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "95": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "96": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "97": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "98": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "99": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "100": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "101": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "102": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "103": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "104": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "105": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "106": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "107": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "108": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "109": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "110": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "111": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "112": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "113": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "114": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "115": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "116": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "117": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "118": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "119": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "120": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "121": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "122": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "123": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "124": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "125": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "126": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "127": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "128": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "129": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "130": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "131": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "132": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "133": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "134": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "135": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "136": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "137": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "138": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "139": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "140": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "141": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "142": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "143": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "144": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "145": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "146": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "147": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "148": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "149": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "150": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "151": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "152": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "153": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "154": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "155": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "156": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "157": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "158": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "159": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "160": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "161": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "162": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "163": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "164": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "165": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "166": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "167": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "168": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "169": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "170": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "171": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "172": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "173": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "174": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "175": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "176": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "177": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "178": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "179": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "180": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "181": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "182": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "183": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "184": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "185": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "186": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "187": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "188": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "189": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "190": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "191": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "192": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "193": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "194": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "195": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "196": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "197": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "198": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "199": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "200": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "201": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "202": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "203": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "204": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "205": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "206": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "207": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "208": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "209": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "210": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "211": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "212": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "213": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "214": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "215": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "216": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "217": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "218": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "219": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "220": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "221": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "222": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "223": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "224": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "225": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "226": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "227": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "228": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "229": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "230": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "231": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "232": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "233": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "234": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "235": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "236": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "237": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "238": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "239": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "240": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "241": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "242": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "243": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "244": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "245": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "246": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "247": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "248": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "249": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "250": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "251": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "252": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "253": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "254": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "255": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "256": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "257": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "258": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "259": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "260": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "261": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "262": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "263": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "264": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "265": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "266": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "267": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "268": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "269": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "270": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "271": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "272": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "273": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "274": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "275": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "276": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "277": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "278": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "279": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "280": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "281": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "282": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "283": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "284": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "285": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "286": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "287": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "288": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "289": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "290": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "291": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "292": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "293": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "294": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "295": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "296": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "297": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "298": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "299": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "300": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "301": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "302": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "303": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "304": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "305": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "306": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "307": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "308": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "309": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "310": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "311": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "312": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "313": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "314": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "315": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "316": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "317": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "318": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "319": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "320": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "321": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "322": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "323": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "324": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "325": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "326": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "327": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "328": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "329": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "330": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "331": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "332": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "333": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "334": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "335": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "336": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "337": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "338": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "339": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "340": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "341": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "342": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "343": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "344": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "345": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "346": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "347": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "348": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "349": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "350": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "351": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "352": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "353": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "354": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "355": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "356": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "357": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "358": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "359": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "360": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "361": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "362": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "363": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "364": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "365": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "366": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "367": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "368": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "369": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "370": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "371": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "372": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "373": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "374": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "375": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "376": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "377": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "378": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "379": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "380": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "381": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "382": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "383": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "384": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "385": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "386": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "387": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "388": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "389": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "390": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "391": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "392": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "393": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "394": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "395": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "396": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "397": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "398": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "399": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "400": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "401": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "402": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "403": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "404": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "405": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "406": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "407": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "408": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "409": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "410": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "411": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "412": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "413": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "414": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "415": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "416": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "417": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "418": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "419": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "420": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "421": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "422": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "423": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "424": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "425": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "426": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "427": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "428": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "429": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "430": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "431": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "432": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "433": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "434": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "435": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "436": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "437": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "438": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "439": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "440": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "441": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "442": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "443": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "444": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "445": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "446": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "447": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "448": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "449": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "450": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "451": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "452": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "453": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "454": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "455": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "456": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "457": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "458": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "459": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "460": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "461": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "462": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "463": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "464": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "465": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "466": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "467": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "468": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "469": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "470": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "471": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "472": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "473": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "474": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "475": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "476": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "477": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "478": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "479": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "480": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "481": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "482": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "483": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "484": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "485": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "486": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "487": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "488": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "489": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "490": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "491": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "492": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "493": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "494": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "495": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "496": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "497": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "498": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "499": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "500": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "501": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "502": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "503": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "504": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "505": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "506": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "507": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "508": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "509": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "510": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "511": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "512": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "513": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "514": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "515": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "516": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "517": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "518": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "519": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "520": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "521": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "522": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "523": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "524": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "525": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "526": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "527": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "528": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "529": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "530": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "531": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "532": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "533": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "534": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "535": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "536": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "537": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "538": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "539": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "540": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "541": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "542": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "543": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "544": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "545": {
+      "terrain": "desert",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "546": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "547": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "548": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "549": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "550": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "551": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "552": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "553": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "554": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "555": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "556": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "557": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "558": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "559": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "560": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "561": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "562": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "563": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "564": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "565": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "566": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "567": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "568": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "569": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "570": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "571": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "572": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "573": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "574": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "575": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "576": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "577": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "578": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "579": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "580": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "581": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "582": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "583": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "584": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "585": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "586": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "587": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "588": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "589": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "590": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "591": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "592": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "593": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "594": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "595": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "596": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "597": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "598": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "599": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "600": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "601": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "602": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "603": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "604": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "605": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "606": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "607": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "608": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "609": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "610": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "611": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "612": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "613": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "614": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "615": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "616": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "617": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "618": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "619": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "620": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "621": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "622": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "623": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "624": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "625": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "626": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "627": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "628": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "629": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "630": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "631": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "632": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "633": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "634": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "635": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "636": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "637": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "638": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "639": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "640": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "641": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "642": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "643": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "644": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "645": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "646": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "647": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "648": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "649": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "650": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "651": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "652": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "653": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "654": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "655": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "656": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "657": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "658": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "659": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "660": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "661": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "662": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "663": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "664": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "665": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "666": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "667": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "668": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "669": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "670": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "671": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "672": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "673": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "674": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "675": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "676": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "677": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "678": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "679": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "680": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "681": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "682": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "683": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "684": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "685": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "686": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "687": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "688": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "689": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "690": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "691": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "692": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "693": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "694": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "695": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "696": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "697": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "698": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "699": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "700": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "701": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "702": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "703": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "704": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "705": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "706": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "707": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "708": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "709": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "710": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "711": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "712": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "713": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "714": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "715": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "716": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "717": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "718": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "719": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "720": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "721": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "722": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "723": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "724": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "725": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "726": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "727": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "728": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "729": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "730": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "731": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "732": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "733": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "734": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "735": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "736": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "737": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "738": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "739": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "740": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "741": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "742": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "743": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "744": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "745": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "746": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "747": {
+      "terrain": "hills",
+      "movement_cost": 1.4,
+      "combat_modifier": -0.1
+    },
+    "748": {
+      "terrain": "urban",
+      "movement_cost": 0.85,
+      "combat_modifier": 0.08
+    },
+    "749": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "750": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "751": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "752": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "753": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "754": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "755": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "756": {
+      "terrain": "plains",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0
+    },
+    "757": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "758": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "759": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "760": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "761": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "762": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "763": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "764": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "765": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "766": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "767": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "768": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "769": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "770": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "771": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "772": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "773": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "774": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "775": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "776": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "777": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "778": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "779": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "780": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "781": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "782": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "783": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "784": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "785": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "786": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "787": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "788": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "789": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "790": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "791": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "792": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "793": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "794": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "795": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "796": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "797": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "798": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "799": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "800": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "801": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "802": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "803": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "804": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "805": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "806": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "807": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "808": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "809": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "810": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "811": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "812": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "813": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "814": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "815": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "816": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "817": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "818": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "819": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "820": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "821": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "822": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "823": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "824": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "825": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "826": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "827": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "828": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "829": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "830": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "831": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "832": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "833": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "834": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "835": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "836": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "837": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "838": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "839": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "840": {
+      "terrain": "tundra",
+      "movement_cost": 1.4,
+      "combat_modifier": 0.0
+    },
+    "9000": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9001": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9002": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9003": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9004": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9005": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9006": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9007": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9008": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9009": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9010": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9011": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9012": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9013": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9014": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9015": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9016": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9017": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9018": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9019": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9020": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9021": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9022": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9023": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9024": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9025": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9026": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9027": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9028": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9029": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9030": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9031": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9032": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9033": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9034": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9035": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9036": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9037": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9038": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9039": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9040": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9041": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9042": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9043": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9044": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9045": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9046": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9047": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9048": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9049": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9050": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9051": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9052": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9053": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9054": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9055": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9056": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9057": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9058": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9059": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9060": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9061": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9062": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9063": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9064": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9065": {
+      "terrain": "coastal",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9066": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9067": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9068": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9069": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9070": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9071": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9072": {
+      "terrain": "desert",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9073": {
+      "terrain": "desert",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9074": {
+      "terrain": "desert",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9075": {
+      "terrain": "hills",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9076": {
+      "terrain": "hills",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9077": {
+      "terrain": "hills",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9078": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9079": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9080": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9081": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9082": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9083": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9084": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9085": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9086": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9087": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9088": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9089": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9090": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9091": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9092": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9093": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9094": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9095": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9096": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9097": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9098": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9099": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9100": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9101": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9102": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9103": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9104": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9105": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9106": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9107": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9108": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9109": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9110": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9111": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9112": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9113": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9114": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9115": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9116": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9117": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9118": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9119": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    }
+  }
+}

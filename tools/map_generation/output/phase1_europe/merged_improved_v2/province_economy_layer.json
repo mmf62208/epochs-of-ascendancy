@@ -1,0 +1,8428 @@
+{
+  "version": 1,
+  "provinces": {
+    "1": {
+      "population": 730000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2.95,
+      "resources": {
+        "rare_earths": 8
+      }
+    },
+    "2": {
+      "population": 760000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 3.4,
+      "resources": {
+        "coal": 80,
+        "iron": 35,
+        "steel": 25
+      }
+    },
+    "3": {
+      "population": 790000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 3.85,
+      "resources": {
+        "coal": 950,
+        "iron": 280,
+        "steel": 150
+      }
+    },
+    "4": {
+      "population": 820000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 4.3,
+      "resources": {
+        "iron": 55,
+        "steel": 30
+      }
+    },
+    "5": {
+      "population": 850000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 4.75,
+      "resources": {
+        "coal": 110
+      }
+    },
+    "6": {
+      "population": 880000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 5.2,
+      "resources": {
+        "semiconductors": 120
+      }
+    },
+    "7": {
+      "population": 910000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 5.65,
+      "resources": {
+        "oil": 1250
+      }
+    },
+    "8": {
+      "population": 940000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 6.1,
+      "resources": {
+        "coal": 120,
+        "iron": 80
+      }
+    },
+    "9": {
+      "population": 970000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 6.55,
+      "resources": {
+        "semiconductors": 85
+      }
+    },
+    "10": {
+      "population": 1000000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 7.0,
+      "resources": {
+        "coal": 180,
+        "rare_earths": 95
+      }
+    },
+    "11": {
+      "population": 1030000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 7.45,
+      "resources": {
+        "semiconductors": 140,
+        "rare_earths": 45
+      }
+    },
+    "12": {
+      "population": 1060000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 2.5,
+      "resources": {
+        "coal": 65
+      }
+    },
+    "13": {
+      "population": 1090000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 2.95,
+      "resources": {
+        "oil": 680
+      }
+    },
+    "14": {
+      "population": 1120000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 3.4,
+      "resources": {
+        "oil": 2450
+      }
+    },
+    "15": {
+      "population": 1150000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 3.85,
+      "resources": {
+        "semiconductors": 220
+      }
+    },
+    "16": {
+      "population": 1180000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 4.3,
+      "resources": {
+        "iron": 350,
+        "coal": 120
+      }
+    },
+    "17": {
+      "population": 1210000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 4.75,
+      "resources": {
+        "steel": 45
+      }
+    },
+    "18": {
+      "population": 1240000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 5.2,
+      "resources": {
+        "coal": 35
+      }
+    },
+    "19": {
+      "population": 1270000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 5.65,
+      "resources": {
+        "coal": 40
+      }
+    },
+    "20": {
+      "population": 1300000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 6.1,
+      "resources": {
+        "iron": 55
+      }
+    },
+    "21": {
+      "population": 1330000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 6.55,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "22": {
+      "population": 1360000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 7.0,
+      "resources": {
+        "iron": 45
+      }
+    },
+    "23": {
+      "population": 1390000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 7.45,
+      "resources": {
+        "oil": 35
+      }
+    },
+    "24": {
+      "population": 1420000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 2.5,
+      "resources": {
+        "oil": 420
+      }
+    },
+    "25": {
+      "population": 1450000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 2.95,
+      "resources": {
+        "semiconductors": 65
+      }
+    },
+    "26": {
+      "population": 1480000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 3.4,
+      "resources": {
+        "coal": 65,
+        "iron": 40
+      }
+    },
+    "27": {
+      "population": 1510000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 3.85,
+      "resources": {
+        "coal": 80,
+        "iron": 55,
+        "rare_earths": 12
+      }
+    },
+    "28": {
+      "population": 1540000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 4.3,
+      "resources": {
+        "oil": 25
+      }
+    },
+    "29": {
+      "population": 1570000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 4.75,
+      "resources": {
+        "iron": 70
+      }
+    },
+    "30": {
+      "population": 1600000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 5.2,
+      "resources": {
+        "steel": 45,
+        "iron": 60
+      }
+    },
+    "31": {
+      "population": 1630000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 5.65,
+      "resources": {
+        "iron": 90
+      }
+    },
+    "32": {
+      "population": 1660000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 6.1,
+      "resources": {
+        "coal": 65
+      }
+    },
+    "33": {
+      "population": 1690000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 6.55,
+      "resources": {
+        "semiconductors": 55
+      }
+    },
+    "34": {
+      "population": 1720000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 7.0,
+      "resources": {
+        "semiconductors": 75
+      }
+    },
+    "35": {
+      "population": 1750000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 7.45,
+      "resources": {
+        "rare_earths": 15
+      }
+    },
+    "36": {
+      "population": 1780000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 2.5,
+      "resources": {
+        "oil": 95
+      }
+    },
+    "37": {
+      "population": 1810000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 2.95,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "38": {
+      "population": 1840000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 3.4,
+      "resources": {
+        "steel": 45
+      }
+    },
+    "39": {
+      "population": 1870000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 3.85,
+      "resources": {
+        "semiconductors": 25
+      }
+    },
+    "40": {
+      "population": 1900000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 4.3,
+      "resources": {
+        "coal": 12
+      }
+    },
+    "41": {
+      "population": 1930000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 4.75,
+      "resources": {
+        "steel": 65
+      }
+    },
+    "42": {
+      "population": 1960000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 5.2,
+      "resources": {
+        "steel": 55
+      }
+    },
+    "43": {
+      "population": 1990000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 5.65,
+      "resources": {
+        "semiconductors": 95,
+        "rare_earths": 30
+      }
+    },
+    "44": {
+      "population": 2020000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 6.1,
+      "resources": {
+        "rare_earths": 65
+      }
+    },
+    "45": {
+      "population": 2050000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 6.55,
+      "resources": {
+        "coal": 40,
+        "semiconductors": 35
+      }
+    },
+    "46": {
+      "population": 2080000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 7.0,
+      "resources": {
+        "semiconductors": 55
+      }
+    },
+    "47": {
+      "population": 2110000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 7.45,
+      "resources": {
+        "oil": 180
+      }
+    },
+    "48": {
+      "population": 2140000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 2.5,
+      "resources": {
+        "steel": 40
+      }
+    },
+    "49": {
+      "population": 2170000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 2.95,
+      "resources": {
+        "steel": 55
+      }
+    },
+    "50": {
+      "population": 2200000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 3.4,
+      "resources": {
+        "coal": 50
+      }
+    },
+    "51": {
+      "population": 2230000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 3.85,
+      "resources": {
+        "oil": 45
+      }
+    },
+    "52": {
+      "population": 2260000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 4.3,
+      "resources": {
+        "coal": 28
+      }
+    },
+    "53": {
+      "population": 2290000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 4.75,
+      "resources": {
+        "oil": 380
+      }
+    },
+    "54": {
+      "population": 2320000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 5.2,
+      "resources": {
+        "oil": 520
+      }
+    },
+    "55": {
+      "population": 2350000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 5.65,
+      "resources": {
+        "oil": 85
+      }
+    },
+    "56": {
+      "population": 2380000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 6.1,
+      "resources": {
+        "iron": 220
+      }
+    },
+    "57": {
+      "population": 2410000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 6.55,
+      "resources": {
+        "coal": 85
+      }
+    },
+    "58": {
+      "population": 2440000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 7.0,
+      "resources": {
+        "coal": 20
+      }
+    },
+    "59": {
+      "population": 2470000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 7.45,
+      "resources": {
+        "coal": 55,
+        "rare_earths": 18
+      }
+    },
+    "60": {
+      "population": 2500000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 2.5,
+      "resources": {
+        "copper": 25
+      }
+    },
+    "61": {
+      "population": 2530000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 2.95,
+      "resources": {
+        "rice": 30
+      }
+    },
+    "62": {
+      "population": 2560000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 3.4,
+      "resources": {
+        "oil": 40
+      }
+    },
+    "63": {
+      "population": 2590000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 3.85,
+      "resources": {
+        "iron": 20
+      }
+    },
+    "64": {
+      "population": 2620000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 4.3,
+      "resources": {
+        "steel": 15
+      }
+    },
+    "65": {
+      "population": 2650000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 4.75,
+      "resources": {
+        "iron": 35,
+        "rare_earths": 12
+      }
+    },
+    "66": {
+      "population": 2680000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 5.2,
+      "resources": {
+        "oil": 120
+      }
+    },
+    "67": {
+      "population": 2710000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 5.65,
+      "resources": {
+        "coal": 80,
+        "iron": 55,
+        "rare_earths": 12
+      }
+    },
+    "68": {
+      "population": 2740000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 6.1,
+      "resources": {
+        "oil": 25
+      }
+    },
+    "69": {
+      "population": 2770000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 6.55,
+      "resources": {
+        "iron": 70
+      }
+    },
+    "70": {
+      "population": 2800000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 7.0,
+      "resources": {
+        "steel": 45,
+        "iron": 60
+      }
+    },
+    "71": {
+      "population": 2830000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 7.45,
+      "resources": {
+        "copper": 80
+      }
+    },
+    "72": {
+      "population": 2860000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 2.5,
+      "resources": {
+        "oil": 45
+      }
+    },
+    "73": {
+      "population": 2890000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 2.95,
+      "resources": {
+        "oil": 320
+      }
+    },
+    "74": {
+      "population": 2920000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 3.4,
+      "resources": {
+        "nickel": 15
+      }
+    },
+    "75": {
+      "population": 2950000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 3.85,
+      "resources": {}
+    },
+    "76": {
+      "population": 2980000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 4.3,
+      "resources": {
+        "iron": 180,
+        "rare_earths": 22
+      }
+    },
+    "77": {
+      "population": 3010000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 4.75,
+      "resources": {
+        "oil": 35
+      }
+    },
+    "78": {
+      "population": 3040000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 5.2,
+      "resources": {
+        "coal": 25
+      }
+    },
+    "79": {
+      "population": 3070000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 5.65,
+      "resources": {
+        "semiconductors": 35,
+        "oil": 25
+      }
+    },
+    "80": {
+      "population": 3100000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 6.1,
+      "resources": {
+        "copper": 30
+      }
+    },
+    "81": {
+      "population": 3130000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 6.55,
+      "resources": {
+        "rare_earths": 15
+      }
+    },
+    "82": {
+      "population": 3160000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 7.0,
+      "resources": {
+        "semiconductors": 45
+      }
+    },
+    "83": {
+      "population": 3190000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 7.45,
+      "resources": {
+        "steel": 50
+      }
+    },
+    "84": {
+      "population": 3220000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 2.5,
+      "resources": {
+        "oil": 380
+      }
+    },
+    "85": {
+      "population": 3250000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 2.95,
+      "resources": {
+        "steel": 35,
+        "oil": 25
+      }
+    },
+    "86": {
+      "population": 3280000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 3.4,
+      "resources": {
+        "oil": 85
+      }
+    },
+    "87": {
+      "population": 3310000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 3.85,
+      "resources": {
+        "coal": 60,
+        "iron": 40
+      }
+    },
+    "88": {
+      "population": 3340000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 4.3,
+      "resources": {
+        "steel": 35
+      }
+    },
+    "89": {
+      "population": 3370000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 4.75,
+      "resources": {
+        "steel": 35
+      }
+    },
+    "90": {
+      "population": 3400000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 5.2,
+      "resources": {
+        "copper": 90
+      }
+    },
+    "91": {
+      "population": 3430000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 5.65,
+      "resources": {
+        "steel": 40,
+        "semiconductors": 25
+      }
+    },
+    "92": {
+      "population": 3460000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 6.1,
+      "resources": {
+        "oil": 30
+      }
+    },
+    "93": {
+      "population": 3490000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 6.55,
+      "resources": {
+        "oil": 280
+      }
+    },
+    "94": {
+      "population": 3520000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 7.0,
+      "resources": {
+        "nickel": 25
+      }
+    },
+    "95": {
+      "population": 3550000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 7.45,
+      "resources": {
+        "oil": 15
+      }
+    },
+    "96": {
+      "population": 3580000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 2.5,
+      "resources": {
+        "tourism": 20
+      }
+    },
+    "97": {
+      "population": 3610000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 2.95,
+      "resources": {
+        "oil": 60
+      }
+    },
+    "98": {
+      "population": 3640000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 3.4,
+      "resources": {
+        "geothermal": 30
+      }
+    },
+    "99": {
+      "population": 3670000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 3.85,
+      "resources": {
+        "rare_earths": 25
+      }
+    },
+    "100": {
+      "population": 700000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 4.3,
+      "resources": {
+        "oil": 680
+      }
+    },
+    "101": {
+      "population": 730000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 4.75,
+      "resources": {
+        "food": 41
+      }
+    },
+    "102": {
+      "population": 760000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 5.2,
+      "resources": {
+        "food": 42
+      }
+    },
+    "103": {
+      "population": 790000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 5.65,
+      "resources": {
+        "food": 43
+      }
+    },
+    "104": {
+      "population": 820000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 6.1,
+      "resources": {
+        "food": 44
+      }
+    },
+    "105": {
+      "population": 850000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 6.55,
+      "resources": {
+        "food": 45
+      }
+    },
+    "106": {
+      "population": 880000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 7.0,
+      "resources": {
+        "food": 46
+      }
+    },
+    "107": {
+      "population": 910000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 7.45,
+      "resources": {
+        "food": 47
+      }
+    },
+    "108": {
+      "population": 940000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 2.5,
+      "resources": {
+        "food": 48
+      }
+    },
+    "109": {
+      "population": 970000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 2.95,
+      "resources": {
+        "food": 49
+      }
+    },
+    "110": {
+      "population": 1000000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 3.4,
+      "resources": {
+        "food": 50
+      }
+    },
+    "111": {
+      "population": 1030000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 3.85,
+      "resources": {
+        "food": 51
+      }
+    },
+    "112": {
+      "population": 1060000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 4.3,
+      "resources": {
+        "food": 52
+      }
+    },
+    "113": {
+      "population": 1090000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 4.75,
+      "resources": {
+        "food": 53
+      }
+    },
+    "114": {
+      "population": 1120000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 5.2,
+      "resources": {
+        "food": 54
+      }
+    },
+    "115": {
+      "population": 1150000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 5.65,
+      "resources": {
+        "food": 55
+      }
+    },
+    "116": {
+      "population": 1180000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 6.1,
+      "resources": {
+        "food": 56
+      }
+    },
+    "117": {
+      "population": 1210000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 6.55,
+      "resources": {
+        "food": 57
+      }
+    },
+    "118": {
+      "population": 1240000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 7.0,
+      "resources": {
+        "food": 58
+      }
+    },
+    "119": {
+      "population": 1270000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 7.45,
+      "resources": {
+        "food": 59
+      }
+    },
+    "120": {
+      "population": 1300000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2.5,
+      "resources": {
+        "food": 20
+      }
+    },
+    "121": {
+      "population": 1330000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 2.95,
+      "resources": {
+        "food": 21
+      }
+    },
+    "122": {
+      "population": 1360000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 3.4,
+      "resources": {
+        "food": 22
+      }
+    },
+    "123": {
+      "population": 1390000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 3.85,
+      "resources": {
+        "food": 23
+      }
+    },
+    "124": {
+      "population": 1420000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 4.3,
+      "resources": {
+        "food": 24
+      }
+    },
+    "125": {
+      "population": 1450000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 4.75,
+      "resources": {
+        "food": 25
+      }
+    },
+    "126": {
+      "population": 1480000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 5.2,
+      "resources": {
+        "food": 26
+      }
+    },
+    "127": {
+      "population": 1510000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 5.65,
+      "resources": {
+        "food": 27
+      }
+    },
+    "128": {
+      "population": 1540000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 6.1,
+      "resources": {
+        "food": 28
+      }
+    },
+    "129": {
+      "population": 1570000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 6.55,
+      "resources": {
+        "food": 29
+      }
+    },
+    "130": {
+      "population": 1600000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 7.0,
+      "resources": {
+        "food": 30
+      }
+    },
+    "131": {
+      "population": 1630000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 7.45,
+      "resources": {
+        "food": 31
+      }
+    },
+    "132": {
+      "population": 1660000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 2.5,
+      "resources": {
+        "food": 32
+      }
+    },
+    "133": {
+      "population": 1690000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 2.95,
+      "resources": {
+        "food": 33
+      }
+    },
+    "134": {
+      "population": 1720000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 3.4,
+      "resources": {
+        "food": 34
+      }
+    },
+    "135": {
+      "population": 1750000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 3.85,
+      "resources": {
+        "food": 35
+      }
+    },
+    "136": {
+      "population": 1780000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 4.3,
+      "resources": {
+        "food": 36
+      }
+    },
+    "137": {
+      "population": 1810000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 4.75,
+      "resources": {
+        "food": 37
+      }
+    },
+    "138": {
+      "population": 1840000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 5.2,
+      "resources": {
+        "food": 38
+      }
+    },
+    "139": {
+      "population": 1870000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 5.65,
+      "resources": {
+        "food": 39
+      }
+    },
+    "140": {
+      "population": 1900000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 6.1,
+      "resources": {
+        "food": 40
+      }
+    },
+    "141": {
+      "population": 1930000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 6.55,
+      "resources": {
+        "food": 41
+      }
+    },
+    "142": {
+      "population": 1960000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 7.0,
+      "resources": {
+        "food": 42
+      }
+    },
+    "143": {
+      "population": 1990000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 7.45,
+      "resources": {
+        "food": 43
+      }
+    },
+    "144": {
+      "population": 2020000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 2.5,
+      "resources": {
+        "food": 44
+      }
+    },
+    "145": {
+      "population": 2050000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 2.95,
+      "resources": {
+        "food": 45
+      }
+    },
+    "146": {
+      "population": 2080000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 3.4,
+      "resources": {
+        "food": 46
+      }
+    },
+    "147": {
+      "population": 2110000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 3.85,
+      "resources": {
+        "food": 47
+      }
+    },
+    "148": {
+      "population": 2140000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 4.3,
+      "resources": {
+        "food": 48
+      }
+    },
+    "149": {
+      "population": 2170000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 4.75,
+      "resources": {
+        "food": 49
+      }
+    },
+    "150": {
+      "population": 2200000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 5.2,
+      "resources": {
+        "food": 50
+      }
+    },
+    "151": {
+      "population": 2230000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 5.65,
+      "resources": {
+        "food": 51
+      }
+    },
+    "152": {
+      "population": 2260000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 6.1,
+      "resources": {
+        "food": 52
+      }
+    },
+    "153": {
+      "population": 2290000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 6.55,
+      "resources": {
+        "food": 53
+      }
+    },
+    "154": {
+      "population": 2320000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 7.0,
+      "resources": {
+        "food": 54
+      }
+    },
+    "155": {
+      "population": 2350000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 7.45,
+      "resources": {
+        "food": 55
+      }
+    },
+    "156": {
+      "population": 2380000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 2.5,
+      "resources": {
+        "food": 56
+      }
+    },
+    "157": {
+      "population": 2410000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 2.95,
+      "resources": {
+        "food": 57
+      }
+    },
+    "158": {
+      "population": 2440000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 3.4,
+      "resources": {
+        "food": 58
+      }
+    },
+    "159": {
+      "population": 2470000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 3.85,
+      "resources": {
+        "food": 59
+      }
+    },
+    "160": {
+      "population": 2500000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 4.3,
+      "resources": {
+        "food": 20
+      }
+    },
+    "161": {
+      "population": 2530000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 4.75,
+      "resources": {
+        "food": 21
+      }
+    },
+    "162": {
+      "population": 2560000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 5.2,
+      "resources": {
+        "food": 22
+      }
+    },
+    "163": {
+      "population": 2590000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 5.65,
+      "resources": {
+        "food": 23
+      }
+    },
+    "164": {
+      "population": 2620000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 6.1,
+      "resources": {
+        "food": 24
+      }
+    },
+    "165": {
+      "population": 2650000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 6.55,
+      "resources": {
+        "food": 25
+      }
+    },
+    "166": {
+      "population": 2680000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 7.0,
+      "resources": {
+        "food": 26
+      }
+    },
+    "167": {
+      "population": 2710000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 7.45,
+      "resources": {
+        "food": 27
+      }
+    },
+    "168": {
+      "population": 2740000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2.5,
+      "resources": {
+        "food": 28
+      }
+    },
+    "169": {
+      "population": 2770000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2.95,
+      "resources": {
+        "food": 29
+      }
+    },
+    "170": {
+      "population": 2800000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 3.4,
+      "resources": {
+        "food": 30
+      }
+    },
+    "171": {
+      "population": 2830000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 3.85,
+      "resources": {
+        "food": 31
+      }
+    },
+    "172": {
+      "population": 2860000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 4.3,
+      "resources": {
+        "food": 32
+      }
+    },
+    "173": {
+      "population": 2890000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 4.75,
+      "resources": {
+        "food": 33
+      }
+    },
+    "174": {
+      "population": 2920000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 5.2,
+      "resources": {
+        "food": 34
+      }
+    },
+    "175": {
+      "population": 2950000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 5.65,
+      "resources": {
+        "food": 35
+      }
+    },
+    "176": {
+      "population": 2980000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 6.1,
+      "resources": {
+        "food": 36
+      }
+    },
+    "177": {
+      "population": 3010000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 6.55,
+      "resources": {
+        "food": 37
+      }
+    },
+    "178": {
+      "population": 3040000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 7.0,
+      "resources": {
+        "food": 38
+      }
+    },
+    "179": {
+      "population": 3070000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 7.45,
+      "resources": {
+        "food": 39
+      }
+    },
+    "180": {
+      "population": 3100000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 2.5,
+      "resources": {
+        "food": 40
+      }
+    },
+    "181": {
+      "population": 3130000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 2.95,
+      "resources": {
+        "food": 41
+      }
+    },
+    "182": {
+      "population": 3160000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 3.4,
+      "resources": {
+        "food": 42
+      }
+    },
+    "183": {
+      "population": 3190000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 3.85,
+      "resources": {
+        "food": 43
+      }
+    },
+    "184": {
+      "population": 3220000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 4.3,
+      "resources": {
+        "food": 44
+      }
+    },
+    "185": {
+      "population": 3250000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 4.75,
+      "resources": {
+        "food": 45
+      }
+    },
+    "186": {
+      "population": 3280000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 5.2,
+      "resources": {
+        "food": 46
+      }
+    },
+    "187": {
+      "population": 3310000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 5.65,
+      "resources": {
+        "food": 47
+      }
+    },
+    "188": {
+      "population": 3340000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 6.1,
+      "resources": {
+        "food": 48
+      }
+    },
+    "189": {
+      "population": 3370000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 6.55,
+      "resources": {
+        "food": 49
+      }
+    },
+    "190": {
+      "population": 3400000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 7.0,
+      "resources": {
+        "food": 50
+      }
+    },
+    "191": {
+      "population": 3430000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 7.45,
+      "resources": {
+        "food": 51
+      }
+    },
+    "192": {
+      "population": 3460000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 2.5,
+      "resources": {
+        "food": 52
+      }
+    },
+    "193": {
+      "population": 3490000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 2.95,
+      "resources": {
+        "food": 53
+      }
+    },
+    "194": {
+      "population": 3520000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 3.4,
+      "resources": {
+        "food": 54
+      }
+    },
+    "195": {
+      "population": 3550000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 3.85,
+      "resources": {
+        "food": 55
+      }
+    },
+    "196": {
+      "population": 3580000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 4.3,
+      "resources": {
+        "food": 56
+      }
+    },
+    "197": {
+      "population": 3610000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 4.75,
+      "resources": {
+        "food": 57
+      }
+    },
+    "198": {
+      "population": 3640000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 5.2,
+      "resources": {
+        "food": 58
+      }
+    },
+    "199": {
+      "population": 3670000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 5.65,
+      "resources": {
+        "food": 59
+      }
+    },
+    "200": {
+      "population": 700000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 6.1,
+      "resources": {
+        "food": 20
+      }
+    },
+    "201": {
+      "population": 730000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 6.55,
+      "resources": {
+        "food": 21
+      }
+    },
+    "202": {
+      "population": 760000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 7.0,
+      "resources": {
+        "food": 22
+      }
+    },
+    "203": {
+      "population": 790000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 7.45,
+      "resources": {
+        "food": 23
+      }
+    },
+    "204": {
+      "population": 820000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 2.5,
+      "resources": {
+        "food": 24
+      }
+    },
+    "205": {
+      "population": 850000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 2.95,
+      "resources": {
+        "food": 25
+      }
+    },
+    "206": {
+      "population": 880000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 3.4,
+      "resources": {
+        "food": 26
+      }
+    },
+    "207": {
+      "population": 910000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 3.85,
+      "resources": {
+        "food": 27
+      }
+    },
+    "208": {
+      "population": 940000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 4.3,
+      "resources": {
+        "food": 28
+      }
+    },
+    "209": {
+      "population": 970000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 4.75,
+      "resources": {
+        "food": 29
+      }
+    },
+    "210": {
+      "population": 1000000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 5.2,
+      "resources": {
+        "food": 30
+      }
+    },
+    "211": {
+      "population": 1030000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 5.65,
+      "resources": {
+        "food": 31
+      }
+    },
+    "212": {
+      "population": 1060000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 6.1,
+      "resources": {
+        "food": 32
+      }
+    },
+    "213": {
+      "population": 1090000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 6.55,
+      "resources": {
+        "food": 33
+      }
+    },
+    "214": {
+      "population": 1120000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 7.0,
+      "resources": {
+        "food": 34
+      }
+    },
+    "215": {
+      "population": 1150000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 7.45,
+      "resources": {
+        "food": 35
+      }
+    },
+    "216": {
+      "population": 1180000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 2.5,
+      "resources": {
+        "food": 36
+      }
+    },
+    "217": {
+      "population": 1210000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 2.95,
+      "resources": {
+        "food": 37
+      }
+    },
+    "218": {
+      "population": 1240000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 3.4,
+      "resources": {
+        "food": 38
+      }
+    },
+    "219": {
+      "population": 1270000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 3.85,
+      "resources": {
+        "food": 39
+      }
+    },
+    "220": {
+      "population": 1300000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 4.3,
+      "resources": {
+        "food": 40
+      }
+    },
+    "221": {
+      "population": 1330000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 4.75,
+      "resources": {
+        "food": 41
+      }
+    },
+    "222": {
+      "population": 1360000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 5.2,
+      "resources": {
+        "food": 42
+      }
+    },
+    "223": {
+      "population": 1390000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 5.65,
+      "resources": {
+        "food": 43
+      }
+    },
+    "224": {
+      "population": 1420000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 6.1,
+      "resources": {
+        "food": 44
+      }
+    },
+    "225": {
+      "population": 1450000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 6.55,
+      "resources": {
+        "food": 45
+      }
+    },
+    "226": {
+      "population": 1480000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 7.0,
+      "resources": {
+        "food": 46
+      }
+    },
+    "227": {
+      "population": 1510000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 7.45,
+      "resources": {
+        "food": 47
+      }
+    },
+    "228": {
+      "population": 1540000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 2.5,
+      "resources": {
+        "food": 48
+      }
+    },
+    "229": {
+      "population": 1570000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 2.95,
+      "resources": {
+        "food": 49
+      }
+    },
+    "230": {
+      "population": 1600000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 3.4,
+      "resources": {
+        "food": 50
+      }
+    },
+    "231": {
+      "population": 1630000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 3.85,
+      "resources": {
+        "food": 51
+      }
+    },
+    "232": {
+      "population": 1660000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 4.3,
+      "resources": {
+        "food": 52
+      }
+    },
+    "233": {
+      "population": 1690000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 4.75,
+      "resources": {
+        "food": 53
+      }
+    },
+    "234": {
+      "population": 1720000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 5.2,
+      "resources": {
+        "food": 54
+      }
+    },
+    "235": {
+      "population": 1750000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 5.65,
+      "resources": {
+        "food": 55
+      }
+    },
+    "236": {
+      "population": 1780000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 6.1,
+      "resources": {
+        "food": 56
+      }
+    },
+    "237": {
+      "population": 1810000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 6.55,
+      "resources": {
+        "food": 57
+      }
+    },
+    "238": {
+      "population": 1840000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 7.0,
+      "resources": {
+        "food": 58
+      }
+    },
+    "239": {
+      "population": 1870000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 7.45,
+      "resources": {
+        "food": 59
+      }
+    },
+    "240": {
+      "population": 1900000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 2.5,
+      "resources": {
+        "food": 20
+      }
+    },
+    "241": {
+      "population": 1930000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 2.95,
+      "resources": {
+        "food": 21
+      }
+    },
+    "242": {
+      "population": 1960000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 3.4,
+      "resources": {
+        "food": 22
+      }
+    },
+    "243": {
+      "population": 1990000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 3.85,
+      "resources": {
+        "food": 23
+      }
+    },
+    "244": {
+      "population": 2020000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 4.3,
+      "resources": {
+        "food": 24
+      }
+    },
+    "245": {
+      "population": 2050000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 4.75,
+      "resources": {
+        "food": 25
+      }
+    },
+    "246": {
+      "population": 2080000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 5.2,
+      "resources": {
+        "food": 26
+      }
+    },
+    "247": {
+      "population": 2110000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 5.65,
+      "resources": {
+        "food": 27
+      }
+    },
+    "248": {
+      "population": 2140000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 6.1,
+      "resources": {
+        "food": 28
+      }
+    },
+    "249": {
+      "population": 2170000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 6.55,
+      "resources": {
+        "food": 29
+      }
+    },
+    "250": {
+      "population": 2200000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 7.0,
+      "resources": {
+        "food": 30
+      }
+    },
+    "251": {
+      "population": 2230000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 7.45,
+      "resources": {
+        "food": 31
+      }
+    },
+    "252": {
+      "population": 2260000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 2.5,
+      "resources": {
+        "food": 32
+      }
+    },
+    "253": {
+      "population": 2290000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 2.95,
+      "resources": {
+        "food": 33
+      }
+    },
+    "254": {
+      "population": 2320000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 3.4,
+      "resources": {
+        "food": 34
+      }
+    },
+    "255": {
+      "population": 2350000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 3.85,
+      "resources": {
+        "food": 35
+      }
+    },
+    "256": {
+      "population": 2380000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 4.3,
+      "resources": {
+        "food": 36
+      }
+    },
+    "257": {
+      "population": 2410000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 4.75,
+      "resources": {
+        "food": 37
+      }
+    },
+    "258": {
+      "population": 2440000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 5.2,
+      "resources": {
+        "food": 38
+      }
+    },
+    "259": {
+      "population": 2470000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 5.65,
+      "resources": {
+        "food": 39
+      }
+    },
+    "260": {
+      "population": 2500000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 6.1,
+      "resources": {
+        "food": 40
+      }
+    },
+    "261": {
+      "population": 2530000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 6.55,
+      "resources": {
+        "food": 41
+      }
+    },
+    "262": {
+      "population": 2560000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 7.0,
+      "resources": {
+        "food": 42
+      }
+    },
+    "263": {
+      "population": 2590000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 7.45,
+      "resources": {
+        "food": 43
+      }
+    },
+    "264": {
+      "population": 2620000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 2.5,
+      "resources": {
+        "food": 44
+      }
+    },
+    "265": {
+      "population": 2650000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 2.95,
+      "resources": {
+        "food": 45
+      }
+    },
+    "266": {
+      "population": 2680000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 3.4,
+      "resources": {
+        "food": 46
+      }
+    },
+    "267": {
+      "population": 2710000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 3.85,
+      "resources": {
+        "food": 47
+      }
+    },
+    "268": {
+      "population": 2740000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 4.3,
+      "resources": {
+        "food": 48
+      }
+    },
+    "269": {
+      "population": 2770000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 4.75,
+      "resources": {
+        "food": 49
+      }
+    },
+    "270": {
+      "population": 2800000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 5.2,
+      "resources": {
+        "food": 50
+      }
+    },
+    "271": {
+      "population": 2830000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 5.65,
+      "resources": {
+        "food": 51
+      }
+    },
+    "272": {
+      "population": 2860000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 6.1,
+      "resources": {
+        "food": 52
+      }
+    },
+    "273": {
+      "population": 2890000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 6.55,
+      "resources": {
+        "food": 53
+      }
+    },
+    "274": {
+      "population": 2920000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 7.0,
+      "resources": {
+        "food": 54
+      }
+    },
+    "275": {
+      "population": 2950000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 7.45,
+      "resources": {
+        "food": 55
+      }
+    },
+    "276": {
+      "population": 2980000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 2.5,
+      "resources": {
+        "food": 56
+      }
+    },
+    "277": {
+      "population": 3010000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 2.95,
+      "resources": {
+        "food": 57
+      }
+    },
+    "278": {
+      "population": 3040000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 3.4,
+      "resources": {
+        "food": 58
+      }
+    },
+    "279": {
+      "population": 3070000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 3.85,
+      "resources": {
+        "food": 59
+      }
+    },
+    "280": {
+      "population": 3100000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 4.3,
+      "resources": {
+        "food": 20
+      }
+    },
+    "281": {
+      "population": 3130000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 4.75,
+      "resources": {
+        "food": 21
+      }
+    },
+    "282": {
+      "population": 3160000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 5.2,
+      "resources": {
+        "food": 22
+      }
+    },
+    "283": {
+      "population": 3190000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 5.65,
+      "resources": {
+        "food": 23
+      }
+    },
+    "284": {
+      "population": 3220000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 6.1,
+      "resources": {
+        "food": 24
+      }
+    },
+    "285": {
+      "population": 3250000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 6.55,
+      "resources": {
+        "food": 25
+      }
+    },
+    "286": {
+      "population": 3280000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 7.0,
+      "resources": {
+        "food": 26
+      }
+    },
+    "287": {
+      "population": 3310000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 7.45,
+      "resources": {
+        "food": 27
+      }
+    },
+    "288": {
+      "population": 3340000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2.5,
+      "resources": {
+        "food": 28
+      }
+    },
+    "289": {
+      "population": 3370000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 2.95,
+      "resources": {
+        "food": 29
+      }
+    },
+    "290": {
+      "population": 3400000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 3.4,
+      "resources": {
+        "food": 30
+      }
+    },
+    "291": {
+      "population": 3430000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 3.85,
+      "resources": {
+        "food": 31
+      }
+    },
+    "292": {
+      "population": 3460000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 4.3,
+      "resources": {
+        "food": 32
+      }
+    },
+    "293": {
+      "population": 3490000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 4.75,
+      "resources": {
+        "food": 33
+      }
+    },
+    "294": {
+      "population": 3520000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 5.2,
+      "resources": {
+        "food": 34
+      }
+    },
+    "295": {
+      "population": 3550000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 5.65,
+      "resources": {
+        "food": 35
+      }
+    },
+    "296": {
+      "population": 3580000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 6.1,
+      "resources": {
+        "food": 36
+      }
+    },
+    "297": {
+      "population": 3610000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 6.55,
+      "resources": {
+        "food": 37
+      }
+    },
+    "298": {
+      "population": 3640000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 7.0,
+      "resources": {
+        "food": 38
+      }
+    },
+    "299": {
+      "population": 3670000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 7.45,
+      "resources": {
+        "food": 39
+      }
+    },
+    "300": {
+      "population": 700000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 2.5,
+      "resources": {
+        "food": 40
+      }
+    },
+    "301": {
+      "population": 730000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 2.95,
+      "resources": {
+        "food": 41
+      }
+    },
+    "302": {
+      "population": 760000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 3.4,
+      "resources": {
+        "food": 42
+      }
+    },
+    "303": {
+      "population": 790000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 3.85,
+      "resources": {
+        "food": 43
+      }
+    },
+    "304": {
+      "population": 820000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 4.3,
+      "resources": {
+        "food": 44
+      }
+    },
+    "305": {
+      "population": 850000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 4.75,
+      "resources": {
+        "food": 45
+      }
+    },
+    "306": {
+      "population": 880000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 5.2,
+      "resources": {
+        "food": 46
+      }
+    },
+    "307": {
+      "population": 910000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 5.65,
+      "resources": {
+        "food": 47
+      }
+    },
+    "308": {
+      "population": 940000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 6.1,
+      "resources": {
+        "food": 48
+      }
+    },
+    "309": {
+      "population": 970000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 6.55,
+      "resources": {
+        "food": 49
+      }
+    },
+    "310": {
+      "population": 1000000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 7.0,
+      "resources": {
+        "food": 50
+      }
+    },
+    "311": {
+      "population": 1030000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 7.45,
+      "resources": {
+        "food": 51
+      }
+    },
+    "312": {
+      "population": 1060000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 2.5,
+      "resources": {
+        "food": 52
+      }
+    },
+    "313": {
+      "population": 1090000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 2.95,
+      "resources": {
+        "food": 53
+      }
+    },
+    "314": {
+      "population": 1120000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 3.4,
+      "resources": {
+        "food": 54
+      }
+    },
+    "315": {
+      "population": 1150000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 3.85,
+      "resources": {
+        "food": 55
+      }
+    },
+    "316": {
+      "population": 1180000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 4.3,
+      "resources": {
+        "food": 56
+      }
+    },
+    "317": {
+      "population": 1210000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 4.75,
+      "resources": {
+        "food": 57
+      }
+    },
+    "318": {
+      "population": 1240000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 5.2,
+      "resources": {
+        "food": 58
+      }
+    },
+    "319": {
+      "population": 1270000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 5.65,
+      "resources": {
+        "food": 59
+      }
+    },
+    "320": {
+      "population": 1300000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 6.1,
+      "resources": {
+        "food": 20
+      }
+    },
+    "321": {
+      "population": 1330000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 6.55,
+      "resources": {
+        "food": 21
+      }
+    },
+    "322": {
+      "population": 1360000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 7.0,
+      "resources": {
+        "food": 22
+      }
+    },
+    "323": {
+      "population": 1390000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 7.45,
+      "resources": {
+        "food": 23
+      }
+    },
+    "324": {
+      "population": 1420000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 2.5,
+      "resources": {
+        "food": 24
+      }
+    },
+    "325": {
+      "population": 1450000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 2.95,
+      "resources": {
+        "food": 25
+      }
+    },
+    "326": {
+      "population": 1480000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 3.4,
+      "resources": {
+        "food": 26
+      }
+    },
+    "327": {
+      "population": 1510000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 3.85,
+      "resources": {
+        "food": 27
+      }
+    },
+    "328": {
+      "population": 1540000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 4.3,
+      "resources": {
+        "food": 28
+      }
+    },
+    "329": {
+      "population": 1570000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 4.75,
+      "resources": {
+        "food": 29
+      }
+    },
+    "330": {
+      "population": 1600000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 5.2,
+      "resources": {
+        "food": 30
+      }
+    },
+    "331": {
+      "population": 1630000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 5.65,
+      "resources": {
+        "food": 31
+      }
+    },
+    "332": {
+      "population": 1660000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 6.1,
+      "resources": {
+        "food": 32
+      }
+    },
+    "333": {
+      "population": 1690000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 6.55,
+      "resources": {
+        "food": 33
+      }
+    },
+    "334": {
+      "population": 1720000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 7.0,
+      "resources": {
+        "food": 34
+      }
+    },
+    "335": {
+      "population": 1750000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 7.45,
+      "resources": {
+        "food": 35
+      }
+    },
+    "336": {
+      "population": 1780000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2.5,
+      "resources": {
+        "food": 36
+      }
+    },
+    "337": {
+      "population": 1810000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2.95,
+      "resources": {
+        "food": 37
+      }
+    },
+    "338": {
+      "population": 1840000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 3.4,
+      "resources": {
+        "food": 38
+      }
+    },
+    "339": {
+      "population": 1870000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 3.85,
+      "resources": {
+        "food": 39
+      }
+    },
+    "340": {
+      "population": 1900000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 4.3,
+      "resources": {
+        "food": 40
+      }
+    },
+    "341": {
+      "population": 1930000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 4.75,
+      "resources": {
+        "food": 41
+      }
+    },
+    "342": {
+      "population": 1960000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 5.2,
+      "resources": {
+        "food": 42
+      }
+    },
+    "343": {
+      "population": 1990000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 5.65,
+      "resources": {
+        "food": 43
+      }
+    },
+    "344": {
+      "population": 2020000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 6.1,
+      "resources": {
+        "food": 44
+      }
+    },
+    "345": {
+      "population": 2050000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 6.55,
+      "resources": {
+        "food": 45
+      }
+    },
+    "346": {
+      "population": 2080000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 7.0,
+      "resources": {
+        "food": 46
+      }
+    },
+    "347": {
+      "population": 2110000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 7.45,
+      "resources": {
+        "food": 47
+      }
+    },
+    "348": {
+      "population": 2140000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 2.5,
+      "resources": {
+        "food": 48
+      }
+    },
+    "349": {
+      "population": 2170000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 2.95,
+      "resources": {
+        "food": 49
+      }
+    },
+    "350": {
+      "population": 2200000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 3.4,
+      "resources": {
+        "food": 50
+      }
+    },
+    "351": {
+      "population": 2230000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 3.85,
+      "resources": {
+        "food": 51
+      }
+    },
+    "352": {
+      "population": 2260000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 4.3,
+      "resources": {
+        "food": 52
+      }
+    },
+    "353": {
+      "population": 2290000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 4.75,
+      "resources": {
+        "food": 53
+      }
+    },
+    "354": {
+      "population": 2320000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 5.2,
+      "resources": {
+        "food": 54
+      }
+    },
+    "355": {
+      "population": 2350000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 5.65,
+      "resources": {
+        "food": 55
+      }
+    },
+    "356": {
+      "population": 2380000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 6.1,
+      "resources": {
+        "food": 56
+      }
+    },
+    "357": {
+      "population": 2410000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 6.55,
+      "resources": {
+        "food": 57
+      }
+    },
+    "358": {
+      "population": 2440000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 7.0,
+      "resources": {
+        "food": 58
+      }
+    },
+    "359": {
+      "population": 2470000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 7.45,
+      "resources": {
+        "food": 59
+      }
+    },
+    "360": {
+      "population": 2500000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 2.5,
+      "resources": {
+        "food": 20
+      }
+    },
+    "361": {
+      "population": 2530000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 2.95,
+      "resources": {
+        "food": 21
+      }
+    },
+    "362": {
+      "population": 2560000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 3.4,
+      "resources": {
+        "food": 22
+      }
+    },
+    "363": {
+      "population": 2590000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 3.85,
+      "resources": {
+        "food": 23
+      }
+    },
+    "364": {
+      "population": 2620000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 4.3,
+      "resources": {
+        "food": 24
+      }
+    },
+    "365": {
+      "population": 2650000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 4.75,
+      "resources": {
+        "food": 25
+      }
+    },
+    "366": {
+      "population": 2680000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 5.2,
+      "resources": {
+        "food": 26
+      }
+    },
+    "367": {
+      "population": 2710000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 5.65,
+      "resources": {
+        "food": 27
+      }
+    },
+    "368": {
+      "population": 2740000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 6.1,
+      "resources": {
+        "food": 28
+      }
+    },
+    "369": {
+      "population": 2770000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 6.55,
+      "resources": {
+        "food": 29
+      }
+    },
+    "370": {
+      "population": 2800000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 7.0,
+      "resources": {
+        "food": 30
+      }
+    },
+    "371": {
+      "population": 2830000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 7.45,
+      "resources": {
+        "food": 31
+      }
+    },
+    "372": {
+      "population": 2860000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 2.5,
+      "resources": {
+        "food": 32
+      }
+    },
+    "373": {
+      "population": 2890000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 2.95,
+      "resources": {
+        "food": 33
+      }
+    },
+    "374": {
+      "population": 2920000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 3.4,
+      "resources": {
+        "food": 34
+      }
+    },
+    "375": {
+      "population": 2950000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 3.85,
+      "resources": {
+        "food": 35
+      }
+    },
+    "376": {
+      "population": 2980000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 4.3,
+      "resources": {
+        "food": 36
+      }
+    },
+    "377": {
+      "population": 3010000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 4.75,
+      "resources": {
+        "food": 37
+      }
+    },
+    "378": {
+      "population": 3040000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 5.2,
+      "resources": {
+        "food": 38
+      }
+    },
+    "379": {
+      "population": 3070000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 5.65,
+      "resources": {
+        "food": 39
+      }
+    },
+    "380": {
+      "population": 3100000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 6.1,
+      "resources": {
+        "food": 40
+      }
+    },
+    "381": {
+      "population": 3130000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 6.55,
+      "resources": {
+        "food": 41
+      }
+    },
+    "382": {
+      "population": 3160000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 7.0,
+      "resources": {
+        "food": 42
+      }
+    },
+    "383": {
+      "population": 3190000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 7.45,
+      "resources": {
+        "food": 43
+      }
+    },
+    "384": {
+      "population": 3220000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 2.5,
+      "resources": {
+        "food": 44
+      }
+    },
+    "385": {
+      "population": 3250000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 2.95,
+      "resources": {
+        "food": 45
+      }
+    },
+    "386": {
+      "population": 3280000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 3.4,
+      "resources": {
+        "food": 46
+      }
+    },
+    "387": {
+      "population": 3310000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 3.85,
+      "resources": {
+        "food": 47
+      }
+    },
+    "388": {
+      "population": 3340000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 4.3,
+      "resources": {
+        "food": 48
+      }
+    },
+    "389": {
+      "population": 3370000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 4.75,
+      "resources": {
+        "food": 49
+      }
+    },
+    "390": {
+      "population": 3400000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 5.2,
+      "resources": {
+        "food": 50
+      }
+    },
+    "391": {
+      "population": 3430000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 5.65,
+      "resources": {
+        "food": 51
+      }
+    },
+    "392": {
+      "population": 3460000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 6.1,
+      "resources": {
+        "food": 52
+      }
+    },
+    "393": {
+      "population": 3490000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 6.55,
+      "resources": {
+        "food": 53
+      }
+    },
+    "394": {
+      "population": 3520000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 7.0,
+      "resources": {
+        "food": 54
+      }
+    },
+    "395": {
+      "population": 3550000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 7.45,
+      "resources": {
+        "food": 55
+      }
+    },
+    "396": {
+      "population": 3580000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 2.5,
+      "resources": {
+        "food": 56
+      }
+    },
+    "397": {
+      "population": 3610000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 2.95,
+      "resources": {
+        "food": 57
+      }
+    },
+    "398": {
+      "population": 3640000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 3.4,
+      "resources": {
+        "food": 58
+      }
+    },
+    "399": {
+      "population": 3670000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 3.85,
+      "resources": {
+        "food": 59
+      }
+    },
+    "400": {
+      "population": 700000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 4.3,
+      "resources": {
+        "food": 20
+      }
+    },
+    "401": {
+      "population": 730000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 4.75,
+      "resources": {
+        "food": 21
+      }
+    },
+    "402": {
+      "population": 760000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 5.2,
+      "resources": {
+        "food": 22
+      }
+    },
+    "403": {
+      "population": 790000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 5.65,
+      "resources": {
+        "food": 23
+      }
+    },
+    "404": {
+      "population": 820000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 6.1,
+      "resources": {
+        "food": 24
+      }
+    },
+    "405": {
+      "population": 850000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 6.55,
+      "resources": {
+        "food": 25
+      }
+    },
+    "406": {
+      "population": 880000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 7.0,
+      "resources": {
+        "food": 26
+      }
+    },
+    "407": {
+      "population": 910000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 7.45,
+      "resources": {
+        "food": 27
+      }
+    },
+    "408": {
+      "population": 940000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 2.5,
+      "resources": {
+        "food": 28
+      }
+    },
+    "409": {
+      "population": 970000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 2.95,
+      "resources": {
+        "food": 29
+      }
+    },
+    "410": {
+      "population": 1000000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 3.4,
+      "resources": {
+        "food": 30
+      }
+    },
+    "411": {
+      "population": 1030000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 3.85,
+      "resources": {
+        "food": 31
+      }
+    },
+    "412": {
+      "population": 1060000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 4.3,
+      "resources": {
+        "food": 32
+      }
+    },
+    "413": {
+      "population": 1090000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 4.75,
+      "resources": {
+        "food": 33
+      }
+    },
+    "414": {
+      "population": 1120000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 5.2,
+      "resources": {
+        "food": 34
+      }
+    },
+    "415": {
+      "population": 1150000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 5.65,
+      "resources": {
+        "food": 35
+      }
+    },
+    "416": {
+      "population": 1180000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 6.1,
+      "resources": {
+        "food": 36
+      }
+    },
+    "417": {
+      "population": 1210000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 6.55,
+      "resources": {
+        "food": 37
+      }
+    },
+    "418": {
+      "population": 1240000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 7.0,
+      "resources": {
+        "food": 38
+      }
+    },
+    "419": {
+      "population": 1270000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 7.45,
+      "resources": {
+        "food": 39
+      }
+    },
+    "420": {
+      "population": 1300000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 2.5,
+      "resources": {
+        "food": 40
+      }
+    },
+    "421": {
+      "population": 1330000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 2.95,
+      "resources": {
+        "food": 41
+      }
+    },
+    "422": {
+      "population": 1360000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 3.4,
+      "resources": {
+        "food": 42
+      }
+    },
+    "423": {
+      "population": 1390000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 3.85,
+      "resources": {
+        "food": 43
+      }
+    },
+    "424": {
+      "population": 1420000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 4.3,
+      "resources": {
+        "food": 44
+      }
+    },
+    "425": {
+      "population": 1450000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 4.75,
+      "resources": {
+        "food": 45
+      }
+    },
+    "426": {
+      "population": 1480000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 5.2,
+      "resources": {
+        "food": 46
+      }
+    },
+    "427": {
+      "population": 1510000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 5.65,
+      "resources": {
+        "food": 47
+      }
+    },
+    "428": {
+      "population": 1540000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 6.1,
+      "resources": {
+        "food": 48
+      }
+    },
+    "429": {
+      "population": 1570000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 6.55,
+      "resources": {
+        "food": 49
+      }
+    },
+    "430": {
+      "population": 1600000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 7.0,
+      "resources": {
+        "food": 50
+      }
+    },
+    "431": {
+      "population": 1630000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 7.45,
+      "resources": {
+        "food": 51
+      }
+    },
+    "432": {
+      "population": 1660000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 2.5,
+      "resources": {
+        "food": 52
+      }
+    },
+    "433": {
+      "population": 1690000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 2.95,
+      "resources": {
+        "food": 53
+      }
+    },
+    "434": {
+      "population": 1720000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 3.4,
+      "resources": {
+        "food": 54
+      }
+    },
+    "435": {
+      "population": 1750000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 3.85,
+      "resources": {
+        "food": 55
+      }
+    },
+    "436": {
+      "population": 1780000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 4.3,
+      "resources": {
+        "food": 56
+      }
+    },
+    "437": {
+      "population": 1810000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 4.75,
+      "resources": {
+        "food": 57
+      }
+    },
+    "438": {
+      "population": 1840000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 5.2,
+      "resources": {
+        "food": 58
+      }
+    },
+    "439": {
+      "population": 1870000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 5.65,
+      "resources": {
+        "food": 59
+      }
+    },
+    "440": {
+      "population": 1900000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 6.1,
+      "resources": {
+        "food": 20
+      }
+    },
+    "441": {
+      "population": 1930000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 6.55,
+      "resources": {
+        "food": 21
+      }
+    },
+    "442": {
+      "population": 1960000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 7.0,
+      "resources": {
+        "food": 22
+      }
+    },
+    "443": {
+      "population": 1990000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 7.45,
+      "resources": {
+        "food": 23
+      }
+    },
+    "444": {
+      "population": 2020000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 2.5,
+      "resources": {
+        "food": 24
+      }
+    },
+    "445": {
+      "population": 2050000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 2.95,
+      "resources": {
+        "food": 25
+      }
+    },
+    "446": {
+      "population": 2080000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 3.4,
+      "resources": {
+        "food": 26
+      }
+    },
+    "447": {
+      "population": 2110000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 3.85,
+      "resources": {
+        "food": 27
+      }
+    },
+    "448": {
+      "population": 2140000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 4.3,
+      "resources": {
+        "food": 28
+      }
+    },
+    "449": {
+      "population": 2170000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 4.75,
+      "resources": {
+        "food": 29
+      }
+    },
+    "450": {
+      "population": 2200000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 5.2,
+      "resources": {
+        "food": 30
+      }
+    },
+    "451": {
+      "population": 2230000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 5.65,
+      "resources": {
+        "food": 31
+      }
+    },
+    "452": {
+      "population": 2260000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 6.1,
+      "resources": {
+        "food": 32
+      }
+    },
+    "453": {
+      "population": 2290000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 6.55,
+      "resources": {
+        "food": 33
+      }
+    },
+    "454": {
+      "population": 2320000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 7.0,
+      "resources": {
+        "food": 34
+      }
+    },
+    "455": {
+      "population": 2350000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 7.45,
+      "resources": {
+        "food": 35
+      }
+    },
+    "456": {
+      "population": 2380000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2.5,
+      "resources": {
+        "food": 36
+      }
+    },
+    "457": {
+      "population": 2410000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 2.95,
+      "resources": {
+        "food": 37
+      }
+    },
+    "458": {
+      "population": 2440000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 3.4,
+      "resources": {
+        "food": 38
+      }
+    },
+    "459": {
+      "population": 2470000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 3.85,
+      "resources": {
+        "food": 39
+      }
+    },
+    "460": {
+      "population": 2500000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 4.3,
+      "resources": {
+        "food": 40
+      }
+    },
+    "461": {
+      "population": 2530000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 4.75,
+      "resources": {
+        "food": 41
+      }
+    },
+    "462": {
+      "population": 2560000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 5.2,
+      "resources": {
+        "food": 42
+      }
+    },
+    "463": {
+      "population": 2590000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 5.65,
+      "resources": {
+        "food": 43
+      }
+    },
+    "464": {
+      "population": 2620000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 6.1,
+      "resources": {
+        "food": 44
+      }
+    },
+    "465": {
+      "population": 2650000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 6.55,
+      "resources": {
+        "food": 45
+      }
+    },
+    "466": {
+      "population": 2680000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 7.0,
+      "resources": {
+        "food": 46
+      }
+    },
+    "467": {
+      "population": 2710000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 7.45,
+      "resources": {
+        "food": 47
+      }
+    },
+    "468": {
+      "population": 2740000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 2.5,
+      "resources": {
+        "food": 48
+      }
+    },
+    "469": {
+      "population": 2770000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 2.95,
+      "resources": {
+        "food": 49
+      }
+    },
+    "470": {
+      "population": 2800000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 3.4,
+      "resources": {
+        "food": 50
+      }
+    },
+    "471": {
+      "population": 2830000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 3.85,
+      "resources": {
+        "food": 51
+      }
+    },
+    "472": {
+      "population": 2860000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 4.3,
+      "resources": {
+        "food": 52
+      }
+    },
+    "473": {
+      "population": 2890000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 4.75,
+      "resources": {
+        "food": 53
+      }
+    },
+    "474": {
+      "population": 2920000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 5.2,
+      "resources": {
+        "food": 54
+      }
+    },
+    "475": {
+      "population": 2950000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 5.65,
+      "resources": {
+        "food": 55
+      }
+    },
+    "476": {
+      "population": 2980000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 6.1,
+      "resources": {
+        "food": 56
+      }
+    },
+    "477": {
+      "population": 3010000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 6.55,
+      "resources": {
+        "food": 57
+      }
+    },
+    "478": {
+      "population": 3040000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 7.0,
+      "resources": {
+        "food": 58
+      }
+    },
+    "479": {
+      "population": 3070000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 7.45,
+      "resources": {
+        "food": 59
+      }
+    },
+    "480": {
+      "population": 3100000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 2.5,
+      "resources": {
+        "food": 20
+      }
+    },
+    "481": {
+      "population": 3130000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 2.95,
+      "resources": {
+        "food": 21
+      }
+    },
+    "482": {
+      "population": 3160000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 3.4,
+      "resources": {
+        "food": 22
+      }
+    },
+    "483": {
+      "population": 3190000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 3.85,
+      "resources": {
+        "food": 23
+      }
+    },
+    "484": {
+      "population": 3220000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 4.3,
+      "resources": {
+        "food": 24
+      }
+    },
+    "485": {
+      "population": 3250000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 4.75,
+      "resources": {
+        "food": 25
+      }
+    },
+    "486": {
+      "population": 3280000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 5.2,
+      "resources": {
+        "food": 26
+      }
+    },
+    "487": {
+      "population": 3310000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 5.65,
+      "resources": {
+        "food": 27
+      }
+    },
+    "488": {
+      "population": 3340000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 6.1,
+      "resources": {
+        "food": 28
+      }
+    },
+    "489": {
+      "population": 3370000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 6.55,
+      "resources": {
+        "food": 29
+      }
+    },
+    "490": {
+      "population": 3400000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 7.0,
+      "resources": {
+        "food": 30
+      }
+    },
+    "491": {
+      "population": 3430000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 7.45,
+      "resources": {
+        "food": 31
+      }
+    },
+    "492": {
+      "population": 3460000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 2.5,
+      "resources": {
+        "food": 32
+      }
+    },
+    "493": {
+      "population": 3490000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 2.95,
+      "resources": {
+        "food": 33
+      }
+    },
+    "494": {
+      "population": 3520000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 3.4,
+      "resources": {
+        "food": 34
+      }
+    },
+    "495": {
+      "population": 3550000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 3.85,
+      "resources": {
+        "food": 35
+      }
+    },
+    "496": {
+      "population": 3580000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 4.3,
+      "resources": {
+        "food": 36
+      }
+    },
+    "497": {
+      "population": 3610000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 4.75,
+      "resources": {
+        "food": 37
+      }
+    },
+    "498": {
+      "population": 3640000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 5.2,
+      "resources": {
+        "food": 38
+      }
+    },
+    "499": {
+      "population": 3670000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 5.65,
+      "resources": {
+        "food": 39
+      }
+    },
+    "500": {
+      "population": 700000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 6.1,
+      "resources": {
+        "food": 40
+      }
+    },
+    "501": {
+      "population": 730000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 6.55,
+      "resources": {
+        "food": 41
+      }
+    },
+    "502": {
+      "population": 760000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 7.0,
+      "resources": {
+        "food": 42
+      }
+    },
+    "503": {
+      "population": 790000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 7.45,
+      "resources": {
+        "food": 43
+      }
+    },
+    "504": {
+      "population": 820000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2.5,
+      "resources": {
+        "food": 44
+      }
+    },
+    "505": {
+      "population": 850000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2.95,
+      "resources": {
+        "food": 45
+      }
+    },
+    "506": {
+      "population": 880000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 3.4,
+      "resources": {
+        "food": 46
+      }
+    },
+    "507": {
+      "population": 910000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 3.85,
+      "resources": {
+        "food": 47
+      }
+    },
+    "508": {
+      "population": 940000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 4.3,
+      "resources": {
+        "food": 48
+      }
+    },
+    "509": {
+      "population": 970000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 4.75,
+      "resources": {
+        "food": 49
+      }
+    },
+    "510": {
+      "population": 1000000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 5.2,
+      "resources": {
+        "food": 50
+      }
+    },
+    "511": {
+      "population": 1030000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 5.65,
+      "resources": {
+        "food": 51
+      }
+    },
+    "512": {
+      "population": 1060000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 6.1,
+      "resources": {
+        "food": 52
+      }
+    },
+    "513": {
+      "population": 1090000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 6.55,
+      "resources": {
+        "food": 53
+      }
+    },
+    "514": {
+      "population": 1120000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 7.0,
+      "resources": {
+        "food": 54
+      }
+    },
+    "515": {
+      "population": 1150000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 7.45,
+      "resources": {
+        "food": 55
+      }
+    },
+    "516": {
+      "population": 1180000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 2.5,
+      "resources": {
+        "food": 56
+      }
+    },
+    "517": {
+      "population": 1210000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 2.95,
+      "resources": {
+        "food": 57
+      }
+    },
+    "518": {
+      "population": 1240000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 3.4,
+      "resources": {
+        "food": 58
+      }
+    },
+    "519": {
+      "population": 1270000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 3.85,
+      "resources": {
+        "food": 59
+      }
+    },
+    "520": {
+      "population": 1300000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 4.3,
+      "resources": {
+        "food": 20
+      }
+    },
+    "521": {
+      "population": 1330000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 4.75,
+      "resources": {
+        "food": 21
+      }
+    },
+    "522": {
+      "population": 1360000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 5.2,
+      "resources": {
+        "food": 22
+      }
+    },
+    "523": {
+      "population": 1390000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 5.65,
+      "resources": {
+        "food": 23
+      }
+    },
+    "524": {
+      "population": 1420000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 6.1,
+      "resources": {
+        "food": 24
+      }
+    },
+    "525": {
+      "population": 1450000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 6.55,
+      "resources": {
+        "food": 25
+      }
+    },
+    "526": {
+      "population": 1480000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 7.0,
+      "resources": {
+        "food": 26
+      }
+    },
+    "527": {
+      "population": 1510000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 7.45,
+      "resources": {
+        "food": 27
+      }
+    },
+    "528": {
+      "population": 1540000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 2.5,
+      "resources": {
+        "food": 28
+      }
+    },
+    "529": {
+      "population": 1570000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 2.95,
+      "resources": {
+        "food": 29
+      }
+    },
+    "530": {
+      "population": 1600000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 3.4,
+      "resources": {
+        "food": 30
+      }
+    },
+    "531": {
+      "population": 1630000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 3.85,
+      "resources": {
+        "food": 31
+      }
+    },
+    "532": {
+      "population": 1660000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 4.3,
+      "resources": {
+        "food": 32
+      }
+    },
+    "533": {
+      "population": 1690000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 4.75,
+      "resources": {
+        "food": 33
+      }
+    },
+    "534": {
+      "population": 1720000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 5.2,
+      "resources": {
+        "food": 34
+      }
+    },
+    "535": {
+      "population": 1750000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 5.65,
+      "resources": {
+        "food": 35
+      }
+    },
+    "536": {
+      "population": 1780000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 6.1,
+      "resources": {
+        "food": 36
+      }
+    },
+    "537": {
+      "population": 1810000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 6.55,
+      "resources": {
+        "food": 37
+      }
+    },
+    "538": {
+      "population": 1840000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 7.0,
+      "resources": {
+        "food": 38
+      }
+    },
+    "539": {
+      "population": 1870000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 7.45,
+      "resources": {
+        "food": 39
+      }
+    },
+    "540": {
+      "population": 1900000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 2.5,
+      "resources": {
+        "food": 40
+      }
+    },
+    "541": {
+      "population": 1930000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 2.95,
+      "resources": {
+        "food": 41
+      }
+    },
+    "542": {
+      "population": 1960000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 3.4,
+      "resources": {
+        "food": 42
+      }
+    },
+    "543": {
+      "population": 1990000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 3.85,
+      "resources": {
+        "food": 43
+      }
+    },
+    "544": {
+      "population": 2020000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 4.3,
+      "resources": {
+        "food": 44
+      }
+    },
+    "545": {
+      "population": 2050000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 4.75,
+      "resources": {
+        "food": 45
+      }
+    },
+    "546": {
+      "population": 2080000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 5.2,
+      "resources": {
+        "food": 46
+      }
+    },
+    "547": {
+      "population": 2110000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 5.65,
+      "resources": {
+        "food": 47
+      }
+    },
+    "548": {
+      "population": 2140000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 6.1,
+      "resources": {
+        "food": 48
+      }
+    },
+    "549": {
+      "population": 2170000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 6.55,
+      "resources": {
+        "food": 49
+      }
+    },
+    "550": {
+      "population": 2200000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 7.0,
+      "resources": {
+        "food": 50
+      }
+    },
+    "551": {
+      "population": 2230000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 7.45,
+      "resources": {
+        "food": 51
+      }
+    },
+    "552": {
+      "population": 2260000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 2.5,
+      "resources": {
+        "food": 52
+      }
+    },
+    "553": {
+      "population": 2290000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 2.95,
+      "resources": {
+        "food": 53
+      }
+    },
+    "554": {
+      "population": 2320000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 3.4,
+      "resources": {
+        "food": 54
+      }
+    },
+    "555": {
+      "population": 2350000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 3.85,
+      "resources": {
+        "food": 55
+      }
+    },
+    "556": {
+      "population": 2380000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 4.3,
+      "resources": {
+        "food": 56
+      }
+    },
+    "557": {
+      "population": 2410000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 4.75,
+      "resources": {
+        "food": 57
+      }
+    },
+    "558": {
+      "population": 2440000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 5.2,
+      "resources": {
+        "food": 58
+      }
+    },
+    "559": {
+      "population": 2470000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 5.65,
+      "resources": {
+        "food": 59
+      }
+    },
+    "560": {
+      "population": 2500000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 6.1,
+      "resources": {
+        "food": 20
+      }
+    },
+    "561": {
+      "population": 2530000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 6.55,
+      "resources": {
+        "food": 21
+      }
+    },
+    "562": {
+      "population": 2560000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 7.0,
+      "resources": {
+        "food": 22
+      }
+    },
+    "563": {
+      "population": 2590000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 7.45,
+      "resources": {
+        "food": 23
+      }
+    },
+    "564": {
+      "population": 2620000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 2.5,
+      "resources": {
+        "food": 24
+      }
+    },
+    "565": {
+      "population": 2650000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 2.95,
+      "resources": {
+        "food": 25
+      }
+    },
+    "566": {
+      "population": 2680000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 3.4,
+      "resources": {
+        "food": 26
+      }
+    },
+    "567": {
+      "population": 2710000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 3.85,
+      "resources": {
+        "food": 27
+      }
+    },
+    "568": {
+      "population": 2740000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 4.3,
+      "resources": {
+        "food": 28
+      }
+    },
+    "569": {
+      "population": 2770000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 4.75,
+      "resources": {
+        "food": 29
+      }
+    },
+    "570": {
+      "population": 2800000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 5.2,
+      "resources": {
+        "food": 30
+      }
+    },
+    "571": {
+      "population": 2830000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 5.65,
+      "resources": {
+        "food": 31
+      }
+    },
+    "572": {
+      "population": 2860000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 6.1,
+      "resources": {
+        "food": 32
+      }
+    },
+    "573": {
+      "population": 2890000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 6.55,
+      "resources": {
+        "food": 33
+      }
+    },
+    "574": {
+      "population": 2920000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 7.0,
+      "resources": {
+        "food": 34
+      }
+    },
+    "575": {
+      "population": 2950000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 7.45,
+      "resources": {
+        "food": 35
+      }
+    },
+    "576": {
+      "population": 2980000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 2.5,
+      "resources": {
+        "food": 36
+      }
+    },
+    "577": {
+      "population": 3010000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 2.95,
+      "resources": {
+        "food": 37
+      }
+    },
+    "578": {
+      "population": 3040000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 3.4,
+      "resources": {
+        "food": 38
+      }
+    },
+    "579": {
+      "population": 3070000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 3.85,
+      "resources": {
+        "food": 39
+      }
+    },
+    "580": {
+      "population": 3100000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 4.3,
+      "resources": {
+        "food": 40
+      }
+    },
+    "581": {
+      "population": 3130000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 4.75,
+      "resources": {
+        "food": 41
+      }
+    },
+    "582": {
+      "population": 3160000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 5.2,
+      "resources": {
+        "food": 42
+      }
+    },
+    "583": {
+      "population": 3190000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 5.65,
+      "resources": {
+        "food": 43
+      }
+    },
+    "584": {
+      "population": 3220000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 6.1,
+      "resources": {
+        "food": 44
+      }
+    },
+    "585": {
+      "population": 3250000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 6.55,
+      "resources": {
+        "food": 45
+      }
+    },
+    "586": {
+      "population": 3280000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 7.0,
+      "resources": {
+        "food": 46
+      }
+    },
+    "587": {
+      "population": 3310000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 7.45,
+      "resources": {
+        "food": 47
+      }
+    },
+    "588": {
+      "population": 3340000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 2.5,
+      "resources": {
+        "food": 48
+      }
+    },
+    "589": {
+      "population": 3370000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 2.95,
+      "resources": {
+        "food": 49
+      }
+    },
+    "590": {
+      "population": 3400000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 3.4,
+      "resources": {
+        "food": 50
+      }
+    },
+    "591": {
+      "population": 3430000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 3.85,
+      "resources": {
+        "food": 51
+      }
+    },
+    "592": {
+      "population": 3460000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 4.3,
+      "resources": {
+        "food": 52
+      }
+    },
+    "593": {
+      "population": 3490000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 4.75,
+      "resources": {
+        "food": 53
+      }
+    },
+    "594": {
+      "population": 3520000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 5.2,
+      "resources": {
+        "food": 54
+      }
+    },
+    "595": {
+      "population": 3550000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 5.65,
+      "resources": {
+        "food": 55
+      }
+    },
+    "596": {
+      "population": 3580000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 6.1,
+      "resources": {
+        "food": 56
+      }
+    },
+    "597": {
+      "population": 3610000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 6.55,
+      "resources": {
+        "food": 57
+      }
+    },
+    "598": {
+      "population": 3640000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 7.0,
+      "resources": {
+        "food": 58
+      }
+    },
+    "599": {
+      "population": 3670000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 7.45,
+      "resources": {
+        "food": 59
+      }
+    },
+    "600": {
+      "population": 700000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 2.5,
+      "resources": {
+        "food": 20
+      }
+    },
+    "601": {
+      "population": 730000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 2.95,
+      "resources": {
+        "food": 21
+      }
+    },
+    "602": {
+      "population": 760000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 3.4,
+      "resources": {
+        "food": 22
+      }
+    },
+    "603": {
+      "population": 790000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 3.85,
+      "resources": {
+        "food": 23
+      }
+    },
+    "604": {
+      "population": 820000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 4.3,
+      "resources": {
+        "food": 24
+      }
+    },
+    "605": {
+      "population": 850000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 4.75,
+      "resources": {
+        "food": 25
+      }
+    },
+    "606": {
+      "population": 880000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 5.2,
+      "resources": {
+        "food": 26
+      }
+    },
+    "607": {
+      "population": 910000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 5.65,
+      "resources": {
+        "food": 27
+      }
+    },
+    "608": {
+      "population": 940000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 6.1,
+      "resources": {
+        "food": 28
+      }
+    },
+    "609": {
+      "population": 970000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 6.55,
+      "resources": {
+        "food": 29
+      }
+    },
+    "610": {
+      "population": 1000000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 7.0,
+      "resources": {
+        "food": 30
+      }
+    },
+    "611": {
+      "population": 1030000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 7.45,
+      "resources": {
+        "food": 31
+      }
+    },
+    "612": {
+      "population": 1060000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 2.5,
+      "resources": {
+        "food": 32
+      }
+    },
+    "613": {
+      "population": 1090000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 2.95,
+      "resources": {
+        "food": 33
+      }
+    },
+    "614": {
+      "population": 1120000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 3.4,
+      "resources": {
+        "food": 34
+      }
+    },
+    "615": {
+      "population": 1150000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 3.85,
+      "resources": {
+        "food": 35
+      }
+    },
+    "616": {
+      "population": 1180000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 4.3,
+      "resources": {
+        "food": 36
+      }
+    },
+    "617": {
+      "population": 1210000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 4.75,
+      "resources": {
+        "food": 37
+      }
+    },
+    "618": {
+      "population": 1240000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 5.2,
+      "resources": {
+        "food": 38
+      }
+    },
+    "619": {
+      "population": 1270000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 5.65,
+      "resources": {
+        "food": 39
+      }
+    },
+    "620": {
+      "population": 1300000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 6.1,
+      "resources": {
+        "food": 40
+      }
+    },
+    "621": {
+      "population": 1330000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 6.55,
+      "resources": {
+        "food": 41
+      }
+    },
+    "622": {
+      "population": 1360000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 7.0,
+      "resources": {
+        "food": 42
+      }
+    },
+    "623": {
+      "population": 1390000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 7.45,
+      "resources": {
+        "food": 43
+      }
+    },
+    "624": {
+      "population": 1420000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2.5,
+      "resources": {
+        "food": 44
+      }
+    },
+    "625": {
+      "population": 1450000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 2.95,
+      "resources": {
+        "food": 45
+      }
+    },
+    "626": {
+      "population": 1480000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 3.4,
+      "resources": {
+        "food": 46
+      }
+    },
+    "627": {
+      "population": 1510000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 3.85,
+      "resources": {
+        "food": 47
+      }
+    },
+    "628": {
+      "population": 1540000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 4.3,
+      "resources": {
+        "food": 48
+      }
+    },
+    "629": {
+      "population": 1570000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 4.75,
+      "resources": {
+        "food": 49
+      }
+    },
+    "630": {
+      "population": 1600000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 5.2,
+      "resources": {
+        "food": 50
+      }
+    },
+    "631": {
+      "population": 1630000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 5.65,
+      "resources": {
+        "food": 51
+      }
+    },
+    "632": {
+      "population": 1660000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 6.1,
+      "resources": {
+        "food": 52
+      }
+    },
+    "633": {
+      "population": 1690000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 6.55,
+      "resources": {
+        "food": 53
+      }
+    },
+    "634": {
+      "population": 1720000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 7.0,
+      "resources": {
+        "food": 54
+      }
+    },
+    "635": {
+      "population": 1750000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 7.45,
+      "resources": {
+        "food": 55
+      }
+    },
+    "636": {
+      "population": 1780000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 2.5,
+      "resources": {
+        "food": 56
+      }
+    },
+    "637": {
+      "population": 1810000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 2.95,
+      "resources": {
+        "food": 57
+      }
+    },
+    "638": {
+      "population": 1840000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 3.4,
+      "resources": {
+        "food": 58
+      }
+    },
+    "639": {
+      "population": 1870000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 3.85,
+      "resources": {
+        "food": 59
+      }
+    },
+    "640": {
+      "population": 1900000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 4.3,
+      "resources": {
+        "food": 20
+      }
+    },
+    "641": {
+      "population": 1930000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 4.75,
+      "resources": {
+        "food": 21
+      }
+    },
+    "642": {
+      "population": 1960000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 5.2,
+      "resources": {
+        "food": 22
+      }
+    },
+    "643": {
+      "population": 1990000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 5.65,
+      "resources": {
+        "food": 23
+      }
+    },
+    "644": {
+      "population": 2020000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 6.1,
+      "resources": {
+        "food": 24
+      }
+    },
+    "645": {
+      "population": 2050000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 6.55,
+      "resources": {
+        "food": 25
+      }
+    },
+    "646": {
+      "population": 2080000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 7.0,
+      "resources": {
+        "food": 26
+      }
+    },
+    "647": {
+      "population": 2110000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 7.45,
+      "resources": {
+        "food": 27
+      }
+    },
+    "648": {
+      "population": 2140000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 2.5,
+      "resources": {
+        "food": 28
+      }
+    },
+    "649": {
+      "population": 2170000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 2.95,
+      "resources": {
+        "food": 29
+      }
+    },
+    "650": {
+      "population": 2200000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 3.4,
+      "resources": {
+        "food": 30
+      }
+    },
+    "651": {
+      "population": 2230000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 3.85,
+      "resources": {
+        "food": 31
+      }
+    },
+    "652": {
+      "population": 2260000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 4.3,
+      "resources": {
+        "food": 32
+      }
+    },
+    "653": {
+      "population": 2290000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 4.75,
+      "resources": {
+        "food": 33
+      }
+    },
+    "654": {
+      "population": 2320000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 5.2,
+      "resources": {
+        "food": 34
+      }
+    },
+    "655": {
+      "population": 2350000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 5.65,
+      "resources": {
+        "food": 35
+      }
+    },
+    "656": {
+      "population": 2380000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 6.1,
+      "resources": {
+        "food": 36
+      }
+    },
+    "657": {
+      "population": 2410000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 6.55,
+      "resources": {
+        "food": 37
+      }
+    },
+    "658": {
+      "population": 2440000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 7.0,
+      "resources": {
+        "food": 38
+      }
+    },
+    "659": {
+      "population": 2470000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 7.45,
+      "resources": {
+        "food": 39
+      }
+    },
+    "660": {
+      "population": 2500000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 2.5,
+      "resources": {
+        "food": 40
+      }
+    },
+    "661": {
+      "population": 2530000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 2.95,
+      "resources": {
+        "food": 41
+      }
+    },
+    "662": {
+      "population": 2560000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 3.4,
+      "resources": {
+        "food": 42
+      }
+    },
+    "663": {
+      "population": 2590000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 3.85,
+      "resources": {
+        "food": 43
+      }
+    },
+    "664": {
+      "population": 2620000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 4.3,
+      "resources": {
+        "food": 44
+      }
+    },
+    "665": {
+      "population": 2650000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 4.75,
+      "resources": {
+        "food": 45
+      }
+    },
+    "666": {
+      "population": 2680000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 5.2,
+      "resources": {
+        "food": 46
+      }
+    },
+    "667": {
+      "population": 2710000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 5.65,
+      "resources": {
+        "food": 47
+      }
+    },
+    "668": {
+      "population": 2740000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 6.1,
+      "resources": {
+        "food": 48
+      }
+    },
+    "669": {
+      "population": 2770000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 6.55,
+      "resources": {
+        "food": 49
+      }
+    },
+    "670": {
+      "population": 2800000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 7.0,
+      "resources": {
+        "food": 50
+      }
+    },
+    "671": {
+      "population": 2830000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 7.45,
+      "resources": {
+        "food": 51
+      }
+    },
+    "672": {
+      "population": 2860000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2.5,
+      "resources": {
+        "food": 52
+      }
+    },
+    "673": {
+      "population": 2890000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 2.95,
+      "resources": {
+        "food": 53
+      }
+    },
+    "674": {
+      "population": 2920000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 3.4,
+      "resources": {
+        "food": 54
+      }
+    },
+    "675": {
+      "population": 2950000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 3.85,
+      "resources": {
+        "food": 55
+      }
+    },
+    "676": {
+      "population": 2980000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 4.3,
+      "resources": {
+        "food": 56
+      }
+    },
+    "677": {
+      "population": 3010000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 4.75,
+      "resources": {
+        "food": 57
+      }
+    },
+    "678": {
+      "population": 3040000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 5.2,
+      "resources": {
+        "food": 58
+      }
+    },
+    "679": {
+      "population": 3070000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 5.65,
+      "resources": {
+        "food": 59
+      }
+    },
+    "680": {
+      "population": 3100000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 6.1,
+      "resources": {
+        "food": 20
+      }
+    },
+    "681": {
+      "population": 3130000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 6.55,
+      "resources": {
+        "food": 21
+      }
+    },
+    "682": {
+      "population": 3160000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 7.0,
+      "resources": {
+        "food": 22
+      }
+    },
+    "683": {
+      "population": 3190000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 7.45,
+      "resources": {
+        "food": 23
+      }
+    },
+    "684": {
+      "population": 3220000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 2.5,
+      "resources": {
+        "food": 24
+      }
+    },
+    "685": {
+      "population": 3250000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 2.95,
+      "resources": {
+        "food": 25
+      }
+    },
+    "686": {
+      "population": 3280000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 3.4,
+      "resources": {
+        "food": 26
+      }
+    },
+    "687": {
+      "population": 3310000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 3.85,
+      "resources": {
+        "food": 27
+      }
+    },
+    "688": {
+      "population": 3340000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 4.3,
+      "resources": {
+        "food": 28
+      }
+    },
+    "689": {
+      "population": 3370000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 4.75,
+      "resources": {
+        "food": 29
+      }
+    },
+    "690": {
+      "population": 3400000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 5.2,
+      "resources": {
+        "food": 30
+      }
+    },
+    "691": {
+      "population": 3430000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 5.65,
+      "resources": {
+        "food": 31
+      }
+    },
+    "692": {
+      "population": 3460000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 6.1,
+      "resources": {
+        "food": 32
+      }
+    },
+    "693": {
+      "population": 3490000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 6.55,
+      "resources": {
+        "food": 33
+      }
+    },
+    "694": {
+      "population": 3520000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 7.0,
+      "resources": {
+        "food": 34
+      }
+    },
+    "695": {
+      "population": 3550000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 7.45,
+      "resources": {
+        "food": 35
+      }
+    },
+    "696": {
+      "population": 3580000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 2.5,
+      "resources": {
+        "food": 36
+      }
+    },
+    "697": {
+      "population": 3610000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 2.95,
+      "resources": {
+        "food": 37
+      }
+    },
+    "698": {
+      "population": 3640000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 3.4,
+      "resources": {
+        "food": 38
+      }
+    },
+    "699": {
+      "population": 3670000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 3.85,
+      "resources": {
+        "food": 39
+      }
+    },
+    "700": {
+      "population": 700000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 4.3,
+      "resources": {
+        "food": 40
+      }
+    },
+    "701": {
+      "population": 730000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 4.75,
+      "resources": {
+        "food": 41
+      }
+    },
+    "702": {
+      "population": 760000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 5.2,
+      "resources": {
+        "food": 42
+      }
+    },
+    "703": {
+      "population": 790000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 5.65,
+      "resources": {
+        "food": 43
+      }
+    },
+    "704": {
+      "population": 820000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 6.1,
+      "resources": {
+        "food": 44
+      }
+    },
+    "705": {
+      "population": 850000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 6.55,
+      "resources": {
+        "food": 45
+      }
+    },
+    "706": {
+      "population": 880000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 7.0,
+      "resources": {
+        "food": 46
+      }
+    },
+    "707": {
+      "population": 910000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 7.45,
+      "resources": {
+        "food": 47
+      }
+    },
+    "708": {
+      "population": 940000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 2.5,
+      "resources": {
+        "food": 48
+      }
+    },
+    "709": {
+      "population": 970000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 2.95,
+      "resources": {
+        "food": 49
+      }
+    },
+    "710": {
+      "population": 1000000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 3.4,
+      "resources": {
+        "food": 50
+      }
+    },
+    "711": {
+      "population": 1030000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 3.85,
+      "resources": {
+        "food": 51
+      }
+    },
+    "712": {
+      "population": 1060000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 4.3,
+      "resources": {
+        "food": 52
+      }
+    },
+    "713": {
+      "population": 1090000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 4.75,
+      "resources": {
+        "food": 53
+      }
+    },
+    "714": {
+      "population": 1120000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 5.2,
+      "resources": {
+        "food": 54
+      }
+    },
+    "715": {
+      "population": 1150000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 5.65,
+      "resources": {
+        "food": 55
+      }
+    },
+    "716": {
+      "population": 1180000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 6.1,
+      "resources": {
+        "food": 56
+      }
+    },
+    "717": {
+      "population": 1210000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 6.55,
+      "resources": {
+        "food": 57
+      }
+    },
+    "718": {
+      "population": 1240000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 7.0,
+      "resources": {
+        "food": 58
+      }
+    },
+    "719": {
+      "population": 1270000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 7.45,
+      "resources": {
+        "food": 59
+      }
+    },
+    "720": {
+      "population": 1300000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 2.5,
+      "resources": {
+        "food": 20
+      }
+    },
+    "721": {
+      "population": 1330000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 2.95,
+      "resources": {
+        "food": 21
+      }
+    },
+    "722": {
+      "population": 1360000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 3.4,
+      "resources": {
+        "food": 22
+      }
+    },
+    "723": {
+      "population": 1390000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 3.85,
+      "resources": {
+        "food": 23
+      }
+    },
+    "724": {
+      "population": 1420000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 4.3,
+      "resources": {
+        "food": 24
+      }
+    },
+    "725": {
+      "population": 1450000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 4.75,
+      "resources": {
+        "food": 25
+      }
+    },
+    "726": {
+      "population": 1480000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 5.2,
+      "resources": {
+        "food": 26
+      }
+    },
+    "727": {
+      "population": 1510000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 5.65,
+      "resources": {
+        "food": 27
+      }
+    },
+    "728": {
+      "population": 1540000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 6.1,
+      "resources": {
+        "food": 28
+      }
+    },
+    "729": {
+      "population": 1570000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 6.55,
+      "resources": {
+        "food": 29
+      }
+    },
+    "730": {
+      "population": 1600000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 7.0,
+      "resources": {
+        "food": 30
+      }
+    },
+    "731": {
+      "population": 1630000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 7.45,
+      "resources": {
+        "food": 31
+      }
+    },
+    "732": {
+      "population": 1660000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 2.5,
+      "resources": {
+        "food": 32
+      }
+    },
+    "733": {
+      "population": 1690000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 2.95,
+      "resources": {
+        "food": 33
+      }
+    },
+    "734": {
+      "population": 1720000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 3.4,
+      "resources": {
+        "food": 34
+      }
+    },
+    "735": {
+      "population": 1750000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 3.85,
+      "resources": {
+        "food": 35
+      }
+    },
+    "736": {
+      "population": 1780000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 4.3,
+      "resources": {
+        "food": 36
+      }
+    },
+    "737": {
+      "population": 1810000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 4.75,
+      "resources": {
+        "food": 37
+      }
+    },
+    "738": {
+      "population": 1840000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 5.2,
+      "resources": {
+        "food": 38
+      }
+    },
+    "739": {
+      "population": 1870000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 5.65,
+      "resources": {
+        "food": 39
+      }
+    },
+    "740": {
+      "population": 1900000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 6.1,
+      "resources": {
+        "food": 40
+      }
+    },
+    "741": {
+      "population": 1930000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 6.55,
+      "resources": {
+        "food": 41
+      }
+    },
+    "742": {
+      "population": 1960000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 7.0,
+      "resources": {
+        "food": 42
+      }
+    },
+    "743": {
+      "population": 1990000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 7.45,
+      "resources": {
+        "food": 43
+      }
+    },
+    "744": {
+      "population": 2020000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 2.5,
+      "resources": {
+        "food": 44
+      }
+    },
+    "745": {
+      "population": 2050000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 2.95,
+      "resources": {
+        "food": 45
+      }
+    },
+    "746": {
+      "population": 2080000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 3.4,
+      "resources": {
+        "food": 46
+      }
+    },
+    "747": {
+      "population": 2110000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 3.85,
+      "resources": {
+        "food": 47
+      }
+    },
+    "748": {
+      "population": 2140000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 4.3,
+      "resources": {
+        "food": 48
+      }
+    },
+    "749": {
+      "population": 2170000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 4.75,
+      "resources": {
+        "food": 49
+      }
+    },
+    "750": {
+      "population": 2200000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 5.2,
+      "resources": {
+        "food": 50
+      }
+    },
+    "751": {
+      "population": 2230000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 5.65,
+      "resources": {
+        "food": 51
+      }
+    },
+    "752": {
+      "population": 2260000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 6.1,
+      "resources": {
+        "food": 52
+      }
+    },
+    "753": {
+      "population": 2290000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 6.55,
+      "resources": {
+        "food": 53
+      }
+    },
+    "754": {
+      "population": 2320000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 7.0,
+      "resources": {
+        "food": 54
+      }
+    },
+    "755": {
+      "population": 2350000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 7.45,
+      "resources": {
+        "food": 55
+      }
+    },
+    "756": {
+      "population": 2380000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 2.5,
+      "resources": {
+        "food": 56
+      }
+    },
+    "757": {
+      "population": 2410000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 2.95,
+      "resources": {
+        "food": 57
+      }
+    },
+    "758": {
+      "population": 2440000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 3.4,
+      "resources": {
+        "food": 58
+      }
+    },
+    "759": {
+      "population": 2470000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 3.85,
+      "resources": {
+        "food": 59
+      }
+    },
+    "760": {
+      "population": 2500000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 4.3,
+      "resources": {
+        "food": 20
+      }
+    },
+    "761": {
+      "population": 2530000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 4.75,
+      "resources": {
+        "food": 21
+      }
+    },
+    "762": {
+      "population": 2560000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 5.2,
+      "resources": {
+        "food": 22
+      }
+    },
+    "763": {
+      "population": 2590000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 5.65,
+      "resources": {
+        "food": 23
+      }
+    },
+    "764": {
+      "population": 2620000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 6.1,
+      "resources": {
+        "food": 24
+      }
+    },
+    "765": {
+      "population": 2650000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 6.55,
+      "resources": {
+        "food": 25
+      }
+    },
+    "766": {
+      "population": 2680000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 7.0,
+      "resources": {
+        "food": 26
+      }
+    },
+    "767": {
+      "population": 2710000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 7.45,
+      "resources": {
+        "food": 27
+      }
+    },
+    "768": {
+      "population": 2740000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 2.5,
+      "resources": {
+        "food": 28
+      }
+    },
+    "769": {
+      "population": 2770000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 2.95,
+      "resources": {
+        "food": 29
+      }
+    },
+    "770": {
+      "population": 2800000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 3.4,
+      "resources": {
+        "food": 30
+      }
+    },
+    "771": {
+      "population": 2830000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 3.85,
+      "resources": {
+        "food": 31
+      }
+    },
+    "772": {
+      "population": 2860000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 4.3,
+      "resources": {
+        "food": 32
+      }
+    },
+    "773": {
+      "population": 2890000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 4.75,
+      "resources": {
+        "food": 33
+      }
+    },
+    "774": {
+      "population": 2920000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 5.2,
+      "resources": {
+        "food": 34
+      }
+    },
+    "775": {
+      "population": 2950000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 5.65,
+      "resources": {
+        "food": 35
+      }
+    },
+    "776": {
+      "population": 2980000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 6.1,
+      "resources": {
+        "food": 36
+      }
+    },
+    "777": {
+      "population": 3010000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 6.55,
+      "resources": {
+        "food": 37
+      }
+    },
+    "778": {
+      "population": 3040000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 7.0,
+      "resources": {
+        "food": 38
+      }
+    },
+    "779": {
+      "population": 3070000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 7.45,
+      "resources": {
+        "food": 39
+      }
+    },
+    "780": {
+      "population": 3100000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 2.5,
+      "resources": {
+        "food": 40
+      }
+    },
+    "781": {
+      "population": 3130000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 2.95,
+      "resources": {
+        "food": 41
+      }
+    },
+    "782": {
+      "population": 3160000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 3.4,
+      "resources": {
+        "food": 42
+      }
+    },
+    "783": {
+      "population": 3190000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 3.85,
+      "resources": {
+        "food": 43
+      }
+    },
+    "784": {
+      "population": 3220000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 4.3,
+      "resources": {
+        "food": 44
+      }
+    },
+    "785": {
+      "population": 3250000,
+      "factories": 2,
+      "infrastructure": 3,
+      "development_level": 4.75,
+      "resources": {
+        "food": 45
+      }
+    },
+    "786": {
+      "population": 3280000,
+      "factories": 3,
+      "infrastructure": 4,
+      "development_level": 5.2,
+      "resources": {
+        "food": 46
+      }
+    },
+    "787": {
+      "population": 3310000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 5.65,
+      "resources": {
+        "food": 47
+      }
+    },
+    "788": {
+      "population": 3340000,
+      "factories": 5,
+      "infrastructure": 6,
+      "development_level": 6.1,
+      "resources": {
+        "food": 48
+      }
+    },
+    "789": {
+      "population": 3370000,
+      "factories": 6,
+      "infrastructure": 7,
+      "development_level": 6.55,
+      "resources": {
+        "food": 49
+      }
+    },
+    "790": {
+      "population": 3400000,
+      "factories": 7,
+      "infrastructure": 8,
+      "development_level": 7.0,
+      "resources": {
+        "food": 50
+      }
+    },
+    "791": {
+      "population": 3430000,
+      "factories": 8,
+      "infrastructure": 2,
+      "development_level": 7.45,
+      "resources": {
+        "food": 51
+      }
+    },
+    "792": {
+      "population": 3460000,
+      "factories": 1,
+      "infrastructure": 3,
+      "development_level": 2.5,
+      "resources": {
+        "food": 52
+      }
+    },
+    "793": {
+      "population": 3490000,
+      "factories": 2,
+      "infrastructure": 4,
+      "development_level": 2.95,
+      "resources": {
+        "food": 53
+      }
+    },
+    "794": {
+      "population": 3520000,
+      "factories": 3,
+      "infrastructure": 5,
+      "development_level": 3.4,
+      "resources": {
+        "food": 54
+      }
+    },
+    "795": {
+      "population": 3550000,
+      "factories": 4,
+      "infrastructure": 6,
+      "development_level": 3.85,
+      "resources": {
+        "food": 55
+      }
+    },
+    "796": {
+      "population": 3580000,
+      "factories": 5,
+      "infrastructure": 7,
+      "development_level": 4.3,
+      "resources": {
+        "food": 56
+      }
+    },
+    "797": {
+      "population": 3610000,
+      "factories": 6,
+      "infrastructure": 8,
+      "development_level": 4.75,
+      "resources": {
+        "food": 57
+      }
+    },
+    "798": {
+      "population": 3640000,
+      "factories": 7,
+      "infrastructure": 2,
+      "development_level": 5.2,
+      "resources": {
+        "food": 58
+      }
+    },
+    "799": {
+      "population": 3670000,
+      "factories": 8,
+      "infrastructure": 3,
+      "development_level": 5.65,
+      "resources": {
+        "food": 59
+      }
+    },
+    "800": {
+      "population": 700000,
+      "factories": 1,
+      "infrastructure": 4,
+      "development_level": 6.1,
+      "resources": {
+        "food": 20
+      }
+    },
+    "801": {
+      "population": 730000,
+      "factories": 2,
+      "infrastructure": 5,
+      "development_level": 6.55,
+      "resources": {
+        "food": 21
+      }
+    },
+    "802": {
+      "population": 760000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 7.0,
+      "resources": {
+        "food": 22
+      }
+    },
+    "803": {
+      "population": 790000,
+      "factories": 4,
+      "infrastructure": 7,
+      "development_level": 7.45,
+      "resources": {
+        "food": 23
+      }
+    },
+    "804": {
+      "population": 820000,
+      "factories": 5,
+      "infrastructure": 8,
+      "development_level": 2.5,
+      "resources": {
+        "food": 24
+      }
+    },
+    "805": {
+      "population": 850000,
+      "factories": 6,
+      "infrastructure": 2,
+      "development_level": 2.95,
+      "resources": {
+        "food": 25
+      }
+    },
+    "806": {
+      "population": 880000,
+      "factories": 7,
+      "infrastructure": 3,
+      "development_level": 3.4,
+      "resources": {
+        "food": 26
+      }
+    },
+    "807": {
+      "population": 910000,
+      "factories": 8,
+      "infrastructure": 4,
+      "development_level": 3.85,
+      "resources": {
+        "food": 27
+      }
+    },
+    "808": {
+      "population": 940000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 4.3,
+      "resources": {
+        "food": 28
+      }
+    },
+    "809": {
+      "population": 970000,
+      "factories": 2,
+      "infrastructure": 6,
+      "development_level": 4.75,
+      "resources": {
+        "food": 29
+      }
+    },
+    "810": {
+      "population": 1000000,
+      "factories": 3,
+      "infrastructure": 7,
+      "development_level": 5.2,
+      "resources": {
+        "food": 30
+      }
+    },
+    "811": {
+      "population": 1030000,
+      "factories": 4,
+      "infrastructure": 8,
+      "development_level": 5.65,
+      "resources": {
+        "food": 31
+      }
+    },
+    "812": {
+      "population": 1060000,
+      "factories": 5,
+      "infrastructure": 2,
+      "development_level": 6.1,
+      "resources": {
+        "food": 32
+      }
+    },
+    "813": {
+      "population": 1090000,
+      "factories": 6,
+      "infrastructure": 3,
+      "development_level": 6.55,
+      "resources": {
+        "food": 33
+      }
+    },
+    "814": {
+      "population": 1120000,
+      "factories": 7,
+      "infrastructure": 4,
+      "development_level": 7.0,
+      "resources": {
+        "food": 34
+      }
+    },
+    "815": {
+      "population": 1150000,
+      "factories": 8,
+      "infrastructure": 5,
+      "development_level": 7.45,
+      "resources": {
+        "food": 35
+      }
+    },
+    "816": {
+      "population": 1180000,
+      "factories": 1,
+      "infrastructure": 6,
+      "development_level": 2.5,
+      "resources": {
+        "food": 36
+      }
+    },
+    "817": {
+      "population": 1210000,
+      "factories": 2,
+      "infrastructure": 7,
+      "development_level": 2.95,
+      "resources": {
+        "food": 37
+      }
+    },
+    "818": {
+      "population": 1240000,
+      "factories": 3,
+      "infrastructure": 8,
+      "development_level": 3.4,
+      "resources": {
+        "food": 38
+      }
+    },
+    "819": {
+      "population": 1270000,
+      "factories": 4,
+      "infrastructure": 2,
+      "development_level": 3.85,
+      "resources": {
+        "food": 39
+      }
+    },
+    "820": {
+      "population": 1300000,
+      "factories": 5,
+      "infrastructure": 3,
+      "development_level": 4.3,
+      "resources": {
+        "food": 40
+      }
+    },
+    "821": {
+      "population": 1330000,
+      "factories": 6,
+      "infrastructure": 4,
+      "development_level": 4.75,
+      "resources": {
+        "food": 41
+      }
+    },
+    "822": {
+      "population": 1360000,
+      "factories": 7,
+      "infrastructure": 5,
+      "development_level": 5.2,
+      "resources": {
+        "food": 42
+      }
+    },
+    "823": {
+      "population": 1390000,
+      "factories": 8,
+      "infrastructure": 6,
+      "development_level": 5.65,
+      "resources": {
+        "food": 43
+      }
+    },
+    "824": {
+      "population": 1420000,
+      "factories": 1,
+      "infrastructure": 7,
+      "development_level": 6.1,
+      "resources": {
+        "food": 44
+      }
+    },
+    "825": {
+      "population": 1450000,
+      "factories": 2,
+      "infrastructure": 8,
+      "development_level": 6.55,
+      "resources": {
+        "food": 45
+      }
+    },
+    "826": {
+      "population": 1480000,
+      "factories": 3,
+      "infrastructure": 2,
+      "development_level": 7.0,
+      "resources": {
+        "food": 46
+      }
+    },
+    "827": {
+      "population": 1510000,
+      "factories": 4,
+      "infrastructure": 3,
+      "development_level": 7.45,
+      "resources": {
+        "food": 47
+      }
+    },
+    "828": {
+      "population": 1540000,
+      "factories": 5,
+      "infrastructure": 4,
+      "development_level": 2.5,
+      "resources": {
+        "food": 48
+      }
+    },
+    "829": {
+      "population": 1570000,
+      "factories": 6,
+      "infrastructure": 5,
+      "development_level": 2.95,
+      "resources": {
+        "food": 49
+      }
+    },
+    "830": {
+      "population": 1600000,
+      "factories": 7,
+      "infrastructure": 6,
+      "development_level": 3.4,
+      "resources": {
+        "food": 50
+      }
+    },
+    "831": {
+      "population": 1630000,
+      "factories": 8,
+      "infrastructure": 7,
+      "development_level": 3.85,
+      "resources": {
+        "food": 51
+      }
+    },
+    "832": {
+      "population": 1660000,
+      "factories": 1,
+      "infrastructure": 8,
+      "development_level": 4.3,
+      "resources": {
+        "food": 52
+      }
+    },
+    "833": {
+      "population": 1690000,
+      "factories": 2,
+      "infrastructure": 2,
+      "development_level": 4.75,
+      "resources": {
+        "food": 53
+      }
+    },
+    "834": {
+      "population": 1720000,
+      "factories": 3,
+      "infrastructure": 3,
+      "development_level": 5.2,
+      "resources": {
+        "food": 54
+      }
+    },
+    "835": {
+      "population": 1750000,
+      "factories": 4,
+      "infrastructure": 4,
+      "development_level": 5.65,
+      "resources": {
+        "food": 55
+      }
+    },
+    "836": {
+      "population": 1780000,
+      "factories": 5,
+      "infrastructure": 5,
+      "development_level": 6.1,
+      "resources": {
+        "food": 56
+      }
+    },
+    "837": {
+      "population": 1810000,
+      "factories": 6,
+      "infrastructure": 6,
+      "development_level": 6.55,
+      "resources": {
+        "food": 57
+      }
+    },
+    "838": {
+      "population": 1840000,
+      "factories": 7,
+      "infrastructure": 7,
+      "development_level": 7.0,
+      "resources": {
+        "food": 58
+      }
+    },
+    "839": {
+      "population": 1870000,
+      "factories": 8,
+      "infrastructure": 8,
+      "development_level": 7.45,
+      "resources": {
+        "food": 59
+      }
+    },
+    "840": {
+      "population": 1900000,
+      "factories": 1,
+      "infrastructure": 2,
+      "development_level": 2.5,
+      "resources": {
+        "food": 20
+      }
+    },
+    "9000": {
+      "population": 1365000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9001": {
+      "population": 1365000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9002": {
+      "population": 1365000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9003": {
+      "population": 507000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9004": {
+      "population": 507000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9005": {
+      "population": 507000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9006": {
+      "population": 1482000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9007": {
+      "population": 1482000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9008": {
+      "population": 1482000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9009": {
+      "population": 1170000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9010": {
+      "population": 1170000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9011": {
+      "population": 1170000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9012": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9013": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9014": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9015": {
+      "population": 871000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9016": {
+      "population": 871000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9017": {
+      "population": 871000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9018": {
+      "population": 455000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9019": {
+      "population": 455000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9020": {
+      "population": 455000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9021": {
+      "population": 1027000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9022": {
+      "population": 1027000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9023": {
+      "population": 1027000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9024": {
+      "population": 1274000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9025": {
+      "population": 1274000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9026": {
+      "population": 1274000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9027": {
+      "population": 1547000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9028": {
+      "population": 1547000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9029": {
+      "population": 1547000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9030": {
+      "population": 1339000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9031": {
+      "population": 1339000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9032": {
+      "population": 1339000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9033": {
+      "population": 1079000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9034": {
+      "population": 1079000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9035": {
+      "population": 1079000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9036": {
+      "population": 1261000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9037": {
+      "population": 1261000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9038": {
+      "population": 1261000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9039": {
+      "population": 1417000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9040": {
+      "population": 1417000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9041": {
+      "population": 1417000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9042": {
+      "population": 1196000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9043": {
+      "population": 1196000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9044": {
+      "population": 1196000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9045": {
+      "population": 1430000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9046": {
+      "population": 1430000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9047": {
+      "population": 1430000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9048": {
+      "population": 1456000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9049": {
+      "population": 1456000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9050": {
+      "population": 1456000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9051": {
+      "population": 494000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9052": {
+      "population": 494000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9053": {
+      "population": 494000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9054": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9055": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9056": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9057": {
+      "population": 1378000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9058": {
+      "population": 1378000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9059": {
+      "population": 1378000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9060": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9061": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9062": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9063": {
+      "population": 1391000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9064": {
+      "population": 1391000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9065": {
+      "population": 1391000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9066": {
+      "population": 559000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9067": {
+      "population": 559000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9068": {
+      "population": 559000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9069": {
+      "population": 572000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9070": {
+      "population": 572000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9071": {
+      "population": 572000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9072": {
+      "population": 598000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9073": {
+      "population": 598000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9074": {
+      "population": 598000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9075": {
+      "population": 624000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9076": {
+      "population": 624000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9077": {
+      "population": 624000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9078": {
+      "population": 637000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9079": {
+      "population": 637000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9080": {
+      "population": 637000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9081": {
+      "population": 676000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9082": {
+      "population": 676000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9083": {
+      "population": 676000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9084": {
+      "population": 715000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9085": {
+      "population": 715000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9086": {
+      "population": 715000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9087": {
+      "population": 728000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9088": {
+      "population": 728000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9089": {
+      "population": 728000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9090": {
+      "population": 754000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9091": {
+      "population": 754000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9092": {
+      "population": 754000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9093": {
+      "population": 780000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9094": {
+      "population": 780000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9095": {
+      "population": 780000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9096": {
+      "population": 793000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9097": {
+      "population": 793000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9098": {
+      "population": 793000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9099": {
+      "population": 832000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9100": {
+      "population": 832000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9101": {
+      "population": 832000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9102": {
+      "population": 884000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9103": {
+      "population": 884000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9104": {
+      "population": 884000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9105": {
+      "population": 910000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9106": {
+      "population": 910000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9107": {
+      "population": 910000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9108": {
+      "population": 936000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9109": {
+      "population": 936000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9110": {
+      "population": 936000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9111": {
+      "population": 949000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9112": {
+      "population": 949000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9113": {
+      "population": 949000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9114": {
+      "population": 962000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9115": {
+      "population": 962000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9116": {
+      "population": 962000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9117": {
+      "population": 1014000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9118": {
+      "population": 1014000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9119": {
+      "population": 1014000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    }
+  }
+}

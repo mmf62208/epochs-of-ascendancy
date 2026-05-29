@@ -2,6 +2,23 @@
 
 **Current snapshot:** [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) · **Testing:** [docs/TESTING_PLAN.md](docs/TESTING_PLAN.md)
 
+> **May 28, 2026 — Map pipeline milestone:** Phase 1 generation tooling is now end-to-end for a **persistent ~180-province test scenario** (PCA subdivision, coastal preservation, chokepoint-safe adjacency rebuild, rich attribute merge, Godot load + camera/overlays). See [docs/MAP_GENERATION_PIPELINE_DESIGN.md](docs/MAP_GENERATION_PIPELINE_DESIGN.md) and [docs/SESSION_NOTES/2026-05-28.md](docs/SESSION_NOTES/2026-05-28.md).
+
+---
+
+## Map Generation Pipeline (Phase 1 Europe)
+
+- [x] Created `tools/map_generation/` structure with `lib/` modules
+- [x] Implemented `naval_analysis.py` with coastal/chokepoint detection
+- [x] Implemented `subdivision_utils.py` with PCA splitting + coastal preservation
+- [x] Added chokepoint protection during adjacency rebuild (`apply_phase1_merge.py`)
+- [x] Improved attribute distribution during merge (resources, development, specials, cities)
+- [x] Created persistent Phase 1 Test Scenario (~180 provinces)
+- [x] Added Godot-side polish for test scenario loading (camera, overlays, diagnostics via `DebugOverlay`)
+- [ ] Further splitter refinements (coastal edge during cuts)
+- [ ] Start producing real layered JSON output (beyond test scenario / hot-load bundles)
+- [ ] Scale generation toward 350–450 province Europe target
+
 ---
 
 ## High Priority (Next 1–2 Weeks)

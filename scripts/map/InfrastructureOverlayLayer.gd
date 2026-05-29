@@ -52,25 +52,25 @@ func refresh_all():
 
 # === Proposed Splits (Phase 1 Map Gen Debug) ===
 func _try_load_proposed_splits():
-    if proposed_data_loaded:
-        return
     if not OS.is_debug_build():
         return
 
     var file = FileAccess.open(PROPOSED_SPLIT_PATH, FileAccess.READ)
     if file == null:
-        # Also try a few common dev paths outside res://
+        # Also try a few common dev paths outside res:// (very useful when iterating on the Python splitter)
         var alt_paths = [
             "tools/map_generation/output/phase1_europe/proposed_children_geometry.json",
-            "../tools/map_generation/output/phase1_europe/proposed_children_geometry.json"
+            "../tools/map_generation/output/phase1_europe/proposed_children_geometry.json",
+            "../../tools/map_generation/output/phase1_europe/proposed_children_geometry.json"
         ]
         for alt in alt_paths:
-            file = FileAccess.open(alt, FileAccess.READ)
-            if file != null:
-                break
+            if FileAccess.file_exists(alt):
+                file = FileAccess.open(alt, FileAccess.READ)
+                if file != null:
+                    break
 
     if file == null:
-        push_warning("InfrastructureOverlayLayer: Could not load proposed_children_geometry.json (expected in debug)")
+        push_warning("InfrastructureOverlayLayer: Could not load proposed_children_geometry.json")
         return
 
     var text = file.get_as_text()
@@ -83,7 +83,7 @@ func _try_load_proposed_splits():
 
     proposed_children = data["proposed_children"]
     proposed_data_loaded = true
-    print("InfrastructureOverlayLayer: Loaded %d proposed Phase 1 child provinces for debug visualization." % proposed_children.size())
+    print("InfrastructureOverlayLayer: Loaded %d proposed Phase 1 child provinces (raw generator output)." % proposed_children.size())
 
 
 func toggle_proposed_splits():
@@ -99,9 +99,19 @@ func set_show_proposed_splits(enabled: bool):
     if not OS.is_debug_build():
         return
     show_proposed_splits = enabled
-    if enabled and not proposed_data_loaded:
+    if enabled:
         _try_load_proposed_splits()
     queue_redraw()
+
+
+func reload_proposed_splits():
+    """Force reload the latest raw proposed children from disk.
+    Call this after editing subdivision_utils.py and re-running the Python generator."""
+    proposed_data_loaded = false
+    proposed_children.clear()
+    _try_load_proposed_splits()
+    queue_redraw()
+    print("InfrastructureOverlayLayer: Reloaded raw proposed splits from disk.")
 
 
 func force_full_refresh():
@@ -389,6 +399,7 @@ func _draw_proposed_splits(zoom: float = 1.0):
 
     var font := ThemeDB.fallback_font
     var base_color := Color(0.2, 0.85, 0.9, 0.9)      # Bright cyan/teal for "proposed"
+    var high_naval_color := Color(0.95, 0.7, 0.2, 0.95)  # Gold/orange for high naval importance children
     var fill_color := Color(0.2, 0.85, 0.9, 0.12)
     var label_color := Color(0.85, 0.95, 1.0, 0.95)
     var parent_label_color := Color(0.65, 0.72, 0.78, 0.75)
@@ -398,7 +409,6 @@ func _draw_proposed_splits(zoom: float = 1.0):
         if pts_raw.size() < 3:
             continue
 
-        # Convert to Vector2 array
         var poly: PackedVector2Array = []
         for p in pts_raw:
             if p is Array and p.size() >= 2:
@@ -407,13 +417,13 @@ func _draw_proposed_splits(zoom: float = 1.0):
         if poly.size() < 3:
             continue
 
-        # Light fill + prominent outline (proposed = "future" visual language)
-        draw_polygon(poly, [fill_color])
-        draw_polyline(poly, base_color, 2.4, true)
-        # Subtle inner highlight for readability at different zooms
-        draw_polyline(poly, Color(base_color, 0.35), 1.0, true)
+        var naval_imp: float = float(child.get("naval_importance", 0.0))
+        var use_color := high_naval_color if naval_imp > 1.2 else base_color
 
-        # Small centroid label
+        draw_polygon(poly, [fill_color])
+        draw_polyline(poly, use_color, 2.4, true)
+        draw_polyline(poly, Color(use_color, 0.35), 1.0, true)
+
         var cx := 0.0
         var cy := 0.0
         for pt in poly:
@@ -427,14 +437,13 @@ func _draw_proposed_splits(zoom: float = 1.0):
         var parent_id = child.get("parent_id", "?")
         var label_pos := Vector2(cx, cy)
 
-        # Child ID (main label)
         draw_string(font, label_pos - Vector2(18, 0), child_id, HORIZONTAL_ALIGNMENT_CENTER, -1, 9, label_color)
 
-        # Parent reference (smaller, below)
         var parent_str := "← p" + str(parent_id)
+        if naval_imp > 0.5:
+            parent_str += "  naval:" + str(naval_imp)
         draw_string(font, label_pos + Vector2(-14, 11), parent_str, HORIZONTAL_ALIGNMENT_CENTER, -1, 7, parent_label_color)
 
-    # Subtle header hint when active (top-leftish area of the map view)
     if zoom > 0.9:
-        var hint := "PHASE 1 PROPOSED SPLITS (debug)"
+        var hint := "RAW PROPOSED SPLITS (from Python generator) — orange = high naval value"
         draw_string(font, Vector2(80, 48), hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.3, 0.9, 0.95, 0.6))

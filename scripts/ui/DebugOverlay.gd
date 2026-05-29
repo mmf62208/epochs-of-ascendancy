@@ -263,6 +263,79 @@ func _build_ui() -> void:
 
 		set_meta("proposed_splits_status", proposed_status)
 
+		# === Real merge validation (item 2) ===
+		var merge_btn := Button.new()
+		merge_btn.text = "🔀 Load Phase 1 Merged Test Map (in-memory)"
+		merge_btn.pressed.connect(_on_load_phase1_merged_map)
+		mapgen_section.add_child(merge_btn)
+
+		var merge_v2_btn := Button.new()
+		merge_v2_btn.text = "🔀 Load IMPROVED Splitter v2 (better balance + naval densify)"
+		merge_v2_btn.pressed.connect(func(): _on_load_phase1_merged_map(true))
+		mapgen_section.add_child(merge_v2_btn)
+
+		# Fast iteration button for splitter development
+		var reload_raw_btn := Button.new()
+		reload_raw_btn.text = "🔄 Reload Raw Proposed Splits (after editing Python splitter)"
+		reload_raw_btn.pressed.connect(_on_reload_raw_proposed)
+		mapgen_section.add_child(reload_raw_btn)
+
+		# v3 with improved closest-child adjacency
+		var merge_v3_btn := Button.new()
+		merge_v3_btn.text = "🔀 Load v3 Closest-Child Wiring (cleanest borders)"
+		merge_v3_btn.pressed.connect(func(): _on_load_phase1_merged_map(false, true))
+		mapgen_section.add_child(merge_v3_btn)
+
+		var playable_v3_btn := Button.new()
+		playable_v3_btn.text = "🎮 Load v3 as Playable Test Map (180 provinces - owners assigned)"
+		playable_v3_btn.pressed.connect(func(): _on_load_phase1_merged_map(false, true, true))
+		mapgen_section.add_child(playable_v3_btn)
+
+		var test_scenario_btn := Button.new()
+		test_scenario_btn.text = "📜 Load Persistent Phase 1 Test Scenario (v6 - 180 provinces, coastal-aware PCA + rich attributes)"
+		test_scenario_btn.pressed.connect(_on_load_phase1_test_scenario)
+		mapgen_section.add_child(test_scenario_btn)
+
+		var restore_btn := Button.new()
+		restore_btn.text = "↩️ Restore Original Map Data"
+		restore_btn.pressed.connect(_on_restore_original_map)
+		mapgen_section.add_child(restore_btn)
+
+		var merge_hint := Label.new()
+		merge_hint.text = "Phase 1 v6: Coastal edge preservation in splitter (extra densify + radial cut bias on long outer arcs) + previous merge polish. Best test map yet."
+		merge_hint.add_theme_font_size_override("font_size", 9)
+		merge_hint.modulate = Color(0.7, 0.85, 0.75)
+		mapgen_section.add_child(merge_hint)
+
+		# === Phase 1 Test Tools ===
+		var test_section := _ensure_section("Phase 1 Test Tools")
+		test_section.modulate = Color(0.9, 0.88, 1.0)
+
+		var highlight_naval_btn := Button.new()
+		highlight_naval_btn.text = "Highlight High-Naval Provinces"
+		highlight_naval_btn.pressed.connect(_on_highlight_naval_pressed)
+		test_section.add_child(highlight_naval_btn)
+
+		var highlight_chokepoints_btn := Button.new()
+		highlight_chokepoints_btn.text = "Highlight Chokepoints / Straits"
+		highlight_chokepoints_btn.pressed.connect(_on_highlight_chokepoints_pressed)
+		test_section.add_child(highlight_chokepoints_btn)
+
+		var show_subdivision_btn := Button.new()
+		show_subdivision_btn.text = "Show Subdivision Candidates"
+		show_subdivision_btn.pressed.connect(_on_show_subdivision_pressed)
+		test_section.add_child(show_subdivision_btn)
+
+		var reload_test_btn := Button.new()
+		reload_test_btn.text = "Reload Phase 1 Test Scenario"
+		reload_test_btn.pressed.connect(_on_reload_test_scenario_pressed)
+		test_section.add_child(reload_test_btn)
+
+		var print_report_btn := Button.new()
+		print_report_btn.text = "Print Test Scenario Report"
+		print_report_btn.pressed.connect(_on_print_test_report_pressed)
+		test_section.add_child(print_report_btn)
+
 	# 2. Time & Simulation
 	var time_section := _ensure_section("Time & Simulation")
 	var time_label := Label.new()
@@ -603,6 +676,364 @@ func _toast(msg: String) -> void:
 		LeaderEventUI.show_toast(msg, 2.0)
 	else:
 		print("DebugOverlay: ", msg)
+
+
+# =============================================================================
+# Phase 1 Map Merge Hot-Load (Item 2 - Real Merge Validation)
+# =============================================================================
+
+const PHASE1_MERGED_BASE := "tools/map_generation/output/phase1_europe/merged_test_map/"
+
+func _on_load_phase1_merged_map(use_improved_v2: bool = false, use_v3_closest: bool = false, playable_test: bool = false):
+	if not OS.is_debug_build():
+		_toast("Phase 1 merge load is debug-only")
+		return
+
+	var label := "v3 as Playable Test Map (180 provinces)" if playable_test else ("v3 Closest-Child Wiring (cleanest borders)" if use_v3_closest else ("IMPROVED Splitter v2 (better balance + naval densify)" if use_improved_v2 else "Phase 1 merged test map (180 provinces)"))
+	_toast("Loading " + label + "...")
+
+	var base := PHASE1_MERGED_BASE
+	if use_v3_closest or playable_test:
+		base = "tools/map_generation/output/phase1_europe/merged_v3_closest_wiring/"
+	elif use_improved_v2:
+		base = "tools/map_generation/output/phase1_europe/merged_improved_v2/"
+
+	var manifest_path := base + "manifest.json"
+	var geo_path := base + "provinces_geometry.json"
+	var adj_path := base + "province_adjacency.json"
+	var terrain_path := base + "province_terrain_layer.json"
+	var res_path := base + "province_resources_layer.json"
+	var eco_path := base + "province_economy_layer.json"
+
+	# Try several dev locations
+	var candidates := [
+		base,
+		"res://" + base,
+		"../" + base,
+		"../../" + base,
+	]
+
+	var found_base := ""
+	for c in candidates:
+		if FileAccess.file_exists(c + "manifest.json"):
+			found_base = c
+			break
+
+	if found_base == "":
+		_toast("Could not find merged test map. Run the Python apply_phase1_merge.py first.")
+		return
+
+	# Load all pieces
+	var manifest := _load_json_dict(found_base + "manifest.json")
+	var geo_data := _load_json_dict(found_base + "provinces_geometry.json")
+	var adj_data := _load_json_dict(found_base + "province_adjacency.json")
+	var terrain_data := _load_json_dict(found_base + "province_terrain_layer.json")
+	var res_data := _load_json_dict(found_base + "province_resources_layer.json")
+	var eco_data := _load_json_dict(found_base + "province_economy_layer.json")
+
+	# Build AdjacencySystem in memory
+	var AdjSys := preload("res://scripts/data/AdjacencySystem.gd")
+	var adj_sys := AdjSys.new()
+	adj_sys.load_from_dict(adj_data)
+
+	# Build lightweight Province dict from the merged geometry + layers
+	var new_provinces: Dictionary = {}
+	var geo_entries: Array = geo_data.get("provinces", [])
+	for entry in geo_entries:
+		if typeof(entry) != TYPE_DICTIONARY:
+			continue
+		var pid := int(entry.get("id", 0))
+		if pid <= 0:
+			continue
+
+		var Prov := preload("res://scripts/map/Province.gd")
+		var p := Prov.new()
+		p.id = pid
+		p.name = "Child " + str(pid) if entry.has("parent_id") else ("Province " + str(pid))
+		p.terrain = "plains"
+		p.is_sea = false
+
+		# Pull attributes from the merged layers when available
+		var tdata := terrain_data.get("provinces", {}).get(str(pid), {})
+		if tdata.has("terrain"):
+			p.terrain = str(tdata["terrain"])
+
+		var edata := eco_data.get("provinces", {}).get(str(pid), {})
+		if edata.has("population"):
+			p.population = int(edata["population"])
+		if edata.has("infrastructure"):
+			p.infrastructure = int(edata["infrastructure"])
+		if edata.has("development_level"):
+			p.development_level = int(edata["development_level"])
+
+		var rdata := res_data.get("provinces", {}).get(str(pid), {})
+		if rdata.has("resources"):
+			p.resources = rdata["resources"].duplicate(true)
+
+		# Minimal geometry attachment (MapRenderer / overlays will use the geometry dict too)
+		new_provinces[pid] = p
+
+	# Build geometry dict in the shape MapManager expects
+	var new_geometry: Dictionary = {}
+	for entry in geo_entries:
+		var pid := int(entry.get("id", 0))
+		if pid > 0:
+			new_geometry[pid] = entry
+
+	# Countries - keep whatever the current map has (we don't touch ownership for this visual test)
+	var current_countries := {}
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country"):
+		# We can't easily enumerate, so we leave countries empty and let the game keep previous ownership
+		pass
+
+	# Assign test owners for playable mode (simple demo assignment for validation)
+	if playable_test:
+		var test_tags := ["GER", "ENG", "FRA", "SOV", "ITA", "POL", "USA"]
+		var idx := 0
+		for pid in new_provinces.keys():
+			if pid >= 9000:  # new children from v3
+				var p: Province = new_provinces[pid]
+				var tag := test_tags[idx % test_tags.size()]
+				p.owner_tag = tag
+				p.controller_tag = tag
+				idx += 1
+		_toast("Assigned test owners to new provinces for playable validation.")
+
+	# Push the new data
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_initialize"):
+		MapManager.force_initialize(new_provinces, new_geometry, adj_sys, current_countries)
+		var toast_msg := "v3 Playable Test Map loaded (180 provinces, test owners)" if playable_test else ("v3 closest-child map loaded" if use_v3_closest else ("IMPROVED v2 splitter map loaded" if use_improved_v2 else "Phase 1 merged map loaded"))
+		_toast(toast_msg + " (%d provinces). Zoom & inspect!" % new_provinces.size())
+
+		# Force visual layers to repaint
+		var overlay := get_tree().get_first_node_in_group("infrastructure_overlay")
+		if overlay and overlay.has_method("force_full_refresh"):
+			overlay.force_full_refresh()
+
+		# Ask MapRenderer to repaint if we can reach it
+		var mr := get_tree().get_first_node_in_group("map_renderer")
+		if mr and mr.has_method("queue_redraw"):
+			mr.queue_redraw()
+	else:
+		_toast("MapManager.force_initialize not available")
+
+
+func _on_restore_original_map():
+	if typeof(ScenarioLoader) != TYPE_NIL and ScenarioLoader.has_method("load_scenario"):
+		# Re-trigger the normal scenario load path (will restore original data)
+		ScenarioLoader.load_scenario(ScenarioLoader.current_scenario_name)
+		_toast("Original map data restored")
+	else:
+		_toast("Cannot auto-restore. Restart the game or reload the scenario manually.")
+
+
+func _on_reload_raw_proposed():
+	var overlay = get_tree().get_first_node_in_group("infrastructure_overlay")
+	if overlay and overlay.has_method("reload_proposed_splits"):
+		overlay.reload_proposed_splits()
+		overlay.set_show_proposed_splits(true)
+		_toast("Raw proposed splits reloaded from disk (fast iteration mode)")
+	else:
+		_toast("Could not find InfrastructureOverlayLayer")
+
+
+func _on_load_phase1_test_scenario():
+	# This now uses the proper persistent scenario + custom data dir support
+	if typeof(ScenarioLoader) != TYPE_NIL and ScenarioLoader.has_method("load_scenario"):
+		ScenarioLoader.load_scenario("phase1_europe_test")
+
+		# === Godot-side polish for the test scenario ===
+		_toast("Phase 1 Europe Test Scenario v6 loaded — 180 provinces • PCA + coastal edges • rich attributes • nice camera start")
+
+		# Auto-enable useful overlays for map dev/testing
+		var infra_overlay = get_tree().get_first_node_in_group("infrastructure_overlay")
+		if infra_overlay and infra_overlay.has_method("set_show_proposed_splits"):
+			infra_overlay.set_show_proposed_splits(true)
+			if infra_overlay.has_method("reload_proposed_splits"):
+				infra_overlay.reload_proposed_splits()
+
+		# Try to set a nice starting camera view focused on Europe
+		_set_nice_starting_view_for_test_map()
+
+		# Force redraws
+		var mr = get_tree().get_first_node_in_group("map_renderer")
+		if mr and mr.has_method("queue_redraw"):
+			mr.queue_redraw()
+		if infra_overlay and infra_overlay.has_method("force_full_refresh"):
+			infra_overlay.force_full_refresh()
+
+		# Rich console diagnostics
+		print("\n=== Phase 1 Europe Test Map v6 Active ===")
+		print("Provinces: ~180 (100 original + 120 generated children)")
+		print("Splitter: PCA + strong coastal edge preservation (v6)")
+		print("Merge: Closest-child + chokepoint protection + smart city/VP/special distribution")
+		print("Data: data/provinces_phase1_test/ + data/scenarios/phase1_europe_test.json")
+		print("Camera: Auto-set to nice Europe-focused starting view")
+		print("Tip: F10 → 'Reload Raw Proposed Splits' to live-iterate on the Python splitter.")
+		print("======================================\n")
+	else:
+		_toast("ScenarioLoader not available for persistent test scenario load")
+
+
+func _load_json_dict(path: String) -> Dictionary:
+	if not FileAccess.file_exists(path):
+		return {}
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return {}
+	var text := file.get_as_text()
+	file.close()
+	var parser := JSON.new()
+	if parser.parse(text) != OK:
+		return {}
+	var data := parser.data
+	if typeof(data) == TYPE_DICTIONARY:
+		return data
+	return {}
+
+
+func _set_nice_starting_view_for_test_map():
+	"""Set a pleasant starting camera position + zoom when the Phase 1 test map is loaded."""
+	var cam_ctrl := get_tree().get_first_node_in_group("camera_controller")
+	if cam_ctrl == null:
+		# Fallback search (common in this project)
+		cam_ctrl = get_node_or_null("/root/Main/WorldMap/CameraInput")
+	if cam_ctrl == null or not cam_ctrl.has_method("_ready"):  # basic sanity
+		return
+
+	# Reasonable starting view for the expanded Europe test map (4096x2048 texture)
+	# Focus roughly on Western/Central Europe, medium zoom
+	var target_pos := Vector2(1800, 650)   # good center for Europe on this texture
+	var target_zoom := 0.85
+
+	if cam_ctrl.has("target") and cam_ctrl.target:
+		cam_ctrl.target.position = target_pos
+		if "scale" in cam_ctrl.target:
+			cam_ctrl.target.scale = Vector2.ONE * target_zoom
+
+	# Also try to set internal target zoom if the controller uses it
+	if "_target_zoom" in cam_ctrl:
+		cam_ctrl._target_zoom = target_zoom
+
+	print("CameraController: Set nice starting view for Phase 1 Test Map (pos=", target_pos, ", zoom=", target_zoom, ")")
+
+
+# =============================================================================
+# Phase 1 Test Tools
+# =============================================================================
+
+const PHASE1_PLAN_RES := "res://tools/map_generation/output/phase1_europe/phase1_europe_plan.json"
+const PHASE1_PLAN_FALLBACK := "tools/map_generation/output/phase1_europe/phase1_europe_plan.json"
+
+
+func _load_phase1_plan_dict() -> Dictionary:
+	var plan := _load_json_dict(PHASE1_PLAN_RES)
+	if plan.is_empty():
+		plan = _load_json_dict(PHASE1_PLAN_FALLBACK)
+	return plan
+
+
+func _on_highlight_naval_pressed() -> void:
+	# Placeholder — future: tint provinces in MapRenderer / test overlay layer
+	var plan := _load_phase1_plan_dict()
+	var naval := plan.get("naval_analysis", {}) as Dictionary
+	var ranked: Array = plan.get("high_priority_candidates", [])
+	var coastal_n := 0
+	var high_naval: Array = []
+	for entry in ranked:
+		if entry is Dictionary and bool(entry.get("is_coastal", false)):
+			coastal_n += 1
+		if entry is Dictionary and float(entry.get("naval_importance", 0.0)) >= 1.5:
+			high_naval.append(entry)
+	print("Highlighting high naval importance provinces...")
+	print(
+		"  Pipeline plan: coastal=%s chokepoints=%s protected_straits=%s"
+		% [naval.get("coastal", "?"), naval.get("chokepoints", "?"), naval.get("protected_straits", "?")]
+	)
+	print("  High-priority coastal candidates: %d (naval_importance >= 1.5: %d)" % [coastal_n, high_naval.size()])
+	for i in mini(high_naval.size(), 8):
+		var e: Dictionary = high_naval[i]
+		print(
+			"    pid %s  naval=%.2f  splits=%s"
+			% [e.get("province_id", "?"), float(e.get("naval_importance", 0.0)), e.get("suggested_splits", "?")]
+		)
+	_toast("Naval highlight: see console (overlay tint TBD)")
+
+
+func _on_highlight_chokepoints_pressed() -> void:
+	var plan := _load_phase1_plan_dict()
+	var ranked: Array = plan.get("high_priority_candidates", [])
+	var choke: Array = []
+	for entry in ranked:
+		if entry is Dictionary and bool(entry.get("is_chokepoint", false)):
+			choke.append(entry)
+	print("Highlighting chokepoints and straits...")
+	print("  Chokepoint candidates in plan: %d" % choke.size())
+	for i in mini(choke.size(), 10):
+		var e: Dictionary = choke[i]
+		print(
+			"    pid %s  priority=%.2f  naval=%.2f"
+			% [e.get("province_id", "?"), float(e.get("priority_score", 0.0)), float(e.get("naval_importance", 0.0))]
+		)
+	_toast("Chokepoint highlight: see console (overlay tint TBD)")
+
+
+func _on_show_subdivision_pressed() -> void:
+	var overlay = get_tree().get_first_node_in_group("infrastructure_overlay")
+	if overlay and overlay.has_method("set_show_proposed_splits"):
+		overlay.set_show_proposed_splits(true)
+		if overlay.has_method("reload_proposed_splits"):
+			overlay.reload_proposed_splits()
+		_refresh_proposed_status(overlay)
+		_toast("Subdivision candidates overlay ON")
+	else:
+		_on_toggle_proposed_splits()
+	print("Showing subdivision candidates...")
+
+
+func _on_reload_test_scenario_pressed() -> void:
+	print("Reloading Phase 1 Test Scenario...")
+	_on_load_phase1_test_scenario()
+
+
+func _on_print_test_report_pressed() -> void:
+	var plan := _load_phase1_plan_dict()
+	var naval := plan.get("naval_analysis", {}) as Dictionary
+	var subdiv := plan.get("subdivision", {}) as Dictionary
+	var live_n := 0
+	var live_coastal := 0
+	var live_sea := 0
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_provinces"):
+		var all: Dictionary = MapManager.get_all_provinces()
+		live_n = all.size()
+		for p in all.values():
+			if p is Province:
+				if p.is_sea:
+					live_sea += 1
+				elif p.resolve_has_port() or str(p.terrain).to_lower() in ["coastal", "coast", "harbor", "port"]:
+					live_coastal += 1
+	print("=== Phase 1 Test Scenario Report ===")
+	print("Live map (MapManager): %d provinces (%d coastal, %d sea)" % [live_n, live_coastal, live_sea])
+	print(
+		"Pipeline naval_analysis: coastal=%s chokepoints=%s protected_straits=%s island_groups=%s"
+		% [
+			naval.get("coastal", "TODO"),
+			naval.get("chokepoints", "TODO"),
+			naval.get("protected_straits", "TODO"),
+			naval.get("island_groups", "TODO"),
+		]
+	)
+	print(
+		"Pipeline subdivision: ranked=%s children_proposed=%s parents=%s"
+		% [
+			subdiv.get("candidates_ranked", "TODO"),
+			subdiv.get("children_proposed", "TODO"),
+			subdiv.get("unique_parents_subdivided", "TODO"),
+		]
+	)
+	print("Target Phase 1 density: %s" % plan.get("target_province_count", "350-450"))
+	print("====================================")
+	_toast("Phase 1 report printed to console")
 
 
 func _input(event: InputEvent) -> void:

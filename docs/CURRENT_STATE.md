@@ -1,8 +1,22 @@
-# Current State of Epochs of Ascendancy (May 25, 2026)
+# Current State of Epochs of Ascendancy (May 28, 2026)
 
 ## Overview
 
 The game has made significant progress on its core simulation loop and map systems. The central `TimeManager` now drives daily, monthly, and yearly ticks, with several systems reacting to it. Agent networks apply real daily pressure on provinces, and the first Technology tree (Support/Radio) produces measurable gameplay effects.
+
+## Map Generation Pipeline (May 28, 2026)
+
+**Status:** Active vertical slice — test scenario playable in Godot
+
+Major progress on the Phase 1 Europe pipeline (`tools/map_generation/`):
+
+- **Tooling:** `lib/naval_analysis.py` (coastal/chokepoint/bridge detection) and `lib/subdivision_utils.py` (PCA-based splitting with coastal edge preservation during cuts).
+- **Merge:** `scripts/apply_phase1_merge.py` rebuilds adjacency, protects chokepoints during rewiring, and distributes resources, development, special features, and cities across child provinces.
+- **Output:** Layered JSON under `output/phase1_europe/` plus merged bundles (`merged_test_map/`, `merged_improved_v2/`, `merged_v3_closest_wiring/`).
+- **Godot test map:** Persistent **Phase 1 Europe Test** scenario (~180 provinces) via `data/provinces_phase1_test/` + `data/scenarios/phase1_europe_test.json`; load from Debug Overlay with camera framing and diagnostics.
+- **Design:** Full pipeline spec in [MAP_GENERATION_PIPELINE_DESIGN.md](MAP_GENERATION_PIPELINE_DESIGN.md); Hidden Hand faction design captured in [HIDDEN_HAND_DESIGN.md](HIDDEN_HAND_DESIGN.md).
+
+**Next:** Refine splitter coastal edges on cut lines; produce production-grade layered exports; scale toward the 350–450 province Europe target.
 
 ## Key Systems Status
 
@@ -57,5 +71,7 @@ The game has made significant progress on its core simulation loop and map syste
 
 - [TESTING_PLAN.md](TESTING_PLAN.md) — manual and regression checklist
 - [MAP_IMPLEMENTATION_PLAN.md](MAP_IMPLEMENTATION_PLAN.md) — province/map roadmap (Phase 1 complete)
+- [MAP_GENERATION_PIPELINE_DESIGN.md](MAP_GENERATION_PIPELINE_DESIGN.md) — procedural Europe expansion pipeline (Phase 1)
+- [HIDDEN_HAND_DESIGN.md](HIDDEN_HAND_DESIGN.md) — secret faction / three power centers design (May 28)
 - [DESIGN_InfrastructureDevelopmentSystem.md](DESIGN_InfrastructureDevelopmentSystem.md) — **new (May 28)**: full active construction + development investment design, data model, integration points, code skeleton, phased plan
 - [TECHNOLOGY_SYSTEM_DESIGN.md](TECHNOLOGY_SYSTEM_DESIGN.md) — tech system design

@@ -67,6 +67,37 @@ func load_adjacency(path: String = "res://data/provinces/province_adjacency.json
 	_load_straits_from_root(root)
 
 
+## Load adjacency directly from a parsed dictionary (the value of the "adjacency" key or the full root).
+## Extremely useful for debug hot-swaps and map generation test merges.
+func load_from_dict(adj_data: Dictionary) -> void:
+	_neighbors_by_id.clear()
+	_strait_extra.clear()
+	_invalidate_neighbor_caches()
+
+	var adj: Dictionary = {}
+	if adj_data.has("adjacency") and typeof(adj_data["adjacency"]) == TYPE_DICTIONARY:
+		adj = adj_data["adjacency"]
+	elif typeof(adj_data) == TYPE_DICTIONARY:
+		adj = adj_data
+
+	for k in adj:
+		var pid := int(k)
+		if pid <= 0:
+			continue
+		var raw: Variant = adj[k]
+		if typeof(raw) != TYPE_ARRAY:
+			continue
+		var packed := PackedInt32Array()
+		packed.resize(raw.size())
+		for i in raw.size():
+			packed[i] = int(raw[i])
+		_neighbors_by_id[pid] = packed
+
+	# Optional straits support
+	if adj_data.has("straits"):
+		_load_straits_from_root(adj_data)
+
+
 func register_province(province: Province) -> void:
 	if province == null:
 		return

@@ -21,6 +21,9 @@ var adjacency_system: AdjacencySystem
 ## Current/last loaded scenario name (for SaveLoadManager metadata and validation).
 var current_scenario_name: String = ""
 
+## Allows test scenarios (like the procedurally generated Phase 1 map) to use their own province data folder.
+var current_province_data_dir: String = "provinces"
+
 signal scenario_loaded()
 
 func get_current_scenario_name() -> String:
@@ -31,8 +34,11 @@ func _ready():
 	load_province_layers()
 	load_base_provinces()
 
-func load_province_geometry():
-	var file_path = "res://data/provinces/provinces_geometry.json"
+func load_province_geometry(data_dir: String = ""):
+	if data_dir.is_empty():
+		data_dir = current_province_data_dir
+
+	var file_path = "res://data/" + data_dir + "/provinces_geometry.json"
 	province_geometry.clear()
 	if not FileAccess.file_exists(file_path):
 		push_warning("Province geometry file missing: " + file_path)
@@ -68,16 +74,18 @@ func load_province_geometry():
 			continue
 		province_geometry[province_id] = entry
 
-	print("✅ Province geometry loaded: ", province_geometry.size())
+	print("✅ Province geometry loaded: ", province_geometry.size(), " (from ", data_dir, ")")
 
-func load_province_layers():
-	_load_adjacency_layer()
-	_load_terrain_layer()
-	_load_city_layer()
-	_load_resources_layer()
-	_load_economy_layer()
-	_load_state_and_region_layers()
-	_load_project_sites_layer()
+func load_province_layers(data_dir: String = ""):
+	if data_dir.is_empty():
+		data_dir = current_province_data_dir
+	_load_adjacency_layer(data_dir)
+	_load_terrain_layer(data_dir)
+	_load_city_layer(data_dir)
+	_load_resources_layer(data_dir)
+	_load_economy_layer(data_dir)
+	_load_state_and_region_layers(data_dir)
+	_load_project_sites_layer(data_dir)
 
 func _load_json_dict(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
@@ -95,45 +103,57 @@ func _load_json_dict(path: String) -> Dictionary:
 		return {}
 	return json.data
 
-func _load_adjacency_layer():
+func _load_adjacency_layer(data_dir: String = ""):
+	if data_dir.is_empty():
+		data_dir = current_province_data_dir
 	province_adjacency.clear()
-	var data = _load_json_dict("res://data/provinces/province_adjacency.json")
+	var data = _load_json_dict("res://data/" + data_dir + "/province_adjacency.json")
 	var raw = data.get("adjacency", {})
 	if typeof(raw) == TYPE_DICTIONARY:
 		province_adjacency = raw
 
-func _load_terrain_layer():
+func _load_terrain_layer(data_dir: String = ""):
+	if data_dir.is_empty():
+		data_dir = current_province_data_dir
 	province_terrain_layer.clear()
-	var data = _load_json_dict("res://data/provinces/province_terrain_layer.json")
+	var data = _load_json_dict("res://data/" + data_dir + "/province_terrain_layer.json")
 	var raw = data.get("provinces", {})
 	if typeof(raw) == TYPE_DICTIONARY:
 		province_terrain_layer = raw
 
-func _load_city_layer():
+func _load_city_layer(data_dir: String = ""):
+	if data_dir.is_empty():
+		data_dir = current_province_data_dir
 	province_city_layer.clear()
-	var data = _load_json_dict("res://data/provinces/province_city_layer.json")
+	var data = _load_json_dict("res://data/" + data_dir + "/province_city_layer.json")
 	var raw = data.get("provinces", {})
 	if typeof(raw) == TYPE_DICTIONARY:
 		province_city_layer = raw
 
-func _load_resources_layer():
+func _load_resources_layer(data_dir: String = ""):
+	if data_dir.is_empty():
+		data_dir = current_province_data_dir
 	province_resources_layer.clear()
-	var data = _load_json_dict("res://data/provinces/province_resources_layer.json")
+	var data = _load_json_dict("res://data/" + data_dir + "/province_resources_layer.json")
 	var raw = data.get("provinces", {})
 	if typeof(raw) == TYPE_DICTIONARY:
 		province_resources_layer = raw
 
-func _load_economy_layer():
+func _load_economy_layer(data_dir: String = ""):
+	if data_dir.is_empty():
+		data_dir = current_province_data_dir
 	province_economy_layer.clear()
-	var data = _load_json_dict("res://data/provinces/province_economy_layer.json")
+	var data = _load_json_dict("res://data/" + data_dir + "/province_economy_layer.json")
 	var raw = data.get("provinces", {})
 	if typeof(raw) == TYPE_DICTIONARY:
 		province_economy_layer = raw
 
-func _load_state_and_region_layers():
+func _load_state_and_region_layers(data_dir: String = ""):
+	if data_dir.is_empty():
+		data_dir = current_province_data_dir
 	province_state_by_id.clear()
 	province_region_by_id.clear()
-	var states_data = _load_json_dict("res://data/provinces/province_states.json")
+	var states_data = _load_json_dict("res://data/" + data_dir + "/province_states.json")
 	var states = states_data.get("states", [])
 	if typeof(states) == TYPE_ARRAY:
 		for s in states:
@@ -145,7 +165,7 @@ func _load_state_and_region_layers():
 				for pid in pids:
 					province_state_by_id[int(pid)] = state_id
 
-	var regions_data = _load_json_dict("res://data/provinces/strategic_regions.json")
+	var regions_data = _load_json_dict("res://data/" + data_dir + "/strategic_regions.json")
 	var regions = regions_data.get("regions", [])
 	if typeof(regions) == TYPE_ARRAY:
 		for r in regions:
@@ -157,9 +177,11 @@ func _load_state_and_region_layers():
 				for pid in pids:
 					province_region_by_id[int(pid)] = region_id
 
-func _load_project_sites_layer():
+func _load_project_sites_layer(data_dir: String = ""):
+	if data_dir.is_empty():
+		data_dir = current_province_data_dir
 	province_projects_by_id.clear()
-	var data = _load_json_dict("res://data/provinces/project_sites.json")
+	var data = _load_json_dict("res://data/" + data_dir + "/project_sites.json")
 	var sites = data.get("sites", [])
 	if typeof(sites) != TYPE_ARRAY:
 		return
@@ -173,8 +195,10 @@ func _load_project_sites_layer():
 			province_projects_by_id[pid] = []
 		province_projects_by_id[pid].append(site)
 
-func load_base_provinces():
-	var file_path = "res://data/provinces/provinces_base.json"
+func load_base_provinces(data_dir: String = ""):
+	if data_dir.is_empty():
+		data_dir = current_province_data_dir
+	var file_path = "res://data/" + data_dir + "/provinces_base.json"
 	var file = FileAccess.open(file_path, FileAccess.READ)
 	if not file:
 		push_warning("Could not open base provinces file: " + file_path)
@@ -216,7 +240,7 @@ func load_base_provinces():
 		_apply_layer_data_to_province(p)
 		base_provinces[p.id] = p
 	_infer_port_access_for_all(base_provinces)
-	print("✅ Base provinces loaded: ", base_provinces.size(), " provinces")
+	print("✅ Base provinces loaded: ", base_provinces.size(), " provinces (from ", data_dir, ")")
 
 func load_scenario(scenario_name: String) -> bool:
 	var file_path = "res://data/scenarios/" + scenario_name + ".json"
@@ -233,7 +257,17 @@ func load_scenario(scenario_name: String) -> bool:
 		push_warning("Failed to parse scenario JSON: " + file_path)
 		return false
 	var data = json.data
-	
+
+	# Support for procedurally generated test maps (e.g. Phase 1 expanded Europe)
+	if data.has("use_province_data_dir"):
+		var requested_dir = str(data["use_province_data_dir"])
+		if requested_dir != current_province_data_dir:
+			current_province_data_dir = requested_dir
+			print("ScenarioLoader: Switching to custom province data dir: ", requested_dir)
+			load_province_geometry(requested_dir)
+			load_province_layers(requested_dir)
+			load_base_provinces(requested_dir)
+
 	provinces.clear()
 	countries.clear()
 

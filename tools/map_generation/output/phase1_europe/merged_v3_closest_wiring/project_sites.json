@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "sites": [
+    {
+      "province_id": 9050,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 10,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 45,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 115,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 150,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 185,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 220,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 255,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 290,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 325,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 360,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 395,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 430,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 465,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 500,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 535,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 570,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 605,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 640,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 675,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 710,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 745,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 780,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 815,
+      "project_type": "mega_factory",
+      "max_level": 5
+    }
+  ]
+}

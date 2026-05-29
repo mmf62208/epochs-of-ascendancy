@@ -198,6 +198,41 @@ def _centroid(points: List[List[float]]) -> List[float]:
     return [x, y]
 
 
+def _principal_axis_direction(points: List[List[float]]) -> Tuple[float, float]:
+    """
+    Compute the direction of the first principal component (major axis) of the point set.
+    Returns a unit vector (dx, dy).
+    Pure Python 2D covariance implementation (no numpy dependency).
+    """
+    if len(points) < 2:
+        return 1.0, 0.0
+
+    cx, cy = _centroid(points)
+    n = len(points)
+    cov_xx = sum((p[0] - cx) ** 2 for p in points) / n
+    cov_yy = sum((p[1] - cy) ** 2 for p in points) / n
+    cov_xy = sum((p[0] - cx) * (p[1] - cy) for p in points) / n
+
+    if abs(cov_xy) < 1e-9:
+        if cov_xx >= cov_yy:
+            return 1.0, 0.0
+        else:
+            return 0.0, 1.0
+
+    trace = cov_xx + cov_yy
+    det = cov_xx * cov_yy - cov_xy * cov_xy
+    # Largest eigenvalue
+    disc = max(0.0, trace**2 - 4 * det)
+    lambda1 = (trace + math.sqrt(disc)) / 2.0
+
+    dx = cov_xy
+    dy = lambda1 - cov_xx
+    length = math.hypot(dx, dy)
+    if length < 1e-9:
+        return 1.0, 0.0
+    return dx / length, dy / length
+
+
 def _polygon_area(points: List[List[float]]) -> float:
     """Shoelace formula area (assumes simple polygon, winding agnostic)."""
     if len(points) < 3:
@@ -224,16 +259,19 @@ def _interpolate(a: List[float], b: List[float], t: float) -> List[float]:
     return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t]
 
 
-def _densify_boundary(points: List[List[float]], target_points: int = 14) -> List[List[float]]:
+def _densify_boundary(points: List[List[float]], target_points: int = 14, coastal_boost: bool = False) -> List[List[float]]:
     """
     Insert linearly interpolated points along edges so low-vertex polygons
     (the current 6-point seed provinces) can be split into sensible children.
     Returns a new list with approximately target_points or more.
+
+    When coastal_boost=True (high naval importance provinces), we put extra
+    density on the longest edges. These are usually the most valuable coastal
+    frontage that we want to preserve across children.
     """
     if len(points) >= target_points:
         return list(points)
 
-    # Compute total length and per-edge lengths
     n = len(points)
     edge_lengths = []
     total_len = 0.0
@@ -248,29 +286,34 @@ def _densify_boundary(points: List[List[float]], target_points: int = 14) -> Lis
     if total_len < 1e-6:
         return list(points)
 
-    # How many extra points we want to insert in total
     extras_needed = max(0, target_points - n)
     if extras_needed == 0:
         return list(points)
 
-    # Distribute extras proportionally to edge length
     result = []
     for i in range(n):
         result.append(list(points[i]))
         length = edge_lengths[i]
         if length < 1e-6:
             continue
-        # Number of inserts on this edge (at least 1 if edge is long)
+
+        # Base inserts proportional to length
         inserts = max(1, int(round(extras_needed * (length / total_len))))
+
+        # Coastal boost: give even more points to the longest edges
+        # (these are the valuable outer/coastal frontage we want to keep intact)
+        if coastal_boost and length > (total_len / n) * 1.3:
+            inserts += 1
+
         inserts = min(inserts, extras_needed)
         extras_needed -= inserts
+
         for j in range(1, inserts + 1):
             t = j / float(inserts + 1)
             result.append(_interpolate(points[i], points[(i + 1) % n], t))
 
-    # If we still need more (rounding), add midpoints on longest edges
+    # Fill remaining points on longest edges (standard behavior)
     while len(result) < target_points and len(result) < n * 3:
-        # Find longest current edge in result ring
         best_i, best_len = 0, 0.0
         m = len(result)
         for i in range(m):
@@ -314,7 +357,52 @@ def _cross(o, a, b):
     return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 
 
-def _radial_split(points: List[List[float]], k: int) -> List[List[List[float]]]:
+def _pca_split(points: List[List[float]], k: int, coastal_boost: bool = False) -> List[List[List[float]]]:
+    """
+    PCA-guided split: cut perpendicular to the major axis of the province.
+    Excellent for elongated or irregular provinces (common in real geography).
+    Falls back gracefully for near-circular shapes.
+    """
+    if k <= 1 or len(points) < 3:
+        return [list(points)]
+
+    dense = _densify_boundary(points, target_points=max(14, len(points) * 2), coastal_boost=coastal_boost)
+    center = _centroid(dense)
+
+    dx, dy = _principal_axis_direction(dense)
+    # Perpendicular direction for the cut line
+    px, py = -dy, dx
+
+    # Project all points onto the perpendicular axis
+    projs = []
+    for p in dense:
+        vec_x = p[0] - center[0]
+        vec_y = p[1] - center[1]
+        proj = vec_x * px + vec_y * py
+        projs.append((proj, p))
+
+    projs.sort(key=lambda x: x[0])
+
+    if len(projs) < k * 2:
+        return _radial_split(points, k)  # fallback
+
+    # Evenly divide the sorted projections
+    n = len(projs)
+    slice_size = n // k
+    children = []
+
+    for i in range(k):
+        start = i * slice_size
+        end = (i + 1) * slice_size if i < k - 1 else n
+        arc = [p for _, p in projs[start:end]]
+        if len(arc) >= 2:
+            # Close with center for a clean polygon
+            children.append(arc + [center])
+
+    return children if len(children) >= 2 else [list(points)]
+
+
+def _radial_split(points: List[List[float]], k: int, extra_densify: int = 0, coastal_boost: bool = False) -> List[List[List[float]]]:
     """
     Improved radial subdivision:
     - Densifies low-vertex input first
@@ -325,8 +413,9 @@ def _radial_split(points: List[List[float]], k: int) -> List[List[List[float]]]:
     if k <= 1 or len(points) < 3:
         return [list(points)]
 
+    base_target = max(14, len(points) * 2) + extra_densify
     # Densify so we have enough vertices to distribute fairly
-    dense = _densify_boundary(points, target_points=max(14, len(points) * 2))
+    dense = _densify_boundary(points, target_points=base_target, coastal_boost=coastal_boost)
 
     center = _centroid(dense)
 
@@ -366,41 +455,89 @@ def _radial_split(points: List[List[float]], k: int) -> List[List[List[float]]]:
     return _bisect_polygon(points, k)
 
 
-def _bisect_polygon(points: List[List[float]], k: int) -> List[List[List[float]]]:
+def _bisect_polygon(points: List[List[float]], k: int, extra_densify: int = 0, coastal_boost: bool = False) -> List[List[List[float]]]:
     """
-    Simple but robust recursive bisection for when radial gives poor results.
-    Repeatedly splits along a reasonable chord (using densified ring + index cuts).
+    Improved bisection with area-balanced cut selection.
+    Evaluates several candidate cut locations on the densified ring and picks
+    the one that produces the most balanced child areas (plus basic perimeter fairness).
+    This produces significantly better-looking splits than fixed 1/3 cuts,
+    especially on irregular or elongated provinces.
     """
     if k <= 1 or len(points) < 3:
         return [list(points)]
 
-    dense = _densify_boundary(points, target_points=max(12, len(points) * 2))
+    base_target = max(12, len(points) * 2) + extra_densify
+    dense = _densify_boundary(points, target_points=base_target, coastal_boost=coastal_boost)
     n = len(dense)
+    if n < 6:
+        dense = _densify_boundary(points, target_points=16)
+        n = len(dense)
 
     pieces: List[List[List[float]]] = [dense]
+    parent_area = _polygon_area(dense)
 
     while len(pieces) < k:
-        # Pick the current largest piece (by point count as proxy for area)
-        pieces.sort(key=lambda p: len(p), reverse=True)
+        pieces.sort(key=lambda p: _polygon_area(p), reverse=True)
         parent = pieces.pop(0)
-        if len(parent) < 5:
+        if len(parent) < 6:
             pieces.append(parent)
             break
 
-        # Cut roughly in half along the ring
         m = len(parent)
-        cut1 = m // 3
-        cut2 = (m * 2) // 3
+        best_cuts = None
+        best_score = 1e12
 
-        # Create two children sharing the cut chord (parent[cut1] and parent[cut2])
-        p1 = parent[cut1:cut2+1]
-        p2 = parent[cut2:] + parent[:cut1+1]
+        # Evaluate a range of possible cut pairs for best area balance
+        step = max(1, m // 12)
+        for i in range(1, m - 2, step):
+            for j in range(i + 2, m - 1, step):
+                seg1 = parent[i:j+1]
+                seg2 = parent[j:] + parent[:i+1]
 
-        # Add a small interior bias point (average of the two cut points) to avoid flatness
-        c = _interpolate(parent[cut1], parent[cut2], 0.5)
-        p1 = p1 + [c]
-        p2 = p2 + [c]
+                if len(seg1) < 3 or len(seg2) < 3:
+                    continue
 
+                c = _interpolate(parent[i], parent[j], 0.5)
+                p1 = seg1 + [c]
+                p2 = seg2 + [c]
+
+                if not _is_valid_polygon(p1) or not _is_valid_polygon(p2):
+                    continue
+
+                a1 = _polygon_area(p1)
+                a2 = _polygon_area(p2)
+                if a1 + a2 < 1e-4:
+                    continue
+
+                # Score: area imbalance + slight penalty for very unbalanced perimeter
+                imbalance = abs(a1 - a2) / max(a1 + a2, 1e-6)
+                perim1 = len(p1)
+                perim2 = len(p2)
+                perim_imbalance = abs(perim1 - perim2) / max(perim1 + perim2, 1)
+                score = imbalance * 1.0 + perim_imbalance * 0.3
+
+                # Coastal preservation bonus: when we care about coastal frontage,
+                # slightly prefer cuts that are more "radial" (cut points roughly opposite).
+                # This helps keep long contiguous coastal arcs on single children.
+                if coastal_boost:
+                    # Rough measure of how "across" the cut is (good for preserving outer arcs)
+                    cut_span = min(abs(i - j), m - abs(i - j))
+                    radial_bonus = (cut_span / (m / 2.0)) * 0.25  # up to ~0.25 bonus
+                    score -= radial_bonus
+
+                if score < best_score:
+                    best_score = score
+                    best_cuts = (p1, p2)
+
+        if best_cuts is None:
+            # Fallback to simple cut
+            cut1 = m // 3
+            cut2 = (m * 2) // 3
+            p1 = parent[cut1:cut2+1] + [_interpolate(parent[cut1], parent[cut2], 0.5)]
+            p2 = parent[cut2:] + parent[:cut1+1] + [_interpolate(parent[cut1], parent[cut2], 0.5)]
+            best_cuts = (p1, p2)
+
+        p1, p2 = best_cuts
         if _is_valid_polygon(p1):
             pieces.append(p1)
         else:
@@ -410,20 +547,19 @@ def _bisect_polygon(points: List[List[float]], k: int) -> List[List[List[float]]
         elif len(pieces) < k:
             pieces.append(parent)
 
-    # Final cleanup + center fallback for any degenerate
+    # Final cleanup
     cleaned = []
     ctr = _centroid(points)
     for p in pieces[:k]:
         if _is_valid_polygon(p):
             cleaned.append(p)
         else:
-            # Emergency fan from center using original
             cleaned.append(points[:3] + [ctr])
 
     return cleaned if len(cleaned) >= 2 else [list(points)]
 
 
-def _simple_cluster_split(points: List[List[float]], k: int) -> List[List[List[float]]]:
+def _simple_cluster_split(points: List[List[float]], k: int, extra_densify: int = 0, coastal_boost: bool = False) -> List[List[List[float]]]:
     """
     Fallback clustering (used only if better methods fail).
     Works on densified points then snaps children to convex hull.
@@ -431,7 +567,8 @@ def _simple_cluster_split(points: List[List[float]], k: int) -> List[List[List[f
     if k <= 1 or len(points) < 3:
         return [list(points)]
 
-    dense = _densify_boundary(points, target_points=max(12, len(points) * 2))
+    base_target = max(12, len(points) * 2) + extra_densify
+    dense = _densify_boundary(points, target_points=base_target, coastal_boost=coastal_boost)
 
     centroids = random.sample(dense, min(k, len(dense)))
 
@@ -471,12 +608,11 @@ def generate_split_geometry(
     """
     Proposes a subdivision of a province into N child provinces.
 
-    2026-05-28 improvements:
-    - Always densifies low-vertex input (current seed provinces are ~6 pts)
-    - Prefers a robust radial arc-ownership method for natural slices
-    - Falls back to repeated geometric bisection for better balance
-    - Produces children with real perimeter ownership + reasonable interior points
-    - Includes area and validity diagnostics
+    2026-05-29 improvements (item 3):
+    - Smarter area-balanced bisection with candidate cut evaluation
+    - Naval / coastal awareness: high-importance provinces get more aggressive
+      densification and a slight bias toward more even perimeter distribution
+      (important for future port/special site placement on children).
     """
     original_points = _get_province_points(province_id, geometry)
     if not original_points or len(original_points) < 3:
@@ -484,38 +620,65 @@ def generate_split_geometry(
 
     parent_area = _polygon_area(original_points)
 
-    # Primary path: improved radial on densified boundary
-    child_polygons = _radial_split(original_points, num_pieces)
+    naval_score = naval_data.get("naval_importance_scores", {}).get(province_id, 0.0)
+    is_coastal = province_id in naval_data.get("coastal_provinces", [])
 
-    # If we got too few or degenerate results, use bisection
+    # For high naval value or coastal provinces, densify more aggressively
+    # and apply coastal_boost so we put extra points on long outer edges
+    # (valuable coastal frontage we want to preserve for children).
+    extra_densify = 0
+    coastal_boost = False
+    if naval_score > 1.0 or is_coastal:
+        extra_densify = 6
+        coastal_boost = True
+
+    # Primary path: PCA for elongated provinces (great for real geography), else radial
+    aspect = 1.0
+    dx, dy = _principal_axis_direction(original_points)
+    # Rough elongation from bounding box in principal direction (simple heuristic)
+    projs = []
+    for p in original_points:
+        cx, cy = _centroid(original_points)
+        vx, vy = p[0] - cx, p[1] - cy
+        projs.append(vx * dx + vy * dy)
+    if projs:
+        aspect = (max(projs) - min(projs)) / (max([abs(p[0]) for p in original_points] + [1]) or 1)
+
+    if num_pieces == 2 and aspect > 1.6:
+        child_polygons = _pca_split(original_points, num_pieces, coastal_boost=coastal_boost)
+    else:
+        child_polygons = _radial_split(original_points, num_pieces, extra_densify=extra_densify, coastal_boost=coastal_boost)
+
+    # If we got too few or degenerate results, use the new smarter bisection
     valid_children = [p for p in child_polygons if _is_valid_polygon(p)]
     if len(valid_children) < max(2, num_pieces // 2):
-        child_polygons = _bisect_polygon(original_points, num_pieces)
+        child_polygons = _bisect_polygon(original_points, num_pieces, extra_densify=extra_densify, coastal_boost=coastal_boost)
         valid_children = [p for p in child_polygons if _is_valid_polygon(p)]
 
     # Last resort
     if len(valid_children) < 2:
-        child_polygons = _simple_cluster_split(original_points, num_pieces)
+        child_polygons = _simple_cluster_split(original_points, num_pieces, extra_densify=extra_densify, coastal_boost=coastal_boost)
         valid_children = [p for p in child_polygons if _is_valid_polygon(p)]
 
     proposals = []
-    total_child_area = 0.0
     for i, poly in enumerate(child_polygons):
         if not _is_valid_polygon(poly):
             continue
         area = _polygon_area(poly)
-        total_child_area += area
+        notes = f"Densify + radial/bisect. Area {parent_area:.1f}→{area:.1f}."
+        if naval_score > 1.0 or is_coastal:
+            notes += " (naval-aware densify)"
         proposals.append({
             "parent_id": province_id,
             "child_index": i,
             "suggested_points": poly,
-            "notes": f"Densify + radial/bisect split. Parent area {parent_area:.1f} -> child area {area:.1f}.",
+            "notes": notes,
             "naval_aware": True,
             "suggested_center": _centroid(poly),
-            "approx_area": round(area, 1)
+            "approx_area": round(area, 1),
+            "naval_importance": round(naval_score, 2)
         })
 
-    # If we somehow produced more than requested, trim (rare)
     if len(proposals) > num_pieces:
         proposals = sorted(proposals, key=lambda p: p["approx_area"], reverse=True)[:num_pieces]
 

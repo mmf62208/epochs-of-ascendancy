@@ -134,3 +134,19 @@ While the generation pipeline is being developed, we will improve the current ma
 3. Higher-resolution source geometry ingestion (future Phase 1.5)
 4. More Special Site content + early AI scaffolding for site selection
 
+## Progress Log (May 28, 2026 — session 2)
+
+**Splitter & merge hardening:**
+- `subdivision_utils.py`: PCA-based cuts with **coastal edge preservation** so child provinces retain sensible shoreline segments instead of arbitrary interior splits.
+- `naval_analysis.py`: Expanded chokepoint/bridge detection feeds protected connections during merge.
+- `apply_phase1_merge.py`: Adjacency rebuild with chokepoint protection; improved inheritance/distribution for **resources, development, special features, and cities** across children.
+
+**Playable test scenario:**
+- Persistent **Phase 1 Europe Test** (~180 provinces): `data/provinces_phase1_test/` + `data/scenarios/phase1_europe_test.json`.
+- Godot: Debug Overlay one-click load, camera framing for the expanded theater, overlay/diagnostic hooks for validation.
+
+**Design collateral:**
+- [HIDDEN_HAND_DESIGN.md](HIDDEN_HAND_DESIGN.md) — compiled faction design (three power centers, discovery stages, alternate play mode).
+
+**Still open:** Finer coastal fidelity on cut boundaries; promote merged output into production `data/provinces/` layers; scale subdivision density toward the **350–450** Europe target.
+
