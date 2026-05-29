@@ -70,7 +70,7 @@ func _resolve_player_tag() -> String:
 
 
 func _configure_top_info_bar(player_tag: String) -> void:
-	var top_bar := get_node_or_null("UILayer/TopInfoBar") as TopInfoBar
+	var top_bar: TopInfoBar = get_node_or_null("UILayer/TopInfoBar") as TopInfoBar
 	if top_bar != null:
 		top_bar.player_country_tag = player_tag
 

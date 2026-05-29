@@ -416,7 +416,7 @@ func _apply_save_data(data: Dictionary) -> void:
 
 	# 2b. Active infrastructure / development projects (must be after map provinces exist)
 	var infra_data := _get_infrastructure_save_data(data)
-	if infra_data != null and typeof(InfrastructureDevelopmentManager) != TYPE_NIL:
+	if not infra_data.is_empty() and typeof(InfrastructureDevelopmentManager) != TYPE_NIL:
 		if InfrastructureDevelopmentManager.has_method("apply_loaded_data"):
 			InfrastructureDevelopmentManager.apply_loaded_data(infra_data)
 		# Explicit visual refresh pass after load (as requested for map overlays / InfoPanel)
@@ -875,8 +875,8 @@ func _migrate_save_data(data: Dictionary) -> void:
 ##   - Legacy key "infrastructure" (user sketch format or early experiments)
 ##   - Per-province "active_project" entries
 func _get_infrastructure_save_data(save_root: Dictionary) -> Dictionary:
-	if save_root == null:
-		return null
+	if save_root.is_empty():
+		return {}
 
 	# Preferred modern format
 	if save_root.has("infrastructure_projects"):
@@ -912,14 +912,16 @@ func _get_infrastructure_save_data(save_root: Dictionary) -> Dictionary:
 				if typeof(p) != TYPE_DICTIONARY:
 					continue
 				var pid := str(p.get("id", ""))
-				var proj := p.get("active_infra_project", null) or p.get("active_project", null)
+				var proj: Variant = p.get("active_infra_project", null)
+				if proj == null:
+					proj = p.get("active_project", null)
 				if proj != null and typeof(proj) == TYPE_DICTIONARY:
 					converted2["active_projects"][pid] = proj
 			if not converted2["active_projects"].is_empty():
 				print("SaveLoad: Found stray per-province project data in map section — migrated.")
 				return converted2
 
-	return null
+	return {}
 
 ## Enhanced save with better error object (for future UI).
 func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:

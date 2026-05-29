@@ -95,7 +95,7 @@ static func hide_overlay() -> void:
 		instance.visible = false
 
 
-static func is_visible() -> bool:
+static func is_overlay_visible() -> bool:
 	return instance != null and instance.visible
 
 
@@ -424,7 +424,8 @@ func _refresh_infrastructure_section():
 	if count_label == null or list == null:
 		return
 
-	list.clear()
+	for child in list.get_children():
+		child.queue_free()
 
 	var manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
 	if not manager:
@@ -457,7 +458,8 @@ func _refresh_infrastructure_section():
 	# Refresh Special Sites list
 	var ss_list := get_meta("special_sites_list") as VBoxContainer
 	if ss_list:
-		ss_list.clear()
+		for child in ss_list.get_children():
+			child.queue_free()
 		if typeof(MapManager) != TYPE_NIL:
 			for pid in MapManager.get_all_provinces().keys():
 				var p := MapManager.get_province(int(pid))
@@ -546,7 +548,7 @@ func _on_boost_all_projects():
 	var manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
 	if manager and manager.has_method("active_projects"):
 		for pid in manager.active_projects.keys():
-			var proj = manager.active_projects[pid]
+			var proj: Variant = manager.active_projects[pid]
 			proj.progress = clampf(proj.progress + 25.0, 0.0, 100.0)
 
 	_refresh_infrastructure_section()
@@ -557,7 +559,7 @@ func _on_complete_all_projects():
 	var manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
 	if manager and manager.has_method("active_projects"):
 		for pid in manager.active_projects.keys():
-			var proj = manager.active_projects[pid]
+			var proj: Variant = manager.active_projects[pid]
 			proj.progress = 100.0
 			# Trigger completion logic if available
 			if manager.has_method("complete_project_for_debug"):
@@ -581,7 +583,7 @@ func _on_sabotage_random_project():
 		return
 
 	var random_pid = keys[randi() % keys.size()]
-	var proj = manager.active_projects[random_pid]
+	var proj: Variant = manager.active_projects[random_pid]
 	proj.modifiers["sabotage"] = -0.8   # strong sabotage
 
 	_refresh_infrastructure_section()
@@ -593,8 +595,9 @@ func _on_sabotage_random_project():
 func _on_debug_spawn_port():
 	var selected := -1
 	# Try to use currently selected province from MapRenderer if available
-	if typeof(MapRenderer) != TYPE_NIL and MapRenderer.has_method("selected_province_id"):
-		selected = MapRenderer.selected_province_id
+	var mr: MapRenderer = get_tree().get_first_node_in_group("map_renderer") as MapRenderer
+	if mr != null:
+		selected = mr.selected_province_id
 
 	if selected < 0:
 		# Fallback: use first province owned by player
@@ -746,19 +749,20 @@ func _on_load_phase1_merged_map(use_improved_v2: bool = false, use_v3_closest: b
 		if pid <= 0:
 			continue
 
-		var Prov := preload("res://scripts/map/Province.gd")
-		var p := Prov.new()
+		var p: Province = Province.new()
 		p.id = pid
 		p.name = "Child " + str(pid) if entry.has("parent_id") else ("Province " + str(pid))
 		p.terrain = "plains"
 		p.is_sea = false
 
 		# Pull attributes from the merged layers when available
-		var tdata := terrain_data.get("provinces", {}).get(str(pid), {})
+		var terrain_by_id: Dictionary = terrain_data.get("provinces", {}) as Dictionary
+		var tdata: Dictionary = terrain_by_id.get(str(pid), {}) as Dictionary
 		if tdata.has("terrain"):
 			p.terrain = str(tdata["terrain"])
 
-		var edata := eco_data.get("provinces", {}).get(str(pid), {})
+		var eco_by_id: Dictionary = eco_data.get("provinces", {}) as Dictionary
+		var edata: Dictionary = eco_by_id.get(str(pid), {}) as Dictionary
 		if edata.has("population"):
 			p.population = int(edata["population"])
 		if edata.has("infrastructure"):
@@ -766,7 +770,8 @@ func _on_load_phase1_merged_map(use_improved_v2: bool = false, use_v3_closest: b
 		if edata.has("development_level"):
 			p.development_level = int(edata["development_level"])
 
-		var rdata := res_data.get("provinces", {}).get(str(pid), {})
+		var res_by_id: Dictionary = res_data.get("provinces", {}) as Dictionary
+		var rdata: Dictionary = res_by_id.get(str(pid), {}) as Dictionary
 		if rdata.has("resources"):
 			p.resources = rdata["resources"].duplicate(true)
 
@@ -793,7 +798,7 @@ func _on_load_phase1_merged_map(use_improved_v2: bool = false, use_v3_closest: b
 		for pid in new_provinces.keys():
 			if pid >= 9000:  # new children from v3
 				var p: Province = new_provinces[pid]
-				var tag := test_tags[idx % test_tags.size()]
+				var tag: String = str(test_tags[idx % test_tags.size()])
 				p.owner_tag = tag
 				p.controller_tag = tag
 				idx += 1
@@ -819,9 +824,10 @@ func _on_load_phase1_merged_map(use_improved_v2: bool = false, use_v3_closest: b
 
 
 func _on_restore_original_map():
-	if typeof(ScenarioLoader) != TYPE_NIL and ScenarioLoader.has_method("load_scenario"):
+	var loader := get_tree().root.find_child("ScenarioLoader", true, false) as ScenarioLoader
+	if loader and loader.has_method("load_scenario"):
 		# Re-trigger the normal scenario load path (will restore original data)
-		ScenarioLoader.load_scenario(ScenarioLoader.current_scenario_name)
+		loader.load_scenario(loader.current_scenario_name)
 		_toast("Original map data restored")
 	else:
 		_toast("Cannot auto-restore. Restart the game or reload the scenario manually.")
@@ -839,8 +845,12 @@ func _on_reload_raw_proposed():
 
 func _on_load_phase1_test_scenario():
 	# This now uses the proper persistent scenario + custom data dir support
-	if typeof(ScenarioLoader) != TYPE_NIL and ScenarioLoader.has_method("load_scenario"):
-		ScenarioLoader.load_scenario("phase1_europe_test")
+	var loader := get_tree().root.find_child("ScenarioLoader", true, false) as ScenarioLoader
+	if loader and loader.has_method("load_scenario"):
+		var success := loader.load_scenario("phase1_europe_test")
+		if not success:
+			_toast("Failed to load Phase 1 test scenario (check console for warnings)")
+			return
 
 		# === Godot-side polish for the test scenario ===
 		_toast("Phase 1 Europe Test Scenario v6 loaded — 180 provinces • PCA + coastal edges • rich attributes • nice camera start")
@@ -869,12 +879,14 @@ func _on_load_phase1_test_scenario():
 		print("Merge: Closest-child + chokepoint protection + smart city/VP/special distribution")
 		print("Data: data/provinces_phase1_test/ + data/scenarios/phase1_europe_test.json")
 		print("Camera: Auto-set to nice Europe-focused starting view")
+		print("Tip: For reliable testing of the Phase 1 map, open scenes/TestScenario.tscn and press F6 (Play Current Scene), or right-click it in the FileSystem dock → 'Set as Main Scene' so F5 launches the test map.")
 		print("Tip: F10 → 'Reload Raw Proposed Splits' to live-iterate on the Python splitter.")
 		print("======================================\n")
 	else:
 		_toast("ScenarioLoader not available for persistent test scenario load")
 
 
+@warning_ignore("return_value_discarded", "unsafe_cast")
 func _load_json_dict(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
 		return {}
@@ -886,36 +898,56 @@ func _load_json_dict(path: String) -> Dictionary:
 	var parser := JSON.new()
 	if parser.parse(text) != OK:
 		return {}
-	var data := parser.data
-	if typeof(data) == TYPE_DICTIONARY:
+	var data: Variant = parser.data
+	if data is Dictionary:
 		return data
 	return {}
 
 
 func _set_nice_starting_view_for_test_map():
-	"""Set a pleasant starting camera position + zoom when the Phase 1 test map is loaded."""
+	"""Set a pleasant starting camera position + zoom when the Phase 1 test map is loaded.
+	Uses robust discovery and defers the change for safety after scene loading.
+	"""
 	var cam_ctrl := get_tree().get_first_node_in_group("camera_controller")
 	if cam_ctrl == null:
-		# Fallback search (common in this project)
+		cam_ctrl = get_tree().root.find_child("CameraInput", true, false)
+	if cam_ctrl == null:
+		cam_ctrl = get_node_or_null("/root/TestScenario/WorldMap/CameraInput")
+	if cam_ctrl == null:
 		cam_ctrl = get_node_or_null("/root/Main/WorldMap/CameraInput")
-	if cam_ctrl == null or not cam_ctrl.has_method("_ready"):  # basic sanity
+	if cam_ctrl == null:
+		push_warning("DebugOverlay: Could not find CameraController for test map view.")
 		return
 
 	# Reasonable starting view for the expanded Europe test map (4096x2048 texture)
-	# Focus roughly on Western/Central Europe, medium zoom
-	var target_pos := Vector2(1800, 650)   # good center for Europe on this texture
+	# Focus roughly on Western/Central Europe, medium zoom so the new provinces are visible
+	var target_pos := Vector2(1800, 650)
 	var target_zoom := 0.85
 
-	if cam_ctrl.has("target") and cam_ctrl.target:
-		cam_ctrl.target.position = target_pos
-		if "scale" in cam_ctrl.target:
-			cam_ctrl.target.scale = Vector2.ONE * target_zoom
+	# Defer to avoid race conditions with _ready / lerp systems
+	call_deferred("_apply_test_map_camera_view", cam_ctrl, target_pos, target_zoom)
 
-	# Also try to set internal target zoom if the controller uses it
-	if "_target_zoom" in cam_ctrl:
-		cam_ctrl._target_zoom = target_zoom
+	print("DebugOverlay: Queued nice starting view for Phase 1 Test Map v6")
 
-	print("CameraController: Set nice starting view for Phase 1 Test Map (pos=", target_pos, ", zoom=", target_zoom, ")")
+func _apply_test_map_camera_view(cam_ctrl: Node, pos: Vector2, zoom: float):
+	if cam_ctrl == null or not is_instance_valid(cam_ctrl):
+		return
+
+	# Prefer the new public API if available (cleaner and respects controller limits)
+	if cam_ctrl.has_method("set_initial_view"):
+		cam_ctrl.call("set_initial_view", pos, zoom, true)
+	else:
+		# Fallback for older versions
+		if cam_ctrl.has("target") and cam_ctrl.target:
+			cam_ctrl.target.position = pos
+			if "scale" in cam_ctrl.target:
+				var clamped_zoom := clampf(zoom, 0.15, 6.0)
+				cam_ctrl.target.scale = Vector2.ONE * clamped_zoom
+
+		if "_target_zoom" in cam_ctrl:
+			cam_ctrl._target_zoom = clampf(zoom, 0.15, 6.0)
+
+	print("CameraController: Applied test map starting view (pos=", pos, ", zoom=", zoom, ")")
 
 
 # =============================================================================
@@ -926,10 +958,13 @@ const PHASE1_PLAN_RES := "res://tools/map_generation/output/phase1_europe/phase1
 const PHASE1_PLAN_FALLBACK := "tools/map_generation/output/phase1_europe/phase1_europe_plan.json"
 
 
+@warning_ignore("return_value_discarded", "unsafe_cast")
 func _load_phase1_plan_dict() -> Dictionary:
-	var plan := _load_json_dict(PHASE1_PLAN_RES)
+	var plan: Dictionary = _load_json_dict(PHASE1_PLAN_RES)
 	if plan.is_empty():
 		plan = _load_json_dict(PHASE1_PLAN_FALLBACK)
+	if not (plan is Dictionary):
+		return {}
 	return plan
 
 

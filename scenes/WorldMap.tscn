@@ -169,13 +169,13 @@ layout_mode = 0
 mouse_filter = 0
 offset_left = 345.0
 offset_top = 8.0
-offset_right = 331.0
+offset_right = 395.0
 offset_bottom = 32.0
 focus_mode = 0
 theme_override_colors/font_color = Color(1, 1, 1, 1)
-theme_override_font_sizes/font_size = 18
+theme_override_font_sizes/font_size = 14
 theme_override_styles/normal = SubResource("StyleBoxFlat_ej7nn")
 theme_override_styles/hover = SubResource("StyleBoxFlat_8rtnk")
-text = "x"
+text = "Close"
 
 [node name="MapCamera" type="Camera2D" parent="." unique_id=813615616]

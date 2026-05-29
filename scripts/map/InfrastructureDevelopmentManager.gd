@@ -385,8 +385,10 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 	project_completed.emit(province_id, new_level, axis, proj)
 
 	# Rich toast / news hook (if NewsFeed or similar exists)
-	if typeof(NewsFeed) != TYPE_NIL:  # soft dependency
-		# NewsFeed.add_entry(...) — implement when news system is ready
+	# Use get_node_or_null to avoid parser errors for non-existent autoloads
+	var news_feed = get_node_or_null("/root/NewsFeed")
+	if news_feed != null:  # soft dependency
+		# news_feed.add_entry(...) — implement when news system is ready
 		pass
 
 	print("InfrastructureDevelopmentManager: COMPLETED %s project on province %d → level %d for %s" % [axis, province_id, new_level, proj.owner_tag])
@@ -536,10 +538,11 @@ func _complete_special_site_project(province_id: int, proj: ProvincialProject) -
 	if province == null:
 		return
 
-	# Prefer the dedicated manager if available
+	# Prefer the dedicated manager if available (use node lookup for robustness)
 	var site: SpecialSite = null
-	if typeof(SpecialSiteManager) != TYPE_NIL and SpecialSiteManager.has_method("create_special_site"):
-		site = SpecialSiteManager.create_special_site(site_id, province_id, proj.owner_tag)
+	var ssm = get_node_or_null("/root/SpecialSiteManager")
+	if ssm and ssm.has_method("create_special_site"):
+		site = ssm.create_special_site(site_id, province_id, proj.owner_tag)
 	else:
 		# Fallback inline creation
 		site = SpecialSite.new()
@@ -565,8 +568,9 @@ func create_special_site(province_id: int, site_id: String, owner: String) -> Sp
 		return null
 
 	var site: SpecialSite = null
-	if typeof(SpecialSiteManager) != TYPE_NIL and SpecialSiteManager.has_method("create_special_site"):
-		site = SpecialSiteManager.create_special_site(site_id, province_id, owner)
+	var ssm = get_node_or_null("/root/SpecialSiteManager")
+	if ssm and ssm.has_method("create_special_site"):
+		site = ssm.create_special_site(site_id, province_id, owner)
 	else:
 		site = SpecialSite.new()
 		site.id = site_id
@@ -651,8 +655,9 @@ func _complete_special_site_upgrade_project(province_id: int, proj: ProvincialPr
 
 	# Create the upgraded site
 	var upgraded_site: SpecialSite = null
-	if typeof(SpecialSiteManager) != TYPE_NIL and SpecialSiteManager.has_method("create_special_site"):
-		upgraded_site = SpecialSiteManager.create_special_site(target_id, province_id, proj.owner_tag)
+	var ssm = get_node_or_null("/root/SpecialSiteManager")
+	if ssm and ssm.has_method("create_special_site"):
+		upgraded_site = ssm.create_special_site(target_id, province_id, proj.owner_tag)
 	else:
 		upgraded_site = SpecialSite.new()
 		upgraded_site.id = target_id

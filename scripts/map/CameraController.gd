@@ -26,9 +26,26 @@ func _ready() -> void:
 		target = self
 	_target_zoom = clampf(target.scale.x, min_zoom, max_zoom)
 	target.scale = Vector2.ONE * _target_zoom
+	add_to_group("camera_controller")
 	set_process(true)
 	set_process_input(true)
 	set_process_unhandled_input(true)
+
+
+## Public helper for debug / test scenario loading to set an initial view cleanly.
+func set_initial_view(target_position: Vector2, target_zoom_level: float, instant: bool = true):
+	if target == null:
+		return
+
+	target.position = target_position
+
+	var clamped := clampf(target_zoom_level, min_zoom, max_zoom)
+	if instant:
+		_target_zoom = clamped
+		target.scale = Vector2.ONE * clamped
+	else:
+		_target_zoom = clamped
+		# Let the normal _process lerp handle the animation
 
 
 func _process(delta: float) -> void:

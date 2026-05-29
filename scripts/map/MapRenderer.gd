@@ -198,10 +198,13 @@ var _btn_station_engineers: Button = null
 
 
 func _ready():
+	add_to_group("map_renderer")
 	if btn_close == null:
 		btn_close = get_node_or_null("UI/InfoPanel/BtnClose") as Button
 
 	if btn_close:
+		btn_close.text = "Close"
+		btn_close.tooltip_text = "Close province inspector"
 		if not btn_close.pressed.is_connected(_on_close_pressed):
 			btn_close.pressed.connect(_on_close_pressed)
 	else:
@@ -607,6 +610,12 @@ func _on_close_pressed() -> void:
 	hide_info_panel()
 
 
+func hide_info_panel() -> void:
+	if info_panel:
+		info_panel.visible = false
+	_clear_selection()
+
+
 func _refresh_province_detail_visibility() -> void:
 	if container == null:
 		return
@@ -805,6 +814,8 @@ func render_provinces():
 		push_error("MapRenderer: container not assigned")
 		return
 
+	var restore_pid := selected_province_id if info_panel != null and info_panel.visible else -1
+
 	_clear_selection()
 	for child in container.get_children():
 		child.queue_free()
@@ -833,6 +844,13 @@ func render_provinces():
 	_refresh_supply_highlights()
 	_update_compare_hint_label()
 	print("✅ Map rendered with real polygons")
+
+	if restore_pid >= 0 and provinces.has(restore_pid):
+		var restored: Province = provinces[restore_pid] as Province
+		var restored_node: Node2D = _province_node(restore_pid)
+		if restored != null and restored_node != null:
+			_select_province(restored, restored_node)
+			show_info_panel(restored)
 
 	# Sync MapPickGrid (via MapManager) after rendering for best picking accuracy
 	if use_spatial_picking and typeof(MapManager) != TYPE_NIL and MapManager.has_method("rebuild_pick_grid"):
@@ -1385,9 +1403,11 @@ func _update_spatial_hover() -> void:
 
 # ====================== INFO PANEL ======================
 
-func show_info_panel(province: Province):
-	if info_panel == null:
+func show_info_panel(province: Province) -> void:
+	if info_panel == null or province == null:
 		return
+
+	info_panel.visible = true
 
 	var name_text := province.name
 	if selected_province_id >= 0 and selected_province_id != province.id:
@@ -1451,15 +1471,9 @@ func show_info_panel(province: Province):
 		special_list.append("%s %s (Lv.%d)" % [_get_feature_icon(fk), fk.capitalize(), level])
 	info_special.text = "Special: " + (", ".join(special_list) if special_list.size() > 0 else "None")
 
-	info_panel.visible = true
 	_update_station_engineers_button(province)
 	_update_infrastructure_investment_ui(province)
 	_update_special_sites_ui(province)
-
-
-func hide_info_panel():
-	if info_panel:
-		info_panel.visible = false
 
 
 func _ensure_station_engineers_button() -> void:

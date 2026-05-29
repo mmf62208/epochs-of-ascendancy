@@ -98,7 +98,9 @@ func _load_mission_definitions() -> void:
 
 func get_agents_for_country(country_tag: String) -> Array[Agent]:
 	var tag := country_tag.strip_edges().to_upper()
-	return agents.get(tag, []) as Array[Agent]
+	if not agents.has(tag):
+		return []
+	return agents[tag] as Array[Agent]
 
 
 func get_agent(agent_id: String) -> Agent:
@@ -114,9 +116,9 @@ func recruit_agent(country_tag: String) -> Agent:
 	var new_agent := AgentGenerator.generate_agent(tag, _current_year)
 
 	if not agents.has(tag):
-		agents[tag] = []
+		agents[tag] = [] as Array[Agent]
 
-	(agents[tag] as Array).append(new_agent)
+	agents[tag].append(new_agent)
 	invalidate_agent_cache(tag)
 	agent_recruited.emit(new_agent.agent_id, tag)
 	print("AgentManager: Recruited %s for %s" % [new_agent.name, tag])

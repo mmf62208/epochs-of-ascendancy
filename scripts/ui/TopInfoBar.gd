@@ -137,11 +137,32 @@ func _on_tick() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
-	# Global debug hotkey — now opens the dedicated Debug Overlay
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F10 or (event.ctrl_pressed and event.shift_pressed and event.keycode == KEY_R):
-			DebugOverlay.toggle()
-			get_viewport().set_input_as_handled()
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	# Global debug hotkey — opens the dedicated Debug Overlay
+	if event.keycode == KEY_F10 or (event.ctrl_pressed and event.shift_pressed and event.keycode == KEY_R):
+		DebugOverlay.toggle()
+		get_viewport().set_input_as_handled()
+		return
+	# Dev convenience keybinds (F5/F6/F9/ESC)
+	if event.keycode == KEY_F5:
+		if typeof(SaveLoadManager) != TYPE_NIL:
+			SaveLoadManager.quicksave()
+			print("F5 QuickSave triggered")
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_F9:
+		if typeof(SaveLoadManager) != TYPE_NIL:
+			SaveLoadManager.quickload()
+			_update_date_time()
+			_update_resources()
+			print("F9 QuickLoad triggered")
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_F6:
+		_show_save_manager_popup()
+		get_viewport().set_input_as_handled()
+	elif event.keycode == KEY_ESCAPE:
+		_on_menu_pressed()
+		get_viewport().set_input_as_handled()
 
 
 func _set_game_speed(speed: int) -> void:
@@ -570,29 +591,6 @@ func _show_save_manager_popup() -> void:
 	get_tree().root.add_child(panel)
 	print("Save Manager popup opened (%d saves)" % saves.size())
 
-
-## Dev convenience keybinds (F5 = quicksave, F9 = quickload).
-## These are intentionally loud in the console so you know the save/load cycle fired.
-func _unhandled_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo:
-		if event.keycode == KEY_F5:
-			if typeof(SaveLoadManager) != TYPE_NIL:
-				SaveLoadManager.quicksave()
-				print("F5 QuickSave triggered")
-			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_F9:
-			if typeof(SaveLoadManager) != TYPE_NIL:
-				SaveLoadManager.quickload()
-				_update_date_time()
-				_update_resources()
-				print("F9 QuickLoad triggered")
-			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_F6:
-			_show_save_manager_popup()
-			get_viewport().set_input_as_handled()
-		elif event.keycode == KEY_ESCAPE:
-			_on_menu_pressed()
-			get_viewport().set_input_as_handled()
 
 ## Helper to populate the Save Manager list inside the main menu with rich metadata.
 func _populate_save_list(parent: VBoxContainer, owning_panel: Panel) -> void:

@@ -33,6 +33,7 @@ func _ready():
 	load_province_geometry()
 	load_province_layers()
 	load_base_provinces()
+	add_to_group("scenario_loader")
 
 func load_province_geometry(data_dir: String = ""):
 	if data_dir.is_empty():

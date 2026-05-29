@@ -38,7 +38,6 @@ var _pending_bilateral_filter: String = ""   # Used for strong handoff from Dipl
 @onready var main_vbox: VBoxContainer = $Margin/MainVBox
 @onready var title_label: Label = $Margin/MainVBox/TitleLabel
 @onready var mode_hbox: HBoxContainer = $Margin/MainVBox/ModeHBox
-@onready var mode_hbox: HBoxContainer = $Margin/MainVBox/ModeHBox
 var public_button: Button
 var black_button: Button
 var my_offers_button: Button
@@ -55,35 +54,33 @@ func _ready() -> void:
 	elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_player_country_tag_fallback"):
 		_player_country = MapManager.get_player_country_tag_fallback()
 
-	# Styling
-	RetrowaveTheme.style_popup_root(self)
-	RetrowaveTheme.style_title(title_label)
-	RetrowaveTheme.style_secondary_button(public_button)
-	RetrowaveTheme.style_secondary_button(black_button)
-	RetrowaveTheme.style_primary_button(refresh_button)
-	RetrowaveTheme.style_secondary_button(close_button)
-
-	# Title
-	title_label.text = "Trade Market"
-
 	# Mode buttons (created dynamically for flexibility)
 	public_button = Button.new()
 	public_button.text = "Public Market"
 	public_button.pressed.connect(_on_public_pressed)
-	RetrowaveTheme.style_secondary_button(public_button)
 	mode_hbox.add_child(public_button)
 
 	black_button = Button.new()
 	black_button.text = "Black Market"
 	black_button.pressed.connect(_on_black_pressed)
-	RetrowaveTheme.style_secondary_button(black_button)
 	mode_hbox.add_child(black_button)
 
 	my_offers_button = Button.new()
 	my_offers_button.text = "My Offers"
 	my_offers_button.pressed.connect(_on_my_offers_pressed)
-	RetrowaveTheme.style_secondary_button(my_offers_button)
 	mode_hbox.add_child(my_offers_button)
+
+	# Styling (after buttons exist)
+	RetrowaveTheme.style_popup_root(self)
+	RetrowaveTheme.style_title(title_label)
+	RetrowaveTheme.style_secondary_button(public_button)
+	RetrowaveTheme.style_secondary_button(black_button)
+	RetrowaveTheme.style_secondary_button(my_offers_button)
+	RetrowaveTheme.style_primary_button(refresh_button)
+	RetrowaveTheme.style_secondary_button(close_button)
+
+	# Title
+	title_label.text = "Trade Market"
 
 	# Bottom buttons
 	refresh_button.text = "Refresh"
