@@ -104,9 +104,12 @@ func _style_static_controls() -> void:
 
 
 func _play_open_fade() -> void:
-	modulate.a = 0.0
-	var tw := create_tween()
-	tw.tween_property(self, "modulate:a", 1.0, FADE_IN_SEC)
+	visible = true
+	var content := get_node_or_null("Background") as Control
+	if content:
+		content.modulate.a = 0.0
+		var tw := create_tween()
+		tw.tween_property(content, "modulate:a", 1.0, FADE_IN_SEC)
 
 
 func _build_menu_options() -> void:
@@ -175,7 +178,7 @@ func _make_menu_button(text: String, option: String, style: String) -> Button:
 
 
 func _on_menu_button_pressed(option: String) -> void:
-	var top_bar := get_tree().root.get_node_or_null("TopInfoBar")
+	var top_bar := TopInfoBar.find_in_tree(get_tree())
 	if top_bar != null and top_bar.has_signal("menu_option_selected"):
 		top_bar.menu_option_selected.emit(option)
 	_handle_menu_option(option)
@@ -353,7 +356,7 @@ func _format_timestamp(raw: String) -> String:
 		var time_part := s.split("T", false, 1)[1] if s.split("T").size() > 1 else ""
 		var date_readable := GameDateDisplay.format_iso_date_readable(date_part) if date_part.contains("-") else date_part
 		var clock := time_part.substr(0, 5) if time_part.length() >= 5 else ""
-		return "%s %s" % [date_readable, clock].strip_edges()
+		return ("%s %s" % [date_readable, clock]).strip_edges()
 	if s.contains("-"):
 		return GameDateDisplay.format_iso_date_readable(s.substr(0, 10))
 	return s.substr(0, 16)
@@ -383,8 +386,7 @@ func _handle_menu_option(option: String) -> void:
 			_set_status("Settings panel coming soon — use in-game options for now.")
 			_toast("Settings will open here in a future update.", 2.5)
 		"return_to_main":
-			_set_status("Return to title screen — not implemented yet.")
-			_toast("Title screen return is not wired yet.", 2.5)
+			_return_to_scenario_start()
 		"exit":
 			_closing = true
 			_pause_game(false)
@@ -414,16 +416,23 @@ func _do_quicksave() -> void:
 
 
 func _open_trade_market() -> void:
+	var existing := get_tree().root.get_node_or_null("TradeMarketView")
+	if existing != null:
+		existing.queue_free()
+		_toast("Trade market closed.", 1.5)
+		return
+
 	var packed := load("res://scenes/ui/TradeMarketView.tscn")
 	if packed == null:
 		_toast("Trade Market is not available yet.", 2.5, true)
 		return
 
 	var view = packed.instantiate()
+	view.name = "TradeMarketView"
 	get_tree().root.add_child(view)
 	if view.has_method("show_market"):
 		view.show_market("PUBLIC")
-	else:
+	elif view.has_method("popup_centered"):
 		view.popup_centered(Vector2i(1100, 700))
 
 	# Close this menu cleanly so pause state is restored
@@ -457,7 +466,7 @@ func _on_load_slot_pressed(slot: String) -> void:
 
 
 func _sync_hud_after_load() -> void:
-	var top_bar := get_tree().root.get_node_or_null("TopInfoBar")
+	var top_bar := TopInfoBar.find_in_tree(get_tree())
 	if top_bar != null:
 		if top_bar.has_method("_update_date_time"):
 			top_bar._update_date_time()
@@ -617,12 +626,24 @@ func _on_close_requested() -> void:
 
 
 func _close_with_fade() -> void:
-	var tw := create_tween()
-	tw.tween_property(self, "modulate:a", 0.0, FADE_OUT_SEC)
-	await tw.finished
+	var content := get_node_or_null("Background") as Control
+	if content:
+		var tw := create_tween()
+		tw.tween_property(content, "modulate:a", 0.0, FADE_OUT_SEC)
+		await tw.finished
 	_pause_game(false)
 	menu_closed.emit()
 	queue_free()
+
+
+func _return_to_scenario_start() -> void:
+	if _closing:
+		return
+	_closing = true
+	_set_status("Restarting playtest scenario…")
+	_toast("Reloading TestScenario…", 2.0)
+	await _close_with_fade()
+	get_tree().change_scene_to_file("res://scenes/TestScenario.tscn")
 
 
 func _pause_game(pause: bool) -> void:
@@ -653,21 +674,17 @@ func _pause_game(pause: bool) -> void:
 
 
 func _get_resume_speed() -> int:
-	var top_bar := get_tree().root.get_node_or_null("TopInfoBar")
-	if top_bar != null and "current_speed" in top_bar:
+	var top_bar := TopInfoBar.find_in_tree(get_tree())
+	if top_bar != null:
 		return maxi(1, int(top_bar.current_speed))
 	return maxi(1, _previous_speed)
 
 
 func _sync_top_bar_after_menu_close(was_paused: bool, speed: int) -> void:
-	var top_bar := get_tree().root.get_node_or_null("TopInfoBar")
+	var top_bar := TopInfoBar.find_in_tree(get_tree())
 	if top_bar == null:
 		return
-	if "is_paused" in top_bar:
-		top_bar.is_paused = was_paused
-	if "current_speed" in top_bar:
-		top_bar.current_speed = speed
-	if top_bar.has_method("_sync_time_manager_controls"):
-		top_bar._sync_time_manager_controls()
-	if top_bar.has_method("_update_speed_buttons"):
-		top_bar._update_speed_buttons()
+	top_bar.is_paused = was_paused
+	top_bar.current_speed = speed
+	top_bar._sync_time_manager_controls()
+	top_bar._update_speed_buttons()

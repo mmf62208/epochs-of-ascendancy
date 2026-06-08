@@ -1,77 +1,102 @@
-# Current State of Epochs of Ascendancy (May 28, 2026)
+# Current State of Epochs of Ascendancy
 
-## Overview
+**Last updated:** June 6, 2026  
+**Playtest entry:** `scenes/TestScenario.tscn` (F5) → `phase1_europe_test` via `TestRunner.gd`  
+**Doc index:** [README.md](README.md)
 
-The game has made significant progress on its core simulation loop and map systems. The central `TimeManager` now drives daily, monthly, and yearly ticks, with several systems reacting to it. Agent networks apply real daily pressure on provinces, and the first Technology tree (Support/Radio) produces measurable gameplay effects.
+---
 
-## Map Generation Pipeline (May 28, 2026)
+## Executive summary
 
-**Status:** Active vertical slice — test scenario playable in Godot
+Strong **map/visual foundation** and **deep simulation backend**. Phase 1 Europe (~180 provinces), grand theater underlay, dynamic borders, F10 debug tools, scrollable province inspector, and a resizable debug overlay are playable. Core autoloads (Time, Supply, Production, Leaders, Agents, Technology, Special Sites) are largely implemented. Main gaps for a 50+ turn playtest: **main-loop combat**, **active infra investment completion**, and **save/load for long sessions**.
 
-Major progress on the Phase 1 Europe pipeline (`tools/map_generation/`):
+---
 
-- **Tooling:** `lib/naval_analysis.py` (coastal/chokepoint/bridge detection) and `lib/subdivision_utils.py` (PCA-based splitting with coastal edge preservation during cuts).
-- **Merge:** `scripts/apply_phase1_merge.py` rebuilds adjacency, protects chokepoints during rewiring, and distributes resources, development, special features, and cities across child provinces.
-- **Output:** Layered JSON under `output/phase1_europe/` plus merged bundles (`merged_test_map/`, `merged_improved_v2/`, `merged_v3_closest_wiring/`).
-- **Godot test map:** Persistent **Phase 1 Europe Test** scenario (~180 provinces) via `data/provinces_phase1_test/` + `data/scenarios/phase1_europe_test.json`; load from Debug Overlay with camera framing and diagnostics.
-- **Design:** Full pipeline spec in [MAP_GENERATION_PIPELINE_DESIGN.md](MAP_GENERATION_PIPELINE_DESIGN.md); Hidden Hand faction design captured in [HIDDEN_HAND_DESIGN.md](HIDDEN_HAND_DESIGN.md).
+## Map & visuals — **Strong**
 
-**Next:** Refine splitter coastal edges on cut lines; produce production-grade layered exports; scale toward the 350–450 province Europe target.
+| Area | Status |
+|------|--------|
+| Grand theater underlay | ✅ `europe_grand_theater_ultra_high.jpg`; legacy maps suppressed |
+| Terrain toggle | ✅ Political vs detailed raster |
+| Map visual editor | ✅ Debug placement, list/delete, JSON export/load |
+| Dynamic borders | ✅ `BorderLayer`; refreshes on owner change |
+| F10 tools | ✅ Border demo, test combat, owner cycle, collapsible sections |
+| Debug overlay UX | ✅ Full-width layout, vertical scroll, drag + resize (⤡) |
+| Province inspector | ✅ Scrollable `InfoPanel` on province click |
+| Phase 1 scenario | ✅ `data/provinces_phase1_test/` |
+| Production art | ⚠️ Placeholder JPG — replace for QC |
 
-## Key Systems Status
+---
 
-### Time System
+## UI shell — **Good (June 6)**
 
-- **Status:** Strong
-- `TimeManager` is the central clock.
-- Daily, monthly, and yearly signals exist and are being used.
-- Real-time advancement + pause/speed control works via `TopInfoBar`.
+| Area | Status |
+|------|--------|
+| TopInfoBar | ✅ Pause/speed, nav buttons, trade/diplomacy toggle |
+| MainMenu | ✅ Save manager, fade, help dialog, scenario restart |
+| LeaderEventUI | ✅ Toasts; headless-safe replacement popups |
+| DebugOverlay | ✅ Resizable panel, readable section layout |
 
-### Map & Overlays
+---
 
-- **Status:** Good / Improving
-- Active overlay layers: `ConflictOverlayLayer` + `AgentNetworkLayer`.
-- Multi-overlay visuals (contested + agent + supply) are functional.
-- Daily agent pressure (supply disruption + infrastructure sabotage) is visible on the map: province tints, ⛟/⚙ glyphs, ambient ring pulse, infra/depot status bars under rings, repair/depot lines in tooltips and inspector.
+## Core systems
 
-### Technology
+| System | Status |
+|--------|--------|
+| Time | ✅ Daily/monthly/yearly ticks; TopInfoBar wired |
+| Supply + overlays | ✅ L key; agent pressure, repair breakdown |
+| Production | ✅ Lines, refinement, stockpile; screen backends tested |
+| Leaders | ✅ 1918/1936/2026 rosters, training, replacements |
+| Agents | ✅ Daily sabotage/disruption; network foundation |
+| Technology | ⚠️ Support/Radio functional; expand trees |
+| Infrastructure | ⚠️ Passive repair/sabotage strong; **Invest** UI started, loop incomplete |
+| Combat | ⚠️ Province assault loop wired (`BattleManager`); AI/multi-day campaigns still pending |
+| Special sites | ✅ Manager + tier IDs; build from InfoPanel |
+| Weather | ⚠️ Overlay stub on grand theater |
+| Save/load | ⚠️ Broad persistence exists; long-session gaps remain |
 
-- **Status:** Partial but promising
-- `TechnologyManager` is mature.
-- Support/Radio tree is a functional vertical slice with real impact in Supply.
-- Map integration via `MapTechnologyContext` (tooltips, legend, mode chips, inspector).
+---
 
-### Agent Networks
+## Testing (headless)
 
-- **Status:** Good
-- Update daily via `AgentManager.advance_networks_daily()`.
-- Apply real province-level effects (national debuff, depot hits, infra chips).
-- Visual and tooltip feedback improving.
+```bash
+godot --headless --path . res://scenes/TestScenario.tscn --quit-after 15
+```
 
-### Repair / Counter-Play + Infrastructure Foundation
+Production line suite passes (design, stockpile, combat width, phased combat, formations). Full leader roster reload is **skipped by default** (OOM risk); set `EOA_RUN_FULL_LEADER_TESTS=1` for the heavy block.
 
-- **Status:** Strong passive simulation + daily duel (excellent foundation)
-- Automatic slow infrastructure repair with full breakdown (`MapManager.get_infrastructure_repair_breakdown`): base + infra pride + stability + tech_focus + real engineer brigades from CombatPresenceRegistry.
-- Agent sabotage creates visible "duel" (depot sabotage_level + infra_sabotage focus networks). Counter-intel clears effects.
-- `ProvinceEffects` aggregator (base dev/infra + NationalSpiritManager + NationalModifierManager) is the canonical source for Supply, Combat, movement, and UI.
-- Rich getters on `Province` (throughput, combat width, org recovery, interdiction resistance, etc.) and `MapManager` effective-value helpers.
-- Build eligibility gates (`province_build_gates.json`) already respect development by era/domain/factory_type and drive production picker + tooltips.
-- **Active development still missing**: No player/AI "Invest" action to raise levels. "Invest here" language exists in UI strings but has no backend. See new design: `docs/DESIGN_InfrastructureDevelopmentSystem.md`.
+Details: [TESTING_PLAN.md](TESTING_PLAN.md)
 
-## Major Gaps
+---
 
-- **Province Infrastructure & Development (active player investment)** — now the highest-priority gap. Full design document created May 28. Passive effects + repair are mature; the construction/project loop is not.
-- Save/Load is partial (provinces dev/infra + many managers are covered, but not yet active infra projects or full roundtrips for 500+ turn sessions).
-- Map build eligibility is gated in data but has no live "raise dev to unlock" lever yet.
-- Many systems still need deeper daily/monthly tick wiring.
-- Testing infrastructure is weak (see [TESTING_PLAN.md](TESTING_PLAN.md)).
-- Top bar / menu needs modernization.
+## Top priorities
 
-## Related Docs
+1. Main-loop combat — **province assault wired** (Ctrl+click, Attack button, capture + borders); AI battle initiation still pending
+2. Finish infrastructure investment loop + persist active projects
+3. Save/load hardening for multi-hour sessions
+4. Replace placeholder map master art when ready
 
-- [TESTING_PLAN.md](TESTING_PLAN.md) — manual and regression checklist
-- [MAP_IMPLEMENTATION_PLAN.md](MAP_IMPLEMENTATION_PLAN.md) — province/map roadmap (Phase 1 complete)
-- [MAP_GENERATION_PIPELINE_DESIGN.md](MAP_GENERATION_PIPELINE_DESIGN.md) — procedural Europe expansion pipeline (Phase 1)
-- [HIDDEN_HAND_DESIGN.md](HIDDEN_HAND_DESIGN.md) — secret faction / three power centers design (May 28)
-- [DESIGN_InfrastructureDevelopmentSystem.md](DESIGN_InfrastructureDevelopmentSystem.md) — **new (May 28)**: full active construction + development investment design, data model, integration points, code skeleton, phased plan
-- [TECHNOLOGY_SYSTEM_DESIGN.md](TECHNOLOGY_SYSTEM_DESIGN.md) — tech system design
+Backlog: [TODO.md](../TODO.md)
+
+---
+
+## Quick playtest
+
+1. **F5** on `TestScenario.tscn`
+2. Click provinces → scrollable inspector; **Close** or Esc
+3. **F10** → debug tools; drag title bar; resize with **⤡** corner
+4. **Menu** → save/load; **Return to Title** reloads scenario
+5. **L / R / T / C / Y** — map overlays
+6. **Combat:** click friendly province with a division → **Ctrl+click** adjacent enemy (or **Attack** in InfoPanel). Try GER on province 1 vs FRA neighbors after setting TopInfoBar country to **GER**.
+
+---
+
+## Related docs
+
+| Doc | Purpose |
+|-----|---------|
+| [README.md](README.md) | Documentation index |
+| [TESTING_PLAN.md](TESTING_PLAN.md) | Regression checklist |
+| [TEST_MAP_GRAND_THEATER_FOUNDATION.md](TEST_MAP_GRAND_THEATER_FOUNDATION.md) | Map QC |
+| [SESSION_NOTES/2026-06-05.md](SESSION_NOTES/2026-06-05.md) | Recent review |
+| [../README.md](../README.md) | Project vision + install |

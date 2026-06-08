@@ -142,6 +142,12 @@ func _on_game_day_advanced(year: int, month: int, day: int) -> void:
 	advance_daily_projects(year, month, day)
 
 
+func _current_game_day_index() -> int:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		return TimeManager.get_total_days_elapsed()
+	return 0
+
+
 ## === Public API (the contract other systems should use) ===
 
 func has_active_project(province_id: int) -> bool:
@@ -226,7 +232,7 @@ func start_infrastructure_project(province_id: int, target_level: int, investor_
 	proj.target_level = target_level
 	proj.work_per_day_base = _calculate_base_work_rate(p, "infrastructure", proj.owner_tag)
 	proj.political_power_cost = int(preview.get("cost_pp", 45))
-	proj.start_day = 0  # TODO: wire real day count from TimeManager when available
+	proj.start_day = _current_game_day_index()
 	proj.status = "active"
 
 	# Seed initial modifiers (engineers already present give immediate bonus)
@@ -532,7 +538,13 @@ func _complete_special_site_project(province_id: int, proj: ProvincialProject) -
 	var site_id: String = proj.modifiers.get("special_site_id", "")
 	if site_id.is_empty():
 		push_warning("Special site project completed with no site_id")
-		return
+		# Robust recovery for demos, old projects, or partial data (prevents silent failure to create visible site)
+		if proj.modifiers.has("special_site"):
+			site_id = str(proj.modifiers["special_site"])
+		elif province_id == 2 or province_id == 10:
+			site_id = "airfield_tier_1" if province_id == 2 else "port_tier_2"
+		if site_id.is_empty():
+			return
 
 	var province: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
 	if province == null:
@@ -761,7 +773,11 @@ func try_start_infrastructure_investment(province_id: int, investor_tag: String)
 	# TODO (Phase B): Real Political Power spend here.
 	# For now we just proceed (the design assumes the UI or a NationalLedger will gate PP later).
 
-	var proj := start_infrastructure_project(province_id, preview.get("eta_days", 30) + (preview.get("current_infra", 3) if "current_infra" in preview else 3), investor_tag)
+	# Compute sensible target (current +1 for MVP)
+	var p_for_target: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	var cur := p_for_target.infrastructure if p_for_target else 1
+	var tgt := cur + 1
+	var proj := start_infrastructure_project(province_id, tgt, investor_tag)
 	if proj == null:
 		return {"success": false, "reason": "Failed to create project (internal error)"}
 

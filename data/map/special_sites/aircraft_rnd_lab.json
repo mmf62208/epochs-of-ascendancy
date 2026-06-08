@@ -1,0 +1,16 @@
+{
+  "id": "aircraft_rnd_lab",
+  "name": "Aircraft R&D Laboratory",
+  "category": "research",
+  "description": "Accelerates aircraft prototyping and reliability iteration. Assign agents here for major bonuses.",
+  "base_effect": {
+    "prototyping_speed": 1.8,
+    "reliability_research": 0.25
+  },
+  "levels": {
+    "1": {"prototyping_speed": 1.8, "maintenance_reduction": 0.05},
+    "2": {"prototyping_speed": 2.4, "maintenance_reduction": 0.12}
+  },
+  "requires_tech": "air_equipment_advanced",
+  "visual": "research_facility"
+}

@@ -665,13 +665,50 @@ func get_engineer_capable_formations(country_tag: String) -> Array[Dictionary]:
 
 
 func get_formations_stationed_at_province(province_id: int, country_tag: String = "") -> Array[Dictionary]:
+	return get_land_divisions_at_province(province_id, country_tag, true)
+
+
+func get_land_divisions_at_province(
+	province_id: int,
+	country_tag: String = "",
+	engineers_only: bool = false,
+) -> Array[Dictionary]:
 	var tag := country_tag.strip_edges().to_upper()
 	if tag.is_empty():
 		tag = player_tag
 	var out: Array[Dictionary] = []
-	for entry in get_engineer_capable_formations(tag):
-		if int(entry.get("stationed_province_id", -1)) == province_id:
-			out.append(entry)
+	if tag.is_empty():
+		return out
+	ensure_division_formations_for_country(tag)
+	division_templates.load_all()
+	for fid_var in division_deployments.keys():
+		var fid := str(fid_var)
+		var dep: Dictionary = division_deployments[fid] as Dictionary
+		if int(dep.get("province_id", -1)) != province_id:
+			continue
+		var dep_tag := str(dep.get("country_tag", tag)).strip_edges().to_upper()
+		if dep_tag != tag:
+			continue
+		var template: DivisionTemplate = division_templates.get_division(fid)
+		if template == null:
+			continue
+		if engineers_only and template.count_engineer_brigade_equivalent() < 0.05:
+			continue
+		var formation: Formation = null
+		if typeof(LeaderManager) != TYPE_NIL:
+			formation = LeaderManager.get_formation(fid)
+		var display := fid
+		if formation != null and not formation.name.is_empty():
+			display = formation.name
+		elif not template.display_name.is_empty():
+			display = template.display_name
+		out.append({
+			"formation_id": fid,
+			"display_name": display,
+			"country_tag": tag,
+			"stationed_province_id": province_id,
+			"engineer_brigades": template.count_engineer_brigade_equivalent(),
+		})
 	return out
 
 

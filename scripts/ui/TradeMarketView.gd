@@ -145,9 +145,9 @@ func _refresh_current_mode() -> void:
 	var offers: Array = []
 	if typeof(TradeManager) != TYPE_NIL:
 		offers = TradeManager.get_market_offers_display_data(
-			country_tag = "",
-			visibility_filter = visibility_filter,
-			for_country_for_fairness = _player_country
+			"",
+			visibility_filter,
+			_player_country
 		)
 
 	# Client-side filter for "My Offers" — expanded nice-to-have:
@@ -156,10 +156,10 @@ func _refresh_current_mode() -> void:
 	if _current_mode == "MY_OFFERS":
 		var filtered := []
 		for o in offers:
-			var from_me := o.get("from_tag") == _player_country
-			var to_me := o.get("to_tag") == _player_country
+			var from_me = o.get("from_tag") == _player_country
+			var to_me = o.get("to_tag") == _player_country
 			if from_me or to_me:
-				var enriched := o.duplicate(true)
+				var enriched = o.duplicate(true)
 				if from_me and to_me:
 					enriched["_my_role"] = "SENT/REC"
 				elif from_me:
@@ -194,7 +194,7 @@ func _clear_list() -> void:
 		child.queue_free()
 
 func _add_offer_row(offer_data: Dictionary) -> void:
-	var is_black := offer_data.get("visibility") == "BLACK"
+	var is_black = offer_data.get("visibility") == "BLACK"
 
 	var row_panel := PanelContainer.new()
 	row_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -297,7 +297,7 @@ func _add_offer_row(offer_data: Dictionary) -> void:
 	center_vbox.add_child(metrics_hbox)
 
 	var fairness_label := Label.new()
-	var fairness := offer_data.get("fairness", {})
+	var fairness = offer_data.get("fairness", {})
 	if not fairness.is_empty():
 		var score := float(fairness.get("score", 1.0))
 		fairness_label.text = "Fairness: %.2f" % score
@@ -312,7 +312,7 @@ func _add_offer_row(offer_data: Dictionary) -> void:
 
 	if is_black:
 		var risk_label := Label.new()
-		var risk_cat := offer_data.get("risk_category", "medium")
+		var risk_cat = offer_data.get("risk_category", "medium")
 		risk_label.text = "Risk: " + risk_cat.to_upper()
 		if risk_cat == "extreme":
 			risk_label.add_theme_color_override("font_color", Color(1.0, 0.25, 0.35))
@@ -360,8 +360,8 @@ func _add_offer_row(offer_data: Dictionary) -> void:
 func _summarize_items(items: Array) -> String:
 	if items.is_empty():
 		return "Nothing"
-	var first := items[0]
-	var name := first.get("display_short", first.get("id", "?"))
+	var first = items[0]
+	var name = first.get("display_short", first.get("id", "?"))
 	if items.size() > 1:
 		return name + " +%d" % (items.size() - 1)
 	return name

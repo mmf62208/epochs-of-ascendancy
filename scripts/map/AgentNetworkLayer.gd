@@ -281,7 +281,7 @@ func _draw_pressure_glyph(
 		draw_colored_polygon(diamond, c)
 	elif focus == "infrastructure_sabotage":
 		var c := Color(ring_color_infra_sabotage.r, ring_color_infra_sabotage.g, ring_color_infra_sabotage.b, alpha)
-		var sz := 9.0 if today_hit else 8.0
+		var sz: float = 9.0 if today_hit else 8.0
 		draw_rect(Rect2(pos - Vector2(sz * 0.5, sz * 0.5), Vector2(sz, sz)), c, true)
 	if today_hit:
 		var flash := Color(1.0, 0.9, 0.75, 0.35 + 0.25 * wave)

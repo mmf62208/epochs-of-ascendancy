@@ -60,6 +60,20 @@ static func _presence_for_province(
 		var scale := float(rules.get_block("intel").get("air_threat_from_superiority_ratio", 10.0))
 		presence["enemy_air_superiority"] = clampf(ratio * scale, 0.0, scale)
 
+		# Deeper wiring to AircraftDesignSystem: immature designs or poor range configs reduce effective air superiority
+		# (prototypes have lower reliability/range impact). Human can improve via iteration/agents.
+		var tree := Engine.get_main_loop() as SceneTree
+		if tree:
+			var debug = tree.get_first_node_in_group("debug_overlay")
+			if debug and debug.has_method("_get_or_create_aircraft_design_system"):
+				var ads = debug.call("_get_or_create_aircraft_design_system")
+				if ads and ads.has_method("get_demo_air_modifier"):
+					var mod: float = ads.get_demo_air_modifier("demo_p51_prototype")
+					if mod < 1.0:
+						presence["enemy_air_superiority"] *= mod  # immature enemy air less threatening
+					elif mod > 1.0:
+						presence["enemy_air_superiority"] *= min(mod, 1.3)
+
 	for tag in report.land_by_tag:
 		if str(tag) != friendly_tag:
 			presence["enemy_brigade_equiv"] = float(presence["enemy_brigade_equiv"]) + report.total_land(tag)

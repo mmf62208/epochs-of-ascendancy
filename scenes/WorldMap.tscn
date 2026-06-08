@@ -34,19 +34,19 @@ bg_color = Color(1, 0.36862746, 0.36862746, 1)
 script = ExtResource("1_ej7nn")
 container = NodePath("ProvinceContainers")
 info_panel = NodePath("UI/InfoPanel")
-info_name = NodePath("UI/InfoPanel/InfoContent/LabelName")
-info_owner = NodePath("UI/InfoPanel/InfoContent/LabelOwner")
-info_population = NodePath("UI/InfoPanel/InfoContent/LabelPopulation")
-info_terrain = NodePath("UI/InfoPanel/InfoContent/LabelTerrain")
-info_factories = NodePath("UI/InfoPanel/InfoContent/LabelFactories")
-info_dev = NodePath("UI/InfoPanel/InfoContent/LabelDev")
-info_resources = NodePath("UI/InfoPanel/InfoContent/LabelResources")
-info_core = NodePath("UI/InfoPanel/InfoContent/LabelCore")
-info_special = NodePath("UI/InfoPanel/InfoContent/LabelSpecial")
-info_logistics = NodePath("UI/InfoPanel/InfoContent/LabelLogistics")
-info_combat = NodePath("UI/InfoPanel/InfoContent/LabelCombat")
-info_modifiers = NodePath("UI/InfoPanel/InfoContent/RichTextModifiers")
-info_national = NodePath("UI/InfoPanel/InfoContent/LabelNationalHeader")
+info_name = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelName")
+info_owner = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelOwner")
+info_population = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelPopulation")
+info_terrain = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelTerrain")
+info_factories = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelFactories")
+info_dev = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelDev")
+info_resources = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelResources")
+info_core = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelCore")
+info_special = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelSpecial")
+info_logistics = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelLogistics")
+info_combat = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelCombat")
+info_modifiers = NodePath("UI/InfoPanel/InfoScroll/InfoContent/RichTextModifiers")
+info_national = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelNationalHeader")
 btn_national_spirits = NodePath("UI/InfoPanel/BtnNationalSpirits")
 btn_close = NodePath("UI/InfoPanel/BtnClose")
 
@@ -59,7 +59,8 @@ target = NodePath("../ProvinceContainers")
 [node name="ProvinceContainers" type="Node2D" parent="." unique_id=725074633]
 
 [node name="WorldBackground" type="Sprite2D" parent="." unique_id=1846700332]
-texture = ExtResource("2_qgb45")
+visible = true
+centered = false
 
 [node name="UI" type="CanvasLayer" parent="." unique_id=900020001]
 layer = 20
@@ -74,74 +75,80 @@ mouse_filter = 0
 theme = SubResource("Theme_ej7nn")
 theme_override_styles/panel = SubResource("StyleBoxFlat_fgl0d")
 
-[node name="InfoContent" type="VBoxContainer" parent="UI/InfoPanel" unique_id=953045890]
+[node name="InfoScroll" type="ScrollContainer" parent="UI/InfoPanel"]
 layout_mode = 0
-offset_left = 16.0
-offset_top = 34.0
-offset_right = 396.0
-offset_bottom = 620.0
-pivot_offset = Vector2(-16, -32)
+offset_left = 12.0
+offset_top = 36.0
+offset_right = 408.0
+offset_bottom = 628.0
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 2
+
+[node name="InfoContent" type="VBoxContainer" parent="UI/InfoPanel/InfoScroll" unique_id=953045890]
+layout_mode = 2
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(360, 0)
 theme_override_constants/separation = 8
 
-[node name="LabelName" type="Label" parent="UI/InfoPanel/InfoContent" unique_id=626102969]
+[node name="LabelName" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=626102969]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 autowrap_mode = 3
 
-[node name="LabelOwner" type="Label" parent="UI/InfoPanel/InfoContent" unique_id=1232100560]
+[node name="LabelOwner" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=1232100560]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelPopulation" type="Label" parent="UI/InfoPanel/InfoContent" unique_id=1757176493]
+[node name="LabelPopulation" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=1757176493]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelTerrain" type="Label" parent="UI/InfoPanel/InfoContent" unique_id=605035102]
+[node name="LabelTerrain" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=605035102]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelFactories" type="Label" parent="UI/InfoPanel/InfoContent" unique_id=1607590146]
+[node name="LabelFactories" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=1607590146]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelDev" type="Label" parent="UI/InfoPanel/InfoContent" unique_id=164803705]
+[node name="LabelDev" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=164803705]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelResources" type="Label" parent="UI/InfoPanel/InfoContent" unique_id=639170995]
+[node name="LabelResources" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=639170995]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelCore" type="Label" parent="UI/InfoPanel/InfoContent" unique_id=1127494955]
+[node name="LabelCore" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=1127494955]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelSpecial" type="Label" parent="UI/InfoPanel/InfoContent" unique_id=1151884655]
+[node name="LabelSpecial" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=1151884655]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelLogistics" type="Label" parent="UI/InfoPanel/InfoContent"]
-custom_minimum_size = Vector2(300, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-autowrap_mode = 3
-
-[node name="LabelCombat" type="Label" parent="UI/InfoPanel/InfoContent"]
+[node name="LabelLogistics" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent"]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 3
 
-[node name="LabelNationalHeader" type="Label" parent="UI/InfoPanel/InfoContent"]
+[node name="LabelCombat" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent"]
+custom_minimum_size = Vector2(300, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 3
+
+[node name="LabelNationalHeader" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent"]
 custom_minimum_size = Vector2(300, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.431373, 0.705882, 1, 1)
@@ -149,7 +156,7 @@ theme_override_font_sizes/font_size = 14
 text = "Modifiers (base → effective)"
 autowrap_mode = 3
 
-[node name="RichTextModifiers" type="RichTextLabel" parent="UI/InfoPanel/InfoContent"]
+[node name="RichTextModifiers" type="RichTextLabel" parent="UI/InfoPanel/InfoScroll/InfoContent"]
 custom_minimum_size = Vector2(360, 140)
 layout_mode = 2
 bbcode_enabled = true

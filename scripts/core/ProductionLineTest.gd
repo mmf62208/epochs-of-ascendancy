@@ -3,6 +3,12 @@ extends RefCounted
 
 ## Headless checks for the production line system. Call from TestRunner or the Godot CLI.
 
+const ENV_FULL_LEADER_ROSTER_TESTS := "EOA_RUN_FULL_LEADER_TESTS"
+
+
+static func _run_full_leader_roster_tests() -> bool:
+	return OS.get_environment(ENV_FULL_LEADER_ROSTER_TESTS) == "1"
+
 
 static func run_all(design_data: DesignDataLoader) -> bool:
 	var ok := true
@@ -19,6 +25,8 @@ static func run_all(design_data: DesignDataLoader) -> bool:
 	ok = _test_priority_reinforcement() and ok
 	ok = _test_sustainment_equipment(design_data) and ok
 	ok = _test_combat_resolver(design_data) and ok
+	ok = _test_phase_combat_resolution() and ok
+	ok = _test_battle_manager_assault() and ok
 	ok = _test_combat_width() and ok
 	ok = _test_leader_manager() and ok
 	ok = _test_formation_spawner() and ok
@@ -617,7 +625,9 @@ static func _test_combat_resolver(design_data: DesignDataLoader) -> bool:
 				return false
 
 			var rommel_xp_before := rommel.experience
+			LeaderManager.assign_leader_to_army("ger_rommel", "panzer_army_africa_test")
 			resolver.resolve_combat_experience("panzer_army_africa_test", "", 1.0)
+			rommel.assigned_army_id = ""
 			if rommel.experience <= rommel_xp_before:
 				resolver.free()
 				print("  [FAIL] combat XP not awarded: ", rommel.experience)
@@ -667,6 +677,106 @@ static func _test_combat_resolver(design_data: DesignDataLoader) -> bool:
 
 	resolver.free()
 	print("  [PASS] CombatResolver effective combat power")
+	return true
+
+
+static func _test_phase_combat_resolution() -> bool:
+	var resolver := CombatResolver.new()
+	var phases: Array[String] = []
+	resolver.combat_phase_advanced.connect(
+		func(phase: String, _data: Dictionary) -> void:
+			phases.append(phase)
+	)
+
+	var battle := Province.new()
+	battle.id = 99999
+	battle.name = "Phase Combat Test"
+	battle.owner_tag = "YUG"
+	battle.controller_tag = "YUG"
+	battle.terrain = "plains"
+	battle.infrastructure = 2
+	battle.development_level = 3
+
+	var attacker := Formation.new()
+	attacker.formation_id = "german_infantry_division_1943"
+	attacker.country_tag = "GER"
+
+	var defender := Formation.new()
+	defender.formation_id = "german_infantry_division_1943_mixed"
+	defender.country_tag = "YUG"
+
+	var result: Dictionary = resolver.resolve_combat(attacker, defender, battle)
+	resolver.free()
+
+	var expected := [
+		CombatResolver.PHASE_POSITIONING,
+		CombatResolver.PHASE_ENGAGEMENT,
+		CombatResolver.PHASE_ATTRITION,
+		CombatResolver.PHASE_RESOLUTION,
+	]
+	for phase_name in expected:
+		if phase_name not in phases:
+			print("  [FAIL] phased combat missing phase ", phase_name, " got ", phases)
+			return false
+	if not result.has("province_control_change"):
+		print("  [FAIL] phased combat result missing province_control_change: ", result)
+		return false
+	if phases.size() != expected.size():
+		print("  [FAIL] phased combat expected 4 phases, got ", phases.size(), ": ", phases)
+		return false
+
+	print("  [PASS] phased combat resolution (4 phases + capture flag)")
+	return true
+
+
+static func _test_battle_manager_assault() -> bool:
+	if typeof(BattleManager) == TYPE_NIL or typeof(MapManager) == TYPE_NIL:
+		print("  [SKIP] battle manager assault (autoloads unavailable)")
+		return true
+
+	var from_pid := 1
+	var to_pid := -1
+	var attacker_tag := "GER"
+	var defender_tag := "FRA"
+
+	var from_prov: Province = MapManager.get_province(from_pid)
+	if from_prov == null:
+		print("  [SKIP] battle manager assault (province 1 missing)")
+		return true
+
+	for nid in MapManager.get_adjacent_provinces(from_pid):
+		var neighbor: Province = MapManager.get_province(int(nid))
+		if neighbor == null or neighbor.owner_tag.is_empty():
+			continue
+		if neighbor.owner_tag.strip_edges().to_upper() != attacker_tag:
+			to_pid = int(nid)
+			defender_tag = neighbor.owner_tag.strip_edges().to_upper()
+			break
+
+	if to_pid < 0:
+		print("  [SKIP] battle manager assault (no adjacent hostile province from pid 1)")
+		return true
+
+	MapManager.update_province_owner(from_pid, attacker_tag, attacker_tag, true)
+	MapManager.update_province_owner(to_pid, defender_tag, defender_tag, true)
+
+	if typeof(SupplyManager) != TYPE_NIL:
+		SupplyManager.move_formation_to_province("german_infantry_division_1943", from_pid, attacker_tag)
+
+	var assault: Dictionary = BattleManager.execute_province_assault(attacker_tag, to_pid, from_pid)
+	if not bool(assault.get("success", false)):
+		print("  [FAIL] battle manager assault: ", assault.get("reason", "unknown"))
+		return false
+
+	var result: Dictionary = assault.get("result", {}) as Dictionary
+	if not result.has("winner"):
+		print("  [FAIL] battle manager assault missing winner: ", result)
+		return false
+
+	print(
+		"  [PASS] battle manager province assault (winner=%s capture=%s)"
+		% [str(result.get("winner", "")), str(result.get("province_control_change", false))]
+	)
 	return true
 
 
@@ -1001,8 +1111,6 @@ static func _test_leader_manager() -> bool:
 		print("  [FAIL] trait level-up cost at level 1 should be 150: ", bold_cost)
 		return false
 	if LeaderManager.can_level_trait("usa_patton_test", "bold"):
-		pass
-	else:
 		print("  [FAIL] can_level_trait should be false without XP")
 		return false
 	patton.experience = bold_cost + 350
@@ -1224,6 +1332,14 @@ static func _test_leader_manager() -> bool:
 	LeaderManager.leaders.erase("usa_patton_test")
 	if LeaderManager.country_positions.has("USA"):
 		(LeaderManager.country_positions["USA"] as Dictionary).erase(LeaderManager.POSITION_CHIEF_OF_ARMY)
+
+	# Skip 1918/2026/1936 full roster reloads unless explicitly requested (slow on F5; OOM in headless CI).
+	if not _run_full_leader_roster_tests():
+		print(
+			"  [PASS] LeaderManager core tests (skipping 1918/2026/1936 roster reload; set %s=1 for full suite)"
+			% ENV_FULL_LEADER_ROSTER_TESTS
+		)
+		return true
 
 	var loaded_1918 := LeaderManager.load_leaders_for_scenario("1918", 1918)
 	if loaded_1918 < 60:

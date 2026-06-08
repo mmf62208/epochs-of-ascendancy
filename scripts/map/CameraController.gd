@@ -6,7 +6,7 @@ extends Node2D
 @export var target: Node2D
 @export var zoom_speed: float = 0.12
 @export var min_zoom: float = 0.15
-@export var max_zoom: float = 6.0
+@export var max_zoom: float = 12.0  # Increased for higher zoom on the high-res larger grand theater map (8K+), to allow closer view of areas, terrain, counters, lines, weather overlays without losing detail.
 @export var enable_zoom: bool = true
 @export var enable_pan: bool = true
 @export var enable_wasd: bool = true
@@ -94,7 +94,7 @@ func _apply_edge_pan(delta: float) -> void:
 		return
 	var nav_delta := MapViewInput.motion_delta(delta)
 	var m := vp.get_mouse_position()
-	var sz := vp.get_visible_rect().size
+	var sz: Vector2 = vp.get_visible_rect().size
 	var dir := Vector2.ZERO
 	if m.x <= edge_pan_margin:
 		dir.x -= 1.0

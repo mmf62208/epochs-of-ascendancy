@@ -3,27 +3,27 @@ class_name SpecialSite
 extends Resource
 
 enum SiteType {
-    PORT,
-    AIRFIELD,
-    NAVAL_SHIPYARD,
-    FACTORY,
-    OIL_REFINERY,
-    ENERGY_PLANT,
-    ICBM_SITE,
-    RADAR_STATION,
-    FLAK_BATTERY,
-    MISSILE_DEFENSE,
-    SPECIAL_PROJECT,      # Manhattan Project, Heavy Water, etc.
-    FORTIFICATION,
-    BRIDGE,               # Can be used for important bridges later
+	PORT,
+	AIRFIELD,
+	NAVAL_SHIPYARD,
+	FACTORY,
+	OIL_REFINERY,
+	ENERGY_PLANT,
+	ICBM_SITE,
+	RADAR_STATION,
+	FLAK_BATTERY,
+	MISSILE_DEFENSE,
+	SPECIAL_PROJECT,      # Manhattan Project, Heavy Water, etc.
+	FORTIFICATION,
+	BRIDGE,               # Can be used for important bridges later
 }
 
 enum ConstructionState {
-    NOT_BUILT,
-    UNDER_CONSTRUCTION,
-    COMPLETED,
-    DAMAGED,
-    DESTROYED
+	NOT_BUILT,
+	UNDER_CONSTRUCTION,
+	COMPLETED,
+	DAMAGED,
+	DESTROYED
 }
 
 @export var id: String
@@ -50,73 +50,73 @@ enum ConstructionState {
 
 
 func is_completed() -> bool:
-    return construction_state == ConstructionState.COMPLETED
+	return construction_state == ConstructionState.COMPLETED
 
 
 func is_under_construction() -> bool:
-    return construction_state == ConstructionState.UNDER_CONSTRUCTION
+	return construction_state == ConstructionState.UNDER_CONSTRUCTION
 
 
 func is_damaged() -> bool:
-    return damage_level > 0 and construction_state != ConstructionState.DESTROYED
+	return damage_level > 0 and construction_state != ConstructionState.DESTROYED
 
 
 func get_visual_tier() -> int:
-    if construction_state == ConstructionState.UNDER_CONSTRUCTION:
-        return 0  # Under construction uses special visual
-    if is_damaged():
-        return -damage_level  # Negative = damaged variant
-    return tier
+	if construction_state == ConstructionState.UNDER_CONSTRUCTION:
+		return 0  # Under construction uses special visual
+	if is_damaged():
+		return -damage_level  # Negative = damaged variant
+	return tier
 
 
 func apply_damage(amount: int) -> void:
-    damage_level = clamp(damage_level + amount, 0, max_damage_level)
-    if damage_level >= max_damage_level:
-        construction_state = ConstructionState.DAMAGED
+	damage_level = clamp(damage_level + amount, 0, max_damage_level)
+	if damage_level >= max_damage_level:
+		construction_state = ConstructionState.DAMAGED
 
 
 func repair_damage(amount: int) -> void:
-    damage_level = clamp(damage_level - amount, 0, max_damage_level)
-    if damage_level == 0 and construction_state == ConstructionState.DAMAGED:
-        construction_state = ConstructionState.COMPLETED
+	damage_level = clamp(damage_level - amount, 0, max_damage_level)
+	if damage_level == 0 and construction_state == ConstructionState.DAMAGED:
+		construction_state = ConstructionState.COMPLETED
 
 
 func start_construction() -> void:
-    construction_state = ConstructionState.UNDER_CONSTRUCTION
-    construction_progress = 0.0
+	construction_state = ConstructionState.UNDER_CONSTRUCTION
+	construction_progress = 0.0
 
 
 func complete_construction() -> void:
-    construction_state = ConstructionState.COMPLETED
-    construction_progress = 1.0
-    damage_level = 0
+	construction_state = ConstructionState.COMPLETED
+	construction_progress = 1.0
+	damage_level = 0
 
 
 func get_fog_of_war_visible(for_country_tag: String) -> bool:
-    if for_country_tag == owner_tag:
-        return true
-    return for_country_tag in discovered_by
+	if for_country_tag == owner_tag:
+		return true
+	return for_country_tag in discovered_by
 
 
 # === Upgrade Support ===
 var upgrade_target_id: String = ""   # e.g. "port_tier_2" if this is "port_tier_1"
 
 func can_be_upgraded() -> bool:
-    return is_completed() and not upgrade_target_id.is_empty() and damage_level == 0
+	return is_completed() and not upgrade_target_id.is_empty() and damage_level == 0
 
 func get_upgrade_target_id() -> String:
-    return upgrade_target_id
+	return upgrade_target_id
 
 func start_upgrade() -> void:
-    if can_be_upgraded():
-        construction_state = ConstructionState.UNDER_CONSTRUCTION
-        construction_progress = 0.0
+	if can_be_upgraded():
+		construction_state = ConstructionState.UNDER_CONSTRUCTION
+		construction_progress = 0.0
 
 func complete_upgrade(new_site_data: Dictionary = {}) -> void:
-    if not can_be_upgraded():
-        return
-    # In real usage, the caller (InfrastructureDevelopmentManager) will replace this site
-    # with a new one created from upgrade_target_id
-    construction_state = ConstructionState.COMPLETED
-    construction_progress = 1.0
-    damage_level = 0
+	if not can_be_upgraded():
+		return
+	# In real usage, the caller (InfrastructureDevelopmentManager) will replace this site
+	# with a new one created from upgrade_target_id
+	construction_state = ConstructionState.COMPLETED
+	construction_progress = 1.0
+	damage_level = 0

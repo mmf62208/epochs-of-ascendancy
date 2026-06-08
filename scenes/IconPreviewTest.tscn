@@ -1,0 +1,29 @@
+[gd_scene load_steps=4 format=3 uid="uid://iconpreviewtest"]
+
+[ext_resource type="Script" path="res://tools/map_generation/debug_proposed_children.gd" id="1_debug"]
+[ext_resource type="Texture2D" path="res://assets/graphics/units/nato/ww2/helicopter_32.png" id="2_heli"]
+[ext_resource type="Texture2D" path="res://assets/graphics/units/nato/modern/destroyer_64.png" id="3_dest"]
+[ext_resource type="Texture2D" path="res://assets/graphics/units/nato/ww2/artillery_32.png" id="4_art"]
+
+[node name="IconPreviewTest" type="Node2D"]
+
+[node name="Label" type="Label" parent="."]
+offset_left = 20.0
+offset_top = 20.0
+text = "NATO Symbols Preview - Multiple Zooms (use DebugOverlay or attach debug gd)"
+metadata/_edit_use_anchors_ = false
+
+[node name="Heli32" type="Sprite2D" parent="."]
+position = Vector2(100, 100)
+texture = ExtResource("2_heli")
+
+[node name="Destroyer64" type="Sprite2D" parent="."]
+position = Vector2(220, 120)
+texture = ExtResource("3_dest")
+
+[node name="Art32" type="Sprite2D" parent="."]
+position = Vector2(340, 100)
+texture = ExtResource("4_art")
+
+[node name="DebugDrawer" type="Node2D" parent="."]
+script = ExtResource("1_debug")

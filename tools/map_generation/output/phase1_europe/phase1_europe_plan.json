@@ -263,12 +263,16 @@
     "generated_resources_phase1.json",
     "generated_economy_phase1.json",
     "special_site_candidates_phase1.json",
+    "map_visual_features_variants_phase1.json",
     "merge_instructions_phase1.json",
     "phase1_europe_plan.json"
   ],
   "notes": [
     "Geometric splitting now uses densify + radial-arc + bisection for usable child polygons even from 6-pt input.",
     "Attribute inheritance pulls from the real 840-province base catalog.",
-    "Next high-leverage work: Godot visualization of proposed splits + adjacency repair logic."
+    "Visual features/variants: hills/swamp/desert tagged for bg images + placement (desert infra allowed but limited density/sand style); seasons (regional snow - heavy in N Russia/Scand/UK north), bomb damage, era/culture (tech/focus/country impact).",
+    "GRAND THEATER scope: full UK/Ireland + Scandinavia + northern Russia (high north) + prior south. Current seed geometry limited; bg images sized for future poly expansion.",
+    "Starter map visual editor in DebugOverlay + MapRenderer.place_demo... + spawn_data_driven... for leveling objects on the images (zoom to river detail supported in high-res bgs).",
+    "Next high-leverage: Godot visualization of proposed splits + adjacency repair logic + full mouse click-to-place in editor + live infra layer updates on bg."
   ]
 }

@@ -1,0 +1,16 @@
+{
+  "id": "prototype_test_airfield",
+  "name": "Prototype Test Airfield",
+  "category": "air_base",
+  "description": "Specialized airfield for flight testing new designs. Greatly speeds maturity gain from 'combat' (test) experience and reduces early prototype losses.",
+  "base_effect": {
+    "test_flight_xp_multiplier": 2.5,
+    "prototype_breakdown_reduction": 0.35
+  },
+  "levels": {
+    "1": {"test_flight_xp_multiplier": 2.5},
+    "3": {"test_flight_xp_multiplier": 3.8, "range_recovery": 0.15}
+  },
+  "requires_infra": 4,
+  "visual": "airfield_advanced"
+}

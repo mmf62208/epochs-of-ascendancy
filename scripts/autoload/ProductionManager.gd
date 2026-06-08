@@ -608,7 +608,7 @@ func is_unit_priority_reinforced(unit_id: String) -> bool:
 
 
 func auto_reinforce_unit_from_stockpile(unit_id: String, required_equipment: Dictionary) -> Dictionary:
-	var shortages := get_unit_shortages(unit_id, required_equipment)
+	var current_stock := get_unit_equipment_stock(unit_id)
 	var fulfilled: Dictionary = {}
 
 	var leader_id := ""
@@ -619,15 +619,19 @@ func auto_reinforce_unit_from_stockpile(unit_id: String, required_equipment: Dic
 	if not leader_id.is_empty() and typeof(LeaderManager) != TYPE_NIL:
 		reinforcement_mult = LeaderManager.get_training_path_reinforcement_multiplier(leader_id)
 
-	for equipment_id in shortages:
-		var needed := int(shortages[equipment_id])
-		var got := request_equipment_for_unit(unit_id, str(equipment_id), needed)
-		if got < needed and reinforcement_mult > 1.0:
-			var bonus := int(ceil(float(needed - got) * (reinforcement_mult - 1.0)))
+	for equipment_id in required_equipment:
+		var needed := int(required_equipment[equipment_id])
+		var have_in_unit := int(current_stock.get(equipment_id, 0))
+		var gap := needed - have_in_unit
+		if gap <= 0:
+			continue
+		var got := request_equipment_for_unit(unit_id, str(equipment_id), gap)
+		if got < gap and reinforcement_mult > 1.0:
+			var bonus := int(ceil(float(gap - got) * (reinforcement_mult - 1.0)))
 			if bonus > 0:
 				got += request_equipment_for_unit(unit_id, str(equipment_id), bonus)
 		if got > 0:
-			fulfilled[equipment_id] = got
+			fulfilled[equipment_id] = int(get_unit_equipment_stock(unit_id).get(equipment_id, 0))
 
 	if not fulfilled.is_empty():
 		unit_reinforced.emit(unit_id, fulfilled.duplicate(true))

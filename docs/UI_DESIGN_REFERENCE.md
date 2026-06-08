@@ -1,6 +1,20 @@
 # UI Design Reference — Epochs of Ascendancy
 
-**Last Updated:** May 2026
+**Last updated:** June 2026 · **Index:** [README.md](README.md)
+
+## Debug overlay (F10)
+
+Development tools live in a **screen-space panel** on `UILayer` (not map space).
+
+| Expectation | Implementation |
+|-------------|----------------|
+| Readable without horizontal scroll | Buttons and labels span panel width; vertical scroll only |
+| Reposition | Drag the **DEBUG OVERLAY** title bar |
+| Resize | Drag the **⤡** grip at the bottom-right corner |
+| Long tool lists | Collapsible sections; Collapse All / Expand All above the scroll area |
+| Aesthetic | `RetrowaveTheme.style_detail_panel` — match TopInfoBar / MainMenu |
+
+Avoid fixed pixel offsets for dynamic tool rows; append to section `VBoxContainer`s so layout stays coherent when the panel is resized.
 
 ## Core UI Principles
 

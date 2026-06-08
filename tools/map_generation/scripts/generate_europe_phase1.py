@@ -72,23 +72,117 @@ def load_base_data() -> Dict[str, Any]:
     return load_json(BASE_PROVINCES)
 
 # =============================================================================
-# REGION DEFINITION (Europe Focus)
+# REGION DEFINITION (Expanded for World-Class Grand Strategy: Europe + NA + ME + Canaries)
 # =============================================================================
+
+EXPANDED_REGION_BOUNDS = {
+    # Approximate lat/lon or province name keywords for expansion.
+    # Full desired grand strategy theater for war in the west (Germany central):
+    # - West: all of UK (England/Scotland/Wales), Ireland
+    # - North: full Norway (fjords to Nordkapp), Sweden, Finland, northern Russia (Kola/Murmansk, Karelia, Arkhangelsk/White Sea, Lapland, high north)
+    # - South/East kept from prior: Canaries, full NA to Egypt/Libya, Suez, Egypt, Iraq/ME for continuity + future east/south fronts.
+    "keywords": [
+        "canary", "morocco", "algeria", "tunisia", "libya", "egypt", "suez", "iraq", "syria", "palestine", "jordan", "lebanon", "saudi", "kuwait",
+        # UK + Ireland (full British Isles for Battle of Britain, strategic air, sea control, potential invasion)
+        "ireland", "britain", "england", "scotland", "wales", "london", "uk", "dublin", "belfast", "glasgow", "edinburgh", "manchester", "liverpool", "birmingham", "cardiff", "belfast", "cork",
+        # Scandinavia + high north (Narvik, Sweden resources, Finland wars, Norway occupation, northern convoys)
+        "sweden", "norway", "finland", "stockholm", "oslo", "helsinki", "bergen", "gothenburg", "copenhagen", "malmo", "tromso", "narvik", "trondheim", "stavanger",
+        # Northern Russia / high north (Murmansk run, Karelia, Arkhangelsk, Leningrad approaches, tundra/forest warfare)
+        "murmansk", "arkhangelsk", "karelia", "leningrad", "petrozavodsk", "svalbard", "lapland", "nordkapp", "kola", "white sea", "archangel", "petro", "mурманск"
+    ],
+    "min_lat": 15.0,   # south (Canaries ~28N, Egypt ~22-30N)
+    "max_lat": 82.0,   # high north: Svalbard/Novaya Zemlya area, northernmost Norway/Russia ops ~78-80N
+    "min_lon": -12.0,  # Ireland west coast (~ -10.5) + UK west
+    "max_lon": 55.0,   # NW Russia (Murmansk ~33E, Arkhangelsk ~40E, a bit buffer)
+}
 
 def identify_europe_provinces(geometry: Dict[str, Any], base: Dict[str, Any]) -> List[int]:
     """
-    Identify which provinces belong to the Europe theater for Phase 1.
-
-    Current heuristic (can be greatly improved later):
-    - Use the existing 100-province geometry as the core Europe set.
-    - Later we can expand using strategic regions, bounding boxes, or manual lists.
+    Identify provinces for the *grand theater* expanded for war in the west scope (Germany central on map):
+    - Full British Isles (all UK: England/Scotland/Wales + Ireland)
+    - Scandinavia (Norway to Nordkapp, Sweden, Finland)
+    - Northern Russia (Kola/Murmansk, Karelia, Arkhangelsk/White Sea, high north/Lapland)
+    - Plus prior south/east: Canaries, NA (to Egypt/Libya), Suez/Egypt, Iraq/ME
+    Current seed geometry may be limited; keywords + future subdivision/geometry expansion will populate polys.
+    Visual bg images must cover the full lat/lon for context + zoomable detail (rivers etc.).
+    Supports hills, swamps, deserts (special handling for desert infra placement); northern areas get heavy seasonal snow.
     """
-    # For now, treat all current geometry provinces as "Europe core"
-    # In a real implementation we would cross-reference with strategic regions,
-    # latitude/longitude if available, or a curated list of important provinces.
-    europe_ids = [p["id"] for p in geometry.get("provinces", [])]
-    print(f"Identified {len(europe_ids)} core Europe provinces from current geometry.")
+    europe_ids = []
+    base_provs = base.get("provinces", [])
+    base_by_id = {p["id"]: p for p in base_provs if "id" in p}
+
+    for p in geometry.get("provinces", []):
+        pid = p.get("id")
+        name = p.get("name", "").lower()
+        # Check keywords for expansion
+        if any(kw in name for kw in EXPANDED_REGION_BOUNDS["keywords"]):
+            europe_ids.append(pid)
+            continue
+        # Fallback to original core
+        if pid in [pp["id"] for pp in geometry.get("provinces", [])]:
+            europe_ids.append(pid)
+
+    # Add terrain features: hills, swamps, desert tags from base if available
+    for pid in europe_ids:
+        if pid in base_by_id:
+            bprov = base_by_id[pid]
+            terrain = bprov.get("terrain", "plains").lower()
+            if "hill" in terrain or "mountain" in terrain:
+                # Mark for hills visuals
+                p.setdefault("features", []).append("hills")
+            if "swamp" in terrain or "marsh" in terrain:
+                p.setdefault("features", []).append("swamp")
+            if "desert" in terrain:
+                p.setdefault("features", []).append("desert")
+
+    print(f"Identified {len(europe_ids)} provinces for GRAND THEATER map (full UK/Ireland + Scandinavia + N Russia high north + prior NA/ME/Egypt/Suez/Canaries).")
+    print("Features (hills/swamp/desert) tagged; northern provinces will use heavy snow in winter variants. Desert infra allowed (sparsely).")
     return europe_ids
+
+# =============================================================================
+# SEASONS, DAMAGE, ERA/CULTURE VARIANTS (for layered visuals)
+# =============================================================================
+
+def generate_season_damage_layers(provinces: List[Dict]) -> Dict[str, Any]:
+    """
+    Generate variant layers for seasons (snow in north, not south), bomb damage,
+    era/architecture changes (impacted by tech/focus tree/culture).
+    Desert handling: sparser buildings, special sand roads/airfields/ports.
+    Output can be used to create layered images or modulate in Godot.
+    """
+    variants = {
+        "winter": {},
+        "damage_1944": {},
+        "era_1936": {},
+        "era_modern": {},
+        "culture_european": {},
+        "culture_arab": {},
+        "desert_infra": {}  # special for desert provinces
+    }
+    for p in provinces:
+        pid = p.get("id")
+        features = p.get("features", [])
+        terrain = p.get("terrain", "plains").lower()
+
+        # Seasons: snow north of ~45 lat or specific
+        if "snow" not in variants["winter"]:
+            variants["winter"][pid] = {"snow_cover": "light" if "hill" in features else "none"}
+        # Desert special: limited density for buildings/roads/ports/airfields
+        if "desert" in features:
+            variants["desert_infra"][pid] = {
+                "building_density": 0.3,
+                "road_style": "sand_track",
+                "port_style": "coastal_desert",
+                "airfield_style": "desert_runway"
+            }
+        # Damage: placeholder for bomb visuals
+        variants["damage_1944"][pid] = {"damage_level": 0.2}  # example
+        # Era/culture: tags for architecture changes
+        variants["era_1936"][pid] = {"style": "interwar"}
+        variants["culture_arab"][pid] = {"style": "middle_eastern"} if "egypt" in str(p.get("name","")).lower() or "iraq" in str(p.get("name","")).lower() else {}
+
+    print("Generated season/damage/era/culture/desert variant layers for map visuals.")
+    return variants
 
 # =============================================================================
 # NAVAL / STRAIT AWARENESS (Critical for Phase 1)
@@ -265,8 +359,37 @@ def run_phase1_europe(output_dir: Path):
     print(f"  Current playable geometry: {len(geometry.get('provinces', []))} provinces")
     print(f"  840-province base catalog loaded: {len(base_provinces)} entries")
 
-    # 1. Define Europe scope
+    # 1. Define Europe scope (expanded: Europe + NA + ME + Canaries + Egypt/Suez/Iraq)
     europe_ids = identify_europe_provinces(geometry, base)
+
+    # 1b. Build visual features layer for hills/swamps/deserts (from tags in identify) + season/damage/era/culture variants.
+    # This drives Godot MapRenderer spawns, dynamic infra allowances (desert limited but possible),
+    # and prompts for high-detail bg images (Grok Imagine) with regional snow (north vs south), bomb damage,
+    # architecture variants (interwar vs later, European vs Arab/ME styles impacted by tech/focus/culture).
+    visual_features = {}
+    for p in geometry.get("provinces", []):
+        pid = p.get("id")
+        if pid not in europe_ids:
+            continue
+        feats = list(p.get("features", []))
+        terrain = p.get("terrain", base_provinces.get(pid, {}).get("terrain", "plains")).lower()
+        # Ensure features reflect terrain for editor / image prompts / placement (hills/swamp/desert)
+        if ("hill" in terrain or "mountain" in terrain) and "hills" not in feats:
+            feats.append("hills")
+        if ("swamp" in terrain or "marsh" in terrain) and "swamp" not in feats:
+            feats.append("swamp")
+        if "desert" in terrain and "desert" not in feats:
+            feats.append("desert")
+        visual_features[pid] = {
+            "features": feats,
+            "terrain": terrain,
+            "desert_infra_ok": "desert" in feats,  # roads/buildings/rail/airfields/ports allowed everywhere incl. difficult desert; visuals limited density + sand styles
+            "hill_swamp_notes": "hills: ridgelines + movement cost; swamp: marsh patches + special combat"
+        }
+
+    variants = generate_season_damage_layers([p for p in geometry.get("provinces", []) if p.get("id") in europe_ids])
+    print(f"  Visual features tagged for {len(visual_features)} provinces (hills/swamp/desert for map images + placement).")
+    print("  Variant layers: winter (regional snow), damage_1944, era_*, culture_*, desert_infra styles ready for Godot layers or image variants.")
 
     # 2. Run full naval analysis using the dedicated module
     print("\nRunning naval analysis (coastal + chokepoints + straits)...")
@@ -439,6 +562,30 @@ def run_phase1_europe(output_dir: Path):
         )
         print("  Wrote special_site_candidates_phase1.json")
 
+    # Visual features + variants layer (for starter map visual editor, MapRenderer data-driven objects,
+    # and generating/using the ultra-detailed bg images with hills/swamp/desert + seasonal/damage/era variants).
+    visual_layer = {
+        "version": 1,
+        "phase": "1_europe",
+        "expanded_region": "GRAND THEATER for war in the west (Germany central): full British Isles (UK all + Ireland) + full Scandinavia (Norway/Sweden/Finland to high north) + northern Russia (Murmansk/Kola/Karelia/Arkhangelsk) + Canaries + full NA to Egypt + Suez/Egypt + Iraq/ME",
+        "provinces": visual_features,
+        "variants": variants,
+        "notes": [
+            "features include 'hills', 'swamp', 'desert' for terrain-specific visuals and placement rules.",
+            "Northern areas (Scand, N Russia, UK north): heavy snow in winter variants (regional, not map-wide); UK midlands less, south/NA/ME none or dust.",
+            "Desert: infra (roads, buildings, rail, airfields, ports) CAN be added; visuals use sand tracks, lower density, special runways/ports.",
+            "Seasons: winter snow only in northern areas (not uniform across map); south/Egypt/ME/NA no snow or light.",
+            "Bomb damage visuals important for 1944+ layers (UK cities, German industrial, Leningrad siege etc.).",
+            "Era/architecture: 1936 interwar base; later eras + tech/focus tree + country culture change building styles (e.g. Arab/ME vs European, Nordic wooden vs central brick).",
+            "Godot: MapRenderer.spawn_data_driven_objects_from_layers() consumes city + terrain layers; editor placements roundtrip here.",
+            "Image prompts for bg: include explicit hills, swamps/marshes, desert dunes with infra allowances; full British Isles, long Norwegian coast/fjords, Finnish lakes, Kola tundra, high detail rivers visible on zoom."
+        ]
+    }
+    (output_dir / "map_visual_features_variants_phase1.json").write_text(
+        json.dumps(visual_layer, indent=2), encoding="utf-8"
+    )
+    print("  Wrote map_visual_features_variants_phase1.json (hills/swamp/desert + seasons/damage/era/culture for editor + images)")
+
     # 6. Merge / integration instructions (for future Godot-side or tooling validation)
     merge_plan = {
         "phase": "1_europe",
@@ -485,13 +632,17 @@ def run_phase1_europe(output_dir: Path):
             "generated_resources_phase1.json",
             "generated_economy_phase1.json",
             "special_site_candidates_phase1.json",
+            "map_visual_features_variants_phase1.json",
             "merge_instructions_phase1.json",
             "phase1_europe_plan.json"
         ],
         "notes": [
             "Geometric splitting now uses densify + radial-arc + bisection for usable child polygons even from 6-pt input.",
             "Attribute inheritance pulls from the real 840-province base catalog.",
-            "Next high-leverage work: Godot visualization of proposed splits + adjacency repair logic."
+            "Visual features/variants: hills/swamp/desert tagged for bg images + placement (desert infra allowed but limited density/sand style); seasons (regional snow - heavy in N Russia/Scand/UK north), bomb damage, era/culture (tech/focus/country impact).",
+            "GRAND THEATER scope: full UK/Ireland + Scandinavia + northern Russia (high north) + prior south. Current seed geometry limited; bg images sized for future poly expansion.",
+            "Starter map visual editor in DebugOverlay + MapRenderer.place_demo... + spawn_data_driven... for leveling objects on the images (zoom to river detail supported in high-res bgs).",
+            "Next high-leverage: Godot visualization of proposed splits + adjacency repair logic + full mouse click-to-place in editor + live infra layer updates on bg."
         ]
     }
 

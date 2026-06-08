@@ -25,18 +25,21 @@ var trade_button: Button   # Added dynamically for quick Trade access
 @onready var oil_label: Label = $ContentRow/RightContainer/ResourcesContainer/OilLabel
 @onready var rubber_label: Label = $ContentRow/RightContainer/ResourcesContainer/RubberLabel
 
+var menu_button: MenuButton  # created dynamically in _setup_compact_menu to save top bar space
+# Legacy flat buttons may exist in scene; we consolidate into menu for space (hide them)
 @onready var save_button: Button = $ContentRow/RightContainer/MenuContainer/SaveButton
 @onready var load_button: Button = $ContentRow/RightContainer/MenuContainer/LoadButton
 @onready var settings_button: Button = $ContentRow/RightContainer/MenuContainer/SettingsButton
 @onready var help_button: Button = $ContentRow/RightContainer/MenuContainer/HelpButton
 
-var debug_button: Button   # Only created in debug builds
+var debug_button: Button   # Only created in debug builds, added to menu
 
 var current_speed: int = 1
 var is_paused: bool = false
 
 
 func _ready() -> void:
+	add_to_group("top_info_bar")
 	_apply_theme()
 	_connect_buttons()
 	_sync_pause_from_time_manager()
@@ -87,21 +90,84 @@ func _apply_theme() -> void:
 	for btn in [save_button, load_button, settings_button, help_button, pause_button]:
 		RetrowaveTheme.style_secondary_button(btn)
 
-	# Debug overlay quick toggle (only in debug builds)
-	if OS.is_debug_build() and debug_button == null:
-		debug_button = Button.new()
-		debug_button.text = "DBG"
-		debug_button.tooltip_text = "Open Debug Overlay (F10 / Ctrl+Shift+R)"
-		debug_button.custom_minimum_size = Vector2(42, 28)
-		$ContentRow/RightContainer/MenuContainer.add_child(debug_button)
-		RetrowaveTheme.style_secondary_button(debug_button)
-		debug_button.pressed.connect(func(): DebugOverlay.toggle())
+	_setup_compact_menu()
 
-		# Pre-create the overlay (hidden) so hotkeys and other systems can find it immediately
-		if DebugOverlay.instance == null:
-			var overlay := DebugOverlay.new()
-			add_child(overlay)
-			overlay.visible = false
+	# Debug overlay quick toggle (only in debug builds) -- we put "Debug (F10)" inside the compact MenuButton
+	# to save top bar space. F10 / Ctrl+Shift+R still work globally.
+	if OS.is_debug_build() and debug_button == null:
+		# Pre-create the overlay (hidden) so hotkeys and other systems can find it immediately.
+		# Use the static toggle/hide which now prefers adding under UILayer for proper screen-space behavior.
+		# Deferred to avoid any early tree/window issues on Linux/X11.
+		call_deferred("_deferred_precreate_debug")
+
+
+func _setup_compact_menu() -> void:
+	# Replace flat menu buttons with a single MenuButton + PopupMenu to save horizontal space on the top bar.
+	# This prevents left/right cutoff when the bar has many nav + resource buttons.
+	# Actions are moved into the popup (like previous design).
+	var menu_container := $ContentRow/RightContainer/MenuContainer
+	if menu_container == null:
+		return
+
+	# Create or reuse MenuButton
+	var mb: MenuButton = null
+	if menu_button == null or not is_instance_valid(menu_button):
+		mb = MenuButton.new()
+		mb.text = "Menu"
+		mb.custom_minimum_size = Vector2(70, 28)
+		menu_container.add_child(mb)
+		menu_button = mb
+	else:
+		mb = menu_button
+
+	var popup := mb.get_popup()
+	popup.clear()
+
+	# Add items for the actions. We connect via id_pressed for simplicity.
+	popup.add_item("Save", 0)
+	popup.add_item("Load", 1)
+	popup.add_separator()
+	popup.add_item("Settings", 2)
+	popup.add_item("Help", 3)
+	popup.add_separator()
+	popup.add_item("Exit to Desktop", 5)
+	if OS.is_debug_build():
+		popup.add_separator()
+		popup.add_item("Debug (F10)", 4)
+
+	popup.id_pressed.connect(_on_menu_item_pressed)
+
+	# Hide the old flat buttons to free space (they are still there in scene for now)
+	for btn in [save_button, load_button, settings_button, help_button]:
+		if btn and is_instance_valid(btn):
+			btn.visible = false
+
+	# If debug button was added flat, hide it too (DBG action is in menu)
+	if debug_button and is_instance_valid(debug_button):
+		debug_button.visible = false
+
+	RetrowaveTheme.style_secondary_button(mb)
+
+
+func _on_menu_item_pressed(id: int) -> void:
+	match id:
+		0: _on_save_pressed()
+		1: _on_load_pressed()
+		2: _on_settings_pressed()
+		3: _on_help_pressed()
+		5:
+			get_tree().quit()
+		4:
+			if OS.is_debug_build():
+				call_deferred("_deferred_debug_toggle")
+
+func _deferred_debug_toggle() -> void:
+	DebugOverlay.toggle()
+
+func _deferred_precreate_debug() -> void:
+	DebugOverlay.toggle()
+	# hide after a frame to let creation settle (avoids X11 window issues on some systems)
+	get_tree().create_timer(0.01).timeout.connect(DebugOverlay.hide_overlay, CONNECT_ONE_SHOT)
 
 
 func _connect_buttons() -> void:
@@ -141,7 +207,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	# Global debug hotkey — opens the dedicated Debug Overlay
 	if event.keycode == KEY_F10 or (event.ctrl_pressed and event.shift_pressed and event.keycode == KEY_R):
-		DebugOverlay.toggle()
+		call_deferred("_deferred_debug_toggle")
 		get_viewport().set_input_as_handled()
 		return
 	# Dev convenience keybinds (F5/F6/F9/ESC)
@@ -321,13 +387,14 @@ func _on_technology_pressed() -> void:
 
 
 func _on_diplomacy_pressed() -> void:
-	var packed := load("res://scenes/ui/DiplomacyView.tscn")
-	if packed:
-		var view = packed.instantiate()
-		get_tree().root.add_child(view)
-		# DiplomacyView handles its own popup_centered in _ready
-	else:
-		_show_toast("Diplomacy screen not available yet.", 2.5, true)
+	_close_overlay_screens()
+	_toggle_root_popup(
+		"DiplomacyView",
+		"res://scenes/ui/DiplomacyView.tscn",
+		func(view: Node) -> void:
+			if view.has_method("popup_centered"):
+				view.call_deferred("popup_centered", Vector2i(1100, 700))
+	)
 
 
 func _on_agents_pressed() -> void:
@@ -347,24 +414,44 @@ func _on_agents_pressed() -> void:
 
 func _on_map_pressed() -> void:
 	_close_overlay_screens()
+	_show_toast("Map view — click a province to open the inspector", 2.5)
+
 
 func _on_trade_pressed() -> void:
-	var packed := load("res://scenes/ui/TradeMarketView.tscn")
-	if packed:
-		var view = packed.instantiate()
-		get_tree().root.add_child(view)
-		if view.has_method("show_market"):
-			view.show_market("PUBLIC")
-		else:
-			view.popup_centered(Vector2i(1100, 700))
-	else:
-		_show_toast("Trade Market not available.", 2.5, true)
+	_close_overlay_screens()
+	_toggle_root_popup(
+		"TradeMarketView",
+		"res://scenes/ui/TradeMarketView.tscn",
+		func(view: Node) -> void:
+			if view.has_method("show_market"):
+				view.call_deferred("show_market", "PUBLIC")
+			elif view.has_method("popup_centered"):
+				view.call_deferred("popup_centered", Vector2i(1100, 700))
+	)
 
 
 func _close_screen(screen_name: String) -> void:
 	var existing := get_tree().root.get_node_or_null(screen_name)
 	if existing != null:
 		existing.queue_free()
+
+
+func _toggle_root_popup(scene_name: String, scene_path: String, configure: Callable = Callable()) -> void:
+	var existing := get_tree().root.get_node_or_null(scene_name)
+	if existing != null:
+		existing.queue_free()
+		return
+	var packed: PackedScene = load(scene_path)
+	if packed == null:
+		_show_toast("%s not available yet." % scene_name, 2.5, true)
+		return
+	var view: Node = packed.instantiate()
+	if view == null:
+		return
+	view.name = scene_name
+	get_tree().root.add_child(view)
+	if configure.is_valid():
+		configure.call(view)
 
 
 func _toggle_screen(screen_name: String, scene_path: String, configure: Callable) -> void:
@@ -427,7 +514,19 @@ func _on_settings_pressed() -> void:
 
 
 func _on_help_pressed() -> void:
-	print("Open Help (TODO)")
+	var dlg := AcceptDialog.new()
+	dlg.title = "Epochs of Ascendancy — Quick Help"
+	dlg.dialog_text = (
+		"Grand strategy playtest harness.\n\n"
+		+ "• Click provinces to inspect ownership, logistics, and combat stats\n"
+		+ "• F10 — debug tools (map editor, borders, combat demo)\n"
+		+ "• L — supply overlay · R/T/C/Y — infra sub-layers\n"
+		+ "• Menu — save/load and settings\n\n"
+		+ "F5 quicksave · F9 quickload · ESC closes most panels."
+	)
+	dlg.confirmed.connect(dlg.queue_free)
+	get_tree().root.add_child(dlg)
+	dlg.popup_centered(Vector2i(520, 260))
 
 ## === Main Menu Architecture (priority 1) ===
 ## TopInfoBar is the trigger:
@@ -497,7 +596,7 @@ func _add_menu_button(parent: VBoxContainer, label: String, option: String) -> v
 			"load":
 				_on_load_pressed()
 			"return_to_main":
-				print("TODO: Return to Main Menu (emit signal for scene change)")
+				get_tree().change_scene_to_file("res://scenes/TestScenario.tscn")
 			"exit":
 				get_tree().quit()
 			"help":
@@ -661,3 +760,16 @@ func _show_toast(message: String, duration: float = 2.5, is_error: bool = false)
 		LeaderEventUI.show_toast(message, duration, is_error)
 	else:
 		push_warning(message)
+
+
+static func find_in_tree(tree: SceneTree) -> TopInfoBar:
+	if tree == null:
+		return null
+	var direct := tree.root.get_node_or_null("UILayer/TopInfoBar")
+	if direct is TopInfoBar:
+		return direct as TopInfoBar
+	for child in tree.root.get_children():
+		var nested := child.get_node_or_null("UILayer/TopInfoBar")
+		if nested is TopInfoBar:
+			return nested as TopInfoBar
+	return tree.get_first_node_in_group("top_info_bar") as TopInfoBar

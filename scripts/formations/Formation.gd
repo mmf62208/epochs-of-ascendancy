@@ -32,6 +32,13 @@ const CATEGORY_SPACE := "space"
 ## Map province where this formation is stationed (division movement / engineer repair).
 @export var stationed_province_id: int = -1
 
+## For air formations: current range/loadout config chosen by player (Ferry_Long_Range, Combat_Load, Escort_Balanced).
+## Used by AircraftDesignSystem for effective range calculations.
+@export var air_range_config: String = "COMBAT_LOAD"
+
+## Links air formation to a specific design in AircraftDesignSystem for range/reliability/prototyping effects.
+@export var air_design_id: String = ""
+
 var assigned_leader: Leader = null
 
 
@@ -75,3 +82,20 @@ static func from_division_template(
 	formation.formation_type = TYPE_DIVISION
 	formation.country_tag = country
 	return formation
+
+## Helper for air range config (used by AircraftDesignSystem and mission planning).
+func get_air_range_config_enum() -> int:
+	# Matches AircraftDesignSystem.RangeConfig
+	match air_range_config:
+		"FERRY_LONG_RANGE", "ferry": return 0
+		"ESCORT_BALANCED", "escort": return 2
+		_: return 1  # COMBAT_LOAD default
+
+func set_air_range_config_from_string(cfg: String) -> void:
+	air_range_config = cfg.to_upper() if cfg else "COMBAT_LOAD"
+
+func get_air_design_id() -> String:
+	return air_design_id
+
+func set_air_design_id(did: String) -> void:
+	air_design_id = did

@@ -329,6 +329,7 @@ func _gather_save_data() -> Dictionary:
 			"scenario_start_date": TimeManager.get_scenario_start_date(),
 			"paused": TimeManager.is_paused(),
 			"time_scale": TimeManager.time_scale,
+			"total_days_elapsed": TimeManager.get_total_days_elapsed(),
 		}
 
 	# --- TechnologyManager ---
@@ -400,6 +401,12 @@ func _gather_save_data() -> Dictionary:
 		else:
 			data["infrastructure_projects"] = {}
 
+	# --- Province Editor (in-game map design tool - debug only, persists drawn provinces across saves) ---
+	# Uses the get_save_data/apply interface like other managers.
+	var pe := get_tree().get_first_node_in_group("province_editor")
+	if pe and pe.has_method("get_save_data"):
+		data["province_editor"] = pe.get_save_data()
+
 	return data
 
 
@@ -459,6 +466,12 @@ func _apply_save_data(data: Dictionary) -> void:
 		if DesignManager.has_method("apply_save_data"):
 			DesignManager.apply_save_data(data["design_lifecycle"])
 
+	# --- Province Editor (debug map design persistence) ---
+	if data.has("province_editor"):
+		var pe := get_tree().get_first_node_in_group("province_editor")
+		if pe and pe.has_method("apply_save_data"):
+			pe.apply_save_data(data["province_editor"])
+
 	# Future: after all core state, allow other managers to react
 	# e.g. if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("on_game_loaded"):
 	#     ProductionManager.on_game_loaded()
@@ -477,6 +490,8 @@ func _apply_time_state(t: Dictionary) -> void:
 		TimeManager.set_paused(bool(t["paused"]))
 	if t.has("time_scale"):
 		TimeManager.set_time_scale(float(t.get("time_scale", 1.0)))
+	if t.has("total_days_elapsed"):
+		TimeManager.total_days_elapsed = maxi(0, int(t.get("total_days_elapsed", 0)))
 	# Do not fire game_day_advanced etc. here — we are restoring state, not simulating.
 
 ## --- Agents (most complex because of Resource instances) ---
@@ -718,7 +733,7 @@ func _serialize_supply_state() -> Dictionary:
 			"sabotage_level": depot.sabotage_level,
 			# inbound/outbound are transient; usually not worth persisting
 		}
-	if SupplyManager.has("division_deployments"):
+	if "division_deployments" in SupplyManager:
 		for fid in SupplyManager.division_deployments.keys():
 			out["division_deployments"][str(fid)] = (
 				SupplyManager.division_deployments[fid] as Dictionary

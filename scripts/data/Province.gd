@@ -38,6 +38,12 @@ extends Resource
 
 ## Special sites (ports, airfields, special projects, fortifications, etc.)
 @export var special_sites: Array[SpecialSite] = []
+
+## Explicit built infrastructure connections (populated by player/AI decisions via projects).
+## These drive the dynamic road/rail layers on the map, making it "come alive".
+## Roads/rails can be added/removed/edited independently of base infrastructure level.
+@export var built_road_neighbors: Array[int] = []
+@export var built_rail_neighbors: Array[int] = []
 #endregion
 
 

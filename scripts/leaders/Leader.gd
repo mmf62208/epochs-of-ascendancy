@@ -95,7 +95,7 @@ func add_trait(trait_id: String, level: int = 1) -> bool:
 
 
 func has_trait(trait_id: String) -> bool:
-	return traits.has(trait_id)
+	return traits.has(trait_id) or trait_levels.has(trait_id)
 
 
 func is_available_for_command() -> bool:

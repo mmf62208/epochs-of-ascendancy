@@ -317,7 +317,16 @@ func load_scenario(scenario_name: String) -> bool:
 				if id <= 6:   # Debug the first few provinces
 					print("  id ", id, " | owner=", p.owner_tag, " | specials=", p.special_features)
 			else:
-				print("  WARNING: id ", id, " not found in provinces!")
+				# Only warn for the first few to avoid log spam in phase1 tests (many demo ids from full map data)
+				if not has_meta("warned_missing_ids"):
+					set_meta("warned_missing_ids", 0)
+				var wc := int(get_meta("warned_missing_ids"))
+				if wc < 5:
+					print("  WARNING: id ", id, " not found in provinces (phase1 data uses subset; safe to ignore for test/demo ids).")
+					set_meta("warned_missing_ids", wc + 1)
+				elif wc == 5:
+					print("  ... (suppressing further 'id not found' warnings for this load)")
+					set_meta("warned_missing_ids", wc + 1)
 
 	_load_countries_from_scenario(data)
 

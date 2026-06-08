@@ -80,31 +80,33 @@ func get_effective_combat_power(
 	# Use Province getter or ProvinceEffects for accurate org/recovery/readiness in this province
 	var org_mod := 1.0
 	var attrition_mod := 1.0
-	if province_for_effects != null and typeof(ProvinceEffects) != TYPE_NIL:
-		# Country tag optional for national layer; empty falls back to pure province dev/infra
-		var owner_tag := ""
-		if typeof(LeaderManager) != TYPE_NIL and not army_id.is_empty():
-			var lid := LeaderManager.get_leader_id_for_army(army_id)
-			if lid != "" and LeaderManager.leaders.has(lid):
-				owner_tag = LeaderManager.leaders[lid].country_tag
-		var pe := _get_effects_for_province(province_for_effects, owner_tag)
-		org_mod = pe.get_effective_organization_recovery() if pe != null else 1.0
-		attrition_mod = pe.get_effective_attrition_multiplier() if pe != null else 1.0
-	elif province_for_effects != null:
-		org_mod = province_for_effects.get_organization_recovery_modifier()
-		attrition_mod = province_for_effects.get_attrition_modifier()
-	else:
-		# Fallback: scale from raw dev/infra (matches Province.gd formulas lightly)
-		org_mod = 0.6 + (float(prov_infra) * 0.025) + (float(prov_dev) * 0.015)
-		attrition_mod = maxf(0.6, 1.0 - (float(prov_dev) * 0.015))
+	var has_province_context := province_id >= 0 or province_for_effects != null
+	if has_province_context:
+		if province_for_effects != null and typeof(ProvinceEffects) != TYPE_NIL:
+			# Country tag optional for national layer; empty falls back to pure province dev/infra
+			var owner_tag := ""
+			if typeof(LeaderManager) != TYPE_NIL and not army_id.is_empty():
+				var lid := LeaderManager.get_leader_id_for_army(army_id)
+				if lid != "" and LeaderManager.leaders.has(lid):
+					owner_tag = LeaderManager.leaders[lid].country_tag
+			var pe := _get_effects_for_province(province_for_effects, owner_tag)
+			org_mod = pe.get_effective_organization_recovery() if pe != null else 1.0
+			attrition_mod = pe.get_effective_attrition_multiplier() if pe != null else 1.0
+		elif province_for_effects != null:
+			org_mod = province_for_effects.get_organization_recovery_modifier()
+			attrition_mod = province_for_effects.get_attrition_modifier()
+		else:
+			# Fallback: scale from raw dev/infra (matches Province.gd formulas lightly)
+			org_mod = 0.6 + (float(prov_infra) * 0.025) + (float(prov_dev) * 0.015)
+			attrition_mod = maxf(0.6, 1.0 - (float(prov_dev) * 0.015))
 
-	# Apply: higher org_mod = better recovery/readiness; lower attrition_mod = less org/readiness loss
-	final_org += (org_mod - 1.0) * 6.0
-	final_readiness += (org_mod - 1.0) * 3.0
-	# Attrition in province reduces effective readiness/org (defensive penalty in bad terrain)
-	if attrition_mod < 1.0:
-		final_readiness *= attrition_mod
-		final_org *= lerp(1.0, attrition_mod, 0.6)
+		# Apply: higher org_mod = better recovery/readiness; lower attrition_mod = less org/readiness loss
+		final_org += (org_mod - 1.0) * 6.0
+		final_readiness += (org_mod - 1.0) * 3.0
+		# Attrition in province reduces effective readiness/org (defensive penalty in bad terrain)
+		if attrition_mod < 1.0:
+			final_readiness *= attrition_mod
+			final_org *= lerp(1.0, attrition_mod, 0.6)
 
 	# Note: For full battle resolution paths (resolve_battle_aftermath etc.), pass province_id/dev
 	# so casualty rolls and post-battle org can also respect province stats via similar getters.
@@ -593,3 +595,159 @@ func _apply_national_combat_modifiers_to_base_stats(stats: Dictionary, nat_mods:
 		modified["manpower"] = float(modified["manpower"]) * (1.0 + mp_mod)
 
 	return modified
+
+
+# ============================================
+# PHASED BATTLE RESOLUTION
+# ============================================
+
+signal combat_phase_advanced(phase: String, data: Dictionary)
+signal combat_resolved(result: Dictionary)
+
+const PHASE_POSITIONING := "POSITIONING"
+const PHASE_ENGAGEMENT := "ENGAGEMENT"
+const PHASE_ATTRITION := "ATTRITION"
+const PHASE_RESOLUTION := "RESOLUTION"
+
+
+func resolve_combat(
+	attacker: Formation,
+	defender: Formation,
+	battle_province: Province,
+	attacker_army_id: String = "",
+	defender_army_id: String = "",
+) -> Dictionary:
+	if battle_province == null:
+		return {"winner": "", "outcome": "invalid", "province_control_change": false}
+
+	var att_tag := attacker.country_tag if attacker != null else ""
+	var def_tag := battle_province.owner_tag
+	if def_tag.is_empty() and defender != null:
+		def_tag = defender.country_tag
+
+	var att_template := attacker.formation_id if attacker != null else "us_infantry_div_ww2"
+	var def_template := defender.formation_id if defender != null else "german_infantry_division_1943"
+	if attacker_army_id.is_empty() and attacker != null:
+		attacker_army_id = attacker.formation_id
+	if defender_army_id.is_empty() and defender != null:
+		defender_army_id = defender.formation_id
+
+	var terrain := battle_province.terrain if battle_province.terrain != "" else "plains"
+	var att_power := get_effective_combat_power(
+		att_template, "", attacker_army_id, terrain,
+		battle_province.id, battle_province.development_level, battle_province.infrastructure,
+	)
+	var def_power := get_effective_combat_power(
+		def_template, "", defender_army_id, terrain,
+		battle_province.id, battle_province.development_level, battle_province.infrastructure,
+	)
+	if att_power.is_empty() or def_power.is_empty():
+		return {"winner": "", "outcome": "invalid", "province_control_change": false}
+
+	var side_state := {
+		"attacker": {
+			"soft": float(att_power.get("soft_attack", 1.0)),
+			"hard": float(att_power.get("hard_attack", 0.0)),
+			"org": float(att_power.get("organization", 1.0)),
+			"readiness": float(att_power.get("readiness", 1.0)),
+		},
+		"defender": {
+			"soft": float(def_power.get("soft_attack", 1.0)),
+			"hard": float(def_power.get("hard_attack", 0.0)),
+			"org": float(def_power.get("organization", 1.0)),
+			"readiness": float(def_power.get("readiness", 1.0)),
+		},
+	}
+
+	combat_phase_advanced.emit(PHASE_POSITIONING, _phase_positioning(battle_province, side_state))
+	combat_phase_advanced.emit(PHASE_ENGAGEMENT, _phase_engagement(battle_province, side_state, att_power, def_power))
+	combat_phase_advanced.emit(PHASE_ATTRITION, _phase_attrition(battle_province, side_state, att_power, def_power))
+	var result := _phase_resolution(battle_province, side_state, att_tag, def_tag)
+	combat_phase_advanced.emit(PHASE_RESOLUTION, result)
+	combat_resolved.emit(result)
+	return result
+
+
+func _phase_positioning(battle_province: Province, side_state: Dictionary) -> Dictionary:
+	var infra_bonus := clampf(float(battle_province.infrastructure) * 0.04, 0.0, 0.25)
+	side_state["defender"]["org"] *= 1.0 + infra_bonus
+	if battle_province.terrain in ["mountains", "jungle", "urban", "marsh"]:
+		side_state["defender"]["soft"] *= 1.08
+	return {"terrain": battle_province.terrain, "infra_bonus": infra_bonus}
+
+
+func _phase_engagement(
+	battle_province: Province,
+	side_state: Dictionary,
+	_att_power: Dictionary,
+	_def_power: Dictionary,
+) -> Dictionary:
+	var width := get_combat_width_for_battle(battle_province.id, battle_province.id, battle_province.terrain)
+	var width_scale := clampf(width / 10.0, 0.35, 1.35)
+	side_state["attacker"]["soft"] *= width_scale
+	side_state["defender"]["soft"] *= clampf(width_scale * 1.05, 0.4, 1.4)
+	return {
+		"width": width,
+		"attacker_strength": _side_strength(side_state["attacker"]),
+		"defender_strength": _side_strength(side_state["defender"]),
+	}
+
+
+func _phase_attrition(
+	_battle_province: Province,
+	side_state: Dictionary,
+	att_power: Dictionary,
+	def_power: Dictionary,
+) -> Dictionary:
+	var att_supply := 1.0
+	var def_supply := 1.0
+	if bool(att_power.get("has_shortages", false)):
+		att_supply = 0.82
+	if bool(def_power.get("has_shortages", false)):
+		def_supply = 0.88
+	side_state["attacker"]["readiness"] *= att_supply
+	side_state["defender"]["readiness"] *= def_supply
+	side_state["attacker"]["org"] *= lerpf(1.0, att_supply, 0.5)
+	side_state["defender"]["org"] *= lerpf(1.0, def_supply, 0.55)
+	return {"attacker_supply": att_supply, "defender_supply": def_supply}
+
+
+func _phase_resolution(
+	battle_province: Province,
+	side_state: Dictionary,
+	attacker_tag: String,
+	defender_tag: String,
+) -> Dictionary:
+	var att_score: float = (
+		_side_strength(side_state["attacker"])
+		* float(side_state["attacker"]["org"])
+		* float(side_state["attacker"]["readiness"])
+	)
+	var def_score: float = (
+		_side_strength(side_state["defender"])
+		* float(side_state["defender"]["org"])
+		* float(side_state["defender"]["readiness"])
+		* 1.06
+	)
+	var winner := "attacker" if att_score >= def_score else "defender"
+	var margin := absf(att_score - def_score) / maxf(def_score, 0.01)
+	var outcome := "minor_victory" if margin < 0.12 else "major_victory"
+	if winner == "defender" and margin >= 0.2:
+		outcome = "heroic_defense"
+	elif winner == "defender":
+		outcome = "delay_success"
+	var captured := winner == "attacker" and attacker_tag != defender_tag and not attacker_tag.is_empty()
+	return {
+		"winner": winner,
+		"outcome": outcome,
+		"attacker_score": att_score,
+		"defender_score": def_score,
+		"province_control_change": captured,
+		"attacker_tag": attacker_tag,
+		"defender_tag": defender_tag,
+		"province_id": battle_province.id,
+	}
+
+
+func _side_strength(side: Dictionary) -> float:
+	return float(side.get("soft", 0.0)) + float(side.get("hard", 0.0)) * 1.6

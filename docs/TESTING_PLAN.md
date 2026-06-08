@@ -60,6 +60,41 @@
 
 Run from Godot with the project’s test scene or headless entry (see `TestRunner.gd` for invocation).
 
+### Headless status (June 6, 2026)
+
+**Fast smoke (recommended):**
+```bash
+godot --headless --path . res://scenes/TestScenario.tscn --quit-after 15
+```
+
+**Full leader roster reload (heavy, may OOM):**
+```bash
+EOA_RUN_FULL_LEADER_TESTS=1 godot --headless --path . res://scenes/TestScenario.tscn --quit-after 45
+```
+
+**ProductionLineTest suite:** passes design, stockpile, mixed divisions, marine readiness, phased combat, formation spawner, cargo logistics.
+
+| Suite | Result |
+|-------|--------|
+| Design / production / refinement | ✅ Pass |
+| National stockpile / auto-reinforce | ✅ Pass |
+| Mixed division generation | ✅ Pass |
+| Marine readiness | ✅ Pass |
+| Leader replacement enqueue | ✅ Pass |
+| Phased combat resolution (4 phases) | ✅ Pass |
+| Combat width | ✅ Pass |
+| Formation spawner / cargo logistics | ✅ Pass |
+| Full 1918/2026/1936 roster reload | ⏭ Skipped unless `EOA_RUN_FULL_LEADER_TESTS=1` |
+
+**Interactive checks (F5):**
+- Province click → scrollable InfoPanel; Close works
+- **F10** debug overlay: full-width buttons, no horizontal scroll; drag title; resize **⤡**
+- Menu open/close restores pause + speed on TopInfoBar
+
+**Grand theater load:** console should show high-res map line + `Loaded 141 leaders` for `phase1_europe_test`.
+
+**Map visual QC:** [TEST_MAP_GRAND_THEATER_FOUNDATION.md](TEST_MAP_GRAND_THEATER_FOUNDATION.md)
+
 ## Future: Structured Harness
 
 - [ ] Scenario fixtures for “agent pressure on capital + hub”

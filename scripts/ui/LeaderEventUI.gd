@@ -105,11 +105,14 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 
 
 func post_news(title: String, body: String, category: String = "general") -> void:
+	var year := 1936
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_current_year"):
+		year = LeaderManager.get_current_year()
 	var entry := {
 		"title": title,
 		"body": body,
 		"category": category,
-		"year": LeaderManager.get_current_year(),
+		"year": year,
 		"time": Time.get_unix_time_from_system(),
 	}
 	news_history.append(entry)
@@ -242,6 +245,8 @@ func _on_leader_replacement_needed(request: Dictionary) -> void:
 
 
 func _try_show_next_replacement() -> void:
+	if DisplayServer.get_name() == "headless":
+		return
 	if _active_retirement_popup != null and is_instance_valid(_active_retirement_popup):
 		return
 	if _active_replacement_popup != null and is_instance_valid(_active_replacement_popup):

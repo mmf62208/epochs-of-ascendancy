@@ -22,22 +22,36 @@ The game emphasizes **player freedom in design** — from customizing divisions,
 
 ## Current Features
 
-- **Three playable start dates** (1918, 1936, 2026) with era-appropriate data
-- **~100 strategic provinces** with resources, terrain, development, infrastructure, population, and victory points
-- **Dynamic province system** featuring factories, special buildings (Research Centers, Ports, Shipyards, Oil Rigs, Nuclear Plants, Spaceports, etc.) with upgradeable levels
-- **Country system** with ideologies, stability, war support, capitals, and colors
-- **Interactive map** with country-colored provinces, capital markers, stacked special feature icons, hover effects, and detailed InfoPanel
-- **Camera controls** — Scroll wheel zoom (toward mouse), WASD panning, edge scrolling, and middle-mouse drag (recently overhauled and solid for prototype use)
-- **Data-driven architecture** — JSON/resources for provinces, scenarios, and countries. Highly moddable foundation
+- **Three playable start dates** (1918, 1936, 2026) with era-appropriate leader rosters
+- **Phase 1 Europe test map** (~180 provinces) plus procedural pipeline toward 350–450 provinces
+- **Grand theater map underlay** — stylized high-detail Europe raster with legacy map suppression
+- **Terrain layer toggle** — detailed raster vs clean political province view (Debug → Map Visual Editor)
+- **Starter map editor** — place cities/ports/airfields on the bg, export/load JSON for python roundtrip
+- **Dynamic province system** — factories, special sites, development, infrastructure, population, victory points
+- **Production line & unit design** — templates, refinement, national equipment stockpile
+- **Leader system** — historical commanders, traits, training paths, replacements, national positions
+- **Combat preview** — effective power, width, leader/terrain/province modifiers (full battle loop in progress)
+- **Agent networks, technology, supply, weather overlays** on the interactive map
+- **Interactive map** with camera (zoom to ~12×), InfoPanel, multiple overlay layers
+- **Data-driven architecture** — JSON/resources for provinces, scenarios, countries, leaders, equipment
+
+**Living snapshot:** [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md) · **Docs:** [docs/README.md](docs/README.md) · **Tasks:** [TODO.md](TODO.md)
 
 ---
 
-## Controls (Current Prototype)
+## Controls (playtest harness)
 
-- **Left Click** — Select province and open InfoPanel
-- **Mouse Hover** — Highlight provinces with pop effect
-- **Camera** — Zoom, pan with WASD/edge/middle drag
-- **Close Panel** — X button or Escape
+| Input | Action |
+|-------|--------|
+| **Left click** | Select province → scrollable InfoPanel |
+| **Ctrl+click** | Assault adjacent enemy province (after staging a friendly division) |
+| **Attack** (InfoPanel) | Launch assault on selected enemy province |
+| **Esc / Close** | Dismiss inspector or open panels |
+| **F10** / Ctrl+Shift+R | Debug overlay (drag title · resize **⤡** corner) |
+| **L / R / T / C / Y** | Supply / roads / rails / cities / sites overlays |
+| **F5 / F9** | Quicksave / quickload |
+| **Menu** | Save manager, trade, help, restart scenario |
+| Camera | Zoom wheel · WASD / edge pan · middle-drag |
 
 ---
 
@@ -85,11 +99,20 @@ Production lines feed these designs. Key equipment categories include infantry g
 
 ---
 
-## Development & Testing (May 2026)
+## Development & Testing (June 2026)
 
 - **Current state:** [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md)
-- **Testing plan:** [docs/TESTING_PLAN.md](docs/TESTING_PLAN.md) (Time, daily agent pressure, Support/Radio, multi-overlay map)
+- **Documentation index:** [docs/README.md](docs/README.md)
 - **Roadmap / tasks:** [TODO.md](TODO.md)
+- **Testing plan:** [docs/TESTING_PLAN.md](docs/TESTING_PLAN.md)
+- **Map QC:** [docs/TEST_MAP_GRAND_THEATER_FOUNDATION.md](docs/TEST_MAP_GRAND_THEATER_FOUNDATION.md)
+
+### Playtest quick start
+
+1. Godot **4.6.2+** → open `scenes/TestScenario.tscn` → **F5**
+2. Default: **phase1_europe_test** with grand theater underlay
+3. **F10** — debug overlay (collapsible sections, map editor, border/combat tools)
+4. Headless smoke: `godot --headless --path . res://scenes/TestScenario.tscn --quit-after 15`
 
 ---
 
@@ -148,7 +171,7 @@ Production lines feed these designs. Key equipment categories include infantry g
 - Balance, alt-history events, Steam integration
 - Mod support expansion
 
-**Note on Map Visuals**: The current interactive province map works well. A full visual overhaul (high-res Earth background + refined province artwork) is deferred to leverage better image generation and design tools available now. Conceptual assets and icons can be prototyped immediately.
+**Note on Map Visuals (updated June 2026):** Grand theater underlay, terrain toggle, dynamic borders, starter map editor, and resizable F10 debug panel are **in the build**. Main-loop combat and production-grade 8K source art are **next** — see [docs/CURRENT_STATE.md](docs/CURRENT_STATE.md).
 
 ---
 
@@ -165,14 +188,20 @@ Production lines feed these designs. Key equipment categories include infantry g
 
 1. Clone the repository
 2. Open in **Godot 4.6.2** or newer
-3. Open `scenes/WorldMap.tscn`
-4. Press **F5** to run
+3. For full playtest harness: open `scenes/TestScenario.tscn` and press **F5**
+4. Or open `scenes/WorldMap.tscn` for the base map scene
 
 ---
 
 ## Map & Visual Assets
 
-The current province map and camera are functional. We can generate conceptual art, icons, UI mockups, or style references right here using available image tools for inspiration or prototyping. Actual in-game textures and a polished world map can be integrated once data models are firmer. Let me know if you want example generations (e.g., espionage facility concepts, designer UI mockups, or alternate province styles).
+The game uses a **grand theater stylized Europe raster** (`assets/maps/europe_grand_theater_ultra_high.jpg`) as the primary underlay, with province vectors and overlays on top. Legacy grey `world_map` assets are suppressed on load.
+
+- Toggle **terrain layer** (detailed art vs clean political view) in Debug → Map Visual Editor
+- Curate placements at high zoom; export `user://map_editor_placements.json` for python roundtrip
+- Replace the placeholder JPG with your final upscaled master when ready (see grand theater test doc)
+
+QC checklist: [docs/TEST_MAP_GRAND_THEATER_FOUNDATION.md](docs/TEST_MAP_GRAND_THEATER_FOUNDATION.md)
 
 ---
 

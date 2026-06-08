@@ -109,12 +109,28 @@ func get_aggregated_infantry_stats(design_data: DesignDataLoader = null) -> Dict
 		"hard_attack": total_hard / float(sample_count),
 		"supply_consumption": total_supply / float(sample_count),
 		"reliability": total_reliability / float(sample_count),
-		"generation": get_average_generation(),
+		"generation": get_reported_generation(),
 		"average_generation": get_average_generation(),
+		"peak_generation": get_peak_generation(),
 	}
 
 
+func get_peak_generation() -> int:
+	resolve_subunits()
+	var peak := 1
+	for subunit in _resolved_subunits:
+		if subunit.has("infantry_equipment_generation"):
+			peak = maxi(peak, int(subunit["infantry_equipment_generation"]))
+	return peak
+
+
+## Mixed divisions report the highest generation present (e.g. bolt action + assault rifle → gen 3).
+func get_reported_generation() -> int:
+	return maxi(get_peak_generation(), get_average_generation())
+
+
 func get_average_generation() -> int:
+	resolve_subunits()
 	var total := 0
 	var count := 0
 	for subunit in _resolved_subunits:

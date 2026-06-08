@@ -31,8 +31,10 @@ NationalSpiritManager="*res://scripts/national/NationalSpiritManager.gd"
 TradeManager="*res://scripts/national/TradeManager.gd"
 MapManager="*res://scripts/map/MapManager.gd"
 InfrastructureDevelopmentManager="*res://scripts/map/InfrastructureDevelopmentManager.gd"
+SpecialSiteManager="*res://scripts/map/SpecialSiteManager.gd"
 TechnologyManager="*res://scripts/technology/TechnologyManager.gd"
 SaveLoadManager="*res://scripts/autoload/SaveLoadManager.gd"
+BattleManager="*res://scripts/combat/BattleManager.gd"
 
 [display]
 

@@ -1069,6 +1069,9 @@ func try_instant_player_replacement(request: Dictionary) -> bool:
 		return false
 	if not is_player_country(str(request.get("country_tag", ""))):
 		return false
+	if str(request.get("context", "")) == REPLACEMENT_CONTEXT_FORMATION:
+		if get_formation(str(request.get("target_id", ""))) == null:
+			return false
 	var candidates := get_replacement_candidates(request)
 	if candidates.size() != 1:
 		return false
@@ -1105,7 +1108,10 @@ func resolve_leader_replacement(
 
 	match context:
 		REPLACEMENT_CONTEXT_FORMATION:
-			applied = assign_leader_to_formation(new_leader_id, target_id)
+			if get_formation(target_id) != null:
+				applied = assign_leader_to_formation(new_leader_id, target_id)
+			else:
+				applied = assign_leader_to_army(new_leader_id, target_id)
 		REPLACEMENT_CONTEXT_NATIONAL_POSITION:
 			if target_id == POSITION_OFFICER_TRAINING:
 				applied = set_officer_training_leader(country, new_leader_id)
@@ -1192,7 +1198,7 @@ func _enqueue_formation_command_vacancy(
 	cause: String,
 ) -> void:
 	var formation := get_formation(formation_id)
-	if formation == null or formation.has_leader():
+	if formation != null and formation.has_leader():
 		return
 
 	var formation_label := formation_id
@@ -1239,7 +1245,8 @@ func _is_replacement_request_still_valid(request: Dictionary) -> bool:
 		REPLACEMENT_CONTEXT_FORMATION:
 			var formation := get_formation(target_id)
 			if formation == null:
-				return false
+				# Legacy army_id assignments (e.g. third_army_test) have no Formation registry.
+				return true
 			return not formation.has_leader()
 		REPLACEMENT_CONTEXT_NATIONAL_POSITION:
 			if not country_positions.has(country_tag):
@@ -1521,7 +1528,7 @@ func _build_leader_screen_data(country_tag: String) -> LeaderScreenData:
 
 	if country_positions.has(country_tag):
 		data.national_positions = (country_positions[country_tag] as Dictionary).duplicate()
-		data.national_position_bonuses = get_national_bonuses(country_tag)
+	data.national_position_bonuses = get_national_bonuses(country_tag)
 
 	data.has_many_injured = (
 		data.total_leaders > 0 and float(injured) > float(data.total_leaders) * 0.25
@@ -2050,6 +2057,8 @@ func apply_training_path_supply_to_stats(
 		return stats
 
 	var leader_id := resolve_leader_id_for_formation(army_or_unit_id)
+	if leader_id.is_empty() and get_leader(army_or_unit_id) != null:
+		leader_id = army_or_unit_id
 	var modifiers := get_leader_training_path_supply_modifiers(leader_id)
 	if modifiers.is_empty():
 		return stats
@@ -3004,7 +3013,9 @@ func generate_new_leader_from_training(
 		return new_leader
 
 	new_leader.experience = randi_range(35, 75) + int(effective_quality * 0.6)
-	_apply_officer_cadet_trait_inheritance(new_leader, training_leader, effective_quality)
+	# Apply mentor flaws before positive traits so exclusive_with does not block inheritance.
+	_apply_officer_cadet_flaw_inheritance(new_leader, training_leader, effective_quality)
+	_apply_officer_cadet_positive_inheritance(new_leader, training_leader, effective_quality)
 
 	return new_leader
 
@@ -3194,7 +3205,28 @@ func _roll_officer_cadet_skills(
 	leader.initiative_skill = clampi(leader.initiative_skill, 1, MAX_SKILL)
 
 
-func _apply_officer_cadet_trait_inheritance(
+func _apply_officer_cadet_flaw_inheritance(
+	cadet: Leader,
+	mentor: Leader,
+	effective_quality: float,
+) -> void:
+	var negative_traits := _get_negative_traits(mentor)
+	if negative_traits.is_empty():
+		return
+
+	var negative_chance := OFFICER_TRAINING_NEGATIVE_BASE_CHANCE - (
+		effective_quality / OFFICER_TRAINING_NEGATIVE_QUALITY_DIVISOR
+	)
+	negative_chance = clampf(negative_chance, 0.22, OFFICER_TRAINING_NEGATIVE_TRAIT_INHERIT_CHANCE)
+	if randf() >= negative_chance:
+		return
+
+	for flaw_id in negative_traits:
+		if try_add_trait_to_leader(cadet, flaw_id, 1):
+			return
+
+
+func _apply_officer_cadet_positive_inheritance(
 	cadet: Leader,
 	mentor: Leader,
 	effective_quality: float,
@@ -3202,19 +3234,28 @@ func _apply_officer_cadet_trait_inheritance(
 	if mentor.trait_levels.is_empty():
 		return
 
-	var positive_chance := OFFICER_TRAINING_POSITIVE_BASE_CHANCE + (effective_quality / OFFICER_TRAINING_POSITIVE_QUALITY_DIVISOR)
-	if randf() < positive_chance:
-		var positive_traits := _get_positive_traits(mentor)
-		if not positive_traits.is_empty():
-			var trait_id := str(positive_traits[randi() % positive_traits.size()])
-			try_add_trait_to_leader(cadet, trait_id, 1)
+	var positive_chance := OFFICER_TRAINING_POSITIVE_BASE_CHANCE + (
+		effective_quality / OFFICER_TRAINING_POSITIVE_QUALITY_DIVISOR
+	)
+	if randf() >= positive_chance:
+		return
 
-	var negative_chance := OFFICER_TRAINING_NEGATIVE_BASE_CHANCE - (effective_quality / OFFICER_TRAINING_NEGATIVE_QUALITY_DIVISOR)
-	if randf() < negative_chance:
-		var negative_traits := _get_negative_traits(mentor)
-		if not negative_traits.is_empty():
-			var flaw_id := str(negative_traits[randi() % negative_traits.size()])
-			try_add_trait_to_leader(cadet, flaw_id, 1)
+	var positive_traits := _get_positive_traits(mentor)
+	if positive_traits.is_empty():
+		return
+
+	var trait_id := str(positive_traits[randi() % positive_traits.size()])
+	try_add_trait_to_leader(cadet, trait_id, 1)
+
+
+## Legacy wrapper kept for any external callers.
+func _apply_officer_cadet_trait_inheritance(
+	cadet: Leader,
+	mentor: Leader,
+	effective_quality: float,
+) -> void:
+	_apply_officer_cadet_flaw_inheritance(cadet, mentor, effective_quality)
+	_apply_officer_cadet_positive_inheritance(cadet, mentor, effective_quality)
 
 
 func _get_positive_traits(leader: Leader) -> Array[String]:
@@ -3411,6 +3452,12 @@ func get_leader_roster_paths_for_scenario(scenario_name: String) -> Array[String
 	var candidate := "res://data/leaders/historical_leaders_%s.json" % key
 	if ResourceLoader.exists(candidate):
 		return [candidate]
+	# Playtest scenarios (e.g. phase1_europe_test) use 1936 start dates but have no dedicated roster file.
+	if key.contains("test") or key.contains("phase1") or key.contains("playtest"):
+		var fallback: Array[String] = []
+		for roster_path in SCENARIO_LEADER_ROSTER_CHAIN["1936"] as Array:
+			fallback.append(str(roster_path))
+		return fallback
 	push_warning(
 		"LeaderManager: no roster file for scenario '%s' (expected %s)"
 		% [scenario_name, candidate]

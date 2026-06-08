@@ -63,6 +63,9 @@ var scenario_start_year: int = 1936
 var paused: bool = false
 var time_scale: float = 1.0   # Future use for simulation speed (1.0, 2.0, 5.0, etc.)
 
+## Monotonic day counter since scenario start (incremented in advance_days).
+var total_days_elapsed: int = 0
+
 # Internal accumulator for real-time driven simulation (in game days)
 var _accumulated_game_days: float = 0.0
 
@@ -94,6 +97,8 @@ func initialize_from_scenario_start_date(start_date_str: String) -> void:
 	else:
 		current_day = 1
 
+	total_days_elapsed = 0
+
 	print("TimeManager: Scenario start date set to %s (year %d)" % [scenario_start_date, current_year])
 
 func get_current_year() -> int:
@@ -104,6 +109,10 @@ func get_current_month() -> int:
 
 func get_current_day() -> int:
 	return current_day
+
+
+func get_total_days_elapsed() -> int:
+	return total_days_elapsed
 
 ## Returns true if we are currently on day 1 of the month (simple proxy for "just entered a new day cycle" in some contexts).
 ## Most systems should connect to the `game_day_advanced` signal instead of polling.
@@ -214,6 +223,7 @@ func advance_days(days: float) -> void:
 				crossed_year = true
 
 		# Emit daily tick for every day advanced (guaranteed valid day 1-31)
+		total_days_elapsed += 1
 		game_day_advanced.emit(current_year, current_month, current_day)
 
 		if crossed_month:
@@ -262,6 +272,7 @@ func get_save_data() -> Dictionary:
 		"scenario_start_date": scenario_start_date,
 		"paused": paused,
 		"time_scale": time_scale,
+		"total_days_elapsed": total_days_elapsed,
 	}
 
 ## Applies previously saved calendar state. Does NOT emit day/month/year signals
@@ -278,3 +289,5 @@ func apply_save_data(data: Dictionary) -> void:
 		set_paused(bool(data["paused"]))
 	if data.has("time_scale"):
 		set_time_scale(float(data.get("time_scale", 1.0)))
+	if data.has("total_days_elapsed"):
+		total_days_elapsed = maxi(0, int(data.get("total_days_elapsed", 0)))

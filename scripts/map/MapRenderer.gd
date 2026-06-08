@@ -127,6 +127,16 @@ var _special_sites_container: VBoxContainer = null
 @export var create_area_nodes_for_fallback: bool = true
 #endregion
 
+const GRAND_THEATER_CANONICAL_BOUNDS := Rect2(0, 0, 5000, 2000)  # Larger canvas for the up-quality, larger high-res version of the grand theater stylized map (image 45 equivalent, 8K+ support). Allows closer zoom views so counters, lines, weather overlays, and placed objects look crisp on the detailed terrain/rivers without pixelation or loss of quality. Use this as the full underlay.
+
+const COUNTRY_BORDER_COLOR := Color(0.03, 0.03, 0.05, 0.92)
+const COUNTRY_BORDER_WIDTH := 3.8
+const COUNTRY_FRONTIER_PREFIX := "CountryFrontier_"
+const _EDGE_KEY_PRECISION := 1.0
+
+## Toggle for separate terrain layer (the high-res detailed raster bg image). When OFF: clean political view (solid ownership fills, no terrain texture underneath) — highly valued in grand strat (HOI4/EU4 players often prefer political/clean for readability of borders/infra/ownership; use terrain mode for combat planning/immersion). Perfect for map editing at close zoom too.
+var show_terrain_layer: bool = true
+
 var _is_middle_dragging := false
 var _middle_drag_start := Vector2.ZERO
 var _last_mouse_pos := Vector2.ZERO
@@ -168,6 +178,12 @@ var _map_time_pulse_until_msec: int = 0
 var _engineer_assign_flash_by_province: Dictionary[int, Dictionary] = {}
 const _ENGINEER_ASSIGN_FLASH_MS := 2400
 var _engineer_deploy_pick_index: int = 0
+var debug_combat_attacker_province_id: int = -1
+## Player-selected province to launch assaults from (Ctrl+click enemy to attack).
+var attack_staging_province_id: int = -1
+
+var _btn_attack: Button = null
+var border_layer: Node2D = null
 
 #region Supply overlay
 @export var supply_overlay_panel: SupplyMenuPanel
@@ -183,6 +199,8 @@ const META_MAP_GLYPH_OFFS := &"_map_glyph_offs"
 var _zoom_fill_characterization_scale: float = 1.0
 var _fill_color_zoom_bucket: int = -2000000000
 var _fill_zoom_at_last_paint: float = -10.0
+var _last_detail_zoom: float = -1.0
+var _last_hover_mouse: Vector2 = Vector2(-99999, -99999)
 
 #region Conflict overlay
 @export var show_conflict_overlay: bool = true
@@ -194,11 +212,14 @@ var _conflict_layer: ConflictOverlayLayer = null
 var _agent_layer: AgentNetworkLayer = null
 #endregion
 
+var weather_layer: Node = null  # WeatherOverlayLayer when present (grand high-res snow/blackout etc.)
+
 var _btn_station_engineers: Button = null
 
 
 func _ready():
 	add_to_group("map_renderer")
+	_wire_info_panel_refs()
 	if btn_close == null:
 		btn_close = get_node_or_null("UI/InfoPanel/BtnClose") as Button
 
@@ -219,6 +240,71 @@ func _ready():
 		print("✅ Camera2D activated")
 	else:
 		push_warning("MapRenderer: MapCamera node missing!")
+
+	# Set default stylized colorized detailed map (user requested image 45 / grand_theater as the map for now).
+	# This ensures at first load we see the high-detail no-borders stylized map, not the old grey/black base.
+	var init_bg := get_node_or_null("WorldBackground") as Sprite2D
+	if init_bg:
+		if init_bg.texture and "world_map" in str(init_bg.texture.resource_path).to_lower():
+			init_bg.visible = false
+		# Idempotent high-res set: if we already have a grand ultra high on this node, just suppress + fit (avoids spam on repeated scenario loads).
+		if init_bg.texture:
+			var rpp := str(init_bg.texture.resource_path).to_lower()
+			if "ultra_high" in rpp or "grand_theater" in rpp:
+				_suppress_old_background_maps()
+				call_deferred("_fit_background_to_bounds")
+				# fall through to other _ready setup
+			else:
+				# Prefer the highest quality/larger version of the grand theater stylized map for closer zoom views (counters, lines, weather, objects look better on detailed terrain).
+				# Generate or use an 8K+ ultra high res version of the grand theater image (the one requested) and place it as europe_grand_theater_ultra_high.jpg or similar.
+				# The code will pick the best available for quality.
+				var tex := load("res://assets/maps/europe_grand_theater_ultra_high.jpg") as Texture2D
+				if tex == null:
+					tex = load("res://assets/maps/europe_grand_theater_ultra_high.png") as Texture2D
+				if tex == null:
+					tex = load("res://assets/maps/europe_grand_theater_ultra_1936.jpg") as Texture2D
+				if tex == null:
+					tex = load("res://assets/maps/europe_grand_theater_ultra_1936.png") as Texture2D
+				if tex == null:
+					tex = load("res://assets/maps/europe_ultra_detail_1936_4k.png") as Texture2D
+				if tex:
+					init_bg.texture = tex
+					init_bg.visible = true
+					init_bg.modulate = Color(0.92, 0.90, 0.85, 0.92)
+					init_bg.centered = false
+					var is_high = "ultra_high" in str(tex.resource_path).to_lower()
+					print("MapRenderer: Default stylized grand theater map set (", "HIGH QUALITY LARGER 8K+ version for close zoom" if is_high else "high quality larger version for close zoom", " - detailed colorized, replaces old map)")
+					# To ensure higher zoom works with the new 8K map, the camera max_zoom is increased, and initial view is closer. The high res texture with mipmap allows close views of areas, counters, lines, weather on the terrain.
+					call_deferred("_fit_background_to_bounds")
+		else:
+			# Prefer the highest quality/larger version of the grand theater stylized map for closer zoom views (counters, lines, weather, objects look better on detailed terrain).
+			# Generate or use an 8K+ ultra high res version of the grand theater image (the one requested) and place it as europe_grand_theater_ultra_high.jpg or similar.
+			# The code will pick the best available for quality.
+			var tex := load("res://assets/maps/europe_grand_theater_ultra_high.jpg") as Texture2D
+			if tex == null:
+				tex = load("res://assets/maps/europe_grand_theater_ultra_high.png") as Texture2D
+			if tex == null:
+				tex = load("res://assets/maps/europe_grand_theater_ultra_1936.jpg") as Texture2D
+			if tex == null:
+				tex = load("res://assets/maps/europe_grand_theater_ultra_1936.png") as Texture2D
+			if tex == null:
+				tex = load("res://assets/maps/europe_ultra_detail_1936_4k.png") as Texture2D
+			if tex:
+				init_bg.texture = tex
+				init_bg.visible = true
+				init_bg.modulate = Color(0.92, 0.90, 0.85, 0.92)
+				init_bg.centered = false
+				var is_high = "ultra_high" in str(tex.resource_path).to_lower()
+				print("MapRenderer: Default stylized grand theater map set (", "HIGH QUALITY LARGER 8K+ version for close zoom" if is_high else "high quality larger version for close zoom", " - detailed colorized, replaces old map)")
+				# To ensure higher zoom works with the new 8K map, the camera max_zoom is increased, and initial view is closer. The high res texture with mipmap allows close views of areas, counters, lines, weather on the terrain.
+				call_deferred("_fit_background_to_bounds")
+		# Aggressively hide any background underneath (ProvinceMap or other rasters that may show old grey map)
+		var pm := find_child("ProvinceMap", true, false) as Sprite2D
+		if pm:
+			pm.visible = false
+			pm.texture = null
+			pm.modulate = Color(0,0,0,0)  # fully transparent to avoid any bleed
+		_suppress_old_background_maps()
 
 	_setup_hover_tooltip()
 	_setup_inspector_extras()
@@ -255,6 +341,13 @@ func _on_map_province_data_changed(province_id: int, what: String) -> void:
 			show_info_panel(provinces[province_id])
 	if _hover_fill_province_id == province_id:
 		_apply_hover_fill(province_id, true)
+	if what in ["owner", "controller", "all"]:
+		if typeof(MapManager) != TYPE_NIL:
+			var live: Province = MapManager.get_province(province_id)
+			if live != null and provinces.has(province_id):
+				provinces[province_id].owner_tag = live.owner_tag
+				provinces[province_id].controller_tag = live.controller_tag
+		_update_country_borders()
 
 
 func _connect_trade_manager_signals_for_map_layers() -> void:
@@ -445,13 +538,52 @@ func _expire_map_time_pulse_if_needed() -> void:
 		_update_supply_legend_text()
 
 
+func _wire_info_panel_refs() -> void:
+	var ui := get_node_or_null("UI")
+	if ui == null:
+		push_warning("MapRenderer: UI CanvasLayer missing — province inspector unavailable")
+		return
+	if info_panel == null:
+		info_panel = ui.get_node_or_null("InfoPanel") as Panel
+	if info_name == null:
+		info_name = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelName") as Label
+	if info_owner == null:
+		info_owner = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelOwner") as Label
+	if info_population == null:
+		info_population = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelPopulation") as Label
+	if info_terrain == null:
+		info_terrain = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelTerrain") as Label
+	if info_factories == null:
+		info_factories = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelFactories") as Label
+	if info_dev == null:
+		info_dev = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelDev") as Label
+	if info_resources == null:
+		info_resources = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelResources") as Label
+	if info_core == null:
+		info_core = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelCore") as Label
+	if info_special == null:
+		info_special = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelSpecial") as Label
+	if info_logistics == null:
+		info_logistics = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelLogistics") as Label
+	if info_combat == null:
+		info_combat = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelCombat") as Label
+	if info_modifiers == null:
+		info_modifiers = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/RichTextModifiers") as RichTextLabel
+	if info_national == null:
+		info_national = ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent/LabelNationalHeader") as Label
+	if btn_national_spirits == null:
+		btn_national_spirits = ui.get_node_or_null("InfoPanel/BtnNationalSpirits") as Button
+	if btn_close == null:
+		btn_close = ui.get_node_or_null("InfoPanel/BtnClose") as Button
+
+
 func _setup_inspector_extras() -> void:
 	if btn_national_spirits and not btn_national_spirits.pressed.is_connected(_on_open_national_spirits_pressed):
 		btn_national_spirits.pressed.connect(_on_open_national_spirits_pressed)
 	if info_modifiers == null:
-		info_modifiers = get_node_or_null("UI/InfoPanel/InfoContent/RichTextModifiers") as RichTextLabel
+		info_modifiers = get_node_or_null("UI/InfoPanel/InfoScroll/InfoContent/RichTextModifiers") as RichTextLabel
 	if info_national == null:
-		info_national = get_node_or_null("UI/InfoPanel/InfoContent/LabelNationalHeader") as Label
+		info_national = get_node_or_null("UI/InfoPanel/InfoScroll/InfoContent/LabelNationalHeader") as Label
 	if info_modifiers:
 		info_modifiers.bbcode_enabled = true
 		info_modifiers.fit_content = false
@@ -462,6 +594,7 @@ func _setup_inspector_extras() -> void:
 		if btn_national_spirits and not btn_national_spirits.pressed.is_connected(_on_open_national_spirits_pressed):
 			btn_national_spirits.pressed.connect(_on_open_national_spirits_pressed)
 	_ensure_station_engineers_button()
+	_ensure_attack_button()
 
 
 func _setup_hover_tooltip() -> void:
@@ -490,6 +623,33 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
+		# Demo toggles for new dynamic infra layers (roads/rails/cities/sites) - makes map come alive with player builds.
+		# R/T/C/Y or F10 DebugOverlay buttons. Sites layer shows vector runways/docks for airfields/ports.
+		if event.keycode == KEY_R:
+			var ol := get_overlay_layer("InfrastructureOverlayLayer")
+			if ol and ol.has_method("toggle_roads"):
+				ol.toggle_roads()
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_T:  # T for rails (R taken)
+			var ol := get_overlay_layer("InfrastructureOverlayLayer")
+			if ol and ol.has_method("toggle_rails"):
+				ol.toggle_rails()
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_C:
+			var ol := get_overlay_layer("InfrastructureOverlayLayer")
+			if ol and ol.has_method("toggle_cities"):
+				ol.toggle_cities()
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_Y:  # Y for "Yards / special sites" (airfields, ports, etc.)
+			var ol := get_overlay_layer("InfrastructureOverlayLayer")
+			if ol and ol.has_method("toggle_sites"):
+				ol.toggle_sites()
+			get_viewport().set_input_as_handled()
+			return
+
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
@@ -500,10 +660,26 @@ func _unhandled_input(event: InputEvent) -> void:
 		if pid >= 0 and provinces.has(pid):
 			var resolved_province: Province = provinces[pid] as Province
 			var resolved_node: Node2D = _province_node(pid)
+			if event is InputEventMouseButton and event.ctrl_pressed:
+				if _try_execute_province_attack(pid, resolved_province):
+					get_viewport().set_input_as_handled()
+					return
 			if event is InputEventMouseButton and event.shift_pressed:
+				if typeof(DebugOverlay) != TYPE_NIL and DebugOverlay.is_map_debug_tools_active():
+					if selected_province_id >= 0 and adjacency != null and adjacency.are_adjacent(pid, selected_province_id):
+						debug_combat_attacker_province_id = pid
+						attack_staging_province_id = pid
+						DebugOverlay.toast_map_debug(
+							"Attacker staging: %s (%d) → battle at selected %d"
+							% [resolved_province.name, pid, selected_province_id]
+						)
+						get_viewport().set_input_as_handled()
+						return
 				if _try_station_engineers_at_province(resolved_province):
 					get_viewport().set_input_as_handled()
 					return
+			if _try_set_attack_staging(resolved_province):
+				pass  # still open inspector below
 			if supply_mode and _handle_supply_province_click(resolved_province):
 				_select_province(resolved_province, resolved_node)
 				get_viewport().set_input_as_handled()
@@ -512,6 +688,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			_select_province(resolved_province, resolved_node)
 			get_viewport().set_input_as_handled()
 			return
+
+	if use_spatial_picking and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+		if typeof(DebugOverlay) != TYPE_NIL and DebugOverlay.is_map_debug_tools_active():
+			var world_pos_r := _screen_to_world(get_viewport().get_mouse_position())
+			var pid_r := -1
+			if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
+				pid_r = MapManager.get_province_at_world_pos(world_pos_r, true)
+			if pid_r >= 0:
+				debug_cycle_province_owner(pid_r)
+				get_viewport().set_input_as_handled()
+				return
 
 	# Middle mouse drag start
 	if event is InputEventMouseButton:
@@ -637,23 +824,38 @@ func _refresh_province_detail_visibility() -> void:
 			_fill_color_zoom_bucket = b
 		_refresh_province_fill_colors()
 
-	for id in _province_name_labels:
-		var lbl: Variant = _province_name_labels[id]
-		if lbl is Label and is_instance_valid(lbl):
-			(lbl as Label).visible = show_province_names and show_details
-			if show_province_names and show_details:
-				var l2 := lbl as Label
-				l2.z_index = _map_province_name_label_z_index()
-				l2.add_theme_font_size_override("font_size", _scale_province_name_font(current_zoom, true))
-				_apply_province_name_label_readability_styles(l2, current_zoom)
+	# Gate heavy per-frame glyph/name style + layout work (theme overrides, reset_size, positions).
+	# Only re-apply when zoom meaningfully changes (or first time). This prevents constant CPU
+	# on idle after load while keeping LOD correct on actual zoom/pan.
+	var zoom_for_details := current_zoom
+	var detail_delta := absf(zoom_for_details - _last_detail_zoom)
+	var needs_detail_update := bucket_changed or drift or detail_delta > 0.003 or _last_detail_zoom < 0.0
+	if needs_detail_update:
+		_last_detail_zoom = zoom_for_details
 
-	for pid in province_nodes:
-		var node: Variant = province_nodes[pid]
-		if node is Node2D and is_instance_valid(node):
-			for child in (node as Node2D).get_children():
-				if child is Label and not (child as Label).has_meta(META_MAP_GLYPH_PX):
-					(child as Label).visible = show_details
-			_layout_zoomed_map_glyphs_for_province_node(int(pid), current_zoom, show_details)
+	# For high-detail phase1 bg + roads overlay: fade in the detail layer on zoom for better province-level roads/buildings/cities visibility.
+	var detail_layer := container.get_node_or_null("DetailOverlay") as Sprite2D
+	if detail_layer and detail_layer.texture:
+		var target_a := clampf( (current_zoom - 0.3) * 1.2 , 0.3, 0.95)
+		detail_layer.modulate.a = target_a
+
+		for id in _province_name_labels:
+			var lbl: Variant = _province_name_labels[id]
+			if lbl is Label and is_instance_valid(lbl):
+				(lbl as Label).visible = show_province_names and show_details
+				if show_province_names and show_details:
+					var l2 := lbl as Label
+					l2.z_index = _map_province_name_label_z_index()
+					l2.add_theme_font_size_override("font_size", _scale_province_name_font(current_zoom, true))
+					_apply_province_name_label_readability_styles(l2, current_zoom)
+
+		for pid in province_nodes:
+			var node: Variant = province_nodes[pid]
+			if node is Node2D and is_instance_valid(node):
+				for child in (node as Node2D).get_children():
+					if child is Label and not (child as Label).has_meta(META_MAP_GLYPH_PX):
+						(child as Label).visible = show_details
+				_layout_zoomed_map_glyphs_for_province_node(int(pid), current_zoom, show_details)
 
 
 ## Smooth 0→1 ramp as map scale enters tactical band (relative to `terrain_zoom_near_thresh`).
@@ -807,6 +1009,7 @@ func initialize(p_provinces: Dictionary, p_geometry: Dictionary, p_adjacency: Ad
 	adjacency = p_adjacency
 	countries = MapScenarioData.coerce_countries(p_countries)
 	render_provinces()
+	_fit_background_to_bounds()
 
 
 func render_provinces():
@@ -817,7 +1020,14 @@ func render_provinces():
 	var restore_pid := selected_province_id if info_panel != null and info_panel.visible else -1
 
 	_clear_selection()
+	# Preserve rasters and weather layer so map images (WorldBackground/ProvinceMap) and weather visuals survive the render clear and
+	# continue to provide the underlay for polys + outlines (fixes "no map images, only outlines"). Weather layer is preserved like rasters.
+	var raster_preserved: Dictionary = {}
 	for child in container.get_children():
+		if child.name in ["WorldBackground", "ProvinceMap", "WeatherOverlayLayer"]:
+			raster_preserved[child.name] = child
+			container.remove_child(child)
+			continue
 		child.queue_free()
 	province_nodes.clear()
 	province_centroids.clear()
@@ -835,12 +1045,51 @@ func render_provinces():
 		container.add_child(node)
 		province_nodes[id] = node
 
+	# Re-attach any preserved rasters so the map image is present for the new polys.
+	for rname in raster_preserved:
+		var r = raster_preserved[rname]
+		if r:
+			container.add_child(r)
+			r.name = rname
+
+	# Ensure WorldBackground (the high-res terrain layer) draws first (under polys)
+	var wb_re := container.get_node_or_null("WorldBackground") as Sprite2D
+	if wb_re:
+		container.move_child(wb_re, 0)
+
+	# After re-attach, immediately suppress any old background map (e.g. ProvinceMap that could show grey underneath the stylized one)
+	_suppress_old_background_maps()
+
+	# Fit the (stylized grand) background to current bounds so the detailed map aligns properly on load/render.
+	_fit_background_to_bounds()
+
+	# Extra: in grand mode, ensure polys use low fill so the detailed image (requested map) is the visible terrain, not a "grey map" from fills.
+	# This is called here too for loads where render happens without full apply.
+	if is_using_grand_stylized_map() or true:  # allow clean mode even on non-grand loads
+		for id in province_nodes:
+			var n = province_nodes[id]
+			if n:
+				for ch in n.get_children():
+					if ch is Polygon2D:
+						var c := (ch as Polygon2D).color
+						c.a = 0.06 if show_terrain_layer else 0.82
+						(ch as Polygon2D).color = c
+
+	# Support for in-game ProvinceEditor (docs/PROVINCE_EDITOR_IN_GAME_DESIGN.md)
+	# When active, the editor can request lower normal province visibility so the clean parchment base + new drawn borders are easier to see.
+	var prov_editor := container.get_node_or_null("ProvinceEditor") as Node
+	if prov_editor and prov_editor.has_method("is_active") and prov_editor.is_active():
+		# Editor is drawing — we could further dim normal fills here if desired
+		pass
+
 	_fill_color_zoom_bucket = -2000000000
 	_fill_zoom_at_last_paint = -10.0
 	_refresh_province_detail_visibility()
 	_setup_supply_layer()
 	_setup_conflict_layer()
 	_setup_agent_layer()
+	_setup_infrastructure_overlay_layer()
+	call_deferred("_setup_weather_overlay_layer")
 	_refresh_supply_highlights()
 	_update_compare_hint_label()
 	print("✅ Map rendered with real polygons")
@@ -855,6 +1104,28 @@ func render_provinces():
 	# Sync MapPickGrid (via MapManager) after rendering for best picking accuracy
 	if use_spatial_picking and typeof(MapManager) != TYPE_NIL and MapManager.has_method("rebuild_pick_grid"):
 		MapManager.rebuild_pick_grid()
+
+	_update_country_borders()
+	_update_unit_icons_for_test()  # demo: show generated NATO icons on provinces that have the test formations spawned in TestRunner/DebugOverlay loads
+
+
+## Switch to a clean base map texture (no political styling, clear rivers/mountains for editing provinces).
+## Call from Debug or editor (ProvinceEditor). Falls back if file not present.
+## Recommended: prepare a dedicated clean_parchment version of your grand theater image with no borders/text for best editing experience.
+func set_clean_base_map(texture_path: String = "res://assets/maps/europe_grand_theater_ultra_high.jpg") -> void:
+	var bg := find_child("WorldBackground", true, false) as Sprite2D
+	if bg == null:
+		return
+	if ResourceLoader.exists(texture_path):
+		var tex := load(texture_path) as Texture2D
+		if tex:
+			bg.texture = tex
+			bg.modulate = Color(0.95, 0.93, 0.88, 0.98)  # slightly cleaner paper tone for editing
+			bg.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+			print("MapRenderer: Switched to clean base map for province editing: ", texture_path)
+			_fit_background_to_bounds()
+	else:
+		push_warning("MapRenderer: Clean base map not found at " + texture_path + " - using current")
 
 
 func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
@@ -1032,7 +1303,15 @@ func _calculate_centroid(points: PackedVector2Array) -> Vector2:
 
 func _get_province_color(province: Province) -> Color:
 	var base := _political_province_base_color(province)
-	return _characterize_province_fill(base, province, _overlay_base_character_blend())
+	var c := _characterize_province_fill(base, province, _overlay_base_character_blend())
+	if is_using_grand_stylized_map() or (not show_terrain_layer):
+		if show_terrain_layer:
+			# Low alpha so the high-res detailed terrain/rivers/hills/swamp/desert image (the requested upscaled map) shows as the terrain layer.
+			c.a = 0.06
+		else:
+			# Clean political view: solid fills for ownership/infra focus (no terrain raster underneath). Matches player preference in HOI4/EU4 for clean modes.
+			c.a = 0.82
+	return c
 
 
 func _overlay_base_character_blend() -> float:
@@ -1374,11 +1653,16 @@ func _update_spatial_hover() -> void:
 	if not use_spatial_picking:
 		return
 
+	var mouse_screen := get_viewport().get_mouse_position()
+	# Skip expensive pick query + world transform when mouse hasn't moved (big idle CPU win after load).
+	if mouse_screen.distance_squared_to(_last_hover_mouse) < 0.5:
+		return
+	_last_hover_mouse = mouse_screen
+
 	var cam := get_viewport().get_camera_2d()
 	if cam == null:
 		return
 
-	var mouse_screen := get_viewport().get_mouse_position()
 	var world_pos := _screen_to_world(mouse_screen)
 
 	var pid := -1
@@ -1474,6 +1758,7 @@ func show_info_panel(province: Province) -> void:
 	_update_station_engineers_button(province)
 	_update_infrastructure_investment_ui(province)
 	_update_special_sites_ui(province)
+	_update_attack_button(province)
 
 
 func _ensure_station_engineers_button() -> void:
@@ -1569,35 +1854,39 @@ func _update_station_engineers_button(province: Province) -> void:
 
 # ====================== INFRASTRUCTURE INVESTMENT UI (Phase A) ======================
 
+func _info_content_vbox() -> VBoxContainer:
+	if info_name != null and info_name.get_parent() is VBoxContainer:
+		return info_name.get_parent() as VBoxContainer
+	var ui := get_node_or_null("UI")
+	if ui == null:
+		return null
+	return ui.get_node_or_null("InfoPanel/InfoScroll/InfoContent") as VBoxContainer
+
+
 func _ensure_infrastructure_investment_ui() -> void:
-	if info_panel == null:
+	var content := _info_content_vbox()
+	if content == null:
 		return
 	if _btn_invest_infra != null and is_instance_valid(_btn_invest_infra):
 		return
 
-	# Status label (shows "In Progress — 68% (ETA 9 days)" or current effective values)
 	_label_invest_status = Label.new()
 	_label_invest_status.name = "LabelInvestStatus"
 	_label_invest_status.text = ""
 	_label_invest_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	_label_invest_status.custom_minimum_size = Vector2(280, 0)
+	_label_invest_status.custom_minimum_size = Vector2(320, 0)
 	_label_invest_status.add_theme_font_size_override("font_size", 11)
-	info_panel.add_child(_label_invest_status)
+	content.add_child(_label_invest_status)
 
-	# Invest button
 	_btn_invest_infra = Button.new()
 	_btn_invest_infra.name = "BtnInvestInfrastructure"
 	_btn_invest_infra.text = "Invest in Infrastructure"
 	_btn_invest_infra.tooltip_text = "Start a provincial development project. Raises infrastructure over time, improving supply, combat width, and unlocking advanced factory types. Cost scales with current level."
-	_btn_invest_infra.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_btn_invest_infra.offset_left = 8.0
-	_btn_invest_infra.offset_top = 178.0   # Positioned below existing content (tune as needed)
-	_btn_invest_infra.offset_right = 195.0
-	_btn_invest_infra.offset_bottom = 200.0
+	_btn_invest_infra.custom_minimum_size = Vector2(200, 28)
 	_btn_invest_infra.visible = false
 	if not _btn_invest_infra.pressed.is_connected(_on_invest_infrastructure_pressed):
 		_btn_invest_infra.pressed.connect(_on_invest_infrastructure_pressed)
-	info_panel.add_child(_btn_invest_infra)
+	content.add_child(_btn_invest_infra)
 
 
 func _update_infrastructure_investment_ui(province: Province) -> void:
@@ -1680,14 +1969,168 @@ func _on_invest_infrastructure_pressed() -> void:
 
 	if result.get("success", false):
 		var eta := int(result.get("eta_days", 18))
-		print("Infrastructure project started on province %d — ETA ~%d days" % [selected_province_id, eta])
-		# Refresh the panel so the button immediately shows "Project Active"
+		var pname := ""
+		if provinces.has(selected_province_id):
+			pname = provinces[selected_province_id].name
+		_show_inspector_toast(
+			"Infrastructure project started%s — ETA ~%d days" % [
+				(" in " + pname) if not pname.is_empty() else "",
+				eta,
+			],
+			3.0,
+		)
 		if provinces.has(selected_province_id):
 			show_info_panel(provinces[selected_province_id])
 	else:
-		print("Cannot start infrastructure investment: %s" % result.get("reason", "unknown"))
+		_show_inspector_toast(
+			str(result.get("reason", "Cannot start infrastructure investment")),
+			3.5,
+			true,
+		)
 
-	# TODO (Phase B): Show a proper toast / confirmation popup instead of print
+
+func _show_inspector_toast(message: String, duration: float = 2.5, is_error: bool = false) -> void:
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast(message, duration, is_error)
+	else:
+		print(message)
+
+
+# ====================== PROVINCE ASSAULT (main combat loop) ======================
+
+func _try_set_attack_staging(province: Province) -> bool:
+	if province == null or typeof(BattleManager) == TYPE_NIL:
+		return false
+	var p_tag := _player_tag()
+	if p_tag.is_empty():
+		return false
+	if _province_controlled_by(province, p_tag):
+		var divisions: Array = BattleManager.get_divisions_at_province(province.id, p_tag)
+		if divisions.is_empty():
+			return false
+		attack_staging_province_id = province.id
+		debug_combat_attacker_province_id = province.id
+		_show_inspector_toast(
+			"Attack staging: %s — Ctrl+click adjacent enemy province" % province.name,
+			2.8,
+		)
+		return true
+	return false
+
+
+func _try_execute_province_attack(target_pid: int, target_province: Province) -> bool:
+	if target_province == null or typeof(BattleManager) == TYPE_NIL:
+		return false
+	var p_tag := _player_tag()
+	if p_tag.is_empty():
+		_show_inspector_toast("Set player country (TopInfoBar) before attacking.", 3.0, true)
+		return true
+
+	var from_pid := attack_staging_province_id
+	if from_pid < 0:
+		from_pid = debug_combat_attacker_province_id
+
+	var assault: Dictionary = BattleManager.execute_province_assault(p_tag, target_pid, from_pid)
+	if not bool(assault.get("success", false)):
+		_show_inspector_toast(str(assault.get("reason", "Attack failed")), 3.2, true)
+		return true
+
+	var result: Dictionary = assault.get("result", {}) as Dictionary
+	var winner := str(result.get("winner", ""))
+	var captured := bool(result.get("province_control_change", false))
+	var outcome := str(result.get("outcome", winner))
+	var atk := str(result.get("attacker_tag", p_tag))
+	var def := str(result.get("defender_tag", target_province.owner_tag))
+
+	if captured:
+		_show_inspector_toast(
+			"%s captured %s (%s)" % [atk, target_province.name, outcome],
+			4.0,
+		)
+		force_border_update()
+	elif winner == "attacker":
+		_show_inspector_toast(
+			"Attack repulsed at %s — %s (no capture)" % [target_province.name, outcome],
+			3.5,
+		)
+	else:
+		_show_inspector_toast(
+			"%s held %s — %s" % [def, target_province.name, outcome],
+			3.5,
+		)
+
+	if provinces.has(target_pid):
+		show_info_panel(provinces[target_pid])
+	return true
+
+
+func _province_controlled_by(province: Province, country_tag: String) -> bool:
+	if province == null:
+		return false
+	var tag := country_tag.strip_edges().to_upper()
+	var ctrl := province.controller_tag.strip_edges().to_upper()
+	if not ctrl.is_empty():
+		return ctrl == tag
+	return province.owner_tag.strip_edges().to_upper() == tag
+
+
+func _ensure_attack_button() -> void:
+	if info_panel == null:
+		return
+	if _btn_attack != null and is_instance_valid(_btn_attack):
+		return
+	_btn_attack = Button.new()
+	_btn_attack.name = "BtnAttackProvince"
+	_btn_attack.text = "Attack (Ctrl+click target)"
+	_btn_attack.tooltip_text = (
+		"Select a friendly province with a division, then Ctrl+click an adjacent enemy province.\n"
+		+ "Or click this button while viewing an attackable neighbor."
+	)
+	_btn_attack.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	_btn_attack.offset_left = 210.0
+	_btn_attack.offset_top = 8.0
+	_btn_attack.offset_right = 395.0
+	_btn_attack.offset_bottom = 32.0
+	_btn_attack.visible = false
+	if not _btn_attack.pressed.is_connected(_on_attack_province_pressed):
+		_btn_attack.pressed.connect(_on_attack_province_pressed)
+	info_panel.add_child(_btn_attack)
+
+
+func _update_attack_button(province: Province) -> void:
+	_ensure_attack_button()
+	if _btn_attack == null:
+		return
+	if province == null or typeof(BattleManager) == TYPE_NIL:
+		_btn_attack.visible = false
+		return
+
+	var p_tag := _player_tag()
+	if p_tag.is_empty():
+		_btn_attack.visible = false
+		return
+
+	var preview := BattleManager.can_assault_province(
+		p_tag,
+		province.id,
+		attack_staging_province_id if attack_staging_province_id >= 0 else debug_combat_attacker_province_id,
+	)
+	var can_attack := bool(preview.get("ok", false))
+	_btn_attack.visible = can_attack
+	if can_attack:
+		_btn_attack.text = "Attack from %s" % str(preview.get("from_province_name", "adjacent"))
+		_btn_attack.tooltip_text = (
+			"Launch assault on %s using %s.\nCtrl+click works from the map too."
+			% [province.name, str(preview.get("division_name", preview.get("formation_id", "division")))]
+		)
+
+
+func _on_attack_province_pressed() -> void:
+	if selected_province_id < 0:
+		return
+	if not provinces.has(selected_province_id):
+		return
+	_try_execute_province_attack(selected_province_id, provinces[selected_province_id])
 
 
 # ====================== SPECIAL SITES UI (InfoPanel) ======================
@@ -1843,7 +2286,8 @@ func _update_special_sites_ui(province: Province) -> void:
 
 
 func _ensure_special_sites_ui() -> void:
-	if info_panel == null:
+	var content := _info_content_vbox()
+	if content == null:
 		return
 	if _label_special_sites_header != null and is_instance_valid(_label_special_sites_header):
 		return
@@ -1852,12 +2296,12 @@ func _ensure_special_sites_ui() -> void:
 	_label_special_sites_header.name = "LabelSpecialSitesHeader"
 	_label_special_sites_header.text = "Special Sites"
 	_label_special_sites_header.add_theme_font_size_override("font_size", 12)
-	info_panel.add_child(_label_special_sites_header)
+	content.add_child(_label_special_sites_header)
 
 	_special_sites_container = VBoxContainer.new()
 	_special_sites_container.name = "SpecialSitesContainer"
 	_special_sites_container.add_theme_constant_override("separation", 4)
-	info_panel.add_child(_special_sites_container)
+	content.add_child(_special_sites_container)
 
 
 func _on_repair_special_site_pressed(province_id: int, site: SpecialSite) -> void:
@@ -1917,7 +2361,7 @@ func _on_start_special_site_construction_pressed(province_id: int) -> void:
 		return
 
 	var player := _player_tag()
-	mgr.debug_start_special_site_project(province_id, "port_tier_1", player)   # MVP: starts real project for basic port
+	mgr.debug_start_special_site_project(province_id, "port_tier_2", player)   # MVP: starts real project for basic port
 
 	if provinces.has(province_id):
 		show_info_panel(provinces[province_id])
@@ -2157,6 +2601,17 @@ func get_overlay_layer(name: String) -> Node2D:
 		return null
 	return container.get_node_or_null(name) as Node2D
 
+## Convenience for toggling the new dynamic infra layers (roads/rails/cities/sites) from UI or input.
+## These layers visualize player-built infrastructure (via projects) making the map "come alive".
+func set_infra_layer_visibility(show_roads: bool, show_rails: bool, show_cities: bool, show_sites: bool = true):
+	var ol := get_overlay_layer("InfrastructureOverlayLayer")
+	if ol and ol.has_method("set_show_roads"):
+		ol.set_show_roads(show_roads)
+		ol.set_show_rails(show_rails)
+		ol.set_show_cities(show_cities)
+		if ol.has_method("set_show_sites"):
+			ol.set_show_sites(show_sites)
+
 func _setup_conflict_layer() -> void:
 	if not show_conflict_overlay or container == null:
 		remove_overlay_layer("ConflictOverlay")
@@ -2198,6 +2653,95 @@ func _setup_agent_layer() -> void:
 
 func setup_demo_agent_overlay() -> void:
 	_setup_agent_layer()
+
+## Always-on infrastructure visual layer (roads/rail/cities + special sites).
+## This is the key "map comes alive" element: decisions (infra projects, special sites, explicit road builds)
+## update province data -> emit -> overlay rebuilds its Node2D sub-layers (editable Line2D etc).
+## Toggle with R/T/C (hotkeys) or F10 Debug buttons. Rebuilt live on project complete.
+func _setup_infrastructure_overlay_layer() -> void:
+	if container == null:
+		return
+	var existing := get_overlay_layer("InfrastructureOverlayLayer")
+	if existing != null and is_instance_valid(existing):
+		# Already present (e.g. from TestRunner or prior render); just ensure group + rebuild
+		if not existing.is_in_group("infrastructure_overlay"):
+			existing.add_to_group("infrastructure_overlay")
+		if existing.has_method("rebuild_all_infra_layers"):
+			existing.rebuild_all_infra_layers()
+		return
+	# Use load() for the layer script to be resilient to compile order / class resolution during full project checks
+	# (historical parse cascades showed "Could not resolve class InfrastructureOverlayLayer" when the overlay file itself had temporary syntax issues).
+	var LayerScript := load("res://scripts/map/InfrastructureOverlayLayer.gd")
+	if LayerScript == null:
+		push_error("MapRenderer: Could not load InfrastructureOverlayLayer.gd")
+		return
+	var layer: Node = null
+	if LayerScript is GDScript:
+		layer = LayerScript.new()
+	if layer == null:
+		return
+	add_overlay_layer("InfrastructureOverlayLayer", layer, 8)
+	# group is added inside layer._ready, but ensure
+	if not layer.is_in_group("infrastructure_overlay"):
+		layer.add_to_group("infrastructure_overlay")
+	print("MapRenderer: InfrastructureOverlayLayer created and added (roads/rails/cities + special sites live layer).")
+
+func setup_demo_infrastructure_overlay() -> void:
+	_setup_infrastructure_overlay_layer()
+
+func _setup_weather_overlay_layer() -> void:
+	if container == null:
+		return
+	# Ensure a WeatherManager exists for queries (light stub; in full project add as Autoload "WeatherManager" in project settings)
+	var wm = get_node_or_null("/root/WeatherManager")
+	if wm == null and get_tree() != null and get_tree().root != null:
+		# Extra search + meta to prevent duplicates if add is deferred and multiple _setup calls happen before add completes
+		if get_tree().root.has_meta("weather_manager"):
+			wm = get_tree().root.get_meta("weather_manager")
+		if wm == null:
+			for c in get_tree().root.get_children():
+				if c.name == "WeatherManager":
+					wm = c
+					break
+	if wm == null:
+		# Try direct new (class_name WeatherManager in the .gd makes it available once the script is parsed by the project)
+		wm = load("res://scripts/weather/WeatherManager.gd").new()
+		if wm:
+			wm.name = "WeatherManager"
+			get_tree().root.set_meta("weather_manager", wm)  # set meta immediately so subsequent sync calls find it before deferred add
+			get_tree().root.add_child.call_deferred(wm)
+			print("MapRenderer: Created transient WeatherManager for test (recommend adding as proper Autoload)")
+			# Seed a few demo northern provinces for GRAND THEATER snow demo (UK/Scand/N Russia)
+			if wm.has_method("initialize_province"):
+				wm.initialize_province(999, {"is_northern": true, "lat": 68, "high_ground_fraction": 0.4})  # e.g. N Norway / Kola
+				wm.initialize_province(998, {"is_northern": true, "lat": 60, "high_ground_fraction": 0.2})  # S Sweden / N UK
+				wm.initialize_province(997, {"is_northern": false, "lat": 45, "high_ground_fraction": 0.1})  # central/south no snow
+			if wm.has_method("cause_blackout"):
+				wm.cause_blackout(999, true)  # demo EMP/nuke/espionage/solar/atmospheric blackout affecting north + surrounding (power loss like flare or strike)
+
+	# Robust existing check: search container and root to prevent dups from multiple inits/loads (as seen in test logs with repeated scenario applies).
+	# Check by node + by name to catch deferred adds in progress.
+	var existing = container.get_node_or_null("WeatherOverlayLayer")
+	if not existing:
+		existing = container.find_child("WeatherOverlayLayer", true, false)
+	if not existing and get_tree() and get_tree().root:
+		existing = get_tree().root.find_child("WeatherOverlayLayer", true, false)
+	if existing:
+		weather_layer = existing as Node
+		if weather_layer and weather_layer.has_method("refresh_for_grand_theater"):
+			weather_layer.call_deferred("refresh_for_grand_theater")
+		return
+	# Load defensively (same pattern as infra for compile resilience)
+	var WScript := load("res://scripts/map/WeatherOverlayLayer.gd")
+	var layer = (WScript as GDScript).new() if WScript is GDScript else null
+	if layer == null:
+		return
+	layer.name = "WeatherOverlayLayer"
+	container.add_child.call_deferred(layer)
+	# Only print the 'added' message when we actually create one (prevents spam on re-inits from repeated scenario loads).
+	if not has_meta("weather_layer_printed"):
+		set_meta("weather_layer_printed", true)
+		print("MapRenderer: WeatherOverlayLayer added (stub for snow progression, storms, events on GRAND THEATER bg; toggle via debug or hotkey). Hidden by default per design.")
 
 # Recommended data access for any overlay layer:
 #   MapManager.get_all_centroids()
@@ -3449,3 +3993,676 @@ func _get_feature_icon(feature: String) -> String:
 		"spaceport": return "🚀"
 		"mega_factory", "major_factory": return "🏭"
 		_: return "◆"
+
+
+## Returns the tight AABB of the actually rendered Polygon2D points (for fitting custom backgrounds
+## such as the phase1 europe grand strategy image to the current geometry, or other dynamic underlays).
+func get_rendered_province_bounds() -> Rect2:
+	# When the high-res grand theater stylized map (the requested upscaled improved one) is the active underlay,
+	# ALWAYS use the large canonical rect for fit, camera framing, and placement. This ensures the pretty detailed
+	# image (rivers, hills, swamps, full UK/Scand/N Russia scope) is the full playable base even if the current
+	# active province set is the small 180-prov phase1 subset (which can report degenerate 0,0 bounds).
+	# The 180/120 "proposed children" are for splitter debug viz overlaid on the large image; main interaction
+	# and the styled map should use the large space.
+	if is_using_grand_stylized_map():
+		return GRAND_THEATER_CANONICAL_BOUNDS
+	var min_x := INF
+	var max_x := -INF
+	var min_y := INF
+	var max_y := -INF
+	var found := false
+	for id in province_nodes.keys():
+		var n := province_nodes[id]
+		if n == null:
+			continue
+		for ch in n.get_children():
+			if ch is Polygon2D:
+				var pts: PackedVector2Array = (ch as Polygon2D).polygon
+				if pts.size() >= 3:
+					found = true
+					for pt in pts:
+						min_x = minf(min_x, pt.x)
+						max_x = maxf(max_x, pt.x)
+						min_y = minf(min_y, pt.y)
+						max_y = maxf(max_y, pt.y)
+	if not found or is_inf(min_x) or (max_x - min_x < 10) or (max_y - min_y < 10):
+		# Robust fallback using the canonical large rect for the high-quality larger grand theater map (up-res for close zoom).
+		# Ensures the detailed bg is always full underlay (not small overlay) .
+		return GRAND_THEATER_CANONICAL_BOUNDS
+	return Rect2(min_x, min_y, max_x - min_x, max_y - min_y)
+
+
+func _fit_background_to_bounds() -> void:
+	# Fit the current WorldBackground (stylized grand map) to the rendered province bounds.
+	# Called after render and in apply to ensure the detailed colorized map aligns on first load.
+	var bg := find_child("WorldBackground", true, false) as Sprite2D
+	if not bg or not bg.texture:
+		return
+	var b := get_rendered_province_bounds()
+	# Grand high-res always uses the large canonical so the requested upscaled map is the full underlay + playable space.
+	if is_using_grand_stylized_map():
+		b = GRAND_THEATER_CANONICAL_BOUNDS
+	bg.position = b.position
+	var img_size := Vector2(bg.texture.get_width(), bg.texture.get_height())
+	bg.scale = b.size / img_size
+	bg.centered = false
+	if bg.texture:
+		bg.texture_filter = 2  # LINEAR_WITH_MIPMAPS for zoom
+	# Always suppress any old background map underneath the stylized one (e.g. ProvinceMap raster that may show grey/black)
+	_suppress_old_background_maps()
+	print("MapRenderer: Fitted stylized background to geo bounds for alignment (underneath suppressed)")
+
+func is_using_grand_stylized_map() -> bool:
+	var bg := find_child("WorldBackground", true, false) as Sprite2D
+	if bg and bg.texture:
+		var p := str(bg.texture.resource_path).to_lower()
+		return "grand_theater" in p or "europe_grand" in p
+	return false
+
+
+## Applies the grand-strategy Europe background image (for phase1 test maps) and fits its
+## transform (position + scale) so the image underlays the rendered province geometry bbox.
+## This ensures "map images" are visible together with vector polys + outlines/grid.
+## Sets meta so any future alignment code can preserve the fit.
+func apply_phase1_europe_background() -> void:
+	if not is_inside_tree():
+		call_deferred("apply_phase1_europe_background")
+		return
+	var bg := find_child("WorldBackground", true, false) as Sprite2D
+	if bg == null:
+		bg = get_node_or_null("WorldBackground") as Sprite2D
+	if bg == null:
+		push_warning("MapRenderer: No WorldBackground node found for phase1 bg apply. (Scene may need the Sprite2D named WorldBackground under the map root.)")
+		return
+
+	# Idempotent: if we already have the desired high-res grand theater ultra map loaded, just suppress + fit + re-frame.
+	# This prevents repeated scenario loads from spamming re-apply, dupe layers, and state flips between 840/180 bounds.
+	if bg.texture:
+		var rp := str(bg.texture.resource_path).to_lower()
+		if "ultra_high" in rp or ("grand_theater" in rp and bg.get_meta("phase1_custom_bg", false)):
+			_suppress_old_background_maps()
+			_fit_background_to_bounds()
+			# Still ensure weather is there once
+			call_deferred("_setup_weather_overlay_layer")
+			return
+
+	# Always prefer the highest quality and larger version of the grand theater stylized map (the one requested for up quality and closer zoom so overlays look better).
+	# Check for high/ultra high res first (e.g. 8K version of the grand image), then previous.
+	# Place the generated high-res image as europe_grand_theater_ultra_high.jpg (or .png) in assets/maps.
+	var tex: Texture2D = null
+	if ResourceLoader.exists("res://assets/maps/europe_grand_theater_ultra_high.jpg"):
+		tex = load("res://assets/maps/europe_grand_theater_ultra_high.jpg") as Texture2D
+	elif ResourceLoader.exists("res://assets/maps/europe_grand_theater_ultra_high.png"):
+		tex = load("res://assets/maps/europe_grand_theater_ultra_high.png") as Texture2D
+	elif ResourceLoader.exists("res://assets/maps/europe_grand_theater_ultra_1936.jpg"):
+		tex = load("res://assets/maps/europe_grand_theater_ultra_1936.jpg") as Texture2D
+	elif ResourceLoader.exists("res://assets/maps/europe_grand_theater_ultra_1936.png"):
+		tex = load("res://assets/maps/europe_grand_theater_ultra_1936.png") as Texture2D
+	elif ResourceLoader.exists("res://assets/maps/europe_grand_theater_ultra_1936_4k.png"):
+		tex = load("res://assets/maps/europe_grand_theater_ultra_1936_4k.png") as Texture2D
+	if tex == null:
+		tex = load("res://assets/maps/europe_ultra_detail_1936_4k.png") as Texture2D
+	if tex != null:
+		bg.texture = tex
+		# For the beautiful grand strategy image, use near-opaque so it doesn't look "transparent over old grey".
+		# Slight paper tint kept for theme. Old grey/black (world_map.png or generated ProvinceMap raster) should be hidden below.
+		bg.modulate = Color(0.92, 0.90, 0.85, 0.92)
+		var is_high = "ultra_high" in str(tex.resource_path).to_lower()
+		if is_high:
+			print("MapRenderer: HIGH QUALITY LARGER 8K+ grand theater map loaded for close zoom views")
+	else:
+		bg.modulate = Color(0.85, 0.85, 0.9, 0.65)
+	bg.visible = true
+	var old := find_child("ProvinceMap", true, false) as Sprite2D
+	if old != null:
+		old.visible = false
+		if old.texture:
+			old.texture = null  # clear any old grey/black generated province raster or map image
+
+	# Aggressively suppress any lingering grey/black base (world_map.png or similar) when we have the detailed grand theater image.
+	# The new map should not have transparent-ish over old grey.
+	if bg.texture and ("grand_theater" in str(bg.texture.resource_path).to_lower() or "ultra_detail" in str(bg.texture.resource_path).to_lower()):
+		bg.visible = true
+		# Already set high alpha/modulate earlier; here ensure no siblings or other map sprites show old base
+		if container:
+			for c in container.get_children():
+				if c is Sprite2D and c.name in ["ProvinceMap", "BaseMap", "MapRaster"]:
+					c.visible = false
+					if c.texture and ("world_map" in str(c.texture.resource_path).to_lower() or "grey" in str(c.texture.resource_path).to_lower() or "gray" in str(c.texture.resource_path).to_lower()):
+						c.texture = null
+
+	# Also ensure the scene's initial WorldBackground texture (world_map grey/black) is not competing if we have a phase1 one.
+	# (We already overwrote .texture above when successful.)
+	_suppress_old_background_maps()
+
+	# Auto-spawn data-driven objects from map gen layers (city placements etc.) so objects are tied
+	# to province areas on the background image. Supports GRAND THEATER geography (full UK/Ireland,
+	# Scandinavia to high north, northern Russia/Murmansk/Karelia + prior Canaries/NA/Egypt/Suez/Iraq/ME),
+	# hills/swamps, desert (special handling for infra placement). Northern heavy snow variants.
+	spawn_data_driven_objects_from_layers()
+	call_deferred("_setup_weather_overlay_layer")
+
+	bg.centered = false
+	var b := get_rendered_province_bounds()
+	# For the high-quality larger grand theater map (requested for closer zoom), use the canonical large rect so the detailed bg is full underlay.
+	# This supports deep zoom for counters, lines, weather on the terrain.
+	if is_using_grand_stylized_map():
+		b = GRAND_THEATER_CANONICAL_BOUNDS
+	bg.position = b.position
+	# Dynamic fit using actual texture pixel size (supports the larger high-res grand image)
+	if bg.texture:
+		var img_size := Vector2(bg.texture.get_width(), bg.texture.get_height())
+		bg.scale = b.size / img_size
+	else:
+		bg.scale = b.size / Vector2(4096.0, 1465.0)  # fallback
+	bg.set_meta("phase1_custom_bg", true)
+	# Use linear mipmap for smooth high detail zoom into provinces (buildings, roads, cities in bg, river details etc.)
+	if bg.texture:
+		bg.texture_filter = 2  # CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS (safe int)
+
+	_suppress_old_background_maps()
+
+	# Setup matching detail overlay and legend if not present (for calls from DebugOverlay etc.)
+	call_deferred("_fit_background_to_bounds")
+	var cont := container
+	if cont:
+		var detail := cont.get_node_or_null("DetailOverlay") as Sprite2D
+		if detail == null:
+			detail = Sprite2D.new()
+			detail.name = "DetailOverlay"
+			detail.texture = load("res://assets/maps/europe_roads_cities_detail_overlay_4k.png") as Texture2D
+			detail.position = bg.position
+			detail.scale = bg.scale
+			detail.z_index = -3
+			detail.modulate = Color(1,1,1,0.65)
+			cont.add_child(detail)
+		var leg := cont.get_node_or_null("MapLegend") as Sprite2D
+		if leg == null:
+			leg = Sprite2D.new()
+			leg.name = "MapLegend"
+			leg.texture = load("res://assets/maps/europe_map_legend_1936.png") as Texture2D
+			leg.position = Vector2(6200, 150)
+			leg.scale = Vector2(0.35, 0.35)
+			leg.modulate = Color(1,1,1,0.55)
+			cont.add_child(leg)
+
+	print("MapRenderer: Applied phase1 GRAND THEATER ultra high-detail bg (full UK/Ireland + Scand high north + N Russia + prior south; no borders, sharp rivers for zoom, infra placeable) fitted dynamically to current geo bounds ", b)
+
+## Spawn data-driven static objects (cities etc.) from map gen layers (e.g. province_city_layer positions).
+## Objects are tied to province areas on the background image (GRAND THEATER: full UK/Ireland + full Scandinavia + northern Russia high north + Canaries/NA/Egypt/Suez/Iraq/ME).
+## Handles hills/swamps/desert (desert gets sparser infra placement; all infra types allowed everywhere incl difficult terrain).
+## Northern areas get heavy regional snow in winter layers. Dynamic layers overlay for decisions.
+## Seasons/damage/era/culture (tech/focus/country) can modulate via variants in data. High-res bg supports zoom to river/coast/fjord detail.
+func spawn_data_driven_objects_from_layers() -> void:
+	if typeof(ScenarioLoader) == TYPE_NIL:
+		return
+	var loader = get_node_or_null("/root/ScenarioLoader")
+	if loader == null:
+		return
+	var city_data: Dictionary = {}
+	if loader.has("province_city_layer") and loader.province_city_layer.has("provinces"):
+		city_data = loader.province_city_layer["provinces"]
+	if city_data.is_empty():
+		return
+
+	var parent := container.get_node_or_null("DataDrivenObjects") as Node2D
+	if parent == null:
+		parent = Node2D.new()
+		parent.name = "DataDrivenObjects"
+		container.add_child(parent)
+
+	var placed := 0
+	for pid_str in city_data:
+		var pid := int(pid_str)
+		var entry: Dictionary = city_data[pid_str]
+		for c in entry.get("cities", []):
+			var pos_arr: Array = c.get("position", [0, 0])
+			var pos := Vector2(pos_arr[0], pos_arr[1])
+			var sz: float = 6.0 + clamp(float(c.get("population", 10000)) / 100000.0, 0.0, 10.0)
+			var rect := ColorRect.new()
+			rect.size = Vector2(sz, sz)
+			rect.position = pos - rect.size * 0.5
+			# Terrain-aware (hills/swamp/desert from data; desert limits density)
+			var terrain := "plains"
+			if loader.has("province_terrain_layer") and loader.province_terrain_layer.has(pid_str):
+				var t = loader.province_terrain_layer[pid_str]
+				terrain = t.get("terrain", "plains") if t is Dictionary else str(t)
+			if "desert" in terrain.to_lower():
+				rect.color = Color(0.92, 0.85, 0.65, 0.75)
+				rect.size *= 0.6
+			elif "swamp" in terrain.to_lower() or "marsh" in terrain.to_lower():
+				rect.color = Color(0.45, 0.58, 0.38, 0.8)
+			elif "hill" in terrain.to_lower():
+				rect.color = Color(0.68, 0.62, 0.55, 0.82)
+			else:
+				rect.color = Color(0.88, 0.82, 0.72, 0.85)
+			parent.add_child(rect)
+			placed += 1
+			if placed > 25:
+				break
+		if placed > 25:
+			break
+	if placed > 0:
+		print("MapRenderer: Spawned %d data-driven objects from city_layer (tied to bg image + province areas; desert/hills/swamp handled)." % placed)
+
+
+## Starter Map Visual Editor support: place a demo object (city, airfield, port, etc.)
+## at an approximate world position (for now: camera center; full version converts
+## screen mouse pos via camera + map container to world coords inside province poly).
+## Respects terrain from data (hills/swamp get different tint/size; desert uses sparser
+## style + limited density per the Python tool variants + identify_europe_provinces).
+## Objects live under DataDrivenObjects so they sit visually with the ultra bg image.
+## Call from DebugOverlay editor buttons. Expand later for drag, multi-type, live layers
+## (roads/rails as Line2D on infra sublayer), season/damage/era/culture swaps (tech/focus/culture
+## driven architecture variants), and JSON export for Python roundtrip to update city_layer etc.
+func place_demo_object_at_mouse(type: String = "city", exact_world_pos: Vector2 = Vector2.INF) -> void:
+	if container == null:
+		return
+	var parent := container.get_node_or_null("DataDrivenObjects") as Node2D
+	if parent == null:
+		parent = Node2D.new()
+		parent.name = "DataDrivenObjects"
+		container.add_child(parent)
+
+	# Get world pos using accurate screen->world (camera canvas inverse) for precise placement at high zoom on the high-res 8K+ detailed map.
+	# Editor LMB in DebugOverlay sets last_editor_screen_mouse so click positions land exactly where intended on terrain features (rivers, hills, coasts) in the image.
+	# exact_world_pos allows load/roundtrip to place at stored coords precisely (no jitter).
+	# In grand high-res mode we prefer positions inside the large fitted bg rect so placements land on the visible styled map even if current province geometry is the small 180-prov subset.
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	var pos := Vector2(2500, 1000)  # sensible center of the large canonical grand theater image
+	if exact_world_pos != Vector2.INF:
+		pos = exact_world_pos
+	elif cam:
+		if has_meta("last_editor_screen_mouse"):
+			var sm: Vector2 = get_meta("last_editor_screen_mouse")
+			pos = _screen_to_world(sm)
+		else:
+			pos = cam.get_screen_center_position()
+		# If we are in grand high-res and the computed pos looks way off (e.g. from a prior tiny 180-prov map state), snap to the current bg rect center.
+		if is_using_grand_stylized_map() and (pos.y > 3000 or pos.y < 0 or pos.x > 6000 or pos.x < 0):
+			var bgc := find_child("WorldBackground", true, false) as Sprite2D
+			if bgc and bgc.texture:
+				var br := get_rendered_province_bounds()
+				pos = br.position + br.size * 0.5
+		# Slight random offset so repeated clicks don't stack exactly (small for high-res precision)
+		pos += Vector2(randf_range(-8, 8), randf_range(-6, 6))
+
+	var sz: float = 8.0
+	var col := Color(0.9, 0.85, 0.7, 0.9)
+	var label := type
+	if type == "airfield":
+		sz = 10.0
+		col = Color(0.6, 0.65, 0.75, 0.85)
+	elif type == "port":
+		sz = 7.0
+		col = Color(0.5, 0.7, 0.85, 0.9)
+	elif type == "factory":
+		sz = 6.0
+		col = Color(0.75, 0.6, 0.55, 0.9)
+
+	# Simple rect proxy (later: use pregen sprites or scenes per era/culture/tech)
+	var rect := ColorRect.new()
+	rect.size = Vector2(sz, sz)
+	rect.position = pos - rect.size * 0.5
+	rect.color = col
+	rect.name = "EditorDemo_%s_%d" % [type, Time.get_ticks_msec()]
+	parent.add_child(rect)
+
+	# Store for export / roundtrip (extend with terrain, province hint, variant keys)
+	if not has_meta("editor_placements"):
+		set_meta("editor_placements", [])
+	var placements: Array = get_meta("editor_placements", [])
+	placements.append({
+		"type": type,
+		"position": [pos.x, pos.y],
+		"size": sz,
+		"terrain_aware": true,  # would query actual terrain at pos via province or data
+		"notes": "demo placed via starter visual editor; desert limits density, hills/swamp tint adjusted"
+	})
+	set_meta("editor_placements", placements)
+
+	print("MapRenderer: Editor placed demo %s at %s (precise on high-res grand bg or exact from load/LMB). Tied to image + province area. Export for python roundtrip." % [type, pos])
+	# Note: for desert provinces (tagged in Python identify), future placement code can
+	# auto-use sand_track style, lower density, special runway/port sprites etc.
+
+
+## Export current editor placements (manual + data-driven) as dict for DebugOverlay to
+## save/roundtrip to Python map gen tool (e.g. to refine city_layer, add visual features
+## for hills/swamp/desert, or bake into new variant images).
+func export_editor_placements() -> Dictionary:
+	var data := {
+		"version": 1,
+		"source": "starter_map_visual_editor",
+		"generated_at": Time.get_datetime_string_from_system(),
+		"placements": get_meta("editor_placements", []),
+		"notes": [
+			"Positions are in world/map coords matching the bg image fit in MapRenderer.",
+			"Use with GRAND THEATER expanded geo (full UK/Ireland + Scandinavia high north + N Russia Murmansk/Kola/Arkhangelsk + Canaries/NA/Egypt/Suez/Iraq/ME).",
+			"Python tool can merge these into province_city_layer or visual_variants.",
+			"Desert infra: limited by design; seasons/regional snow (heavy north), bomb damage, era/culture (tech+focus+country) to be layered.",
+			"Call spawn_data_driven_objects_from_layers() after loading new data to refresh."
+		]
+	}
+	print("MapRenderer: export_editor_placements -> %d manual/editor placements" % data["placements"].size())
+	return data
+
+
+## Clear demo/editor objects (for iteration in visual editor / playtest).
+func clear_editor_demo_objects() -> void:
+	if container == null:
+		return
+	var parent := container.get_node_or_null("DataDrivenObjects") as Node2D
+	if parent:
+		parent.queue_free()
+		print("MapRenderer: Cleared DataDrivenObjects (demo editor placements and data-driven spawns). Re-apply bg or reload to respawn from layers.")
+	# Also clear meta placements
+	if has_meta("editor_placements"):
+		set_meta("editor_placements", [])
+
+
+## Public: returns current editor placements array (for Debug list, export, roundtrip).
+func get_editor_placements() -> Array:
+	return get_meta("editor_placements", []) as Array
+
+
+## Public: remove a placement entry by approximate position (used by editor list Delete).
+func remove_editor_placement_at(pos: Vector2, tol: float = 30.0) -> bool:
+	if not has_meta("editor_placements"):
+		return false
+	var arr: Array = get_meta("editor_placements", [])
+	for i in range(arr.size() - 1, -1, -1):
+		var p: Dictionary = arr[i] as Dictionary
+		var pp := Vector2(float(p.get("position", [0, 0])[0]), float(p.get("position", [0, 0])[1]))
+		if pp.distance_to(pos) <= tol:
+			arr.remove_at(i)
+			set_meta("editor_placements", arr)
+			return true
+	return false
+
+
+## Toggle separate terrain layer (detailed high-res raster bg vs clean political view).
+## When disabled: hides the beautiful terrain/rivers/hills image so polys show solid ownership colors (clean view for focus on infra/ownership or precise editing).
+func toggle_terrain_layer() -> void:
+	set_show_terrain_layer(not show_terrain_layer)
+
+
+func set_show_terrain_layer(enabled: bool) -> void:
+	show_terrain_layer = enabled
+	_apply_terrain_layer_visibility()
+	print("MapRenderer: Terrain layer ", "ON (detailed high-res bg + thin outlines)" if enabled else "OFF (CLEAN POLITICAL VIEW - solid fills, no terrain raster)")
+
+
+func _apply_terrain_layer_visibility() -> void:
+	var bg := find_child("WorldBackground", true, false) as Sprite2D
+	if bg:
+		bg.visible = show_terrain_layer
+		if show_terrain_layer:
+			bg.modulate = Color(0.92, 0.90, 0.85, 0.92)
+		else:
+			bg.modulate = Color(1.0, 1.0, 1.0, 0.0)
+	# Force repaint of fills with correct alpha (low for terrain visible, higher for clean political)
+	_fill_color_zoom_bucket = -999999999
+	for id in province_nodes.keys():
+		_refresh_single_province_fill(id)
+	_suppress_old_background_maps()
+	# If weather snow/blackout active, let it re-apply tint/veil now that terrain visibility changed (cheap rebuild)
+	call_deferred("_maybe_refresh_weather_for_terrain")
+
+
+func _maybe_refresh_weather_for_terrain() -> void:
+	if container == null: return
+	var wl := container.get_node_or_null("WeatherOverlayLayer") as Node
+	if wl and wl.has_method("_rebuild_visuals"):
+		wl.call("_rebuild_visuals")
+
+
+## Centralized suppression so old grey/black (world_map.png, generated ProvinceMap rasters, etc) NEVER show underneath the desired high-res grand theater map.
+func _suppress_old_background_maps() -> void:
+	# Under container (most rasters live here after preserve/reattach)
+	if container:
+		for c in container.get_children():
+			if c is Sprite2D:
+				var s := c as Sprite2D
+				var rp := str(s.texture.resource_path).to_lower() if s.texture else ""
+				if s.name in ["ProvinceMap", "BaseMap", "MapRaster"] or "world_map" in rp or "grey" in rp or "gray" in rp:
+					s.visible = false
+					s.texture = null
+					s.modulate = Color(0, 0, 0, 0)
+	# Also check siblings/parent level (scene root may have ProvinceMap)
+	var p := get_parent()
+	if p:
+		for c in p.get_children():
+			if c is Sprite2D:
+				var s := c as Sprite2D
+				var rp := str(s.texture.resource_path).to_lower() if s.texture else ""
+				if s.name in ["ProvinceMap", "BaseMap", "MapRaster"] or "world_map" in rp:
+					s.visible = false
+					s.texture = null
+					s.modulate = Color(0, 0, 0, 0)
+	# Deep search for any lingering
+	var old_pm := find_child("ProvinceMap", true, false) as Sprite2D
+	if old_pm:
+		old_pm.visible = false
+		old_pm.texture = null
+		old_pm.modulate = Color(0, 0, 0, 0)
+	var old_bg := find_child("WorldBackground", true, false) as Sprite2D
+	if old_bg and old_bg.texture:
+		var rp2 := str(old_bg.texture.resource_path).to_lower()
+		if "world_map" in rp2 and show_terrain_layer:  # only kill if it's the bad one
+			old_bg.visible = false
+			old_bg.texture = null
+	# Extra: in grand high-res mode, any other large Sprite that looks like a full-screen map raster (gray / generated / black) gets hidden so the styled one is the clear base.
+	if is_using_grand_stylized_map() and container:
+		var current_wb := find_child("WorldBackground", true, false) as Sprite2D
+		for c in container.get_children():
+			if c is Sprite2D and c != current_wb:
+				var s := c as Sprite2D
+				if s.texture:
+					var rps := str(s.texture.resource_path).to_lower()
+					var sz := s.texture.get_size()
+					if sz.x > 1000 and sz.y > 500 and ("map" in rps or "province" in rps or "base" in rps or "raster" in rps or "grey" in rps or "gray" in rps or "world" in rps):
+						s.visible = false
+						s.modulate = Color(0,0,0,0)
+
+
+## Demo: adds NATO symbol sprites (using generated assets) to province nodes that have
+## stationed formations (from the test spawns in TestRunner / phase1 loads).
+## Replaces previous ColorRect fallback now that proper symbol suite exists.
+func _update_unit_icons_for_test() -> void:
+	if typeof(SupplyManager) == TYPE_NIL or not SupplyManager.has_method("get_formations_stationed_at_province"):
+		return
+
+	# Clear any previous demo icons
+	for id in province_nodes.keys():
+		var n := province_nodes[id]
+		if n == null: continue
+		for c in n.get_children():
+			if c.name.begins_with("DemoUnitIcon_"):
+				c.queue_free()
+
+	var idx := 0
+	for id in province_nodes.keys():
+		var forms: Array = SupplyManager.get_formations_stationed_at_province(id)
+		var p: Province = provinces.get(id)
+		var has_unit := not forms.is_empty()
+		if not has_unit and p and not p.owner_tag.is_empty() and not SupplyManager.division_deployments.is_empty():
+			for fid in SupplyManager.division_deployments:
+				var dep: Dictionary = SupplyManager.division_deployments[fid] as Dictionary
+				if int(dep.get("province_id", -1)) == id:
+					has_unit = true
+					break
+		if not has_unit:
+			continue
+
+		var n := province_nodes[id]
+		var counter := Node2D.new()
+		counter.name = "DemoUnitIcon_" + str(id)
+		counter.position = Vector2(0, -8)
+		counter.scale = Vector2(0.6, 0.6)
+		n.add_child(counter)
+
+		# Use actual NATO symbol if available, fallback to colored rect for type
+		var tex_path := "res://assets/graphics/units/nato/modern/infantry_32.png"
+		# Simple heuristic based on index or formation for demo variety
+		if idx % 4 == 1:
+			tex_path = "res://assets/graphics/units/nato/ww2/artillery_32.png"
+		elif idx % 4 == 2:
+			tex_path = "res://assets/graphics/units/nato/modern/destroyer_64.png"
+		elif idx % 4 == 3:
+			tex_path = "res://assets/graphics/units/nato/ww2/helicopter_32.png"
+		var tex: Texture2D = load(tex_path) as Texture2D
+		if tex:
+			var spr := Sprite2D.new()
+			spr.texture = tex
+			spr.centered = true
+			counter.add_child(spr)
+		else:
+			# fallback rect if texture missing
+			var bg := ColorRect.new()
+			bg.size = Vector2(20, 16)
+			bg.position = Vector2(-10, -8)
+			bg.color = Color(0.1, 0.12, 0.18, 0.9)
+			counter.add_child(bg)
+
+		idx += 1
+
+
+## --- Dynamic country frontiers (shared-edge model) ---
+
+func force_border_update() -> void:
+	_update_country_borders()
+
+
+func _ensure_border_layer() -> void:
+	if border_layer != null and is_instance_valid(border_layer):
+		return
+	if container == null:
+		return
+	border_layer = Node2D.new()
+	border_layer.name = "BorderLayer"
+	border_layer.z_index = 15
+	container.add_child(border_layer)
+
+
+func _update_country_borders(_affected_pids: Array = []) -> void:
+	_ensure_border_layer()
+	if border_layer == null or province_nodes.is_empty():
+		return
+	_sync_shared_edge_frontiers(province_nodes.keys())
+
+
+func _sync_shared_edge_frontiers(_scan_pids: Array) -> void:
+	for child in border_layer.get_children():
+		var cname := str(child.name)
+		if cname.begins_with(COUNTRY_FRONTIER_PREFIX):
+			child.queue_free()
+
+	var edge_map: Dictionary = {}
+	for pid_var in province_nodes.keys():
+		var pid := int(pid_var)
+		var owner := _live_owner_tag(pid)
+		if owner.is_empty():
+			continue
+		var pts := _province_polygon_points(pid)
+		if pts.size() < 3:
+			continue
+		for i in pts.size():
+			var a: Vector2 = pts[i]
+			var b: Vector2 = pts[(i + 1) % pts.size()]
+			var key := _canonical_edge_key(a, b)
+			if not edge_map.has(key):
+				edge_map[key] = {"a": a, "b": b, "owners": {}, "count": 0}
+			var rec: Dictionary = edge_map[key]
+			rec["owners"][owner] = true
+			rec["count"] = int(rec.get("count", 0)) + 1
+
+	var seg_idx := 0
+	for key in edge_map.keys():
+		var rec: Dictionary = edge_map[key]
+		var owners: Dictionary = rec.get("owners", {})
+		var count := int(rec.get("count", 0))
+		var is_international := owners.size() >= 2
+		var is_outer := count <= 1
+		if not is_international and not is_outer:
+			continue
+		var a: Vector2 = rec.get("a", Vector2.ZERO)
+		var b: Vector2 = rec.get("b", Vector2.ZERO)
+		var seg := Line2D.new()
+		seg.name = COUNTRY_FRONTIER_PREFIX + str(seg_idx)
+		seg.points = PackedVector2Array([a, b])
+		seg.default_color = COUNTRY_BORDER_COLOR
+		seg.width = COUNTRY_BORDER_WIDTH
+		seg.antialiased = true
+		seg.joint_mode = Line2D.LINE_JOINT_ROUND
+		seg.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		seg.end_cap_mode = Line2D.LINE_CAP_ROUND
+		border_layer.add_child(seg)
+		seg_idx += 1
+
+
+func _live_owner_tag(province_id: int) -> String:
+	var live: Province = null
+	if typeof(MapManager) != TYPE_NIL:
+		live = MapManager.get_province(province_id)
+	if live == null:
+		live = provinces.get(province_id)
+	if live == null:
+		return ""
+	return live.owner_tag.strip_edges().to_upper()
+
+
+func _province_polygon_points(province_id: int) -> PackedVector2Array:
+	if geometry.has(province_id):
+		var g: Dictionary = geometry[province_id]
+		var pts: PackedVector2Array = g.get("points", PackedVector2Array())
+		if pts.size() >= 3:
+			return pts
+	if province_nodes.has(province_id):
+		var pnode: Node2D = province_nodes[province_id]
+		for ch in pnode.get_children():
+			if ch is Polygon2D:
+				return (ch as Polygon2D).polygon
+	return PackedVector2Array()
+
+
+func _canonical_edge_key(a: Vector2, b: Vector2) -> String:
+	var step := _EDGE_KEY_PRECISION
+	var ax := int(roundf(a.x / step))
+	var ay := int(roundf(a.y / step))
+	var bx := int(roundf(b.x / step))
+	var by := int(roundf(b.y / step))
+	if ax > bx or (ax == bx and ay > by):
+		var tx := ax
+		ax = bx
+		bx = tx
+		var ty := ay
+		ay = by
+		by = ty
+	return "%d,%d|%d,%d" % [ax, ay, bx, by]
+
+
+static func debug_cycle_province_owner(province_id: int) -> void:
+	var mr := Engine.get_main_loop().root.get_first_node_in_group("map_renderer") as MapRenderer
+	if mr == null or province_id < 0:
+		return
+	mr._cycle_province_owner_tag(province_id)
+
+
+func _cycle_province_owner_tag(province_id: int) -> void:
+	if not provinces.has(province_id):
+		return
+	const DEMO_TAGS: Array[String] = ["YUG", "SRB", "CRO", "SLO", "HUN", "BGR", "GER", "SOV", "USA", "ENG"]
+	var prov: Province = provinces[province_id]
+	var current := prov.owner_tag.to_upper() if not prov.owner_tag.is_empty() else "YUG"
+	var idx := DEMO_TAGS.find(current)
+	var next_tag := DEMO_TAGS[(idx + 1) % DEMO_TAGS.size()] if idx >= 0 else DEMO_TAGS[0]
+	if typeof(MapManager) != TYPE_NIL:
+		MapManager.ensure_country_stub(next_tag)
+		MapManager.update_province_owner(province_id, next_tag, next_tag, false)
+	else:
+		prov.owner_tag = next_tag
+		prov.controller_tag = next_tag
+		_refresh_single_province_fill(province_id)
+		_update_country_borders()
+	if typeof(DebugOverlay) != TYPE_NIL and DebugOverlay.is_map_debug_tools_active():
+		DebugOverlay.toast_map_debug("Province %d → %s" % [province_id, next_tag])

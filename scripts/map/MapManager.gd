@@ -41,6 +41,10 @@ var _world_bounds: Rect2 = Rect2()        # rough axis-aligned bounds of all pro
 var pick_grid: MapPickGrid = null
 var pick_grid_cell_size: float = 64.0
 
+# Temporary editor provinces for live in-game editing (from ProvinceEditor)
+var _editor_provinces: Dictionary[int, Province] = {}
+var _editor_geometry: Dictionary = {}
+
 func _ready() -> void:
 	# Try to connect to ScenarioLoader if it is already in the tree (common autoload ordering)
 	_connect_to_scenario_loader()
@@ -93,6 +97,33 @@ func initialize_from_map_data(map_data: MapScenarioData) -> void:
 	scenario_map_ready.emit()
 	provinces_loaded.emit(_provinces.size())
 
+## Add temporary provinces from in-game editor. These overlay for picking, queries, hover etc.
+## Human can draw and immediately test gameplay impact (movement, supply, combat width) without full reload.
+## Call clear_temporary_editor_provinces() to remove.
+func add_temporary_editor_provinces(new_provs: Dictionary[int, Province], new_geo: Dictionary) -> void:
+	_editor_provinces = new_provs.duplicate()
+	_editor_geometry = new_geo.duplicate()
+
+	# Merge for queries (editor takes precedence for same id, but usually new ids)
+	for pid in _editor_provinces:
+		_provinces[pid] = _editor_provinces[pid]
+		_geometry[pid] = _editor_geometry[pid]
+
+	_recompute_centroids_and_bounds()
+	_try_build_pick_grid()  # Rebuilds including editor ones for live picking
+
+	print("🗺️ MapManager: Added %d temporary editor provinces for live picking/editing." % _editor_provinces.size())
+
+func clear_temporary_editor_provinces() -> void:
+	for pid in _editor_provinces:
+		_provinces.erase(pid)
+		_geometry.erase(pid)
+	_editor_provinces.clear()
+	_editor_geometry.clear()
+	_recompute_centroids_and_bounds()
+	_try_build_pick_grid()
+	print("🗺️ MapManager: Cleared temporary editor provinces.")
+
 ## --- Public Query API ---
 
 func has_province_data() -> bool:
@@ -114,6 +145,16 @@ func get_country(tag: String) -> Variant:
 	if tag.is_empty():
 		return null
 	return _countries.get(tag) if _countries.has(tag) else _countries.get(tag.to_upper())
+
+
+## Register a minimal country entry so owner tags render and validate in playtests.
+func ensure_country_stub(tag: String, color: Color = Color(0.45, 0.55, 0.65, 0.88)) -> void:
+	if tag.is_empty():
+		return
+	var key := tag.strip_edges().to_upper()
+	if _countries.has(key):
+		return
+	_countries[key] = {"tag": key, "name": key, "color": color}
 
 func get_player_country_tag_fallback() -> String:
 	# Useful for early UI before player selection is wired
@@ -457,6 +498,69 @@ func update_province_infrastructure(province_id: int, new_infra: int) -> bool:
 func notify_province_changed(province_id: int, what: String) -> void:
 	if _provinces.has(province_id):
 		province_data_changed.emit(province_id, what)
+
+## === Infrastructure Connection Editing API (for "map comes alive" via player/AI decisions) ===
+## These mutate the explicit built_road_neighbors / built_rail_neighbors on Province instances.
+## Used by InfrastructureDevelopmentManager on relevant project complete (e.g. "build road link"),
+## or direct UI actions like "construct highway between A-B", or debug.
+## After mutate, emit data changed (so overlays can react) + notify the visual layer to rebuild node children.
+## The overlay's rebuild_ uses these explicit lists (preferred over pure infra-level inference).
+
+func build_road_connection(p1: int, p2: int) -> void:
+	var prov1: Province = get_province(p1)
+	var prov2: Province = get_province(p2)
+	if prov1 == null or prov2 == null or p1 == p2:
+		return
+	if p2 not in prov1.built_road_neighbors:
+		prov1.built_road_neighbors.append(p2)
+	if p1 not in prov2.built_road_neighbors:
+		prov2.built_road_neighbors.append(p1)
+	province_data_changed.emit(p1, "infrastructure")
+	province_data_changed.emit(p2, "infrastructure")
+	_notify_infra_layer_rebuild()
+
+func build_rail_connection(p1: int, p2: int) -> void:
+	var prov1: Province = get_province(p1)
+	var prov2: Province = get_province(p2)
+	if prov1 == null or prov2 == null or p1 == p2:
+		return
+	if p2 not in prov1.built_rail_neighbors:
+		prov1.built_rail_neighbors.append(p2)
+	if p1 not in prov2.built_rail_neighbors:
+		prov2.built_rail_neighbors.append(p1)
+	province_data_changed.emit(p1, "infrastructure")
+	province_data_changed.emit(p2, "infrastructure")
+	_notify_infra_layer_rebuild()
+
+func remove_road_connection(p1: int, p2: int) -> void:
+	var prov1: Province = get_province(p1)
+	var prov2: Province = get_province(p2)
+	if prov1 != null:
+		prov1.built_road_neighbors.erase(p2)
+	if prov2 != null:
+		prov2.built_road_neighbors.erase(p1)
+	province_data_changed.emit(p1, "infrastructure")
+	province_data_changed.emit(p2, "infrastructure")
+	_notify_infra_layer_rebuild()
+
+func remove_rail_connection(p1: int, p2: int) -> void:
+	var prov1: Province = get_province(p1)
+	var prov2: Province = get_province(p2)
+	if prov1 != null:
+		prov1.built_rail_neighbors.erase(p2)
+	if prov2 != null:
+		prov2.built_rail_neighbors.erase(p1)
+	province_data_changed.emit(p1, "infrastructure")
+	province_data_changed.emit(p2, "infrastructure")
+	_notify_infra_layer_rebuild()
+
+func _notify_infra_layer_rebuild() -> void:
+	# Find the overlay (grouped) and ask it to rebuild its road/rail/city node layers from current province data.
+	var overlay := get_tree().get_first_node_in_group("infrastructure_overlay") if get_tree() else null
+	if overlay and overlay.has_method("rebuild_all_infra_layers"):
+		overlay.rebuild_all_infra_layers()
+	elif overlay and overlay.has_method("force_full_refresh"):
+		overlay.force_full_refresh()
 
 ## Clears active daily sabotage effects for a province (used by counter-intel operations).
 ## Removes temporary supply disruption debuffs associated with this province.
