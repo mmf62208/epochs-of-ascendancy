@@ -4196,7 +4196,7 @@ func apply_phase1_europe_background() -> void:
 func spawn_data_driven_objects_from_layers() -> void:
 	if typeof(ScenarioLoader) == TYPE_NIL:
 		return
-	var loader = get_node_or_null("/root/ScenarioLoader")
+	var loader := get_tree().root.find_child("ScenarioLoader", true, false) as ScenarioLoader
 	if loader == null:
 		return
 	var city_data: Dictionary = {}

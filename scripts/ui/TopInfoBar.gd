@@ -33,6 +33,10 @@ var menu_button: MenuButton  # created dynamically in _setup_compact_menu to sav
 @onready var help_button: Button = $ContentRow/RightContainer/MenuContainer/HelpButton
 
 var debug_button: Button   # Only created in debug builds, added to menu
+var player_tag_label: Label
+var player_country_select: OptionButton
+
+const PLAYER_TAG_OPTIONS := ["USA", "GER", "FRA", "GBR", "SOV", "ITA", "JPN", "CHN"]
 
 var current_speed: int = 1
 var is_paused: bool = false
@@ -46,6 +50,7 @@ func _ready() -> void:
 	_update_speed_buttons()
 	_update_date_time()
 	_update_resources()
+	_sync_player_country_tag(false)
 	if typeof(TimeManager) != TYPE_NIL:
 		if not TimeManager.game_year_advanced.is_connected(_on_game_year_advanced):
 			TimeManager.game_year_advanced.connect(_on_game_year_advanced)
@@ -90,6 +95,7 @@ func _apply_theme() -> void:
 	for btn in [save_button, load_button, settings_button, help_button, pause_button]:
 		RetrowaveTheme.style_secondary_button(btn)
 
+	_ensure_player_country_control()
 	_setup_compact_menu()
 
 	# Debug overlay quick toggle (only in debug builds) -- we put "Debug (F10)" inside the compact MenuButton
@@ -147,6 +153,62 @@ func _setup_compact_menu() -> void:
 		debug_button.visible = false
 
 	RetrowaveTheme.style_secondary_button(mb)
+
+
+func _ensure_player_country_control() -> void:
+	if player_country_select != null and is_instance_valid(player_country_select):
+		return
+	var right_container := $ContentRow/RightContainer
+	if right_container == null:
+		return
+
+	var wrap := HBoxContainer.new()
+	wrap.name = "PlayerCountryContainer"
+	wrap.add_theme_constant_override("separation", 4)
+	right_container.add_child(wrap)
+	right_container.move_child(wrap, 0)
+
+	player_tag_label = Label.new()
+	player_tag_label.text = "Playing:"
+	wrap.add_child(player_tag_label)
+	RetrowaveTheme.style_info_bar_label(player_tag_label, RetrowaveTheme.TEXT_DIM)
+
+	player_country_select = OptionButton.new()
+	player_country_select.custom_minimum_size = Vector2(76, 28)
+	for tag in PLAYER_TAG_OPTIONS:
+		player_country_select.add_item(tag)
+	wrap.add_child(player_country_select)
+	RetrowaveTheme.style_secondary_button(player_country_select)
+	player_country_select.item_selected.connect(func(index: int) -> void:
+		_sync_player_country_tag(true, player_country_select.get_item_text(index))
+	)
+
+
+func _sync_player_country_tag(announce: bool = false, override_tag: String = "") -> void:
+	var tag := (override_tag if not override_tag.is_empty() else player_country_tag).strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "USA"
+	player_country_tag = tag
+
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("set_player_country_tag"):
+		LeaderManager.set_player_country_tag(tag)
+	if typeof(SupplyManager) != TYPE_NIL:
+		SupplyManager.player_tag = tag
+
+	if player_tag_label != null and is_instance_valid(player_tag_label):
+		player_tag_label.tooltip_text = "Active player country for leaders, agents, supply, and combat controls."
+	if player_country_select != null and is_instance_valid(player_country_select):
+		var found := false
+		for i in player_country_select.item_count:
+			if player_country_select.get_item_text(i) == tag:
+				player_country_select.select(i)
+				found = true
+				break
+		if not found:
+			player_country_select.add_item(tag)
+			player_country_select.select(player_country_select.item_count - 1)
+	if announce:
+		_show_toast("Playing as %s" % tag, 1.8)
 
 
 func _on_menu_item_pressed(id: int) -> void:
@@ -218,17 +280,52 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 	elif event.keycode == KEY_F9:
 		if typeof(SaveLoadManager) != TYPE_NIL:
-			SaveLoadManager.quickload()
-			_update_date_time()
-			_update_resources()
+			_load_slot_from_ui(SaveLoadManager.DEFAULT_SLOT)
 			print("F9 QuickLoad triggered")
 		get_viewport().set_input_as_handled()
 	elif event.keycode == KEY_F6:
 		_show_save_manager_popup()
 		get_viewport().set_input_as_handled()
 	elif event.keycode == KEY_ESCAPE:
-		_on_menu_pressed()
+		if not _close_topmost_ui_layer():
+			_on_menu_pressed()
 		get_viewport().set_input_as_handled()
+
+
+func _close_topmost_ui_layer() -> bool:
+	if typeof(DebugOverlay) != TYPE_NIL and DebugOverlay.is_overlay_visible():
+		DebugOverlay.hide_overlay()
+		return true
+
+	var root := get_tree().root
+	for node_name in [
+		"MainMenu",
+		"SaveManagerPopup",
+		"MainMenuPopup",
+		"TradeMarketView",
+		"DiplomacyView",
+		"TechnologyScreen",
+		"AgentAssignmentScreen",
+		"LeaderAssignmentScreen",
+		"ProductionAssignmentScreen",
+		"NationalSpiritsScreen",
+	]:
+		var existing := root.get_node_or_null(node_name)
+		if existing != null:
+			if node_name == "MainMenu" and existing.has_method("_on_close_requested"):
+				existing._on_close_requested()
+			else:
+				existing.queue_free()
+				if node_name == "MainMenuPopup":
+					_pause_for_menu(false)
+			return true
+
+	var map_renderer := root.find_child("MapRenderer", true, false) as MapRenderer
+	if map_renderer != null and map_renderer.info_panel != null and map_renderer.info_panel.visible:
+		map_renderer.hide_info_panel()
+		return true
+
+	return false
 
 
 func _set_game_speed(speed: int) -> void:
@@ -338,12 +435,57 @@ func _update_resources() -> void:
 	rubber_label.text = "Rubber: %.0f" % float(stockpile.get("rubber", 0.0))
 
 
-func _close_overlay_screens() -> void:
-	_close_screen("ProductionAssignmentScreen")
-	_close_screen("LeaderAssignmentScreen")
-	_close_screen("AgentAssignmentScreen")
-	_close_screen("NationalSpiritsScreen")
-	_close_screen("TechnologyScreen")
+func _sync_hud_after_load() -> void:
+	_sync_pause_from_time_manager()
+	if typeof(TimeManager) != TYPE_NIL and not TimeManager.is_paused():
+		current_speed = clampi(int(round(maxf(TimeManager.time_scale, 1.0))), 1, 4)
+	_sync_player_country_tag(false)
+	_update_speed_buttons()
+	_update_date_time()
+	_update_resources()
+
+
+func _load_slot_from_ui(slot: String, owning_panel: Node = null) -> void:
+	if typeof(SaveLoadManager) == TYPE_NIL:
+		_show_toast("Save system unavailable.", 3.0, true)
+		return
+
+	if SaveLoadManager.has_method("check_scenario_compatibility"):
+		var compat: Dictionary = SaveLoadManager.check_scenario_compatibility(slot)
+		if not bool(compat.get("compatible", true)):
+			var saved_s := str(compat.get("saved_scenario", "?"))
+			var cur_s := str(compat.get("current_scenario", "?"))
+			var msg := "Scenario mismatch: save is %s, current is %s." % [saved_s, cur_s]
+			_show_toast(msg, 3.5, true)
+			return
+
+	var result: Dictionary = {}
+	if SaveLoadManager.has_method("load_game_detailed"):
+		result = SaveLoadManager.load_game_detailed(slot)
+	else:
+		result = {"ok": SaveLoadManager.load_game(slot)}
+
+	if bool(result.get("ok", false)):
+		_sync_hud_after_load()
+		_show_toast("Game loaded: %s" % slot, 2.5)
+		if owning_panel != null and is_instance_valid(owning_panel):
+			owning_panel.queue_free()
+	else:
+		_show_toast(str(result.get("error", "Load failed")), 3.0, true)
+
+
+func _close_overlay_screens(except_name: String = "") -> void:
+	for screen_name in [
+		"ProductionAssignmentScreen",
+		"LeaderAssignmentScreen",
+		"AgentAssignmentScreen",
+		"NationalSpiritsScreen",
+		"TechnologyScreen",
+		"DiplomacyView",
+		"TradeMarketView",
+	]:
+		if screen_name != except_name:
+			_close_screen(screen_name)
 
 
 func _on_production_pressed() -> void:
@@ -387,7 +529,7 @@ func _on_technology_pressed() -> void:
 
 
 func _on_diplomacy_pressed() -> void:
-	_close_overlay_screens()
+	_close_overlay_screens("DiplomacyView")
 	_toggle_root_popup(
 		"DiplomacyView",
 		"res://scenes/ui/DiplomacyView.tscn",
@@ -418,7 +560,7 @@ func _on_map_pressed() -> void:
 
 
 func _on_trade_pressed() -> void:
-	_close_overlay_screens()
+	_close_overlay_screens("TradeMarketView")
 	_toggle_root_popup(
 		"TradeMarketView",
 		"res://scenes/ui/TradeMarketView.tscn",
@@ -468,7 +610,8 @@ func _toggle_screen(screen_name: String, scene_path: String, configure: Callable
 	var scene: Node = packed.instantiate()
 	if scene == null:
 		return
-	configure.call(scene)
+	if configure.is_valid():
+		configure.call(scene)
 	scene.name = screen_name
 	get_tree().root.add_child(scene)
 
@@ -664,10 +807,7 @@ func _show_save_manager_popup() -> void:
 			var load_btn := Button.new()
 			load_btn.text = "Load"
 			load_btn.pressed.connect(func():
-				SaveLoadManager.load_game(s.get("slot", ""))
-				_update_date_time()
-				_update_resources()
-				panel.queue_free()
+				_load_slot_from_ui(str(s.get("slot", "")), panel)
 			)
 			h.add_child(load_btn)
 
@@ -715,13 +855,7 @@ func _populate_save_list(parent: VBoxContainer, owning_panel: Panel) -> void:
 		var load_btn := Button.new()
 		load_btn.text = "Load"
 		load_btn.pressed.connect(func():
-			var ok := SaveLoadManager.load_game(s.get("slot", ""))
-			_update_date_time()
-			_update_resources()
-			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				LeaderEventUI.show_toast("Game loaded: " + s.get("slot", ""), 2.5)
-			if owning_panel and is_instance_valid(owning_panel):
-				owning_panel.queue_free()
+			_load_slot_from_ui(str(s.get("slot", "")), owning_panel)
 			_pause_for_menu(false)
 		)
 		h.add_child(load_btn)
