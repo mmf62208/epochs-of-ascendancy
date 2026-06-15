@@ -521,27 +521,38 @@ func _ready() -> void:
 			sm.advance_supply_day(1.0)
 		print("Supply network ready (toggle overlay with L)")
 
-	# Prevent unbounded real-time time simulation / TopInfoBar ticking after demo setup.
-	# The original complaint was that loading the project "locks the computer or uses a lot of resources".
-	# We have already performed all manual project advances and layer rebuilds needed for the test visuals.
-	# Let the test scenario run with frozen or very limited time progression (manual advances only).
+	# Keep the normal playtest loop interactive: TopInfoBar drives TimeManager via its 1s timer.
+	# Constrained smoke runs can opt back into the older manual-only mode with EOA_FREEZE_TIME=1.
 	var top_bar := get_node_or_null("UILayer/TopInfoBar")
-	if top_bar:
-		top_bar.set_process(false)
-		top_bar.set_process_internal(false)
-		for ch in top_bar.get_children():
-			if ch is Timer:
-				(ch as Timer).stop()
 	var tm := get_node_or_null("/root/TimeManager")
-	if tm:
-		if "real_time_accumulator" in tm:
-			tm.real_time_accumulator = 0.0
-		# Stop real-time drive (and process if possible). Manual advance_daily_projects + game_day signals still work for tests/demos.
-		tm.set_process(false)
-		if tm.has_method("set_process_mode"):
-			# 4 == PROCESS_MODE_DISABLED
-			tm.set_process_mode(4)
-		print("TestRunner: Time simulation throttled/paused for phase1 test (manual advances only; prevents long-running/ high-resource behavior).")
+	if OS.get_environment("EOA_FREEZE_TIME") == "1":
+		if top_bar:
+			top_bar.set_process(false)
+			top_bar.set_process_internal(false)
+			for ch in top_bar.get_children():
+				if ch is Timer:
+					(ch as Timer).stop()
+		if tm:
+			if "real_time_accumulator" in tm:
+				tm.real_time_accumulator = 0.0
+			tm.set_process(false)
+			if tm.has_method("set_process_mode"):
+				# 4 == PROCESS_MODE_DISABLED
+				tm.set_process_mode(4)
+		print("TestRunner: Time simulation frozen by EOA_FREEZE_TIME=1 (manual advances only).")
+	else:
+		if top_bar:
+			top_bar.set_process(true)
+			top_bar.set_process_internal(true)
+			for ch in top_bar.get_children():
+				if ch is Timer:
+					(ch as Timer).start()
+		if tm:
+			tm.set_process(true)
+			if tm.has_method("set_process_mode"):
+				# 0 == PROCESS_MODE_INHERIT
+				tm.set_process_mode(0)
+		print("TestRunner: Time simulation enabled for interactive playtest (pause/speed controls drive calendar).")
 
 	if mm != null and mm.has_method("has_province_data") and mm.has_province_data():
 		print("✅ MapManager ready with %d provinces (ProvinceEffects now centralized)" % mm.get_province_count())
@@ -596,6 +607,8 @@ func _configure_top_info_bar(player_tag: String) -> void:
 	var top_bar: TopInfoBar = get_node_or_null("UILayer/TopInfoBar") as TopInfoBar
 	if top_bar != null:
 		top_bar.player_country_tag = player_tag
+		if top_bar.has_method("_sync_player_country_tag"):
+			top_bar._sync_player_country_tag(false)
 
 
 func _wire_factory_province_lookup() -> void:

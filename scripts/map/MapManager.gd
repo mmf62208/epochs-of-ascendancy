@@ -54,8 +54,15 @@ func _ready() -> void:
 		if not TimeManager.game_day_advanced.is_connected(_on_game_day_advanced):
 			TimeManager.game_day_advanced.connect(_on_game_day_advanced)
 
+func _find_scenario_loader() -> ScenarioLoader:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	return tree.root.find_child("ScenarioLoader", true, false) as ScenarioLoader
+
+
 func _connect_to_scenario_loader() -> void:
-	var loader := get_node_or_null("/root/ScenarioLoader") as ScenarioLoader
+	var loader := _find_scenario_loader()
 	if loader != null:
 		if not loader.scenario_loaded.is_connected(_on_scenario_loaded):
 			loader.scenario_loaded.connect(_on_scenario_loaded)
@@ -64,7 +71,7 @@ func _connect_to_scenario_loader() -> void:
 			_pull_from_loader(loader)
 
 func _on_scenario_loaded() -> void:
-	var loader := get_node_or_null("/root/ScenarioLoader") as ScenarioLoader
+	var loader := _find_scenario_loader()
 	if loader != null:
 		_pull_from_loader(loader)
 

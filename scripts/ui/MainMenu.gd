@@ -625,7 +625,7 @@ func _on_close_requested() -> void:
 	await _close_with_fade()
 
 
-func _close_with_fade() -> void:
+func _close_with_fade():
 	var content := get_node_or_null("Background") as Control
 	if content:
 		var tw := create_tween()
