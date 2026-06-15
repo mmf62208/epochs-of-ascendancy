@@ -141,7 +141,8 @@ func _setup_compact_menu() -> void:
 		popup.add_separator()
 		popup.add_item("Debug (F10)", 4)
 
-	popup.id_pressed.connect(_on_menu_item_pressed)
+	if not popup.id_pressed.is_connected(_on_menu_item_pressed):
+		popup.id_pressed.connect(_on_menu_item_pressed)
 
 	# Hide the old flat buttons to free space (they are still there in scene for now)
 	for btn in [save_button, load_button, settings_button, help_button]:
