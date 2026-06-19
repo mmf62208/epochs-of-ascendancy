@@ -66,6 +66,29 @@ func total_land(tag: String) -> float:
 func total_air(tag: String) -> float:
 	return float(air_by_tag.get(tag, 0.0))
 
+func get_air_dominance_for(tag: String) -> float:
+	# Scale 0-1: fraction of air power controlled by tag vs total in province.
+	# For dominance: needs high ratio (e.g. >0.8 or 4:1+) to fully suppress enemy air ops in large region.
+	# Slight advantage (0.6) allows enemy ops but costly (penalties to effect, higher losses).
+	var my = total_air(tag)
+	var total = my
+	for t in air_by_tag.keys():
+		if t != tag:
+			total += float(air_by_tag[t])
+	if total <= 0.0:
+		return 1.0
+	return my / total
+
+func air_dominance_level(tag: String) -> String:
+	# For tips/UI: none/partial/full based on dominance.
+	var dom = get_air_dominance_for(tag)
+	if dom > 0.8:
+		return "full"
+	elif dom > 0.55:
+		return "partial"
+	else:
+		return "none"
+
 
 func total_naval_at_port(tag: String) -> float:
 	return float(naval_at_port_by_tag.get(tag, 0.0))

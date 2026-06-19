@@ -80,6 +80,18 @@ func get_effective_combat_power(
 
 		terrain_bonus = leader.get_terrain_modifier(terrain)
 		final_soft += terrain_bonus * 8.0
+
+	# Space combat to ground: orbital strikes and guided munitions (from space designer assets).
+	# Greater impacts on troops (precision strikes, morale/ org hits for infantry). Costly to maintain.
+	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(leader.country_tag if leader else "player", "space_designer_unlocked"):
+		var space_bonus := 0.15  # base for space support
+		if "guided" in str(preview.get("special", "")) if "preview" in locals() else false:
+			space_bonus = 0.3  # greater for advanced guided
+		final_soft += space_bonus * 5.0
+		final_hard += space_bonus * 3.0
+		# Greater org loss for enemy if space strike
+		if "space_strike" in str(preview.get("special", "")) if "preview" in locals() else false:
+			final_org *= 0.85  # extra org hit from orbital guided on troops
 		final_hard += terrain_bonus * 5.0
 
 	# Province infrastructure & development effects (Deeper Combat integration - Phase 1 item 2)

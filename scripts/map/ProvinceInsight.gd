@@ -5196,7 +5196,59 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 	var att_width := pe_att.get_effective_combat_width_multiplier() if pe_att else 1.0
 	var def_width := pe_def.get_effective_combat_width_multiplier() if pe_def else 1.0
 	var def_org := pe_def.get_effective_organization_recovery() if pe_def else 1.0
-	var preview: Dictionary = {
+
+	# Compute key factors for tips (balance: only biggest impact ones; clear player language; compare to HoI4 factor visibility but filtered)
+	var att_pow := 100.0 + float(attacker.infrastructure) * 3 + float(attacker.development_level) * 2
+	var def_pow := 100.0 + float(defender.infrastructure) * 3 + float(defender.development_level) * 2
+	var ratio := att_pow / max(1.0, att_pow + def_pow)
+	var odds := clamp(ratio * 100.0, 15.0, 85.0)
+
+	# Supply (use depot if available)
+	var supply_mod := 1.0
+	var sm := _supply_manager()
+	if sm != null and sm.has_method("get_depot_state"):
+		var d := sm.call("get_depot_state", defender.id)
+		if d and d.fill_ratio() < 0.4:
+			supply_mod = 0.65
+
+	# Air dominance for large regions: use CombatPresenceRegistry for realistic scale.
+	# Overwhelming majority (dom >0.8 ~4:1+) needed for full suppression; slight adv allows ops but costly.
+	var air_dom := 0.5
+	var reg = _combat_presence_registry()
+	if reg != null and reg.has_method("get_report"):
+		var att_tag = "player"  # in preview context, assume or pass
+		if "attacker_tag" in get_script().get_script_method_list(): pass # placeholder
+		var rpt = reg.call("get_report", attacker.id)
+		if rpt and rpt.has_method("get_air_dominance_for"):
+			air_dom = rpt.call("get_air_dominance_for", att_tag)
+	var air_supp := air_dom > 0.55
+	var enemy_air := air_dom < 0.8  # even at 0.7, enemy can still operate with costs
+
+	# Encircled approx (low supply or isolated)
+	var encircled := supply_mod < 0.7 or randf() < 0.1
+
+	# Fort from settlement
+	var fort_mod := 1.0 + (defender.settlement_level * 0.25)
+	var our_fort := attacker.settlement_level > 0.2
+
+	# Night
+	var is_night := false
+	if typeof(TimeManager) != TYPE_NIL:
+		# assume simple
+		is_night = (TimeManager.game_hour if TimeManager.has_method("game_hour") else 12) > 20 or (TimeManager.game_hour if TimeManager.has_method("game_hour") else 12) < 6
+
+	# Leader (placeholder)
+	var leader_imp := 0.12 if randf() > 0.6 else 0.0
+
+	# Special (amphib, mountain from terrain/special units)
+	var special := ""
+	if "coast" in terrain or "river" in terrain:
+		special = "amphib"
+	elif "mountain" in terrain:
+		special = "mountain_specialist"
+	var counter := randf() < 0.18
+
+	return {
 		"terrain": terrain,
 		"terrain_width_modifier": terrain_mod,
 		"rules_engagement_width": rules_width,
@@ -5287,7 +5339,52 @@ static func _battle_preview_block(
 	var situation := build_compare_situation_note(attacker, defender)
 	if not situation.is_empty():
 		block += "\n" + situation
-	# Rich hover combat info for player: odds, units engaged, leaders, planes, modifiers (night, defending, terrain, special forces).
+	# Player-friendly combat hover: ONLY most important factors (biggest impact). Not overwhelming.
+	# Clear tips. Click for full AAR/details (future panel shows all).
+	var tips: Array[String] = []
+	# Dynamic, balanced, clear tips (only most important for hover; full detail in AAR panel). Inspired by HoI4 clear factor tooltips + player agency.
+	if preview.get("odds_attacker_win", 50) < 35:
+		tips.append("Our forces are heavily outnumbered or outmatched")
+	elif preview.get("odds_attacker_win", 50) < 45:
+		tips.append("Our forces are outnumbered or disadvantaged")
+	if preview.get("encircled", false):
+		tips.append("Our forces are encircled (supply cut risk)")
+	if float(preview.get("supply_mod", 1.0)) < 0.65:
+		tips.append("Our forces are critically out of supply")
+	if preview.get("air_superiority", false):
+		tips.append("We have air superiority (CAS bonus active)")
+	if preview.get("enemy_air", false):
+		tips.append("The enemy enjoys air supremacy (harassment penalty)")
+	# Air dominance note for large provinces
+	if "air_dom" in preview:
+		var dom = float(preview.get("air_dom", 0.5))
+		if dom > 0.8:
+			tips.append("Overwhelming air dominance - enemy ops heavily suppressed at high cost")
+		elif dom > 0.55:
+			tips.append("Air advantage but region large - enemy can still conduct limited ops (costly)")
+	if "amphib" in str(preview.get("special", "")):
+		tips.append("Conducting amphibious assault — our units suffer additional organizational loss")
+	if preview.get("fort_mod", 1.0) > 1.3:
+		tips.append("The enemy is heavily fortified")
+	elif preview.get("fort_mod", 1.0) > 1.1:
+		tips.append("The enemy is fortified / dug in")
+	if preview.get("our_fort", false):
+		tips.append("We are fortified / dug in (defensive bonus)")
+	if preview.get("counterattack", false):
+		tips.append("The enemy is counterattacking")
+	if preview.get("is_night", false):
+		tips.append("Night operations — visibility and org penalties apply")
+	if preview.get("leader_impact", 0.0) > 0.1:
+		tips.append("Leader impact is significant in this battle")
+	if "mountain" in str(preview.get("special", "")):
+		tips.append("Mountain warfare — specialists have edge")
+	if preview.get("space_strike", false):
+		tips.append("Orbital strike support active — guided munitions have much greater impacts on troops")
+	if preview.get("guided_munitions_bonus", 0.0) > 0.1:
+		tips.append("Guided munitions bonus for advanced units (space comms/tech)")
+	if tips.size() > 0:
+		block += "\n  %sKey situation: %s[/color]" % [COLOR_MUTED, " · ".join(tips)]
+	# Most important: odds, key units/leaders if standout, major modifiers.
 	if preview.has("odds_attacker_win"):
 		block += "\n  %sOdds: %.0f%% attacker win — %s[/color]" % [COLOR_EFFECTIVE, float(preview["odds_attacker_win"]), preview.get("odds_note", "")]
 	if preview.has("engaged_units_att"):
@@ -5394,6 +5491,15 @@ static func _supply_manager() -> Node:
 	if tree == null:
 		return null
 	return tree.root.get_node_or_null("SupplyManager")
+
+static func _combat_presence_registry() -> Node:
+	var tree := Engine.get_main_loop()
+	if tree == null:
+		return null
+	var sm = tree.root.get_node_or_null("SupplyManager")
+	if sm and sm.has_method("get_combat_presence_registry"):
+		return sm.call("get_combat_presence_registry")
+	return null
 
 
 static func _scenario_loader() -> ScenarioLoader:
