@@ -7,9 +7,18 @@
       "manpower": 14000,
       "support_supply_per_day": 85,
       "equipment": [
-        {"template_id": "m4_sherman_medium", "count": 54},
-        {"template_id": "m3_stuart_light", "count": 54},
-        {"template_id": "gmc_6x6_cargo_truck", "count": 120}
+        {
+          "template_id": "m4_sherman_medium",
+          "count": 54
+        },
+        {
+          "template_id": "m3_stuart_light",
+          "count": 54
+        },
+        {
+          "template_id": "gmc_6x6_cargo_truck",
+          "count": 120
+        }
       ]
     },
     {
@@ -18,8 +27,14 @@
       "manpower": 15000,
       "support_supply_per_day": 72,
       "equipment": [
-        {"template_id": "m3_stuart_light", "count": 12},
-        {"template_id": "gmc_6x6_cargo_truck", "count": 200}
+        {
+          "template_id": "m3_stuart_light",
+          "count": 12
+        },
+        {
+          "template_id": "gmc_6x6_cargo_truck",
+          "count": 200
+        }
       ]
     },
     {
@@ -30,10 +45,23 @@
       "infantry_equipment_template": "infantry_m1_garand",
       "sustainment_equipment_template": "improved_sustainment",
       "equipment": [
-        {"type": "infantry", "count": 12000, "infantry_equipment_override": null},
-        {"type": "artillery_towed", "count": 36},
-        {"template_id": "gmc_6x6_cargo_truck", "count": 800},
-        {"template_id": "m4_sherman_medium", "count": 50}
+        {
+          "type": "infantry",
+          "count": 12000,
+          "infantry_equipment_override": null
+        },
+        {
+          "type": "artillery_towed",
+          "count": 36
+        },
+        {
+          "template_id": "gmc_6x6_cargo_truck",
+          "count": 800
+        },
+        {
+          "template_id": "m4_sherman_medium",
+          "count": 50
+        }
       ]
     },
     {
@@ -43,12 +71,25 @@
       "support_supply_per_day": 75,
       "infantry_equipment_template": "infantry_k98_bolt_action",
       "equipment": [
-        {"type": "infantry", "count": 12000, "infantry_equipment_override": null},
-        {"type": "artillery_towed", "count": 36},
-        {"type": "truck", "count": 800}
+        {
+          "type": "infantry",
+          "count": 12000,
+          "infantry_equipment_override": null
+        },
+        {
+          "type": "artillery_towed",
+          "count": 36
+        },
+        {
+          "type": "truck",
+          "count": 800
+        }
       ],
       "subunits": [
-        {"template_id": "infantry_battalion", "count": 9}
+        {
+          "template_id": "infantry_battalion",
+          "count": 9
+        }
       ]
     },
     {
@@ -80,7 +121,11 @@
       "infantry_equipment_template": "infantry_m1_garand",
       "sustainment_equipment_template": "marine_amphibious_sustainment",
       "equipment": [
-        {"type": "infantry", "count": 10000, "infantry_equipment_override": null}
+        {
+          "type": "infantry",
+          "count": 10000,
+          "infantry_equipment_override": null
+        }
       ]
     },
     {
@@ -89,8 +134,14 @@
       "manpower": 4500,
       "support_supply_per_day": 48,
       "equipment": [
-        {"template_id": "m4_sherman_medium", "count": 40},
-        {"template_id": "gmc_6x6_cargo_truck", "count": 60}
+        {
+          "template_id": "m4_sherman_medium",
+          "count": 40
+        },
+        {
+          "template_id": "gmc_6x6_cargo_truck",
+          "count": 60
+        }
       ]
     },
     {
@@ -100,12 +151,25 @@
       "support_supply_per_day": 120,
       "infantry_equipment_template": "infantry_m1_garand",
       "equipment": [
-        {"template_id": "churchill_mk7_heavy", "count": 36},
-        {"template_id": "m4_sherman_medium", "count": 24},
-        {"type": "truck", "count": 200}
+        {
+          "template_id": "churchill_mk7_heavy",
+          "count": 36
+        },
+        {
+          "template_id": "m4_sherman_medium",
+          "count": 24
+        },
+        {
+          "type": "truck",
+          "count": 200
+        }
       ],
       "subunits": [
-        {"type": "mech", "count": 12, "equipment_override": null}
+        {
+          "type": "mech",
+          "count": 12,
+          "equipment_override": null
+        }
       ]
     },
     {
@@ -114,9 +178,79 @@
       "manpower": 200,
       "support_supply_per_day": 50,
       "equipment": [
-        {"template_id": "gps_satellite", "count": 4},
-        {"template_id": "r7_sputnik", "count": 2}
+        {
+          "template_id": "gps_satellite",
+          "count": 4
+        },
+        {
+          "template_id": "r7_sputnik",
+          "count": 2
+        }
       ]
+    }
+  ],
+  "templates": [
+    {
+      "template_id": "marine_amphib_div",
+      "name": "Marine Amphibious Division",
+      "base_unit_templates": [
+        "marine_amphibious_division"
+      ],
+      "support_templates": [
+        "engineer",
+        "artillery"
+      ],
+      "width": 20,
+      "unlock_tech": "special_forces_training"
+    },
+    {
+      "template_id": "paratroop_div",
+      "name": "Paratrooper Division",
+      "base_unit_templates": [
+        "paratrooper_division"
+      ],
+      "support_templates": [
+        "airborne_support"
+      ],
+      "width": 15,
+      "unlock_tech": "airborne"
+    },
+    {
+      "template_id": "sf_div",
+      "name": "Special Forces Brigade/Division",
+      "base_unit_templates": [
+        "special_forces_division"
+      ],
+      "support_templates": [
+        "recon"
+      ],
+      "width": 10,
+      "unlock_tech": "special_forces_training"
+    },
+    {
+      "template_id": "mountain_div",
+      "name": "Mountain Division",
+      "base_unit_templates": [
+        "mountain_division"
+      ],
+      "support_templates": [
+        "engineer",
+        "pack_artillery"
+      ],
+      "width": 18,
+      "unlock_tech": "mountain_warfare"
+    },
+    {
+      "template_id": "ski_troops_div",
+      "name": "Ski Troops / Winter Division",
+      "base_unit_templates": [
+        "ski_troops_division"
+      ],
+      "support_templates": [
+        "winter_support"
+      ],
+      "width": 16,
+      "unlock_tech": "winter_warfare_doctrine"
     }
   ]
 }

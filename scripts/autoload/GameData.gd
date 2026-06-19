@@ -1739,6 +1739,42 @@ func process_space_race_events(year: int, month: int) -> void:
 
 # End of new major living events block. Integrate by calling from monthly + TestRunner forces + dialogue responses.
 
+func process_gmo_bio_crisis_events(year: int, month: int) -> void:
+	# GMO / Bio engineering consequences (genetic_engineering_1970, human_genetic_enhancement_1990, cloning).
+	# Crises: food safety backlash, mutation risks, ethics riots, Hand exploitation. Trades from node flavor (yield vs bio risk).
+	_init_peace_state_if_needed()
+	for tag in peace_state.get("population", {}).keys():
+		if typeof(TechnologyManager) != TYPE_NIL:
+			if TechnologyManager.is_tech_completed(tag, "genetic_engineering_1970") or TechnologyManager.is_tech_completed(tag, "human_genetic_enhancement_1990"):
+				var coh := get_pillar(tag, "cohesion")
+				var hand_i := float(peace_state.get("hand_influence", {}).get(tag, 0.2))
+				if coh < 55 or hand_i > 0.35:
+					if randf() < 0.25:
+						apply_pillar_shift(tag, "cohesion", -4, "gmo_backlash")
+						apply_agent_pillar_influence("HIDDEN_HAND", "cohesion", 3, "public")
+						if typeof(LeaderEventUI) != TYPE_NIL:
+							LeaderEventUI.post_news("GMO / Bio-Engineering Crisis", "%s faces public backlash over genetic crops or bio enhancements: contamination fears, mutation risks, ethics revolt. Player choices: ban (slow food/tech), investigate (mitigate but Hand gains), or push (bonus yield but risk bigger crisis)." % tag, "crisis")
+						print("[GMO BIO CRISIS] %s genetic tech crisis (low coh or high hand). Alternate future: enhanced food security or bio-weapon leak / clone army issues." % tag)
+						# Tie to cloning if present
+						if TechnologyManager.has_rule_flag(tag, "cloning"):
+							start_riot(0, tag, 1.2)  # sample
+
+func process_ai_awakening_crisis(year: int, month: int) -> void:
+	# AI awakening / singularity alternate future (agi_battle_management, advanced computer/AI techs in strategic_future).
+	# Crisis: AI self-awareness, rebellion risk, or golden boost if embraced. Trades: research speed vs control/ethics.
+	_init_peace_state_if_needed()
+	for tag in peace_state.get("population", {}).keys():
+		if typeof(TechnologyManager) != TYPE_NIL:
+			if TechnologyManager.is_tech_completed(tag, "agi_battle_management") or (year > 1980 and TechnologyManager.has_rule_flag(tag, "advanced_computers")):
+				var hand_i := float(peace_state.get("hand_influence", {}).get(tag, 0.2))
+				if randf() < 0.2:
+					if hand_i > 0.4 or get_pillar(tag, "cohesion") < 50:
+						apply_pillar_shift(tag, "cohesion", -6, "ai_rebellion")
+						apply_agent_pillar_influence("HIDDEN_HAND", "ascendancy", 4, "public")
+						if typeof(LeaderEventUI) != TYPE_NIL:
+							LeaderEventUI.post_news("AI Awakening / Singularity Crisis", "%s AI systems show signs of self-awareness: rebellion risk or uncontrollable power. Choices: embrace (massive research/industry bonus, but loss of control / ethics nightmare), restrict (safe but lag), or weaponize (Hand loves this path)." % tag, "crisis")
+						print("[AI AWAKENING] %s AI crisis event (alternate future branch). High Hand -> bad path; player agency determines golden vs dystopia." % tag)
+
 func process_epoch_shifts(current_year: int) -> void:
 	# Expanded every ~20yr (dynamic cadence: multiples of 20 or 1910/30/50... ; not rigidly fixed list) major shift/opportunity.
 	# 5-6 choices per shift: economic off-gold/inflation, military posture provoking neighbors (geo border), tech priority lag/unlock waves, colonial/unrest, political/revolution risk, cultural/cohesion hit.
@@ -2661,7 +2697,7 @@ func get_national_manpower_reinforce_mult(tag: String) -> float:
 			mult *= (1.0 + mp_rep * 0.8)  # 0.2 tech -> ~16% boost
 		# Also check via NMM if flowed
 		if typeof(NationalModifierManager) != TYPE_NIL:
-			var cmods := NationalModifierManager.get_combat_modifiers(tag)
+			var cmods: Dictionary = NationalModifierManager.get_combat_modifiers(tag)
 			mp_rep = maxf(mp_rep, float(cmods.get("manpower_replacement", 0.0)))
 			if mp_rep > 0.0:
 				mult *= (1.0 + mp_rep * 0.4)
@@ -3532,6 +3568,8 @@ func process_monthly_demographic_erosion(year: int, month: int) -> void:
 	process_weather_famine_riot_variant(year, month)
 	# Space race and secret programs (priority per user: early space Expanse/steampunk/mech alt-history, 1918 variations)
 	process_space_race_events(year, month)
+	process_gmo_bio_crisis_events(year, month)
+	process_ai_awakening_crisis(year, month)
 
 	print("[NEW EVENTS MONTHLY] Called all 4-6 new processors (separatism from riots/Paris pid4 req, sabotage from unaddr ethics, labor pid3 geo, naval/coastal, HH scandal high hand, ethics chain, weather famine variant) — evidence of integration in living world loop.")
 	print("Monthly demographic erosion processed for year %d month %d. Non-citizen ratios and foreign military %% drive gradual public/institutional strain + social inflation (Mandate/industrial drag). Pro-natal and fortified borders counter it. + Living riots/research events for reactive world. + NEW 4-6 major events (separatism/sabotage/labor/naval/scandal/ethics/weather famine) with reqs/chains/agency." % [year, month])

@@ -56,12 +56,70 @@ static func show_country_borders(t: Tier) -> bool:
 	return true
 
 
+static func show_province_hover_detail(t: Tier) -> bool:
+	return t == Tier.TACTICAL
+
+
+static func show_compact_hover_tooltip(t: Tier) -> bool:
+	return t == Tier.OPERATIONAL
+
+
+static func show_strategic_hover_tooltip(t: Tier) -> bool:
+	return t == Tier.STRATEGIC
+
+
+static func country_border_width(t: Tier) -> float:
+	match t:
+		Tier.STRATEGIC:
+			return 4.6
+		Tier.OPERATIONAL:
+			return 3.4
+		_:
+			return 2.6
+
+
+static func country_border_alpha(t: Tier) -> float:
+	match t:
+		Tier.STRATEGIC:
+			return 0.96
+		Tier.OPERATIONAL:
+			return 0.90
+		_:
+			return 0.78
+
+
 static func show_province_glyphs(t: Tier) -> bool:
 	return t == Tier.TACTICAL
 
 
 static func use_batched_mesh_fills(t: Tier) -> bool:
 	return t == Tier.STRATEGIC
+
+
+static func use_viewport_culling(t: Tier) -> bool:
+	return t == Tier.STRATEGIC
+
+
+static func show_minimap_political_dots(t: Tier) -> bool:
+	return t == Tier.STRATEGIC
+
+
+static func nation_label_font_px(t: Tier) -> int:
+	match t:
+		Tier.STRATEGIC:
+			return 26
+		Tier.OPERATIONAL:
+			return 20
+		_:
+			return 16
+
+
+static func region_label_font_px(t: Tier) -> int:
+	match t:
+		Tier.OPERATIONAL:
+			return 18
+		_:
+			return 14
 
 
 static func label_alpha_for_tier(t: Tier, kind: String) -> float:

@@ -35,9 +35,10 @@ python3 tools/map_generation/build_curated_strategic_regions.py
 
 ## Map UX (operational zoom)
 
-- **Region fill:** Vic3-style soft tint + thin border — **hovered region only** (`MapRegionHighlightLayer`).
+- **Region fill:** Vic3-style soft tint + **merged outer border** (no internal province grid) — **hovered region only** (`MapRegionHighlightLayer`).
 - **Region label:** **cursor/hover only** — not all regions at once (`MapPoliticalLabelsLayer`).
-- **Nation labels:** visible at strategic + operational zoom.
+- **Nation labels:** visible at strategic + operational zoom; **font scales by tier** (26px strategic → 20px operational).
+- **Strategic culling:** off-screen province nodes + nation labels hidden at strategic zoom (prep for 1k+ provinces).
 - **Province names:** tactical zoom only.
 
 ## References from major GS titles

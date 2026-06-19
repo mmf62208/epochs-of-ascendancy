@@ -10,6 +10,8 @@ var _region_labels: Dictionary = {}  # region_id -> Label
 var _built: bool = false
 var _current_tier: int = 0  # MapZoomLOD.Tier.STRATEGIC
 var _hover_region_id: int = -1
+var _viewport_rect: Rect2 = Rect2()
+var _viewport_culling_active: bool = false
 
 
 func _ready() -> void:
@@ -44,6 +46,14 @@ func set_hovered_region(region_id: int, tier: int = -1) -> void:
 	if not _built:
 		return
 	_apply_region_label_visibility()
+
+
+func sync_viewport(world_rect: Rect2, active: bool) -> void:
+	_viewport_rect = world_rect
+	_viewport_culling_active = active
+	if not _built:
+		return
+	_apply_tier_visibility(_current_tier)
 
 
 func _clear_labels() -> void:
@@ -89,6 +99,7 @@ func _build_nation_labels(province_centroids: Dictionary, provinces: Dictionary)
 					if nm != null and str(nm) != "":
 						entry["name"] = str(nm)
 
+	var nation_label_nodes: Array[Label] = []
 	for tag_var in by_tag.keys():
 		var tag := str(tag_var)
 		var e: Dictionary = by_tag[tag]
@@ -100,6 +111,8 @@ func _build_nation_labels(province_centroids: Dictionary, provinces: Dictionary)
 		lbl.name = "NationLabel_%s" % tag
 		add_child(lbl)
 		_nation_labels[tag] = lbl
+		nation_label_nodes.append(lbl)
+	_resolve_label_collisions(nation_label_nodes, 96.0)
 
 
 func _build_region_labels(province_centroids: Dictionary) -> void:
@@ -130,6 +143,29 @@ func _build_region_labels(province_centroids: Dictionary) -> void:
 		_region_labels[rid] = lbl
 
 
+func _resolve_label_collisions(labels: Array, min_sep: float) -> void:
+	if labels.size() < 2:
+		return
+	for _pass in 3:
+		for i in range(labels.size()):
+			var la: Label = labels[i] as Label
+			if la == null:
+				continue
+			for j in range(i + 1, labels.size()):
+				var lb: Label = labels[j] as Label
+				if lb == null:
+					continue
+				var delta := la.position - lb.position
+				var dist := delta.length()
+				if dist >= min_sep:
+					continue
+				var push := Vector2(min_sep, 0.0)
+				if dist > 0.01:
+					push = delta.normalized() * ((min_sep - dist) * 0.5)
+				la.position += push
+				lb.position -= push
+
+
 func _make_label(text: String, pos: Vector2, font_px: int, col: Color) -> Label:
 	var lbl := Label.new()
 	lbl.text = text
@@ -148,14 +184,27 @@ func _make_label(text: String, pos: Vector2, font_px: int, col: Color) -> Label:
 func _apply_tier_visibility(tier: int) -> void:
 	var show_n: bool = MapZoomLODScript.show_nation_labels(tier)
 	var show_r: bool = MapZoomLODScript.show_region_labels(tier)
+	var nation_px: int = MapZoomLODScript.nation_label_font_px(tier)
+	var region_px: int = MapZoomLODScript.region_label_font_px(tier)
 	for lbl in _nation_labels.values():
 		if lbl is Label:
 			var l := lbl as Label
-			l.visible = show_n
+			var in_view := (
+				not _viewport_culling_active
+				or _viewport_rect.size == Vector2.ZERO
+				or _viewport_rect.has_point(l.position)
+			)
+			l.visible = show_n and in_view
 			if show_n:
+				l.add_theme_font_size_override("font_size", nation_px)
 				var c := l.get_theme_color("font_color")
 				c.a = MapZoomLODScript.label_alpha_for_tier(tier, "nation")
 				l.add_theme_color_override("font_color", c)
+	for rid_var in _region_labels.keys():
+		var lbl_r: Variant = _region_labels[rid_var]
+		if lbl_r is Label:
+			var lr := lbl_r as Label
+			lr.add_theme_font_size_override("font_size", region_px)
 	_apply_region_label_visibility(show_r)
 
 
@@ -170,6 +219,7 @@ func _apply_region_label_visibility(force_show_tier: bool = false) -> void:
 		var active := show_r and _hover_region_id >= 0 and rid == _hover_region_id
 		l.visible = active
 		if active:
+			l.add_theme_font_size_override("font_size", MapZoomLODScript.region_label_font_px(_current_tier))
 			var c2 := l.get_theme_color("font_color")
 			c2.a = MapZoomLODScript.label_alpha_for_tier(_current_tier, "region")
 			l.add_theme_color_override("font_color", c2)

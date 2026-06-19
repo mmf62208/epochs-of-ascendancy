@@ -252,6 +252,9 @@ var _fill_color_zoom_bucket: int = -2000000000
 var _fill_zoom_at_last_paint: float = -10.0
 var _last_detail_zoom: float = -1.0
 var _last_hover_mouse: Vector2 = Vector2(-99999, -99999)
+var _last_viewport_cull_pos: Vector2 = Vector2(-99999, -99999)
+var _last_viewport_cull_zoom: float = -1.0
+var _viewport_culling_active: bool = false
 
 #region Conflict overlay
 @export var show_conflict_overlay: bool = true
@@ -1121,6 +1124,8 @@ func _setup_player_map_ux() -> void:
 		var cam2 := get_node_or_null("MapCamera") as Camera2D
 		if _map_minimap.has_method("bind"):
 			_map_minimap.call("bind", self, cam2)
+		if _map_minimap.has_method("set_lod_tier"):
+			_map_minimap.call("set_lod_tier", _map_lod_tier)
 
 	if _adjacency_preview == null and container != null:
 		var AdjScript := preload("res://scripts/map/AdjacencyPreviewLayer.gd")
@@ -1291,7 +1296,16 @@ func _refresh_province_detail_visibility() -> void:
 			if _region_highlight_layer.has_method("sync_tier"):
 				_region_highlight_layer.call("sync_tier", tier)
 		_sync_hovered_strategic_region(_hover_province)
+		_sync_border_lod(tier)
+		if _map_minimap != null and is_instance_valid(_map_minimap) and _map_minimap.has_method("set_lod_tier"):
+			_map_minimap.call("set_lod_tier", tier)
+		if _hover_province != null:
+			if MapZoomLODScript.show_province_hover_detail(tier):
+				_apply_hover_visuals(_hover_province.id, true)
+			elif _hover_outline_province_id >= 0:
+				_apply_hover_visuals(_hover_outline_province_id, false)
 
+	_sync_viewport_culling()
 	var show_details: bool = MapZoomLODScript.show_province_glyphs(tier) or current_zoom > province_detail_min_zoom
 	var show_prov_names: bool = show_province_names and MapZoomLODScript.show_province_labels(tier)
 	_zoom_fill_characterization_scale = current_zoom
@@ -1611,8 +1625,11 @@ func render_provinces():
 			MapManager.rebuild_pick_grid(MapCanvasConfig.PICK_GRID_CELL_SIZE)
 
 	_update_country_borders()
+	_sync_border_lod(_map_lod_tier)
 	_rebuild_political_labels()
 	_rebuild_region_highlight()
+	if _map_minimap != null and is_instance_valid(_map_minimap) and _map_minimap.has_method("invalidate_political_cache"):
+		_map_minimap.call("invalidate_political_cache")
 	_update_unit_icons_for_test()  # demo: show generated NATO icons on provinces that have the test formations spawned in TestRunner/DebugOverlay loads
 	call_deferred("_rebuild_province_mesh_layer")
 	call_deferred("_sync_batched_mesh_fills", true)
@@ -1758,6 +1775,98 @@ func _sync_hovered_strategic_region(province: Province) -> void:
 	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 		if _political_labels_layer.has_method("set_hovered_region"):
 			_political_labels_layer.call("set_hovered_region", rid, _map_lod_tier)
+
+
+func _sync_border_lod(tier: int) -> void:
+	if border_layer == null or not is_instance_valid(border_layer):
+		return
+	var w: float = MapZoomLODScript.country_border_width(tier)
+	var a: float = MapZoomLODScript.country_border_alpha(tier)
+	for child in border_layer.get_children():
+		if not (child is Line2D):
+			continue
+		if not str(child.name).begins_with(COUNTRY_FRONTIER_PREFIX):
+			continue
+		var seg := child as Line2D
+		seg.width = w
+		var c := seg.default_color
+		c.a = a
+		seg.default_color = c
+
+
+func _get_camera_world_rect(margin_ratio: float = 0.10) -> Rect2:
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	if cam == null:
+		return Rect2()
+	var vp_size := get_viewport().get_visible_rect().size
+	var zoom := maxf(cam.zoom.x, cam.zoom.y)
+	var half := vp_size * 0.5 / maxf(zoom, 0.01)
+	var center := cam.global_position
+	var rect := Rect2(center - half, half * 2.0)
+	var margin := margin_ratio * maxf(rect.size.x, rect.size.y)
+	return rect.grow(margin)
+
+
+func _sync_viewport_culling(force: bool = false) -> void:
+	var use_cull := MapZoomLODScript.use_viewport_culling(_map_lod_tier)
+	if not use_cull:
+		if _viewport_culling_active:
+			_clear_viewport_culling()
+		return
+
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	if cam == null:
+		return
+	var pos := cam.global_position
+	var zoom := _get_camera_zoom()
+	if (
+		not force
+		and _viewport_culling_active
+		and pos.distance_squared_to(_last_viewport_cull_pos) < 256.0
+		and absf(zoom - _last_viewport_cull_zoom) < 0.015
+	):
+		return
+	_last_viewport_cull_pos = pos
+	_last_viewport_cull_zoom = zoom
+	_viewport_culling_active = true
+
+	var world_rect := _get_camera_world_rect(0.14)
+	var visible_pids: Dictionary = {}
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_in_rect"):
+		for pid in MapManager.get_provinces_in_rect(world_rect, 96.0):
+			visible_pids[int(pid)] = true
+	if selected_province_id >= 0:
+		visible_pids[selected_province_id] = true
+	if _hover_province != null:
+		visible_pids[_hover_province.id] = true
+	for pid in _get_interesting_province_ids().keys():
+		visible_pids[int(pid)] = true
+
+	for pid_var in province_nodes.keys():
+		var pid := int(pid_var)
+		var node: Node2D = province_nodes[pid_var] as Node2D
+		if node == null or not is_instance_valid(node):
+			continue
+		node.visible = visible_pids.has(pid)
+
+	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
+		if _political_labels_layer.has_method("sync_viewport"):
+			_political_labels_layer.call("sync_viewport", world_rect, true)
+
+
+func _clear_viewport_culling() -> void:
+	if not _viewport_culling_active:
+		return
+	_viewport_culling_active = false
+	_last_viewport_cull_pos = Vector2(-99999, -99999)
+	_last_viewport_cull_zoom = -1.0
+	for pid_var in province_nodes.keys():
+		var node: Node2D = province_nodes[pid_var] as Node2D
+		if node != null and is_instance_valid(node):
+			node.visible = true
+	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
+		if _political_labels_layer.has_method("sync_viewport"):
+			_political_labels_layer.call("sync_viewport", Rect2(), false)
 
 
 func _should_use_batched_mesh_fills() -> bool:
@@ -3194,10 +3303,16 @@ func _refresh_hover_tooltip(province: Province) -> void:
 			or "🏔" in elig_glance
 			or "↗" in elig_glance
 		)
-	var text := ProvinceInsight.build_hover_tooltip(
-		province, selected_province_id, counterpart, supply_mode, hover_role,
-		is_candidate, contested, has_agent,
-	)
+	var text := ""
+	if MapZoomLODScript.show_strategic_hover_tooltip(_map_lod_tier):
+		text = ProvinceInsight.build_strategic_hover_tooltip(province)
+	elif MapZoomLODScript.show_compact_hover_tooltip(_map_lod_tier):
+		text = ProvinceInsight.build_compact_hover_tooltip(province)
+	else:
+		text = ProvinceInsight.build_hover_tooltip(
+			province, selected_province_id, counterpart, supply_mode, hover_role,
+			is_candidate, contested, has_agent,
+		)
 	var mouse := get_viewport().get_mouse_position()
 	var compare_active := counterpart != null
 	var selected_accent := selected_province_id == province.id
@@ -5132,6 +5247,8 @@ func _get_province_polygon(node: Node2D) -> Polygon2D:
 
 
 func _apply_hover_visuals(province_id: int, active: bool) -> void:
+	if active and not MapZoomLODScript.show_province_hover_detail(_map_lod_tier):
+		return
 	if active:
 		if _hover_outline_province_id >= 0 and _hover_outline_province_id != province_id:
 			_apply_hover_visuals(_hover_outline_province_id, false)
@@ -7370,7 +7487,9 @@ func _sync_shared_edge_frontiers(_scan_pids: Array) -> void:
 			if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
 				use_color = MapManager.get_country_color(own)
 		seg.default_color = use_color
-		seg.width = COUNTRY_BORDER_WIDTH
+		seg.width = MapZoomLODScript.country_border_width(_map_lod_tier)
+		var ba: float = MapZoomLODScript.country_border_alpha(_map_lod_tier)
+		seg.default_color.a = ba
 		seg.antialiased = true
 		seg.joint_mode = Line2D.LINE_JOINT_ROUND
 		seg.begin_cap_mode = Line2D.LINE_CAP_ROUND
@@ -7391,16 +7510,16 @@ func _live_owner_tag(province_id: int) -> String:
 
 
 func _province_polygon_points(province_id: int) -> PackedVector2Array:
-	if geometry.has(province_id):
-		var g: Dictionary = geometry[province_id]
-		var pts: PackedVector2Array = g.get("points", PackedVector2Array())
-		if pts.size() >= 3:
-			return pts
 	if province_nodes.has(province_id):
 		var pnode: Node2D = province_nodes[province_id]
 		for ch in pnode.get_children():
 			if ch is Polygon2D:
 				return (ch as Polygon2D).polygon
+	if geometry.has(province_id):
+		var g: Dictionary = geometry[province_id]
+		var pts: PackedVector2Array = g.get("points", PackedVector2Array())
+		if pts.size() >= 3:
+			return MapCanvasConfig.transform_province_points(pts, _is_world_canvas_active(), true)
 	return PackedVector2Array()
 
 

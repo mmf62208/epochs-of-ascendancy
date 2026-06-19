@@ -170,6 +170,47 @@ func _print_grand_theater_qc_evidence(mapr: Node) -> void:
 				print("[GRAND THEATER QC] FAIL Data-driven naval chokepoints")
 			notes.append("chokepoints=%d" % chokes.size())
 
+		if MapManager.has_method("get_all_strategic_regions"):
+			var regions: Dictionary = MapManager.get_all_strategic_regions()
+			total += 1
+			var region_ok: bool = regions.size() >= 20
+			if region_ok:
+				passed += 1
+				print("[GRAND THEATER QC] PASS Curated strategic regions (%d, e.g. %s)" % [
+					regions.size(),
+					MapManager.get_strategic_region_name(1) if MapManager.has_method("get_strategic_region_name") else "?",
+				])
+			else:
+				print("[GRAND THEATER QC] FAIL Curated strategic regions (count=%d)" % regions.size())
+			notes.append("regions=%d" % regions.size())
+
+		if MapManager.has_method("get_province_region_id") and MapManager.has_method("get_province"):
+			var london_rid := MapManager.get_province_region_id(9275)
+			total += 1
+			var london_ok: bool = london_rid == 1
+			if london_ok:
+				passed += 1
+				print("[GRAND THEATER QC] PASS UK split (London → Southern England, rid=%d)" % london_rid)
+			else:
+				print("[GRAND THEATER QC] FAIL UK split (London rid=%d, expected 1)" % london_rid)
+
+	if mapr != null:
+		total += 1
+		var lod_ok: bool = mapr.get("_region_highlight_layer") != null or mapr.get("_political_labels_layer") != null
+		if lod_ok:
+			passed += 1
+			print("[GRAND THEATER QC] PASS Map zoom LOD layers wired")
+		else:
+			print("[GRAND THEATER QC] FAIL Map zoom LOD layers wired")
+
+		total += 1
+		var cull_ok: bool = mapr.has_method("_sync_viewport_culling") and mapr.has_method("_get_camera_world_rect")
+		if cull_ok:
+			passed += 1
+			print("[GRAND THEATER QC] PASS Strategic viewport culling API")
+		else:
+			print("[GRAND THEATER QC] FAIL Strategic viewport culling API")
+
 	if mapr != null and mapr.has_method("get_overlay_layer"):
 		var ol: Node = mapr.call("get_overlay_layer", "InfrastructureOverlayLayer") as Node
 		if ol != null and ol.has_method("get_era_infra_profile"):
