@@ -1,6 +1,6 @@
 # Current State of Epochs of Ascendancy
 
-**Last updated:** 2026-06-19 + continued (balance, more tips, full AAR panel, more art portraits/space/tech icons): ALL 4 agents completed + new in /home/mikef/eoa-goals-worktree: 
+**Last updated:** 2026-06-19 + continued (combat history testing vs WWI/WWII [Marne/Verdun/Stalingrad/Midway sims; gaps: logistics, chem/bio, naval, espionage, combined arms, leader initiative; recs in /tmp/combat-history-testing-summary.md], leader portraits batch [spawned for ALL ~450; wire json + assets], 1910 start analysis [pros: more nation build time/alt-1914; cons: scope/data; rec: ADD as 4th, DO NOT scrap 1918/36/26; see /tmp/1910-start-design.md], spawned combat/art/1910 agents; air/space/unit combat [dominance 4:1+, orbital/guided, specialists, tests]; AAR/tips/balance; art wired; merged): 
 1. Events: 5 dedicated backlash processes + full chains/persist/UI/resolver/Test (cloning/genetic/bio-sonic/VR/phaser-tele prestige+accident).
 2. Space wiring: scanners/tele/shields/phasers/secret_fleet/power_armor/life-reuse/fusion live in GameData/Resolver/Supply/TM/Agent/TestRunner + logs.
 3. Layered prod: per-line current_production_layer + _LAYER_TRADES (mass/auto/additive/nano) in ProductionLine/PM/NMM + UI previews/buttons in AssignmentScreen + F10 inspect + TestRunner 50T exercise.

@@ -2106,7 +2106,7 @@ func _build_ui() -> void:
 	harness_section.add_child(preview_combat_btn)
 
 	var aar_btn := Button.new()
-	aar_btn.text = "📜 Show Battle AAR Panel (full details: units, leaders, all factors, logs - accessible from preview/inspector)"
+	aar_btn.text = "📜 Show Battle AAR Panel (F10) — unit combat logs (Formation.combat_log), leader impacts +%, full modifiers %% list, space/air effects, tips. Callable from preview note [Press F10 for full AAR], post-battle auto"
 	aar_btn.pressed.connect(func(): show_battle_aar({}))
 	harness_section.add_child(aar_btn)
 
@@ -3820,7 +3820,7 @@ func _on_load_phase1_test_scenario():
 		print("River metadata: 126 children have river_aware=True (e.g. 9000-9005 for orig 82); notes enriched in geometry")
 		print("Visual: F10 Subdiv button (or harness) spawns green Line2D for the 5 river-cross sample children overlaid; also auto-loads sample for demo")
 		print("Camera: Auto-set to nice Europe-focused starting view")
-		print("Tip: For reliable testing of the Phase 1 map, open scenes/TestScenario.tscn and press F6 (Play Current Scene), or right-click it in the FileSystem dock → 'Set as Main Scene' so F5 launches the test map.")
+		print("Tip: For reliable testing of the Phase 1 map, open scenes/TestScenario.tscn and press F6 (Play Current Scene)... Use F10 '📜 Show Battle AAR Panel' + combat preview in inspector (note: [Press F10 for full AAR]) + Ctrl+click assaults to exercise unit logs, full % modifiers, leader impacts, space/air effects.")
 		print("Tip: F10 → 'Reload Raw Proposed Splits' to live-iterate on the Python splitter.")
 		print("======================================\n")
 		# Auto demo the river sample overlays + load sample for the 5-child river visual even on full 471
@@ -4950,26 +4950,239 @@ func _open_space_designer() -> void:
 	toast_map_debug("Space Designer opened. Choose base, add modules (propulsion, sensors, life support), finalize to unlock custom design for production.")
 
 func show_battle_aar(result: Dictionary = {}) -> void:
-	# Specific accessible AAR panel (full details when clicked from preview/inspector/post-battle).
-	# Shows all factors, units, leaders, logs, outcomes. Not in hover (too much); clear in preview, deep here.
+	# Enhanced specific + accessible AAR panel: unit combat logs (from Formation.combat_log via BM), leader impacts, full modifiers w/ % , space/air effects, tips.
+	# Callable from combat preview in ProvinceInsight via text note "[Press F10 for full AAR]", post-battle auto (player), dedicated F10 btn.
+	# Balance integration: reflects real air thresh (full at 4:1), space costly not instant, damage from BM apply, logs factors.
 	if result.is_empty():
-		# Demo sample
+		# Improved demo with keys used by new panel + logs snapshot + power details
 		result = {
 			"attacker_tag": "GER", "defender_tag": "FRA",
 			"from_province_id": 82, "target_province_id": 101,
 			"odds_attacker_win": 62.0,
 			"winner": "GER",
 			"attacker_casualties": 145, "defender_casualties": 98,
-						"key_factors": ["air_superiority", "overwhelming_air_dominance", "leader_impact_high", "fort_mod_def_1.2", "supply_mod_att_0.8", "special_mountain", "space_strike", "orbital_guided"],
-			"leader_att": "Rommel (+18% attack/org)",
-			"leader_def": "Manstein (+12% def)",
+			"key_factors": ["air_superiority", "overwhelming_air_dominance", "leader_impact_high", "fort_mod_def_1.2", "supply_mod_att_0.8", "special_mountain", "space_strike", "orbital_guided"],
+			"leader_name": "Rommel",
+			"leader_attack_bonus": 0.18,
 			"units_att": ["Panzer x2", "Inf x5", "CAS support"],
 			"units_def": ["Fortified Inf x4", "Mountain x1"],
-			"modifiers_detail": ["+15% air CAS", "-8% night", "+22% defending fort", "+5% terrain", "Leader bonus decisive", "+18% orbital strike (guided munitions)", "Space recon precision +12%"],
 			"air_dominance_level": "full",
 			"air_power_ratio": 4.2,
-			"outcome": "GER breakthrough, province captured. Encirclement risk for remaining FRA. " + "Overwhelming air superiority achieved - enemy grounded at high cost.",
-			"date": "1940-05"
+			"cas_mult": 1.35,
+			"outcome": "GER breakthrough, province captured. Encirclement risk for remaining FRA. Overwhelming air superiority achieved - enemy grounded at high cost.",
+			"date": "1940-05",
+			"space_strike_bonus": 0.18,
+			"orbital_guided_munitions": 0.12,
+			"special": "mountain,space_support",
+			"combat_logs": {
+				"attacker": [{"date":"1940-05", "province_id":101, "result":"win", "key_factors":["overwhelming_air_superiority","space_guided_munitions_precision","leader_impact_high"], "leader":"Rommel", "outcome":"Casualties: 145 vs 98"}],
+				"defender": [{"date":"1940-05", "province_id":101, "result":"loss", "key_factors":["enemy_air_dominance_full","orbital_strike_support"], "leader":"Manstein", "outcome":"Casualties: 145 vs 98"}]
+			},
+			"attacker_power_detail": {"leader_name":"Rommel", "leader_attack_bonus":0.18, "terrain_bonus_applied":0.08, "space_strike_bonus":0.18, "national_combat_modifiers":{"army_org_factor":0.1}, "training_path_soft_bonus":4.0},
+			"defender_power_detail": {"leader_name":"Manstein", "leader_attack_bonus":0.12, "terrain_bonus_applied":0.12, "orbital_guided_munitions":0.12}
+		}
+
+	var win := Window.new()
+	win.title = "Battle AAR: %s vs %s (%s) [F10 accessible]" % [result.get("attacker_tag","?"), result.get("defender_tag","?"), result.get("date","")]
+	win.size = Vector2(720, 560)
+	var scroll := ScrollContainer.new()
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var vb := VBoxContainer.new()
+	vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(vb)
+	win.add_child(scroll)
+
+	# Header
+	var hdr := Label.new()
+	hdr.text = "AFTER ACTION REPORT — Full Details (unit logs, leaders, modifiers %, air/space, tips)"
+	hdr.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(hdr)
+	vb.add_child(HSeparator.new())
+
+	# Date / Province lookup for specificity
+	var date_str := str(result.get("date", ""))
+	var prov_id := int(result.get("target_province_id", result.get("province_id", -1)))
+	var prov_name := ""
+	if typeof(MapManager) != TYPE_NIL:
+		var p: Province = MapManager.get_province(prov_id)
+		if p != null:
+			prov_name = p.name
+	var meta := Label.new()
+	meta.text = "Date: %s | Province: %s (#%d) | From: %s" % [date_str if date_str else "current", prov_name if prov_name else "?", prov_id, str(result.get("from_province_id", "?"))]
+	vb.add_child(meta)
+
+	# Odds / Result
+	var odds := Label.new()
+	odds.text = "Est. odds attacker win: %.0f%% | Winner: %s | Outcome: %s" % [float(result.get("odds_attacker_win",50)), result.get("winner","?"), str(result.get("outcome","")).substr(0,120)]
+	odds.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(odds)
+
+	# Casualties
+	var cas := Label.new()
+	cas.text = "Casualties: Attacker %s vs Defender %s" % [result.get("attacker_casualties","?"), result.get("defender_casualties","?")]
+	vb.add_child(cas)
+
+	# Units (from preview or fallback)
+	var units := Label.new()
+	units.text = "Units involved — Att: %s | Def: %s" % [str(result.get("units_att", result.get("attacker_units", ["(see inspector)"]))), str(result.get("units_def", result.get("defender_units", ["(see inspector)"])))]
+	vb.add_child(units)
+	vb.add_child(HSeparator.new())
+
+	# === Leader impacts (from power_detail or result)
+	var lsec := Label.new()
+	lsec.text = "LEADER IMPACTS"
+	lsec.add_theme_color_override("font_color", Color(0.9, 0.8, 0.2))
+	vb.add_child(lsec)
+	var att_pd := result.get("attacker_power_detail", {}) if typeof(result.get("attacker_power_detail", {})) == TYPE_DICTIONARY else {}
+	var def_pd := result.get("defender_power_detail", {}) if typeof(result.get("defender_power_detail", {})) == TYPE_DICTIONARY else {}
+	var lead_att := Label.new()
+	var att_ldr := str(result.get("leader_name", att_pd.get("leader_name", result.get("leader_att", "—"))))
+	var att_ldr_b := float(att_pd.get("leader_attack_bonus", result.get("leader_attack_bonus", 0.0)))
+	lead_att.text = "Attacker leader: %s  (attack bonus +%.0f%% | org/logistics from leader traits)" % [att_ldr, att_ldr_b * 100.0]
+	vb.add_child(lead_att)
+	var lead_def := Label.new()
+	var def_ldr := str(def_pd.get("leader_name", result.get("leader_def", "—")))
+	var def_ldr_b := float(def_pd.get("leader_attack_bonus", 0.0))
+	lead_def.text = "Defender leader: %s  (defense/terrain bonus +%.0f%%)" % [def_ldr, def_ldr_b * 100.0]
+	vb.add_child(lead_def)
+	var lead_note := Label.new()
+	lead_note.text = "  (Leaders affect soft/hard/org/readiness/terrain; training paths add more. Full in Leader inspector.)"
+	lead_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(lead_note)
+	vb.add_child(HSeparator.new())
+
+	# === Unit combat logs (pull from Formation.combat_log if available in result["combat_logs"] or query LeaderManager)
+	var logsec := Label.new()
+	logsec.text = "UNIT COMBAT LOGS (from Formation.combat_log — follows unit)"
+	logsec.add_theme_color_override("font_color", Color(0.7, 0.9, 0.7))
+	vb.add_child(logsec)
+	var logs_src := result.get("combat_logs", {})
+	var shown_logs := false
+	for role in ["attacker", "defender"]:
+		var role_logs = logs_src.get(role, []) if typeof(logs_src) == TYPE_DICTIONARY else []
+		if role_logs and role_logs.size() > 0:
+			shown_logs = true
+			var recent = role_logs[-1] if role_logs.size() > 0 else {}
+			var llab := Label.new()
+			llab.text = "%s log: date=%s prov=%s result=%s factors=%s leader=%s outcome=%s" % [
+				role.capitalize(),
+				recent.get("date", "?"),
+				str(recent.get("province_id", prov_id)),
+				recent.get("result", "?"),
+				", ".join(recent.get("key_factors", result.get("key_factors", []))),
+				recent.get("leader", result.get("leader_name", "—")),
+				str(recent.get("outcome", "")).substr(0, 60)
+			]
+			llab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			vb.add_child(llab)
+	if not shown_logs:
+		var no_log := Label.new()
+		no_log.text = "  (No live combat_log entries; demo or non-Formation battle. Logs appended in BM._log_unit_combat on real assaults. Check Formation in inspectors.)"
+		no_log.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		vb.add_child(no_log)
+	vb.add_child(HSeparator.new())
+
+	# === Full list of modifiers with % values (built from power_details + result air/space/terrain + carried preview keys)
+	var modsec := Label.new()
+	modsec.text = "FULL MODIFIERS (with % values)"
+	modsec.add_theme_color_override("font_color", Color(0.6, 0.85, 1.0))
+	vb.add_child(modsec)
+	var mods_list := []
+	# From power details (leader, terrain, training, space, nat)
+	for pd_role in ["attacker", "defender"]:
+		var pd = att_pd if pd_role == "attacker" else def_pd
+		if pd:
+			if float(pd.get("leader_attack_bonus", 0)) != 0.0:
+				mods_list.append("%s leader attack: +%.0f%%" % [pd_role, float(pd.get("leader_attack_bonus",0))*100])
+			if float(pd.get("terrain_bonus_applied", 0)) != 0.0:
+				mods_list.append("%s terrain bonus: +%.0f%%" % [pd_role, float(pd.get("terrain_bonus_applied",0))*100])
+			if float(pd.get("training_path_soft_bonus", 0)) != 0.0:
+				mods_list.append("%s training path: +%.1f soft" % [pd_role, float(pd.get("training_path_soft_bonus",0))])
+			var natm = pd.get("national_combat_modifiers", {})
+			if natm and float(natm.get("army_org_factor",0)) > 0:
+				mods_list.append("%s national org: +%.0f%%" % [pd_role, float(natm.get("army_org_factor",0))*100])
+	# Air / CAS from result
+	var adl := str(result.get("air_dominance_level", ""))
+	var ar := float(result.get("air_power_ratio", 0.0))
+	var cm := float(result.get("cas_mult", 1.0))
+	if adl != "" and adl != "none":
+		mods_list.append("Air dominance (%s, ratio %.1f): CAS x%.2f (~+%.0f%%)" % [adl, ar, cm, (cm-1.0)*100])
+	if float(result.get("air_weather_mod", 1.0)) != 1.0:
+		mods_list.append("Air weather: x%.2f" % float(result.get("air_weather_mod",1)))
+	# Space
+	if float(result.get("space_strike_bonus", 0)) > 0:
+		mods_list.append("Space strike bonus: +%.0f%% attacks (devastating soft/hard)" % (float(result.get("space_strike_bonus",0))*100))
+	if float(result.get("orbital_guided_munitions", 0)) > 0:
+		mods_list.append("Orbital guided munitions: +%.0f%% +org/morale suppression on enemy" % (float(result.get("orbital_guided_munitions",0))*100))
+	# Other from result / preview carry / factors
+	if float(result.get("fort_mod", 1.0)) != 1.0:
+		mods_list.append("Fort/settlement def: x%.2f (~+%.0f%%)" % [float(result.get("fort_mod",1)), (float(result.get("fort_mod",1))-1)*100])
+	if float(result.get("supply_mod", 1.0)) != 1.0:
+		mods_list.append("Supply: x%.2f" % float(result.get("supply_mod",1)))
+	if bool(result.get("is_night", false)):
+		mods_list.append("Night ops: visibility/org penalties (~-38% CAS/air)")
+	if "mountain" in str(result.get("special","")):
+		mods_list.append("Mountain terrain specialist edge: +8% soft")
+	# From key_factors as fallback %
+	for kf in result.get("key_factors", []):
+		if "fort" in kf: mods_list.append("Fort mod (from factor): ~+22% def")
+		if "leader" in kf: mods_list.append("Leader impact (from factor): decisive +15-20%")
+	for m in mods_list:
+		var mlab := Label.new()
+		mlab.text = "  • " + m
+		vb.add_child(mlab)
+	if mods_list.size() == 0:
+		vb.add_child(Label.new("  (No detailed modifiers; using key_factors)"))
+	vb.add_child(HSeparator.new())
+
+	# === Space / Air effects (dedicated, with balance notes)
+	var asec := Label.new()
+	asec.text = "AIR & SPACE EFFECTS"
+	asec.add_theme_color_override("font_color", Color(0.6, 0.7, 1.0))
+	vb.add_child(asec)
+	var airl := Label.new()
+	airl.text = "Air: dominance=%s ratio=%.1f:1 cas_mult=%.2f (full>=4:1 for overwhelm suppress in large prov; partial 1.8:1 limited CAS; slight adv allows enemy ops at +cost -effect; night/weather heavy penalty)" % [adl if adl else "n/a", ar, cm]
+	airl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(airl)
+	var spacel := Label.new()
+	var ssb := float(result.get("space_strike_bonus", result.get("space_strike", 0.0)))
+	var ogm := float(result.get("orbital_guided_munitions", 0.0))
+	spacel.text = "Space: strike=%.2f guided=%.2f (from designer assets + NMM + GameData; precision guided +soft/hard on troops, area denial, morale/org hits for non-space; costly to maintain, not instant win; space_capable units gain extra vs orbital)" % [ssb, ogm]
+	spacel.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(spacel)
+	vb.add_child(HSeparator.new())
+
+	# === Tips (updated to reference AAR + balance)
+	var tsec := Label.new()
+	tsec.text = "TIPS (see AAR for deep)"
+	tsec.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
+	vb.add_child(tsec)
+	var tips_aar := [
+		"Full unit combat logs, leader %, exact modifiers list, space/air details in this AAR panel (F10).",
+		"Balance: Air 4:1+ needed for full suppression (large provinces); partial gives some CAS but enemy still operates with penalty.",
+		"Space strike/guided: high impact on ground (esp vs non-space units) but expensive (supply/attrition/maintenance); recon edge but not decisive alone.",
+		"Check Formation inspectors for persistent combat_log history + current org/rdy/str (damage from battle, heal via Supply + infra).",
+		"Leader + training paths + nat spirits + terrain + infra/dev + settlement fort + supply + weather all stack; use preview for quick odds.",
+		"Post-battle: advance time or use Supply to recover formations; reinforce from pop/prod stocks."
+	]
+	for t in tips_aar:
+		var tlab := Label.new()
+		tlab.text = "• " + t
+		tlab.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		vb.add_child(tlab)
+
+	# Close
+	var close := Button.new()
+	close.text = "Close AAR (re-open via F10 button or post-battle)"
+	close.pressed.connect(win.queue_free)
+	vb.add_child(close)
+
+	get_tree().root.add_child(win)
+	win.popup_centered()
+	print("[AAR PANEL] Enhanced full battle AAR shown for %s (pulled logs=%s, mods=%d)" % [result.get("target_province_id", -1), shown_logs, mods_list.size()])
+
+
+
 
 	var win := Window.new()
 	win.title = "Battle AAR: %s vs %s (%s)" % [result.get("attacker_tag","?"), result.get("defender_tag","?"), result.get("date","")]

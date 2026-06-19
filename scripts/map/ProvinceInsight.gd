@@ -5309,11 +5309,13 @@ static func _battle_preview_block(
 		tips.append("Guided munitions bonus for advanced units (space comms/tech)")
 	if tips.size() > 0:
 		block += "\n  %sKey situation: %s[/color]" % [COLOR_MUTED, " · ".join(tips)]
+	# Update tips to reference AAR for full specificity (unit logs from Formation, leader, modifiers %, space/air)
+	tips.append("See full AAR (F10) for unit combat logs (Formation.combat_log: date/province/result/key factors/leader), leader impacts, modifiers with % values, space/air effects")
 	# Accessibility for full AAR (not in hover to avoid overwhelm; click/F10 for deep)
-	block += "\n  %s[Full AAR accessible via F10 'Show Battle AAR Panel' or post-battle auto; shows unit logs (date/province/result/factors), leaders, space/air/guided, all % modifiers. Balance: overwhelming air (4:1+) for full province dominance, space costly but high impact on troops.][/color]" % COLOR_MUTED
+	block += "\n  %s[Press F10 for full AAR] — unit combat logs, leader impacts, full modifiers %% list, space/air effects, tips. Balance: air dominance 4:1+ full suppress; space high precision impact but maintenance costly, not instant win.[/color]" % COLOR_MUTED
 	# Most important: odds, key units/leaders if standout, major modifiers.
 	if preview.has("odds_attacker_win"):
-		block += "\n  %sEstimated success odds: %.0f%% (click for full breakdown)[/color]" % [COLOR_EFFECTIVE, float(preview["odds_attacker_win"])]
+		block += "\n  %sEstimated success odds: %.0f%% (click for full breakdown) [Press F10 for full AAR][/color]" % [COLOR_EFFECTIVE, float(preview["odds_attacker_win"])]
 	return block
 
 
