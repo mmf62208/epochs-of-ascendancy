@@ -30,5 +30,13 @@
     "description": "Unlocks improved fighter and CAS designs.",
     "cost_years": 2.0,
     "status": "locked"
+  },
+  "space_design_basic": {
+    "id": "space_design_basic",
+    "name": "Basic Space Asset Design",
+    "area": "space",
+    "cost_years": 4,
+    "status": "locked",
+    "era": 1955
   }
 }

@@ -2251,6 +2251,12 @@ func _build_ui() -> void:
 	)
 	harness_section.add_child(layered_inspect_btn)
 
+	# Space Designer button - full UI integration
+	var space_btn := Button.new()
+	space_btn.text = "🛸 Open Space Designer (Sat/Station/Ship - requires space_designer_unlocked tech)"
+	space_btn.pressed.connect(_open_space_designer)
+	harness_section.add_child(space_btn)
+
 	# Simple Mech Designer stub (from F10 or unlock): popup choice diesel/steam/steampunk alt for armor/mech. Persist choice. Wire note to div templates.
 	var mech_designer_btn := Button.new()
 	mech_designer_btn.text = "🤖 Force Mech Designer Unlock + Open Variant Choice (diesel/steam/steampunk stub popup)"
@@ -4924,3 +4930,16 @@ func _show_mech_variant_choice_popup(tag: String, gd: Node) -> void:
 	vb.add_child(cancel)
 	win.popup_centered()
 	print("[MECH DESIGNER STUB] Popup shown for %s variant choice (diesel/steam/steampunk)." % tag)
+func _open_space_designer() -> void:
+	# Check unlock via tech/rule_flag
+	var unlocked := false
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("has_rule_flag"):
+		unlocked = GameData.call("has_rule_flag", "player", "space_designer_unlocked")
+	if not unlocked:
+		toast_map_debug("Space Designer locked. Research 'space_design_basic' or orbital techs first.")
+		return
+	
+	var popup := preload("res://scripts/ui/SpaceDesignPopup.gd").new()
+	get_tree().root.add_child(popup)
+	popup.set_player_tag("player" if "player" in get_tree().root.get("peace_state", {}) else "USA")
+	toast_map_debug("Space Designer opened. Choose base, add modules (propulsion, sensors, life support), finalize to unlock custom design for production.")

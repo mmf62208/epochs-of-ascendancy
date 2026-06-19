@@ -1698,5 +1698,45 @@
       "flavor": "Trek phasers (stun to vaporize) + photon/quantum torpedoes. After missiles/lasers. Trade-off: power hog, heat management, overkill ethics, requires mature shields/scanners first, insane R&D cost.",
       "icon": "res://assets/graphics/icons/tech/phaser_torpedo_combat_64.png"
     }
+  },
+  "space_design_basic": {
+    "id": "space_design_basic",
+    "name": "Basic Space Asset Design",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 3,
+    "row": 10,
+    "tier": 3,
+    "era_min": 1955,
+    "era_max": 1975,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "orbital_shipyard_program"
+    ],
+    "research": {
+      "base_cost_days": 120,
+      "category": "space",
+      "ahead_of_time_penalty_per_year": 0.15
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "space_designer_unlocked"
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_satellite_design"
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_space_station_design"
+      }
+    ],
+    "ui": {
+      "short_effect": "Unlocks basic spaceship, station, satellite designer. Customize with modules for propulsion, sensors, life support.",
+      "flavor": "From prototypes to operational designs. First step to true space power projection. Trade-offs in mass, power, cost.",
+      "icon": "res://assets/graphics/icons/tech/space_design_basic.png"
+    }
   }
 }

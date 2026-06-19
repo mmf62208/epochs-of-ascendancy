@@ -5113,6 +5113,34 @@ static func _battle_preview_block(
 	var situation := build_compare_situation_note(attacker, defender)
 	if not situation.is_empty():
 		block += "\n" + situation
+	# Player-friendly combat hover: ONLY most important factors (biggest impact). Not overwhelming.
+	# Clear tips. Click for full AAR/details (future panel shows all).
+	var tips: Array[String] = []
+	if preview.get("odds_attacker_win", 50) < 40:
+		tips.append("Our forces are outnumbered or disadvantaged")
+	if preview.get("encircled", false):
+		tips.append("Our forces are encircled")
+	if float(preview.get("supply_mod", 1.0)) < 0.7:
+		tips.append("Our forces are out of supply")
+	if preview.get("air_superiority", false):
+		tips.append("We have air superiority")
+	if preview.get("enemy_air", false):
+		tips.append("The enemy enjoys air supremacy")
+	if "amphib" in str(preview.get("special", "")):
+		tips.append("Conducting amphibious assault — our units suffer additional organizational loss")
+	if preview.get("fort_mod", 1.0) > 1.2:
+		tips.append("The enemy is fortified")
+	if preview.get("our_fort", false):
+		tips.append("We are fortified / dug in")
+	if preview.get("counterattack", false):
+		tips.append("The enemy is counterattacking")
+	if preview.get("leader_impact", 0.0) > 0.1:
+		tips.append("Leader impact is significant in this battle")
+	if tips.size() > 0:
+		block += "\n  %sKey situation: %s[/color]" % [COLOR_MUTED, " · ".join(tips)]
+	# Most important: odds, key units/leaders if standout, major modifiers.
+	if preview.has("odds_attacker_win"):
+		block += "\n  %sEstimated success odds: %.0f%% (click for full breakdown)[/color]" % [COLOR_EFFECTIVE, float(preview["odds_attacker_win"])]
 	return block
 
 
