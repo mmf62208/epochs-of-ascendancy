@@ -3,7 +3,7 @@
   "name": "M3 Stuart Light Tank",
   "base_type": "Armored",
   "size_category": "Light",
-  "visual_archetype": "light_tank",
+  "visual_archetype": "interwar_light_tank",
   "crew_required": 4,
   "base_training_level": 20,
   "max_experience_level": 100,

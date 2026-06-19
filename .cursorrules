@@ -1,0 +1,42 @@
+# Epochs of Ascendancy - Godot 4 Grand Strategy Game
+
+This is a complex Godot 4.6.2 "Forward Plus" grand strategy / alt-history sandbox game focused on 1936+ Europe/world with deep systems.
+
+## Core Principles When Editing
+- Prefer explicit types in GDScript (avoid bare `var x := something` that infers as Variant; the project treats many inference warnings as errors).
+- All major state lives in autoloads (GameData, TimeManager, MapManager, SaveLoadManager, etc.).
+- Monthly simulation is driven by TimeManager.game_month_advanced signal → GameData.process_monthly_demographic_erosion (this now includes riots, research ethics, etc.).
+- Events must support requirements (e.g. Paris events only if owner has province ID 4; riots trigger on public cohesion < 50%, can spread, have duration-based effects, resolved via policies/agents/military with different outcomes; research complete → 6 months later ethics event).
+- Hidden Hand, player choices, world state, and the core loop (erosion + agents + policies + combat + economy) must drive events for "living world" feel.
+- Save/load must explicitly persist new state (see GameData.get_save_data / apply_save_data and peace_state keys like active_riots, pending_research_events).
+- 50-turn integrated tests are critical: use EOA_RUN_50_TURN_SIM=1 or the fast/direct test env vars. Direct fast tests (EOA_TEST_SAVE_LOAD=1 or EOA_FAST_TEST=1) are the quick way to verify new event + persist logic without waiting for full 50t init.
+- Use MapManager for all province ownership/adjacency queries (get_provinces_by_owner, get_province_owner, get_adjacent_provinces).
+- Weather, production, infra, combat, supply all interact; changes must not break headless --check-only or the test harness.
+
+## Key Commands / Testing (run from project root)
+- Compile check: godot --headless --path . --check-only
+- Fast events + save/load test (recommended for new riots/research work): EOA_TEST_SAVE_LOAD=1 godot --headless --path . scenes/TestScenario.tscn --quit-after 50
+- Even lighter fast path: EOA_FAST_TEST=1 godot --headless ... --quit-after 60
+- Full 50t sim (heavy): EOA_RUN_50_TURN_SIM=1 godot --headless --path . scenes/TestScenario.tscn --quit-after 300+
+- Open editor: godot --path . --editor
+- Run test scenario: godot --path . scenes/TestScenario.tscn
+
+## Important Files / Systems
+- scripts/autoload/GameData.gd — central simulation, pillars, events (riots, research ethics, peace, demographic), save/load hooks.
+- scripts/core/TestRunner.gd — 50t harness, event forcing, persist checks, fast test entrypoints.
+- scenes/TestScenario.tscn — the integrated test scene used for all 50t evidence and direct tests (main_scene UID).
+- scripts/map/MapManager.gd — single source of truth for provinces, owners, adjacency.
+- SaveLoadManager.gd + GameData apply/get_save_data — must handle new dicts (active_riots, pending_research_events).
+- LeaderEventUI.gd — toasts and news for events (use categories like "crisis", "hand_event").
+- WeatherManager / WeatherOverlayLayer — full penalties + visuals.
+
+## Style & Polish Notes
+- Keep monthly erosion and event code efficient (no heavy per-prov daily loops in GDScript).
+- New events should feel driven by Hidden Hand / low cohesion / tech / ownership / player policy choices.
+- Always update docs/CURRENT_STATE.md and TESTING_PLAN.md when adding major systems or test evidence.
+- When adding new persisted state, add to GameData.get_save_data, apply_save_data, clear_for_load, and _init_peace_state_if_needed migration guards.
+- Use LeaderEventUI.post_news(...) and show_toast(...) for player feedback on major events.
+
+When the AI in Cursor (Composer / Chat) suggests changes, make sure they are minimal, respect existing patterns, and preferably include updates to the fast test paths and docs.
+
+The goal is a polished, replayable living-world grand strategy experience with deep player agency, narrative, and 50+ turn stability.

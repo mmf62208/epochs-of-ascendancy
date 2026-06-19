@@ -77,6 +77,10 @@ static func _format_effect_label(effect: String, magnitude: float) -> String:
 			return "~%.0f research progress stolen" % magnitude
 		"long_term_tech_intel":
 			return "Long-term technology intel source"
+		"production_boost":
+			return "+%.0f%% production output/speed boost" % (magnitude * 100.0)
+		"resource_discovery":
+			return "+%.0f%% resource output / exploration gain" % (magnitude * 100.0)
 		"temporary_intel_bonus":
 			return "Temporary intel network bonus (+%.0f)" % magnitude
 		"enemy_agent_disruption":
@@ -85,6 +89,22 @@ static func _format_effect_label(effect: String, magnitude: float) -> String:
 			return "Enemy intel quality degraded"
 		"tech_theft_protection":
 			return "Counter-intel: tech theft protection"
+		"inclusion_leverage":
+			return "+%.0f Inclusion Leverage at the peace table (major diplomatic win)" % magnitude
+		"minister_compromised":
+			return "Key minister compromised — strong influence on conference terms"
+		"narrative_shift":
+			return "Public/elite narrative shifted (%.0f influence on grievance & legitimacy)" % magnitude
+		"bargaining_leverage":
+			return "+%.0f bargaining leverage from leaked positions" % magnitude
+		"enemy_leverage_blocked":
+			return "Enemy conference influence operations blocked (%.0f leverage denied)" % magnitude
+		"grievance_backlash":
+			return "Grievance backlash (+%.0f) — failed attempt hardened opposition" % magnitude
+		"scandal_backlash":
+			return "Scandal backlash — operation exposure damaged position"
+		"term_modifier":
+			return "Direct term influence applied (%.0f weight toward favorable outcome)" % magnitude
 		_:
 			if magnitude > 0.0:
 				return "%s (%.2f)" % [effect.replace("_", " "), magnitude]

@@ -462,14 +462,26 @@ func _create_agent_row(summary: Dictionary) -> PanelContainer:
 	panel.add_child(outer)
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+	row.add_theme_constant_override("separation", 6)
 	outer.add_child(row)
+
+	# Agent portrait (new support; agent_male/female from generator + save hardened)
+	var ap_rect := TextureRect.new()
+	ap_rect.custom_minimum_size = Vector2(22, 22)
+	ap_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	ap_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var apath := str(summary.get("portrait_path", ""))
+	if apath != "" and ResourceLoader.exists(apath):
+		var atex := load(apath) as Texture2D
+		if atex: ap_rect.texture = atex
+	ap_rect.visible = ap_rect.texture != null
+	row.add_child(ap_rect)
 
 	var badge := str(summary.get("status_badge", ""))
 	if not badge.is_empty():
 		row.add_child(_badge_label(badge, group))
 	var status_text := str(summary.get("status_detail", _format_status(summary)))
-	row.add_child(_row_label(str(summary.get("name", "")), 118))
+	row.add_child(_row_label(str(summary.get("name", "")), 110))
 	row.add_child(_status_label(status_text, 112, group))
 	row.add_child(_row_label(str(summary.get("level", 1)), 32))
 	row.add_child(_row_label(str(summary.get("skills_text", "")), 150))

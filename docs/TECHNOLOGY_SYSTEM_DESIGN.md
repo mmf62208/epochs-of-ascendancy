@@ -92,7 +92,7 @@ Three parallel tracks — each with a clear fantasy:
 | `land_equipment` | Infantry / Support / Armor | Rifles, support gear, artillery, tanks, mechanized, modules |
 | `naval_equipment` | Naval | Hulls, modules, ASW, carriers, submarines, port rules |
 | `air_equipment` | Air | Fighters, CAS, bombers, helicopters, UAVs, airframes |
-| `space_equipment` | (future HOI4 mods) | Launch, ISR satellites, ASAT, orbital logistics (2050 band) |
+| `space_equipment` | (future HOI4 mods) | Launch, ISR satellites, ASAT, orbital logistics (2050 band); expanded 1945-1970 alt-history: V2/rocketry_foundations, sputnik_satellite, human_spaceflight, moon_landing, orbital_station, mars_probe, mech_prototype/dieselpunk_mech/mech_designer, secret vs public branches (secret_funding_space, public_space_program, rule_flag secret_funding), nuclear_thermal_engine, ai_research + ai_ethics |
 | `land_doctrine` | Land doctrine | Plans, combat width, entrenchment—sync keys to `doctrine_training_paths` |
 | `naval_doctrine` | Naval doctrine | Fleet in being, trade interdiction, carrier ops |
 | `air_doctrine` | Air doctrine | Air superiority, ground support, strategic bombing |
@@ -109,7 +109,7 @@ Use **overlapping year ranges** on each node; UI groups nodes into swimlanes:
 | `pre_war` | 1900–1918 | Early oil, bolt-action, dreadnoughts |
 | `interwar` | 1919–1938 | Mechanization begins, radar proto |
 | `industrial_war` | 1936–1955 | WWII peak (scenario 1936 anchor) |
-| `cold_war` | 1946–1989 | Jets, missiles, early computing |
+| `cold_war` | 1946–1989 | Jets, missiles, early computing; 1945-1970 space race alt-history branch (V2 -> sputnik -> moon / secret space / dieselpunk mechs; public prestige vs black budget rule_flags + agent funding missions) |
 | `modern` | 1970–2010 | Precision, NBC, network-centric |
 | `information` | 1990–2030 | Stealth, drones, GPS-era |
 | `near_future` | 2020–2040 | Hypersonics, AI-assisted C2 (2026 roster exists) |
@@ -427,6 +427,7 @@ Hook `LeaderManager.game_year_advanced` (already used by agents) to:
 - [x] National starting tech files per scenario (`data/technology/starting/1918.json`, `1936.json`, `2026.json`).
 - [x] `strategic_future` megaprojects for 2040+ scenarios (`strategic_future.json`; applied on 2026 start for majors).
 - [x] `ScenarioLoader` → `TechnologyManager.apply_scenario_starting_tech()` on load.
+- Early space race milestones (GameData 1957+ first_satellite etc) check TM.is_tech_completed (ids like sputnik_program, lunar_landing_program; support edit_tech for tests). Research ethics space militarization from signal/pending. See CURRENT_STATE + GameData process_space_race_events.
 
 ### Phase F — Polish (HOI4++)
 
@@ -479,6 +480,65 @@ When adding a node, verify:
 3. Implement Phase A in Cursor while Grok Build wires combat/production consumers for unlock types.
 4. Expand Agent UI “Technology impact” line when active research exists (read from `TechnologyManager`).
 
+## 14. 2026 Evolution — Agent-Centric Project Layer (post user query June 2026)
+
+User feedback (June 2026): Early "radio" nodes corrected to accurate telegraphy → voice progression (1895 Wireless Telegraphy is Morse/radio waves, not voice "radio"; voice nets 1930s; radar is separate). Agents must be *central* to technology (not just passive theft). Doctrines tie in. Modules depend on tech. Avoid "exactly HOI4". Tradeoffs must matter with real consequences. Maximize replay via choices + agent outcomes.
+
+**Current base tree (implemented)**: Authored nodes (columns/rows for graph, prereqs + mutually_exclusive_with for alts, era_min for 1890s-1938 grounding, concrete unlocks to modules/designs/doctrine_keys/buildings). 53 nodes across industry/land/naval/air/support/land_doctrine + new national_projects prototype. UI already has domain/era filters, list+graph views, agent bar (intel bonus, compromised count, active tech missions, theft protection), inspector showing exact effects + agent risk, doctrine panel. RP unified with stolen bank/compromised halting + intel bonus. Strong existing agent integration (steal_research adds progress or alternatives, infiltrate gives long-term RP bonus, secure for counter, compromise halts research).
+
+**Example current path + tradeoffs**: GER rushes early_radio_telegraphy_1895 (telegraphy, +recon + radio module) + chemical/synthetic_1917 → chooses synthetic_fuel_focus_1935 (mut excl with import path; unlocks refinery cat + more supply mods + synthetic_tires). This gives logistics independence (great vs blockade) but creates high "detection_signature" for agents (enemy can target the plants or steal the exact module tech, handing them your sustainment edge). Simultaneously take carrier_aviation_program project instead of BB supremacy for CVs + carrier_task_force key. Tradeoff: strong projection, but if you skip ASW tech (or agent failed to steal it for you) subs counter your carriers hard. Changing service doctrine (blitz to something else) now applies org loss to your panzer divisions + design penalties (as requested — no stability hit). Modules (mg08, bofors, ap50_bomb, radios, synthetics) are gated behind these choices.
+
+**Tradeoffs & consequences baked in**:
+- Mutually exclusive branches force real style commitment (mobile armor vs infantry support tanks; carrier vs battleship; CAS/tactical air vs early strategic bombing; synthetic autarky vs import security).
+- Agent surface: High-value nodes have theft_target + sabotage_delay + detection_signature. Successful enemy steal = they get progress/bank or the unlock; you may get "compromised" (research halted) + intel leak (enemy knows your exact capabilities for counter-design).
+- Doctrine evolution: Tech unlocks keys for training paths + service doctrines (on chiefs). Full power comes from leader XP + agent "reform" missions. Changing mid-campaign has targeted org hits on formations (divs/ships/wings) + prototype re-eval penalties.
+- Modules & designs: Depend on tech (or projects). Designer still allows micro, but service doctrine + tech bias the available archetypes and suggested modules.
+- Replay: Different branch choices + which agent missions succeed/fail + chief assignments create different equipment mixes, vulnerabilities, and counters every game. Alts are plausible (early German synthetic or heavy program, French mobile alt to Maginot, UK radar network priority).
+
+**Proposed evolution options (reviewed against other games + user priorities)**:
+
+1. **Incremental Authored Tree Polish (light evolution, closest to current)**: Keep rich authored grid + mut excl. Add "R&D Focus" assignment (player assigns a tech-skilled agent or chief to a domain for bonus RP or small chance of "breakthrough" that spawns a hidden alt module or reduces cost on a mut-excl branch). Expand existing agent missions slightly (more targeted steal on specific high modules). Tradeoffs via existing mut excl + ahead penalties + compromise. Replay from branch choice + occasional breakthroughs.
+
+   Pros: Low dev cost, preserves historical control players like. Cons: Agents still somewhat secondary (not "key").
+
+2. **Card/Draw + Invention Layer (Stellaris-inspired choice + Vic3 organic feel)**: After completing key prereqs or era bands, instead of one fixed next node you "draw" 2-4 development options (different tradeoff profiles: e.g. "reliable mass medium tank" vs "experimental heavy with new module" vs "export-quality light for allies"). Draws biased by current service doctrine, captured enemy equipment (from combat/agents), agent-gathered "foreign theories". Inventions pop from conditions (like Vic3). Agents can "plant theory" or "steal blueprint" to add/remove cards or bias draws.
+
+   Pros: Feels fresh vs pure tree, high variance/replay, choices have immediate visible consequences in the draw. Cons: Loses some "I planned this exact 1890-1938 path" predictability; harder to author tight historical + alt branches.
+
+3. **Diffusion + Agent-Primary Advancement (most outside-the-box, Vic3 + Shadow Empire + Distant Worlds emergent)**: Reduce rigid authored prereq tree. Have domain "knowledge levels" or broad tech areas that advance via passive RP + direct agent investment (send agent team on "industrial espionage" or "prototype recovery" missions that give direct progress or captured modules/designs into your catalog). Combat XP + captured enemy units can "diffuse" tech (reverse engineer). Doctrines evolve from accumulated leader/agent/combat data rather than pure research. Tradeoffs via "adoption penalties" (jumping ahead without supporting industry/infra causes readiness/org issues or module incompatibility until fixed).
+
+   Pros: Agents become the primary driver of your tech edge (exactly as requested). Extremely high replay and "outside HOI4". Emergent stories (your agents steal the enemy's new tank gun, you field it before they do). Cons: Loses strong authored historical grounding and player sense of "planning the exact tree"; can feel less directed for new players.
+
+4. **Authored Core Tree + Agent-Driven National Projects Layer (Terra Invicta + Stellaris hybrid — RECOMMENDED BEST)**: Keep the rich authored tree we built (for 1890-1938 historical fidelity, concrete module/design/doctrine unlocks, alt-history branches with mut excl, era gating, player planning). On top, add a "National Projects" layer (node_kind: "project", long base_cost_days, often single or limited "R&D capacity" slots). These are the high-stakes "developments" (Synthetic Fuel Initiative, Carrier Aviation Program, Radar Defense Network, Heavy Breakthrough Armor, Combined Arms Reform). 
+
+   - Projects unlock powerful or alt modules + designs + doctrine evolution.
+   - **Agents are key**: Tech-skilled agents (or chiefs) can be assigned to lead/sponsor a project for speed bonuses or special outcomes. Enemy agents run steal_project (get the project unlocked for *their* country to start, plus some progress), sabotage (add massive delay + possible "leaked weakness" that gives enemy a counter mod or doctrine exploit), or plant mole (long-term hidden bonus or future compromise).
+   - Doctrines tie in: Many doctrine evolution keys come from or are boosted by projects (e.g. combined_arms_reform_project). Service doctrine choice affects project costs/success (blitz nation gets bonus on mobile armor projects).
+   - Modules depend on tech *and* projects (core tree gives basics; projects give the signature powerful/alt ones).
+   - Tradeoffs & consequences are explicit and multi-layered (see the JSON prototype for "tradeoffs" object per project: benefits, costs, consequences like "successful enemy theft flips the advantage + exposes your plants"). Projects can fail or be compromised with real in-game effects (fuel crisis events, bigger org loss on doctrine change, detectable signatures for bombing).
+   - Replayability: Core branches give structure, but which projects you prioritize + which agent ops succeed/fail + order of thefts create wildly different 1938-39 force mixes and weaknesses even on identical nations. Different factions/nations have natural affinities (cost reductions or bonuses on certain projects).
+
+   Why this is best (and why not pure HOI4):
+   - Directly addresses "agents are key and ... play a role in technology and developments", "doctrines tie in", "modules depend on technology".
+   - Incorporates feedback from Stellaris (espionage steal tech with risk/reward + leader assignment) and especially Terra Invicta (private projects driven by councilors/agents, shared elements for competition, explicit component tradeoffs, theft of projects is core gameplay and creates consequences).
+   - Not exactly HOI4: The project layer + heavy agent agency + explicit "tradeoffs object" + consequence hooks (leaks, crises, exploitation) make development feel like real R&D with spies, not just clicking a grid.
+   - Tradeoffs matter: Every major choice (branch or project) has visible stats, agent exposure, lock-in costs (via doctrine change penalties), and exploitable surfaces. Choices have downstream consequences (your synthetic plants become prime agent/bomber targets; stolen carrier program lets enemy build CVs that counter your BB-heavy navy).
+   - Replay + player agency: Authored tree gives reliable historical/alt-history scaffolding (players can still "I will do early synthetics then carrier alt"). Agent + project outcomes add the chaos and personal story that makes each campaign unique without feeling random. Greater than HOI4 because espionage success/failure is now a major variable in who has the tech edge.
+   - Fits existing systems: We already have steal_research, compromised, stolen bank, agent_tech_summary in the UI, project-kind support in the schema, node unlocks. The new national_projects_1890_1938.json prototype (5 projects) auto-loads and demonstrates.
+
+**Recommendation**: Go with Option 4 (Authored Tree + Projects). It is the sweet spot for this project: grounds the 1890-1938 era and alt-history the user wants, makes agents the active driver of "developments" (as emphasized), creates deep meaningful tradeoffs with consequences, boosts replay without losing player control, and is evolutionary (builds on the excellent current tree/UI/agent integration) rather than a full rewrite. We can iterate by expanding the project JSON, adding dedicated project slots or leader/agent assignment mechanics in TechnologyManager + UI, and wiring more agent mission outcomes (e.g. "steal_project" that grants the node to the actor).
+
+Prototype data added: `data/technology/trees/national_projects_1890_1938.json` (synthetic, carrier, radar, heavy armor, combined arms reform — all with agent theft/sabotage hooks, explicit tradeoffs, and ties to modules/doctrines/designs). These will appear in the tech screen (as project nodes). Next steps if approved: wire project-specific ticking/assignment in manager, add "assign agent to project" in UI, expand steal_research or add steal_project outcome, update inspector to call out project risks.
+
+This evolves us in the direction the user loves while staying true to "not exactly like HOI4" and making agents/doctrines/modules feel integrated with real stakes. 
+
+Radio fix applied (names/flavors now clearly distinguish telegraphy vs voice radio vs radar). 
+
+**In-game edit mode (added 2026-06):** `get_editable_tech_tree(country_tag)` returns core_nodes + custom_nodes + merged + country_progress (for UI/debug panels). `add_custom_tech(tech_id, node_data, for_country?)` injects alt-history/runtime nodes into technology_nodes/custom_tech_nodes (merged in editable view; research hooks via existing _apply). `edit_tech_progress(tag, id, delta, set_completed)`, `retool_tech_node(id, changes)`, `remove_custom_tech`. Customs + progress persist via SaveLoadManager (country_state + custom_tech_nodes in get/apply_save_data). Enables easy in-game tweaks without JSON edit. Ties to GameData epoch shifts (tech priority choice can trigger lag/unlock waves + edit hooks), agents (espionage on custom), Map (some future techs geo-gated via context). Hybrid with initiatives tree pattern.
+Recent expansions (additive_manuf, consumer_electronics/vr, sonic/cb/bio, cloning/cyber/genetic, drones/scanners/shields/tele/phasers) now minimally wired (2026-06 subagent): see NMM/CombatResolver/GameData/Supply/TechManager for manpower_replacement, prod_flex, weapon flags in combat, recon/interdict, space bonuses, ethics amp. Balance via existing tradeoffs (ethics_risk, power draw, coh hits). No broad doc overhaul.
+
+Ready for review and next implementation pass.
+
 ---
 
 ## Related docs
@@ -487,3 +547,19 @@ When adding a node, verify:
 - [UI_DESIGN_REFERENCE.md](UI_DESIGN_REFERENCE.md) — layered complexity, Retrowave.
 - [LEADER_SYSTEM_DESIGN.md](LEADER_SYSTEM_DESIGN.md) — training paths / doctrine keys.
 - Agent missions: `data/agents/mission_definitions.json` (technology category).
+
+## Future: Ascendancy/tech geo impacts on world map combat (stub)
+Per task: tie more to ascendancy tree geo (rivers/chunks/elev/coarse continents) for combat modifiers (e.g. tech "Naval Choke" boosts straits in BM naval; tree node gives non-Eur mtn assault bonus when holding elev chunk).
+Implement via shared geo_mod in ProvinceInsight/BM context + NMM. AI target scoring can include geo-tech value. Stubs ready for parallel tree work. See MAP_SYSTEM_DESIGN, CURRENT_STATE, WORLD_CLASS_MAP_ROADMAP.
+
+## 1945-1970 Early Space Race & Mech Expansion (added 2026-06)
+- research_catalog.json: 26+ entries (v2_rocket, sputnik_satellite, human_spaceflight, moon_landing, moon_base, orbital_station, mars_probe, mars_base, mech_prototype, dieselpunk_mech, secret_space_program, ai_research, satellite_network, expanse_rocket, nuclear_thermal_engine, rocketry_foundations, mech_designer, ai_ethics, public_space_program, secret_funding_space + more). Areas: space/strategic/land. Costs 1.5-7 years.
+- Trees: Extended strategic_future.json (now includes rocketry_foundations @1938 linking aircraft_industry_ii_1935; 15+ space/mech nodes era 1943-1970 with prereqs, unlocks for modifiers/recon/ascendancy/rule_flags like allow_satellites/secret_funding/allow_dieselpunk_mechs/mech_division; public_space_program vs secret_funding_space mutually_exclusive with secret_funding rule_flag + agent theft hooks). Appended covert_orbital_initiative to national_projects_1890_1938.json (secret_funding, 1945 era, black budget flavor).
+- Units: Updated a4_v2_rocket.json, r7_sputnik.json, redstone_jupiter, saturn_v_apollo, gemini_spacecraft, gps_satellite, falcon9 etc unlock_tech to new ids (v2_rocket, sputnik_satellite, moon_landing, human_spaceflight, satellite_network). Added mech_division_proto + orbital_recon_asset to division_templates.json (referenced via division_template unlock).
+- TM/Registry: Extended has_tech_unlock for "division_template" (checks deferred + new unlocked_division_templates), populate in registry, grant_temporary_rule_flag, state init/migrate. Diffusion/ethics via ai_ethics node + space_equipment domain. GameData.gd updated techs_for_ms + rule checks to honor our nodes (e.g. secret_funding, moon_landing etc) for space_race_competition/peace.
+- Agents: Added fund_secret_space_program + steal_space_intel to mission_definitions.json. Wired in AgentManager.gd: filter availability on secret_funding rule_flag / v2/sputnik techs; _apply_secret_space_funding effect (boosts via apply_tech_intel_bonus scaled for secret, temp flag, scandal on detect). Ties black market / secret space to tech rule_flags.
+- Assets: Coordinated res://assets/graphics/icons/space_race/* (steampunk_rocket.png, secret_space.png, moon_landing.png, mars_landing.png, space_station.png, moon_base.png, first_spaceflight.png) added as ui.icon to key nodes (v2, sputnik, secret, moon, orbital_station, mars etc).
+- Save/load: Relies on existing country_state (rule_flags, deferred_unlocks, permanent_mods, unlocked_*), custom tech support; 50T tests use later (tech count now includes ~20 space/mech nodes).
+- Usage: Research v2_rocket (post 1930s air) -> sputnik -> branches public (ascendancy/prestige) or secret (hidden recon, agent fund missions) -> moon_landing / mech_designer / ai etc. Unlocks space units (rockets/sats), mech divs, rule_flags for production/clandestine, recon/ascendancy mods. Secret paths synergize Agent black ops for funding; public for morale/Ascendancy.
+
+Dieselpunk/steampunk alt branches via mech_designer + rocketry_foundations. Era_min 1938+ for precursors, 1945+ core. 10+ linked nodes completed.

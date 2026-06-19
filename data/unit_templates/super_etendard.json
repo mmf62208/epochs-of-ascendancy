@@ -1,10 +1,10 @@
 {
   "id": "super_etendard",
-  "name": "Super Étendard",
+  "name": "Super \u00c9tendard",
   "design_family": "french_carrier_air",
   "base_type": "Air",
   "size_category": "Medium",
-  "visual_archetype": "fighter",
+  "visual_archetype": "prop_fighter",
   "crew_required": 1,
   "base_training_level": 35,
   "max_experience_level": 100,

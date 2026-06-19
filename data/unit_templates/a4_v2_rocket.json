@@ -4,7 +4,7 @@
   "design_family": "german_space_ww2",
   "base_type": "Space",
   "size_category": "Medium",
-  "visual_archetype": "rocket",
+  "visual_archetype": "rocket_launcher",
   "crew_required": 0,
   "base_training_level": 20,
   "max_experience_level": 100,
@@ -34,8 +34,8 @@
     "Cargo": "aggregat4_stage"
   },
   "unlock_tech": [
-    "german_rockets",
-    "ballistic_missiles"
+    "v2_rocket",
+    "rocketry_foundations"
   ],
   "can_mount_drones": false,
   "is_vehicle": true,

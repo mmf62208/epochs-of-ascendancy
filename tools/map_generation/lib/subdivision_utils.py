@@ -12,6 +12,8 @@ and which should be protected (especially straits and key coastal areas).
 
 from typing import Dict, List, Tuple, Set
 from . import naval_analysis
+import json
+from pathlib import Path
 
 
 # =============================================================================
@@ -22,14 +24,89 @@ from . import naval_analysis
 # We deliberately lower the threshold so the pipeline can demonstrate real subdivision
 # on the playable starter map. When we ingest higher-resolution source data this can rise.
 MIN_POINTS_FOR_SPLIT = 5
-MAX_SPLITS_PER_PROVINCE = 4
+MAX_SPLITS_PER_PROVINCE = 6
 
 # Scoring weights
 NAVAL_IMPORTANCE_WEIGHT = 2.8
 SIZE_WEIGHT = 1.0
 COASTAL_BONUS = 1.1
 STRAIT_PROTECTION_PENALTY = 0.55   # Strongly discourage splitting strait provinces
+# For full 350-450 Europe target (from ~100 seed), make subdivision more aggressive
+SUBDIVISION_SCORE_THRESHOLD = 0.70  # Lowered from 0.95 for denser Phase1 Europe playtest map
+AGGRESSIVE_SPLIT_BONUS = 1.5  # Extra push for non-protected to hit target density
 
+# Real layers awareness (new for natural borders from NASA/Natural Earth rivers + elev)
+RIVER_CROSS_BONUS = 1.8  # Provinces crossed by major real rivers (from build rivers.json) get priority split so rivers become natural boundaries
+HIGH_ELEV_SPLIT_BONUS = 1.2  # High elev areas (from snow/elev layers) prefer more splits for mountain provinces
+RIVER_MAJOR_THRESHOLD = 3  # number of points in river poly to count as "major" for crossing
+
+# =============================================================================
+# REAL DATA LAYERS HELPERS (rivers + elev for natural borders)
+# =============================================================================
+
+def load_real_rivers(rivers_json_path: str = None) -> List[List[List[float]]]:
+    """Load the real rivers polylines from the map build (data/map/rivers.json or rivers_world.json).
+    Returns list of polylines (each a list of [x,y] in canvas pixels).
+    """
+    if rivers_json_path is None:
+        base = Path(__file__).resolve().parent.parent.parent.parent / "data" / "map"
+        rivers_json_path = str(base / "rivers.json")
+        if not Path(rivers_json_path).exists():
+            rivers_json_path = str(base / "rivers_world.json")
+    if not Path(rivers_json_path).exists():
+        return []
+    try:
+        with open(rivers_json_path) as f:
+            data = json.load(f)
+        rivers = data.get("rivers", [])
+        polylines = []
+        for r in rivers:
+            pts = r.get("points", [])
+            if len(pts) >= RIVER_MAJOR_THRESHOLD:
+                polylines.append(pts)
+        return polylines
+    except Exception:
+        return []
+
+def river_crosses_province(river_poly: List[List[float]], prov_points: List[List[float]]) -> bool:
+    """Simple check if a river polyline crosses or touches the interior of the province poly (coarse bbox + segment test).
+    Pure python, no deps.
+    """
+    if not river_poly or not prov_points or len(prov_points) < 3:
+        return False
+    # Bbox quick reject
+    minx = min(p[0] for p in prov_points)
+    maxx = max(p[0] for p in prov_points)
+    miny = min(p[1] for p in prov_points)
+    maxy = max(p[1] for p in prov_points)
+    rminx = min(p[0] for p in river_poly)
+    rmaxx = max(p[0] for p in river_poly)
+    rminy = min(p[1] for p in river_poly)
+    rmaxy = max(p[1] for p in river_poly)
+    if rmaxx < minx or rminx > maxx or rmaxy < miny or rminy > maxy:
+        return False
+    # Sample a few segments of river vs province edges (coarse but effective for major rivers)
+    for i in range(len(river_poly)-1):
+        ra, rb = river_poly[i], river_poly[i+1]
+        for j in range(len(prov_points)):
+            pa = prov_points[j]
+            pb = prov_points[(j+1) % len(prov_points)]
+            # Simple segment bbox overlap as proxy for cross (good enough for guidance)
+            if max(ra[0], rb[0]) >= min(pa[0], pb[0]) and min(ra[0], rb[0]) <= max(pa[0], pb[0]) and \
+               max(ra[1], rb[1]) >= min(pa[1], pb[1]) and min(ra[1], rb[1]) <= max(pa[1], pb[1]):
+                return True
+    return False
+
+def compute_river_cross_score(province_id: int, geometry: Dict, real_rivers: List[List[List[float]]]) -> float:
+    """Return bonus [0..RIVER_CROSS_BONUS] if this province is crossed by one or more major real rivers.
+    Encourages splitting so the river becomes the new border between children.
+    """
+    prov = next((p for p in geometry.get("provinces", []) if p.get("id") == province_id), None)
+    if not prov or not real_rivers:
+        return 0.0
+    pts = prov.get("points", [])
+    crossings = sum(1 for rv in real_rivers if river_crosses_province(rv, pts))
+    return min(RIVER_CROSS_BONUS, crossings * 0.9)
 
 # =============================================================================
 # CORE DECISION FUNCTIONS
@@ -39,11 +116,13 @@ def should_split_province(
     province_id: int,
     geometry: Dict,
     naval_data: Dict,
-    avg_point_count: float
+    avg_point_count: float,
+    real_rivers: List[List[List[float]]] = None
 ) -> bool:
     """
     Returns whether this province is a good candidate for subdivision.
     Relaxed thresholds for the current coarse 6-point seed geometry.
+    Now also respects real rivers (from layers build) as natural boundaries: provinces crossed by major rivers get boosted split priority.
     """
     prov = next((p for p in geometry.get("provinces", []) if p.get("id") == province_id), None)
     if not prov:
@@ -70,18 +149,27 @@ def should_split_province(
             if points < 12:   # With coarse data, almost never split protected straits
                 return False
 
+    # Real rivers awareness (drive natural borders): boost score for river-crossed provinces so splits respect rivers as boundaries
+    if real_rivers:
+        river_bonus = compute_river_cross_score(province_id, geometry, real_rivers)
+        score += river_bonus
+
     # Much more permissive threshold for the starter map
-    return score > 0.95
+    # Use aggressive threshold + bonus for full 350-450 target density
+    score = score * (1.0 + AGGRESSIVE_SPLIT_BONUS * 0.1)  # slight boost
+    return score > SUBDIVISION_SCORE_THRESHOLD
 
 
 def suggest_number_of_splits(
     province_id: int,
     geometry: Dict,
-    naval_data: Dict
+    naval_data: Dict,
+    real_rivers: List[List[List[float]]] = None
 ) -> int:
     """
     Given that we want to split this province, how many pieces should we aim for?
     Tuned for coarse 6-point starter geometry (most provinces get 2-3 children).
+    Now river-aware: river-crossed get +1 splits so rivers define children borders.
     """
     prov = next((p for p in geometry.get("provinces", []) if p.get("id") == province_id), None)
     if not prov:
@@ -91,12 +179,15 @@ def suggest_number_of_splits(
     naval_score = naval_data.get("naval_importance_scores", {}).get(province_id, 0.0)
 
     # With 6-pt input we rarely want >3 children per parent in Phase 1
-    base = 2
-    if points >= 8:
-        base = 3
+    # Aggressive for 350-450 full Europe playtest territories (avg ~4x from seed)
+    base = 3
+    if points >= 6:
+        base = 4
+    if points >= 10:
+        base = 5
 
-    # Give coastal and high-naval provinces a slight push toward 3
-    if naval_score > 1.0 or province_id in naval_data.get("coastal_provinces", []):
+    # Give coastal and high-naval provinces push toward higher for dense Europe theater
+    if naval_score > 0.5 or province_id in naval_data.get("coastal_provinces", []):
         base = min(MAX_SPLITS_PER_PROVINCE, base + 1)
 
     # Be conservative with protected straits
@@ -104,6 +195,12 @@ def suggest_number_of_splits(
         if province_id in (data.get("province_a", -1), data.get("province_b", -1)):
             base = min(2, base)
             break
+
+    # Drive real rivers: + splits for crossed so river lines become the new province borders (natural)
+    if real_rivers:
+        river_cross = compute_river_cross_score(province_id, geometry, real_rivers)
+        if river_cross > 0.5:
+            base = min(MAX_SPLITS_PER_PROVINCE, base + 1)
 
     return max(2, min(MAX_SPLITS_PER_PROVINCE, base))
 
@@ -115,7 +212,8 @@ def suggest_number_of_splits(
 def rank_provinces_for_subdivision(
     province_ids: List[int],
     geometry: Dict,
-    naval_data: Dict
+    naval_data: Dict,
+    real_rivers: List[List[List[float]]] = None
 ) -> List[Tuple[int, float]]:
     """
     Returns a sorted list of (province_id, priority) for subdivision.
@@ -126,12 +224,13 @@ def rank_provinces_for_subdivision(
     - High naval importance provinces
     - Coastal provinces
     - While protecting major straits
+    - NEW: provinces crossed by real rivers from layers (rivers become natural borders between children)
     """
     ranked = []
     avg_points = sum(len(p.get("points", [])) for p in geometry.get("provinces", [])) / max(len(geometry.get("provinces", [])), 1)
 
     for pid in province_ids:
-        if not should_split_province(pid, geometry, naval_data, avg_points):
+        if not should_split_province(pid, geometry, naval_data, avg_points, real_rivers):
             continue
 
         prov = next((p for p in geometry.get("provinces", []) if p.get("id") == pid), None)
@@ -152,6 +251,12 @@ def rank_provinces_for_subdivision(
                 break
 
         final_score = (size_score + naval_bonus + coastal_bonus) * strait_penalty
+
+        # Real rivers bonus (drive hard on natural borders from build data)
+        if real_rivers:
+            river_bonus = compute_river_cross_score(pid, geometry, real_rivers)
+            final_score += river_bonus
+
         ranked.append((pid, round(final_score, 3)))
 
     # Fallback relaxation for early development
@@ -357,7 +462,7 @@ def _cross(o, a, b):
     return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
 
 
-def _pca_split(points: List[List[float]], k: int, coastal_boost: bool = False) -> List[List[List[float]]]:
+def _pca_split(points: List[List[float]], k: int, coastal_boost: bool = False, real_rivers: List[List[List[float]]] = None) -> List[List[List[float]]]:
     """
     PCA-guided split: cut perpendicular to the major axis of the province.
     Excellent for elongated or irregular provinces (common in real geography).
@@ -372,6 +477,21 @@ def _pca_split(points: List[List[float]], k: int, coastal_boost: bool = False) -
     dx, dy = _principal_axis_direction(dense)
     # Perpendicular direction for the cut line
     px, py = -dy, dx
+
+    # Real rivers drive: if this province is crossed by major river(s), align one cut axis to a river direction
+    # so the river polyline becomes (part of) the new border between children. Natural borders from data!
+    if real_rivers:
+        for rv in real_rivers[:3]:  # few major
+            if len(rv) >= 2 and river_crosses_province(rv, dense):
+                # river direction as preferred cut axis (parallel to river for boundary)
+                r0, r1 = rv[0], rv[-1]
+                rdx = r1[0] - r0[0]
+                rdy = r1[1] - r0[1]
+                rlen = math.hypot(rdx, rdy) or 1.0
+                rdx /= rlen; rdy /= rlen
+                # blend or override to river-parallel for natural split
+                px, py = rdx, rdy
+                break  # use first crossing major river for guidance
 
     # Project all points onto the perpendicular axis
     projs = []
@@ -402,7 +522,7 @@ def _pca_split(points: List[List[float]], k: int, coastal_boost: bool = False) -
     return children if len(children) >= 2 else [list(points)]
 
 
-def _radial_split(points: List[List[float]], k: int, extra_densify: int = 0, coastal_boost: bool = False) -> List[List[List[float]]]:
+def _radial_split(points: List[List[float]], k: int, extra_densify: int = 0, coastal_boost: bool = False, real_rivers: List[List[List[float]]] = None) -> List[List[List[float]]]:
     """
     Improved radial subdivision:
     - Densifies low-vertex input first
@@ -431,6 +551,32 @@ def _radial_split(points: List[List[float]], k: int, extra_densify: int = 0, coa
         sorted_pts = sorted(points, key=angle)
         n = len(sorted_pts)
 
+    # Real rivers: bias rotation so one radial cut / boundary aligns with river dir
+    # (makes the river polyline form a natural edge between two children)
+    if real_rivers:
+        river_cut_angle = None
+        for rv in real_rivers[:3]:
+            if len(rv) >= 2 and river_crosses_province(rv, dense):
+                r0, r1 = rv[0], rv[-1]
+                rdx = r1[0] - r0[0]
+                rdy = r1[1] - r0[1]
+                river_cut_angle = math.atan2(rdy, rdx)
+                break
+        if river_cut_angle is not None:
+            def ang_diff(a):
+                d = abs(a - river_cut_angle) % (2 * math.pi)
+                return min(d, 2 * math.pi - d)
+            best_i = 0
+            best_d = 1e9
+            for ii in range(n):
+                aa = angle(sorted_pts[ii])
+                dd = ang_diff(aa)
+                if dd < best_d:
+                    best_d = dd
+                    best_i = ii
+            if best_i > 0:
+                sorted_pts = sorted_pts[best_i:] + sorted_pts[:best_i]
+
     slice_size = max(2, n // k)
     child_polygons: List[List[List[float]]] = []
 
@@ -455,7 +601,7 @@ def _radial_split(points: List[List[float]], k: int, extra_densify: int = 0, coa
     return _bisect_polygon(points, k)
 
 
-def _bisect_polygon(points: List[List[float]], k: int, extra_densify: int = 0, coastal_boost: bool = False) -> List[List[List[float]]]:
+def _bisect_polygon(points: List[List[float]], k: int, extra_densify: int = 0, coastal_boost: bool = False, real_rivers: List[List[List[float]]] = None) -> List[List[List[float]]]:
     """
     Improved bisection with area-balanced cut selection.
     Evaluates several candidate cut locations on the densified ring and picks
@@ -472,6 +618,15 @@ def _bisect_polygon(points: List[List[float]], k: int, extra_densify: int = 0, c
     if n < 6:
         dense = _densify_boundary(points, target_points=16)
         n = len(dense)
+
+    # Real rivers bias for bisect: compute river dir to prefer aligned cuts (river as natural shared edge)
+    river_cut_angle = None
+    if real_rivers:
+        for rv in real_rivers[:3]:
+            if len(rv) >= 2 and river_crosses_province(rv, dense):
+                r0, r1 = rv[0], rv[-1]
+                river_cut_angle = math.atan2(r1[1]-r0[1], r1[0]-r0[0])
+                break
 
     pieces: List[List[List[float]]] = [dense]
     parent_area = _polygon_area(dense)
@@ -525,6 +680,15 @@ def _bisect_polygon(points: List[List[float]], k: int, extra_densify: int = 0, c
                     radial_bonus = (cut_span / (m / 2.0)) * 0.25  # up to ~0.25 bonus
                     score -= radial_bonus
 
+                if river_cut_angle is not None:
+                    cut_dx = parent[j][0] - parent[i][0]
+                    cut_dy = parent[j][1] - parent[i][1]
+                    cang = math.atan2(cut_dy, cut_dx) if (cut_dx or cut_dy) else 0
+                    dang = abs(cang - river_cut_angle) % (2 * math.pi)
+                    dang = min(dang, 2 * math.pi - dang)
+                    if dang < 0.8:
+                        score *= 0.6  # prefer river-aligned cut for natural border
+
                 if score < best_score:
                     best_score = score
                     best_cuts = (p1, p2)
@@ -559,7 +723,7 @@ def _bisect_polygon(points: List[List[float]], k: int, extra_densify: int = 0, c
     return cleaned if len(cleaned) >= 2 else [list(points)]
 
 
-def _simple_cluster_split(points: List[List[float]], k: int, extra_densify: int = 0, coastal_boost: bool = False) -> List[List[List[float]]]:
+def _simple_cluster_split(points: List[List[float]], k: int, extra_densify: int = 0, coastal_boost: bool = False, real_rivers: List[List[List[float]]] = None) -> List[List[List[float]]]:
     """
     Fallback clustering (used only if better methods fail).
     Works on densified points then snaps children to convex hull.
@@ -603,7 +767,8 @@ def generate_split_geometry(
     province_id: int,
     geometry: Dict,
     naval_data: Dict,
-    num_pieces: int = 2
+    num_pieces: int = 2,
+    real_rivers: List[List[List[float]]] = None
 ) -> List[Dict]:
     """
     Proposes a subdivision of a province into N child provinces.
@@ -645,19 +810,19 @@ def generate_split_geometry(
         aspect = (max(projs) - min(projs)) / (max([abs(p[0]) for p in original_points] + [1]) or 1)
 
     if num_pieces == 2 and aspect > 1.6:
-        child_polygons = _pca_split(original_points, num_pieces, coastal_boost=coastal_boost)
+        child_polygons = _pca_split(original_points, num_pieces, coastal_boost=coastal_boost, real_rivers=real_rivers)
     else:
-        child_polygons = _radial_split(original_points, num_pieces, extra_densify=extra_densify, coastal_boost=coastal_boost)
+        child_polygons = _radial_split(original_points, num_pieces, extra_densify=extra_densify, coastal_boost=coastal_boost, real_rivers=real_rivers)
 
     # If we got too few or degenerate results, use the new smarter bisection
     valid_children = [p for p in child_polygons if _is_valid_polygon(p)]
     if len(valid_children) < max(2, num_pieces // 2):
-        child_polygons = _bisect_polygon(original_points, num_pieces, extra_densify=extra_densify, coastal_boost=coastal_boost)
+        child_polygons = _bisect_polygon(original_points, num_pieces, extra_densify=extra_densify, coastal_boost=coastal_boost, real_rivers=real_rivers)
         valid_children = [p for p in child_polygons if _is_valid_polygon(p)]
 
     # Last resort
     if len(valid_children) < 2:
-        child_polygons = _simple_cluster_split(original_points, num_pieces, extra_densify=extra_densify, coastal_boost=coastal_boost)
+        child_polygons = _simple_cluster_split(original_points, num_pieces, extra_densify=extra_densify, coastal_boost=coastal_boost, real_rivers=real_rivers)
         valid_children = [p for p in child_polygons if _is_valid_polygon(p)]
 
     proposals = []
@@ -668,12 +833,18 @@ def generate_split_geometry(
         notes = f"Densify + radial/bisect. Area {parent_area:.1f}→{area:.1f}."
         if naval_score > 1.0 or is_coastal:
             notes += " (naval-aware densify)"
+        rc = 0.0
+        if real_rivers:
+            rc = compute_river_cross_score(province_id, geometry, real_rivers)
+            if rc > 0.5:
+                notes += " (river-cross natural border guidance)"
         proposals.append({
             "parent_id": province_id,
             "child_index": i,
             "suggested_points": poly,
             "notes": notes,
             "naval_aware": True,
+            "river_aware": rc > 0.5 if real_rivers else False,
             "suggested_center": _centroid(poly),
             "approx_area": round(area, 1),
             "naval_importance": round(naval_score, 2)

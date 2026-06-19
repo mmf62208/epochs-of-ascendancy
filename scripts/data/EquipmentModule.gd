@@ -13,6 +13,9 @@ extends Resource
 @export var anti_air: float = 0.0
 @export var reliability_bonus: float = 0.0
 @export var reliability_penalty: float = 0.0
+@export var fuel_efficiency: float = 0.0  # higher = lower fuel/supply consumption for vehicles/ships/planes
+@export var speed_bonus: float = 0.0  # direct + to movement/combat speed or range
+@export var power_output: float = 0.0  # hp/kw proxy for thrust/power/weight tradeoffs
 @export var production_time: float = 0.0
 @export var cost: Dictionary = {}
 @export var special_flags: Array[String] = []
@@ -33,6 +36,9 @@ static func from_dict(data: Dictionary) -> EquipmentModule:
 	mod.anti_air = float(data.get("anti_air", 0))
 	mod.reliability_bonus = float(data.get("reliability_bonus", 0))
 	mod.reliability_penalty = float(data.get("reliability_penalty", 0))
+	mod.fuel_efficiency = float(data.get("fuel_efficiency", 0))
+	mod.speed_bonus = float(data.get("speed_bonus", 0))
+	mod.power_output = float(data.get("power_output", 0))
 	mod.production_time = float(data.get("production_time", 0))
 	mod.cost = _dict_from_variant(data.get("cost", {}))
 	mod.special_flags = _string_array(data.get("special_flags", []))

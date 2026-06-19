@@ -4,7 +4,7 @@
   "design_family": "russian_armored_nineties",
   "base_type": "Armored",
   "size_category": "Medium",
-  "visual_archetype": "medium_tank",
+  "visual_archetype": "light_tank",
   "crew_required": 3,
   "base_training_level": 34,
   "max_experience_level": 100,

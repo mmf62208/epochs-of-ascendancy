@@ -349,6 +349,13 @@ func _gather_save_data() -> Dictionary:
 	if typeof(MapManager) != TYPE_NIL:
 		data["map"] = _serialize_map_state()
 
+	# --- WeatherManager (snow coverage from layers + sim, ground_state, events, power blackouts; snow_potential on provinces is in map state) ---
+	if typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_save_state"):
+			data["weather"] = WeatherManager.get_save_state()
+		else:
+			data["weather"] = {}
+
 	# --- SupplyManager ---
 	if typeof(SupplyManager) != TYPE_NIL:
 		data["supply"] = _serialize_supply_state()
@@ -387,6 +394,13 @@ func _gather_save_data() -> Dictionary:
 	if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("get_save_data"):
 		data["design_lifecycle"] = DesignManager.get_save_data()
 
+	if typeof(TradeManager) != TYPE_NIL and TradeManager.has_method("get_save_data"):
+		data["trade"] = TradeManager.get_save_data()
+
+	# --- GameData (demographic/policy state for Ascendancy Initiatives, Policy/Law screen, Trust Erosion, manpower, relocation/settlement) ---
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_save_data"):
+		data["game_data"] = GameData.get_save_data()
+
 	# --- Leaders ---
 	if typeof(LeaderManager) != TYPE_NIL:
 		if LeaderManager.has_method("get_save_data"):
@@ -417,9 +431,31 @@ func _apply_save_data(data: Dictionary) -> void:
 	if data.has("time") and typeof(TimeManager) != TYPE_NIL:
 		_apply_time_state(data["time"])
 
-	# 2. Map provinces (owner/controller/dev/infra) — triggers province_data_changed
+	# 2. Map provinces (owner/controller/dev/infra + now settlement/built_road/rail for Phase 3 persistence) — triggers province_data_changed + MapRenderer tints/inspector/layers
 	if data.has("map") and typeof(MapManager) != TYPE_NIL:
 		_apply_map_state(data["map"])
+		# Re-init hook for MapManager/MapRenderer on load (per WORLD_CLASS_MAP_ROADMAP Phase 3): force full refresh so runtime province state (settlement_level, built_* from actions) + owner changes survive roundtrip and drive live visuals on 460-prov map. Uses existing force + emit listeners.
+		var mr_refresh := get_tree().get_first_node_in_group("map_renderer") if get_tree() != null else null
+		if mr_refresh == null:
+			mr_refresh = get_node_or_null("/root/WorldMap")
+		if mr_refresh and mr_refresh.has_method("force_full_map_refresh"):
+			mr_refresh.call_deferred("force_full_map_refresh")
+		elif mr_refresh and mr_refresh.has_method("_refresh_province_fill_colors"):
+			mr_refresh.call_deferred("_refresh_province_fill_colors")
+		# Also nudge MapManager for pick/centroid if needed post heavy apply (safe no-op if no method)
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("_recompute_centroids_and_bounds"):
+			MapManager.call("_recompute_centroids_and_bounds")
+
+	# Weather after map (provinces) + time; restores dynamic snow/ground/events from save (layer snow_potential re-applied via provinces on load)
+	if data.has("weather") and typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("load_save_state"):
+			WeatherManager.load_save_state(data["weather"])
+
+	# Re-apply regional control bonuses (full control effects on supply throughput, production output via factory_output etc.) after owners/provinces restored
+	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("_apply_regional_control_throughput_bonuses"):
+		SupplyManager._apply_regional_control_throughput_bonuses()
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("clear_all_caches"):
+		ProductionManager.clear_all_caches()
 
 	# 2b. Active infrastructure / development projects (must be after map provinces exist)
 	var infra_data := _get_infrastructure_save_data(data)
@@ -429,6 +465,8 @@ func _apply_save_data(data: Dictionary) -> void:
 		# Explicit visual refresh pass after load (as requested for map overlays / InfoPanel)
 		if InfrastructureDevelopmentManager.has_method("refresh_all_project_visuals"):
 			InfrastructureDevelopmentManager.refresh_all_project_visuals()
+		if InfrastructureDevelopmentManager.has_method("initialize_with_time"):
+			InfrastructureDevelopmentManager.initialize_with_time()
 
 	# 3. Supply depots only (deployments after leaders — step 7b)
 	if data.has("supply") and typeof(SupplyManager) != TYPE_NIL:
@@ -465,6 +503,24 @@ func _apply_save_data(data: Dictionary) -> void:
 	if data.has("design_lifecycle") and typeof(DesignManager) != TYPE_NIL:
 		if DesignManager.has_method("apply_save_data"):
 			DesignManager.apply_save_data(data["design_lifecycle"])
+
+	if data.has("trade") and typeof(TradeManager) != TYPE_NIL:
+		if TradeManager.has_method("apply_save_data"):
+			TradeManager.apply_save_data(data["trade"])
+		# Re-apply regional convoy bonuses to trade flows post-load (full control may have changed; re-assign routes for updated risk)
+		if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("_apply_regional_control_throughput_bonuses"):
+			SupplyManager._apply_regional_control_throughput_bonuses()
+		if typeof(TradeManager) != TYPE_NIL:
+			for f in TradeManager.get_active_trade_flows():
+				if f and TradeManager.has_method("_try_assign_supply_route_to_flow"):
+					TradeManager._try_assign_supply_route_to_flow(f)
+
+	# --- GameData demographic/policy state (after core managers) ---
+	if data.has("game_data") and typeof(GameData) != TYPE_NIL:
+		if GameData.has_method("clear_for_load"):
+			GameData.clear_for_load()
+		if GameData.has_method("apply_save_data"):
+			GameData.apply_save_data(data["game_data"])
 
 	# --- Province Editor (debug map design persistence) ---
 	if data.has("province_editor"):
@@ -546,6 +602,7 @@ func _dict_to_agent(d: Dictionary) -> Agent:
 	a.assigned_target_tech_id = str(d.get("assigned_target_tech_id", ""))
 	a.birth_year = int(d.get("birth_year", 1900))
 	a.start_year = int(d.get("start_year", 1930))
+	a.portrait_path = str(d.get("portrait_path", ""))
 
 	# Runtime
 	a.compromised_until_year = int(d.get("compromised_until_year", 0))
@@ -553,7 +610,11 @@ func _dict_to_agent(d: Dictionary) -> Agent:
 	a.total_missions_completed = int(d.get("total_missions_completed", 0))
 	a.successful_missions = int(d.get("successful_missions", 0))
 	a.mission_history = (d.get("mission_history", []) as Array).duplicate(true)
-	a.traits = (d.get("traits", []) as Array).duplicate()
+	var raw_t = d.get("traits", [])
+	a.traits = []
+	if raw_t is Array:
+		for t in raw_t:
+			a.traits.append(str(t))
 
 	return a
 
@@ -633,6 +694,9 @@ func _serialize_map_state() -> Dictionary:
 			"controller_tag": p.controller_tag,
 			"development_level": p.development_level,
 			"infrastructure": p.infrastructure,
+			"settlement_level": p.settlement_level,
+			"built_road_neighbors": p.built_road_neighbors.duplicate(),
+			"built_rail_neighbors": p.built_rail_neighbors.duplicate(),
 			"special_sites": _serialize_special_sites(p),
 			# Add more mutables (factories, resources, special_features deltas, cores, etc.) as they gain runtime mutation.
 		})
@@ -660,10 +724,43 @@ func _apply_map_state(m: Dictionary) -> void:
 		if e.has("infrastructure"):
 			MapManager.update_province_infrastructure(pid, int(e["infrastructure"]))
 
+		if e.has("settlement_level"):
+			var sl := float(e.get("settlement_level", 0.0))
+			if MapManager.has_method("update_province_settlement"):
+				MapManager.update_province_settlement(pid, sl)
+			else:
+				# fallback direct + emit (preserves Province getter data for combat/preview)
+				var pp: Province = MapManager.get_province(pid)
+				if pp != null:
+					pp.settlement_level = clampf(sl, 0.0, 5.0)
+					MapManager.notify_province_changed(pid, "settlement")
+
+		if e.has("built_road_neighbors"):
+			var p_road: Province = MapManager.get_province(pid)
+			if p_road != null:
+				p_road.built_road_neighbors = Array(e.get("built_road_neighbors", []), TYPE_INT, "", null)
+				MapManager.notify_province_changed(pid, "infrastructure")
+		if e.has("built_rail_neighbors"):
+			var p_rail: Province = MapManager.get_province(pid)
+			if p_rail != null:
+				p_rail.built_rail_neighbors = Array(e.get("built_rail_neighbors", []), TYPE_INT, "", null)
+				MapManager.notify_province_changed(pid, "infrastructure")
+
 		if e.has("special_sites"):
 			_apply_special_sites(pid, e["special_sites"])
 
 	print("SaveLoad: Applied province state to %d provinces (signals emitted)" % list.size())
+
+	# Re-seed weather from (possibly updated) provinces snow_potential after map restore (preserves layer-driven high elev snow on reload)
+	var wm := get_node_or_null("/root/WeatherManager") if get_tree() else null
+	if wm == null and Engine.has_singleton("WeatherManager"):
+		wm = Engine.get_singleton("WeatherManager")
+	if wm and wm.has_method("initialize_province") and typeof(MapManager) != TYPE_NIL:
+		var allp := MapManager.get_all_provinces() if MapManager.has_method("get_all_provinces") else {}
+		for pidv in allp:
+			var p: Province = allp[pidv]
+			if p and p.snow_potential > 0.0:
+				wm.initialize_province(pidv, {"is_northern": p.snow_potential > 0.05, "lat": 55.0, "high_ground_fraction": p.snow_potential, "snow_potential": p.snow_potential})
 
 
 ## Helper to serialize special sites on a province

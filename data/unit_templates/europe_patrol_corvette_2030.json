@@ -4,7 +4,7 @@
   "design_family": "european_naval_planned",
   "base_type": "Naval",
   "size_category": "Light",
-  "visual_archetype": "destroyer",
+  "visual_archetype": "frigate",
   "crew_required": 80,
   "base_training_level": 34,
   "max_experience_level": 100,

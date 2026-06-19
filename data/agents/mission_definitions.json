@@ -107,6 +107,90 @@
       }
     }
   },
+  "boost_production": {
+    "id": "boost_production",
+    "name": "Optimize Industrial Production",
+    "category": "influence",
+    "description": "Use industrial expertise or influence to temporarily boost factory output, speed, or specific production categories (e.g., tanks, aircraft). Agent type/trait determines focus (e.g., tech specialist for armor, influence for general). Positive counterpart to sabotage.",
+    "base_success_chance": 0.55,
+    "duration_months": 5,
+    "detection_risk": 0.25,
+    "skill_requirement": "influence",
+    "min_skill_level": 3,
+    "outcomes": {
+      "success": {
+        "effect": "production_boost",
+        "magnitude": 0.15,
+        "prestige_gain": 4,
+        "description": "Significant production efficiency gains achieved."
+      },
+      "partial": {
+        "effect": "production_boost",
+        "magnitude": 0.08,
+        "prestige_gain": 2,
+        "description": "Moderate boosts to industrial output."
+      },
+      "failure": {
+        "description": "The optimization efforts had little effect."
+      }
+    }
+  },
+  "explore_resources": {
+    "id": "explore_resources",
+    "name": "Resource Exploration & Prospecting",
+    "category": "intelligence",
+    "description": "Deploy agents for geological surveys, prospecting, or acquiring resource maps/tech. Can discover new resource deposits, improve gathering efficiency, or reduce resource costs in production. Ties to resource gathering/exploration.",
+    "base_success_chance": 0.50,
+    "duration_months": 6,
+    "detection_risk": 0.30,
+    "skill_requirement": "intelligence",
+    "min_skill_level": 4,
+    "outcomes": {
+      "success": {
+        "effect": "resource_discovery",
+        "magnitude": 0.20,
+        "prestige_gain": 5,
+        "description": "New resources prospected or extraction methods improved."
+      },
+      "partial": {
+        "effect": "resource_discovery",
+        "magnitude": 0.10,
+        "prestige_gain": 2,
+        "description": "Some resource intelligence gained."
+      },
+      "failure": {
+        "description": "Exploration yielded no significant results."
+      }
+    }
+  },
+  "industrial_espionage": {
+    "id": "industrial_espionage",
+    "name": "Acquire Industrial Secrets",
+    "category": "technology",
+    "description": "Steal production techniques, blueprints, or efficiency methods from enemy industry. Boosts your production speed/output or unlocks better resource use. Positive industrial counterpart to tech theft.",
+    "base_success_chance": 0.48,
+    "duration_months": 4,
+    "detection_risk": 0.35,
+    "skill_requirement": "technology",
+    "min_skill_level": 4,
+    "outcomes": {
+      "success": {
+        "effect": "production_boost",
+        "magnitude": 0.12,
+        "prestige_gain": 3,
+        "description": "Valuable production secrets acquired, boosting efficiency."
+      },
+      "partial": {
+        "effect": "production_boost",
+        "magnitude": 0.06,
+        "prestige_gain": 1,
+        "description": "Some industrial techniques obtained."
+      },
+      "failure": {
+        "description": "The espionage attempt failed."
+      }
+    }
+  },
   "influence_propaganda": {
     "id": "influence_propaganda",
     "name": "Run Influence Campaign",
@@ -293,6 +377,317 @@
       },
       "failure": {
         "description": "The security review was largely ineffective."
+      }
+    }
+  },
+  "defend_tech_secrecy": {
+    "id": "defend_tech_secrecy",
+    "name": "Impose Project Secrecy (Manhattan-style)",
+    "category": "counter_intelligence",
+    "description": "Assign a counter-intel specialist to tightly control a specific high-value research project or technology. Reduces enemy theft/sabotage chances significantly for the duration, at the cost of slower progress (compartmentalization) and high detection risk if the agent is targeted. Perfect for protecting breakthrough work like synthetic fuels, radar nets, or heavy armor programs.",
+    "base_success_chance": 0.45,
+    "duration_months": 6,
+    "detection_risk": 0.35,
+    "skill_requirement": "counter_intelligence",
+    "min_skill_level": 5,
+    "target_tech_required": true,
+    "outcomes": {
+      "success": {
+        "effect": "tech_theft_protection",
+        "magnitude": 3,
+        "prestige_gain": 6,
+        "description": "Project security greatly enhanced; enemy operations against this tech heavily degraded for extended period."
+      },
+      "partial": {
+        "effect": "tech_theft_protection",
+        "magnitude": 1,
+        "prestige_gain": 2,
+        "description": "Some additional secrecy achieved."
+      },
+      "failure": {
+        "description": "The secrecy effort failed or was compromised."
+      }
+    }
+  },
+  "secure_inclusion": {
+    "id": "secure_inclusion",
+    "name": "Secure Seat at the Peace Table",
+    "category": "diplomacy",
+    "description": "High-stakes operation to force or negotiate a seat for your nation (or allies) at the main conference table. Primary lever for Central Powers players seeking to rewrite history. Success generates major 'Inclusion Leverage'.",
+    "base_success_chance": 0.32,
+    "duration_months": 2,
+    "detection_risk": 0.55,
+    "skill_requirement": "influence",
+    "min_skill_level": 5,
+    "conference_window_only": true,
+    "outcomes": {
+      "success": {
+        "effect": "inclusion_leverage",
+        "magnitude": 55,
+        "prestige_gain": 12,
+        "description": "Major diplomatic breakthrough — your side gains real negotiating weight or forces observer/full participant status."
+      },
+      "partial": {
+        "effect": "inclusion_leverage",
+        "magnitude": 22,
+        "prestige_gain": 4,
+        "description": "Partial success. Some influence gained; the historical exclusion may be softened but not overturned."
+      },
+      "failure": {
+        "effect": "grievance_backlash",
+        "magnitude": 15,
+        "description": "The attempt was exposed or rebuffed. Historical path hardens and grievance increases."
+      }
+    }
+  },
+  "bribe_influential_minister": {
+    "id": "bribe_influential_minister",
+    "name": "Bribe Key Negotiating Minister",
+    "category": "diplomacy",
+    "description": "Target a specific influential figure in an opposing or wavering delegation with direct financial or political inducements to shift their position on key terms.",
+    "base_success_chance": 0.38,
+    "duration_months": 3,
+    "detection_risk": 0.48,
+    "skill_requirement": "influence",
+    "min_skill_level": 4,
+    "conference_window_only": true,
+    "outcomes": {
+      "success": {
+        "effect": "term_modifier",
+        "magnitude": 18,
+        "prestige_gain": 6,
+        "description": "The minister's voice moves in your favor on at least one major term bucket."
+      },
+      "partial": {
+        "effect": "term_modifier",
+        "magnitude": 8,
+        "prestige_gain": 2,
+        "description": "Some movement; a minor concession or softened language is achieved."
+      },
+      "failure": {
+        "description": "The approach failed or was quietly rejected. No change, minor prestige cost possible."
+      }
+    }
+  },
+  "honeypot_operation": {
+    "id": "honeypot_operation",
+    "name": "Honeypot / Compromise Operation",
+    "category": "diplomacy",
+    "description": "Deploy personal influence or a trusted operative to compromise or heavily sway a key Entente (or other) minister/delegate through seduction, scandal, or private leverage. High reward, high risk.",
+    "base_success_chance": 0.29,
+    "duration_months": 4,
+    "detection_risk": 0.62,
+    "skill_requirement": "influence",
+    "min_skill_level": 6,
+    "conference_window_only": true,
+    "outcomes": {
+      "success": {
+        "effect": "minister_compromised",
+        "magnitude": 1,
+        "prestige_gain": 15,
+        "description": "Target is now deeply compromised. Major shift available on one or more term buckets during resolution."
+      },
+      "partial": {
+        "effect": "term_modifier",
+        "magnitude": 12,
+        "prestige_gain": 5,
+        "description": "Some useful leverage or embarrassing material obtained; partial term influence."
+      },
+      "failure": {
+        "effect": "scandal_backlash",
+        "magnitude": 20,
+        "description": "Operation blown. Major scandal risk. Your own position weakened and historical gravity increases."
+      }
+    }
+  },
+  "shape_public_narrative": {
+    "id": "shape_public_narrative",
+    "name": "Shape Public & Elite Narrative",
+    "category": "diplomacy",
+    "description": "Run influence campaigns, plant stories, and sway elite opinion in target capitals (and your own) around 'fair peace' vs. 'harsh diktat' framing. Affects both conference resolution and later follow-on points.",
+    "base_success_chance": 0.55,
+    "duration_months": 5,
+    "detection_risk": 0.18,
+    "skill_requirement": "influence",
+    "min_skill_level": 3,
+    "outcomes": {
+      "success": {
+        "effect": "narrative_shift",
+        "magnitude": 20,
+        "prestige_gain": 4,
+        "description": "Public and elite opinion moves noticeably in the desired direction. Grievance or winner legitimacy adjusted."
+      },
+      "partial": {
+        "effect": "narrative_shift",
+        "magnitude": 9,
+        "prestige_gain": 1,
+        "description": "Modest narrative gains. Small but real effect on resolution and future crises."
+      },
+      "failure": {
+        "description": "Counter-narratives dominate. Little or no shift."
+      }
+    }
+  },
+  "leak_negotiating_position": {
+    "id": "leak_negotiating_position",
+    "name": "Leak Opposing Red Lines",
+    "category": "diplomacy",
+    "description": "Acquire and selectively leak the negotiating positions or bottom lines of other powers to create public pressure, bargaining advantage, or embarrassment.",
+    "base_success_chance": 0.47,
+    "duration_months": 3,
+    "detection_risk": 0.35,
+    "skill_requirement": "influence",
+    "min_skill_level": 4,
+    "conference_window_only": true,
+    "outcomes": {
+      "success": {
+        "effect": "bargaining_leverage",
+        "magnitude": 16,
+        "prestige_gain": 5,
+        "description": "Key positions exposed. You (or your side) gain meaningful leverage in the final resolution."
+      },
+      "partial": {
+        "effect": "bargaining_leverage",
+        "magnitude": 7,
+        "prestige_gain": 2,
+        "description": "Partial leaks create limited pressure."
+      },
+      "failure": {
+        "description": "No useful material or the leak backfired."
+      }
+    }
+  },
+  "counter_conference_influence": {
+    "id": "counter_conference_influence",
+    "name": "Counter Enemy Conference Influence",
+    "category": "diplomacy",
+    "description": "Active counter-intelligence and disruption against opposing agents and influence operations targeting the same ministers and delegations.",
+    "base_success_chance": 0.52,
+    "duration_months": 3,
+    "detection_risk": 0.22,
+    "skill_requirement": "counter_intelligence",
+    "min_skill_level": 4,
+    "conference_window_only": true,
+    "outcomes": {
+      "success": {
+        "effect": "enemy_leverage_blocked",
+        "magnitude": 25,
+        "prestige_gain": 4,
+        "description": "Enemy networks and influence attempts are rolled up or neutralized for the conference window."
+      },
+      "partial": {
+        "effect": "enemy_leverage_blocked",
+        "magnitude": 10,
+        "prestige_gain": 1,
+        "description": "Some enemy operations disrupted."
+      },
+      "failure": {
+        "description": "Counter-effort had little effect."
+      }
+    }
+  },
+  "lobby_domestic_law": {
+    "id": "lobby_domestic_law",
+    "name": "Lobby / Campaign for Policy or Law Change",
+    "category": "influence",
+    "description": "Long-duration domestic influence operation: bribe parliamentarians, run propaganda campaigns, twist arms, plant stories, or directly influence a king/court to pass or block a major policy/law (pro-natal, borders, conscription, police type, money supply, justice, welfare/social services, etc.). Ties up the agent(s) for months — real trade-off vs Tech development, Intel, Trade, Vision (Initiatives), or Diplomacy work. Changing laws is a big deal; this is the primary lever for most players. Includes cultural war policies (elite 'healthcare' control vs traditional family).",
+    "base_success_chance": 0.48,
+    "duration_months": 8,
+    "detection_risk": 0.15,
+    "skill_requirement": "influence",
+    "min_skill_level": 4,
+    "outcomes": {
+      "success": {
+        "effect": "policy_shift",
+        "magnitude": 1,
+        "description": "Law or policy successfully shifted in the desired direction with reduced player cost or backlash. Agent commitment paid off."
+      },
+      "partial": {
+        "effect": "policy_shift",
+        "magnitude": 0,
+        "description": "Modest progress — player change cost reduced or public opinion moved slightly."
+      },
+      "failure": {
+        "description": "Effort exposed or blocked. Possible small backlash or wasted agent time."
+      }
+    }
+  },
+  "expand_secret_police_network": {
+    "id": "expand_secret_police_network",
+    "name": "Build or Expand Secret Police / Domestic Control Network",
+    "category": "influence",
+    "description": "Agent-driven effort to grow secret police or internal control apparatus. Improves resistance to Hidden Hand subversion but risks public cohesion hit and 'tyranny' narrative if overdone.",
+    "base_success_chance": 0.55,
+    "duration_months": 6,
+    "detection_risk": 0.25,
+    "skill_requirement": "influence",
+    "min_skill_level": 3,
+    "outcomes": {
+      "success": {
+        "effect": "police_type_shift",
+        "magnitude": 1,
+        "description": "Secret police apparatus strengthened. Better Hidden Hand defense, public trust cost."
+      },
+      "failure": {
+        "description": "Network compromised or public backlash."
+      }
+    }
+  },
+  "fund_secret_space_program": {
+    "id": "fund_secret_space_program",
+    "name": "Fund / Launder for Secret Space Program",
+    "category": "technology",
+    "description": "Use black market, front companies, or influence ops to channel hidden funds into secret space/rocket projects. Requires or boosts 'secret_funding' tech path. Low visibility but high reward for covert space race.",
+    "base_success_chance": 0.55,
+    "duration_months": 5,
+    "detection_risk": 0.30,
+    "skill_requirement": "technology",
+    "min_skill_level": 4,
+    "target_tech_required": false,
+    "outcomes": {
+      "success": {
+        "effect": "secret_space_funding",
+        "magnitude": 0.25,
+        "prestige_gain": 3,
+        "description": "Black funds successfully laundered into the secret space effort. Accelerates hidden rocket/sat progress."
+      },
+      "partial": {
+        "effect": "secret_space_funding",
+        "magnitude": 0.10,
+        "prestige_gain": 1,
+        "description": "Partial funding secured; some progress on clandestine assets."
+      },
+      "failure": {
+        "description": "Funding attempt exposed or diverted. Minor scandal risk if secret_funding active."
+      }
+    }
+  },
+  "steal_space_intel": {
+    "id": "steal_space_intel",
+    "name": "Steal Enemy Space Program Intel",
+    "category": "technology",
+    "description": "Target rival's public or secret space efforts for blueprints, sat imagery, or rocket tech. Synergizes with v2_rocket / sputnik tech trees.",
+    "base_success_chance": 0.48,
+    "duration_months": 4,
+    "detection_risk": 0.40,
+    "skill_requirement": "technology",
+    "min_skill_level": 4,
+    "target_tech_required": true,
+    "outcomes": {
+      "success": {
+        "effect": "research_progress",
+        "magnitude": 0.35,
+        "prestige_gain": 4,
+        "description": "Valuable space tech documents and telemetry obtained."
+      },
+      "partial": {
+        "effect": "research_progress",
+        "magnitude": 0.15,
+        "prestige_gain": 2,
+        "description": "Fragmentary data on enemy orbital or rocket programs."
+      },
+      "failure": {
+        "description": "Space intel op failed or backfired."
       }
     }
   }

@@ -1,7 +1,7 @@
 {
   "radio_i": {
     "id": "radio_i",
-    "name": "Radio Detection",
+    "name": "Tactical Radio Telegraphy & Early Voice Sets",
     "domain": "support",
     "tree_id": "support_electronics",
     "node_kind": "research",
@@ -11,7 +11,9 @@
     "era_min": 1910,
     "era_max": 1945,
     "epoch": "interwar",
-    "prerequisites": [],
+    "prerequisites": [
+      "early_radio_telegraphy_1895"
+    ],
     "mutually_exclusive_with": [],
     "research": {
       "base_cost_days": 70,
@@ -20,18 +22,74 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "modifier", "stat": "reconnaissance", "value": 0.05 },
-      { "type": "doctrine_key", "key": "combined_arms" }
+      {
+        "type": "modifier",
+        "stat": "reconnaissance",
+        "value": 0.05
+      },
+      {
+        "type": "doctrine_key",
+        "key": "combined_arms"
+      }
     ],
-    "agent": { "theft_target": true, "intel_domain": "technology" },
+    "agent": {
+      "theft_target": true,
+      "intel_domain": "technology"
+    },
     "ui": {
       "short_effect": "Improves recon and unlocks Combined Arms doctrine study",
-      "flavor": "Crystal radios and early direction finding reshape the battlefield."
+      "flavor": "WWI-era crystal sets and spark/arc transmitters (still largely Morse telegraphy with early voice experiments). Enables real-time artillery spotting and division coordination. True mobile voice radio nets come in the 1930s."
+    }
+  },
+  "radar_prototype_1935": {
+    "id": "radar_prototype_1935",
+    "name": "Early Radar (Chain Home Proto)",
+    "domain": "support",
+    "tree_id": "support_electronics",
+    "node_kind": "research",
+    "column": 1,
+    "row": 0,
+    "tier": 2,
+    "era_min": 1934,
+    "era_max": 1950,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "radio_i",
+      "electric_power_generation_1890"
+    ],
+    "research": {
+      "base_cost_days": 95,
+      "category": "electronics",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "air_detection",
+        "value": 0.15
+      },
+      {
+        "type": "equipment_module",
+        "module_id": "microwave_early_warning"
+      },
+      {
+        "type": "doctrine_key",
+        "key": "air_defense"
+      }
+    ],
+    "agent": {
+      "theft_target": true,
+      "intel_domain": "technology"
+    },
+    "ui": {
+      "short_effect": "+15% air detection; early warning radar modules (UK historical, alt for others)",
+      "flavor": "Separate from voice radio: 1930s radio detection and ranging (RDF/radar). Watson-Watt Chain Home proto. Transforms air defense. Note: early 'radio' tech is still largely telegraphy/Morse."
     }
   },
   "radio_ii": {
     "id": "radio_ii",
-    "name": "Radio Networks",
+    "name": "Radio Telephone Networks (Voice Command)",
     "domain": "support",
     "tree_id": "support_electronics",
     "node_kind": "research",
@@ -41,7 +99,9 @@
     "era_min": 1936,
     "era_max": 1960,
     "epoch": "industrial_war",
-    "prerequisites": ["radio_i"],
+    "prerequisites": [
+      "radio_i"
+    ],
     "research": {
       "base_cost_days": 90,
       "category": "electronics",
@@ -49,13 +109,65 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "modifier", "stat": "planning_speed", "value": 0.08 },
-      { "type": "division_capability", "capability": "motorized_logistics" }
+      {
+        "type": "modifier",
+        "stat": "planning_speed",
+        "value": 0.08
+      },
+      {
+        "type": "division_capability",
+        "capability": "motorized_logistics"
+      }
     ],
-    "agent": { "theft_target": true, "intel_domain": "technology" },
+    "agent": {
+      "theft_target": true,
+      "intel_domain": "technology"
+    },
     "ui": {
       "short_effect": "Faster planning; motorized logistics divisions",
-      "flavor": "Net-centric command at division level becomes doctrine."
+      "flavor": "1930s vacuum-tube voice radio nets. True 'radio' (voice) command & control at scale. Transforms combined arms and mobile warfare coordination."
+    }
+  },
+  "fire_control_computers_1936": {
+    "id": "fire_control_computers_1936",
+    "name": "Mechanical Fire Control & AA Predictors",
+    "domain": "support",
+    "tree_id": "support_electronics",
+    "node_kind": "research",
+    "column": 1,
+    "row": 1,
+    "tier": 3,
+    "era_min": 1935,
+    "era_max": 1955,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "radar_prototype_1935",
+      "radio_ii"
+    ],
+    "research": {
+      "base_cost_days": 85,
+      "category": "electronics",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "naval_firepower",
+        "value": 0.08
+      },
+      {
+        "type": "equipment_module",
+        "module_id": "bofors_37mm_at"
+      }
+    ],
+    "agent": {
+      "theft_target": true,
+      "intel_domain": "technology"
+    },
+    "ui": {
+      "short_effect": "+naval AA/gunnery accuracy; unlocks advanced predictor modules",
+      "flavor": "US/UK/British gunnery computers + early AA. Critical vs aircraft and surface actions."
     }
   },
   "radio_iii": {
@@ -70,7 +182,9 @@
     "era_min": 1942,
     "era_max": 1980,
     "epoch": "industrial_war",
-    "prerequisites": ["radio_ii"],
+    "prerequisites": [
+      "radio_ii"
+    ],
     "research": {
       "base_cost_days": 110,
       "category": "electronics",
@@ -78,8 +192,15 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "modifier", "stat": "encryption", "value": 1.0 },
-      { "type": "agent_mission", "mission_id": "infiltrate_research_lab" }
+      {
+        "type": "modifier",
+        "stat": "encryption",
+        "value": 1.0
+      },
+      {
+        "type": "agent_mission",
+        "mission_id": "infiltrate_research_lab"
+      }
     ],
     "agent": {
       "theft_target": true,
@@ -89,6 +210,140 @@
     "ui": {
       "short_effect": "Stronger encryption; unlocks deep infiltration missions",
       "flavor": "Rotors and one-time pads delay enemy signals intelligence."
+    }
+  },
+  "sonar_1938": {
+    "id": "sonar_1938",
+    "name": "Active/Passive Sonar for ASW",
+    "domain": "support",
+    "tree_id": "support_electronics",
+    "node_kind": "research",
+    "column": 2,
+    "row": 1,
+    "tier": 3,
+    "era_min": 1935,
+    "era_max": 1960,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "radio_ii",
+      "fire_control_computers_1936"
+    ],
+    "research": {
+      "base_cost_days": 95,
+      "category": "electronics",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "sub_detection",
+        "value": 0.2
+      },
+      {
+        "type": "equipment_module",
+        "module_id": "bqq5_sonar_suite"
+      },
+      {
+        "type": "doctrine_key",
+        "key": "asw_warfare"
+      }
+    ],
+    "ui": {
+      "short_effect": "+sub detection, ASW sonar modules, ASW doctrine",
+      "flavor": "Hull-mounted and towed array sonars for hunting subs. Critical for convoy protection and sub vs sub. Trade-off: noisy active pings reveal your position.",
+      "icon": "res://assets/graphics/icons/tech/sonar_array.png"
+    }
+  },
+  "proximity_fuses_1942": {
+    "id": "proximity_fuses_1942",
+    "name": "Proximity Fuses (VT Fuze)",
+    "domain": "support",
+    "tree_id": "support_electronics",
+    "node_kind": "research",
+    "column": 1,
+    "row": 2,
+    "tier": 3,
+    "era_min": 1940,
+    "era_max": 1955,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "fire_control_computers_1936",
+      "radar_prototype_1935"
+    ],
+    "research": {
+      "base_cost_days": 100,
+      "category": "electronics",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "aa_efficiency",
+        "value": 0.25
+      },
+      {
+        "type": "modifier",
+        "stat": "naval_aa",
+        "value": 0.2
+      },
+      {
+        "type": "equipment_module",
+        "module_id": "bofors_37mm_at"
+      }
+    ],
+    "ui": {
+      "short_effect": "+25% AA efficiency, proximity VT fuzes for guns/AA (huge vs aircraft, V1s)",
+      "flavor": "Radio proximity fuses detonate near target. Transforms AA and artillery vs planes/subs. US/UK edge; very resource/electronics heavy. Trade-off vs contact fuses (cost, reliability in some conditions).",
+      "icon": "res://assets/graphics/icons/tech/proximity_fuse.png"
+    }
+  },
+  "advanced_encryption_1943": {
+    "id": "advanced_encryption_1943",
+    "name": "Advanced Encryption & Codebreaking",
+    "domain": "support",
+    "tree_id": "support_electronics",
+    "node_kind": "research",
+    "column": 0,
+    "row": 3,
+    "tier": 4,
+    "era_min": 1940,
+    "era_max": 1980,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "radio_iii"
+    ],
+    "research": {
+      "base_cost_days": 120,
+      "category": "electronics",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "encryption",
+        "value": 2
+      },
+      {
+        "type": "modifier",
+        "stat": "intel_success",
+        "value": 0.15
+      },
+      {
+        "type": "rule_flag",
+        "flag": "codebreaking"
+      }
+    ],
+    "agent": {
+      "theft_target": true,
+      "intel_domain": "technology"
+    },
+    "ui": {
+      "short_effect": "Strong encryption + codebreaking bonus; +intel, agent theft harder for enemies",
+      "flavor": "Enigma/Ultra successors, early computers for breaking. Huge for signals intel, protecting plans. Trade-off: massive compute/electricity cost; if enemy gets your machine, disaster.",
+      "icon": "res://assets/graphics/icons/tech/sonar_array.png"
     }
   }
 }

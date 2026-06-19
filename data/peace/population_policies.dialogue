@@ -1,0 +1,351 @@
+# population_policies.dialogue
+# Branching for top-level demographic policies / laws (pro-natal native growth incentives, fortified borders/restriction, foreign military integration, two-tier justice).
+# Complements Ascendancy Initiatives tree (big directional choices) with tunable ongoing Policy/Law screen.
+# Models user request: options beyond migration (tax breaks/housing for large families take longer but are sustainable; "build the wall" / strict barriers; two-tier justice as historical norm; high non-citizens or foreign troops in military have real consequences like debasing the currency).
+# Launched from demo policy buttons or future Policy screen / Initiatives resolution.
+
+~ start_population_policy_choice
+
+Your nation faces a fundamental demographic question. Open immigration delivers quick cheap labor and industrial surge but brings long-term public cohesion costs, job pressure for citizens, crime, cultural friction, and "social inflation" (the slow debasement of trust and efficiency, exactly like coming off the gold standard or excessive government expansion and printing). 
+
+Native-focused policies (pro-natal incentives) grow your own population more slowly but more sustainably — families feel supported, public cohesion holds or rises, reliance on foreigners drops. Restriction ("build the wall", high barriers) protects citizen employment and identity at the price of slower growth. Allowing large numbers of non-citizens into the military is tempting for cheap numbers but carries loyalty and cohesion risks.
+
+Two-tier justice (special treatment for elites and royals) is the historical norm in many kingdoms and empires — it can stabilize the upper strata but fuels resentment below.
+
+- Launch pro-natal family incentives (tax relief for children, priority housing for families with 5+ kids, cultural encouragement)
+  do GameData.apply_pro_natal_incentives("player", 2)
+  Slower but healthier path. Public sentiment improves over time as native families grow and feel valued. Less "foreign labor" pressure. Excellent foundation for a high-cohesion Golden Age. Costs political capital (Mandate) but pays dividends in stability.
+  => population_policy_aftermath
+
+- Fortify the borders / make immigration difficult (you have to really want it)
+  do GameData.apply_border_policy("player", "fortified")
+  Strong visible barrier policy. Citizen jobs and public cohesion protected. Industrial growth slower without the cheap labor surge. Enforcement has ongoing Mandate cost (or agent missions). Classic "preserve the nation" choice with real trade-offs.
+  => population_policy_aftermath
+
+- Integrate large foreign contingents into the military (cheap legions, fast expansion)
+  do GameData.apply_military_integration("player", 0.28)
+  Immediate numbers and cost advantages. But institutional loyalty questions rise, public sees "our army" diluted, and high non-citizen presence acts like currency debasement — gradual Mandate and efficiency drag ("social inflation"), plus elevated risk in crises or if cohesion is already low. Powerful but dangerous lever.
+  => population_policy_aftermath
+
+- Formalize two-tier justice (special legal and social privileges for elite/royal strata)
+  do GameData.apply_justice_policy("player", "two_tier")
+  Reflects historical reality in countless kingdoms. Elite cohesion and short-term Mandate boosted (the upper classes feel secure and loyal). Public resentment grows; Hidden Hand gains narrative fuel from "injustice." Flavorful for traditional or imperial playthroughs; risky for broad legitimacy.
+  => population_policy_aftermath
+
+- Balanced native + selective skilled path (pro-natal level 1 + skilled immigration only)
+  do GameData.apply_pro_natal_incentives("player", 1)
+  do GameData.apply_border_policy("player", "skilled_only")
+  Compromise. Some native support + high-quality foreign talent only. Lower scale, lower backlash, slower but cleaner growth. Good middle road for players who want both growth and cohesion.
+  => population_policy_aftermath
+
+=> END
+
+~ population_policy_aftermath
+
+Policy choice made. These are living, adjustable laws (top-level Policy/Law screen concept). You can revisit them as Ascendancy, events, or new Initiatives unlock better options or force changes. Watch the monthly erosion simulation for the real long-term consequences of your demographic mix — non-citizen ratios and foreign military percentages create gradual public strain and "inflation" effects unless countered by pro-natal, assimilation, or strict borders. The tree gives the big visionary pushes; these policies are the day-to-day steering.
+=> END
+
+~ fiat_crisis_choice
+
+Fiat expansion or heavy foreign military reliance has pushed Trust Erosion and fiat_strain high. Hyperinflation-style pressures are building — public cohesion cracking, Ascendancy and production efficiency suffering, Hidden Hand circling for exploitation (radicalization opportunities). This mirrors historical Weimar-style collapses: short-term survival via more printing/stimulus, or painful pivot to sovereign wealth, gold backing, or austerity (pro-natal + restriction to rebuild native trust).
+
+Your levers are still there, but the clock is ticking. High non-citizen or foreign % makes recovery slower.
+
+- Double down on fiat expansion (more short stimulus, accelerate erosion)
+  do GameData.apply_money_supply_policy("player", "expanded_fiat")
+  Immediate Mandate and industrial boost to "solve" the crisis. But Trust Erosion spikes further, production drag worsens, public pain intensifies. Hidden Hand gains ground. Classic path to radicalization or collapse unless you pivot hard later.
+  => fiat_crisis_aftermath
+
+- Pivot to sovereign wealth / gold backing (austerity + asset stabilization)
+  do GameData.apply_sovereign_wealth("player", 2)
+  do GameData.apply_money_supply_policy("player", "gold_standard")
+  Costs Mandate short-term and slows growth, but sharply reduces Trust Erosion and fiat_strain. Strong counter to Hidden Hand debasement agenda. Recovery path opens (like post-Weimar stabilization) — slower but builds real resilience and prestige.
+  => fiat_crisis_aftermath
+
+- Hybrid: Pro-natal surge + restricted borders + limited sovereign (balanced recovery)
+  do GameData.apply_pro_natal_incentives("player", 2)
+  do GameData.apply_border_policy("player", "restricted")
+  do GameData.apply_sovereign_wealth("player", 1)
+  Native growth push + immigration slowdown to rebuild citizen base and cohesion. Partial asset backing to stabilize currency/trust. Slower relief but avoids death spiral; positions for Golden Age demographic strength. Good middle path if you have the political capital.
+  => fiat_crisis_aftermath
+
+- Exploit the chaos (alt-history / radical path)
+  do GameData.apply_pillar_shift("player", "ascendancy", -10, "fiat_chaos_exploit")
+  do GameData.record_crisis_response("fiat", "exploit")
+  Use the crisis for revanchist or authoritarian consolidation. Short-term power grab (Ascendancy/Mandate swing via two-tier or centralization), but massive public backlash and Hidden Hand fuel. High-risk divergence that can lead to stronger (or collapsed) state.
+  => fiat_crisis_aftermath
+
+=> END
+
+~ fiat_crisis_aftermath
+
+Fiat crisis resolved (or escalated). The monthly processor will continue tracking Trust Erosion and fiat_strain. Policy/Law changes and agent influence remain your tools to steer recovery or lean into the storm. Remember: these choices compound over years — pro-natal and sound money build long-term floors, while unchecked printing or foreign reliance creates the "social inflation" that erodes everything else.
+=> END
+
+~ secret_police_backlash
+
+Your secret police apparatus has triggered backlash: public protests, Hidden Hand exploitation of "tyranny" narratives, elite may support but institutional strain rises. Historical norm in many regimes, but risky for cohesion.
+
+- Double down (expand further for control)
+  do GameData.apply_police_type("player", "secret")
+  Short-term HH resistance up, but deeper public hit and potential unrest events. Powerful but undermines long-term legitimacy.
+  => END
+
+- Reform (scale back to local police)
+  do GameData.apply_police_type("player", "local")
+  +Public trust recovery, but -HH resistance. Trade-off for stability.
+  => END
+
+- Use agents to mitigate (propaganda or crackdown)
+  do GameData.allocate_agent_to_policy_influence("secret_agent", "police", "player", 3)
+  Agent time spent dampens backlash. Policy stays "secret" but public hit reduced; Hidden Hand opportunity limited. Trade-off: those agents unavailable for other work.
+  => END
+
+- Full reform and public apology
+  do GameData.apply_police_type("player", "local")
+  do GameData.apply_pillar_shift("player", "cohesion", 8, "public")
+  Big public recovery and cohesion boost. HH loses ground. But short-term institutional control drops (crime or subversion risk rises temporarily). Good for high-Ascendancy legitimacy play.
+
+=> END
+
+~ conscription_riot_branch
+
+High conscription (level 2) + low public cohesion has triggered unrest: protests, draft evasion, Hidden Hand agitation in the streets. "Our sons for a war that isn't ours" or "elites safe while we bleed" narratives spread. Historical risk in total-war mobilization without broad support.
+
+- Double down (enforce with secret police / foreign troops)
+  do GameData.apply_conscription_law("player", 2)
+  do GameData.apply_police_type("player", "secret")
+  Short-term manpower and allocation hold. But public cohesion craters further, loyalty multiplier on any foreign elements worsens, Hidden Hand gains massively on public. Risk of wider civil unrest or separatism.
+
+- Ease conscription + pro-natal pivot (reduce level, push native incentives)
+  do GameData.apply_conscription_law("player", 0)
+  do GameData.apply_pro_natal_incentives("player", 2)
+  Public relief and long-term native growth path. Manpower tighter short-term but cohesion recovers; better for Golden Age sustainability. Costs some military flexibility now.
+
+- Exploit for centralization (use crisis to expand emergency powers / two-tier)
+  do GameData.apply_pillar_shift("player", "ascendancy", 5, "crisis_exploit")
+  do GameData.apply_justice_policy("player", "two_tier")
+  Authoritarian consolidation. Short Ascendancy/Mandate win, easier future allocations. But massive long-term public and Hidden Hand blowback. Alt-history "strongman" path with real costs.
+
+=> END
+
+~ golden_pro_natal_surge
+Your nation has entered a Golden Age with strong pro-natal policies (or high settlement from relocation). Native families are booming — a true demographic dividend. Manpower surges, public cohesion floors rise, loyalty in settled/repopulated areas strengthens. The world notices your model.
+
+- Celebrate and export the model (Golden Civilizational Renaissance synergy)
+  do GameData.apply_pillar_shift("player", "cohesion", 15, "golden_native")
+  do GameData.adjust_manpower("player", 40, "golden_pro_natal")
+  Massive public/elite/institutional cohesion + manpower. Cultural export prestige. Future immigration from compatible spheres becomes easier (affinity bonus flavor). "The world looks to us."
+
+- Focus inward on military readiness (use the surge for professional expansion)
+  do GameData.apply_pillar_shift("player", "mandate", 10, "golden_military")
+  do GameData.recruit_units("player", 25)  # if available
+  Manpower windfall converts directly to higher-quality forces. Loyalty multiplier improves in settled areas. Excellent for players who paired pro-natal with professional military doctrine.
+
+- Use the strength for projection (Golden Hegemonic Mandate)
+  do GameData.apply_pillar_shift("player", "mandate", 20, "golden_projection")
+  International reactions soften; easier integration/puppet acceptance in low-cohesion neighbors. "Failed states look to our prosperous model."
+
+The surge is temporary (decays over years) but the long-term native base and cohesion floor are permanent advantages if you sustain the policies. Hidden Hand will target this strength.
+
+=> END
+
+~ welfare_burden_crisis
+Expansive or elite-driven social services / "healthcare" models have created a large, unsustainable welfare burden. Short-term "savings" or elite control (abstract pop management, end-of-life optimization, broad equity programs) masked the costs – now public trust erodes, Mandate bleeds, Hidden Hand exploits the "decadent overreach" or "cruel efficiency" narrative. Disastrous policies in action: burden like social inflation, risking Golden collapse or separatism.
+
+Toasts first for awareness; now interactive choices with clear opposites and payoffs (short elite/Mandate relief vs long public/HH disaster; balance via restraint or clever pivot).
+
+- Double down on elite optimization (more control, cut "undesirables" for costs)
+  do GameData.apply_social_services_policy("player", "elite_optimization")
+  Short-term Mandate and elite cohesion surge (costs controlled, "efficient" pop management). But public cohesion tanks, welfare_burden spikes, HH gains massively. Crazy efficiency path – powerful for traditional/imperial but risks total legitimacy collapse.
+
+- Pivot to compassionate restraint (scale back expansive services, traditional focus)
+  do GameData.apply_social_services_policy("player", "traditional")
+  Public relief and cohesion recovery. Welfare burden eases, long-term stability. But short-term elite/Mandate hit (lost "savings"). Clean opposite: restraint pays in sustainability, costs political capital now.
+
+- Hybrid "managed burden" (limited services + pro-natal buffer)
+  do GameData.apply_social_services_policy("player", "compassionate_end_of_life")
+  do GameData.apply_pro_natal_incentives("player", 1)
+  Balanced: Some welfare optimization with native growth counter. Moderate burden, mixed payoffs. Fun middle path – acknowledges trade-offs without full disaster.
+
+- Exploit the crisis (radical expansion or authoritarian control for "greater good")
+  do GameData.apply_social_services_policy("player", "expansive_burden")
+  do GameData.apply_pillar_shift("player", "ascendancy", -8, "welfare_chaos")
+  Short power grab or narrative win, but welfare_burden explodes, public revolt, Golden blocked or turned "decadent". High-risk alt-history – crazy disastrous payoff for daring players.
+
+=> END
+
+~ education_policy_choice
+Governmental public education: A key vector in the cultural war. "Public" systems produce compliant worker bees (industrial boost, good for short-term economy and "little citizens" ready for workforce/feminism), but conformity kills critical thinking, independent action, problem-solving – and serves as pipeline for removing Bible/traditional values, pushing feminism, making populace more prone to Hidden Hand demands. "Traditional/classical" fosters independent thinkers and family-oriented problem solvers (pro-sanctity of life, buffers cultural poison), but may slow mass labor discipline or mark you as "outlier."
+
+- Public indoctrination (worker bees, conformity for industry)
+  do GameData.apply_governmental_education_policy("player", "public_indoctrination")
+  Short industrial/workforce surge. But anti-family (both "educated" for work = harder kids), HH vector (less critical, more compliant for propaganda like bible removal, feminism). Low cohesion pressures this "reform."
+
+- Traditional classical (independent thinkers, family values)
+  do GameData.apply_governmental_education_policy("player", "traditional_classical")
+  Long-term cohesion, better agents/leaders, pro-natal/family buffer. Resists "woke" but alerts Hidden Hand as traditional outlier – more propaganda pressure.
+
+- Mixed compromise
+  do GameData.apply_governmental_education_policy("player", "mixed_public")
+  Balanced industrial with some independence. Middle path, but less pure payoffs.
+
+=> END
+
+~ separatism_crisis_branch
+Unresolved riots have ignited a separatism crisis (e.g. Paris Commune 2.0 if pid4 owned, or regional independence). Long-term map control and pillars at risk; Hidden Hand gains from division. Your choice persists "radicalization" and "separatism_risk" affecting future events.
+
+- Harsh suppression (martial + mil force; short coh recover but high radicalization risk + map owner threat)
+  do GameData.handle_riot_player_choice(4, "player", "policy_martial")
+  do GameData.apply_pillar_shift("player", "ascendancy", -5, "separatism_harsh")
+  Strong immediate containment. But fuels long-term radicalization/separatism meter; may lose effective control of key provinces in alt paths. Costly prestige.
+  => separatism_aftermath
+
+- Concessions and autonomy offers (short relief, but empower radicals)
+  do GameData.handle_riot_player_choice(4, "player", "concede")
+  do GameData.apply_pillar_shift("player", "cohesion", 3, "separatism_concede")
+  Buys time and public relief. But separatism_risk and radicalization rise sharply — future independence movements or HH win more likely. Trade-off for living world reactivity.
+  => separatism_aftermath
+
+- Agent-led counter-subversion + investigate (mitigates HH, low visibility)
+  do GameData.handle_riot_player_choice(4, "player", "agent_counter")
+  do GameData.apply_agent_pillar_influence("HIDDEN_HAND", "cohesion", -5, "public")
+  Best long-term: reduces radicalization, setbacks Hand. Agents tied up (trade-off). Good for high-agency players tracking the Hand.
+  => separatism_aftermath
+
+- Push through with tree initiative (if Ascendancy high: geo integration or crackdown node)
+  do GameData.apply_pillar_shift("player", "ascendancy", 4, "separatism_push")
+  do GameData.unlock_ascendancy_initiative("player", "assimilation_crisis")
+  Use crisis for Ascendancy win (if eligible). Dynamic tree/geo payoff or backlash. Alt-history flavor.
+  => separatism_aftermath
+
+=> END
+
+~ separatism_aftermath
+Separatism response resolved. Monthly process will track "separatism_risk" and "radicalization" — high values can chain to more crises, map effects (future owner shifts in full), or HH-fueled civil events. Choices here drive living reactive world.
+=> END
+
+~ research_sabotage_response
+Research ethics concerns went unaddressed or high Hand exploitation triggered sabotage (infra/tech drag). Player agency: investigate (agent), accept ban, or double-down on tech.
+
+- Launch agent counter-intel mission (trace saboteurs, mitigate)
+  do GameData.apply_agent_pillar_influence("player", "cohesion", 4, "public")
+  do GameData.apply_agent_pillar_influence("HIDDEN_HAND", "cohesion", -4, "public")
+  Agents investigate; setback for Hand, cohesion recover. Trade-off: agent unavailable elsewhere.
+  => research_sabotage_after
+
+- Formal ban + ethics board (mitigate, research slowdown)
+  do GameData.record_ethics_response("player", "synthetic_fuel_focus_1935", "banned")
+  do GameData.apply_pillar_shift("player", "cohesion", 6, "ethics_ban")
+  Public trust gain, HH setback. Tech lag as cost. Clean opposite to push.
+  => research_sabotage_after
+
+- Double down / push through (bonus industrial but backlash risk)
+  do GameData.record_ethics_response("player", "synthetic_fuel_focus_1935", "pushed")
+  do GameData.apply_pillar_shift("player", "industrial_base", 8, "ethics_push")
+  Short gain (as chain). But if Hand high, future sabotage or coh crisis. High-risk alt-history.
+  => research_sabotage_after
+
+=> END
+
+~ research_sabotage_after
+Ethics/sabotage choice made. "ethics_responses" persisted for chains (ignored -> more sabotage; pushed -> mixed bonus/risk). Watch monthly + agent missions for living escalation.
+=> END
+
+~ labor_unrest_choice
+Labor unrest in key industrial province (e.g. pid3 ownership + low coh/high welfare cond). Econ base hit; ties geo map loop.
+
+- Crack down (martial + secret police)
+  do GameData.apply_pillar_shift("player", "cohesion", -4, "labor_crack")
+  do GameData.apply_police_type("player", "secret")
+  Short econ stabilization. Public/Hand backlash; may chain to riots/separatism.
+  => labor_after
+
+- Concede wages/welfare buffer (short econ cost, long coh)
+  do GameData.apply_pillar_shift("player", "industrial_base", -3, "labor_concede")
+  do GameData.apply_pillar_shift("player", "cohesion", 5, "labor_relief")
+  Public relief. Radicalization lower. Trade-off visible in monthly.
+  => labor_after
+
+- Agent infiltration of unions (counter + intel)
+  do GameData.allocate_agent_to_policy_influence("labor_agent", "police", "player", 2)
+  do GameData.apply_pillar_shift("player", "ascendancy", 2, "labor_intel")
+  Mitigates without direct hit. Good agency.
+  => labor_after
+
+=> END
+
+~ labor_after
+Labor choice persisted. Future monthly checks ownership + welfare/coh for more unrest or resolution.
+=> END
+
+~ naval_mutiny_response
+Coastal/port ownership + low coh/Hand triggers naval mutiny or foreign agent infiltration. Mil drag + coh hit.
+
+- Execute leaders / harsh discipline (short mil recover, long loyalty/coh loss)
+  do GameData.apply_pillar_shift("player", "military_allocation", 0.02, "mutiny_harsh")
+  do GameData.apply_pillar_shift("player", "cohesion", -5, "mutiny_backlash")
+  Immediate control. But fuels narrative for Hand and future coastal events.
+  => naval_after
+
+- Investigate + agent counter-espionage (mitigate root)
+  do GameData.apply_agent_pillar_influence("HIDDEN_HAND", "cohesion", -4, "public")
+  do GameData.apply_pillar_shift("player", "cohesion", 4, "naval_agent")
+  Traces foreign/Hand link; good for revelation chain. Agents cost.
+  => naval_after
+
+- Concede demands (pay/sailor rights)
+  do GameData.apply_pillar_shift("player", "mandate", -6, "mutiny_concede")
+  do GameData.apply_pillar_shift("player", "cohesion", 3, "mutiny_relief")
+  Short relief, long radicalization risk in forces.
+  => naval_after
+
+=> END
+
+~ naval_after
+Naval response done. Geo coastal ownership + state now drives living mutiny/agent events in monthly.
+=> END
+
+~ hh_scandal_investigate
+HH manufactured scandal (high hand from black trade/failed peace + pillar weakness). Coh hit, revelation up. Agency: investigate with agents or ignore (escalates).
+
+- Full agent investigation (trace funding/backers)
+  do GameData.apply_agent_pillar_influence("player", "cohesion", 5, "public")
+  do GameData.apply_agent_pillar_influence("HIDDEN_HAND", "cohesion", -5, "public")
+  do GameData.increase_hand_influence("player", -0.05)
+  Revelation chain advances positively (player opposed); meter drop, coh recover. Agents tied (real trade-off).
+  => scandal_after
+
+- Public denial + propaganda (short cover, long risk)
+  do GameData.apply_pillar_shift("player", "cohesion", -2, "scandal_deny")
+  do GameData.apply_pillar_shift("player", "ascendancy", 3, "scandal_cover")
+  Hand loves the lie — future escalation + targeted risk.
+  => scandal_after
+
+- Embrace the narrative (alt radical path)
+  do GameData.apply_pillar_shift("player", "ascendancy", 8, "scandal_embrace")
+  do GameData.apply_agent_pillar_influence("HIDDEN_HAND", "cohesion", 6, "public")
+  Dark power spike short; long betrayal/erosion as per Good-vs-Evil setup.
+  => scandal_after
+
+=> END
+
+~ scandal_after
+Scandal choice persisted in hand_revelation/scandal_meter. Agent "investigate" missions feed the long chain to full reveal or Hand win.
+=> END
+
+~ ethics_choice_chain_example
+(Internal for demo chaining after ethics concerns news; player picks response that sets ethics_responses for sabotage/backlash.)
+- Ignore (default risk)
+  do GameData.record_ethics_response("player", "synthetic_fuel_focus_1935", "ignored")
+  => END
+
+- Push despite concerns (bonus risk)
+  do GameData.record_ethics_response("player", "synthetic_fuel_focus_1935", "pushed")
+  => END
+
+- Ban / ethics oversight (safe)
+  do GameData.record_ethics_response("player", "synthetic_fuel_focus_1935", "banned")
+  => END
+
+=> END

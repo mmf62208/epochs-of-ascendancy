@@ -342,7 +342,9 @@ func apply_save_data(data: Dictionary) -> void:
 			f.current_damage = float(fd.get("current_damage", 0.0))
 			f.repair_progress = float(fd.get("repair_progress", 0.0))
 			f.is_annexed = bool(fd.get("is_annexed", false))
-			f.assigned_lines = (fd.get("assigned_lines", []) as Array).duplicate()
+			f.assigned_lines = []
+			for x in (fd.get("assigned_lines", []) as Array):
+				f.assigned_lines.append(str(x))
 			f.max_production_lines = int(fd.get("max_production_lines", 1))
 			f.factory_type = str(fd.get("factory_type", "standard"))
 			f.current_production_design = str(fd.get("current_production_design", ""))

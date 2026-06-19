@@ -4,7 +4,7 @@
   "design_family": "soviet_armored_sixties",
   "base_type": "Armored",
   "size_category": "Light",
-  "visual_archetype": "apc",
+  "visual_archetype": "armored_vehicle",
   "crew_required": 3,
   "base_training_level": 28,
   "max_experience_level": 100,

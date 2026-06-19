@@ -47,6 +47,7 @@ static func create_leader_from_data(leader_data: Dictionary) -> Leader:
 	leader.training_path_id = str(leader_data.get("training_path_id", ""))
 	leader.training_path_level = clampi(int(leader_data.get("training_path_level", 0)), 0, 3)
 	leader.previous_training_path_id = str(leader_data.get("previous_training_path_id", ""))
+	leader.portrait_path = str(leader_data.get("portrait", leader_data.get("portrait_path", "")))
 	return leader
 
 

@@ -1,0 +1,9027 @@
+{
+  "version": 1,
+  "provinces": {
+    "1": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8.0,
+      "primary_resource": "rare_earths"
+    },
+    "2": {
+      "resources": {
+        "coal": 80,
+        "iron": 35,
+        "steel": 25
+      },
+      "resource_score": 140.0,
+      "primary_resource": "coal"
+    },
+    "3": {
+      "resources": {
+        "coal": 950,
+        "iron": 280,
+        "steel": 150
+      },
+      "resource_score": 1380.0,
+      "primary_resource": "coal"
+    },
+    "4": {
+      "resources": {
+        "iron": 55,
+        "steel": 30
+      },
+      "resource_score": 85.0,
+      "primary_resource": "iron"
+    },
+    "5": {
+      "resources": {
+        "coal": 110
+      },
+      "resource_score": 110.0,
+      "primary_resource": "coal"
+    },
+    "6": {
+      "resources": {
+        "semiconductors": 120
+      },
+      "resource_score": 120.0,
+      "primary_resource": "semiconductors"
+    },
+    "7": {
+      "resources": {
+        "oil": 1250
+      },
+      "resource_score": 1250.0,
+      "primary_resource": "oil"
+    },
+    "8": {
+      "resources": {
+        "coal": 120,
+        "iron": 80
+      },
+      "resource_score": 200.0,
+      "primary_resource": "coal"
+    },
+    "9": {
+      "resources": {
+        "semiconductors": 85
+      },
+      "resource_score": 85.0,
+      "primary_resource": "semiconductors"
+    },
+    "10": {
+      "resources": {
+        "coal": 180,
+        "rare_earths": 95
+      },
+      "resource_score": 275.0,
+      "primary_resource": "coal"
+    },
+    "11": {
+      "resources": {
+        "semiconductors": 140,
+        "rare_earths": 45
+      },
+      "resource_score": 185.0,
+      "primary_resource": "semiconductors"
+    },
+    "12": {
+      "resources": {
+        "coal": 65
+      },
+      "resource_score": 65.0,
+      "primary_resource": "coal"
+    },
+    "13": {
+      "resources": {
+        "oil": 680
+      },
+      "resource_score": 680.0,
+      "primary_resource": "oil"
+    },
+    "14": {
+      "resources": {
+        "oil": 2450
+      },
+      "resource_score": 2450.0,
+      "primary_resource": "oil"
+    },
+    "15": {
+      "resources": {
+        "semiconductors": 220
+      },
+      "resource_score": 220.0,
+      "primary_resource": "semiconductors"
+    },
+    "16": {
+      "resources": {
+        "iron": 350,
+        "coal": 120
+      },
+      "resource_score": 470.0,
+      "primary_resource": "iron"
+    },
+    "17": {
+      "resources": {
+        "steel": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "steel"
+    },
+    "18": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "coal"
+    },
+    "19": {
+      "resources": {
+        "coal": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "coal"
+    },
+    "20": {
+      "resources": {
+        "iron": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "iron"
+    },
+    "21": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "22": {
+      "resources": {
+        "iron": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "iron"
+    },
+    "23": {
+      "resources": {
+        "oil": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "oil"
+    },
+    "24": {
+      "resources": {
+        "oil": 420
+      },
+      "resource_score": 420.0,
+      "primary_resource": "oil"
+    },
+    "25": {
+      "resources": {
+        "semiconductors": 65
+      },
+      "resource_score": 65.0,
+      "primary_resource": "semiconductors"
+    },
+    "26": {
+      "resources": {
+        "coal": 65,
+        "iron": 40
+      },
+      "resource_score": 105.0,
+      "primary_resource": "coal"
+    },
+    "27": {
+      "resources": {
+        "coal": 80,
+        "iron": 55,
+        "rare_earths": 12
+      },
+      "resource_score": 147.0,
+      "primary_resource": "coal"
+    },
+    "28": {
+      "resources": {
+        "oil": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "oil"
+    },
+    "29": {
+      "resources": {
+        "iron": 70
+      },
+      "resource_score": 70.0,
+      "primary_resource": "iron"
+    },
+    "30": {
+      "resources": {
+        "steel": 45,
+        "iron": 60
+      },
+      "resource_score": 105.0,
+      "primary_resource": "iron"
+    },
+    "31": {
+      "resources": {
+        "iron": 90
+      },
+      "resource_score": 90.0,
+      "primary_resource": "iron"
+    },
+    "32": {
+      "resources": {
+        "coal": 65
+      },
+      "resource_score": 65.0,
+      "primary_resource": "coal"
+    },
+    "33": {
+      "resources": {
+        "semiconductors": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "semiconductors"
+    },
+    "34": {
+      "resources": {
+        "semiconductors": 75
+      },
+      "resource_score": 75.0,
+      "primary_resource": "semiconductors"
+    },
+    "35": {
+      "resources": {
+        "rare_earths": 15
+      },
+      "resource_score": 15.0,
+      "primary_resource": "rare_earths"
+    },
+    "36": {
+      "resources": {
+        "oil": 95
+      },
+      "resource_score": 95.0,
+      "primary_resource": "oil"
+    },
+    "37": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "38": {
+      "resources": {
+        "steel": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "steel"
+    },
+    "39": {
+      "resources": {
+        "semiconductors": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "semiconductors"
+    },
+    "40": {
+      "resources": {
+        "coal": 12
+      },
+      "resource_score": 12.0,
+      "primary_resource": "coal"
+    },
+    "41": {
+      "resources": {
+        "steel": 65
+      },
+      "resource_score": 65.0,
+      "primary_resource": "steel"
+    },
+    "42": {
+      "resources": {
+        "steel": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "steel"
+    },
+    "43": {
+      "resources": {
+        "semiconductors": 95,
+        "rare_earths": 30
+      },
+      "resource_score": 125.0,
+      "primary_resource": "semiconductors"
+    },
+    "44": {
+      "resources": {
+        "rare_earths": 65
+      },
+      "resource_score": 65.0,
+      "primary_resource": "rare_earths"
+    },
+    "45": {
+      "resources": {
+        "coal": 40,
+        "semiconductors": 35
+      },
+      "resource_score": 75.0,
+      "primary_resource": "coal"
+    },
+    "46": {
+      "resources": {
+        "semiconductors": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "semiconductors"
+    },
+    "47": {
+      "resources": {
+        "oil": 180
+      },
+      "resource_score": 180.0,
+      "primary_resource": "oil"
+    },
+    "48": {
+      "resources": {
+        "steel": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "steel"
+    },
+    "49": {
+      "resources": {
+        "steel": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "steel"
+    },
+    "50": {
+      "resources": {
+        "coal": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "coal"
+    },
+    "51": {
+      "resources": {
+        "oil": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "oil"
+    },
+    "52": {
+      "resources": {
+        "coal": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "coal"
+    },
+    "53": {
+      "resources": {
+        "oil": 380
+      },
+      "resource_score": 380.0,
+      "primary_resource": "oil"
+    },
+    "54": {
+      "resources": {
+        "oil": 520
+      },
+      "resource_score": 520.0,
+      "primary_resource": "oil"
+    },
+    "55": {
+      "resources": {
+        "oil": 85
+      },
+      "resource_score": 85.0,
+      "primary_resource": "oil"
+    },
+    "56": {
+      "resources": {
+        "iron": 220
+      },
+      "resource_score": 220.0,
+      "primary_resource": "iron"
+    },
+    "57": {
+      "resources": {
+        "coal": 85
+      },
+      "resource_score": 85.0,
+      "primary_resource": "coal"
+    },
+    "58": {
+      "resources": {
+        "coal": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "coal"
+    },
+    "59": {
+      "resources": {
+        "coal": 55,
+        "rare_earths": 18
+      },
+      "resource_score": 73.0,
+      "primary_resource": "coal"
+    },
+    "60": {
+      "resources": {
+        "copper": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "copper"
+    },
+    "61": {
+      "resources": {
+        "rice": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "rice"
+    },
+    "62": {
+      "resources": {
+        "oil": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "oil"
+    },
+    "63": {
+      "resources": {
+        "iron": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "iron"
+    },
+    "64": {
+      "resources": {
+        "steel": 15
+      },
+      "resource_score": 15.0,
+      "primary_resource": "steel"
+    },
+    "65": {
+      "resources": {
+        "iron": 35,
+        "rare_earths": 12
+      },
+      "resource_score": 47.0,
+      "primary_resource": "iron"
+    },
+    "66": {
+      "resources": {
+        "oil": 120
+      },
+      "resource_score": 120.0,
+      "primary_resource": "oil"
+    },
+    "67": {
+      "resources": {
+        "coal": 80,
+        "iron": 55,
+        "rare_earths": 12
+      },
+      "resource_score": 147.0,
+      "primary_resource": "coal"
+    },
+    "68": {
+      "resources": {
+        "oil": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "oil"
+    },
+    "69": {
+      "resources": {
+        "iron": 70
+      },
+      "resource_score": 70.0,
+      "primary_resource": "iron"
+    },
+    "70": {
+      "resources": {
+        "steel": 45,
+        "iron": 60
+      },
+      "resource_score": 105.0,
+      "primary_resource": "iron"
+    },
+    "71": {
+      "resources": {
+        "copper": 80
+      },
+      "resource_score": 80.0,
+      "primary_resource": "copper"
+    },
+    "72": {
+      "resources": {
+        "oil": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "oil"
+    },
+    "73": {
+      "resources": {
+        "oil": 320
+      },
+      "resource_score": 320.0,
+      "primary_resource": "oil"
+    },
+    "74": {
+      "resources": {
+        "nickel": 15
+      },
+      "resource_score": 15.0,
+      "primary_resource": "nickel"
+    },
+    "75": {
+      "resources": {},
+      "resource_score": 0,
+      "primary_resource": "none"
+    },
+    "76": {
+      "resources": {
+        "iron": 180,
+        "rare_earths": 22
+      },
+      "resource_score": 202.0,
+      "primary_resource": "iron"
+    },
+    "77": {
+      "resources": {
+        "oil": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "oil"
+    },
+    "78": {
+      "resources": {
+        "coal": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "coal"
+    },
+    "79": {
+      "resources": {
+        "semiconductors": 35,
+        "oil": 25
+      },
+      "resource_score": 60.0,
+      "primary_resource": "semiconductors"
+    },
+    "80": {
+      "resources": {
+        "copper": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "copper"
+    },
+    "81": {
+      "resources": {
+        "rare_earths": 15
+      },
+      "resource_score": 15.0,
+      "primary_resource": "rare_earths"
+    },
+    "82": {
+      "resources": {
+        "semiconductors": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "semiconductors"
+    },
+    "83": {
+      "resources": {
+        "steel": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "steel"
+    },
+    "84": {
+      "resources": {
+        "oil": 380
+      },
+      "resource_score": 380.0,
+      "primary_resource": "oil"
+    },
+    "85": {
+      "resources": {
+        "steel": 35,
+        "oil": 25
+      },
+      "resource_score": 60.0,
+      "primary_resource": "steel"
+    },
+    "86": {
+      "resources": {
+        "oil": 85
+      },
+      "resource_score": 85.0,
+      "primary_resource": "oil"
+    },
+    "87": {
+      "resources": {
+        "coal": 60,
+        "iron": 40
+      },
+      "resource_score": 100.0,
+      "primary_resource": "coal"
+    },
+    "88": {
+      "resources": {
+        "steel": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "steel"
+    },
+    "89": {
+      "resources": {
+        "steel": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "steel"
+    },
+    "90": {
+      "resources": {
+        "copper": 90
+      },
+      "resource_score": 90.0,
+      "primary_resource": "copper"
+    },
+    "91": {
+      "resources": {
+        "steel": 40,
+        "semiconductors": 25
+      },
+      "resource_score": 65.0,
+      "primary_resource": "steel"
+    },
+    "92": {
+      "resources": {
+        "oil": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "oil"
+    },
+    "93": {
+      "resources": {
+        "oil": 280
+      },
+      "resource_score": 280.0,
+      "primary_resource": "oil"
+    },
+    "94": {
+      "resources": {
+        "nickel": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "nickel"
+    },
+    "95": {
+      "resources": {
+        "oil": 15
+      },
+      "resource_score": 15.0,
+      "primary_resource": "oil"
+    },
+    "96": {
+      "resources": {
+        "tourism": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "tourism"
+    },
+    "97": {
+      "resources": {
+        "oil": 60
+      },
+      "resource_score": 60.0,
+      "primary_resource": "oil"
+    },
+    "98": {
+      "resources": {
+        "geothermal": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "geothermal"
+    },
+    "99": {
+      "resources": {
+        "rare_earths": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "rare_earths"
+    },
+    "100": {
+      "resources": {
+        "oil": 680
+      },
+      "resource_score": 680.0,
+      "primary_resource": "oil"
+    },
+    "101": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "102": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "103": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "104": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "105": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "106": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "107": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "108": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "109": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "110": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "111": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "112": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "113": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "114": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "115": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "116": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "117": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "118": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "119": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "120": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "121": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "122": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "123": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "124": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "125": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "126": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "127": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "128": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "129": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "130": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "131": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "132": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "133": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "134": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "135": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "136": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "137": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "138": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "139": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "140": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "141": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "142": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "143": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "144": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "145": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "146": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "147": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "148": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "149": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "150": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "151": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "152": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "153": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "154": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "155": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "156": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "157": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "158": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "159": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "160": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "161": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "162": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "163": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "164": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "165": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "166": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "167": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "168": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "169": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "170": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "171": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "172": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "173": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "174": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "175": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "176": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "177": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "178": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "179": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "180": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "181": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "182": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "183": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "184": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "185": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "186": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "187": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "188": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "189": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "190": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "191": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "192": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "193": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "194": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "195": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "196": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "197": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "198": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "199": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "200": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "201": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "202": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "203": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "204": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "205": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "206": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "207": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "208": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "209": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "210": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "211": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "212": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "213": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "214": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "215": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "216": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "217": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "218": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "219": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "220": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "221": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "222": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "223": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "224": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "225": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "226": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "227": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "228": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "229": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "230": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "231": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "232": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "233": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "234": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "235": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "236": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "237": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "238": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "239": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "240": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "241": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "242": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "243": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "244": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "245": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "246": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "247": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "248": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "249": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "250": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "251": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "252": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "253": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "254": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "255": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "256": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "257": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "258": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "259": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "260": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "261": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "262": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "263": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "264": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "265": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "266": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "267": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "268": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "269": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "270": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "271": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "272": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "273": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "274": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "275": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "276": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "277": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "278": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "279": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "280": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "281": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "282": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "283": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "284": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "285": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "286": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "287": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "288": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "289": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "290": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "291": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "292": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "293": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "294": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "295": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "296": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "297": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "298": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "299": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "300": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "301": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "302": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "303": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "304": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "305": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "306": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "307": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "308": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "309": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "310": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "311": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "312": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "313": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "314": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "315": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "316": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "317": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "318": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "319": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "320": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "321": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "322": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "323": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "324": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "325": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "326": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "327": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "328": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "329": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "330": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "331": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "332": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "333": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "334": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "335": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "336": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "337": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "338": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "339": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "340": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "341": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "342": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "343": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "344": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "345": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "346": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "347": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "348": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "349": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "350": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "351": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "352": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "353": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "354": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "355": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "356": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "357": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "358": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "359": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "360": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "361": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "362": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "363": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "364": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "365": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "366": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "367": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "368": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "369": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "370": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "371": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "372": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "373": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "374": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "375": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "376": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "377": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "378": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "379": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "380": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "381": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "382": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "383": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "384": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "385": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "386": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "387": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "388": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "389": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "390": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "391": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "392": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "393": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "394": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "395": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "396": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "397": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "398": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "399": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "400": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "401": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "402": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "403": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "404": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "405": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "406": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "407": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "408": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "409": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "410": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "411": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "412": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "413": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "414": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "415": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "416": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "417": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "418": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "419": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "420": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "421": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "422": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "423": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "424": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "425": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "426": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "427": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "428": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "429": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "430": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "431": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "432": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "433": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "434": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "435": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "436": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "437": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "438": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "439": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "440": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "441": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "442": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "443": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "444": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "445": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "446": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "447": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "448": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "449": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "450": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "451": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "452": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "453": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "454": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "455": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "456": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "457": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "458": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "459": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "460": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "461": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "462": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "463": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "464": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "465": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "466": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "467": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "468": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "469": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "470": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "471": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "472": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "473": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "474": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "475": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "476": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "477": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "478": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "479": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "480": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "481": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "482": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "483": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "484": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "485": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "486": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "487": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "488": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "489": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "490": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "491": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "492": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "493": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "494": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "495": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "496": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "497": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "498": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "499": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "500": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "501": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "502": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "503": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "504": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "505": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "506": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "507": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "508": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "509": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "510": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "511": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "512": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "513": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "514": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "515": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "516": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "517": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "518": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "519": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "520": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "521": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "522": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "523": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "524": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "525": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "526": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "527": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "528": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "529": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "530": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "531": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "532": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "533": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "534": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "535": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "536": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "537": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "538": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "539": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "540": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "541": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "542": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "543": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "544": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "545": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "546": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "547": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "548": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "549": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "550": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "551": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "552": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "553": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "554": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "555": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "556": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "557": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "558": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "559": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "560": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "561": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "562": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "563": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "564": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "565": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "566": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "567": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "568": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "569": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "570": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "571": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "572": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "573": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "574": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "575": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "576": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "577": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "578": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "579": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "580": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "581": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "582": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "583": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "584": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "585": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "586": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "587": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "588": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "589": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "590": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "591": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "592": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "593": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "594": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "595": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "596": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "597": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "598": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "599": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "600": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "601": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "602": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "603": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "604": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "605": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "606": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "607": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "608": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "609": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "610": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "611": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "612": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "613": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "614": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "615": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "616": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "617": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "618": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "619": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "620": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "621": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "622": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "623": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "624": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "625": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "626": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "627": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "628": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "629": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "630": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "631": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "632": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "633": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "634": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "635": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "636": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "637": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "638": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "639": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "640": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "641": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "642": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "643": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "644": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "645": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "646": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "647": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "648": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "649": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "650": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "651": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "652": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "653": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "654": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "655": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "656": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "657": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "658": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "659": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "660": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "661": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "662": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "663": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "664": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "665": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "666": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "667": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "668": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "669": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "670": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "671": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "672": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "673": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "674": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "675": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "676": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "677": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "678": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "679": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "680": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "681": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "682": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "683": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "684": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "685": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "686": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "687": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "688": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "689": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "690": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "691": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "692": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "693": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "694": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "695": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "696": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "697": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "698": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "699": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "700": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "701": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "702": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "703": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "704": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "705": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "706": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "707": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "708": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "709": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "710": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "711": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "712": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "713": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "714": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "715": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "716": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "717": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "718": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "719": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "720": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "721": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "722": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "723": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "724": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "725": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "726": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "727": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "728": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "729": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "730": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "731": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "732": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "733": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "734": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "735": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "736": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "737": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "738": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "739": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "740": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "741": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "742": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "743": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "744": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "745": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "746": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "747": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "748": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "749": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "750": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "751": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "752": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "753": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "754": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "755": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "756": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "757": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "758": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "759": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "760": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "761": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "762": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "763": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "764": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "765": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "766": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "767": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "768": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "769": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "770": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "771": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "772": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "773": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "774": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "775": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "776": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "777": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "778": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "779": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "780": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "781": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "782": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "783": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "784": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "785": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "786": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "787": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "788": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "789": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "790": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "791": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "792": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "793": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "794": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "795": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "796": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "797": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "798": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "799": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "800": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "801": {
+      "resources": {
+        "food": 21
+      },
+      "resource_score": 21.0,
+      "primary_resource": "food"
+    },
+    "802": {
+      "resources": {
+        "food": 22
+      },
+      "resource_score": 22.0,
+      "primary_resource": "food"
+    },
+    "803": {
+      "resources": {
+        "food": 23
+      },
+      "resource_score": 23.0,
+      "primary_resource": "food"
+    },
+    "804": {
+      "resources": {
+        "food": 24
+      },
+      "resource_score": 24.0,
+      "primary_resource": "food"
+    },
+    "805": {
+      "resources": {
+        "food": 25
+      },
+      "resource_score": 25.0,
+      "primary_resource": "food"
+    },
+    "806": {
+      "resources": {
+        "food": 26
+      },
+      "resource_score": 26.0,
+      "primary_resource": "food"
+    },
+    "807": {
+      "resources": {
+        "food": 27
+      },
+      "resource_score": 27.0,
+      "primary_resource": "food"
+    },
+    "808": {
+      "resources": {
+        "food": 28
+      },
+      "resource_score": 28.0,
+      "primary_resource": "food"
+    },
+    "809": {
+      "resources": {
+        "food": 29
+      },
+      "resource_score": 29.0,
+      "primary_resource": "food"
+    },
+    "810": {
+      "resources": {
+        "food": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "food"
+    },
+    "811": {
+      "resources": {
+        "food": 31
+      },
+      "resource_score": 31.0,
+      "primary_resource": "food"
+    },
+    "812": {
+      "resources": {
+        "food": 32
+      },
+      "resource_score": 32.0,
+      "primary_resource": "food"
+    },
+    "813": {
+      "resources": {
+        "food": 33
+      },
+      "resource_score": 33.0,
+      "primary_resource": "food"
+    },
+    "814": {
+      "resources": {
+        "food": 34
+      },
+      "resource_score": 34.0,
+      "primary_resource": "food"
+    },
+    "815": {
+      "resources": {
+        "food": 35
+      },
+      "resource_score": 35.0,
+      "primary_resource": "food"
+    },
+    "816": {
+      "resources": {
+        "food": 36
+      },
+      "resource_score": 36.0,
+      "primary_resource": "food"
+    },
+    "817": {
+      "resources": {
+        "food": 37
+      },
+      "resource_score": 37.0,
+      "primary_resource": "food"
+    },
+    "818": {
+      "resources": {
+        "food": 38
+      },
+      "resource_score": 38.0,
+      "primary_resource": "food"
+    },
+    "819": {
+      "resources": {
+        "food": 39
+      },
+      "resource_score": 39.0,
+      "primary_resource": "food"
+    },
+    "820": {
+      "resources": {
+        "food": 40
+      },
+      "resource_score": 40.0,
+      "primary_resource": "food"
+    },
+    "821": {
+      "resources": {
+        "food": 41
+      },
+      "resource_score": 41.0,
+      "primary_resource": "food"
+    },
+    "822": {
+      "resources": {
+        "food": 42
+      },
+      "resource_score": 42.0,
+      "primary_resource": "food"
+    },
+    "823": {
+      "resources": {
+        "food": 43
+      },
+      "resource_score": 43.0,
+      "primary_resource": "food"
+    },
+    "824": {
+      "resources": {
+        "food": 44
+      },
+      "resource_score": 44.0,
+      "primary_resource": "food"
+    },
+    "825": {
+      "resources": {
+        "food": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "food"
+    },
+    "826": {
+      "resources": {
+        "food": 46
+      },
+      "resource_score": 46.0,
+      "primary_resource": "food"
+    },
+    "827": {
+      "resources": {
+        "food": 47
+      },
+      "resource_score": 47.0,
+      "primary_resource": "food"
+    },
+    "828": {
+      "resources": {
+        "food": 48
+      },
+      "resource_score": 48.0,
+      "primary_resource": "food"
+    },
+    "829": {
+      "resources": {
+        "food": 49
+      },
+      "resource_score": 49.0,
+      "primary_resource": "food"
+    },
+    "830": {
+      "resources": {
+        "food": 50
+      },
+      "resource_score": 50.0,
+      "primary_resource": "food"
+    },
+    "831": {
+      "resources": {
+        "food": 51
+      },
+      "resource_score": 51.0,
+      "primary_resource": "food"
+    },
+    "832": {
+      "resources": {
+        "food": 52
+      },
+      "resource_score": 52.0,
+      "primary_resource": "food"
+    },
+    "833": {
+      "resources": {
+        "food": 53
+      },
+      "resource_score": 53.0,
+      "primary_resource": "food"
+    },
+    "834": {
+      "resources": {
+        "food": 54
+      },
+      "resource_score": 54.0,
+      "primary_resource": "food"
+    },
+    "835": {
+      "resources": {
+        "food": 55
+      },
+      "resource_score": 55.0,
+      "primary_resource": "food"
+    },
+    "836": {
+      "resources": {
+        "food": 56
+      },
+      "resource_score": 56.0,
+      "primary_resource": "food"
+    },
+    "837": {
+      "resources": {
+        "food": 57
+      },
+      "resource_score": 57.0,
+      "primary_resource": "food"
+    },
+    "838": {
+      "resources": {
+        "food": 58
+      },
+      "resource_score": 58.0,
+      "primary_resource": "food"
+    },
+    "839": {
+      "resources": {
+        "food": 59
+      },
+      "resource_score": 59.0,
+      "primary_resource": "food"
+    },
+    "840": {
+      "resources": {
+        "food": 20
+      },
+      "resource_score": 20.0,
+      "primary_resource": "food"
+    },
+    "9000": {
+      "resources": {
+        "oil": 176
+      },
+      "resource_score": 176,
+      "primary_resource": "oil"
+    },
+    "9001": {
+      "resources": {
+        "oil": 176
+      },
+      "resource_score": 176,
+      "primary_resource": "oil"
+    },
+    "9002": {
+      "resources": {
+        "oil": 176
+      },
+      "resource_score": 176,
+      "primary_resource": "oil"
+    },
+    "9003": {
+      "resources": {
+        "oil": 176
+      },
+      "resource_score": 176,
+      "primary_resource": "oil"
+    },
+    "9004": {
+      "resources": {
+        "oil": 176
+      },
+      "resource_score": 176,
+      "primary_resource": "oil"
+    },
+    "9005": {
+      "resources": {
+        "oil": 176
+      },
+      "resource_score": 176,
+      "primary_resource": "oil"
+    },
+    "9006": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9007": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9008": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9009": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9010": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9011": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9012": {
+      "resources": {
+        "semiconductors": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
+    },
+    "9013": {
+      "resources": {
+        "semiconductors": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
+    },
+    "9014": {
+      "resources": {
+        "semiconductors": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
+    },
+    "9015": {
+      "resources": {
+        "semiconductors": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
+    },
+    "9016": {
+      "resources": {
+        "semiconductors": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
+    },
+    "9017": {
+      "resources": {
+        "semiconductors": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
+    },
+    "9018": {
+      "resources": {
+        "coal": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "coal"
+    },
+    "9019": {
+      "resources": {
+        "coal": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "coal"
+    },
+    "9020": {
+      "resources": {
+        "coal": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "coal"
+    },
+    "9021": {
+      "resources": {
+        "coal": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "coal"
+    },
+    "9022": {
+      "resources": {
+        "coal": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "coal"
+    },
+    "9023": {
+      "resources": {
+        "coal": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "coal"
+    },
+    "9024": {
+      "resources": {
+        "nickel": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "nickel"
+    },
+    "9025": {
+      "resources": {
+        "nickel": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "nickel"
+    },
+    "9026": {
+      "resources": {
+        "nickel": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "nickel"
+    },
+    "9027": {
+      "resources": {
+        "nickel": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "nickel"
+    },
+    "9028": {
+      "resources": {
+        "nickel": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "nickel"
+    },
+    "9029": {
+      "resources": {
+        "nickel": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "nickel"
+    },
+    "9030": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9031": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9032": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9033": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9034": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9035": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9036": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9037": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9038": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9039": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9040": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9041": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9042": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9043": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9044": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9045": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9046": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9047": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9048": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9049": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9050": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9051": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9052": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9053": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9054": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9055": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9056": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9057": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9058": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9059": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9060": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9061": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9062": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9063": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9064": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9065": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9066": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9067": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9068": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9069": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9070": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9071": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9072": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9073": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9074": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9075": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9076": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9077": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9078": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9079": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9080": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9081": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9082": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9083": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9084": {
+      "resources": {
+        "copper": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "copper"
+    },
+    "9085": {
+      "resources": {
+        "copper": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "copper"
+    },
+    "9086": {
+      "resources": {
+        "copper": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "copper"
+    },
+    "9087": {
+      "resources": {
+        "copper": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "copper"
+    },
+    "9088": {
+      "resources": {
+        "copper": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "copper"
+    },
+    "9089": {
+      "resources": {
+        "copper": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "copper"
+    },
+    "9090": {
+      "resources": {
+        "coal": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "coal"
+    },
+    "9091": {
+      "resources": {
+        "coal": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "coal"
+    },
+    "9092": {
+      "resources": {
+        "coal": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "coal"
+    },
+    "9093": {
+      "resources": {
+        "coal": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "coal"
+    },
+    "9094": {
+      "resources": {
+        "coal": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "coal"
+    },
+    "9095": {
+      "resources": {
+        "coal": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "coal"
+    },
+    "9096": {
+      "resources": {
+        "copper": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "copper"
+    },
+    "9097": {
+      "resources": {
+        "copper": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "copper"
+    },
+    "9098": {
+      "resources": {
+        "copper": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "copper"
+    },
+    "9099": {
+      "resources": {
+        "copper": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "copper"
+    },
+    "9100": {
+      "resources": {
+        "copper": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "copper"
+    },
+    "9101": {
+      "resources": {
+        "copper": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "copper"
+    },
+    "9102": {
+      "resources": {
+        "tourism": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "tourism"
+    },
+    "9103": {
+      "resources": {
+        "tourism": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "tourism"
+    },
+    "9104": {
+      "resources": {
+        "tourism": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "tourism"
+    },
+    "9105": {
+      "resources": {
+        "tourism": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "tourism"
+    },
+    "9106": {
+      "resources": {
+        "tourism": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "tourism"
+    },
+    "9107": {
+      "resources": {
+        "tourism": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "tourism"
+    },
+    "9108": {
+      "resources": {
+        "geothermal": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "geothermal"
+    },
+    "9109": {
+      "resources": {
+        "geothermal": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "geothermal"
+    },
+    "9110": {
+      "resources": {
+        "geothermal": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "geothermal"
+    },
+    "9111": {
+      "resources": {
+        "geothermal": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "geothermal"
+    },
+    "9112": {
+      "resources": {
+        "geothermal": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "geothermal"
+    },
+    "9113": {
+      "resources": {
+        "geothermal": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "geothermal"
+    },
+    "9114": {
+      "resources": {
+        "nickel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "nickel"
+    },
+    "9115": {
+      "resources": {
+        "nickel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "nickel"
+    },
+    "9116": {
+      "resources": {
+        "nickel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "nickel"
+    },
+    "9117": {
+      "resources": {
+        "nickel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "nickel"
+    },
+    "9118": {
+      "resources": {
+        "nickel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "nickel"
+    },
+    "9119": {
+      "resources": {
+        "nickel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "nickel"
+    },
+    "9120": {
+      "resources": {
+        "oil": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "oil"
+    },
+    "9121": {
+      "resources": {
+        "oil": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "oil"
+    },
+    "9122": {
+      "resources": {
+        "oil": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "oil"
+    },
+    "9123": {
+      "resources": {
+        "oil": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "oil"
+    },
+    "9124": {
+      "resources": {
+        "oil": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "oil"
+    },
+    "9125": {
+      "resources": {
+        "oil": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "oil"
+    },
+    "9132": {
+      "resources": {
+        "semiconductors": 77,
+        "rare_earths": 24
+      },
+      "resource_score": 101,
+      "primary_resource": "semiconductors"
+    },
+    "9133": {
+      "resources": {
+        "semiconductors": 77,
+        "rare_earths": 24
+      },
+      "resource_score": 101,
+      "primary_resource": "semiconductors"
+    },
+    "9134": {
+      "resources": {
+        "semiconductors": 77,
+        "rare_earths": 24
+      },
+      "resource_score": 101,
+      "primary_resource": "semiconductors"
+    },
+    "9135": {
+      "resources": {
+        "semiconductors": 77,
+        "rare_earths": 24
+      },
+      "resource_score": 101,
+      "primary_resource": "semiconductors"
+    },
+    "9136": {
+      "resources": {
+        "semiconductors": 77,
+        "rare_earths": 24
+      },
+      "resource_score": 101,
+      "primary_resource": "semiconductors"
+    },
+    "9137": {
+      "resources": {
+        "semiconductors": 77,
+        "rare_earths": 24
+      },
+      "resource_score": 101,
+      "primary_resource": "semiconductors"
+    },
+    "9138": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9139": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9140": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9141": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9142": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9143": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9144": {
+      "resources": {
+        "oil": 1347
+      },
+      "resource_score": 1347,
+      "primary_resource": "oil"
+    },
+    "9145": {
+      "resources": {
+        "oil": 1347
+      },
+      "resource_score": 1347,
+      "primary_resource": "oil"
+    },
+    "9146": {
+      "resources": {
+        "oil": 1347
+      },
+      "resource_score": 1347,
+      "primary_resource": "oil"
+    },
+    "9147": {
+      "resources": {
+        "oil": 1347
+      },
+      "resource_score": 1347,
+      "primary_resource": "oil"
+    },
+    "9148": {
+      "resources": {
+        "oil": 1347
+      },
+      "resource_score": 1347,
+      "primary_resource": "oil"
+    },
+    "9149": {
+      "resources": {
+        "oil": 1347
+      },
+      "resource_score": 1347,
+      "primary_resource": "oil"
+    },
+    "9150": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9151": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9152": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9153": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9154": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9155": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9156": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9157": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9158": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9159": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9160": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9161": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9162": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9163": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9164": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9165": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9166": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9167": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9168": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9169": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9170": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9171": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9172": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9173": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9174": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9175": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9176": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9177": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9178": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9179": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9180": {
+      "resources": {
+        "coal": 35,
+        "iron": 22
+      },
+      "resource_score": 57,
+      "primary_resource": "coal"
+    },
+    "9181": {
+      "resources": {
+        "coal": 35,
+        "iron": 22
+      },
+      "resource_score": 57,
+      "primary_resource": "coal"
+    },
+    "9182": {
+      "resources": {
+        "coal": 35,
+        "iron": 22
+      },
+      "resource_score": 57,
+      "primary_resource": "coal"
+    },
+    "9183": {
+      "resources": {
+        "coal": 35,
+        "iron": 22
+      },
+      "resource_score": 57,
+      "primary_resource": "coal"
+    },
+    "9184": {
+      "resources": {
+        "coal": 35,
+        "iron": 22
+      },
+      "resource_score": 57,
+      "primary_resource": "coal"
+    },
+    "9185": {
+      "resources": {
+        "coal": 35,
+        "iron": 22
+      },
+      "resource_score": 57,
+      "primary_resource": "coal"
+    },
+    "9186": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9187": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9188": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9189": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9190": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9191": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9192": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9193": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9194": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9195": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9196": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9197": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9198": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9199": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9200": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9201": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9202": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9203": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9204": {
+      "resources": {
+        "oil": 52
+      },
+      "resource_score": 52,
+      "primary_resource": "oil"
+    },
+    "9205": {
+      "resources": {
+        "oil": 52
+      },
+      "resource_score": 52,
+      "primary_resource": "oil"
+    },
+    "9206": {
+      "resources": {
+        "oil": 52
+      },
+      "resource_score": 52,
+      "primary_resource": "oil"
+    },
+    "9207": {
+      "resources": {
+        "oil": 52
+      },
+      "resource_score": 52,
+      "primary_resource": "oil"
+    },
+    "9208": {
+      "resources": {
+        "oil": 52
+      },
+      "resource_score": 52,
+      "primary_resource": "oil"
+    },
+    "9209": {
+      "resources": {
+        "oil": 52
+      },
+      "resource_score": 52,
+      "primary_resource": "oil"
+    },
+    "9210": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9211": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9212": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9213": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9214": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9215": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9216": {
+      "resources": {
+        "coal": 6
+      },
+      "resource_score": 6,
+      "primary_resource": "coal"
+    },
+    "9217": {
+      "resources": {
+        "coal": 6
+      },
+      "resource_score": 6,
+      "primary_resource": "coal"
+    },
+    "9218": {
+      "resources": {
+        "coal": 6
+      },
+      "resource_score": 6,
+      "primary_resource": "coal"
+    },
+    "9219": {
+      "resources": {
+        "coal": 6
+      },
+      "resource_score": 6,
+      "primary_resource": "coal"
+    },
+    "9220": {
+      "resources": {
+        "coal": 6
+      },
+      "resource_score": 6,
+      "primary_resource": "coal"
+    },
+    "9221": {
+      "resources": {
+        "coal": 6
+      },
+      "resource_score": 6,
+      "primary_resource": "coal"
+    },
+    "9222": {
+      "resources": {
+        "steel": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9223": {
+      "resources": {
+        "steel": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9224": {
+      "resources": {
+        "steel": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9225": {
+      "resources": {
+        "steel": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9226": {
+      "resources": {
+        "steel": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9227": {
+      "resources": {
+        "steel": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9228": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9229": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9230": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9231": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9232": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9233": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9234": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9235": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9236": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9237": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9238": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9239": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9240": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9241": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9242": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9243": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9244": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9245": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9246": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9247": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9248": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9249": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9250": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9251": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9252": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9253": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9254": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9255": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9256": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9257": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9258": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9259": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9260": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9261": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9262": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9263": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9264": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9265": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9266": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9267": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9268": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9269": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9270": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9271": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9272": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9273": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9274": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9275": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9276": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9277": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9278": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9279": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9280": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9281": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9282": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9283": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9284": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9285": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9286": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9287": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9288": {
+      "resources": {
+        "rare_earths": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "rare_earths"
+    },
+    "9289": {
+      "resources": {
+        "rare_earths": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "rare_earths"
+    },
+    "9290": {
+      "resources": {
+        "rare_earths": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "rare_earths"
+    },
+    "9291": {
+      "resources": {
+        "rare_earths": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "rare_earths"
+    },
+    "9292": {
+      "resources": {
+        "rare_earths": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "rare_earths"
+    },
+    "9293": {
+      "resources": {
+        "coal": 22,
+        "semiconductors": 19
+      },
+      "resource_score": 41,
+      "primary_resource": "coal"
+    },
+    "9294": {
+      "resources": {
+        "coal": 22,
+        "semiconductors": 19
+      },
+      "resource_score": 41,
+      "primary_resource": "coal"
+    },
+    "9295": {
+      "resources": {
+        "coal": 22,
+        "semiconductors": 19
+      },
+      "resource_score": 41,
+      "primary_resource": "coal"
+    },
+    "9296": {
+      "resources": {
+        "coal": 22,
+        "semiconductors": 19
+      },
+      "resource_score": 41,
+      "primary_resource": "coal"
+    },
+    "9297": {
+      "resources": {
+        "coal": 22,
+        "semiconductors": 19
+      },
+      "resource_score": 41,
+      "primary_resource": "coal"
+    },
+    "9298": {
+      "resources": {
+        "steel": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "steel"
+    },
+    "9299": {
+      "resources": {
+        "steel": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "steel"
+    },
+    "9300": {
+      "resources": {
+        "steel": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "steel"
+    },
+    "9301": {
+      "resources": {
+        "steel": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "steel"
+    },
+    "9302": {
+      "resources": {
+        "steel": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "steel"
+    },
+    "9303": {
+      "resources": {
+        "coal": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "coal"
+    },
+    "9304": {
+      "resources": {
+        "coal": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "coal"
+    },
+    "9305": {
+      "resources": {
+        "coal": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "coal"
+    },
+    "9306": {
+      "resources": {
+        "coal": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "coal"
+    },
+    "9307": {
+      "resources": {
+        "coal": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "coal"
+    },
+    "9308": {
+      "resources": {
+        "coal": 15
+      },
+      "resource_score": 15,
+      "primary_resource": "coal"
+    },
+    "9309": {
+      "resources": {
+        "coal": 15
+      },
+      "resource_score": 15,
+      "primary_resource": "coal"
+    },
+    "9310": {
+      "resources": {
+        "coal": 15
+      },
+      "resource_score": 15,
+      "primary_resource": "coal"
+    },
+    "9311": {
+      "resources": {
+        "coal": 15
+      },
+      "resource_score": 15,
+      "primary_resource": "coal"
+    },
+    "9312": {
+      "resources": {
+        "coal": 15
+      },
+      "resource_score": 15,
+      "primary_resource": "coal"
+    },
+    "9313": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9314": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9315": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9316": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9317": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9318": {
+      "resources": {
+        "oil": 286
+      },
+      "resource_score": 286,
+      "primary_resource": "oil"
+    },
+    "9319": {
+      "resources": {
+        "oil": 286
+      },
+      "resource_score": 286,
+      "primary_resource": "oil"
+    },
+    "9320": {
+      "resources": {
+        "oil": 286
+      },
+      "resource_score": 286,
+      "primary_resource": "oil"
+    },
+    "9321": {
+      "resources": {
+        "oil": 286
+      },
+      "resource_score": 286,
+      "primary_resource": "oil"
+    },
+    "9322": {
+      "resources": {
+        "oil": 286
+      },
+      "resource_score": 286,
+      "primary_resource": "oil"
+    },
+    "9323": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9324": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9325": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9326": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9327": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9328": {
+      "resources": {
+        "iron": 121
+      },
+      "resource_score": 121,
+      "primary_resource": "iron"
+    },
+    "9329": {
+      "resources": {
+        "iron": 121
+      },
+      "resource_score": 121,
+      "primary_resource": "iron"
+    },
+    "9330": {
+      "resources": {
+        "iron": 121
+      },
+      "resource_score": 121,
+      "primary_resource": "iron"
+    },
+    "9331": {
+      "resources": {
+        "iron": 121
+      },
+      "resource_score": 121,
+      "primary_resource": "iron"
+    },
+    "9332": {
+      "resources": {
+        "iron": 121
+      },
+      "resource_score": 121,
+      "primary_resource": "iron"
+    },
+    "9333": {
+      "resources": {
+        "coal": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "coal"
+    },
+    "9334": {
+      "resources": {
+        "coal": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "coal"
+    },
+    "9335": {
+      "resources": {
+        "coal": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "coal"
+    },
+    "9336": {
+      "resources": {
+        "coal": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "coal"
+    },
+    "9337": {
+      "resources": {
+        "coal": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "coal"
+    },
+    "9338": {
+      "resources": {
+        "coal": 30,
+        "rare_earths": 9
+      },
+      "resource_score": 39,
+      "primary_resource": "coal"
+    },
+    "9339": {
+      "resources": {
+        "coal": 30,
+        "rare_earths": 9
+      },
+      "resource_score": 39,
+      "primary_resource": "coal"
+    },
+    "9340": {
+      "resources": {
+        "coal": 30,
+        "rare_earths": 9
+      },
+      "resource_score": 39,
+      "primary_resource": "coal"
+    },
+    "9341": {
+      "resources": {
+        "coal": 30,
+        "rare_earths": 9
+      },
+      "resource_score": 39,
+      "primary_resource": "coal"
+    },
+    "9342": {
+      "resources": {
+        "coal": 30,
+        "rare_earths": 9
+      },
+      "resource_score": 39,
+      "primary_resource": "coal"
+    },
+    "9343": {
+      "resources": {
+        "oil": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "oil"
+    },
+    "9344": {
+      "resources": {
+        "oil": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "oil"
+    },
+    "9345": {
+      "resources": {
+        "oil": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "oil"
+    },
+    "9346": {
+      "resources": {
+        "oil": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "oil"
+    },
+    "9347": {
+      "resources": {
+        "oil": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "oil"
+    },
+    "9348": {
+      "resources": {
+        "iron": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "iron"
+    },
+    "9349": {
+      "resources": {
+        "iron": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "iron"
+    },
+    "9350": {
+      "resources": {
+        "iron": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "iron"
+    },
+    "9351": {
+      "resources": {
+        "iron": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "iron"
+    },
+    "9352": {
+      "resources": {
+        "iron": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "iron"
+    },
+    "9353": {
+      "resources": {
+        "steel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "steel"
+    },
+    "9354": {
+      "resources": {
+        "steel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "steel"
+    },
+    "9355": {
+      "resources": {
+        "steel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "steel"
+    },
+    "9356": {
+      "resources": {
+        "steel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "steel"
+    },
+    "9357": {
+      "resources": {
+        "steel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "steel"
+    },
+    "9358": {
+      "resources": {
+        "coal": 44,
+        "iron": 30,
+        "rare_earths": 6
+      },
+      "resource_score": 80,
+      "primary_resource": "coal"
+    },
+    "9359": {
+      "resources": {
+        "coal": 44,
+        "iron": 30,
+        "rare_earths": 6
+      },
+      "resource_score": 80,
+      "primary_resource": "coal"
+    },
+    "9360": {
+      "resources": {
+        "coal": 44,
+        "iron": 30,
+        "rare_earths": 6
+      },
+      "resource_score": 80,
+      "primary_resource": "coal"
+    },
+    "9361": {
+      "resources": {
+        "coal": 44,
+        "iron": 30,
+        "rare_earths": 6
+      },
+      "resource_score": 80,
+      "primary_resource": "coal"
+    },
+    "9362": {
+      "resources": {
+        "coal": 44,
+        "iron": 30,
+        "rare_earths": 6
+      },
+      "resource_score": 80,
+      "primary_resource": "coal"
+    },
+    "9363": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9364": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9365": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9366": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9367": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9368": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9369": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9370": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9371": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9372": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9373": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9374": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9375": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9376": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9377": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9378": {
+      "resources": {
+        "iron": 99,
+        "rare_earths": 12
+      },
+      "resource_score": 111,
+      "primary_resource": "iron"
+    },
+    "9379": {
+      "resources": {
+        "iron": 99,
+        "rare_earths": 12
+      },
+      "resource_score": 111,
+      "primary_resource": "iron"
+    },
+    "9380": {
+      "resources": {
+        "iron": 99,
+        "rare_earths": 12
+      },
+      "resource_score": 111,
+      "primary_resource": "iron"
+    },
+    "9381": {
+      "resources": {
+        "iron": 99,
+        "rare_earths": 12
+      },
+      "resource_score": 111,
+      "primary_resource": "iron"
+    },
+    "9382": {
+      "resources": {
+        "iron": 99,
+        "rare_earths": 12
+      },
+      "resource_score": 111,
+      "primary_resource": "iron"
+    },
+    "9383": {
+      "resources": {
+        "semiconductors": 19,
+        "oil": 13
+      },
+      "resource_score": 32,
+      "primary_resource": "semiconductors"
+    },
+    "9384": {
+      "resources": {
+        "semiconductors": 19,
+        "oil": 13
+      },
+      "resource_score": 32,
+      "primary_resource": "semiconductors"
+    },
+    "9385": {
+      "resources": {
+        "semiconductors": 19,
+        "oil": 13
+      },
+      "resource_score": 32,
+      "primary_resource": "semiconductors"
+    },
+    "9386": {
+      "resources": {
+        "semiconductors": 19,
+        "oil": 13
+      },
+      "resource_score": 32,
+      "primary_resource": "semiconductors"
+    },
+    "9387": {
+      "resources": {
+        "semiconductors": 19,
+        "oil": 13
+      },
+      "resource_score": 32,
+      "primary_resource": "semiconductors"
+    },
+    "9388": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9389": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9390": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9391": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9392": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9393": {
+      "resources": {
+        "steel": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "steel"
+    },
+    "9394": {
+      "resources": {
+        "steel": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "steel"
+    },
+    "9395": {
+      "resources": {
+        "steel": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "steel"
+    },
+    "9396": {
+      "resources": {
+        "steel": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "steel"
+    },
+    "9397": {
+      "resources": {
+        "steel": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "steel"
+    },
+    "9398": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9399": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9400": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9401": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9402": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9403": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9404": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9405": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9406": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9407": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9408": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9409": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9410": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9411": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9412": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9413": {
+      "resources": {
+        "copper": 49
+      },
+      "resource_score": 49,
+      "primary_resource": "copper"
+    },
+    "9414": {
+      "resources": {
+        "copper": 49
+      },
+      "resource_score": 49,
+      "primary_resource": "copper"
+    },
+    "9415": {
+      "resources": {
+        "copper": 49
+      },
+      "resource_score": 49,
+      "primary_resource": "copper"
+    },
+    "9416": {
+      "resources": {
+        "copper": 49
+      },
+      "resource_score": 49,
+      "primary_resource": "copper"
+    },
+    "9417": {
+      "resources": {
+        "copper": 49
+      },
+      "resource_score": 49,
+      "primary_resource": "copper"
+    },
+    "9418": {
+      "resources": {
+        "steel": 22,
+        "semiconductors": 13
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9419": {
+      "resources": {
+        "steel": 22,
+        "semiconductors": 13
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9420": {
+      "resources": {
+        "steel": 22,
+        "semiconductors": 13
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9421": {
+      "resources": {
+        "steel": 22,
+        "semiconductors": 13
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9422": {
+      "resources": {
+        "steel": 22,
+        "semiconductors": 13
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9423": {
+      "resources": {
+        "oil": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "oil"
+    },
+    "9424": {
+      "resources": {
+        "oil": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "oil"
+    },
+    "9425": {
+      "resources": {
+        "oil": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "oil"
+    },
+    "9426": {
+      "resources": {
+        "oil": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "oil"
+    },
+    "9427": {
+      "resources": {
+        "oil": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "oil"
+    },
+    "9428": {
+      "resources": {
+        "rare_earths": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "rare_earths"
+    },
+    "9429": {
+      "resources": {
+        "rare_earths": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "rare_earths"
+    },
+    "9430": {
+      "resources": {
+        "rare_earths": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "rare_earths"
+    },
+    "9431": {
+      "resources": {
+        "rare_earths": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "rare_earths"
+    },
+    "9432": {
+      "resources": {
+        "rare_earths": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "rare_earths"
+    },
+    "9433": {
+      "resources": {
+        "oil": 374
+      },
+      "resource_score": 374,
+      "primary_resource": "oil"
+    },
+    "9434": {
+      "resources": {
+        "oil": 374
+      },
+      "resource_score": 374,
+      "primary_resource": "oil"
+    },
+    "9435": {
+      "resources": {
+        "oil": 374
+      },
+      "resource_score": 374,
+      "primary_resource": "oil"
+    },
+    "9436": {
+      "resources": {
+        "oil": 374
+      },
+      "resource_score": 374,
+      "primary_resource": "oil"
+    },
+    "9437": {
+      "resources": {
+        "oil": 374
+      },
+      "resource_score": 374,
+      "primary_resource": "oil"
+    }
+  }
+}

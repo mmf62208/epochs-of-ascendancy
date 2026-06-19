@@ -11,6 +11,7 @@ const TRAINING_PATH_BONUS_COLOR := Color(0.4, 0.85, 0.95)
 @onready var age_assignment_label: Label = (
 	$MarginContainer/VBoxContainer/Header/InfoVBox/AgeAssignmentLabel
 )
+@onready var portrait_rect: TextureRect = $MarginContainer/VBoxContainer/Header/Portrait
 @onready var skills_label: Label = $MarginContainer/VBoxContainer/Header/InfoVBox/SkillsLabel
 @onready var xp_label: Label = $MarginContainer/VBoxContainer/Header/InfoVBox/XPLabel
 @onready var training_path_label: Label = $MarginContainer/VBoxContainer/Header/InfoVBox/TrainingPathLabel
@@ -298,6 +299,15 @@ func _update_header() -> void:
 	name_label.add_theme_font_size_override("font_size", 20)
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	age_assignment_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+
+	if portrait_rect:
+		if current_leader.portrait_path != "" and ResourceLoader.exists(current_leader.portrait_path):
+			var tex := load(current_leader.portrait_path) as Texture2D
+			if tex:
+				portrait_rect.texture = tex
+				portrait_rect.visible = true
+		else:
+			portrait_rect.visible = false  # hide if no portrait
 
 	var age := 0
 	if typeof(LeaderManager) != TYPE_NIL:

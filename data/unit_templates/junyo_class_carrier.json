@@ -1,10 +1,10 @@
 {
   "id": "junyo_class_carrier",
-  "name": "Jun'yō-class",
+  "name": "Jun'y\u014d-class",
   "design_family": "japanese_naval_ww2",
   "base_type": "Naval",
   "size_category": "Medium",
-  "visual_archetype": "carrier",
+  "visual_archetype": "destroyer",
   "crew_required": 1200,
   "base_training_level": 34,
   "max_experience_level": 100,

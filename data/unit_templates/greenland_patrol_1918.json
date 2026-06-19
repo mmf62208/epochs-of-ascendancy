@@ -4,7 +4,7 @@
   "design_family": "greenland_naval_1918",
   "base_type": "Naval",
   "size_category": "Light",
-  "visual_archetype": "patrol",
+  "visual_archetype": "patrol_boat",
   "crew_required": 15,
   "base_training_level": 28,
   "max_experience_level": 100,

@@ -4,7 +4,7 @@
   "design_family": "french_naval_helo_modern",
   "base_type": "Air",
   "size_category": "Medium",
-  "visual_archetype": "helicopter",
+  "visual_archetype": "prop_fighter",
   "crew_required": 3,
   "base_training_level": 32,
   "max_experience_level": 100,

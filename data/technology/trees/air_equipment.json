@@ -11,7 +11,9 @@
     "era_min": 1914,
     "era_max": 1930,
     "epoch": "pre_war",
-    "prerequisites": ["basic_machine_tools"],
+    "prerequisites": [
+      "military_aviation_industry_1911"
+    ],
     "research": {
       "base_cost_days": 65,
       "category": "air",
@@ -19,11 +21,61 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "unit_design", "template_ids": ["usa_fighter_1918"] }
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "usa_fighter_1918",
+          "ger_fighter_1918",
+          "fra_fighter_1918"
+        ]
+      }
     ],
     "ui": {
-      "short_effect": "SPAD / Curtiss pursuit designs",
-      "flavor": "Fabric-covered wings and rotary engines dominate the skies over the Western Front."
+      "short_effect": "SPAD / Albatros / Sopwith / Curtiss pursuit designs",
+      "flavor": "Fabric-covered wings and rotary engines dominate the skies over the Western Front. Recon to fighter evolution."
+    }
+  },
+  "ground_attack_cas_1928": {
+    "id": "ground_attack_cas_1928",
+    "name": "Early Close Air Support & Dive Bombers",
+    "domain": "air_equipment",
+    "tree_id": "air_equipment",
+    "node_kind": "research",
+    "column": 1,
+    "row": 0,
+    "tier": 2,
+    "era_min": 1925,
+    "era_max": 1940,
+    "epoch": "interwar",
+    "prerequisites": [
+      "airframe_1918",
+      "military_aviation_industry_1911"
+    ],
+    "research": {
+      "base_cost_days": 75,
+      "category": "air",
+      "ahead_of_time_penalty_per_year": 0.11,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "bf109g_fighter"
+        ]
+      },
+      {
+        "type": "equipment_module",
+        "module_id": "ap50_bomb_load"
+      },
+      {
+        "type": "doctrine_key",
+        "key": "close_air_support"
+      }
+    ],
+    "ui": {
+      "short_effect": "Early CAS / dive bomber airframes; unlocks CAS doctrine key + bomb modules",
+      "flavor": "Henschel, early Stuka experiments. Ties air directly to land battle (blitzkrieg enabler)."
     }
   },
   "airframe_1936": {
@@ -32,13 +84,16 @@
     "domain": "air_equipment",
     "tree_id": "air_equipment",
     "node_kind": "research",
-    "column": 1,
-    "row": 0,
+    "column": 0,
+    "row": 1,
     "tier": 2,
     "era_min": 1934,
     "era_max": 1955,
     "epoch": "industrial_war",
-    "prerequisites": ["airframe_1918"],
+    "prerequisites": [
+      "airframe_1918",
+      "aircraft_industry_ii_1935"
+    ],
     "research": {
       "base_cost_days": 90,
       "category": "air",
@@ -46,11 +101,106 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "unit_design", "template_ids": ["usa_fighter_1936"] }
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "usa_fighter_1936",
+          "bf109g_fighter",
+          "sov_fighter_1936",
+          "a6m_zero_fighter",
+          "ita_fighter_1936"
+        ]
+      }
     ],
     "ui": {
-      "short_effect": "P-36 / early P-40 pursuit line",
-      "flavor": "All-metal monoplanes with retractable gear enter squadron service."
+      "short_effect": "P-36 / Bf109 / I-16 / A5M / early monoplanes",
+      "flavor": "All-metal monoplanes with retractable gear enter squadron service. 1936-39 air superiority race."
+    }
+  },
+  "tactical_bomber_1936": {
+    "id": "tactical_bomber_1936",
+    "name": "Tactical & Medium Bombers",
+    "domain": "air_equipment",
+    "tree_id": "air_equipment",
+    "node_kind": "research",
+    "column": 1,
+    "row": 1,
+    "tier": 3,
+    "era_min": 1934,
+    "era_max": 1955,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "ground_attack_cas_1928",
+      "airframe_1936"
+    ],
+    "research": {
+      "base_cost_days": 95,
+      "category": "air",
+      "ahead_of_time_penalty_per_year": 0.11,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "lancaster_bomber"
+        ]
+      },
+      {
+        "type": "modifier",
+        "stat": "air_ground_attack",
+        "value": 0.1
+      }
+    ],
+    "ui": {
+      "short_effect": "Do-17 / Blenheim / early medium bombers; +ground attack",
+      "flavor": "Level bombing + army cooperation. Critical for interwar deep battle or tactical support doctrines."
+    }
+  },
+  "strategic_bombing_program_1935": {
+    "id": "strategic_bombing_program_1935",
+    "name": "Strategic Heavy Bombers (Early)",
+    "domain": "air_equipment",
+    "tree_id": "air_equipment",
+    "node_kind": "research",
+    "column": 2,
+    "row": 0,
+    "tier": 3,
+    "era_min": 1933,
+    "era_max": 1950,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "airframe_1936"
+    ],
+    "mutually_exclusive_with": [
+      "ground_attack_cas_1928"
+    ],
+    "research": {
+      "base_cost_days": 140,
+      "category": "air",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "lancaster_bomber"
+        ]
+      },
+      {
+        "type": "doctrine_key",
+        "key": "strategic_bombing"
+      },
+      {
+        "type": "modifier",
+        "stat": "strategic_bombing_power",
+        "value": 0.15
+      }
+    ],
+    "ui": {
+      "short_effect": "Early 4-engine heavies; strategic bombing doctrine key + power",
+      "flavor": "Alt-history accelerated (or UK/US focus). Industrial targeting over battlefield support. High cost, long term payoff."
     }
   },
   "airframe_2026": {
@@ -60,12 +210,14 @@
     "tree_id": "air_equipment",
     "node_kind": "research",
     "column": 2,
-    "row": 0,
+    "row": 2,
     "tier": 4,
     "era_min": 2018,
     "era_max": 2050,
     "epoch": "near_future",
-    "prerequisites": ["airframe_1936"],
+    "prerequisites": [
+      "airframe_1936"
+    ],
     "research": {
       "base_cost_days": 130,
       "category": "air",
@@ -73,11 +225,275 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "unit_design", "template_ids": ["usa_fighter_2026"] }
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "usa_fighter_2026"
+        ]
+      }
     ],
     "ui": {
       "short_effect": "F-35A Lightning II production clearance",
       "flavor": "Stealth, sensor fusion, and multi-role strike in contested airspace."
+    }
+  },
+  "advanced_piston_aviation_1935": {
+    "id": "advanced_piston_aviation_1935",
+    "name": "Advanced Piston Aviation Engines (Merlin/DB601 Era)",
+    "domain": "air_equipment",
+    "tree_id": "air_equipment",
+    "node_kind": "research",
+    "column": 2,
+    "row": 3,
+    "tier": 2,
+    "era_min": 1933,
+    "era_max": 1948,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "early_gas_engines_1905",
+      "high_octane_aviation_fuel_1938"
+    ],
+    "research": {
+      "base_cost_days": 80,
+      "category": "air",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "air_speed",
+        "value": 0.1
+      },
+      {
+        "type": "rule_flag",
+        "flag": "advanced_piston_air"
+      },
+      {
+        "type": "module_unlock",
+        "module_ids": [
+          "merlin_engine",
+          "packard_merlin_v1650",
+          "db_605a_engine",
+          "allison_v1710_engine"
+        ]
+      }
+    ],
+    "ui": {
+      "short_effect": "+10% fighter/bomber speed + altitude perf. The P-51/Spitfire/Zero engine race - fuel quality and supercharging decide who wins the sky.",
+      "flavor": "Liquid-cooled V-12s and high-output radials. US/UK high-octane + two-stage superchargers gave decisive edge over Axis in many theaters. Choosing gas/aviation fuel path makes you king of the air but thirsty and vulnerable to oil cutoff.",
+      "icon": "res://assets/graphics/icons/engines/high_octane_refinery.png"
+    }
+  },
+  "jet_engine_foundations_1944": {
+    "id": "jet_engine_foundations_1944",
+    "name": "Jet Engine Foundations (Turbojet)",
+    "domain": "air_equipment",
+    "tree_id": "air_equipment",
+    "node_kind": "research",
+    "column": 3,
+    "row": 4,
+    "tier": 3,
+    "era_min": 1942,
+    "era_max": 1960,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "advanced_piston_aviation_1935",
+      "rare_earth_materials_1950"
+    ],
+    "research": {
+      "base_cost_days": 110,
+      "category": "air",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "air_speed",
+        "value": 0.15
+      },
+      {
+        "type": "rule_flag",
+        "flag": "jet_propulsion"
+      },
+      {
+        "type": "module_unlock",
+        "module_category": "jet"
+      }
+    ],
+    "ui": {
+      "short_effect": "Unlocks early jets (Me262, P-80, Meteor). Massive speed leap but high fuel use, short range, teething problems.",
+      "flavor": "End of piston supremacy. Requires good materials (rare earths/titanium) and later computers for controls. Gas path leads here naturally; diesel/steam paths need more catch-up investment.",
+      "icon": "res://assets/graphics/icons/engines/jet_fadec_computer.png"
+    }
+  },
+  "german_jet_early_1938": {
+    "id": "german_jet_early_1938",
+    "name": "Early German Jet & Rocket Aircraft (Me262/V1 Proto)",
+    "domain": "air_equipment",
+    "tree_id": "air_equipment",
+    "node_kind": "research",
+    "column": 3,
+    "row": 2,
+    "tier": 3,
+    "era_min": 1937,
+    "era_max": 1945,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "advanced_piston_aviation_1935",
+      "rocketry_foundations"
+    ],
+    "research": {
+      "base_cost_days": 140,
+      "category": "air",
+      "ahead_of_time_penalty_per_year": 0.2,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "early_jet_germany"
+      },
+      {
+        "type": "modifier",
+        "stat": "air_speed",
+        "value": 0.12
+      },
+      {
+        "type": "equipment_module",
+        "module_id": "bmw_003_jet_engine"
+      }
+    ],
+    "ui": {
+      "short_effect": "Early jet fighters/bombers (alt-history German investment). Massive speed but fuel guzzler, short range, teething.",
+      "flavor": "If Germany invests earlier in jets/rockets (historical delay due to war priorities), Me262-like and V1 precursors appear 1938-40. Huge alt-history edge in air superiority, but resource/engineering hell. Trade-off: diverts from piston improvements or heavy bombers.",
+      "icon": ""
+    }
+  },
+  "self_sealing_fuel_tanks_1939": {
+    "id": "self_sealing_fuel_tanks_1939",
+    "name": "Self-Sealing Fuel Tanks & Fire Suppression",
+    "domain": "air_equipment",
+    "tree_id": "air_equipment",
+    "node_kind": "research",
+    "column": 2,
+    "row": 2,
+    "tier": 3,
+    "era_min": 1936,
+    "era_max": 1950,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "airframe_1936"
+    ],
+    "research": {
+      "base_cost_days": 70,
+      "category": "air",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "equipment_module",
+        "module_id": "self_sealing_fuel_tanks"
+      },
+      {
+        "type": "modifier",
+        "stat": "aircraft_survivability",
+        "value": 0.15
+      }
+    ],
+    "ui": {
+      "short_effect": "Unlocks self-sealing fuel tanks (existing module); +aircraft fire resistance/survivability",
+      "flavor": "Rubber-lined tanks that seal bullet holes + CO2 systems. Dramatically reduces fires/explosions in damaged planes. US/UK advantage in WW2; expensive and adds weight. Trade-off vs range/speed.",
+      "icon": "res://assets/graphics/icons/tech/self_sealing_fuel_tank.png"
+    }
+  },
+  "superlight_aluminum_1940": {
+    "id": "superlight_aluminum_1940",
+    "name": "Superlight Aluminum Alloys & Composites",
+    "domain": "air_equipment",
+    "tree_id": "air_equipment",
+    "node_kind": "research",
+    "column": 1,
+    "row": 3,
+    "tier": 3,
+    "era_min": 1938,
+    "era_max": 1960,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "aircraft_industry_ii_1935"
+    ],
+    "research": {
+      "base_cost_days": 85,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "air_speed",
+        "value": 0.08
+      },
+      {
+        "type": "modifier",
+        "stat": "aircraft_range",
+        "value": 0.1
+      },
+      {
+        "type": "resource",
+        "resource": "aluminum",
+        "bonus": 0.15
+      }
+    ],
+    "ui": {
+      "short_effect": "+air speed/range; better aluminum efficiency (map or synth aluminum critical)",
+      "flavor": "High-strength lightweight alloys for airframes. Enables faster, longer-ranged planes. Requires quality bauxite/aluminum or synthesis. Trade-off: expensive, diverts from steel production.",
+      "icon": ""
+    }
+  },
+  "guided_missiles_air_1944": {
+    "id": "guided_missiles_air_1944",
+    "name": "Guided Air-to-Air & Air-to-Surface Missiles",
+    "domain": "air_equipment",
+    "tree_id": "air_equipment",
+    "node_kind": "research",
+    "column": 3,
+    "row": 3,
+    "tier": 4,
+    "era_min": 1942,
+    "era_max": 1970,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "jet_engine_foundations_1944",
+      "fire_control_computers_1936"
+    ],
+    "research": {
+      "base_cost_days": 110,
+      "category": "air",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "equipment_module",
+        "module_id": "asraam_missile"
+      },
+      {
+        "type": "equipment_module",
+        "module_id": "brimstone_missile"
+      },
+      {
+        "type": "modifier",
+        "stat": "air_missile_effectiveness",
+        "value": 0.2
+      }
+    ],
+    "ui": {
+      "short_effect": "Early guided AAM/ASM (Sidewinder/AGM precursors); big leap in air combat and strike",
+      "flavor": "Radio or heat-seeking guided missiles. Transforms fighter and bomber effectiveness. Expensive, electronics heavy, vulnerable to countermeasures. Trade-off vs gun armament (reliability in close range).",
+      "icon": ""
     }
   }
 }

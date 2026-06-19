@@ -557,7 +557,7 @@ static func build_province_technology_bbcode(province: Province, country_tag: St
 
 
 static func get_build_mode_preview(country_tag: String = "") -> Dictionary:
-	var preview := {
+	var preview: Dictionary = {
 		"active": false,
 		"target_tech_id": "",
 		"target_label": "Select technology",

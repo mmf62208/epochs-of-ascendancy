@@ -4,7 +4,7 @@
   "design_family": "uk_armored_ww1",
   "base_type": "Armored",
   "size_category": "Heavy",
-  "visual_archetype": "heavy_tank",
+  "visual_archetype": "ww1_tank",
   "crew_required": 8,
   "base_training_level": 10,
   "max_experience_level": 70,

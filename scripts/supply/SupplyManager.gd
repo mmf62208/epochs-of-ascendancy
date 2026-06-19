@@ -13,9 +13,11 @@ var depot_states: Dictionary[int, ProvinceDepotState] = {}
 var provinces: Dictionary[int, Province] = {}
 var adjacency: AdjacencySystem = null
 var player_tag: String = "USA"
+const DEBUG_AIR_MISSION_LOGS := false  # Off during play; F10 harness can call _process_air_missions directly when needed.
 
 var player_depot_province_ids: Array[int] = []
 var force_registry: CombatPresenceRegistry = CombatPresenceRegistry.new()
+var mined_seas: Dictionary = {}  # sea_pid -> days_remaining (set by MINELAY order, decayed by time, cleared by ASW)
 ## formation_id -> {province_id, country_tag} — source of truth for player division map presence.
 var division_deployments: Dictionary = {}
 var attrition_ledger: AttritionReplenishmentLedger = AttritionReplenishmentLedger.new()
@@ -106,9 +108,79 @@ func _init_depot_states() -> void:
 		state.stockpile = hub.storage_capacity * float(throughput_rules.get("initial_fill_ratio", 0.65))
 		depot_states[hub.province_id] = state
 
+	# Apply regional control bonuses (full control of a strategic region gives desirable logistics/power projection rewards)
+	_apply_regional_control_throughput_bonuses()
+
 
 func get_depot_state(province_id: int) -> ProvinceDepotState:
 	return depot_states.get(province_id)
+
+## Regional control reward hook: if the owning country fully controls the strategic region containing this depot,
+## grant a throughput bonus. This makes "cleaning up" a whole region (e.g. securing the British Isles, or the Baltic)
+## strategically rewarding beyond just the provinces.
+func _apply_regional_control_throughput_bonuses() -> void:
+	if typeof(MapManager) == TYPE_NIL or not MapManager.is_ready():
+		return
+	for pid in depot_states.keys():
+		var state: ProvinceDepotState = depot_states[pid]
+		var p: Province = null
+		if provinces.has(pid):
+			p = provinces[pid]
+		else:
+			p = MapManager.get_province(pid)
+		if p == null:
+			continue
+		var owner := p.owner_tag
+		if owner.is_empty():
+			continue
+		# Check if this province's region is fully controlled by its owner
+		var rid := MapManager.get_province_region_id(pid)
+		if rid <= 0:
+			continue
+		if MapManager.is_strategic_region_fully_controlled(rid, owner):
+			# Use real table bonuses from improved scenario connections (regional_pride etc already wired elsewhere; here throughput + resources)
+			var bonuses := MapManager.get_active_regional_control_bonuses(owner)
+			var tp := float(bonuses.get("supply_throughput", bonuses.get("throughput", 0.12)))
+			if tp > 0.0:
+				state.throughput_capacity *= (1.0 + tp)
+				if not state.has_meta("regional_control_bonus"):
+					state.set_meta("regional_control_bonus", tp)
+			# Additional from table: winter/convoy resilience for full regions (e.g. Arctic, Atlantic) boost supply in harsh conditions
+			var extra_s := float(bonuses.get("winter_supply_resilience", bonuses.get("convoy_efficiency", 0.0)))
+			if extra_s > 0.0:
+				state.throughput_capacity *= (1.0 + extra_s * 0.5)
+			# port_capacity for depots that are ports (full control of port regions boosts trade/supply throughput)
+			var h: ProvinceSupplyHub = hubs.get(pid) as ProvinceSupplyHub
+			if h != null and h.port_level > 0:
+				var port_b := float(bonuses.get("port_capacity", 0.0))
+				if port_b > 0.0:
+					state.throughput_capacity *= (1.0 + port_b * 0.5)
+			# Resource bonus if this depot/hub provides relevant resources (e.g. iron in Scandinavia region)
+			if bonuses.has("resource_bonus") and typeof(bonuses["resource_bonus"]) == TYPE_DICTIONARY:
+				var res_b := bonuses["resource_bonus"] as Dictionary
+				# Simple: boost stockpile or throughput if hub has matching resource (demo; full would check hub resources)
+				for res in res_b.keys():
+					if p != null and p.resources.has(res) and float(p.resources[res]) > 0:
+						state.throughput_capacity *= (1.0 + float(res_b[res]) * 0.5)  # partial apply
+						break
+			# Next-level integration: river natural border or strategic chokepoint (Danish Straits, Gibraltar, Skagerrak from special sites + straits data)
+			# gives supply throughput / naval logi bonus when controlled (narrows = force multiplier for supply).
+			if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_chokepoint_or_river_supply_bonus"):
+				var crb := MapManager.get_chokepoint_or_river_supply_bonus(pid)
+				if crb > 1.001:
+					state.throughput_capacity *= crb
+					if not state.has_meta("chokepoint_river_bonus"):
+						state.set_meta("chokepoint_river_bonus", crb - 1.0)
+
+			# Agent-driven resource discovery / exploration national mod (new positive agent impact)
+			# Boosts throughput if province has resources (simulates better extraction/gathering from agent prospecting).
+			if typeof(NationalModifierManager) != TYPE_NIL:
+				var res_mod: Dictionary = NationalModifierManager.get_resource_modifiers(owner) if NationalModifierManager.has_method("get_resource_modifiers") else {}
+				var res_mult: float = float(res_mod.get("resource_output_multiplier", 1.0))
+				if res_mult > 1.001 and p != null and p.resources.size() > 0:
+					state.throughput_capacity *= res_mult
+					if not state.has_meta("resource_agent_bonus"):
+						state.set_meta("resource_agent_bonus", res_mult - 1.0)
 
 
 func get_depot_menu_lines(limit: int = 5) -> Array[String]:
@@ -363,6 +435,103 @@ func advance_supply_day(days: float = 1.0) -> void:
 
 	# Naval recon from fleets in sea zones (1 chance per day per seazone presence)
 	_process_naval_recon(days)
+	# Air missions: recon %, bombing, CAS, interdiction based on air formations/missions/intensity.
+	# Intensity/aggressiveness: higher = more sorties (more supply/fuel cost, e.g. round-the-clock airbase ops), stronger effect (better recon %/interdiction).
+	# Doctrines/tech (radio for org/coordination, proximity shells for AA, air doctrine) impact.
+	# Air can be attached to ships (naval strike/bombard for amphib/land) or land forces (CAS).
+	_process_air_missions(days)
+
+	# Full training daily advance (roadmap phase3): is_training formations get readiness/org/xp boost daily; supply cost; leader (officer quality + path) bonuses apply to rate; progress to is_trained for combat bonus.
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_all_formations"):
+		for f in LeaderManager.get_all_formations():
+			if f == null or not ("is_training" in f and f.is_training):
+				continue
+			var train_mult := 1.0
+			# Leader bonus: officer training quality or assigned leader training path effects speed unit training (readiness/org gain).
+			if "leader_id" in f and not str(f.leader_id).is_empty() and LeaderManager.has_method("get_officer_training_quality"):
+				var q := float(LeaderManager.get_officer_training_quality(str(f.country_tag if "country_tag" in f else "")))
+				train_mult *= clampf(0.7 + q / 60.0, 0.7, 2.2)  # officer quality drives faster train
+			# Simple training path synergy if leader (reuse org recovery etc as proxy for training efficiency).
+			if "leader_id" in f and LeaderManager.has_method("get_leader_training_path_effects"):
+				var leff: Dictionary = LeaderManager.get_leader_training_path_effects(LeaderManager.get_leader(f.leader_id))
+				if leff.has("organization_recovery"):
+					train_mult *= (1.0 + float(leff["organization_recovery"]) * 0.5)
+			if "readiness" in f:
+				f.readiness = min(1.8, float(f.readiness) + 0.025 * days * train_mult)
+			if "organization" in f:
+				f.organization = min(1.8, float(f.organization) + 0.012 * days * train_mult)
+			if "training_progress" in f:
+				f.training_progress = float(f.training_progress) + 0.8 * days * train_mult
+			# Award xp to leader for training command (ties leaders to unit train complete).
+			if "leader_id" in f and not str(f.leader_id).is_empty() and LeaderManager.has_method("award_xp_to_leader"):
+				LeaderManager.award_xp_to_leader(str(f.leader_id), int(3 * days * train_mult), "formation_training")
+			# Supply cost for training (readiness buildup burns supply/fuel; makes holding infra/supply provinces key).
+			var stationed := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+			if stationed >= 0 and depot_states.has(stationed):
+				var dep: ProvinceDepotState = depot_states[stationed]
+				var cost: float = 4.0 * days * max(0.6, train_mult - 0.5)  # higher quality train costs more sustain
+				dep.stockpile = max(0.0, dep.stockpile - cost)
+				if dep.stockpile < 5.0:
+					train_mult *= 0.4  # starved training slows
+			# Reach trained state (better combat: higher rdy baseline, used in resolver/inspector).
+			if "training_progress" in f and float(f.training_progress) >= 6.0 and not bool(f.get("is_trained", false)):
+				f.is_trained = true
+				if "readiness" in f: f.readiness = max(float(f.readiness), 1.35)
+				if "organization" in f: f.organization = max(float(f.organization), 1.2)
+				print("[TRAIN COMPLETE] %s reached trained state (progress %.1f, mult %.2f). +combat rdy/org bonus. is_training can now be cleared or kept for sustain." % [str(f.formation_id if "formation_id" in f else "form"), float(f.training_progress), train_mult])
+			if float(f.get("training_progress", 0.0)) > 18.0:
+				f.is_training = false  # auto graduate after extended training
+				print("[TRAIN] %s auto-graduated from is_training after extended (sustained training)." % str(f.formation_id if "formation_id" in f else ""))
+
+	# General formation recovery (core of main combat loop): all formations (idle, moving, post-battle) recover org/readiness daily from supply/infra.
+	# Rate scaled by province local org recovery (infra/dev/settlement/weather), supply depot state, and national shortages.
+	# Low org from combat or doctrine shifts now heals over time if supplied — makes holding good infra provinces and winning supply war matter.
+	# Training gets additional on top (already handled). Combat formations or unsupplied recover much slower.
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_all_formations"):
+		for f in LeaderManager.get_all_formations():
+			if f == null or ("is_training" in f and f.is_training):
+				continue  # training handled above; skip double
+			var base_org_rec := 0.008 * days
+			var base_rdy_rec := 0.015 * days
+			var stationed := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+			var rec_factor := 1.0
+			var has_local_supply := true
+			if stationed >= 0 and typeof(MapManager) != TYPE_NIL:
+				var p: Province = MapManager.get_province(stationed)
+				if p != null:
+					# Prefer Province method (includes settlement, welfare, terrain, snow etc.)
+					if p.has_method("get_organization_recovery_modifier"):
+						rec_factor = p.get_organization_recovery_modifier()
+					else:
+						rec_factor = 0.7 + (clampf(float(p.infrastructure), 0, 12) * 0.03) + (clampf(float(p.development_level), 0, 8) * 0.02)
+					# Check local depot for supply pressure
+					if depot_states.has(stationed):
+						var dep: ProvinceDepotState = depot_states[stationed]
+						if dep and dep.throughput_capacity > 0 and dep.stockpile < (dep.throughput_capacity * 0.2):
+							has_local_supply = false
+							rec_factor *= 0.4  # unsupplied province = slow healing
+			# National/resource shortage drag (from production eval or NMM)
+			if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("has_national_shortages"):
+				if ProductionManager.has_national_shortages(f.country_tag if "country_tag" in f else ""):
+					rec_factor *= 0.55
+			if not has_local_supply:
+				base_org_rec *= 0.3
+				base_rdy_rec *= 0.4
+			# Apply (clamped; also slightly reduced if unit is in aggressive mission)
+			var intensity_drag := 1.0
+			if "mission_intensity" in f:
+				intensity_drag = clampf(1.0 - (float(f.mission_intensity) - 1.0) * 0.15, 0.6, 1.3)
+			if "organization" in f:
+				f.organization = min(1.5, float(f.organization) + base_org_rec * rec_factor * intensity_drag)
+			if "readiness" in f:
+				f.readiness = min(1.5, float(f.readiness) + base_rdy_rec * rec_factor * intensity_drag)
+
+	# Basic reinforce from national equipment stockpile for strength-depleted formations (daily loop).
+	# Uses shared _try_reinforce_formation for consistency with BM post-combat casualties.
+	# Strength casualties now reinforced from stock; production matters.
+	if typeof(ProductionManager) != TYPE_NIL and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_all_formations"):
+		for f in LeaderManager.get_all_formations():
+			_try_reinforce_formation(f)
 
 	var attrition := get_attrition_cargo_summary()
 	var attrition_tons := float(attrition.get("total_tons", 0.0)) * days
@@ -383,6 +552,13 @@ func advance_supply_day(days: float = 1.0) -> void:
 		var delivery := 1.0 - plan.interdiction_chance
 		var reinf_bonus := clampf((plan.reinforcement_modifier - 1.0) * 0.6, 0.0, 0.35)
 		delivery = clampf(delivery * (1.0 + reinf_bonus), 0.2, 1.15)
+		# Winter supply resilience from full regions for snow provinces (reduces snow penalty on delivery)
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+			var reg := MapManager.get_active_regional_control_bonuses(player_tag)
+			var winter_r := float(reg.get("winter_supply_resilience", 0.0))
+			var dst_p := MapManager.get_province(plan.target_province_id) if MapManager.has_method("get_province") else null
+			if winter_r > 0.0 and dst_p and dst_p.snow_potential > 0.1:
+				delivery = clampf(delivery * (1.0 + winter_r * 0.5), 0.2, 1.15)
 		var inflow := pulled * delivery
 		var overflow := dst.apply_inflow(inflow)
 		if overflow > 0.0 and src != null:
@@ -459,6 +635,13 @@ func find_route_for_trade(from_tag: String, to_tag: String, cargo_tons: float = 
 		_routes[plan.route_id] = plan
 		# Note: interdiction estimation inside _plan_route uses player_tag currently.
 		# For cross-country trade this is an approximation; future work can improve it.
+
+		# Port capacity bonus for sea trade (full control of port regions boosts cargo for trade flows)
+		if plan.uses_port and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+			var reg := MapManager.get_active_regional_control_bonuses(from_tag)
+			var port_b := float(reg.get("port_capacity", 0.0))
+			if port_b > 0.0:
+				plan.cargo_tons_per_day *= (1.0 + port_b)
 
 	active_cargo = old_cargo
 	return plan
@@ -571,37 +754,120 @@ func _process_naval_recon(days: float = 1.0) -> void:
 		if naval_report.navy_total <= 0.0:
 			continue
 
+		# Decay/clear mines (MINELAY sets, time decays, ASW clears)
+		if mined_seas.has(sea_pid):
+			mined_seas[sea_pid] = float(mined_seas.get(sea_pid, 0)) - days
+			if mined_seas[sea_pid] <= 0:
+				mined_seas.erase(sea_pid)
+
 		# For each owner with naval presence in this seazone
 		for owner in naval_report.naval_strength:
 			var strength = float(naval_report.naval_strength[owner])
 			if strength <= 0.0:
 				continue
 
+			# Apply overarching naval order mods from actual formations (if any in/near sea)
+			var order_detect_mod := 1.0
+			var order_stealth_mod := 1.0
+			if typeof(LeaderManager) != TYPE_NIL:
+				for f in LeaderManager.get_formations_for_country(owner):
+					if f and f.get_category() == "naval" and f.stationed_province_id == sea_pid and f.current_naval_order != Formation.NAVAL_ORDER_NONE:
+						order_detect_mod *= f.get_naval_order_detection_mod()
+						order_stealth_mod *= f.get_naval_order_stealth_mod()
+						break  # use one representative order per owner/zone for demo
+			var owner_order := Formation.NAVAL_ORDER_NONE
+			if typeof(LeaderManager) != TYPE_NIL:
+				for f in LeaderManager.get_formations_for_country(owner):
+					if f and f.get_category() == "naval" and f.stationed_province_id == sea_pid and f.current_naval_order != Formation.NAVAL_ORDER_NONE:
+						owner_order = f.current_naval_order
+						break
+			# Air support boosts SEARCH/STRIKE detect/engage (tie to air wings over sea)
+			var air_strength := 0.0
+			if naval_report.has_method("total_air"):
+				air_strength = naval_report.total_air(owner)
+			if air_strength > 0 and owner_order in [Formation.NAVAL_ORDER_SEARCH_PATROL, Formation.NAVAL_ORDER_STRIKE]:
+				order_detect_mod *= (1.0 + air_strength * 0.05)
+
 			# Recon to adjacent land provinces (1 chance per day)
 			if adjacency_sys != null:
 				var land_neighbors = adjacency_sys.get_land_neighbors(sea_pid)
 				for land_pid in land_neighbors:
-					# Chance based on strength (stronger fleet = better chance)
-					# Base chance per day ~ strength / 20 , capped
-					var chance = minf(0.75, strength / 25.0)
+					# Chance based on strength (stronger fleet = better chance) + order
+					var chance = minf(0.75, strength / 25.0 * order_detect_mod)
 					if randf() < chance:
-						# Successful recon on land province
-						# For now, boost local recon or log; later feed to intel map or Province "scouted"
-						# Example: add temporary bonus to interdiction resistance or reveal to player
 						_add_naval_recon_intel(land_pid, owner, strength * 0.1)
 
-			# Enemy fleet spotting in same seazone
+			# Enemy fleet spotting in same seazone - enhanced with orders, class, weather, etc.
 			for other_owner in naval_report.naval_strength:
 				if other_owner == owner:
 					continue
-				# Simple hostility check (in real game, use diplomacy or at_war)
 				if _are_hostile(owner, other_owner):
-					var other_strength = float(naval_report.naval_strength[other_owner])
-					# Detection chance based on relative strength + recon value
-					var detect_chance = minf(0.6, (strength * 1.2) / (other_strength + 5.0))
+					var other_strength: float = float(naval_report.naval_strength.get(other_owner, 0.0))
+					var other_subs: float = naval_report.total_subs(other_owner) if naval_report.has_method("total_subs") else other_strength * 0.2
+					var other_surface: float = naval_report.total_surface(other_owner) if naval_report.has_method("total_surface") else other_strength * 0.8
+					var recon_bonus: float = naval_report.total_naval_recon(owner) if naval_report.has_method("total_naval_recon") else strength * 0.1
+					var detect_chance: float = minf(0.85, (strength * 1.1 + recon_bonus) / (other_strength + 8.0))
+					# Orders: SEARCH boosts detect, AMBUSH/CONVOY lower profile (stealth)
+					detect_chance *= order_detect_mod * (1.0 / max(0.5, order_stealth_mod))  # inverse stealth for enemy detect of us? adjust for own order
+					# Enemy order stealth reduces their detect chance
+					if typeof(LeaderManager) != TYPE_NIL:
+						for f in LeaderManager.get_formations_for_country(other_owner):
+							if f and f.get_category() == "naval" and f.stationed_province_id == sea_pid:
+								detect_chance *= f.get_naval_order_stealth_mod()
+								break
+					# Weather/storms
+					if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_naval_spotting_visibility"):
+						var vis: float = WeatherManager.get_naval_spotting_visibility(sea_pid)
+						detect_chance *= vis * 0.9 + 0.1
+					# Chokepoint
+					if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint") and MapManager.has_strategic_chokepoint(sea_pid):
+						detect_chance *= 1.7
+					# Subs harder
+					if other_subs > other_surface * 0.5:
+						detect_chance *= 0.6
+					# Groups
+					detect_chance = minf(0.95, detect_chance + (strength / 50.0))
 					if randf() < detect_chance:
-						# Enemy fleet detected in zone
 						_report_enemy_naval_detection(sea_pid, owner, other_owner, other_strength)
+						var eng_range_mod: float = 1.0
+						var is_closer: bool = false
+						if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_naval_spotting_visibility"):
+							var v: float = WeatherManager.get_naval_spotting_visibility(sea_pid)
+							eng_range_mod = clamp(v, 0.4, 1.0)
+							if v < 0.5:
+								eng_range_mod *= 0.7
+								is_closer = true
+						# Orders affect range/closer: use full get_naval_order_engagement_mod (AMBUSH/S&D in low vis/strait -> closer; STRIKE good vis -> stand-off)
+						var spotter_order = Formation.NAVAL_ORDER_NONE
+						if typeof(LeaderManager) != TYPE_NIL and typeof(MapManager) != TYPE_NIL:
+							for f in LeaderManager.get_formations_for_country(owner):
+								if f and f.get_category() == "naval" and f.stationed_province_id == sea_pid and f.current_naval_order != Formation.NAVAL_ORDER_NONE:
+									spotter_order = f.current_naval_order
+									var choke = MapManager.has_strategic_chokepoint(sea_pid) if MapManager.has_method("has_strategic_chokepoint") else false
+									var eng = f.get_naval_order_engagement_mod(eng_range_mod, choke)
+									eng_range_mod = float(eng.get("range_mod", eng_range_mod))
+									is_closer = bool(eng.get("closer_engagement", is_closer))
+									break
+						_try_trigger_naval_combat(sea_pid, owner, other_owner, eng_range_mod, other_subs > 0, is_closer)
+						# Aggressive orders (S&D, STRIKE, MINELAY) set raiding threat for this sea, affecting enemy supply interdiction on routes using this sea
+						if spotter_order in [Formation.NAVAL_ORDER_SEARCH_AND_DESTROY, Formation.NAVAL_ORDER_STRIKE, Formation.NAVAL_ORDER_MINELAY]:
+							var threats = get_meta("sea_naval_raiding") if has_meta("sea_naval_raiding") else {}
+							if not threats.has(sea_pid):
+								threats[sea_pid] = {}
+							threats[sea_pid][owner] = strength  # raider's strength as threat in sea for enemy supply
+							set_meta("sea_naval_raiding", threats)
+
+			# MINELAY sets persistent mines (threat to enemy in sea/straits), ASW clears them
+			var owner_order_for_mine = Formation.NAVAL_ORDER_NONE
+			if typeof(LeaderManager) != TYPE_NIL:
+				for f in LeaderManager.get_formations_for_country(owner):
+					if f and f.get_category() == "naval" and f.stationed_province_id == sea_pid and f.current_naval_order != Formation.NAVAL_ORDER_NONE:
+						owner_order_for_mine = f.current_naval_order
+						break
+			if owner_order_for_mine == Formation.NAVAL_ORDER_MINELAY:
+				mined_seas[sea_pid] = 30.0
+			elif owner_order_for_mine == Formation.NAVAL_ORDER_ASW and mined_seas.has(sea_pid):
+				mined_seas.erase(sea_pid)
 
 
 func _add_naval_recon_intel(land_pid: int, owner: String, recon_value: float) -> void:
@@ -617,6 +883,98 @@ func _report_enemy_naval_detection(sea_pid: int, spotter: String, spotted: Strin
 	# Placeholder for UI/AI notification: "Enemy fleet detected in seazone X"
 	# Can emit signal or add to intel
 	print("Naval detection: %s spotted %s fleet (str %.1f) in sea province %d" % [spotter, spotted, strength, sea_pid])
+	# Feed to intel or map for player awareness (future full UI)
+	if typeof(SupplyIntelBridge) != TYPE_NIL:
+		SupplyIntelBridge.record_naval_spotting(sea_pid, spotter, spotted, strength)
+
+## Process air missions for air formations (or attached air support to land/naval forces).
+## Missions: RECON (spotting % boost), CAS (land combat support), INTERDICTION (supply disruption), STRATEGIC_BOMBING, AIR_SUPERIORITY, NAVAL_STRIKE (attach to ships for bombardment in amphib/land battles).
+## Intensity/aggressiveness: higher = more missions/sorties (e.g. round-the-clock airbase ops with more supplies/fuel), stronger %/bonus but higher cost, risk, attrition.
+## Doctrines/tech: radio for higher org/coordination in missions (move/attack support), proximity shells boost AA vs air missions, air doctrine improves effectiveness.
+## Air can be assigned/attached to ships (naval strike/bombard support) or land forces (CAS, recon).
+## Weather, basing (airfields), design maturity affect.
+func _process_air_missions(days: float = 1.0) -> void:
+	if days <= 0.0 or typeof(LeaderManager) == TYPE_NIL:
+		return
+	# For each country with air formations
+	for tag in ["USA", "GER", "SOV", "ENG", "FRA"]:  # demo; in full scan all
+		for f in LeaderManager.get_formations_for_country(tag):
+			if f == null or f.get_category() != "air" or f.current_air_mission == Formation.AIR_MISSION_NONE:
+				continue
+			var intensity := f.mission_intensity
+			var mission := f.current_air_mission
+			var attached_to_ship := f.attached_air_formation_id != ""  # or check if formation is naval
+			# Supply cost based on intensity (higher for aggressive/round-the-clock)
+			var supply_cost := f.get_mission_supply_cost(1.0) * days * 0.1  # proxy
+			# Effectiveness from ADS/profile
+			var eff := 1.0
+			if f.has_method("get_mission_mods"):
+				var mods := f.get_mission_mods()
+				eff = float(mods.get("effect", 1.0))
+			# Doctrines/tech/radio/proximity impact (stub; wire to tech/doctrine)
+			var tech_boost := 1.0
+			# Example: radio for org in high intensity missions
+			if intensity > 1.2:
+				tech_boost *= 1.1
+			# Proximity shells for AA (if mission involves air contest or attached)
+			if mission in [Formation.AIR_MISSION_AIR_SUPERIORITY] or attached_to_ship:
+				tech_boost *= 1.05  # AA better vs planes
+			eff *= tech_boost
+			# Mission effects
+			match mission:
+				Formation.AIR_MISSION_RECON:
+					var recon_pct := 20.0 + intensity * 15.0
+					recon_pct *= eff * (0.7 + days * 0.1)
+					if DEBUG_AIR_MISSION_LOGS:
+						print("Air RECON mission (intensity %.1f, eff %.2f): +%.0f%% recon/spotting boost for %s (attach to ships for naval recon)." % [intensity, eff, recon_pct, tag])
+				Formation.AIR_MISSION_CLOSE_AIR_SUPPORT:
+					if DEBUG_AIR_MISSION_LOGS:
+						print("Air CAS mission (intensity %.1f): +%.0f%% ground combat/org support (attach to land forces or for amphib)." % [intensity, 10.0 + intensity * 10.0 * eff])
+				Formation.AIR_MISSION_INTERDICTION:
+					if DEBUG_AIR_MISSION_LOGS:
+						var interd := 0.02 + intensity * 0.03
+						print("Air INTERDICTION (intensity %.1f): +%.0f%% supply interdiction in area." % [intensity, interd * 100 * eff])
+				Formation.AIR_MISSION_STRATEGIC_BOMBING:
+					if DEBUG_AIR_MISSION_LOGS:
+						print("Air STRATEGIC_BOMBING (intensity %.1f): infra/prod damage (higher intensity more but risk)." % [intensity])
+				Formation.AIR_MISSION_AIR_SUPERIORITY:
+					if DEBUG_AIR_MISSION_LOGS:
+						print("Air SUPERIORITY (intensity %.1f): contest air, escort bonus, AA vs enemy air." % [intensity])
+				Formation.AIR_MISSION_NAVAL_STRIKE:
+					if DEBUG_AIR_MISSION_LOGS:
+						print("Air NAVAL_STRIKE (intensity %.1f, attached to ship? %s): bonus vs fleets (naval bombardment support for land/amphib)." % [intensity, attached_to_ship])
+				Formation.AIR_MISSION_TRANSPORT:
+					if DEBUG_AIR_MISSION_LOGS:
+						print("Air TRANSPORT (intensity %.1f): airlift supplies/troops (higher intensity more capacity but cost)." % [intensity])
+			if intensity > 1.5 and randf() < 0.1 and DEBUG_AIR_MISSION_LOGS:
+				print("  Air mission high intensity attrition for %s." % tag)
+			# Doctrines/tech examples applied above.
+
+## Strategic naval combat trigger after spotting.
+## Uses detection mod, weather for range, chokepoint for close, ship types (subs), groups.
+## For sea provinces (large ocean/sea "squares"), spotting chance determines if battle "happens".
+## Once spotted, adjusted engagement range based on vis/storms/night -> closer = different tactics (subs shine in low vis/close, surface in good vis/long).
+func _try_trigger_naval_combat(sea_pid: int, spotter: String, spotted: String, range_mod: float = 1.0, sub_heavy: bool = false, closer_engagement: bool = false) -> void:
+	# Only for hostile, and with some chance even after detect (not every spot leads to immediate full action; positioning etc.)
+	if not _are_hostile(spotter, spotted):
+		return
+	var engage_chance: float = 0.6 * clamp(range_mod, 0.3, 1.2)
+	# In straits/chokepoints, higher chance of engagement (less room to maneuver/hide)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint") and MapManager.has_strategic_chokepoint(sea_pid):
+		engage_chance *= 1.4
+	# Night/storm/closer from order (low range_mod or explicit) -> chance for closer, more intense or ambush style
+	if range_mod < 0.6 or closer_engagement:
+		engage_chance *= 1.2
+	if randf() < engage_chance:
+		print("Naval combat triggered: %s vs %s in sea %d (range_mod=%.2f, sub_heavy=%s, closer=%s, chokepoint_engage_boost)" % [spotter, spotted, sea_pid, range_mod, sub_heavy, closer_engagement])
+		# In full: call BattleManager or naval specific combat resolver with sea_pid, formations if any, range_mod for weapon effectiveness, sub bonuses. Orders influence (S&D aggressive close).
+		# For demo: log detailed factors, and if BattleManager available, attempt naval engagement (passes order mods via range/closer).
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("execute_naval_engagement"):
+			BattleManager.execute_naval_engagement(spotter, spotted, sea_pid, range_mod, sub_heavy, closer_engagement)
+		else:
+			if typeof(LeaderManager) != TYPE_NIL:
+				pass
+			print("  [NAVAL ENGAGEMENT SIM] Spot -> possible combat at adjusted range. Factors: vis/storm/night/closer=%s, straits=%s, subs=%s, groups boost spot, order mods applied." % [closer_engagement or range_mod<0.6, MapManager.has_strategic_chokepoint(sea_pid) if typeof(MapManager)!=TYPE_NIL and MapManager.has_method("has_strategic_chokepoint") else false, sub_heavy])
 
 
 func _are_hostile(a: String, b: String) -> bool:
@@ -666,6 +1024,58 @@ func get_engineer_capable_formations(country_tag: String) -> Array[Dictionary]:
 
 func get_formations_stationed_at_province(province_id: int, country_tag: String = "") -> Array[Dictionary]:
 	return get_land_divisions_at_province(province_id, country_tag, true)
+
+
+## World-class reinforce helper (called daily + from BM post strength casualties).
+## Reinforces a specific formation from national stock if depleted; production/stock matters for endurance. Ties combat casualties to econ loop.
+func _try_reinforce_formation(f: Formation) -> void:
+	if f == null or not ("strength" in f) or not ("design_id" in f) or f.design_id.is_empty():
+		return
+	var str_val := float(f.strength)
+	if str_val >= 0.90:
+		return
+	var ctag := str(f.country_tag if "country_tag" in f else "")
+	if ctag.is_empty():
+		return
+	var stock: Dictionary = {}
+	if ProductionManager.has_method("get_country_equipment_stockpile"):
+		stock = ProductionManager.get_country_equipment_stockpile(ctag)
+	var did := str(f.design_id)
+	var avail := int(stock.get(did, 0)) if stock else 0
+	if avail <= 0:
+		return
+	var taken := 0
+	if ProductionManager.has_method("take_from_country_equipment_stockpile"):
+		taken = ProductionManager.take_from_country_equipment_stockpile(ctag, did, 1)
+	if taken > 0:
+		f.strength = min(1.0, str_val + 0.09 + randf() * 0.03)
+		if "organization" in f:
+			f.organization = min(1.5, float(f.organization) + 0.03)
+		if "readiness" in f:
+			f.readiness = min(1.5, float(f.readiness) + 0.05)
+		print("[REINFORCE] %s (%s) reinforced from stock post-casualty or daily (str now %.2f)." % [f.formation_id if "formation_id" in f else did, ctag, float(f.strength)])
+	# NEW wiring: pop -> recruit pool -> reinforce formations (deduct manpower on reinforce if low str; strain already in recruit).
+	if str_val < 0.85 and typeof(GameData) != TYPE_NIL and GameData.has_method("recruit_units") and GameData.has_method("get_available_recruits"):
+		if GameData.get_available_recruits(ctag) > 10 and GameData.recruit_units(ctag, 1):
+			f.strength = min(1.0, float(f.strength) + 0.06)
+			print("[REINFORCE+MANPOWER] %s reinforced from pop recruit pool (manpower deducted + strain applied). Pool now feeds field strength." % (f.formation_id if "formation_id" in f else did))
+
+
+## Wiring: factory production output (mil or civilian) boosts local province depot stock/supply (roadmap).
+## Called from Production on complete for the factory's province.
+func boost_depot_from_production(province_id: int, owner_tag: String, amount: int) -> void:
+	if province_id < 0 or amount <= 0:
+		return
+	if not depot_states.has(province_id):
+		# ensure basic
+		var st := ProvinceDepotState.new(province_id, 100.0)
+		depot_states[province_id] = st
+	var dep: ProvinceDepotState = depot_states[province_id]
+	var boost: float = float(amount) * 0.8  # goods to local stock
+	dep.stockpile = min(dep.storage_capacity * 1.2, dep.stockpile + boost)
+	dep.throughput_capacity = max(dep.throughput_capacity, 50.0)
+	depot_stock_changed.emit(province_id, dep.stockpile)
+	print("[PROD->SUPPLY WIRE] %s boosted depot #%d stock +%.1f (from factory output %d). Local supply for combat/recovery now higher." % [owner_tag, province_id, boost, amount])
 
 
 func get_land_divisions_at_province(
@@ -828,6 +1238,17 @@ func move_formation_to_province(
 		var formation: Formation = LeaderManager.get_formation(fid)
 		if formation != null:
 			formation.stationed_province_id = province_id
+			# Teleport capability (from teleporters_2025): if division has teleport_infantry capability, allow 'instant' flavor (no extra cost here, but flag rapid)
+			if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_division_capability(tag, "teleport_infantry"):
+				print("[TELEPORT WIRING] %s division %s uses teleport_infantry capability (rapid_deployment bonus from tech; energy cost in supply)." % [tag, fid])
+			# Naval sea move trigger: if moving naval formation to sea province, apply default order if none, trigger recon/detect
+			if formation.get_category() == "naval" and province.is_sea:
+				if formation.current_naval_order == Formation.NAVAL_ORDER_NONE:
+					formation.current_naval_order = Formation.NAVAL_ORDER_SEARCH_PATROL
+				# Trigger naval recon/detect in zone (may spot enemy or set orders effects)
+				if has_method("_process_naval_recon"):
+					_process_naval_recon(0.1)
+				# If enemy naval present, may trigger spot/engagement via recon logic
 	if moved_from >= 0 and moved_from != province_id:
 		_recalculate_engineers_at_province(moved_from, tag)
 	register_division_presence(province_id, tag, template, 1.0)
@@ -1048,7 +1469,7 @@ func _plan_route(
 	if typeof(NationalSpiritManager) != TYPE_NIL:
 		nat_interdiction += NationalSpiritManager.get_total_interdiction_resistance_modifier(player_tag)
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var temp := NationalModifierManager.get_supply_modifiers(player_tag)
+		var temp: Dictionary = NationalModifierManager.get_supply_modifiers(player_tag)
 		nat_interdiction += float(temp.get("interdiction_resistance", 0.0))
 
 	var total_interdiction_resist := route_resist + nat_interdiction
@@ -1056,6 +1477,43 @@ func _plan_route(
 	if total_interdiction_resist > 0.0:
 		var reduction := clampf(total_interdiction_resist * 0.65, 0.0, 0.60)
 		plan.interdiction_chance *= (1.0 - reduction)
+
+	# Trade convoy / naval regional bonuses (convoy_efficiency, naval_range_multiplier, convoy_protection etc from full controlled chokepoint/home regions)
+	# This makes securing "British Isles", "Atlantic Approaches", "Anatolia & Straits" directly improve trade/supply safety.
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+		var reg := MapManager.get_active_regional_control_bonuses(player_tag)
+		var c_eff := float(reg.get("convoy_efficiency", 0.0))
+		var n_mult := float(reg.get("naval_range_multiplier", 1.0))
+		var c_prot := float(reg.get("convoy_protection", 0.0))
+		var total_convoy_red: float = c_eff + c_prot + max(0.0, n_mult - 1.0) * 0.4
+		if total_convoy_red > 0.0:
+			var creduction := clampf(total_convoy_red * 0.5, 0.0, 0.5)
+			plan.interdiction_chance *= (1.0 - creduction)
+			plan.interdiction_breakdown["regional_convoy"] = creduction
+
+	# Port capacity for sea routes (full control of port regions boosts cargo for supply/trade)
+	if plan.uses_port and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+		var reg := MapManager.get_active_regional_control_bonuses(player_tag)
+		var port_b := float(reg.get("port_capacity", 0.0))
+		if port_b > 0.0:
+			plan.cargo_tons_per_day *= (1.0 + port_b)
+
+	# Winter supply resilience from full regions reduces snow impact on routes (if snow_potential or current snow on path)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+		var reg := MapManager.get_active_regional_control_bonuses(player_tag)
+		var winter_res := float(reg.get("winter_supply_resilience", 0.0))
+		if winter_res > 0.0:
+			var snow_pen := 0.0
+			for pid_var in plan.province_path:
+				var pid := int(pid_var)
+				var pr: Province = provinces.get(pid)
+				if pr != null and pr.snow_potential > 0.1:
+					snow_pen += 0.05
+				# Could check current WeatherManager snow too
+			if snow_pen > 0.0:
+				var wred := clampf(winter_res * snow_pen * 2.0, 0.0, 0.5)
+				plan.interdiction_chance *= (1.0 - wred)
+				plan.interdiction_breakdown["winter_snow_resilience"] = wred
 
 	# === Reinforcement speed from ProvinceEffects / getters + national ===
 	var route_reinforce := _calculate_route_reinforcement_modifier(plan.province_path, player_tag)
@@ -1065,9 +1523,9 @@ func _plan_route(
 		var spirit_combat := NationalSpiritManager.get_spirit_combat_modifiers(player_tag)
 		nat_reinforce += float(spirit_combat.get("reinforcement_speed", 0.0))
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var temp_c := NationalModifierManager.get_combat_modifiers(player_tag)
+		var temp_c: Dictionary = NationalModifierManager.get_combat_modifiers(player_tag)
 		nat_reinforce += float(temp_c.get("reinforcement_speed", 0.0))
-		var temp_s := NationalModifierManager.get_supply_modifiers(player_tag)
+		var temp_s: Dictionary = NationalModifierManager.get_supply_modifiers(player_tag)
 		nat_reinforce += float(temp_s.get("reinforcement_speed", 0.0))
 
 	# === Radio tree (Support) effects: planning_speed and reconnaissance ===
@@ -1079,6 +1537,34 @@ func _plan_route(
 		if recon > 0.0:
 			# Better reconnaissance improves intel, reducing effective interdiction
 			plan.interdiction_chance *= maxf(0.55, 1.0 - recon * 1.2)   # 0.05 from radio_i → noticeable reduction
+
+		# Drone swarms + advanced scanners (drone_swarm_1980, scanners_sensors_1975): +recon/precision from tech + rule_flag
+		# Wires to supply interdiction (drones for persistent ISR/EW, scanners multi-spectral); balance: jamming/EM/power vuln (flags allow counter via agents)
+		if typeof(TechnologyManager) != TYPE_NIL:
+			if TechnologyManager.has_rule_flag(player_tag, "drone_warfare") or TechnologyManager.has_rule_flag(player_tag, "advanced_sensors"):
+				var drone_recon := 0.0
+				if TechnologyManager.has_rule_flag(player_tag, "drone_warfare"):
+					drone_recon += 0.12
+				if TechnologyManager.has_rule_flag(player_tag, "advanced_sensors"):
+					drone_recon += 0.18
+				plan.interdiction_chance *= maxf(0.4, 1.0 - drone_recon)
+				# Also slight supply efficiency (better routing/awareness)
+				plan.daily_supply_need = max(0.1, plan.daily_supply_need * (1.0 - drone_recon * 0.25))
+
+		# Shields/tele high-future (deflector_shields_1995, teleporters_2025): power/precision costs trade-off (higher supply for energy fields/transporters)
+		# Balance with prior supply engines: strong defense/rapid but power hog (fusion prereq); also in space habs
+		if typeof(TechnologyManager) != TYPE_NIL:
+			if TechnologyManager.has_rule_flag(player_tag, "energy_shields"):
+				plan.daily_supply_need *= 1.08  # power draw
+			if TechnologyManager.has_rule_flag(player_tag, "teleportation"):
+				plan.daily_supply_need *= 1.12  # extreme energy/precision
+				plan.interdiction_chance *= 0.6  # hard to interdict teleported supply? but risky
+			# Use rapid_deployment mod from nat for faster effective reinforce in plans
+			if typeof(NationalModifierManager) != TYPE_NIL:
+				var sm := NationalModifierManager.get_combat_modifiers(player_tag)
+				var rapid := float(sm.get("rapid_deployment", 0.0))
+				if rapid > 0.0:
+					plan.daily_supply_need *= maxf(0.7, 1.0 - rapid * 0.5)  # offset some via efficiency of instant?
 
 		# Airfield special sites provide additional reconnaissance (Phase 2)
 		var air_recon := 0.0
@@ -1093,6 +1579,35 @@ func _plan_route(
 		if air_recon > 0.0:
 			plan.interdiction_chance *= maxf(0.7, 1.0 - air_recon * 0.01)
 
+	# Sea naval raiding/protection from orders (S&D/MINELAY/STRIKE in sea on route add threat; CONVOY_DUTY/ESCORT protect)
+	# This makes assigning aggressive orders to fleets in key sea zones (e.g. Atlantic, straits) directly raid enemy supply, while escort orders safeguard your own.
+	var sea_raiding := 0.0
+	var sea_protect := 0.0
+	for pid in plan.province_path:
+		var p: Province = provinces.get(pid)
+		if p != null and p.is_sea:
+			# Raiding threat from enemy aggressive orders
+			var threats = get_meta("sea_naval_raiding") if has_meta("sea_naval_raiding") else {}
+			var sea_th = threats.get(pid, {})
+			for r in sea_th:
+				if r != player_tag:
+					sea_raiding += float(sea_th[r]) * 0.015
+			# Persistent minelay threat from MINELAY order (decays, cleared by ASW)
+			if mined_seas.get(pid, 0) > 0:
+				sea_raiding += 0.05  # adds to interdiction until cleared
+			# Protection from own CONVOY/ESCORT orders in the sea
+			if typeof(LeaderManager) != TYPE_NIL:
+				for f in LeaderManager.get_formations_for_country(player_tag):
+					if f and f.get_category() == "naval" and f.stationed_province_id == pid and f.current_naval_order in [Formation.NAVAL_ORDER_CONVOY_DUTY, Formation.NAVAL_ORDER_ESCORT]:
+						sea_protect += 0.05  # or use f.get_naval_order_supply_mod etc.
+	if sea_raiding > 0.0:
+		plan.interdiction_chance = min(0.92, plan.interdiction_chance + sea_raiding)
+		plan.interdiction_breakdown["sea_naval_raiding"] = sea_raiding
+	if sea_protect > 0.0:
+		var prot_red := clampf(sea_protect * 0.8, 0.0, 0.4)
+		plan.interdiction_chance *= (1.0 - prot_red)
+		plan.interdiction_breakdown["sea_naval_protect"] = prot_red
+
 	plan.reinforcement_modifier = maxf(0.6, 1.0 + route_reinforce + nat_reinforce)
 
 	var attrition := get_attrition_cargo_summary()
@@ -1103,7 +1618,7 @@ func _plan_route(
 	if typeof(NationalSpiritManager) != TYPE_NIL:
 		attrition_res += NationalSpiritManager.get_total_attrition_reduction_modifier(player_tag)
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var temp := NationalModifierManager.get_supply_modifiers(player_tag)
+		var temp: Dictionary = NationalModifierManager.get_supply_modifiers(player_tag)
 		attrition_res += float(temp.get("attrition_reduction", 0.0))
 
 	if attrition_res > 0.0:
@@ -1143,7 +1658,18 @@ func _calculate_route_interdiction_resistance(path: Array, player_tag: String) -
 		count += 1
 	if count == 0:
 		return 0.0
-	return total / float(count)
+	var base_avg := total / float(count)
+
+	# Regional convoy protection boosts route resistance (full control of naval/chokepoint regions)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+		var reg := MapManager.get_active_regional_control_bonuses(player_tag)
+		var c_eff := float(reg.get("convoy_efficiency", 0.0))
+		var c_prot := float(reg.get("convoy_protection", 0.0))
+		var n_mult := float(reg.get("naval_range_multiplier", 1.0))
+		var reg_boost: float = c_eff + c_prot + max(0.0, n_mult - 1.0) * 0.2
+		if reg_boost > 0.0:
+			base_avg += reg_boost * 0.5  # additive to resistance
+	return base_avg
 
 
 ## Average friendly-path reinforcement speed modifier (dev/infra + national).

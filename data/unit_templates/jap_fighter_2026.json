@@ -4,7 +4,7 @@
   "design_family": "japanese_army_2026_air",
   "base_type": "Air",
   "size_category": "Medium",
-  "visual_archetype": "fighter",
+  "visual_archetype": "jet_fighter",
   "crew_required": 1,
   "base_training_level": 38,
   "max_experience_level": 100,

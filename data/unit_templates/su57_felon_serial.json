@@ -4,7 +4,7 @@
   "design_family": "russian_air_twenty_twenties",
   "base_type": "Air",
   "size_category": "Heavy",
-  "visual_archetype": "fighter",
+  "visual_archetype": "prop_fighter",
   "crew_required": 1,
   "base_training_level": 36,
   "max_experience_level": 100,

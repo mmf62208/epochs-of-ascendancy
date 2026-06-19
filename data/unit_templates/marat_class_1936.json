@@ -4,7 +4,7 @@
   "design_family": "soviet_naval_1936",
   "base_type": "Naval",
   "size_category": "Heavy",
-  "visual_archetype": "battleship",
+  "visual_archetype": "destroyer",
   "crew_required": 950,
   "base_training_level": 30,
   "max_experience_level": 100,

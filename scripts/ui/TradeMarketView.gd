@@ -47,6 +47,9 @@ var my_offers_button: Button
 @onready var refresh_button: Button = $Margin/MainVBox/ButtonHBox/RefreshButton
 @onready var close_button: Button = $Margin/MainVBox/ButtonHBox/CloseButton
 
+# Persistent convoys section for active protected trade flows (high-value: shows regional convoy protection from full naval regions)
+var convoys_vbox: VBoxContainer = null
+
 func _ready() -> void:
 	# Try to get the real player country
 	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
@@ -91,6 +94,13 @@ func _ready() -> void:
 	# Start in Public Market
 	_set_mode("PUBLIC")
 
+	# Create persistent convoys section at top (always visible, above the scroll list for offers)
+	convoys_vbox = VBoxContainer.new()
+	main_vbox.add_child(convoys_vbox)
+	# Position it after mode_hbox, before scroll (index 2 or 3)
+	main_vbox.move_child(convoys_vbox, 3)
+	_update_convoys_section()
+
 	# Optional: Listen to TradeManager changes to auto-refresh (nice to have)
 	if typeof(TradeManager) != TYPE_NIL:
 		if not TradeManager.offer_created.is_connected(_on_trade_manager_changed):
@@ -99,12 +109,18 @@ func _ready() -> void:
 			TradeManager.deal_accepted.connect(_on_trade_manager_changed)
 		if not TradeManager.deal_rejected.is_connected(_on_trade_manager_changed):
 			TradeManager.deal_rejected.connect(_on_trade_manager_changed)
+		if not TradeManager.trade_flow_interdicted.is_connected(_on_trade_manager_changed):
+			TradeManager.trade_flow_interdicted.connect(_on_trade_manager_changed)
+		if not TradeManager.trade_flow_created.is_connected(_on_trade_manager_changed):
+			TradeManager.trade_flow_created.connect(_on_trade_manager_changed)
+			TradeManager.deal_rejected.connect(_on_trade_manager_changed)
 		if not TradeManager.counter_offer_requested.is_connected(_on_counter_created):
 			TradeManager.counter_offer_requested.connect(_on_counter_created)
 
 func _on_trade_manager_changed(_a = null, _b = null, _c = null, _d = null) -> void:
 	# Simple auto-refresh when offers change
 	_refresh_current_mode()
+	_update_convoys_section()
 
 func _set_mode(new_mode: String) -> void:
 	_current_mode = new_mode
@@ -188,6 +204,8 @@ func _refresh_current_mode() -> void:
 
 	for offer_data in offers:
 		_add_offer_row(offer_data)
+
+	_update_convoys_section()
 
 func _clear_list() -> void:
 	for child in list_vbox.get_children():
@@ -410,11 +428,57 @@ func _on_reject_pressed(offer_id: String) -> void:
 
 func _on_close_pressed() -> void:
 	hide()
+
+func _update_convoys_section() -> void:
+	if convoys_vbox == null:
+		return
+	for child in convoys_vbox.get_children():
+		child.queue_free()
+	if typeof(TradeManager) == TYPE_NIL:
+		return
+	var active_flows: Array = TradeManager.get_active_trade_flows() if TradeManager.has_method("get_active_trade_flows") else []
+	if active_flows.is_empty():
+		var lbl := Label.new()
+		lbl.text = "No active protected convoys."
+		RetrowaveTheme.style_body_label(lbl)
+		convoys_vbox.add_child(lbl)
+		return
+	var header := Label.new()
+	header.text = "Active Protected Convoys (%d) - regional bonuses reduce interdiction loss" % active_flows.size()
+	RetrowaveTheme.style_title(header)
+	convoys_vbox.add_child(header)
+	for f in active_flows:
+		if not (f is TradeFlow):
+			continue
+		var prot := float(f.metadata.get("regional_convoy_protection", 0.0))
+		var lost := f.total_lost_to_interdiction
+		var attr := float(f.metadata.get("last_route_attrition", 0.0))
+		var line := Label.new()
+		line.text = "  %s→%s: %.1f %s/turn (prot %.0f%%, lost %.1f%s)" % [f.from_tag, f.to_tag, f.quantity_per_turn, f.item_id, prot*100, lost, (", attr %.1f%%" % (attr*100)) if attr > 0.001 else ""]
+		RetrowaveTheme.style_body_label(line)
+		convoys_vbox.add_child(line)
+	# Add demo interdict button for harness (non-AI)
+	var demo_btn := Button.new()
+	demo_btn.text = "Demo Interdict Convoy (harness)"
+	demo_btn.pressed.connect(func():
+		if active_flows.size() > 0:
+			var tf: TradeFlow = active_flows[0]
+			if typeof(TradeManager) != TYPE_NIL:
+				TradeManager.interdict_trade_flow(tf.flow_id, "demo_sub", 0.3)
+				_update_convoys_section()  # refresh
+				if typeof(LeaderEventUI) != TYPE_NIL:
+					LeaderEventUI.show_toast("Demo interdict on %s (loss reduced by protection)" % tf.flow_id)
+	)
+	RetrowaveTheme.style_secondary_button(demo_btn)
+	convoys_vbox.add_child(demo_btn)
+
 	queue_free()
 
 func show_market(initial_mode: String = "PUBLIC", filter_country: String = "") -> void:
 	_set_mode(initial_mode)
 	popup_centered(Vector2(1100, 700))
+
+	_update_convoys_section()
 
 	# Strong pre-filtering support for DiplomacyView handoff
 	if not filter_country.is_empty():

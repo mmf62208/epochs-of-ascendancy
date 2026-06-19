@@ -1,10 +1,10 @@
 {
   "id": "finland_coastal_1936",
-  "name": "Väinämöinen",
+  "name": "V\u00e4in\u00e4m\u00f6inen",
   "design_family": "finnish_naval_1936",
   "base_type": "Naval",
   "size_category": "Medium",
-  "visual_archetype": "cruiser",
+  "visual_archetype": "destroyer",
   "crew_required": 420,
   "base_training_level": 28,
   "max_experience_level": 100,

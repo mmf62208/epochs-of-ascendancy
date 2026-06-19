@@ -4,7 +4,7 @@
   "design_family": "turkish_naval_planned",
   "base_type": "Naval",
   "size_category": "Medium",
-  "visual_archetype": "carrier",
+  "visual_archetype": "destroyer",
   "crew_required": 1200,
   "base_training_level": 30,
   "max_experience_level": 100,

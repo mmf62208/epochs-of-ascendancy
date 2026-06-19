@@ -1,0 +1,40 @@
+{
+  "generated_at": "2026-06-18T22:40:42.574000+00:00",
+  "region": "world_full",
+  "bbox_lonlat": [
+    -180.0,
+    -56.0,
+    180.0,
+    83.0
+  ],
+  "canvas_pixels": [
+    8192,
+    4096
+  ],
+  "game_bounds": {
+    "x": 0,
+    "y": 0,
+    "w": 8192,
+    "h": 4096
+  },
+  "tile_zoom": 3,
+  "layers": {
+    "base": "assets/maps/layers/world_base_stylized.png",
+    "rivers": "assets/maps/layers/world_layer_rivers.png",
+    "elevation": "assets/maps/layers/world_layer_elevation.png",
+    "vegetation": "assets/maps/layers/world_layer_vegetation.png",
+    "composite": "assets/maps/layers/world_grand_theater_composite.png",
+    "snow_mask": "assets/maps/layers/world_snow_mask.png"
+  },
+  "data_sources": {
+    "elevation": "NASA SRTM-derived Terrarium tiles (Mapzen/AWS open elevation tiles)",
+    "satellite": "NASA VIIRS Blue Marble Shaded Relief + Bathymetry (GIBS WMTS)",
+    "rivers": "Natural Earth 1:10m rivers & lake centerlines"
+  },
+  "attribution": [
+    "NASA SRTM elevation (via Terrarium tiles)",
+    "NASA VIIRS Blue Marble",
+    "Natural Earth physical vectors"
+  ],
+  "notes": "Stylized for grand-strategy readability (clean default: parchment + directional hills + rivers + subtle coast). Vegetation is a separate very faint togglable layer (V). See TerrainLayerStack and docs/REAL_WORLD_MAP_LAYERS.md."
+}

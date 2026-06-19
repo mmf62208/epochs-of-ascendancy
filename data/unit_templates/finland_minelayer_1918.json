@@ -4,7 +4,7 @@
   "design_family": "finnish_naval_1918",
   "base_type": "Naval",
   "size_category": "Light",
-  "visual_archetype": "patrol",
+  "visual_archetype": "destroyer",
   "crew_required": 45,
   "base_training_level": 22,
   "max_experience_level": 100,

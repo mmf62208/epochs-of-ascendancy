@@ -3,7 +3,7 @@
   "name": "Ju 87 Stuka Dive Bomber",
   "base_type": "Air",
   "size_category": "Bomber",
-  "visual_archetype": "bomber",
+  "visual_archetype": "dive_bomber",
   "crew_required": 2,
   "base_training_level": 22,
   "max_experience_level": 100,

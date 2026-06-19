@@ -4,7 +4,7 @@
   "design_family": "australian_naval_1936",
   "base_type": "Naval",
   "size_category": "Medium",
-  "visual_archetype": "cruiser",
+  "visual_archetype": "destroyer",
   "crew_required": 600,
   "base_training_level": 30,
   "max_experience_level": 100,

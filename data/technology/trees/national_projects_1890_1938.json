@@ -1,0 +1,367 @@
+{
+  "_comment": "National R&D Projects — long-duration, high-impact, agent-stealable/sabotageable initiatives. node_kind: 'project'. These sit alongside the core tree for the 'developments' layer. They often unlock powerful modules + designs + doctrine evolution, but carry explicit risks, costs, and detection surfaces for agents. This is a prototype for the recommended hybrid evolution.",
+  "synthetic_fuel_initiative": {
+    "id": "synthetic_fuel_initiative",
+    "name": "Synthetic Fuel & Rubber Initiative",
+    "domain": "industry",
+    "tree_id": "national_projects",
+    "node_kind": "project",
+    "column": 4,
+    "row": 2,
+    "tier": 3,
+    "era_min": 1932,
+    "era_max": 1950,
+    "epoch": "interwar",
+    "prerequisites": ["synthetic_materials_1917", "chemical_industry_1909"],
+    "mutually_exclusive_with": ["import_oil_security"],
+    "research": {
+      "base_cost_days": 280,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "modifier", "stat": "supply_efficiency", "value": 0.12 },
+      { "type": "equipment_module", "module_id": "synthetic_tires" },
+      { "type": "production_category", "category": "synthetic_fuel", "min_factory_type": "refinery" },
+      { "type": "rule_flag", "flag": "synthetic_autarky" }
+    ],
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 90,
+      "intel_domain": "technology",
+      "detection_signature": "high_industrial",
+      "counter_intel_node": "secure_research_facility"
+    },
+    "ui": {
+      "short_effect": "Major long-term supply independence + synthetic modules (high agent detection risk)",
+      "flavor": "German-style autarky program (Fischer-Tropsch etc.). Massive investment. If enemy agents steal progress or compromise the plants, they gain your fuel tech AND you suffer production halts + intel leaks about your logistics. Friendly resource_explorer or industrial agents can boost via exploration / production missions for extra edge.",
+      "tooltip_stats": ["+12% supply_efficiency (permanent)", "Unlocks advanced synthetic tire & fuel modules", "High theft/sabotage target for agents", "Tradeoff: Creates 'synthetic plant' targets for enemy bombing & espionage", "Agent prod/resource boosts (new missions) mitigate costs / add output"]
+    },
+    "tradeoffs": {
+      "benefits": "Oil blockade immunity, cheap long-war sustainment, unique engine modules",
+      "costs": "High upfront RP and steel/chemical drain, visible industrial signature (easier agent intel and bombing), lock-in (switching to import path later is very expensive)",
+      "consequences": "Successful enemy steal hands them your edge; failed project can trigger national 'fuel crisis' event or doctrine weakness exposure"
+    }
+  },
+  "carrier_aviation_program": {
+    "id": "carrier_aviation_program",
+    "name": "Carrier Aviation Development Program",
+    "domain": "naval_equipment",
+    "tree_id": "national_projects",
+    "node_kind": "project",
+    "column": 4,
+    "row": 0,
+    "tier": 3,
+    "era_min": 1928,
+    "era_max": 1945,
+    "epoch": "interwar",
+    "prerequisites": ["carrier_experiments_1918", "military_aviation_industry_1911"],
+    "mutually_exclusive_with": ["battleship_supremacy_doctrine"],
+    "research": {
+      "base_cost_days": 220,
+      "category": "naval",
+      "ahead_of_time_penalty_per_year": 0.14,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "unit_design", "template_ids": ["akagi_carrier_1936"] },
+      { "type": "equipment_module", "module_id": "ap50_bomb_load" },
+      { "type": "doctrine_key", "key": "carrier_task_force" },
+      { "type": "division_capability", "capability": "carrier_operations" }
+    ],
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 60,
+      "intel_domain": "technology",
+      "detection_signature": "naval_construction"
+    },
+    "ui": {
+      "short_effect": "Full carrier task force capability + naval air modules (alt to battleship focus)",
+      "flavor": "Dedicated program to convert and build proper flat-tops with air groups. Requires vision (and risk). Enemy agents can steal your carrier blueprints or sabotage the flight deck experiments.",
+      "tooltip_stats": ["Unlocks proper CV designs and carrier fighter/bomber modules", "Carrier doctrine key for navy chiefs", "Tradeoff vs BB supremacy path"]
+    },
+    "tradeoffs": {
+      "benefits": "Sea control via airpower, long-range strike, flexible power projection",
+      "costs": "Expensive (steel + trained pilots + special hulls), vulnerable if you lack ASW or fighter cover (agent intel helps enemy subs find your carriers)",
+      "consequences": "If you rush this without supporting sub-hunting tech (stolen or researched), subs become devastating counters. Doctrine lock-in makes switching painful (org hits on fleets)."
+    }
+  },
+  "radar_defense_network": {
+    "id": "radar_defense_network",
+    "name": "Integrated Radar Early Warning Network",
+    "domain": "support",
+    "tree_id": "national_projects",
+    "node_kind": "project",
+    "column": 4,
+    "row": 1,
+    "tier": 3,
+    "era_min": 1935,
+    "era_max": 1955,
+    "epoch": "industrial_war",
+    "prerequisites": ["radar_prototype_1935", "radio_ii"],
+    "research": {
+      "base_cost_days": 180,
+      "category": "electronics",
+      "ahead_of_time_penalty_per_year": 0.13,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "modifier", "stat": "air_detection", "value": 0.25 },
+      { "type": "doctrine_key", "key": "air_defense" },
+      { "type": "building", "building_id": "radar_station_i" }
+    ],
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 45,
+      "intel_domain": "technology"
+    },
+    "ui": {
+      "short_effect": "Major air defense edge + radar stations (UK-style Chain Home alt)",
+      "flavor": "National project to blanket coast with RDF stations + command centers. Huge defensive multiplier. Very tempting theft target for enemy agents (gives them your detection tech).",
+      "tooltip_stats": ["+25% air detection (huge for intercept)", "Unlocks air_defense doctrine key and radar buildings", "High espionage value"]
+    },
+    "tradeoffs": {
+      "benefits": "Survive strategic bombing campaigns, enable night fighting and fighter direction",
+      "costs": "Expensive infra (many stations), if compromised enemy gets your radar tech + knows your coverage gaps",
+      "consequences": "Agent theft of this project can completely flip the Battle of Britain equivalent in the enemy's favor."
+    }
+  },
+  "heavy_breakthrough_armor": {
+    "id": "heavy_breakthrough_armor",
+    "name": "Heavy Tank & Assault Gun Program",
+    "domain": "land_equipment",
+    "tree_id": "national_projects",
+    "node_kind": "project",
+    "column": 4,
+    "row": 3,
+    "tier": 4,
+    "era_min": 1935,
+    "era_max": 1950,
+    "epoch": "industrial_war",
+    "prerequisites": ["infantry_support_tank_doctrine", "tank_plant_i"],
+    "mutually_exclusive_with": ["interwar_light_tank_1932"],
+    "research": {
+      "base_cost_days": 240,
+      "category": "armor",
+      "ahead_of_time_penalty_per_year": 0.16,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "unit_design", "template_ids": ["tiger_i_heavy_tank"] },
+      { "type": "modifier", "stat": "hard_attack", "value": 0.15 },
+      { "type": "equipment_module", "module_id": "bofors_37mm_at" }
+    ],
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 75
+    },
+    "ui": {
+      "short_effect": "Heavy breakthrough armor (Tiger lineage) + hard attack (costly alt path)",
+      "flavor": "Dedicated heavy program for smashing fortified lines or enemy armor. Slow and expensive to produce and field. Attractive for enemy agents to steal (or sabotage to keep you from deploying them).",
+      "tooltip_stats": ["Unlocks heavy tank designs", "+15% hard attack", "Pairs best with methodical or attrition doctrines"]
+    },
+    "tradeoffs": {
+      "benefits": "Can crack tough defenses and out-gun mediums in direct fights",
+      "costs": "Production hog, high fuel/parts demand, mobility penalty in bad terrain; if agent steals the project the enemy gets your heavies first",
+      "consequences": "Over-reliance creates 'heavy tank' counter-doctrines or cheap mass light tank swarms become meta against you."
+    }
+  },
+  "combined_arms_reform_project": {
+    "id": "combined_arms_reform_project",
+    "name": "Combined Arms Doctrine Reform",
+    "domain": "land_doctrine",
+    "tree_id": "national_projects",
+    "node_kind": "project",
+    "column": 4,
+    "row": 4,
+    "tier": 3,
+    "era_min": 1934,
+    "era_max": 1950,
+    "epoch": "industrial_war",
+    "prerequisites": ["radio_ii", "mobile_warfare_study"],
+    "research": {
+      "base_cost_days": 150,
+      "category": "land_doctrine",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "doctrine_key", "key": "combined_arms_school" },
+      { "type": "doctrine_key", "key": "joint_fire_coordination" }
+    ],
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 40
+    },
+    "ui": {
+      "short_effect": "Evolves service doctrine options toward true combined arms (infantry + armor + air + artillery)",
+      "flavor": "Major inter-service reform project. Chiefs + agents drive it. Success unlocks powerful training paths. Failure or theft can expose doctrinal weaknesses (enemy gets intel on your coordination gaps).",
+      "tooltip_stats": ["Unlocks combined_arms and joint_fire doctrine keys for leader training", "Strong synergy with voice radio and CAS tech"]
+    },
+    "tradeoffs": {
+      "benefits": "Best-in-class coordination bonuses, more flexible leaders, counters pure mass or pure mobile enemies",
+      "costs": "Requires investment in multiple domains (radio + air + armor already researched); rigid if you change doctrine later (bigger org hits)",
+      "consequences": "Enemy agent 'doctrine analysis' mission after theft can give them permanent counters to your combined arms tactics."
+    }
+  },
+  "national_revival_initiative": {
+    "id": "national_revival_initiative",
+    "name": "National Revival & Cultural Ascendancy Initiative",
+    "domain": "support",
+    "tree_id": "national_projects",
+    "node_kind": "project",
+    "column": 4,
+    "row": 5,
+    "tier": 3,
+    "era_min": 1918,
+    "era_max": 1950,
+    "epoch": "interwar",
+    "prerequisites": ["land_doctrine_i"],
+    "research": {
+      "base_cost_days": 200,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "modifier", "stat": "prestige", "value": 0.10 },
+      { "type": "rule_flag", "flag": "cultural_revival" }
+    ],
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 50,
+      "intel_domain": "technology"
+    },
+    "ui": {
+      "short_effect": "Big Ascendancy / pillar momentum boost + cultural soft power (agent influence specialists excel)",
+      "flavor": "Post-war revival project tying into Ascendancy Initiatives tree. Boosts national will/prestige pillar. Influence/diplomat agents sponsor for faster success or alt-history cultural branches. Risk: enemy can steal 'narrative' and undermine your cohesion.",
+      "tooltip_stats": ["+10% prestige / Ascendancy momentum", "Unlocks cultural revival options in Ascendancy tree", "High value for influence-specialist agents"]
+    },
+    "tradeoffs": {
+      "benefits": "Accelerates Ascendancy gain, unlocks Golden Age adjacent specials, improves Mandate from soft power, great for underdogs or alt-history reconciliation paths",
+      "costs": "Long duration, diverts agents from tech/intel (opportunity cost vs research projects), visible 'revival' can attract Hidden Hand or enemy counter-narrative ops",
+      "consequences": "If sabotaged or stolen, can cause Cohesion backlash or 'stolen glory' event reducing your Ascendancy. Success makes your agents more effective at future diplomacy missions."
+    }
+  },
+  "guderian_armor_reform_1929": {
+    "id": "guderian_armor_reform_1929",
+    "name": "Guderian-Style Armor Doctrine Reform",
+    "domain": "land_equipment",
+    "tree_id": "national_projects",
+    "node_kind": "project",
+    "column": 4,
+    "row": 6,
+    "tier": 3,
+    "era_min": 1925,
+    "era_max": 1940,
+    "epoch": "interwar",
+    "prerequisites": ["tank_prototypes_1916", "mobile_warfare_study"],
+    "research": {
+      "base_cost_days": 160,
+      "category": "armor",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "doctrine_key", "key": "mobile_warfare" },
+      { "type": "unit_design", "template_ids": ["ger_armor_1936"] },
+      { "type": "production_category", "category": "medium_tank", "min_factory_type": "tank_plant" }
+    ],
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 45
+    },
+    "ui": {
+      "short_effect": "Accelerates mobile armor doctrine + medium tank designs (agent 'saboteur_expert' or military trait leaders excel)",
+      "flavor": "1920s-30s German interwar tank experiments led by visionary officers. Agent with strong military/breakthrough traits as 'lead' gives bonus progress and unlocks faster combined arms synergy. Timeline flavor: post-Versailles covert development.",
+      "tooltip_stats": ["Unlocks blitz/mobile warfare keys + Pz series designs", "Agent leadership (traits like breakthrough_visionary) speeds by 20%+"]
+    },
+    "tradeoffs": {
+      "benefits": "Early mobile doctrine edge, cheaper mediums, strong synergy with CAS projects",
+      "costs": "Diverts from infantry/artillery paths, high enemy intel interest (espionage risk)",
+      "consequences": "If stolen, enemy gains your tank doctrine edge early; success ties to agent record for Ascendancy boost"
+    }
+  },
+  "tukhachevsky_deep_battle_1932": {
+    "id": "tukhachevsky_deep_battle_1932",
+    "name": "Tukhachevsky Deep Battle Operational Reform",
+    "domain": "land_doctrine",
+    "tree_id": "national_projects",
+    "node_kind": "project",
+    "column": 4,
+    "row": 7,
+    "tier": 3,
+    "era_min": 1928,
+    "era_max": 1945,
+    "epoch": "interwar",
+    "prerequisites": ["land_doctrine_i", "mobile_warfare_study"],
+    "research": {
+      "base_cost_days": 180,
+      "category": "land_doctrine",
+      "ahead_of_time_penalty_per_year": 0.11,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "doctrine_key", "key": "deep_battle" },
+      { "type": "division_capability", "capability": "motorized_division" }
+    ],
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 55
+    },
+    "ui": {
+      "short_effect": "Deep echeloned operations doctrine + motorized capability (high 'military' or 'intelligence' attribute agents lead best)",
+      "flavor": "Soviet 1920s-30s operational art development. Agent attributes (esp. high sabotage/intel for 'deep strike' thinking) provide major progress bonus and tie success to national military prestige/Ascendancy. Historical purge risk flavor in alt paths.",
+      "tooltip_stats": ["Deep battle key, echelon bonuses, motorized unlock", "Agent skill/trait leadership reduces cost 15-25%"]
+    },
+    "tradeoffs": {
+      "benefits": "Mass + coordination edge for large fronts, unlocks airborne/motorized synergies",
+      "costs": "Complex coordination (higher command requirements), vulnerable to purges or theft in story events",
+      "consequences": "Stolen deep battle gives enemy layered defense counters; success boosts institutional Cohesion pillar"
+    }
+  },
+  "covert_orbital_initiative": {
+    "id": "covert_orbital_initiative",
+    "name": "Covert Orbital Recon Initiative",
+    "domain": "space_equipment",
+    "tree_id": "national_projects",
+    "node_kind": "project",
+    "column": 5,
+    "row": 8,
+    "tier": 4,
+    "era_min": 1945,
+    "era_max": 1960,
+    "epoch": "industrial_war",
+    "prerequisites": ["rocketry_foundations"],
+    "mutually_exclusive_with": ["public_space_program"],
+    "research": {
+      "base_cost_days": 210,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.14,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "rule_flag", "flag": "secret_funding" },
+      { "type": "rule_flag", "flag": "allow_early_recon_sat" },
+      { "type": "modifier", "stat": "reconnaissance", "value": 0.09 }
+    ],
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 80,
+      "intel_domain": "technology",
+      "counter_intel_node": "secure_research_facility"
+    },
+    "ui": {
+      "icon": "res://assets/graphics/icons/space_race/secret_space.png",
+      "short_effect": "Early secret sats and rocket recon (ties to black budget agents)",
+      "flavor": "1945 alt-history secret space program using captured V2 tech. Funded via agents black market ops or hidden industrial siphons. Public alternative is open prestige race.",
+      "tooltip_stats": ["+9% recon from covert ISR", "secret_funding rule for clandestine units", "High value for tech theft agents"]
+    },
+    "tradeoffs": {
+      "benefits": "Surprise recon edge, early satellite_network path, synergizes with AgentManager secret funding missions",
+      "costs": "Expensive in RP, visible if blown (political cost), diverts agents from other ops",
+      "consequences": "Theft hands enemy your early space ISR; success can unlock special agent missions for ongoing secret space funding"
+    }
+  }
+}

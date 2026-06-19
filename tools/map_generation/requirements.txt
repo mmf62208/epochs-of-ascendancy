@@ -1,0 +1,2 @@
+# Map generation pipeline (optional; stdlib + Pillow minimum)
+pillow>=10.0.0

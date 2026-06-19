@@ -11,7 +11,10 @@
     "era_min": 1916,
     "era_max": 1935,
     "epoch": "pre_war",
-    "prerequisites": ["port_shipyard_i"],
+    "prerequisites": [
+      "port_shipyard_i",
+      "dreadnought_revolution_1906"
+    ],
     "research": {
       "base_cost_days": 75,
       "category": "naval",
@@ -19,11 +22,17 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "unit_design", "template_ids": ["wickes_class_dd_1918"] }
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "wickes_class_dd_1918",
+          "ger_frigate_1918"
+        ]
+      }
     ],
     "ui": {
-      "short_effect": "Wickes-class destroyer (1918 fit)",
-      "flavor": "Mass-produced flush-deckers for convoy escort and ASW."
+      "short_effect": "Wickes-class + early German escorts (1918 fit)",
+      "flavor": "Mass-produced flush-deckers for convoy escort and ASW. WWI U-boat response."
     }
   },
   "patrol_frigate_1918": {
@@ -38,7 +47,9 @@
     "era_min": 1914,
     "era_max": 1935,
     "epoch": "pre_war",
-    "prerequisites": ["port_shipyard_i"],
+    "prerequisites": [
+      "port_shipyard_i"
+    ],
     "research": {
       "base_cost_days": 70,
       "category": "naval",
@@ -46,11 +57,147 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "unit_design", "template_ids": ["usa_frigate_1918"] }
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "usa_frigate_1918",
+          "fra_frigate_1918"
+        ]
+      }
     ],
     "ui": {
       "short_effect": "Coastal patrol frigate designs",
       "flavor": "Gunboat diplomacy and harbor defense in the age of dreadnoughts."
+    }
+  },
+  "early_submarine_warfare_1914": {
+    "id": "early_submarine_warfare_1914",
+    "name": "Early Submarine & U-Boat Tactics",
+    "domain": "naval_equipment",
+    "tree_id": "naval_equipment",
+    "node_kind": "research",
+    "column": 1,
+    "row": 0,
+    "tier": 2,
+    "era_min": 1910,
+    "era_max": 1935,
+    "epoch": "pre_war",
+    "prerequisites": [
+      "port_shipyard_i",
+      "dreadnought_revolution_1906"
+    ],
+    "research": {
+      "base_cost_days": 80,
+      "category": "naval",
+      "ahead_of_time_penalty_per_year": 0.11,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "bars_class_sub_1918",
+          "type_viic"
+        ]
+      },
+      {
+        "type": "production_category",
+        "category": "submarine",
+        "min_factory_type": "shipyard"
+      }
+    ],
+    "ui": {
+      "short_effect": "WWI U-boats & fleet subs; unlocks sub production & Type VII lineage",
+      "flavor": "Unrestricted warfare debut. ASW response forces destroyer tech forward."
+    }
+  },
+  "carrier_experiments_1918": {
+    "id": "carrier_experiments_1918",
+    "name": "Aircraft Carrier Experiments",
+    "domain": "naval_equipment",
+    "tree_id": "naval_equipment",
+    "node_kind": "research",
+    "column": 2,
+    "row": 0,
+    "tier": 2,
+    "era_min": 1916,
+    "era_max": 1938,
+    "epoch": "interwar",
+    "prerequisites": [
+      "military_aviation_industry_1911",
+      "port_shipyard_i"
+    ],
+    "mutually_exclusive_with": [
+      "battleship_supremacy_doctrine"
+    ],
+    "research": {
+      "base_cost_days": 120,
+      "category": "naval",
+      "ahead_of_time_penalty_per_year": 0.13,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "akagi_carrier_1936"
+        ]
+      },
+      {
+        "type": "division_capability",
+        "capability": "carrier_operations"
+      },
+      {
+        "type": "doctrine_key",
+        "key": "carrier_task_force"
+      }
+    ],
+    "ui": {
+      "short_effect": "Early CVs (Langley/Akagi lineage); unlocks carrier ops & task force doctrine key",
+      "flavor": "Furious, Argus, Hosho experiments. US/UK/Japan interwar race for air power at sea. Alt-history: earlier full commitment."
+    }
+  },
+  "battleship_supremacy_doctrine": {
+    "id": "battleship_supremacy_doctrine",
+    "name": "Battleship Supremacy & Big Gun Navy",
+    "domain": "naval_equipment",
+    "tree_id": "naval_equipment",
+    "node_kind": "research",
+    "column": 2,
+    "row": 1,
+    "tier": 2,
+    "era_min": 1918,
+    "era_max": 1940,
+    "epoch": "interwar",
+    "prerequisites": [
+      "dreadnought_revolution_1906"
+    ],
+    "mutually_exclusive_with": [
+      "carrier_experiments_1918"
+    ],
+    "research": {
+      "base_cost_days": 100,
+      "category": "naval",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "bismarck",
+          "yamato"
+        ]
+      },
+      {
+        "type": "modifier",
+        "stat": "naval_firepower",
+        "value": 0.1
+      }
+    ],
+    "ui": {
+      "short_effect": "Fast BBs & super-battleships (Bismarck/Yamato); +naval gunnery",
+      "flavor": "Decisive battle fleet doctrine (IJN historical, alt for others). Heavy armor/guns over airpower."
     }
   },
   "patrol_frigate_1936": {
@@ -59,13 +206,16 @@
     "domain": "naval_equipment",
     "tree_id": "naval_equipment",
     "node_kind": "research",
-    "column": 1,
-    "row": 0,
+    "column": 0,
+    "row": 2,
     "tier": 2,
     "era_min": 1934,
     "era_max": 1965,
     "epoch": "industrial_war",
-    "prerequisites": ["port_shipyard_i"],
+    "prerequisites": [
+      "destroyer_1918",
+      "port_shipyard_i"
+    ],
     "research": {
       "base_cost_days": 95,
       "category": "naval",
@@ -73,11 +223,60 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "unit_design", "template_ids": ["usa_frigate_1936"] }
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "usa_frigate_1936",
+          "ger_frigate_1936"
+        ]
+      }
     ],
     "ui": {
       "short_effect": "Pre-war destroyer leader / frigate lineage",
-      "flavor": "Long-range escorts for trade protection and fleet screening."
+      "flavor": "Long-range escorts for trade protection and fleet screening. Tribal, Maass, Benson classes."
+    }
+  },
+  "naval_aviation_modules_1935": {
+    "id": "naval_aviation_modules_1935",
+    "name": "Carrier Air Group & Naval Aviation Tech",
+    "domain": "naval_equipment",
+    "tree_id": "naval_equipment",
+    "node_kind": "research",
+    "column": 1,
+    "row": 2,
+    "tier": 3,
+    "era_min": 1934,
+    "era_max": 1950,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "carrier_experiments_1918",
+      "aircraft_industry_ii_1935"
+    ],
+    "research": {
+      "base_cost_days": 85,
+      "category": "naval",
+      "ahead_of_time_penalty_per_year": 0.11,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "equipment_module",
+        "module_id": "ap50_bomb_load"
+      },
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "a6m_zero_fighter"
+        ]
+      },
+      {
+        "type": "doctrine_key",
+        "key": "carrier_task_force"
+      }
+    ],
+    "ui": {
+      "short_effect": "Dedicated carrier aircraft + modules (Zero, early USN fighters); strengthens CV doctrine",
+      "flavor": "Arrestor wires, deck parks, folding wings. Transforms CV from scout to striking arm."
     }
   },
   "multirole_frigate_2026": {
@@ -92,7 +291,9 @@
     "era_min": 2015,
     "era_max": 2050,
     "epoch": "near_future",
-    "prerequisites": ["patrol_frigate_1936"],
+    "prerequisites": [
+      "patrol_frigate_1936"
+    ],
     "research": {
       "base_cost_days": 120,
       "category": "naval",
@@ -100,11 +301,222 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "unit_design", "template_ids": ["usa_frigate_2026"] }
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "usa_frigate_2026"
+        ]
+      }
     ],
     "ui": {
-      "short_effect": "Arleigh Burke–class guided-missile destroyer line",
+      "short_effect": "Arleigh Burke\u2013class guided-missile destroyer line",
       "flavor": "AEGIS, VLS, and integrated air defense for blue-water fleets."
+    }
+  },
+  "steam_turbine_naval_1906": {
+    "id": "steam_turbine_naval_1906",
+    "name": "Steam Turbine Naval Propulsion",
+    "domain": "naval_equipment",
+    "tree_id": "naval_equipment",
+    "node_kind": "research",
+    "column": 0,
+    "row": 2,
+    "tier": 1,
+    "era_min": 1905,
+    "era_max": 1935,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "steam_propulsion_1880"
+    ],
+    "research": {
+      "base_cost_days": 70,
+      "category": "naval",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "naval_speed",
+        "value": 0.07
+      },
+      {
+        "type": "module_unlock",
+        "module_ids": [
+          "geared_steam_turbine_60k",
+          "iowa_class_turbine_212k"
+        ]
+      }
+    ],
+    "ui": {
+      "short_effect": "Dreadnought-era big speed jump for capital ships. Coal/oil turbine power.",
+      "flavor": "Parsons turbines revolutionize naval power. Fast battleships and early carriers. Still steam but far better power density; pairs with good boilers and later oil conversion."
+    }
+  },
+  "diesel_sub_propulsion_1930": {
+    "id": "diesel_sub_propulsion_1930",
+    "name": "Advanced Diesel-Electric Sub Propulsion",
+    "domain": "naval_equipment",
+    "tree_id": "naval_equipment",
+    "node_kind": "research",
+    "column": 1,
+    "row": 3,
+    "tier": 2,
+    "era_min": 1925,
+    "era_max": 1950,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "diesel_engine_1912"
+    ],
+    "research": {
+      "base_cost_days": 85,
+      "category": "naval",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "submarine_range",
+        "value": 0.12
+      },
+      {
+        "type": "rule_flag",
+        "flag": "advanced_diesel_sub"
+      },
+      {
+        "type": "module_unlock",
+        "module_category": "sub_diesel"
+      }
+    ],
+    "ui": {
+      "short_effect": "Long-range, efficient sub engines. Diesel mastery shines for undersea warfare and commerce raiding.",
+      "flavor": "German Type VII / US Gato backbone. If you went heavy diesel early, your subs are better and cheaper to run. Gas-only paths struggle with range/endurance here."
+    }
+  },
+  "dual_purpose_guns_1935": {
+    "id": "dual_purpose_guns_1935",
+    "name": "Dual-Purpose Guns (Surface + AA)",
+    "domain": "naval_equipment",
+    "tree_id": "naval_equipment",
+    "node_kind": "research",
+    "column": 2,
+    "row": 2,
+    "tier": 3,
+    "era_min": 1932,
+    "era_max": 1955,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "fire_control_computers_1936",
+      "steam_turbine_naval_1906"
+    ],
+    "research": {
+      "base_cost_days": 90,
+      "category": "naval",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "naval_aa",
+        "value": 0.15
+      },
+      {
+        "type": "modifier",
+        "stat": "naval_firepower",
+        "value": 0.08
+      },
+      {
+        "type": "equipment_module",
+        "module_id": "bofors_37mm_at"
+      }
+    ],
+    "ui": {
+      "short_effect": "Dual-purpose 5\"/127mm+ guns: strong vs surface and aircraft. US/UK style.",
+      "flavor": "Guns that do both surface fire and AA. Enables lighter, more flexible escorts and cruisers. Trade-off vs pure heavy battleship guns (less armor pen on capital ships) or pure AA focus.",
+      "icon": ""
+    }
+  },
+  "heavy_siege_coastal_artillery_1930": {
+    "id": "heavy_siege_coastal_artillery_1930",
+    "name": "Heavy & Siege Coastal Artillery",
+    "domain": "naval_equipment",
+    "tree_id": "naval_equipment",
+    "node_kind": "research",
+    "column": 3,
+    "row": 1,
+    "tier": 2,
+    "era_min": 1928,
+    "era_max": 1950,
+    "epoch": "interwar",
+    "prerequisites": [
+      "battleship_supremacy_doctrine"
+    ],
+    "research": {
+      "base_cost_days": 80,
+      "category": "naval",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "coastal_defense",
+        "value": 0.25
+      },
+      {
+        "type": "building",
+        "building_id": "coastal_battery_heavy"
+      }
+    ],
+    "ui": {
+      "short_effect": "Massive coastal siege guns and heavy batteries for shore defense and bombardment.",
+      "flavor": "16\"+ coastal guns, railway siege artillery for ports. Devastating vs amphibious assaults and for bombarding enemy coasts. Expensive, immobile, vulnerable to air/ counter-battery. Trade-off vs mobile fleet focus.",
+      "icon": ""
+    }
+  },
+  "anti_ship_missiles_1955": {
+    "id": "anti_ship_missiles_1955",
+    "name": "Anti-Ship & Multi-Role Guided Missiles (Trump-class Proto)",
+    "domain": "naval_equipment",
+    "tree_id": "naval_equipment",
+    "node_kind": "research",
+    "column": 1,
+    "row": 4,
+    "tier": 4,
+    "era_min": 1950,
+    "era_max": 1980,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "guided_missiles_air_1944",
+      "dual_purpose_guns_1935"
+    ],
+    "research": {
+      "base_cost_days": 130,
+      "category": "naval",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "missile_navy"
+      },
+      {
+        "type": "modifier",
+        "stat": "anti_ship_missile_dmg",
+        "value": 0.3
+      },
+      {
+        "type": "equipment_module",
+        "module_id": "brimstone_missile"
+      }
+    ],
+    "ui": {
+      "short_effect": "Ship-launched anti-ship, anti-air, multi-role missiles. Missile-heavy 'Trump-class' style future BBs/cruisers.",
+      "flavor": "Exocet/Harpoon precursors on steroids. Transforms surface warfare: standoff strikes, saturation attacks. High cost per shot, needs good sensors/electronics. Trade-off vs traditional gun battleships (ammo endurance, close-range brawling, cheaper sustained fire).",
+      "icon": ""
     }
   }
 }

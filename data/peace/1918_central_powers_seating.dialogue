@@ -1,0 +1,36 @@
+# 1918_central_powers_seating.dialogue
+# Real sample for Dialogue Manager 3
+# Used in the Armistice Peace Conference for the key historical vs alt-history choice.
+# Responses use `do GameData.record_term_choice(...)` to update the peace state live.
+# Conditions use leverage passed from the calling code.
+
+~ central_powers_seating
+
+The Armistice has been signed on 11 November 1918. The victors are gathering to dictate the peace.
+
+The question of whether the defeated Central Powers — Germany, Austria-Hungary, and the Ottoman Empire — will have any voice at the table is the first great test of the new order.
+
+{leverage > 40} Your agents have built substantial leverage through influence operations, bribes, and compromises among the Entente ministers. The historical path is no longer inevitable.
+
+- [HISTORICAL] Full Exclusion — Germany, Austria-Hungary and the Ottomans shall have no substantive seat. The terms will be dictated to them.
+  do GameData.record_term_choice("central_powers_seating", "full_exclusion")
+  This is the historical outcome. Grievance among the defeated will be severe and long-lasting. The seeds of future crises are sown.
+  => end
+
+- Limited Observers — The Central Powers may send observers and have a limited voice on secondary matters.
+  do GameData.record_term_choice("central_powers_seating", "limited_observers")
+  A compromise. Some bitterness is eased, but the core power imbalance remains.
+  => end
+
+- Full Participants (Major Alt-History) — Through extraordinary effort your side has forced full participation at the table for the defeated powers.
+  do GameData.record_term_choice("central_powers_seating", "full_participants")
+  This is a profound divergence from history. Reconciliation paths may open earlier, but the Entente victors will feel betrayed. Backlash and instability are likely in the coming years.
+  => end
+
+=> END
+
+# End title for clean close
+~ end
+
+The choice has been recorded. You may now review the other terms or resolve the conference.
+=> END

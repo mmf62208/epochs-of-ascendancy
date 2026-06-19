@@ -4,7 +4,7 @@
   "design_family": "uk_naval_modern",
   "base_type": "Naval",
   "size_category": "Medium",
-  "visual_archetype": "destroyer",
+  "visual_archetype": "frigate",
   "crew_required": 118,
   "base_training_level": 30,
   "max_experience_level": 100,

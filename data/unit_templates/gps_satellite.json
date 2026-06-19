@@ -30,7 +30,7 @@
     "Engine": "vanguard_second_stage"
   },
   "unlock_tech": [
-    "navigation_satellites"
+    "satellite_network"
   ],
   "can_mount_drones": false,
   "is_vehicle": true,

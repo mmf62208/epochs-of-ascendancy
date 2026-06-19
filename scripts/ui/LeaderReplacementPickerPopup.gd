@@ -186,13 +186,15 @@ func _on_vacant_pressed() -> void:
 
 func _on_later_pressed() -> void:
 	replacement_completed.emit(_request.duplicate(), "", false)
-	queue_free()
+	hide()
+	call_deferred("queue_free")
 
 
 func _finish(new_leader_id: String, left_vacant: bool) -> void:
 	replacement_completed.emit(_request.duplicate(), new_leader_id, left_vacant)
 	_refresh_leader_screen()
-	queue_free()
+	hide()
+	call_deferred("queue_free")
 
 
 func _refresh_leader_screen() -> void:

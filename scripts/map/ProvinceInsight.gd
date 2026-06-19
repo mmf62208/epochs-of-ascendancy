@@ -214,6 +214,10 @@ static func build_inspector_full_bbcode(
 	if not battle.is_empty():
 		lines.append("")
 		lines.append(battle)
+	var missions := str(report.get("stationed_formations", ""))
+	# Always show the section for gameplay visibility (player can see at a glance which formations have orders/missions here, even if none; useful for planning assaults, naval ops etc.)
+	lines.append("")
+	lines.append("%sFormations & Missions here: %s[/color]" % [COLOR_TECH, missions])
 	return "\n".join(lines)
 
 
@@ -274,7 +278,7 @@ static func build_combat_summary_for_inspector(
 		elif selected_province_id == other.id:
 			attacker = other
 			defender = province
-		var preview := get_battle_preview(attacker, defender)
+		var preview: Dictionary = get_battle_preview(attacker, defender)
 		if not preview.is_empty():
 			lines.append(
 				"vs %s: engagement width %.1f (%s)"
@@ -1173,6 +1177,75 @@ static func build_inspector_conflict_section(province: Province) -> String:
 		return ""
 	var lines: PackedStringArray = []
 	lines.append("%s── Conflict / control ──[/color]" % COLOR_HEADER)
+	# Regional strategic control indicator (full region ownership gives powerful bonuses)
+	var rid: int = 0
+	if MapManager.has_method("get_province_region_id"):
+		rid = MapManager.get_province_region_id(province.id)
+	if rid > 0:
+		var rname: String = MapManager.get_strategic_region_name(rid)
+		var fully: bool = MapManager.is_strategic_region_fully_controlled(rid, province.owner_tag)
+		var ctrl_line: String = "Region: %s" % rname
+		if fully:
+			ctrl_line += "  [b][color=#4ade80]FULLY CONTROLLED[/color][/b] (+regional bonuses active)"
+			# Population pride callout
+			var bonuses := MapManager.get_active_regional_control_bonuses(province.owner_tag)
+			if float(bonuses.get("regional_pride", 0.0)) > 0.0:
+				ctrl_line += "  [i]Local population proud & united[/i]"
+			# Show a couple more active flavorful bonuses for the full region(s)
+			var extra := []
+			if float(bonuses.get("factory_output", 0.0)) > 0.0: extra.append("factory +%.0f%%" % (float(bonuses["factory_output"])*100))
+			if float(bonuses.get("manpower_recovery", 0.0)) > 0.0: extra.append("manpower +%.0f%%" % (float(bonuses["manpower_recovery"])*100))
+			if extra.size() > 0:
+				ctrl_line += "  [" + ", ".join(extra) + "]"
+		lines.append(ctrl_line)
+
+	# NEW inspector fields for pop/manpower (phase1): nat pop -> labor (prod bonus) + recruits/pool; feeds width/reinf/strain. Local factories benefit from it. See F10 recruit/pop buttons + TopInfoBar/Policy.
+	if province.owner_tag and typeof(GameData) != TYPE_NIL:
+		var ps: Dictionary = GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
+		var nat_pop: float = float(ps.get("population", {}).get(province.owner_tag, 0.0))
+		var rec: int = GameData.get_available_recruits(province.owner_tag) if GameData.has_method("get_available_recruits") else 0
+		var wbonus: float = GameData.get_national_manpower_width_bonus(province.owner_tag) if GameData.has_method("get_national_manpower_width_bonus") else 0.0
+		var labor: float = 1.0
+		if nat_pop > 0.0:
+			labor = clampf(1.0 + (nat_pop / 100000000.0) * 0.2, 1.0, 1.5)
+		lines.append("👥 Pop/Manpower (econ/war): nat=%.1fM rec=%d labor×%.2f width+%.0f%% (drives prod+recruit+width+reinf; recruit strains coh)" % [nat_pop / 1000000.0, rec, labor, wbonus * 100.0])
+		if typeof(FactoryManager) != TYPE_NIL and FactoryManager.get_factories_in_province(province.id).size() > 0:
+			lines.append("  (local factories here use pop labor bonus for output; click for lines + advance time to produce)")
+
+	# Terrain from layers inference (real DEM/veg data for accurate highlands etc.)
+	if MapManager.has_method("get_province_terrain"):
+		var terr := MapManager.get_province_terrain(province.id)
+		if terr.has("terrain") and terr.get("source", "") == "real_layers_inference":
+			var tline := "Terrain (inferred from elev/veg layers): %s (move x%.2f)" % [str(terr.get("terrain", "plains")).capitalize(), float(terr.get("movement_cost", 1.0))]
+			if terr.get("snow_potential", 0.0) > 0.1:
+				tline += " snow_potential %.2f (white bits in winter)" % float(terr.get("snow_potential", 0.0))
+			lines.append(tline)
+	# Demo applied sample river subdiv children (live mutate test from sample, with carried terrain/river_aware from layers inference)
+	if MapManager.has_method("get_demo_subdiv_children"):
+		var demos: Array = MapManager.get_demo_subdiv_children(province.id)
+		if demos and demos.size() > 0:
+			var dline := "Demo river-cross subdiv (sample apply): "
+			var parts: Array = []
+			for d in demos.slice(0, min(5, demos.size())):
+				var t := str(d.get("terrain", "?")).capitalize()
+				var r := " (river)" if d.get("river_aware") else ""
+				parts.append("%s%s" % [t, r])
+			dline += ", ".join(parts)
+			if demos.size() > 5:
+				dline += " ..."
+			lines.append(dline)
+	# Naval orders visibility for sea provinces (player can see fleets + current orders like CONVOY_DUTY, S&D, MINELAY, ASW in sea zones)
+	if province.is_sea and typeof(LeaderManager) != TYPE_NIL:
+		var naval_info: Array = []
+		for tag in ["USA", "GER", "SOV", "ENG", "FRA"]:  # demo tags with test fleets
+			for f in LeaderManager.get_formations_for_country(tag):
+				if f and f.get_category() == "naval" and f.stationed_province_id == province.id:
+					naval_info.append("%s:%s" % [tag, f.current_naval_order])
+		if naval_info.size() > 0:
+			lines.append("Naval in sea (orders): " + ", ".join(naval_info))
+	# River natural border note (layers/demo) - shows defense/supply bonus in effects/combat
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_river_border") and MapManager.has_river_border(province.id):
+		lines.append("River natural border (demo/layers): +supply/defense (see effects, BM assaults)")
 	lines.append(build_conflict_status_bbcode(province))
 	lines.append(
 		"%sMap: diagonal stripes mark owner ≠ controller provinces.[/color]" % COLOR_MUTED
@@ -1195,7 +1268,7 @@ static func build_overlay_layers_summary_bbcode(
 		layers.append("%s◎ %d agent[/color]" % [COLOR_NATIONAL, n_agent])
 	if supply_overlay_active:
 		layers.append("%s● supply fill[/color]" % COLOR_EFFECTIVE)
-	var tech_preview := MapTechnologyContext.get_build_mode_preview(player_tag)
+	var tech_preview: Dictionary = MapTechnologyContext.get_build_mode_preview(player_tag)
 	if bool(tech_preview.get("active", false)):
 		layers.append("%s🔬 build (planned)[/color]" % COLOR_TECH)
 	if layers.is_empty():
@@ -4051,6 +4124,7 @@ static func build_province_report(
 		"routes_bbcode": build_routes_through_province_bbcode(province.id, tag),
 		"battle_block": _battle_block_for(province, selected_province_id, other_province),
 		"supply_overlay_active": false,
+		"stationed_formations": _get_stationed_missions_summary(province.id, tag),
 	}
 
 
@@ -4239,21 +4313,41 @@ static func format_report_inspector(report: Dictionary, selected_province_id: in
 # --- Stat rows ---
 
 static func _logistics_rows(pe: ProvinceEffects) -> Array[Dictionary]:
-	return [
+	var rows: Array[Dictionary] = [
 		_make_mult_row("Supply throughput", pe.province.get_supply_throughput_modifier(), pe.get_effective_throughput_multiplier(), pe, "supply_throughput"),
 		_make_add_row("Local supply gen", pe.province.get_local_supply_generation_modifier(), pe.get_effective_local_supply_generation(), pe, "local_supply", true),
 		_make_mult_row("Interdiction resist", pe.province.get_interdiction_resistance_modifier(), pe.get_effective_interdiction_resistance(), pe, "interdiction_resistance"),
 		_make_mult_row("Reinforcement", pe.province.get_reinforcement_speed_modifier(), pe.get_effective_reinforcement_speed(), pe, "reinforcement_speed"),
 		_make_score_row("Logistics quality", pe.province.get_logistics_quality(), pe.get_effective_logistics_quality(), pe, "logistics_quality"),
 	]
+	# Playtest visibility for settlement/relocation (demographic engineering payoff).
+	if pe.province and pe.province.settlement_level > 0.01:
+		var s := pe.province.settlement_level
+		rows.append({
+			"label": "Settlement supply bonus",
+			"base": pe.province.get_local_supply_generation_modifier(),
+			"effective": pe.get_effective_local_supply_generation() + (s * 0.05),
+			"note": "+%.0f%% local supply from repopulation/settlement (level %.2f)" % [s * 5 * 100, s]
+		})
+	return rows
 
 
 static func _combat_rows(pe: ProvinceEffects) -> Array[Dictionary]:
-	return [
+	var rows: Array[Dictionary] = [
 		_make_mult_row("Combat width", pe.province.get_combat_width_modifier(), pe.get_effective_combat_width_multiplier(), pe, "combat_width"),
 		_make_mult_row("Org recovery", pe.province.get_organization_recovery_modifier(), pe.get_effective_organization_recovery(), pe, "organization_recovery"),
 		_make_mult_row("Attrition", pe.province.get_attrition_modifier(), pe.get_effective_attrition_multiplier(), pe, "attrition_reduction", true),
 	]
+	# World-class playtest feedback for demographic/relocation systems: surface settlement explicitly.
+	if pe.province and pe.province.settlement_level > 0.01:
+		var set_bonus := pe.province.settlement_level
+		rows.append({
+			"label": "Settlement (repopulation)",
+			"base": pe.province.get_organization_recovery_modifier(),  # proxy
+			"effective": pe.get_effective_organization_recovery() * (1.0 + set_bonus * 0.04),  # approximate uplift
+			"note": "+%.0f%% org / -%.0f%% attrition / + local supply / combat def +%.1f%% from settlement (%.2f)" % [set_bonus * 4 * 100, set_bonus * 3 * 100, pe.province.get_settlement_combat_def_bonus() * 100.0, set_bonus]
+		})
+	return rows
 
 
 static func _make_mult_row(
@@ -4768,6 +4862,10 @@ static func build_supply_map_hint_bbcode(province_id: int) -> String:
 		var ptag := str(sm.player_tag).strip_edges().to_upper()
 		if TradeManager.count_trade_flows_on_map_province(province_id, ptag) > 0:
 			trade_note = " · trade corridor"
+			if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+				var reg := MapManager.get_active_regional_control_bonuses(ptag)
+				if float(reg.get("convoy_efficiency", 0.0)) > 0.0 or float(reg.get("port_capacity", 0.0)) > 0.0 or float(reg.get("naval_range_multiplier", 1.0)) > 1.0:
+					trade_note = " · trade corridor (convoy protected + regional bonuses)"
 	var route_bits := route_note + trade_note
 	var geo := ""
 	if typeof(MapManager) != TYPE_NIL:
@@ -5057,7 +5155,7 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 	var att_width := pe_att.get_effective_combat_width_multiplier() if pe_att else 1.0
 	var def_width := pe_def.get_effective_combat_width_multiplier() if pe_def else 1.0
 	var def_org := pe_def.get_effective_organization_recovery() if pe_def else 1.0
-	return {
+	var preview: Dictionary = {
 		"terrain": terrain,
 		"terrain_width_modifier": terrain_mod,
 		"rules_engagement_width": rules_width,
@@ -5070,7 +5168,24 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 		"defender_infra": defender.infrastructure,
 		"attacker_dev": attacker.development_level,
 		"defender_dev": defender.development_level,
+		# Snow from current weather + layer potential (high value map/weather integration for previews)
+		"snow_coverage": 0.0,
+		"snow_potential": defender.snow_potential,
 	}
+	# Populate live snow if WM available (for combat preview note)
+	if typeof(WeatherManager) != TYPE_NIL:
+		var wm = null
+		if Engine.has_singleton("WeatherManager"):
+			wm = Engine.get_singleton("WeatherManager")
+		if wm == null:
+			var tree := Engine.get_main_loop() as SceneTree
+			if tree and tree.root:
+				wm = tree.root.get_node_or_null("/root/WeatherManager")
+		if wm and wm.has_method("get_province_snow"):
+			preview["snow_coverage"] = float(wm.get_province_snow(defender.id))
+	if float(preview.get("snow_coverage", 0.0)) > 0.1 or float(preview.get("snow_potential", 0.0)) > 0.1:
+		preview["snow_note"] = "❄ Snow cov %.0f%% (layer pot %.0f%%) - attack/mobility hit" % [float(preview["snow_coverage"])*100, float(preview["snow_potential"])*100]
+	return preview
 
 
 static func _local_battle_block(province: Province) -> String:
@@ -5137,6 +5252,8 @@ static func _format_preview_header(title: String, preview: Dictionary) -> String
 			int(preview.get("defender_dev", 0)),
 		]
 	)
+	if preview.has("snow_note"):
+		lines.append("  %s%s[/color]" % [COLOR_MUTED, str(preview.get("snow_note", ""))])
 	lines.append(
 		"  %sAttacker width ×%.2f · Defender width ×%.2f · Defender org ×%.2f[/color]"
 		% [
@@ -5218,3 +5335,26 @@ static func _scenario_loader() -> ScenarioLoader:
 		return null
 	var node: Node = tree.root.find_child("ScenarioLoader", true, false)
 	return node as ScenarioLoader
+
+
+static func _get_stationed_missions_summary(province_id: int, country_tag: String = "") -> String:
+	# Key gameplay UI part: show current naval/air/land missions, intensity, attach for formations in/owning this province.
+	# Used in inspector/report for visibility of orders (player can use Debug sub-menu or future full UI to assign).
+	if typeof(LeaderManager) == TYPE_NIL:
+		return ""
+	var parts: Array[String] = []
+	for f in LeaderManager.get_formations_for_country(country_tag if country_tag else ""):
+		if f == null or f.stationed_province_id != province_id:
+			continue
+		var cat := f.get_category() if f.has_method("get_category") else ""
+		var line := ""
+		if cat == "naval" and f.current_naval_order != "":
+			line = "Naval: %s (int %.1f)" % [f.current_naval_order, f.mission_intensity]
+		elif cat == "air" and f.current_air_mission != "":
+			var att := f.attached_air_formation_id if f.attached_air_formation_id != "" else ""
+			line = "Air: %s%s (int %.1f)" % [f.current_air_mission, " (attached to ship)" if att else "", f.mission_intensity]
+		elif cat == "land" and f.current_land_mission != "":
+			line = "Land: %s (int %.1f)" % [f.current_land_mission, f.mission_intensity]
+		if line != "":
+			parts.append(line)
+	return "; ".join(parts) if parts.size() > 0 else "None (assign via F10 Debug missions/orders sub-menu or full formation UI)"

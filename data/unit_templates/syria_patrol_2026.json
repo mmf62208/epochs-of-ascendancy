@@ -4,7 +4,7 @@
   "design_family": "syrian_naval_2026",
   "base_type": "Naval",
   "size_category": "Light",
-  "visual_archetype": "destroyer",
+  "visual_archetype": "patrol_boat",
   "crew_required": 20,
   "base_training_level": 28,
   "max_experience_level": 100,

@@ -1,0 +1,44 @@
+# 1923_crisis.dialogue
+# Real sample for Dialogue Manager 3 - 1923 Major Crisis (Ruhr / Sanctions / Hyperinflation analog)
+# Triggered from the follow-on system when advancing to 1923 after the 1918 conference.
+# Choices affect grievance, can lead to continuation/partition paths, and respect prior peace terms (e.g. if full_participants was chosen, options are milder).
+# Uses leverage and previous term choices passed from code.
+
+~ crisis_1923
+
+The fragile peace has collapsed into crisis. In the historical path, occupation of the Ruhr and passive resistance have triggered hyperinflation and political chaos in Germany.
+
+{previous_terms.get("central_powers_seating", "") == "full_participants"} Because you secured a seat at the table in 1918, the crisis is less severe and international goodwill is higher. Negotiation is more viable.
+
+{leverage > 30} Your agent networks and prior influence operations give you significant tools to shape the outcome.
+
+- [HISTORICAL] Harsh Repression & Occupation — Double down on enforcement. Crush resistance.
+  do GameData.record_crisis_response("1923", "harsh_repression")
+  do GameData.add_grievance("player", 40, "1923_harsh")
+  The historical choice. Grievance skyrockets. Risk of total collapse and radicalization increases dramatically. Possible continuation trigger.
+  => end
+
+- Negotiate & Seek Stabilization — Use agents and diplomacy to broker a deal, perhaps with international loans or concessions.
+  do GameData.record_crisis_response("1923", "negotiate_stabilize")
+  do GameData.add_grievance("player", 10, "1923_negotiate")
+  A more moderate path. Grievance rises less. Opens doors to 1924 stabilization and reconciliation branches.
+  => end
+
+- Exploit the Chaos (Alt-History / Revanchist) — Use the crisis to advance radical or revanchist goals, or support proxies.
+  do GameData.record_crisis_response("1923", "exploit_chaos")
+  do GameData.add_grievance("player", 25, "1923_exploit")
+  High risk, high reward divergence. May accelerate certain focus or tech paths but invites severe backlash and isolation.
+  => end
+
+- Leverage Agents for Hidden Advantage — Quietly use networks to protect assets, move resources, or position for a future switch/successor play.
+  do GameData.record_crisis_response("1923", "agent_leverage")
+  do GameData.add_grievance("player", 15, "1923_agents")
+  Your pre-crisis agent work pays off. This can feed directly into stash/transfer mechanics if continuation becomes necessary.
+  => end
+
+=> END
+
+~ end
+
+The crisis response has been recorded. The follow-on system will continue to evolve the peace state. Watch for further decision points or collapse conditions.
+=> END

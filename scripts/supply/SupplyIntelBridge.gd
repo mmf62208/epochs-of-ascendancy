@@ -105,3 +105,7 @@ static func _ctrl(province: Province) -> String:
 	if not province.controller_tag.is_empty():
 		return province.controller_tag
 	return province.owner_tag
+
+static func record_naval_spotting(sea_pid: int, spotter: String, spotted: String, strength: float) -> void:
+	# Stub: record for intel UI or alerts. In full would update per-country naval intel map.
+	print("Intel: naval spotting recorded %s spotted %s (%.1f) at sea %d" % [spotter, spotted, strength, sea_pid])

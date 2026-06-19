@@ -1,0 +1,50 @@
+# immigration_culture_events.dialogue
+# Sample for macro culture modeling and immigration policy choices in the Ascendancy Initiatives tree.
+# Launched from demo buttons, CulturalShift states in chart, or post-1918 follow-ons / victory integration when demographic decisions matter.
+# Models real trade-offs: foreign workers/immigration for cheap labor & quick industrial boost vs. citizen job loss, lowered public cohesion, crime rise, cultural friction, Hidden Hand exploitation.
+# Macro groups (not micro cultures): Western, Islamic, African, Sinic, Indic, Orthodox, Latin for playable sandbox while capturing large civilizational differences.
+# Short-term: Industrial/Mandate + (cheap goods/labor), some public happiness from lower prices.
+# Long-term: Public Cohesion drain (jobs, wages, "undermines nation"), Institutional strain (crime/integration load), Elite may benefit, Hidden Hand amplifies public erosion.
+# Policies: open (max short gain, high risk), guest_worker (temporary, lower long hit), skilled_only (talent boost, lower scale), assimilation_focus (spend Ascendancy for better long Cohesion and partial conversion).
+# Ties to pillars, Golden Age eligibility, separatism risk, victory cultural_distance resistance.
+# Conditions can check current pillars or prior peace terms for alt-history flavor (e.g. harsh treaty makes assimilation harder or more needed).
+
+~ start_immigration_choice
+
+Post-war recovery or rapid industrialization pressures push demographic decisions. Do you open to foreign workers from a major cultural sphere for cheap labor and goods (short-term boost to industrial_base and some public sentiment), or pursue a more controlled/assimilation path? Large civilizational differences (Western liberal traditions vs Islamic religious cohesion vs African communal vs Sinic Confucian order) create believable friction. Not every micro-culture — macro spheres keep the sandbox powerful and understandable.
+
+Your current primary sphere and public Cohesion will shape the backlash. Hidden Hand loves unmanaged immigration waves in low-public nations (funds unrest, erodes the very groups that could resist).
+
+- Bring in Western workers (scale moderate, open policy — quick labor/goods, cultural affinity high with many hosts but still job pressure)
+  do GameData.apply_immigration_policy("player", "Western", 0.35, "open")
+  Short: Industrial base and Mandate rise (cheap skilled-ish labor, consumer prices ease). Public gets some happiness from goods. Long: Noticeable public Cohesion drop (citizen competition), institutional crime/integration load. Affinity helps — less severe than distant spheres. Hidden Hand may still exploit public group.
+  => end
+
+- Guest worker program from Islamic world (controlled, lower assimilation intent — classic historical pattern, high short boost, contained long risk)
+  do GameData.apply_immigration_policy("player", "Islamic", 0.45, "guest_worker")
+  Strong short-term industrial/Mandate surge from large cheap labor pool. Public Cohesion hit is real but policy caps some cultural clash and permanent settlement. Elite profits high. If public already low, watch for Hidden Hand amplification and later separatism or radicalization events. Good for quick rebuild after harsh peace terms.
+  => end
+
+- Skilled immigration + assimilation focus from Sinic sphere (higher bar, costs Ascendancy, better long-term cohesion conversion)
+  do GameData.unlock_ascendancy_initiative("player", "assimilation_crisis")  # Reuses the gated path that spends Ascendancy for mitigation
+  do GameData.apply_immigration_policy("player", "Sinic", 0.25, "assimilation_focus")
+  Lower volume but high quality (tech/industry talent). You spend Ascendancy on active assimilation policies (language, values, integration programs). Long-term public and institutional Cohesion recover or even gain as some convert toward your primary. Expensive in the moment — powerful if you are already high Ascendancy heading for Golden Age.
+  => end
+
+- Restricted / Homogeneous path (minimal immigration, protect citizen jobs and public cohesion — slower industrial growth)
+  do GameData.apply_pillar_shift("player", "cohesion", 12, "homogeneous_restriction")
+  do GameData.apply_pillar_shift("player", "industrial_base", -8, "homogeneous_restriction")  # Opportunity cost
+  No short cheap labor boom. Public Cohesion holds or rises (jobs protected, cultural familiarity). Institutional feels stable. Trade-off: Slower industrial_base growth, potential Mandate hit if rivals pull ahead with guest labor. Excellent for high-trust Golden Age push or nations recovering from prior low public (riots/food/rights issues).
+  => end
+
+- African labor wave (open, high scale for raw industry — largest short boost, highest cultural distance friction in many Western/ Sinic hosts)
+  do GameData.apply_immigration_policy("player", "African", 0.55, "open")
+  Massive short industrial_base and cheap goods surge (unskilled + semi for factories, construction, agriculture). Public Cohesion takes the heaviest hit (visible job/wage/crime pressure). Large civilizational distance amplifies long-term erosion and Hidden Hand opportunity. Can accelerate recovery dramatically or plant seeds of later unrest/separatism if not paired with assimilation initiative or strong institutional Cohesion. Classic "cheap labor now, cohesion bomb later" sandbox choice.
+  => end
+
+=> END
+
+~ end
+
+Demographic choice resolved. Watch your Cohesion groups (public bears most visible pain from competition/culture; elite often pushes for more labor; institutional tracks crime and services load). Low public + high immigration = higher separatism risk and Hidden Hand subversion. High Ascendancy + smart policy (or Golden Age special) can turn immigration into a net civilizational strength rather than a slow undermine. These decisions live naturally in the Ascendancy Initiatives tree — not every path leads straight to Golden, but the right combinations (plus agents and economy) get you there with real character for your nation.
+=> END

@@ -4,7 +4,7 @@
   "design_family": "merchant_naval",
   "base_type": "Naval",
   "size_category": "Medium",
-  "visual_archetype": "cargo_ship",
+  "visual_archetype": "destroyer",
   "crew_required": 45,
   "base_training_level": 18,
   "max_experience_level": 100,

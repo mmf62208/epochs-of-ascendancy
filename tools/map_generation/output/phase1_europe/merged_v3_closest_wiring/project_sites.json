@@ -2,18 +2,18 @@
   "version": 1,
   "sites": [
     {
-      "province_id": 9050,
+      "province_id": 9047,
       "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 9363,
+      "project_type": "mega_factory",
       "max_level": 5
     },
     {
       "province_id": 10,
       "project_type": "major_port",
-      "max_level": 5
-    },
-    {
-      "province_id": 45,
-      "project_type": "mega_factory",
       "max_level": 5
     },
     {

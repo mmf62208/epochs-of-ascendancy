@@ -77,6 +77,14 @@ static func estimate(
 			total += land_bump
 			breakdown["enemy_land"] += land_bump
 
+		# Regional control wiring: full friendly control of region reduces interdiction risk (convoy_efficiency, naval_range from bonuses; strategic depth etc.)
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("is_strategic_region_fully_controlled"):
+			var rid := MapManager.get_province_region_id(pid)
+			if rid > 0 and MapManager.is_strategic_region_fully_controlled(rid, owner_tag):
+				var red := float(inter_rules.get("full_regional_control_reduction", 0.05))
+				total = max(0.0, total - red)
+				breakdown["regional_control"] = breakdown.get("regional_control", 0.0) - red
+
 		var hub: ProvinceSupplyHub = hubs.get(pid)
 		if hub != null and hub.port_level > 0 and bool(presence.get("enemy_naval_at_port", false)):
 			breakdown["enemy_naval"] += float(inter_rules.get("enemy_naval_at_port", 0.14)) * 0.5

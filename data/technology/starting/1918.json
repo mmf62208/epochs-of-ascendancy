@@ -1,7 +1,7 @@
 {
   "scenario": "1918",
   "defaults": {
-    "completed": ["basic_machine_tools"],
+    "completed": ["basic_machine_tools", "smokeless_powder_1884", "electric_power_generation_1890", "assembly_line_production_1913", "early_radio_telegraphy_1895", "dreadnought_revolution_1906", "chemical_industry_1909", "military_aviation_industry_1911", "tank_prototypes_1916", "port_shipyard_i", "steam_propulsion_1880", "early_gas_engines_1905"],
     "research_slots": 2
   },
   "countries": {
@@ -12,28 +12,72 @@
         "port_shipyard_i",
         "destroyer_1918",
         "airframe_1918",
-        "light_armor_1918"
+        "light_armor_1918",
+        "assembly_line_production_1913",
+        "military_aviation_industry_1911",
+        "tank_prototypes_1916",
+        "dreadnought_revolution_1906",
+        "patrol_frigate_1918"
       ],
       "research_slots": 3
     },
     "GER": {
-      "completed": ["radio_i", "land_doctrine_i", "port_shipyard_i", "destroyer_1918"],
+      "completed": [
+        "radio_i",
+        "land_doctrine_i",
+        "port_shipyard_i",
+        "destroyer_1918",
+        "early_submarine_warfare_1914",
+        "airframe_1918",
+        "chemical_industry_1909",
+        "synthetic_materials_1917",
+        "tank_prototypes_1916"
+      ],
       "research_slots": 3
     },
     "ENG": {
-      "completed": ["radio_i", "land_doctrine_i", "port_shipyard_i", "destroyer_1918", "patrol_frigate_1918"],
+      "completed": [
+        "radio_i",
+        "land_doctrine_i",
+        "port_shipyard_i",
+        "destroyer_1918",
+        "patrol_frigate_1918",
+        "dreadnought_revolution_1906",
+        "assembly_line_production_1913",
+        "military_aviation_industry_1911",
+        "tank_prototypes_1916",
+        "airframe_1918"
+      ],
       "research_slots": 3
     },
     "FRA": {
-      "completed": ["radio_i", "land_doctrine_i"],
+      "completed": [
+        "radio_i",
+        "land_doctrine_i",
+        "tank_prototypes_1916",
+        "airframe_1918",
+        "dreadnought_revolution_1906",
+        "methodical_battle_study"
+      ],
       "research_slots": 2
     },
     "SOV": {
-      "completed": ["land_doctrine_i"],
+      "completed": [
+        "land_doctrine_i",
+        "tank_prototypes_1916",
+        "airframe_1918"
+      ],
       "research_slots": 2
     },
     "JAP": {
-      "completed": ["land_doctrine_i", "port_shipyard_i", "patrol_frigate_1918"],
+      "completed": [
+        "land_doctrine_i",
+        "port_shipyard_i",
+        "patrol_frigate_1918",
+        "dreadnought_revolution_1906",
+        "military_aviation_industry_1911",
+        "airframe_1918"
+      ],
       "research_slots": 2
     }
   }

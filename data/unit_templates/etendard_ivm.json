@@ -1,10 +1,10 @@
 {
   "id": "etendard_ivm",
-  "name": "Étendard IVM",
+  "name": "\u00c9tendard IVM",
   "design_family": "french_carrier_air",
   "base_type": "Air",
   "size_category": "Medium",
-  "visual_archetype": "fighter",
+  "visual_archetype": "prop_fighter",
   "crew_required": 1,
   "base_training_level": 33,
   "max_experience_level": 100,

@@ -1,10 +1,10 @@
 {
   "id": "bearn_carrier",
-  "name": "Béarn",
+  "name": "B\u00e9arn",
   "design_family": "french_naval_interwar",
   "base_type": "Naval",
   "size_category": "Heavy",
-  "visual_archetype": "carrier",
+  "visual_archetype": "destroyer",
   "crew_required": 900,
   "base_training_level": 29,
   "max_experience_level": 100,

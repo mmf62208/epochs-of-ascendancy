@@ -4,56 +4,8 @@
     "1": {
       "cities": []
     },
-    "2": {
-      "cities": [
-        {
-          "id": "C2_1",
-          "name": "Berlin",
-          "position": [
-            157.43,
-            62.6
-          ],
-          "population": 560000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
     "3": {
       "cities": []
-    },
-    "4": {
-      "cities": [
-        {
-          "id": "C4_1",
-          "name": "Paris",
-          "position": [
-            351.33,
-            62.6
-          ],
-          "population": 720000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "5": {
-      "cities": [
-        {
-          "id": "C5_1",
-          "name": "London",
-          "position": [
-            448.29,
-            62.6
-          ],
-          "population": 400000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
     },
     "6": {
       "cities": [
@@ -61,8 +13,8 @@
           "id": "C6_1",
           "name": "Washington DC",
           "position": [
-            545.24,
-            62.6
+            1171.46,
+            581.4
           ],
           "population": 480000,
           "port_level": 0,
@@ -77,26 +29,10 @@
           "id": "C7_1",
           "name": "Houston Energy Corridor",
           "position": [
-            642.19,
-            62.6
+            962.9,
+            685.4
           ],
           "population": 560000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "8": {
-      "cities": [
-        {
-          "id": "C8_1",
-          "name": "Moscow",
-          "position": [
-            739.14,
-            62.6
-          ],
-          "population": 640000,
           "port_level": 0,
           "airport_level": 0,
           "industry_slots": 3
@@ -109,8 +45,8 @@
           "id": "C9_1",
           "name": "Tokyo",
           "position": [
-            836.1,
-            62.6
+            3637.36,
+            618.04
           ],
           "population": 720000,
           "port_level": 0,
@@ -125,8 +61,8 @@
           "id": "C10_1",
           "name": "Beijing",
           "position": [
-            933.05,
-            62.6
+            3372.37,
+            570.03
           ],
           "population": 400000,
           "port_level": 0,
@@ -144,8 +80,8 @@
           "id": "C15_1",
           "name": "Silicon Valley",
           "position": [
-            1417.81,
-            62.6
+            659.0,
+            598.58
           ],
           "population": 400000,
           "port_level": 0,
@@ -160,8 +96,8 @@
           "id": "C18_1",
           "name": "Istanbul",
           "position": [
-            1708.67,
-            62.6
+            2377.61,
+            557.4
           ],
           "population": 640000,
           "port_level": 0,
@@ -176,8 +112,8 @@
           "id": "C19_1",
           "name": "Warsaw",
           "position": [
-            1805.62,
-            62.6
+            2287.05,
+            429.74
           ],
           "population": 720000,
           "port_level": 0,
@@ -192,8 +128,8 @@
           "id": "C21_1",
           "name": "Rome",
           "position": [
-            1999.52,
-            62.6
+            2190.22,
+            547.27
           ],
           "population": 480000,
           "port_level": 0,
@@ -208,8 +144,8 @@
           "id": "C22_1",
           "name": "Madrid",
           "position": [
-            2096.48,
-            62.6
+            2005.9,
+            564.11
           ],
           "population": 560000,
           "port_level": 0,
@@ -224,8 +160,8 @@
           "id": "C25_1",
           "name": "Seoul",
           "position": [
-            2387.33,
-            62.6
+            3492.75,
+            596.65
           ],
           "population": 400000,
           "port_level": 0,
@@ -243,8 +179,8 @@
           "id": "C30_1",
           "name": "Sao Paulo",
           "position": [
-            2872.1,
-            62.6
+            1517.45,
+            1291.95
           ],
           "population": 400000,
           "port_level": 0,
@@ -259,8 +195,8 @@
           "id": "C31_1",
           "name": "Volgograd",
           "position": [
-            2969.05,
-            62.6
+            2554.31,
+            469.9
           ],
           "population": 480000,
           "port_level": 0,
@@ -275,8 +211,8 @@
           "id": "C33_1",
           "name": "Hong Kong",
           "position": [
-            3162.95,
-            62.6
+            3347.0,
+            770.05
           ],
           "population": 640000,
           "port_level": 0,
@@ -291,8 +227,8 @@
           "id": "C34_1",
           "name": "Singapore",
           "position": [
-            3259.9,
-            62.6
+            3229.24,
+            1008.64
           ],
           "population": 720000,
           "port_level": 0,
@@ -307,8 +243,8 @@
           "id": "C37_1",
           "name": "Ottawa",
           "position": [
-            3550.76,
-            62.6
+            1186.82,
+            507.22
           ],
           "population": 560000,
           "port_level": 0,
@@ -323,8 +259,8 @@
           "id": "C39_1",
           "name": "Vancouver",
           "position": [
-            3744.67,
-            62.6
+            647.17,
+            463.3
           ],
           "population": 216000,
           "port_level": 2,
@@ -339,361 +275,10 @@
           "id": "C43_1",
           "name": "Guangzhou",
           "position": [
-            60.48,
-            163.8
+            3336.65,
+            760.83
           ],
           "population": 640000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "44": {
-      "cities": []
-    },
-    "45": {
-      "cities": [
-        {
-          "id": "C45_1",
-          "name": "Mumbai",
-          "position": [
-            254.38,
-            163.8
-          ],
-          "population": 400000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "48": {
-      "cities": [
-        {
-          "id": "C48_1",
-          "name": "Rotterdam",
-          "position": [
-            545.24,
-            163.8
-          ],
-          "population": 640000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "49": {
-      "cities": [
-        {
-          "id": "C49_1",
-          "name": "Milan",
-          "position": [
-            642.19,
-            163.8
-          ],
-          "population": 720000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "50": {
-      "cities": [
-        {
-          "id": "C50_1",
-          "name": "Kharkiv",
-          "position": [
-            739.14,
-            163.8
-          ],
-          "population": 400000,
-          "port_level": 0,
-          "airport_level": 1,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "52": {
-      "cities": [
-        {
-          "id": "C52_1",
-          "name": "Ankara",
-          "position": [
-            933.05,
-            163.8
-          ],
-          "population": 560000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "53": {
-      "cities": [
-        {
-          "id": "C53_1",
-          "name": "Baghdad",
-          "position": [
-            1030.0,
-            163.8
-          ],
-          "population": 640000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "54": {
-      "cities": []
-    },
-    "55": {
-      "cities": [
-        {
-          "id": "C55_1",
-          "name": "Jakarta",
-          "position": [
-            1223.9,
-            163.8
-          ],
-          "population": 400000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "56": {
-      "cities": [
-        {
-          "id": "C56_1",
-          "name": "Perth",
-          "position": [
-            1320.86,
-            163.8
-          ],
-          "population": 480000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "57": {
-      "cities": [
-        {
-          "id": "C57_1",
-          "name": "Brisbane",
-          "position": [
-            1417.81,
-            163.8
-          ],
-          "population": 560000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "59": {
-      "cities": [
-        {
-          "id": "C59_1",
-          "name": "Hanoi",
-          "position": [
-            1611.71,
-            163.8
-          ],
-          "population": 720000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "61": {
-      "cities": [
-        {
-          "id": "C61_1",
-          "name": "Bangkok",
-          "position": [
-            1805.62,
-            163.8
-          ],
-          "population": 480000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "62": {
-      "cities": [
-        {
-          "id": "C62_1",
-          "name": "Kuala Lumpur",
-          "position": [
-            1902.57,
-            163.8
-          ],
-          "population": 560000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "63": {
-      "cities": [
-        {
-          "id": "C63_1",
-          "name": "Stockholm",
-          "position": [
-            1999.52,
-            163.8
-          ],
-          "population": 640000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "64": {
-      "cities": [
-        {
-          "id": "C64_1",
-          "name": "Copenhagen",
-          "position": [
-            2096.48,
-            163.8
-          ],
-          "population": 720000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "67": {
-      "cities": []
-    },
-    "68": {
-      "cities": [
-        {
-          "id": "C68_1",
-          "name": "Buenos Aires",
-          "position": [
-            2484.29,
-            163.8
-          ],
-          "population": 640000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "69": {
-      "cities": [
-        {
-          "id": "C69_1",
-          "name": "Rio de Janeiro",
-          "position": [
-            2581.24,
-            163.8
-          ],
-          "population": 720000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "70": {
-      "cities": [
-        {
-          "id": "C70_1",
-          "name": "Sao Paulo",
-          "position": [
-            2678.19,
-            163.8
-          ],
-          "population": 400000,
-          "port_level": 0,
-          "airport_level": 1,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "72": {
-      "cities": []
-    },
-    "76": {
-      "cities": [
-        {
-          "id": "C76_1",
-          "name": "Adelaide",
-          "position": [
-            3259.9,
-            163.8
-          ],
-          "population": 480000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "79": {
-      "cities": [
-        {
-          "id": "C79_1",
-          "name": "Ho Chi Minh City",
-          "position": [
-            3550.76,
-            163.8
-          ],
-          "population": 720000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "81": {
-      "cities": []
-    },
-    "83": {
-      "cities": [
-        {
-          "id": "C83_1",
-          "name": "Isfahan",
-          "position": [
-            3938.57,
-            163.8
-          ],
-          "population": 640000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "84": {
-      "cities": [
-        {
-          "id": "C84_1",
-          "name": "Baghdad",
-          "position": [
-            4035.52,
-            163.8
-          ],
-          "population": 720000,
           "port_level": 0,
           "airport_level": 0,
           "industry_slots": 3
@@ -706,8 +291,8 @@
           "id": "C85_1",
           "name": "Damascus",
           "position": [
-            60.48,
-            265.0
+            2460.9,
+            642.73
           ],
           "population": 400000,
           "port_level": 0,
@@ -715,95 +300,6 @@
           "industry_slots": 3
         }
       ]
-    },
-    "86": {
-      "cities": [
-        {
-          "id": "C86_1",
-          "name": "Abuja",
-          "position": [
-            157.43,
-            265.0
-          ],
-          "population": 480000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "88": {
-      "cities": [
-        {
-          "id": "C88_1",
-          "name": "Pretoria",
-          "position": [
-            351.33,
-            265.0
-          ],
-          "population": 640000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "89": {
-      "cities": [
-        {
-          "id": "C89_1",
-          "name": "Cordoba",
-          "position": [
-            448.29,
-            265.0
-          ],
-          "population": 720000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "90": {
-      "cities": [
-        {
-          "id": "C90_1",
-          "name": "Santiago",
-          "position": [
-            545.24,
-            265.0
-          ],
-          "population": 400000,
-          "port_level": 0,
-          "airport_level": 1,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "91": {
-      "cities": []
-    },
-    "92": {
-      "cities": [
-        {
-          "id": "C92_1",
-          "name": "Cali",
-          "position": [
-            739.14,
-            265.0
-          ],
-          "population": 560000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "99": {
-      "cities": []
-    },
-    "100": {
-      "cities": []
     },
     "101": {
       "cities": []
@@ -5469,46 +4965,14 @@
         }
       ]
     },
-    "9002": {
-      "cities": [
-        {
-          "id": "C73_1",
-          "name": "Caracas",
-          "position": [
-            2969.05,
-            163.8
-          ],
-          "population": 192000,
-          "port_level": 2,
-          "airport_level": 0,
-          "industry_slots": 1
-        }
-      ]
-    },
     "9005": {
-      "cities": [
-        {
-          "id": "C97_1",
-          "name": "Anchorage",
-          "position": [
-            1223.9,
-            265.0
-          ],
-          "population": 168000,
-          "port_level": 2,
-          "airport_level": 0,
-          "industry_slots": 1
-        }
-      ]
-    },
-    "9008": {
       "cities": [
         {
           "id": "C82_1",
           "name": "Penang",
           "position": [
-            3841.62,
-            163.8
+            3169.4,
+            968.01
           ],
           "population": 168000,
           "port_level": 2,
@@ -5520,29 +4984,13 @@
     "9011": {
       "cities": [
         {
-          "id": "C58_1",
-          "name": "Auckland",
+          "id": "C73_1",
+          "name": "Caracas",
           "position": [
-            1514.76,
-            163.8
+            1266.93,
+            910.35
           ],
           "population": 192000,
-          "port_level": 2,
-          "airport_level": 0,
-          "industry_slots": 1
-        }
-      ]
-    },
-    "9014": {
-      "cities": [
-        {
-          "id": "C94_1",
-          "name": "Santiago de Cuba",
-          "position": [
-            933.05,
-            265.0
-          ],
-          "population": 216000,
           "port_level": 2,
           "airport_level": 0,
           "industry_slots": 1
@@ -5552,29 +5000,13 @@
     "9017": {
       "cities": [
         {
-          "id": "C35_1",
-          "name": "Cape Town",
+          "id": "C97_1",
+          "name": "Anchorage",
           "position": [
-            3356.86,
-            62.6
+            778.29,
+            1313.62
           ],
-          "population": 120000,
-          "port_level": 2,
-          "airport_level": 0,
-          "industry_slots": 1
-        }
-      ]
-    },
-    "9020": {
-      "cities": [
-        {
-          "id": "C93_1",
-          "name": "Maracaibo",
-          "position": [
-            836.1,
-            265.0
-          ],
-          "population": 192000,
+          "population": 168000,
           "port_level": 2,
           "airport_level": 0,
           "industry_slots": 1
@@ -5584,29 +5016,13 @@
     "9023": {
       "cities": [
         {
-          "id": "C47_1",
-          "name": "Oslo",
+          "id": "C58_1",
+          "name": "Auckland",
           "position": [
-            448.29,
-            163.8
+            4018.3,
+            1448.38
           ],
-          "population": 168000,
-          "port_level": 2,
-          "airport_level": 0,
-          "industry_slots": 1
-        }
-      ]
-    },
-    "9026": {
-      "cities": [
-        {
-          "id": "C66_1",
-          "name": "Lagos",
-          "position": [
-            2290.38,
-            163.8
-          ],
-          "population": 144000,
+          "population": 192000,
           "port_level": 2,
           "airport_level": 0,
           "industry_slots": 1
@@ -5616,29 +5032,13 @@
     "9029": {
       "cities": [
         {
-          "id": "C87_1",
-          "name": "Durban",
+          "id": "C94_1",
+          "name": "Santiago de Cuba",
           "position": [
-            254.38,
-            265.0
+            976.29,
+            1339.62
           ],
-          "population": 168000,
-          "port_level": 2,
-          "airport_level": 0,
-          "industry_slots": 1
-        }
-      ]
-    },
-    "9032": {
-      "cities": [
-        {
-          "id": "C71_1",
-          "name": "Lima",
-          "position": [
-            2775.14,
-            163.8
-          ],
-          "population": 144000,
+          "population": 216000,
           "port_level": 2,
           "airport_level": 0,
           "industry_slots": 1
@@ -5648,11 +5048,91 @@
     "9035": {
       "cities": [
         {
-          "id": "C51_1",
-          "name": "Odessa",
+          "id": "C35_1",
+          "name": "Cape Town",
           "position": [
-            836.1,
-            163.8
+            2239.29,
+            1415.09
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9041": {
+      "cities": [
+        {
+          "id": "C77_1",
+          "name": "Darwin",
+          "position": [
+            3516.91,
+            1171.32
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9047": {
+      "cities": [
+        {
+          "id": "C80_1",
+          "name": "Cebu",
+          "position": [
+            3437.68,
+            912.17
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9059": {
+      "cities": [
+        {
+          "id": "C24_1",
+          "name": "Tehran",
+          "position": [
+            2614.54,
+            623.05
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9065": {
+      "cities": [
+        {
+          "id": "C32_1",
+          "name": "Novosibirsk",
+          "position": [
+            2974.57,
+            402.76
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9071": {
+      "cities": [
+        {
+          "id": "C66_1",
+          "name": "Lagos",
+          "position": [
+            2066.4,
+            956.28
           ],
           "population": 144000,
           "port_level": 2,
@@ -5661,7 +5141,135 @@
         }
       ]
     },
-    "9038": {
+    "9077": {
+      "cities": [
+        {
+          "id": "C93_1",
+          "name": "Maracaibo",
+          "position": [
+            1038.29,
+            1349.62
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9083": {
+      "cities": [
+        {
+          "id": "C47_1",
+          "name": "Oslo",
+          "position": [
+            2153.81,
+            347.04
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9089": {
+      "cities": [
+        {
+          "id": "C20_1",
+          "name": "Kiev",
+          "position": [
+            2378.1,
+            454.84
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9095": {
+      "cities": [
+        {
+          "id": "C46_1",
+          "name": "Bangalore",
+          "position": [
+            2910.9,
+            882.09
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9101": {
+      "cities": [
+        {
+          "id": "C61_1",
+          "name": "Bangkok",
+          "position": [
+            3171.8,
+            873.08
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9107": {
+      "cities": [
+        {
+          "id": "C87_1",
+          "name": "Durban",
+          "position": [
+            2382.37,
+            1368.97
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9113": {
+      "cities": [
+        {
+          "id": "C71_1",
+          "name": "Lima",
+          "position": [
+            1151.67,
+            1166.66
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9119": {
+      "cities": [
+        {
+          "id": "C51_1",
+          "name": "Odessa",
+          "position": [
+            2380.07,
+            500.19
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9125": {
       "cities": [
         {
           "id": "C65_1",
@@ -5677,30 +5285,14 @@
         }
       ]
     },
-    "9041": {
-      "cities": [
-        {
-          "id": "C77_1",
-          "name": "Darwin",
-          "position": [
-            3356.86,
-            163.8
-          ],
-          "population": 168000,
-          "port_level": 2,
-          "airport_level": 0,
-          "industry_slots": 1
-        }
-      ]
-    },
-    "9044": {
+    "9131": {
       "cities": [
         {
           "id": "C60_1",
           "name": "Manila",
           "position": [
-            1708.67,
-            163.8
+            3404.7,
+            863.52
           ],
           "population": 120000,
           "port_level": 2,
@@ -5709,14 +5301,14 @@
         }
       ]
     },
-    "9047": {
+    "9137": {
       "cities": [
         {
           "id": "C78_1",
           "name": "Christchurch",
           "position": [
-            3453.81,
-            163.8
+            3994.37,
+            1524.36
           ],
           "population": 192000,
           "port_level": 2,
@@ -5725,30 +5317,14 @@
         }
       ]
     },
-    "9050": {
-      "cities": [
-        {
-          "id": "C80_1",
-          "name": "Cebu",
-          "position": [
-            3647.71,
-            163.8
-          ],
-          "population": 120000,
-          "port_level": 2,
-          "airport_level": 0,
-          "industry_slots": 1
-        }
-      ]
-    },
-    "9053": {
+    "9143": {
       "cities": [
         {
           "id": "C96_1",
           "name": "Honolulu",
           "position": [
-            1126.95,
-            265.0
+            844.29,
+            1319.62
           ],
           "population": 144000,
           "port_level": 2,
@@ -5757,14 +5333,14 @@
         }
       ]
     },
-    "9056": {
+    "9149": {
       "cities": [
         {
           "id": "C98_1",
           "name": "Reykjavik",
           "position": [
-            1320.86,
-            265.0
+            712.29,
+            1303.62
           ],
           "population": 192000,
           "port_level": 2,
@@ -5773,14 +5349,14 @@
         }
       ]
     },
-    "9059": {
+    "9155": {
       "cities": [
         {
           "id": "C74_1",
           "name": "Havana",
           "position": [
-            3066.0,
-            163.8
+            1091.78,
+            766.42
           ],
           "population": 216000,
           "port_level": 2,
@@ -5789,14 +5365,14 @@
         }
       ]
     },
-    "9062": {
+    "9161": {
       "cities": [
         {
           "id": "C95_1",
           "name": "Colon",
           "position": [
-            1030.0,
-            265.0
+            910.29,
+            1327.62
           ],
           "population": 120000,
           "port_level": 2,
@@ -5805,14 +5381,14 @@
         }
       ]
     },
-    "9065": {
+    "9167": {
       "cities": [
         {
           "id": "C75_1",
           "name": "Panama Canal Zone",
           "position": [
-            3162.95,
-            163.8
+            1122.95,
+            927.57
           ],
           "population": 120000,
           "port_level": 2,
@@ -5821,14 +5397,14 @@
         }
       ]
     },
-    "9068": {
+    "9173": {
       "cities": [
         {
           "id": "C11_1",
           "name": "Shanghai",
           "position": [
-            1030.0,
-            62.6
+            3411.43,
+            674.0
           ],
           "population": 480000,
           "port_level": 0,
@@ -5837,14 +5413,14 @@
         }
       ]
     },
-    "9071": {
+    "9179": {
       "cities": [
         {
           "id": "C12_1",
           "name": "New Delhi",
           "position": [
-            1126.95,
-            62.6
+            2907.66,
+            703.85
           ],
           "population": 560000,
           "port_level": 0,
@@ -5853,14 +5429,14 @@
         }
       ]
     },
-    "9080": {
+    "9191": {
       "cities": [
         {
           "id": "C17_1",
           "name": "St. Petersburg",
           "position": [
-            1611.71,
-            62.6
+            2376.44,
+            346.91
           ],
           "population": 560000,
           "port_level": 0,
@@ -5869,30 +5445,14 @@
         }
       ]
     },
-    "9083": {
-      "cities": [
-        {
-          "id": "C20_1",
-          "name": "Kiev",
-          "position": [
-            1902.57,
-            62.6
-          ],
-          "population": 400000,
-          "port_level": 0,
-          "airport_level": 1,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "9086": {
+    "9197": {
       "cities": [
         {
           "id": "C23_1",
           "name": "Cairo",
           "position": [
-            2193.43,
-            62.6
+            2384.89,
+            687.44
           ],
           "population": 640000,
           "port_level": 0,
@@ -5901,30 +5461,14 @@
         }
       ]
     },
-    "9089": {
-      "cities": [
-        {
-          "id": "C24_1",
-          "name": "Tehran",
-          "position": [
-            2290.38,
-            62.6
-          ],
-          "population": 720000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "9092": {
+    "9203": {
       "cities": [
         {
           "id": "C26_1",
           "name": "Sydney",
           "position": [
-            2484.29,
-            62.6
+            3750.14,
+            1414.52
           ],
           "population": 480000,
           "port_level": 0,
@@ -5933,14 +5477,14 @@
         }
       ]
     },
-    "9095": {
+    "9209": {
       "cities": [
         {
           "id": "C28_1",
           "name": "Buenos Aires",
           "position": [
-            2678.19,
-            62.6
+            1365.52,
+            1422.82
           ],
           "population": 640000,
           "port_level": 0,
@@ -5949,14 +5493,14 @@
         }
       ]
     },
-    "9098": {
+    "9215": {
       "cities": [
         {
           "id": "C29_1",
           "name": "Rio de Janeiro",
           "position": [
-            2775.14,
-            62.6
+            1537.77,
+            1290.02
           ],
           "population": 720000,
           "port_level": 0,
@@ -5965,30 +5509,14 @@
         }
       ]
     },
-    "9101": {
-      "cities": [
-        {
-          "id": "C32_1",
-          "name": "Novosibirsk",
-          "position": [
-            3066.0,
-            62.6
-          ],
-          "population": 560000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 3
-        }
-      ]
-    },
-    "9104": {
+    "9221": {
       "cities": [
         {
           "id": "C36_1",
           "name": "Mexico City",
           "position": [
-            3453.81,
-            62.6
+            900.84,
+            808.35
           ],
           "population": 480000,
           "port_level": 0,
@@ -5997,14 +5525,14 @@
         }
       ]
     },
-    "9107": {
+    "9227": {
       "cities": [
         {
           "id": "C38_1",
           "name": "Montreal",
           "position": [
-            3647.71,
-            62.6
+            1193.45,
+            511.25
           ],
           "population": 640000,
           "port_level": 0,
@@ -6013,14 +5541,14 @@
         }
       ]
     },
-    "9110": {
+    "9233": {
       "cities": [
         {
           "id": "C40_1",
           "name": "Helsinki",
           "position": [
-            3841.62,
-            62.6
+            2315.14,
+            344.18
           ],
           "population": 400000,
           "port_level": 0,
@@ -6029,14 +5557,14 @@
         }
       ]
     },
-    "9113": {
+    "9239": {
       "cities": [
         {
           "id": "C41_1",
           "name": "Chicago",
           "position": [
-            3938.57,
-            62.6
+            1033.23,
+            552.51
           ],
           "population": 480000,
           "port_level": 0,
@@ -6045,14 +5573,14 @@
         }
       ]
     },
-    "9116": {
+    "9245": {
       "cities": [
         {
           "id": "C42_1",
           "name": "Detroit",
           "position": [
-            4035.52,
-            62.6
+            1085.37,
+            547.38
           ],
           "population": 560000,
           "port_level": 0,
@@ -6061,16 +5589,464 @@
         }
       ]
     },
-    "9119": {
+    "9251": {
       "cities": [
         {
-          "id": "C46_1",
-          "name": "Bangalore",
+          "id": "C49_1",
+          "name": "Milan",
           "position": [
-            351.33,
-            163.8
+            2135.07,
+            511.71
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9257": {
+      "cities": [
+        {
+          "id": "C70_1",
+          "name": "Sao Paulo",
+          "position": [
+            1498.46,
+            1297.29
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9263": {
+      "cities": [
+        {
+          "id": "C84_1",
+          "name": "Baghdad",
+          "position": [
+            2534.34,
+            650.29
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9269": {
+      "cities": [
+        {
+          "id": "C8_1",
+          "name": "Moscow",
+          "position": [
+            2459.1,
+            394.55
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9275": {
+      "cities": [
+        {
+          "id": "C5_1",
+          "name": "London",
+          "position": [
+            2029.55,
+            442.88
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9281": {
+      "cities": [
+        {
+          "id": "C4_1",
+          "name": "Paris",
+          "position": [
+            2057.48,
+            472.97
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9287": {
+      "cities": [
+        {
+          "id": "C2_1",
+          "name": "Berlin",
+          "position": [
+            2183.45,
+            431.26
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9293": {
+      "cities": [
+        {
+          "id": "C55_1",
+          "name": "Jakarta",
+          "position": [
+            3254.87,
+            1105.65
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9299": {
+      "cities": [
+        {
+          "id": "C62_1",
+          "name": "Kuala Lumpur",
+          "position": [
+            3196.07,
+            999.38
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9305": {
+      "cities": [
+        {
+          "id": "C79_1",
+          "name": "Ho Chi Minh City",
+          "position": [
+            3252.51,
+            911.73
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9311": {
+      "cities": [
+        {
+          "id": "C86_1",
+          "name": "Abuja",
+          "position": [
+            2124.47,
+            931.59
           ],
           "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9317": {
+      "cities": [
+        {
+          "id": "C90_1",
+          "name": "Santiago",
+          "position": [
+            1235.91,
+            1414.61
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9329": {
+      "cities": [
+        {
+          "id": "C50_1",
+          "name": "Kharkiv",
+          "position": [
+            2452.7,
+            464.67
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9335": {
+      "cities": [
+        {
+          "id": "C76_1",
+          "name": "Adelaide",
+          "position": [
+            3616.98,
+            1431.4
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9341": {
+      "cities": [
+        {
+          "id": "C83_1",
+          "name": "Isfahan",
+          "position": [
+            2627.84,
+            662.57
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9347": {
+      "cities": [
+        {
+          "id": "C89_1",
+          "name": "Cordoba",
+          "position": [
+            1309.57,
+            1391.59
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9353": {
+      "cities": [
+        {
+          "id": "C92_1",
+          "name": "Cali",
+          "position": [
+            1107.74,
+            1360.84
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9363": {
+      "cities": [
+        {
+          "id": "C45_1",
+          "name": "Mumbai",
+          "position": [
+            2879.6,
+            817.16
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9368": {
+      "cities": [
+        {
+          "id": "C48_1",
+          "name": "Rotterdam",
+          "position": [
+            2101.09,
+            442.38
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9373": {
+      "cities": [
+        {
+          "id": "C52_1",
+          "name": "Ankara",
+          "position": [
+            2423.97,
+            579.22
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9378": {
+      "cities": [
+        {
+          "id": "C53_1",
+          "name": "Baghdad",
+          "position": [
+            2555.1,
+            654.77
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9388": {
+      "cities": [
+        {
+          "id": "C56_1",
+          "name": "Perth",
+          "position": [
+            3368.51,
+            1397.33
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9393": {
+      "cities": [
+        {
+          "id": "C57_1",
+          "name": "Brisbane",
+          "position": [
+            3791.46,
+            1346.51
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9398": {
+      "cities": [
+        {
+          "id": "C59_1",
+          "name": "Hanoi",
+          "position": [
+            3254.6,
+            794.91
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9403": {
+      "cities": [
+        {
+          "id": "C63_1",
+          "name": "Stockholm",
+          "position": [
+            2255.64,
+            357.81
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9408": {
+      "cities": [
+        {
+          "id": "C64_1",
+          "name": "Copenhagen",
+          "position": [
+            2193.1,
+            399.47
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9418": {
+      "cities": [
+        {
+          "id": "C68_1",
+          "name": "Buenos Aires",
+          "position": [
+            1386.02,
+            1427.39
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9423": {
+      "cities": [
+        {
+          "id": "C69_1",
+          "name": "Rio de Janeiro",
+          "position": [
+            1559.17,
+            1294.78
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9438": {
+      "cities": [
+        {
+          "id": "C88_1",
+          "name": "Pretoria",
+          "position": [
+            2371.07,
+            1327.0
+          ],
+          "population": 640000,
           "port_level": 0,
           "airport_level": 0,
           "industry_slots": 3
@@ -6083,13 +6059,13 @@
           "id": "C9000_1",
           "name": "New Settlement",
           "position": [
-            1270.4935515873015,
-            888.1693650793651
+            3165.8023958333333,
+            950.6980555555556
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23700,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6099,13 +6075,29 @@
           "id": "C9001_1",
           "name": "New Settlement",
           "position": [
-            1310.269265873016,
-            903.2303174603175
+            3184.0478125,
+            943.9343055555556
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23700,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
+        }
+      ]
+    },
+    "9002": {
+      "cities": [
+        {
+          "id": "C9002_1",
+          "name": "New Settlement",
+          "position": [
+            3208.1869791666663,
+            952.1343055555556
+          ],
+          "population": 23700,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6115,13 +6107,13 @@
           "id": "C9003_1",
           "name": "New Settlement",
           "position": [
-            782.9285714285714,
-            1287.2142857142858
+            3212.4834375,
+            969.3043055555556
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23700,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6131,13 +6123,13 @@
           "id": "C9004_1",
           "name": "New Settlement",
           "position": [
-            823.1190476190476,
-            1307.142857142857
+            3189.2853124999997,
+            977.6418055555556
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23700,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6147,13 +6139,13 @@
           "id": "C9006_1",
           "name": "New Settlement",
           "position": [
-            3173.028511904762,
-            945.4631746031746
+            1263.388715277778,
+            893.3180555555555
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 24850,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6163,13 +6155,29 @@
           "id": "C9007_1",
           "name": "New Settlement",
           "position": [
-            3213.4972023809523,
-            960.7810317460317
+            1281.3268402777778,
+            886.6655555555556
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 24850,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
+        }
+      ]
+    },
+    "9008": {
+      "cities": [
+        {
+          "id": "C9008_1",
+          "name": "New Settlement",
+          "position": [
+            1305.050590277778,
+            894.7255555555555
+          ],
+          "population": 24850,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6179,13 +6187,13 @@
           "id": "C9009_1",
           "name": "New Settlement",
           "position": [
-            4021.5325,
-            1428.1156944444444
+            1309.2724652777779,
+            911.6147222222222
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 24850,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6195,13 +6203,13 @@
           "id": "C9010_1",
           "name": "New Settlement",
           "position": [
-            4057.6852380952378,
-            1441.8766468253968
+            1286.4743402777779,
+            919.8222222222222
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 24850,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6211,13 +6219,13 @@
           "id": "C9012_1",
           "name": "New Settlement",
           "position": [
-            980.9285714285714,
-            1313.2142857142858
+            773.2916666666666,
+            1293.625
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23750,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6227,13 +6235,29 @@
           "id": "C9013_1",
           "name": "New Settlement",
           "position": [
-            1021.1190476190476,
-            1333.142857142857
+            796.125,
+            1285.25
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23750,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
+        }
+      ]
+    },
+    "9014": {
+      "cities": [
+        {
+          "id": "C9014_1",
+          "name": "New Settlement",
+          "position": [
+            820.2083333333333,
+            1294.5
+          ],
+          "population": 23750,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6243,13 +6267,13 @@
           "id": "C9015_1",
           "name": "New Settlement",
           "position": [
-            2242.566349206349,
-            1394.6178571428572
+            819.5416666666666,
+            1319.25
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23750,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6259,13 +6283,13 @@
           "id": "C9016_1",
           "name": "New Settlement",
           "position": [
-            2279.1196825396823,
-            1408.5225000000003
+            795.5416666666666,
+            1323.75
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23750,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6275,13 +6299,13 @@
           "id": "C9018_1",
           "name": "New Settlement",
           "position": [
-            1042.9285714285713,
-            1323.2142857142858
+            4015.0768749999997,
+            1432.8216319444446
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23600,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6291,13 +6315,29 @@
           "id": "C9019_1",
           "name": "New Settlement",
           "position": [
-            1083.1190476190477,
-            1343.142857142857
+            4031.3770833333333,
+            1426.7397569444445
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23600,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
+        }
+      ]
+    },
+    "9020": {
+      "cities": [
+        {
+          "id": "C9020_1",
+          "name": "New Settlement",
+          "position": [
+            4052.9416666666666,
+            1434.1060069444445
+          ],
+          "population": 23600,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6307,13 +6347,13 @@
           "id": "C9021_1",
           "name": "New Settlement",
           "position": [
-            2156.7663690476193,
-            328.4582936507936
+            4056.7795833333334,
+            1449.5370486111112
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23600,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6323,13 +6363,13 @@
           "id": "C9022_1",
           "name": "New Settlement",
           "position": [
-            2189.7486309523806,
-            341.0776984126984
+            4036.059583333333,
+            1457.031423611111
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23600,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6339,13 +6379,13 @@
           "id": "C9024_1",
           "name": "New Settlement",
           "position": [
-            2070.0070634920635,
-            933.8030753968253
+            971.2916666666666,
+            1319.625
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23600,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6355,13 +6395,29 @@
           "id": "C9025_1",
           "name": "New Settlement",
           "position": [
-            2110.336468253968,
-            949.0668849206351
+            994.125,
+            1311.25
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23600,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
+        }
+      ]
+    },
+    "9026": {
+      "cities": [
+        {
+          "id": "C9026_1",
+          "name": "New Settlement",
+          "position": [
+            1018.2083333333333,
+            1320.5
+          ],
+          "population": 23600,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6371,13 +6427,13 @@
           "id": "C9027_1",
           "name": "New Settlement",
           "position": [
-            2385.695873015873,
-            1348.2015674603174
+            1017.5416666666666,
+            1345.25
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23600,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6387,13 +6443,13 @@
           "id": "C9028_1",
           "name": "New Settlement",
           "position": [
-            2422.810753968254,
-            1362.3090674603175
+            993.5416666666666,
+            1349.75
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23600,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6403,13 +6459,13 @@
           "id": "C9030_1",
           "name": "New Settlement",
           "position": [
-            1155.2112698412698,
-            1144.5928968253968
+            2236.0394444444446,
+            1399.3704166666669
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23550,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6419,13 +6475,29 @@
           "id": "C9031_1",
           "name": "New Settlement",
           "position": [
-            1194.7693650793651,
-            1159.5821825396824
+            2252.5194444444446,
+            1393.2302083333334
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23550,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
+        }
+      ]
+    },
+    "9032": {
+      "cities": [
+        {
+          "id": "C9032_1",
+          "name": "New Settlement",
+          "position": [
+            2274.323194444444,
+            1400.6718750000002
+          ],
+          "population": 23550,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6435,13 +6507,13 @@
           "id": "C9033_1",
           "name": "New Settlement",
           "position": [
-            2383.2515277777784,
-            480.59253968253967
+            2278.204027777778,
+            1416.2618750000001
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23550,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6451,13 +6523,13 @@
           "id": "C9034_1",
           "name": "New Settlement",
           "position": [
-            2416.5083134920633,
-            494.98111111111115
+            2257.2502777777777,
+            1423.8368750000002
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 23550,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 4
         }
       ]
     },
@@ -6467,13 +6539,13 @@
           "id": "C9036_1",
           "name": "New Settlement",
           "position": [
-            2152.9007539682543,
-            288.6557142857143
+            3513.3905555555557,
+            1154.3977083333334
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19650,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6483,13 +6555,29 @@
           "id": "C9037_1",
           "name": "New Settlement",
           "position": [
-            2183.9355158730164,
-            302.14226190476194
+            3531.203680555556,
+            1147.7883333333334
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19650,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9038": {
+      "cities": [
+        {
+          "id": "C9038_1",
+          "name": "New Settlement",
+          "position": [
+            3554.7686805555554,
+            1155.8020833333335
+          ],
+          "population": 19650,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6499,13 +6587,13 @@
           "id": "C9039_1",
           "name": "New Settlement",
           "position": [
-            3520.445555555555,
-            1149.282023809524
+            3558.9595138888894,
+            1172.5825000000002
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19650,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6515,13 +6603,13 @@
           "id": "C9040_1",
           "name": "New Settlement",
           "position": [
-            3559.9506746031743,
-            1164.2526190476192
+            3536.317013888889,
+            1180.7325
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19650,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6531,13 +6619,13 @@
           "id": "C9042_1",
           "name": "New Settlement",
           "position": [
-            3408.2849404761905,
-            841.5849999999999
+            3434.143298611111,
+            895.1309027777777
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6547,13 +6635,29 @@
           "id": "C9043_1",
           "name": "New Settlement",
           "position": [
-            3445.7244642857145,
-            857.6846428571428
+            3452.0889236111107,
+            888.4729861111111
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9044": {
+      "cities": [
+        {
+          "id": "C9044_1",
+          "name": "New Settlement",
+          "position": [
+            3475.8264236111113,
+            896.5450694444444
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6563,13 +6667,13 @@
           "id": "C9045_1",
           "name": "New Settlement",
           "position": [
-            3997.5901388888888,
-            1504.5459722222222
+            3480.052465277777,
+            913.4421527777777
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6579,13 +6683,13 @@
           "id": "C9046_1",
           "name": "New Settlement",
           "position": [
-            4031.232876984127,
-            1519.0947817460317
+            3457.2380902777772,
+            921.6496527777779
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6595,13 +6699,13 @@
           "id": "C9048_1",
           "name": "New Settlement",
           "position": [
-            3441.2509325396823,
-            889.978134920635
+            2717.6610416666667,
+            368.14215277777777
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6611,13 +6715,29 @@
           "id": "C9049_1",
           "name": "New Settlement",
           "position": [
-            3481.0490277777785,
-            905.0543253968253
+            2732.72625,
+            362.5017361111111
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9050": {
+      "cities": [
+        {
+          "id": "C9050_1",
+          "name": "New Settlement",
+          "position": [
+            2752.6533333333336,
+            369.3388194444445
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6627,13 +6747,13 @@
           "id": "C9051_1",
           "name": "New Settlement",
           "position": [
-            848.9285714285714,
-            1293.2142857142858
+            2753.56625,
+            385.5225694444444
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6643,13 +6763,29 @@
           "id": "C9052_1",
           "name": "New Settlement",
           "position": [
-            889.1190476190476,
-            1313.142857142857
+            2737.04875,
+            390.61506944444443
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9053": {
+      "cities": [
+        {
+          "id": "C9053_1",
+          "name": "New Settlement",
+          "position": [
+            2720.634375,
+            382.58131944444443
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6659,13 +6795,13 @@
           "id": "C9054_1",
           "name": "New Settlement",
           "position": [
-            716.9285714285714,
-            1277.2142857142858
+            2611.310972222222,
+            607.4303472222223
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6675,13 +6811,29 @@
           "id": "C9055_1",
           "name": "New Settlement",
           "position": [
-            757.1190476190476,
-            1297.142857142857
+            2627.6836805555554,
+            601.3268055555557
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9056": {
+      "cities": [
+        {
+          "id": "C9056_1",
+          "name": "New Settlement",
+          "position": [
+            2649.338263888889,
+            608.7226388888889
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6691,13 +6843,13 @@
           "id": "C9057_1",
           "name": "New Settlement",
           "position": [
-            1095.1943253968254,
-            745.1537698412698
+            2653.193263888889,
+            624.213888888889
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6707,13 +6859,13 @@
           "id": "C9058_1",
           "name": "New Settlement",
           "position": [
-            1133.2349206349209,
-            759.5951984126984
+            2632.382013888889,
+            631.7401388888889
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6723,13 +6875,13 @@
           "id": "C9060_1",
           "name": "New Settlement",
           "position": [
-            914.9285714285714,
-            1301.2142857142858
+            2971.580104166667,
+            388.21944444444443
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6739,13 +6891,29 @@
           "id": "C9061_1",
           "name": "New Settlement",
           "position": [
-            955.1190476190476,
-            1321.142857142857
+            2986.7576041666666,
+            382.53715277777775
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9062": {
+      "cities": [
+        {
+          "id": "C9062_1",
+          "name": "New Settlement",
+          "position": [
+            3006.8288541666666,
+            389.4192361111111
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6755,13 +6923,13 @@
           "id": "C9063_1",
           "name": "New Settlement",
           "position": [
-            1126.6041666666665,
-            905.2266666666667
+            3007.749895833334,
+            405.7142361111111
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6771,13 +6939,13 @@
           "id": "C9064_1",
           "name": "New Settlement",
           "position": [
-            1164.7882142857143,
-            921.6276190476191
+            2991.1117708333336,
+            410.8429861111111
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6787,13 +6955,13 @@
           "id": "C9066_1",
           "name": "New Settlement",
           "position": [
-            3414.804345238095,
-            653.2764880952382
+            2062.8048611111108,
+            939.0212152777779
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20000,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6803,13 +6971,29 @@
           "id": "C9067_1",
           "name": "New Settlement",
           "position": [
-            3450.061488095238,
-            668.4855357142858
+            2080.9896527777773,
+            932.2785069444444
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20000,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9068": {
+      "cities": [
+        {
+          "id": "C9068_1",
+          "name": "New Settlement",
+          "position": [
+            2105.046319444444,
+            940.4489236111111
+          ],
+          "population": 20000,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6819,13 +7003,13 @@
           "id": "C9069_1",
           "name": "New Settlement",
           "position": [
-            2911.073412698413,
-            682.9445436507937
+            2109.3246527777774,
+            957.5624652777778
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20000,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6835,13 +7019,13 @@
           "id": "C9070_1",
           "name": "New Settlement",
           "position": [
-            2946.676507936508,
-            698.2914484126985
+            2086.2096527777776,
+            965.8768402777778
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20000,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6851,13 +7035,13 @@
           "id": "C9072_1",
           "name": "New Settlement",
           "position": [
-            2563.488035714286,
-            727.1023214285714
+            1033.2916666666667,
+            1329.625
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20650,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6867,13 +7051,13 @@
           "id": "C9073_1",
           "name": "New Settlement",
           "position": [
-            2599.6042261904763,
-            742.6637499999999
+            1056.125,
+            1321.25
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20650,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6883,13 +7067,13 @@
           "id": "C9074_1",
           "name": "New Settlement",
           "position": [
-            2568.2089880952376,
-            754.4451785714284
+            1080.2083333333335,
+            1330.5
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20650,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6899,13 +7083,13 @@
           "id": "C9075_1",
           "name": "New Settlement",
           "position": [
-            2723.6905952380953,
-            363.7321825396826
+            1079.5416666666667,
+            1355.25
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20650,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6915,29 +7099,13 @@
           "id": "C9076_1",
           "name": "New Settlement",
           "position": [
-            2755.594761904762,
-            377.570753968254
+            1055.5416666666667,
+            1359.75
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
-        }
-      ]
-    },
-    "9077": {
-      "cities": [
-        {
-          "id": "C9077_1",
-          "name": "New Settlement",
-          "position": [
-            2727.859642857143,
-            388.0478968253969
-          ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20650,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6947,13 +7115,13 @@
           "id": "C9078_1",
           "name": "New Settlement",
           "position": [
-            2379.463115079365,
-            328.290992063492
+            2150.8753125,
+            332.7703472222222
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20250,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6963,13 +7131,29 @@
           "id": "C9079_1",
           "name": "New Settlement",
           "position": [
-            2410.9563293650795,
-            341.9593253968254
+            2165.7486458333333,
+            327.1997222222222
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20250,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9080": {
+      "cities": [
+        {
+          "id": "C9080_1",
+          "name": "New Settlement",
+          "position": [
+            2185.4219791666665,
+            333.95472222222224
+          ],
+          "population": 20250,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6979,13 +7163,13 @@
           "id": "C9081_1",
           "name": "New Settlement",
           "position": [
-            2381.171884920635,
-            435.5749404761905
+            2188.9209375,
+            348.09930555555553
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20250,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -6995,13 +7179,13 @@
           "id": "C9082_1",
           "name": "New Settlement",
           "position": [
-            2415.4547420634917,
-            448.66267857142856
+            2170.0128125,
+            354.97305555555556
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20250,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7011,13 +7195,13 @@
           "id": "C9084_1",
           "name": "New Settlement",
           "position": [
-            2388.212063492064,
-            666.6836904761905
+            2375.0474652777775,
+            440.04864583333335
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7027,13 +7211,29 @@
           "id": "C9085_1",
           "name": "New Settlement",
           "position": [
-            2425.300992063492,
-            680.7825
+            2390.5097569444442,
+            434.26822916666663
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9086": {
+      "cities": [
+        {
+          "id": "C9086_1",
+          "name": "New Settlement",
+          "position": [
+            2410.956423611111,
+            441.27531250000004
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7043,13 +7243,13 @@
           "id": "C9087_1",
           "name": "New Settlement",
           "position": [
-            2617.7957936507933,
-            602.7068650793651
+            2414.595798611111,
+            455.94510416666674
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7059,13 +7259,13 @@
           "id": "C9088_1",
           "name": "New Settlement",
           "position": [
-            2654.1025793650792,
-            616.5236507936507
+            2394.943923611111,
+            463.07572916666663
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7075,13 +7275,13 @@
           "id": "C9090_1",
           "name": "New Settlement",
           "position": [
-            3753.421507936508,
-            1394.0480753968254
+            2907.3956250000006,
+            865.2012847222222
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7091,13 +7291,29 @@
           "id": "C9091_1",
           "name": "New Settlement",
           "position": [
-            3789.9791269841267,
-            1407.9537896825398
+            2925.1756250000003,
+            858.6042013888889
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9092": {
+      "cities": [
+        {
+          "id": "C9092_1",
+          "name": "New Settlement",
+          "position": [
+            2948.6943750000005,
+            866.5983680555555
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7107,13 +7323,13 @@
           "id": "C9093_1",
           "name": "New Settlement",
           "position": [
-            1368.7946031746035,
-            1402.3930952380954
+            2949.7706250000006,
+            885.5331597222221
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7123,13 +7339,13 @@
           "id": "C9094_1",
           "name": "New Settlement",
           "position": [
-            1405.25376984127,
-            1416.265357142857
+            2930.275625,
+            891.4900347222222
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7139,13 +7355,13 @@
           "id": "C9096_1",
           "name": "New Settlement",
           "position": [
-            1541.1875,
-            1268.7503373015873
+            3168.2969444444443,
+            856.2364930555556
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7155,13 +7371,29 @@
           "id": "C9097_1",
           "name": "New Settlement",
           "position": [
-            1579.2544047619049,
-            1283.1981944444447
+            3186.0246527777776,
+            849.6550347222222
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9098": {
+      "cities": [
+        {
+          "id": "C9098_1",
+          "name": "New Settlement",
+          "position": [
+            3209.480486111111,
+            857.6317013888889
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7171,13 +7403,13 @@
           "id": "C9099_1",
           "name": "New Settlement",
           "position": [
-            2977.6548214285713,
-            383.7777777777778
+            3213.655486111111,
+            874.338576388889
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7187,13 +7419,13 @@
           "id": "C9100_1",
           "name": "New Settlement",
           "position": [
-            3009.7925595238094,
-            397.70742063492065
+            3191.117986111111,
+            882.456701388889
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7203,13 +7435,13 @@
           "id": "C9102_1",
           "name": "New Settlement",
           "position": [
-            904.2921825396826,
-            786.8257142857143
+            2379.0694444444443,
+            1353.023576388889
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19900,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7219,13 +7451,29 @@
           "id": "C9103_1",
           "name": "New Settlement",
           "position": [
-            942.8380158730158,
-            801.444761904762
+            2395.8013194444447,
+            1346.7931597222223
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19900,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9104": {
+      "cities": [
+        {
+          "id": "C9104_1",
+          "name": "New Settlement",
+          "position": [
+            2417.940069444445,
+            1354.3452430555558
+          ],
+          "population": 19900,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7235,13 +7483,13 @@
           "id": "C9105_1",
           "name": "New Settlement",
           "position": [
-            1196.5805753968255,
-            491.62593253968265
+            2421.8817361111114,
+            1370.1596180555557
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19900,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7251,13 +7499,13 @@
           "id": "C9106_1",
           "name": "New Settlement",
           "position": [
-            1231.541646825397,
-            504.9586706349207
+            2400.605486111111,
+            1377.8414930555557
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19900,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7267,13 +7515,13 @@
           "id": "C9108_1",
           "name": "New Settlement",
           "position": [
-            2318.150218253968,
-            325.5728174603175
+            1148.1455555555558,
+            1149.7150694444445
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19850,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7283,13 +7531,29 @@
           "id": "C9109_1",
           "name": "New Settlement",
           "position": [
-            2349.6131944444446,
-            339.2299603174603
+            1165.9847222222222,
+            1143.0975694444444
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19850,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9110": {
+      "cities": [
+        {
+          "id": "C9110_1",
+          "name": "New Settlement",
+          "position": [
+            1189.578888888889,
+            1151.1200694444442
+          ],
+          "population": 19850,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7299,13 +7563,13 @@
           "id": "C9111_1",
           "name": "New Settlement",
           "position": [
-            1036.4026388888888,
-            532.6181349206349
+            1193.7780555555555,
+            1167.9238194444445
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19850,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7315,13 +7579,13 @@
           "id": "C9112_1",
           "name": "New Settlement",
           "position": [
-            1071.86501984127,
-            546.1276587301588
+            1171.1005555555555,
+            1176.0850694444443
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19850,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7331,13 +7595,13 @@
           "id": "C9114_1",
           "name": "New Settlement",
           "position": [
-            1088.5387103174603,
-            527.5216865079366
+            2376.966840277778,
+            485.1786111111111
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19700,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7347,13 +7611,29 @@
           "id": "C9115_1",
           "name": "New Settlement",
           "position": [
-            1123.9343055555555,
-            541.0125198412699
+            2392.6697569444445,
+            479.3127777777778
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19700,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9116": {
+      "cities": [
+        {
+          "id": "C9116_1",
+          "name": "New Settlement",
+          "position": [
+            2413.4426736111113,
+            486.4194444444444
+          ],
+          "population": 19700,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7363,13 +7643,13 @@
           "id": "C9117_1",
           "name": "New Settlement",
           "position": [
-            2914.511785714286,
-            860.043115079365
+            2414.3932986111113,
+            503.25194444444446
           ],
-          "population": 14000,
-          "port_level": 0,
-          "airport_level": 0,
-          "industry_slots": 2
+          "population": 19700,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
         }
       ]
     },
@@ -7379,10 +7659,2394 @@
           "id": "C9118_1",
           "name": "New Settlement",
           "position": [
-            2952.1653571428574,
-            876.2294246031745
+            2397.176423611111,
+            508.5494444444445
           ],
-          "population": 14000,
+          "population": 19700,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9120": {
+      "cities": [
+        {
+          "id": "C9120_1",
+          "name": "New Settlement",
+          "position": [
+            2147.0354861111114,
+            292.95416666666665
+          ],
+          "population": 19700,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9121": {
+      "cities": [
+        {
+          "id": "C9121_1",
+          "name": "New Settlement",
+          "position": [
+            2161.690069444445,
+            287.455625
+          ],
+          "population": 19700,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9122": {
+      "cities": [
+        {
+          "id": "C9122_1",
+          "name": "New Settlement",
+          "position": [
+            2181.075902777778,
+            294.1202083333333
+          ],
+          "population": 19700,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9123": {
+      "cities": [
+        {
+          "id": "C9123_1",
+          "name": "New Settlement",
+          "position": [
+            2181.960486111111,
+            309.89104166666664
+          ],
+          "population": 19700,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9124": {
+      "cities": [
+        {
+          "id": "C9124_1",
+          "name": "New Settlement",
+          "position": [
+            2165.8942361111112,
+            314.8522916666667
+          ],
+          "population": 19700,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9126": {
+      "cities": [
+        {
+          "id": "C9126_1",
+          "name": "New Settlement",
+          "position": [
+            3401.211145833333,
+            846.7154166666668
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9127": {
+      "cities": [
+        {
+          "id": "C9127_1",
+          "name": "New Settlement",
+          "position": [
+            3418.8863541666665,
+            840.1539583333333
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9128": {
+      "cities": [
+        {
+          "id": "C9128_1",
+          "name": "New Settlement",
+          "position": [
+            3442.2734375,
+            848.1081250000001
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9129": {
+      "cities": [
+        {
+          "id": "C9129_1",
+          "name": "New Settlement",
+          "position": [
+            3443.343229166667,
+            866.9356250000001
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9130": {
+      "cities": [
+        {
+          "id": "C9130_1",
+          "name": "New Settlement",
+          "position": [
+            3423.9613541666668,
+            872.8631250000001
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9132": {
+      "cities": [
+        {
+          "id": "C9132_1",
+          "name": "New Settlement",
+          "position": [
+            3991.231076388889,
+            1509.1846180555556
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9133": {
+      "cities": [
+        {
+          "id": "C9133_1",
+          "name": "New Settlement",
+          "position": [
+            4007.118993055555,
+            1503.2502430555555
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9134": {
+      "cities": [
+        {
+          "id": "C9134_1",
+          "name": "New Settlement",
+          "position": [
+            4028.131909722222,
+            1510.4377430555555
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9135": {
+      "cities": [
+        {
+          "id": "C9135_1",
+          "name": "New Settlement",
+          "position": [
+            4029.092951388889,
+            1527.4575347222224
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9136": {
+      "cities": [
+        {
+          "id": "C9136_1",
+          "name": "New Settlement",
+          "position": [
+            4011.674826388889,
+            1532.8119097222223
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9138": {
+      "cities": [
+        {
+          "id": "C9138_1",
+          "name": "New Settlement",
+          "position": [
+            839.2916666666666,
+            1299.625
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9139": {
+      "cities": [
+        {
+          "id": "C9139_1",
+          "name": "New Settlement",
+          "position": [
+            862.125,
+            1291.25
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9140": {
+      "cities": [
+        {
+          "id": "C9140_1",
+          "name": "New Settlement",
+          "position": [
+            886.2083333333333,
+            1300.5
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9141": {
+      "cities": [
+        {
+          "id": "C9141_1",
+          "name": "New Settlement",
+          "position": [
+            885.5416666666666,
+            1325.25
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9142": {
+      "cities": [
+        {
+          "id": "C9142_1",
+          "name": "New Settlement",
+          "position": [
+            861.5416666666666,
+            1329.75
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9144": {
+      "cities": [
+        {
+          "id": "C9144_1",
+          "name": "New Settlement",
+          "position": [
+            707.2916666666666,
+            1283.625
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9145": {
+      "cities": [
+        {
+          "id": "C9145_1",
+          "name": "New Settlement",
+          "position": [
+            730.125,
+            1275.25
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9146": {
+      "cities": [
+        {
+          "id": "C9146_1",
+          "name": "New Settlement",
+          "position": [
+            754.2083333333333,
+            1284.5
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9147": {
+      "cities": [
+        {
+          "id": "C9147_1",
+          "name": "New Settlement",
+          "position": [
+            753.5416666666666,
+            1309.25
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9148": {
+      "cities": [
+        {
+          "id": "C9148_1",
+          "name": "New Settlement",
+          "position": [
+            729.5416666666666,
+            1313.75
+          ],
+          "population": 19600,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9150": {
+      "cities": [
+        {
+          "id": "C9150_1",
+          "name": "New Settlement",
+          "position": [
+            1088.4017361111112,
+            750.0899305555556
+          ],
+          "population": 19550,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9151": {
+      "cities": [
+        {
+          "id": "C9151_1",
+          "name": "New Settlement",
+          "position": [
+            1105.5523611111112,
+            743.7120138888889
+          ],
+          "population": 19550,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9152": {
+      "cities": [
+        {
+          "id": "C9152_1",
+          "name": "New Settlement",
+          "position": [
+            1128.2436111111112,
+            751.4428472222222
+          ],
+          "population": 19550,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9153": {
+      "cities": [
+        {
+          "id": "C9153_1",
+          "name": "New Settlement",
+          "position": [
+            1132.2815277777777,
+            767.6315972222224
+          ],
+          "population": 19550,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9154": {
+      "cities": [
+        {
+          "id": "C9154_1",
+          "name": "New Settlement",
+          "position": [
+            1110.4740277777778,
+            775.4953472222222
+          ],
+          "population": 19550,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9156": {
+      "cities": [
+        {
+          "id": "C9156_1",
+          "name": "New Settlement",
+          "position": [
+            905.2916666666666,
+            1307.625
+          ],
+          "population": 19550,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9157": {
+      "cities": [
+        {
+          "id": "C9157_1",
+          "name": "New Settlement",
+          "position": [
+            928.125,
+            1299.25
+          ],
+          "population": 19550,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9158": {
+      "cities": [
+        {
+          "id": "C9158_1",
+          "name": "New Settlement",
+          "position": [
+            952.2083333333333,
+            1308.5
+          ],
+          "population": 19550,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9159": {
+      "cities": [
+        {
+          "id": "C9159_1",
+          "name": "New Settlement",
+          "position": [
+            951.5416666666666,
+            1333.25
+          ],
+          "population": 19550,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9160": {
+      "cities": [
+        {
+          "id": "C9160_1",
+          "name": "New Settlement",
+          "position": [
+            927.5416666666666,
+            1337.75
+          ],
+          "population": 19550,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9162": {
+      "cities": [
+        {
+          "id": "C9162_1",
+          "name": "New Settlement",
+          "position": [
+            1119.3897916666667,
+            910.4541666666667
+          ],
+          "population": 19500,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9163": {
+      "cities": [
+        {
+          "id": "C9163_1",
+          "name": "New Settlement",
+          "position": [
+            1137.4164583333334,
+            903.7675
+          ],
+          "population": 19500,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9164": {
+      "cities": [
+        {
+          "id": "C9164_1",
+          "name": "New Settlement",
+          "position": [
+            1161.268125,
+            911.8708333333334
+          ],
+          "population": 19500,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9165": {
+      "cities": [
+        {
+          "id": "C9165_1",
+          "name": "New Settlement",
+          "position": [
+            1162.3602083333333,
+            931.0525
+          ],
+          "population": 19500,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9166": {
+      "cities": [
+        {
+          "id": "C9166_1",
+          "name": "New Settlement",
+          "position": [
+            1142.5939583333334,
+            937.0875000000001
+          ],
+          "population": 19500,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9168": {
+      "cities": [
+        {
+          "id": "C9168_1",
+          "name": "New Settlement",
+          "position": [
+            3408.142604166667,
+            658.1246875
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9169": {
+      "cities": [
+        {
+          "id": "C9169_1",
+          "name": "New Settlement",
+          "position": [
+            3424.7882291666665,
+            651.9228125
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9170": {
+      "cities": [
+        {
+          "id": "C9170_1",
+          "name": "New Settlement",
+          "position": [
+            3446.8107291666665,
+            659.4378125000001
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9171": {
+      "cities": [
+        {
+          "id": "C9171_1",
+          "name": "New Settlement",
+          "position": [
+            3447.8201041666666,
+            677.2255208333333
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9172": {
+      "cities": [
+        {
+          "id": "C9172_1",
+          "name": "New Settlement",
+          "position": [
+            3429.5682291666667,
+            682.8211458333333
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9174": {
+      "cities": [
+        {
+          "id": "C9174_1",
+          "name": "New Settlement",
+          "position": [
+            2904.345138888889,
+            687.8371180555556
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9175": {
+      "cities": [
+        {
+          "id": "C9175_1",
+          "name": "New Settlement",
+          "position": [
+            2921.156388888889,
+            681.5785763888889
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9176": {
+      "cities": [
+        {
+          "id": "C9176_1",
+          "name": "New Settlement",
+          "position": [
+            2943.3963888888893,
+            689.1606597222222
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9177": {
+      "cities": [
+        {
+          "id": "C9177_1",
+          "name": "New Settlement",
+          "position": [
+            2944.410555555556,
+            707.1121180555556
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9178": {
+      "cities": [
+        {
+          "id": "C9178_1",
+          "name": "New Settlement",
+          "position": [
+            2925.980555555556,
+            712.7627430555556
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9180": {
+      "cities": [
+        {
+          "id": "C9180_1",
+          "name": "New Settlement",
+          "position": [
+            2556.6640625,
+            732.0615625
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9181": {
+      "cities": [
+        {
+          "id": "C9181_1",
+          "name": "New Settlement",
+          "position": [
+            2573.7151041666666,
+            725.7184375
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9182": {
+      "cities": [
+        {
+          "id": "C9182_1",
+          "name": "New Settlement",
+          "position": [
+            2596.2755208333333,
+            733.4059375
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9183": {
+      "cities": [
+        {
+          "id": "C9183_1",
+          "name": "New Settlement",
+          "position": [
+            2597.3069791666667,
+            751.6065625
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9184": {
+      "cities": [
+        {
+          "id": "C9184_1",
+          "name": "New Settlement",
+          "position": [
+            2578.6126041666666,
+            757.3309375
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9185": {
+      "cities": [
+        {
+          "id": "C9185_1",
+          "name": "New Settlement",
+          "position": [
+            2560.0282291666663,
+            748.2990625
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9186": {
+      "cities": [
+        {
+          "id": "C9186_1",
+          "name": "New Settlement",
+          "position": [
+            2373.510451388889,
+            332.64923611111107
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9187": {
+      "cities": [
+        {
+          "id": "C9187_1",
+          "name": "New Settlement",
+          "position": [
+            2388.3829513888886,
+            327.07340277777774
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9188": {
+      "cities": [
+        {
+          "id": "C9188_1",
+          "name": "New Settlement",
+          "position": [
+            2408.0517013888884,
+            333.8275694444444
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9189": {
+      "cities": [
+        {
+          "id": "C9189_1",
+          "name": "New Settlement",
+          "position": [
+            2408.954826388889,
+            349.8146527777777
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9190": {
+      "cities": [
+        {
+          "id": "C9190_1",
+          "name": "New Settlement",
+          "position": [
+            2392.647951388889,
+            354.8459027777777
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9192": {
+      "cities": [
+        {
+          "id": "C9192_1",
+          "name": "New Settlement",
+          "position": [
+            2381.590277777778,
+            671.5014583333333
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9193": {
+      "cities": [
+        {
+          "id": "C9193_1",
+          "name": "New Settlement",
+          "position": [
+            2398.3100694444443,
+            665.2772916666667
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9194": {
+      "cities": [
+        {
+          "id": "C9194_1",
+          "name": "New Settlement",
+          "position": [
+            2420.4342361111107,
+            672.823125
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9195": {
+      "cities": [
+        {
+          "id": "C9195_1",
+          "name": "New Settlement",
+          "position": [
+            2424.371736111111,
+            688.6285416666667
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9196": {
+      "cities": [
+        {
+          "id": "C9196_1",
+          "name": "New Settlement",
+          "position": [
+            2403.109236111111,
+            696.3047916666667
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9198": {
+      "cities": [
+        {
+          "id": "C9198_1",
+          "name": "New Settlement",
+          "position": [
+            3746.891805555556,
+            1398.800798611111
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9199": {
+      "cities": [
+        {
+          "id": "C9199_1",
+          "name": "New Settlement",
+          "position": [
+            3763.377638888889,
+            1392.6605902777778
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9200": {
+      "cities": [
+        {
+          "id": "C9200_1",
+          "name": "New Settlement",
+          "position": [
+            3785.182222222222,
+            1400.1022569444444
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9201": {
+      "cities": [
+        {
+          "id": "C9201_1",
+          "name": "New Settlement",
+          "position": [
+            3789.063055555556,
+            1415.6941319444445
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9202": {
+      "cities": [
+        {
+          "id": "C9202_1",
+          "name": "New Settlement",
+          "position": [
+            3768.1068055555556,
+            1423.2722569444445
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9204": {
+      "cities": [
+        {
+          "id": "C9204_1",
+          "name": "New Settlement",
+          "position": [
+            1362.2830555555556,
+            1407.1370833333335
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9205": {
+      "cities": [
+        {
+          "id": "C9205_1",
+          "name": "New Settlement",
+          "position": [
+            1378.723263888889,
+            1401.0060416666668
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9206": {
+      "cities": [
+        {
+          "id": "C9206_1",
+          "name": "New Settlement",
+          "position": [
+            1400.4715972222223,
+            1408.431875
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9207": {
+      "cities": [
+        {
+          "id": "C9207_1",
+          "name": "New Settlement",
+          "position": [
+            1404.338263888889,
+            1423.9877083333333
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9208": {
+      "cities": [
+        {
+          "id": "C9208_1",
+          "name": "New Settlement",
+          "position": [
+            1383.438263888889,
+            1431.5427083333334
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9210": {
+      "cities": [
+        {
+          "id": "C9210_1",
+          "name": "New Settlement",
+          "position": [
+            1534.3897916666667,
+            1273.6905902777776
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9211": {
+      "cities": [
+        {
+          "id": "C9211_1",
+          "name": "New Settlement",
+          "position": [
+            1551.553125,
+            1267.3062152777777
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9212": {
+      "cities": [
+        {
+          "id": "C9212_1",
+          "name": "New Settlement",
+          "position": [
+            1574.2589583333333,
+            1275.0387152777778
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9213": {
+      "cities": [
+        {
+          "id": "C9213_1",
+          "name": "New Settlement",
+          "position": [
+            1578.3010416666666,
+            1291.2418402777778
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9214": {
+      "cities": [
+        {
+          "id": "C9214_1",
+          "name": "New Settlement",
+          "position": [
+            1556.4772916666668,
+            1299.1087152777777
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9216": {
+      "cities": [
+        {
+          "id": "C9216_1",
+          "name": "New Settlement",
+          "position": [
+            897.4079861111111,
+            791.825
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9217": {
+      "cities": [
+        {
+          "id": "C9217_1",
+          "name": "New Settlement",
+          "position": [
+            914.7894444444445,
+            785.3641666666667
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9218": {
+      "cities": [
+        {
+          "id": "C9218_1",
+          "name": "New Settlement",
+          "position": [
+            937.7815277777777,
+            793.1908333333333
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9219": {
+      "cities": [
+        {
+          "id": "C9219_1",
+          "name": "New Settlement",
+          "position": [
+            941.8711111111111,
+            809.5816666666667
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9220": {
+      "cities": [
+        {
+          "id": "C9220_1",
+          "name": "New Settlement",
+          "position": [
+            919.7761111111112,
+            817.5466666666666
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9222": {
+      "cities": [
+        {
+          "id": "C9222_1",
+          "name": "New Settlement",
+          "position": [
+            1190.337673611111,
+            496.18454861111115
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9223": {
+      "cities": [
+        {
+          "id": "C9223_1",
+          "name": "New Settlement",
+          "position": [
+            1206.1005902777777,
+            490.29329861111114
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9224": {
+      "cities": [
+        {
+          "id": "C9224_1",
+          "name": "New Settlement",
+          "position": [
+            1226.9547569444444,
+            497.4332986111111
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9225": {
+      "cities": [
+        {
+          "id": "C9225_1",
+          "name": "New Settlement",
+          "position": [
+            1230.6653819444446,
+            512.3768402777778
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9226": {
+      "cities": [
+        {
+          "id": "C9226_1",
+          "name": "New Settlement",
+          "position": [
+            1210.6272569444443,
+            519.6374652777778
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9228": {
+      "cities": [
+        {
+          "id": "C9228_1",
+          "name": "New Settlement",
+          "position": [
+            2312.2028819444445,
+            329.9265972222222
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9229": {
+      "cities": [
+        {
+          "id": "C9229_1",
+          "name": "New Settlement",
+          "position": [
+            2327.062048611111,
+            324.35701388888884
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9230": {
+      "cities": [
+        {
+          "id": "C9230_1",
+          "name": "New Settlement",
+          "position": [
+            2346.714965277778,
+            331.10493055555554
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9231": {
+      "cities": [
+        {
+          "id": "C9231_1",
+          "name": "New Settlement",
+          "position": [
+            2347.6101736111113,
+            347.07868055555554
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9232": {
+      "cities": [
+        {
+          "id": "C9232_1",
+          "name": "New Settlement",
+          "position": [
+            2331.3220486111113,
+            352.1036805555555
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9234": {
+      "cities": [
+        {
+          "id": "C9234_1",
+          "name": "New Settlement",
+          "position": [
+            1030.0704513888888,
+            537.2350694444444
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9235": {
+      "cities": [
+        {
+          "id": "C9235_1",
+          "name": "New Settlement",
+          "position": [
+            1046.0589930555557,
+            531.2704861111112
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9236": {
+      "cities": [
+        {
+          "id": "C9236_1",
+          "name": "New Settlement",
+          "position": [
+            1067.2131597222221,
+            538.5021527777777
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9237": {
+      "cities": [
+        {
+          "id": "C9237_1",
+          "name": "New Settlement",
+          "position": [
+            1070.9754513888888,
+            553.6450694444444
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9238": {
+      "cities": [
+        {
+          "id": "C9238_1",
+          "name": "New Settlement",
+          "position": [
+            1050.6498263888889,
+            561.0063194444444
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9240": {
+      "cities": [
+        {
+          "id": "C9240_1",
+          "name": "New Settlement",
+          "position": [
+            1082.2194097222223,
+            532.1346180555555
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9241": {
+      "cities": [
+        {
+          "id": "C9241_1",
+          "name": "New Settlement",
+          "position": [
+            1098.1756597222222,
+            526.1729513888889
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9242": {
+      "cities": [
+        {
+          "id": "C9242_1",
+          "name": "New Settlement",
+          "position": [
+            1119.2894097222222,
+            533.3962847222222
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9243": {
+      "cities": [
+        {
+          "id": "C9243_1",
+          "name": "New Settlement",
+          "position": [
+            1123.047951388889,
+            548.5202430555555
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9244": {
+      "cities": [
+        {
+          "id": "C9244_1",
+          "name": "New Settlement",
+          "position": [
+            1102.757326388889,
+            555.8646180555555
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9246": {
+      "cities": [
+        {
+          "id": "C9246_1",
+          "name": "New Settlement",
+          "position": [
+            2131.9584027777773,
+            496.6376736111111
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9247": {
+      "cities": [
+        {
+          "id": "C9247_1",
+          "name": "New Settlement",
+          "position": [
+            2147.7221527777774,
+            490.7507986111111
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9248": {
+      "cities": [
+        {
+          "id": "C9248_1",
+          "name": "New Settlement",
+          "position": [
+            2168.582152777778,
+            497.88704861111114
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9249": {
+      "cities": [
+        {
+          "id": "C9249_1",
+          "name": "New Settlement",
+          "position": [
+            2172.291736111111,
+            512.8360069444444
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9250": {
+      "cities": [
+        {
+          "id": "C9250_1",
+          "name": "New Settlement",
+          "position": [
+            2152.2479861111105,
+            520.0966319444444
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9252": {
+      "cities": [
+        {
+          "id": "C9252_1",
+          "name": "New Settlement",
+          "position": [
+            1495.075625,
+            1280.9938194444446
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9253": {
+      "cities": [
+        {
+          "id": "C9253_1",
+          "name": "New Settlement",
+          "position": [
+            1512.1993750000001,
+            1274.6290277777778
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9254": {
+      "cities": [
+        {
+          "id": "C9254_1",
+          "name": "New Settlement",
+          "position": [
+            1534.8556250000001,
+            1282.3461111111112
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9255": {
+      "cities": [
+        {
+          "id": "C9255_1",
+          "name": "New Settlement",
+          "position": [
+            1538.884375,
+            1298.5106944444447
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9256": {
+      "cities": [
+        {
+          "id": "C9256_1",
+          "name": "New Settlement",
+          "position": [
+            1517.114375,
+            1306.3631944444444
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9258": {
+      "cities": [
+        {
+          "id": "C9258_1",
+          "name": "New Settlement",
+          "position": [
+            2531.0838541666667,
+            634.5322222222222
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9259": {
+      "cities": [
+        {
+          "id": "C9259_1",
+          "name": "New Settlement",
+          "position": [
+            2547.6028125000003,
+            628.3782638888889
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9260": {
+      "cities": [
+        {
+          "id": "C9260_1",
+          "name": "New Settlement",
+          "position": [
+            2569.4548958333335,
+            635.8349305555555
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9261": {
+      "cities": [
+        {
+          "id": "C9261_1",
+          "name": "New Settlement",
+          "position": [
+            2570.4559375000003,
+            653.4940972222222
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9262": {
+      "cities": [
+        {
+          "id": "C9262_1",
+          "name": "New Settlement",
+          "position": [
+            2552.3453125,
+            659.0515972222222
+          ],
+          "population": 20500,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9264": {
+      "cities": [
+        {
+          "id": "C9264_1",
+          "name": "New Settlement",
+          "position": [
+            2456.111770833333,
+            380.05055555555555
+          ],
+          "population": 20350,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9265": {
+      "cities": [
+        {
+          "id": "C9265_1",
+          "name": "New Settlement",
+          "position": [
+            2471.2436458333336,
+            374.3876388888889
+          ],
+          "population": 20350,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9266": {
+      "cities": [
+        {
+          "id": "C9266_1",
+          "name": "New Settlement",
+          "position": [
+            2491.2586458333335,
+            381.2497222222222
+          ],
+          "population": 20350,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9267": {
+      "cities": [
+        {
+          "id": "C9267_1",
+          "name": "New Settlement",
+          "position": [
+            2492.173020833334,
+            397.5047222222222
+          ],
+          "population": 20350,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9268": {
+      "cities": [
+        {
+          "id": "C9268_1",
+          "name": "New Settlement",
+          "position": [
+            2475.5836458333333,
+            402.6184722222222
+          ],
+          "population": 20350,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9270": {
+      "cities": [
+        {
+          "id": "C9270_1",
+          "name": "New Settlement",
+          "position": [
+            2026.5153472222223,
+            428.1418055555556
+          ],
+          "population": 20150,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9271": {
+      "cities": [
+        {
+          "id": "C9271_1",
+          "name": "New Settlement",
+          "position": [
+            2041.9124305555556,
+            422.3824305555556
+          ],
+          "population": 20150,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9272": {
+      "cities": [
+        {
+          "id": "C9272_1",
+          "name": "New Settlement",
+          "position": [
+            2062.275763888889,
+            429.3611805555556
+          ],
+          "population": 20150,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9273": {
+      "cities": [
+        {
+          "id": "C9273_1",
+          "name": "New Settlement",
+          "position": [
+            2065.897013888889,
+            443.9770138888889
+          ],
+          "population": 20150,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9274": {
+      "cities": [
+        {
+          "id": "C9274_1",
+          "name": "New Settlement",
+          "position": [
+            2046.3257638888892,
+            451.0757638888889
+          ],
+          "population": 20150,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9276": {
+      "cities": [
+        {
+          "id": "C9276_1",
+          "name": "New Settlement",
+          "position": [
+            2054.4078819444444,
+            458.083125
+          ],
+          "population": 20050,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9277": {
+      "cities": [
+        {
+          "id": "C9277_1",
+          "name": "New Settlement",
+          "position": [
+            2069.964756944444,
+            452.2670833333333
+          ],
+          "population": 20050,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9278": {
+      "cities": [
+        {
+          "id": "C9278_1",
+          "name": "New Settlement",
+          "position": [
+            2090.5460069444443,
+            459.31291666666664
+          ],
+          "population": 20050,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9279": {
+      "cities": [
+        {
+          "id": "C9279_1",
+          "name": "New Settlement",
+          "position": [
+            2094.207048611111,
+            474.0725
+          ],
+          "population": 20050,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9280": {
+      "cities": [
+        {
+          "id": "C9280_1",
+          "name": "New Settlement",
+          "position": [
+            2074.4289236111113,
+            481.2462499999999
+          ],
+          "population": 20050,
+          "port_level": 2,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9282": {
+      "cities": [
+        {
+          "id": "C9282_1",
+          "name": "New Settlement",
+          "position": [
+            2180.4251041666666,
+            416.57569444444437
+          ],
+          "population": 19900,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9283": {
+      "cities": [
+        {
+          "id": "C9283_1",
+          "name": "New Settlement",
+          "position": [
+            2195.756354166667,
+            410.83819444444435
+          ],
+          "population": 19900,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9284": {
+      "cities": [
+        {
+          "id": "C9284_1",
+          "name": "New Settlement",
+          "position": [
+            2216.0376041666664,
+            417.7931944444444
+          ],
+          "population": 19900,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9285": {
+      "cities": [
+        {
+          "id": "C9285_1",
+          "name": "New Settlement",
+          "position": [
+            2219.646979166667,
+            432.35152777777773
+          ],
+          "population": 19900,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9286": {
+      "cities": [
+        {
+          "id": "C9286_1",
+          "name": "New Settlement",
+          "position": [
+            2200.1563541666665,
+            439.4215277777777
+          ],
+          "population": 19900,
+          "port_level": 1,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9323": {
+      "cities": [
+        {
+          "id": "C9323_1",
+          "name": "New Settlement",
+          "position": [
+            1173.6857142857143,
+            1346.4714285714285
+          ],
+          "population": 16500,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9358": {
+      "cities": [
+        {
+          "id": "C9358_1",
+          "name": "New Settlement",
+          "position": [
+            3234.3764285714283,
+            684.8972448979591
+          ],
+          "population": 16500,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9383": {
+      "cities": [
+        {
+          "id": "C9383_1",
+          "name": "New Settlement",
+          "position": [
+            2599.8369387755097,
+            688.6630612244899
+          ],
+          "population": 16500,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9413": {
+      "cities": [
+        {
+          "id": "C9413_1",
+          "name": "New Settlement",
+          "position": [
+            2369.475,
+            1332.104693877551
+          ],
+          "population": 16500,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9428": {
+      "cities": [
+        {
+          "id": "C9428_1",
+          "name": "New Settlement",
+          "position": [
+            1207.6466326530613,
+            981.1610204081633
+          ],
+          "population": 16500,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9433": {
+      "cities": [
+        {
+          "id": "C9433_1",
+          "name": "New Settlement",
+          "position": [
+            3176.5643877551024,
+            820.474693877551
+          ],
+          "population": 16500,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9443": {
+      "cities": [
+        {
+          "id": "C9443_1",
+          "name": "New Settlement",
+          "position": [
+            660.8163265306122,
+            1300.3163265306123
+          ],
+          "population": 16500,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9448": {
+      "cities": [
+        {
+          "id": "C9448_1",
+          "name": "New Settlement",
+          "position": [
+            594.8163265306122,
+            1292.3163265306123
+          ],
+          "population": 15750,
           "port_level": 0,
           "airport_level": 0,
           "industry_slots": 2

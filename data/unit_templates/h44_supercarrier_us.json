@@ -4,7 +4,7 @@
   "design_family": "us_naval_paper",
   "base_type": "Naval",
   "size_category": "SuperHeavy",
-  "visual_archetype": "carrier",
+  "visual_archetype": "fleet_carrier",
   "crew_required": 5000,
   "base_training_level": 30,
   "max_experience_level": 100,

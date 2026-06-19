@@ -309,10 +309,39 @@ func _snap_to_pop(pos: Vector2) -> Vector2:
 ## Load river/coast polylines for snap (from data/map/rivers.json or editor export).
 ## If not present, uses province geometry edges as proxy (as before).
 ## Call from Debug or auto on editor activate.
+## Supports world chunks: if rivers_path is default and a world chunk underlay is active (via MapRenderer bg tex), auto-loads the per-chunk rivers.json for localized snap in that theater portion.
 func load_rivers_for_snap(rivers_path: String = "res://data/map/rivers.json") -> void:
+	# For world-scale editing you can pass "res://data/map/rivers_world.json" (or the region specific one).
 	_river_polylines.clear()
-	if FileAccess.file_exists(rivers_path):
-		var f := FileAccess.open(rivers_path, FileAccess.READ)
+	var effective_path := rivers_path
+	# Auto-detect chunk for portion editing (when MapRenderer has swapped to world_chunk underlay)
+	if rivers_path == "res://data/map/rivers.json" or rivers_path.ends_with("rivers.json"):
+		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+		if mr and mr.has_method("find_child"):
+			var bg := mr.find_child("WorldBackground", true, false) as Sprite2D
+			if bg and bg.texture and "world_chunk" in str(bg.texture.resource_path):
+				var chunk_str := str(bg.texture.resource_path)
+				var idx_str := chunk_str.get_slice("_", 2)
+				if idx_str.is_valid_int():
+					var cpath := "res://assets/maps/world_chunks/world_chunk_%02d_rivers.json" % idx_str.to_int()
+					if FileAccess.file_exists(cpath):
+						effective_path = cpath
+						print("ProvinceEditor: Detected chunk underlay, using per-chunk rivers for snap: ", cpath)
+	_load_rivers_from_path(effective_path)
+	# Fallback: add some province edges as "rivers" if no data (proxy for natural borders)
+	if _river_polylines.is_empty() and typeof(MapManager) != TYPE_NIL:
+		for pid in MapManager._geometry:
+			var g: Dictionary = MapManager._geometry[pid]
+			var pts: PackedVector2Array = g.get("points", PackedVector2Array())
+			if pts.size() > 3:  # add every other edge as proxy
+				for i in range(0, pts.size(), 2):
+					var p1: Vector2 = pts[i]
+					var p2: Vector2 = pts[(i+1) % pts.size()]
+					_river_polylines.append(PackedVector2Array([p1, p2]))
+
+func _load_rivers_from_path(path: String) -> void:
+	if FileAccess.file_exists(path):
+		var f := FileAccess.open(path, FileAccess.READ)
 		var txt := f.get_as_text()
 		f.close()
 		var parsed: Variant = JSON.parse_string(txt)
@@ -325,21 +354,16 @@ func load_rivers_for_snap(rivers_path: String = "res://data/map/rivers.json") ->
 							line.append(Vector2(float(pt[0]), float(pt[1])))
 					if line.size() > 1:
 						_river_polylines.append(line)
-			print("ProvinceEditor: Loaded ", _river_polylines.size(), " river polylines for snap.")
+			print("ProvinceEditor: Loaded ", _river_polylines.size(), " river polylines for snap from ", path)
 		else:
-			print("ProvinceEditor: No valid rivers in ", rivers_path, " - using geometry proxy.")
+			print("ProvinceEditor: No valid rivers in ", path, " - using geometry proxy.")
 	else:
-		print("ProvinceEditor: No rivers.json at ", rivers_path, " - river snap will use province edges as terrain boundaries.")
-	# Fallback: add some province edges as "rivers" if no data (proxy for natural borders)
-	if _river_polylines.is_empty() and typeof(MapManager) != TYPE_NIL:
-		for pid in MapManager._geometry:
-			var g: Dictionary = MapManager._geometry[pid]
-			var pts: PackedVector2Array = g.get("points", PackedVector2Array())
-			if pts.size() > 3:  # add every other edge as proxy
-				for i in range(0, pts.size(), 2):
-					var p1: Vector2 = pts[i]
-					var p2: Vector2 = pts[(i+1) % pts.size()]
-					_river_polylines.append(PackedVector2Array([p1, p2]))
+		print("ProvinceEditor: No rivers.json at ", path, " - river snap will use province edges as terrain boundaries.")
+
+## Public helper for explicit chunk (e.g. called after debug chunk load).
+func load_chunk_rivers_for_snap(chunk_index: int) -> void:
+	var cpath := "res://assets/maps/world_chunks/world_chunk_%02d_rivers.json" % chunk_index
+	load_rivers_for_snap(cpath)  # will use the chunk one, or fallback logic if missing
 
 func _snap_to_rivers(pos: Vector2) -> Vector2:
 	var best := pos
@@ -695,6 +719,26 @@ func export_to_json(base_path: String = "user://editor_provinces/") -> Dictionar
 	provinces_exported.emit(result["geometry_path"])
 	print("ProvinceEditor: Exported %d provinces to %s" % [geometry_entries.size(), base_path])
 	return result
+
+
+## Hot-reload exported editor geometry into the active test scenario (Debug workflow).
+func hot_reload_to_test_scenario(export_base: String = "user://editor_provinces/") -> bool:
+	var exported := export_to_json(export_base)
+	if exported.is_empty():
+		return false
+	var sl := get_node_or_null("/root/ScenarioLoader") as ScenarioLoader
+	if sl == null:
+		push_warning("ProvinceEditor: ScenarioLoader unavailable for hot reload")
+		return false
+	if sl.has_method("load_province_geometry"):
+		sl.load_province_geometry(sl.current_province_data_dir)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("rebuild_pick_grid"):
+		MapManager.rebuild_pick_grid()
+	var mapr := get_tree().get_first_node_in_group("map_renderer")
+	if mapr != null and mapr.has_method("force_full_map_refresh"):
+		mapr.call("force_full_map_refresh")
+	print("ProvinceEditor: Hot-reload requested (%d editor provinces exported). Re-run scenario load for full merge." % int(exported.get("count", 0)))
+	return true
 
 # === Integration with MapRenderer (future) ===
 # When active, MapRenderer can call set_editor_mode(true) to lower normal province alpha

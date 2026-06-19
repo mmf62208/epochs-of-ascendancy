@@ -1,0 +1,13 @@
+{
+  "id": "bio_agent_disperser",
+  "name": "Bio-Agent Disperser",
+  "category": "Weapon",
+  "tier": 4,
+  "reliability_bonus": -5,
+  "soft_attack": 15,
+  "hard_attack": 5,
+  "cost": {"steel": 3, "chemicals": 12},
+  "production_time": 35,
+  "special_flags": ["bio", "area"],
+  "description": "Engineered pathogen dispersal for area denial. High effect but massive ethics/backlash risk and uncontrollability."
+}

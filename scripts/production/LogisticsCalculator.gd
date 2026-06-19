@@ -70,14 +70,30 @@ static func compute(
 		template, loadout, effective_cargo, logistics_rules,
 	)
 	var combat := _aggregate_combat_stats(loadout, design_data)
+	var engine := _aggregate_engine_stats(loadout, design_data)
 	var readiness_mult := 1.0
 	if bool(logistics_rules.get("combat_readiness_applies_to_cargo_units", true)):
 		readiness_mult = clampf(combat_readiness, 0.0, 1.0)
-	out["combat_soft_attack"] = combat["soft"] * readiness_mult
-	out["combat_hard_attack"] = combat["hard"] * readiness_mult
-	out["combat_air_attack"] = combat["air"] * readiness_mult
-	out["combat_anti_air"] = combat["anti_air"] * readiness_mult
-	out["combat_anti_ship"] = combat["anti_ship"] * readiness_mult
+	# High-value: Loyalty / foreign military penalty on combat effectiveness (from Province/GameData loyalty multiplier and foreign %).
+	# Models reduced morale, coordination, or reliability in units with high foreign troop integration (historical parallels in mixed forces).
+	var loyalty_penalty := 1.0
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_military_loyalty_multiplier"):
+		var loy: float = GameData.get_military_loyalty_multiplier("player")
+		loyalty_penalty = clampf(loy, 0.6, 1.1)
+	out["combat_soft_attack"] = combat["soft"] * readiness_mult * loyalty_penalty
+	out["combat_hard_attack"] = combat["hard"] * readiness_mult * loyalty_penalty
+	out["combat_air_attack"] = combat["air"] * readiness_mult * loyalty_penalty
+	out["combat_anti_air"] = combat["anti_air"] * readiness_mult * loyalty_penalty
+	out["combat_anti_ship"] = combat["anti_ship"] * readiness_mult * loyalty_penalty
+	# Engine stats now live: higher fuel_efficiency lowers consumption; speed_bonus aids mobility/range; power for thrust/accel.
+	out["engine_fuel_efficiency"] = engine.get("fuel_efficiency", 0.0)
+	out["engine_speed_bonus"] = engine.get("speed_bonus", 0.0)
+	out["engine_power"] = engine.get("power_output", 0.0)
+	out["engine_reliability_bonus"] = engine.get("reliability", 0.0)
+	# Power system demo: higher fuel_efficiency reduces effective fuel/supply need for the unit (visible in production preview and supply draw).
+	if float(out.get("engine_fuel_efficiency", 0.0)) > 0.0:
+		var base_fuel: float = maxf(float(out.get("fuel_consumption", 1.0)), 1.0)
+		out["fuel_consumption"] = base_fuel / (1.0 + float(out["engine_fuel_efficiency"]) * 0.02)  # 2% per point efficiency
 	return out
 
 
@@ -152,3 +168,21 @@ static func _aggregate_combat_stats(loadout: Dictionary, design_data: DesignData
 		combat["anti_air"] += mod.anti_air
 		combat["anti_ship"] += mod.anti_ship
 	return combat
+
+## Aggregate engine/propulsion module effects from loadout (for speed, fuel efficiency, power, reliability).
+## Used by supply (fuel draw), movement (speed), reliability, and combat mobility.
+## Engine choice (diesel vs gas vs nuclear) now has real gameplay weight and cross-domain potential.
+static func _aggregate_engine_stats(loadout: Dictionary, design_data: DesignDataLoader) -> Dictionary:
+	var eng := {"fuel_efficiency": 0.0, "speed_bonus": 0.0, "power_output": 0.0, "reliability": 0.0}
+	if design_data == null:
+		return eng
+	for slot_name in loadout:
+		var module_id := str(loadout[slot_name])
+		if module_id.is_empty(): continue
+		var mod: EquipmentModule = design_data.get_module(module_id)
+		if mod == null or mod.category.to_lower() != "engine": continue
+		eng["fuel_efficiency"] += mod.fuel_efficiency
+		eng["speed_bonus"] += mod.speed_bonus
+		eng["power_output"] += mod.power_output
+		eng["reliability"] += mod.reliability_bonus
+	return eng

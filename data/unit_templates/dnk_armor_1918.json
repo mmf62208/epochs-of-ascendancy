@@ -4,7 +4,7 @@
   "design_family": "danish_army_1918_armor",
   "base_type": "Armored",
   "size_category": "Light",
-  "visual_archetype": "light_tank",
+  "visual_archetype": "ww1_tank",
   "crew_required": 2,
   "base_training_level": 12,
   "max_experience_level": 100,

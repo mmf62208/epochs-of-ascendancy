@@ -4,7 +4,7 @@
   "design_family": "italian_naval_1918",
   "base_type": "Naval",
   "size_category": "Heavy",
-  "visual_archetype": "battleship",
+  "visual_archetype": "destroyer",
   "crew_required": 1000,
   "base_training_level": 28,
   "max_experience_level": 100,

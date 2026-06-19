@@ -44,6 +44,11 @@ var _min_cell: Vector2i = Vector2i(0, 0)
 var _max_cell: Vector2i = Vector2i(0, 0)
 var _is_built: bool = false
 
+## Demo virtual support: child polys from subdiv overrides become pickable (virtual ids like 82000+)
+var _virtual_centroids: Dictionary = {}  # vid -> Vector2
+var _virtual_polys: Dictionary = {}      # vid -> PackedVector2Array
+var _virtual_to_parent: Dictionary = {}  # vid -> parent_id
+
 ## --- Build ---
 
 ## centroids: Dictionary[int, Vector2]   (province_id -> centroid in the same coordinate space as the map polygons)
@@ -81,6 +86,7 @@ func clear() -> void:
 	_min_cell = Vector2i(0, 0)
 	_max_cell = Vector2i(0, 0)
 	_is_built = false
+	clear_virtuals()
 
 func is_built() -> bool:
 	return _is_built
@@ -92,6 +98,12 @@ func is_built() -> bool:
 func get_province_at(world_pos: Vector2, max_cell_radius: int = -1, use_exact_polygon: bool = false, geometry_provider: Callable = Callable()) -> int:
 	if not _is_built:
 		return -1
+
+	# Demo virtual children (from override geo) are always exact-polygon tested first (cheap, 5 max) so subdivided children are pickable in demo.
+	for vkey in _virtual_polys.keys():
+		var poly: PackedVector2Array = _virtual_polys[vkey]
+		if poly.size() >= 3 and _point_in_polygon(world_pos, poly):
+			return int(vkey)
 
 	var effective_radius := max_cell_radius
 	if effective_radius < 0:
@@ -259,6 +271,7 @@ func get_grid_stats() -> Dictionary:
 		"max_cell": _max_cell,
 		"centroid_only_mode": centroid_only_mode,
 		"adaptive_radius": adaptive_radius,
+		"virtual_demo_children": _virtual_polys.size(),
 	}
 
 func debug_get_candidates_around(world_pos: Vector2, radius: int = 2) -> Array[int]:
@@ -280,3 +293,80 @@ func _approx_polygon_area(poly: PackedVector2Array) -> float:
 		area += (poly[j].x + poly[i].x) * (poly[j].y - poly[i].y)
 		j = i
 	return absf(area) * 0.5
+
+## --- Demo virtual children support (for MapPickGrid + override geo in tests) ---
+
+## Add child polys for a parent as virtual pickable entries.
+## Virtual ids are synthetic ints (parent*1000 + i) to avoid clashing real province ids; returned by get_province_at when point hits child poly exactly.
+## child_polys: array of point-lists (each [[x,y], ...] or Vector2s)
+func add_demo_children(parent_id: int, child_polys: Array) -> Array[int]:
+	var vids: Array[int] = []
+	var idx := 0
+	for cp_raw in child_polys:
+		var pts_arr: Array = []
+		if cp_raw is Array:
+			pts_arr = cp_raw
+		elif cp_raw is PackedVector2Array:
+			for p in cp_raw: pts_arr.append(p)
+		if pts_arr.size() < 3: continue
+		var ptsv := PackedVector2Array()
+		var sx := 0.0
+		var sy := 0.0
+		var cnt := 0
+		for pt in pts_arr:
+			var vx: float = 0.0
+			var vy: float = 0.0
+			if pt is Array and pt.size() >= 2:
+				vx = float(pt[0])
+				vy = float(pt[1])
+			elif pt is Vector2:
+				vx = pt.x
+				vy = pt.y
+			elif pt is PackedFloat32Array and pt.size() >= 2:
+				vx = pt[0]
+				vy = pt[1]
+			ptsv.append(Vector2(vx, vy))
+			sx += vx
+			sy += vy
+			cnt += 1
+		if cnt < 3: continue
+		var c := Vector2(sx / cnt, sy / cnt)
+		var vid := parent_id * 1000 + idx
+		_virtual_centroids[vid] = c
+		_virtual_polys[vid] = ptsv
+		_virtual_to_parent[vid] = parent_id
+		vids.append(vid)
+		idx += 1
+	if vids.size() > 0:
+		print("🗺️ MapPickGrid: added ", vids.size(), " demo virtual children for parent ", parent_id, " vids=", vids, " (pickable via exact poly in get_province_at for demo test)")
+	return vids
+
+func remove_demo_children(parent_id: int = -1) -> void:
+	var to_del: Array = []
+	for vid in _virtual_to_parent.keys():
+		if parent_id < 0 or _virtual_to_parent[vid] == parent_id:
+			to_del.append(vid)
+	for vid in to_del:
+		_virtual_centroids.erase(vid)
+		_virtual_polys.erase(vid)
+		_virtual_to_parent.erase(vid)
+	if to_del.size() > 0:
+		print("🗺️ MapPickGrid: removed demo virtual children (parent ", parent_id if parent_id>=0 else "all", ")")
+
+func clear_virtuals() -> void:
+	_virtual_centroids.clear()
+	_virtual_polys.clear()
+	_virtual_to_parent.clear()
+
+func get_virtual_count() -> int:
+	return _virtual_polys.size()
+
+func get_virtual_children_for_parent(parent_id: int) -> Array[int]:
+	var res: Array[int] = []
+	for vid in _virtual_to_parent:
+		if _virtual_to_parent[vid] == parent_id:
+			res.append(int(vid))
+	return res
+
+func has_virtual_demo() -> bool:
+	return _virtual_polys.size() > 0

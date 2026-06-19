@@ -2,7 +2,7 @@
 **Epochs of Ascendancy**
 
 **Version:** 1.0 (Compiled)  
-**Status:** Design Phase – Ready for Review & Iteration
+**Status:** Design Phase – Ready for Review & Iteration (updated 2026-06-18 with gradual 40s revelation, key events, black market feed, narrative escalation, false/sacrificial armistice, player aid/risk systems)
 
 ---
 
@@ -185,3 +185,21 @@ This mode would be unlocked after significant progress in normal campaigns and w
 ---
 
 **End of Document**
+
+## 11. 2026-06 Updates: Gradual Revelation, Black Market Feed, Narrative Escalation, False Peace (per gameplay feedback)
+
+- **Revelation gradual "glimmer in the 40s"**: Starts subtle post-WWII (whispers of secret networks behind "noble" war machines, MIC complex forming). Builds via hand_influence (from wars, corruption, black market, fiat, overreach). Full "outs itself" only later (Eisenhower 1961 MIC speech precursors, JFK 1963 targeting, Reagan 1981 attempt, global pattern of opponents killed/ineffective/subservient in many countries). Systems: hand_revelation meter + yearly event checks in process_hand_revelation_events (connected to Time year_advanced). Key events aid player *over time* if opposed (via tree expose nodes, agents, low hand choices): +ascendancy, hand reduction on rivals, unlock anti-Hand paths, legitimacy toasts. If ignored/complicit: risks (targeted leaders "accidents", -cohesion, "subservient" penalties). Player sandbox choice: fight early (risky, targeted) or surf then turn (risky).
+
+- **Black market explicitly feeds Hidden Hand**: In TradeManager accept/resolve for BLACK or generated_by black_market: profits laundered +hand_influence (scaled by risk/value). Represents real corruption (mob, prohibition-era profits, deep state elements, shadow trade empowering unaccountable powers). "Follow the money" loop: black deals boost Hand systemic influence, which then affects pillars, events, revelation speed. (Ties to agent smuggling missions, exposure risk, scandals on reveal.)
+
+- **Narrative/toast escalation (loved)**: "early 'our noble cause'", "mid 'the enemy is pure evil'", "post-reveal 'we were all tools'" (of the Hand which loves wars for its agenda). Implemented in revelation process + epoch/news: phase "noble_cause" / "pure_evil" / "we_were_tools" based on revelation level; used in post_news for war/epoch/crisis toasts. Public mood shifts organically, affecting cohesion/ascendancy flavor.
+
+- **False peace / sacrificial armistice (top idea)**: In epoch shifts choices + demo apply: "Accept Sacrificial Armistice" — short Mandate/cohesion boost, but +hand_influence (hidden deals with the powers, like post-WWI compromises or cold war pacts that empowered the complex). Narrative: looks like peace but sows next conflict. Player who takes it feeds Hand (corruption); refusers gain long legitimacy but short pain. Ties to 1918 peace system ripples (aid/waste/corruption feeding Hand).
+
+- **Player aid over time + risk**: Key events (Eisenhower/JFK/Reagan/global) check prior "oppose" (low hand, tree choices, agents) to give bonuses or backfire on Hand. Revelation systems reward foresight (anti-Hand tree nodes via edit mode, expose missions). Fits "key events may aid the player over time" while "those who openly moved against were targeted... in some cases killed, others rendered ineffective or subservient".
+
+- **Map world-class continued**: Reviewed/iterated NA (Rockies alignment to western land/coast in chunk00 + full), Greenland scale compacted (realistic proportions vs mercator), SA (Andes spine), Great Lakes prominent/distinct in correct central NA (rivers layer fills + high alpha 0.82-0.92 in world tls configure + MapRenderer load grand override). Composite of AI-corrected chunks (image_edit) into full layers. Code ensures world rivers/elev loaded/visible/alpha boosted on auto large map (not just Europe or H). Other layers (snow, veg) via existing world support. "all mountains off" addressed for Americas; re-run build/split for further. Matches "level it up make it world class fix any other graphic or layer issues".
+
+These deepen the sandbox emulation of real forces (corruption feeding unaccountable power, narrative control in wars, gradual exposure of hidden agendas with historical parallels), while providing fun risk/reward loops, player agency via tree/agents/choices, and evolving "war of good vs evil" into cosmic intrigue without railroading. Black market now mechanically feeds the Hand as requested. LS now auto-closes/removes at 100% completion.
+
+(Implementation in GameData (states, process funcs, epoch choices/demo, news phases), TradeManager (black feed hook), LoadingScreen (auto hide on 99.5%+), MapRenderer/TLS (world rivers load/alpha), image layers (edits + composite). Docs updated.)

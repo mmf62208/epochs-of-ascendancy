@@ -34,8 +34,8 @@
     "Sensors": "explorer1_science_payload"
   },
   "unlock_tech": [
-    "us_space_program",
-    "early_satellites"
+    "v2_rocket",
+    "sputnik_satellite"
   ],
   "can_mount_drones": false,
   "is_vehicle": true,

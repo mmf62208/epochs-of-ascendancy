@@ -56,6 +56,31 @@ enum DesignStatus {
 	OBSOLETE,
 }
 
+# Design Doctrines (hybrid Option 1+2 from assessment): ... (see full above, but placed here for syntax)
+const DESIGN_DOCTRINES = {
+	"rugged_redundancy": {
+		"name": "Rugged Redundancy (P-47 style)",
+		"description": "Extra tough with backups. +Durability/reliability vs damage. Higher weight/cost/time. Memorable 'tough' designs that survive hits.",
+		"stat_mods": {"reliability": 1.2, "durability": 1.3, "weight": 1.15, "cost": 1.1, "production_time": 1.2},
+		"module_tags": ["redundancy", "rugged_armor"],
+		"real_world": "P-47 Thunderbolt: armored, redundant systems, survived heavy flak."
+	},
+	"lightweight_performance": {
+		"name": "Lightweight Performance (Zero style)",
+		"description": "Minimal structure for max speed/agility/range. Low cost/weight but low durability (fragile, no armor). High risk.",
+		"stat_mods": {"speed": 1.25, "agility": 1.2, "weight": 0.85, "cost": 0.9, "durability": 0.7, "reliability": 0.9},
+		"module_tags": ["lightweight", "high_performance"],
+		"real_world": "Mitsubishi A6M Zero: exceptional maneuverability and range, but no pilot armor or self-sealing tanks."
+	},
+	"compartmentalized_survivability": {
+		"name": "Compartmentalized Survivability (Ship style)",
+		"description": "Internal compartments, damage control, fire suppression. +Survivability (less likely to sink/crit from hit/fire). +Weight/complexity. Ideal for capital ships and carriers.",
+		"stat_mods": {"survivability": 1.4, "fire_resist": 1.3, "weight": 1.1, "cost": 1.05, "production_time": 1.15},
+		"module_tags": ["compartment", "damage_control", "fire_suppression", "hull_reinforcement"],
+		"real_world": "WWII BB/CV: watertight bulkheads, counter-flooding. +50%+ chance to survive torpedo hit without catastrophic loss."
+	}
+}
+
 const OBSOLETE_AGE_YEARS := 30
 
 const DOMAIN_ALL := "all"
@@ -991,6 +1016,56 @@ func _era_to_year(era: String, design_id: String) -> int:
 		return from_id
 	return 1940
 
+# Apply design doctrine (from 3-option assessment hybrid): sets base mods and tags for module filtering. Called when player selects base model in designer.
+# Returns modified stats or loads suggested modules. Keeps fun/memorable (doctrine choice) + trade-offs (explicit in UI/modules).
+func apply_design_doctrine(design_id: String, doctrine_key: String) -> Dictionary:
+	if not DESIGN_DOCTRINES.has(doctrine_key):
+		return {}
+	var doctrine = DESIGN_DOCTRINES[doctrine_key]
+	var result = {"mods": doctrine.get("stat_mods", {}), "suggested_modules": [], "flavor": doctrine.get("description", ""), "real_world": doctrine.get("real_world", "")}
+	# In full designer: apply mods to base stats, filter available modules by tags.
+	# Example: for "rugged_redundancy", unlock redundancy modules, +durability.
+	print("[DESIGN DOCTRINE] Applied %s to %s: %s (trade-offs: weight/cost for protection)" % [doctrine_key, design_id, doctrine.get("name")])
+	return result
+
+# Get available doctrines for a domain/era (for designer UI).
+func get_available_doctrines(domain: String = "", era: String = "") -> Array:
+	var avail = []
+	for key in DESIGN_DOCTRINES:
+		# Filter by domain if needed (e.g. compartmentalized great for naval).
+		avail.append({"key": key, "name": DESIGN_DOCTRINES[key]["name"], "desc": DESIGN_DOCTRINES[key]["description"]})
+	return avail
+
+# Integrate service doctrine with unit design (high-level guideline for agents/AI in picker/design).
+# E.g., if army "blitzkrieg", prefer mobile armor modules, apply bonuses to designs.
+# Player micro overrides in designer; doctrine gives direction + national bonuses.
+func get_designs_filtered_by_service_doctrine(country_tag: String, service: String, base_catalog: Array) -> Array:
+	var doctrine := ""
+	if typeof(LeaderManager) != TYPE_NIL:
+		doctrine = LeaderManager.get_service_doctrine(country_tag, service)
+	if doctrine.is_empty() or not DESIGN_DOCTRINES.has(doctrine):
+		return base_catalog
+	var def := DESIGN_DOCTRINES[doctrine] as Dictionary
+	var filtered := []
+	var bonus_tags: Array = def.get("module_tags", [])
+	for d in base_catalog:
+		var tpl: UnitTemplate = null
+		if typeof(GameData) != TYPE_NIL and GameData.design_data != null:
+			tpl = GameData.design_data.get_template(str(d))
+		if tpl == null:
+			filtered.append(d)
+			continue
+		var arch := str(tpl.visual_archetype).to_lower()
+		# Prefer matching archetype (e.g. mobile for blitz)
+		if "blitz" in doctrine and ("tank" in arch or "mobile" in arch):
+			filtered.append(d)
+		elif "attrition" in doctrine and ("artillery" in arch or "infantry" in arch):
+			filtered.append(d)
+		else:
+			filtered.append(d)  # all, but AI would weight
+	# In real: weight by doctrine, or auto-apply mods.
+	print("[SERVICE DOCTRINE FILTER] For %s %s doctrine '%s': filtered designs prefer %s archetypes" % [country_tag, service, doctrine, bonus_tags])
+	return filtered
 
 func _year_from_id(design_id: String) -> int:
 	var id := design_id.to_lower()

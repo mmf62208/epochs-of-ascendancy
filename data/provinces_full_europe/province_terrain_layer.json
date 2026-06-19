@@ -1,0 +1,3690 @@
+{
+  "version": 1,
+  "province_terrain_layer": {
+    "version": 1,
+    "provinces": {
+      "1": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "3": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.064,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "6": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "7": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.451,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "10": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "13": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.53,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "15": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "18": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.632,
+        "veg_strength": 0.0,
+        "snow_potential": 0.694,
+        "source": "real_layers_inference"
+      },
+      "19": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.457,
+        "veg_strength": 0.0,
+        "snow_potential": 0.413,
+        "source": "real_layers_inference"
+      },
+      "21": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.35,
+        "veg_strength": 0.0,
+        "snow_potential": 0.124,
+        "source": "real_layers_inference"
+      },
+      "22": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "25": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "27": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "30": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.168,
+        "veg_strength": 0.0,
+        "snow_potential": 0.111,
+        "source": "real_layers_inference"
+      },
+      "31": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.668,
+        "veg_strength": 0.0,
+        "snow_potential": 0.705,
+        "source": "real_layers_inference"
+      },
+      "33": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.216,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "34": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.492,
+        "veg_strength": 0.0,
+        "snow_potential": 0.125,
+        "source": "real_layers_inference"
+      },
+      "37": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "39": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "43": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.159,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "85": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9000": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.324,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9001": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.38,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9002": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.126,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9003": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.002,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9004": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.002,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9005": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.002,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9006": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9007": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9008": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9009": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9010": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9011": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9012": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.533,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9013": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.529,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9014": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.537,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9015": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.539,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9016": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.514,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9017": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.531,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9018": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.729,
+        "veg_strength": 0.0,
+        "snow_potential": 0.91,
+        "source": "real_layers_inference"
+      },
+      "9019": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.703,
+        "veg_strength": 0.0,
+        "snow_potential": 0.802,
+        "source": "real_layers_inference"
+      },
+      "9020": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.737,
+        "veg_strength": 0.0,
+        "snow_potential": 0.984,
+        "source": "real_layers_inference"
+      },
+      "9021": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.596,
+        "veg_strength": 0.0,
+        "snow_potential": 0.57,
+        "source": "real_layers_inference"
+      },
+      "9022": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.709,
+        "veg_strength": 0.0,
+        "snow_potential": 0.861,
+        "source": "real_layers_inference"
+      },
+      "9023": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.687,
+        "veg_strength": 0.0,
+        "snow_potential": 0.811,
+        "source": "real_layers_inference"
+      },
+      "9024": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9025": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9026": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9027": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9028": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9029": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9030": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9031": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9032": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9033": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9034": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9035": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9036": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9037": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9038": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9039": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9040": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9041": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9042": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9043": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9044": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9045": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9046": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9047": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9048": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9049": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9050": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9051": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.13,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9052": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.325,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9053": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.091,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9054": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9055": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.181,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9056": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.45,
+        "veg_strength": 0.0,
+        "snow_potential": 0.329,
+        "source": "real_layers_inference"
+      },
+      "9057": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.431,
+        "veg_strength": 0.0,
+        "snow_potential": 0.209,
+        "source": "real_layers_inference"
+      },
+      "9058": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9059": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9060": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9061": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9062": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9063": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9064": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9065": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9066": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.707,
+        "veg_strength": 0.0,
+        "snow_potential": 0.899,
+        "source": "real_layers_inference"
+      },
+      "9067": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.705,
+        "veg_strength": 0.0,
+        "snow_potential": 0.899,
+        "source": "real_layers_inference"
+      },
+      "9068": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.691,
+        "veg_strength": 0.0,
+        "snow_potential": 0.877,
+        "source": "real_layers_inference"
+      },
+      "9069": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.704,
+        "veg_strength": 0.0,
+        "snow_potential": 0.821,
+        "source": "real_layers_inference"
+      },
+      "9070": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.672,
+        "veg_strength": 0.0,
+        "snow_potential": 0.784,
+        "source": "real_layers_inference"
+      },
+      "9071": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.7,
+        "veg_strength": 0.0,
+        "snow_potential": 0.899,
+        "source": "real_layers_inference"
+      },
+      "9072": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9073": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9074": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9075": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9076": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9077": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9078": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.536,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9079": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.417,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9080": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.425,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9081": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.405,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9082": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.412,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9083": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.449,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9084": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.529,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9085": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.531,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9086": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.529,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9087": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.523,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9088": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.529,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9089": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.522,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9090": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.737,
+        "veg_strength": 0.0,
+        "snow_potential": 0.965,
+        "source": "real_layers_inference"
+      },
+      "9091": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.726,
+        "veg_strength": 0.0,
+        "snow_potential": 0.936,
+        "source": "real_layers_inference"
+      },
+      "9092": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.726,
+        "veg_strength": 0.0,
+        "snow_potential": 0.972,
+        "source": "real_layers_inference"
+      },
+      "9093": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.734,
+        "veg_strength": 0.0,
+        "snow_potential": 0.947,
+        "source": "real_layers_inference"
+      },
+      "9094": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.743,
+        "veg_strength": 0.0,
+        "snow_potential": 0.979,
+        "source": "real_layers_inference"
+      },
+      "9095": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.726,
+        "veg_strength": 0.0,
+        "snow_potential": 0.937,
+        "source": "real_layers_inference"
+      },
+      "9096": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.546,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9097": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.54,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9098": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.533,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9099": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.543,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9100": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.544,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9101": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.545,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9102": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9103": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9104": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9105": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9106": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9107": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9108": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9109": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9110": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9111": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9112": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9113": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9114": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9115": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9116": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9117": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9118": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9119": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9120": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9121": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9122": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9123": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9124": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9125": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9126": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.529,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9127": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.551,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9128": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.545,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9129": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.113,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9130": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.113,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9131": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.231,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9132": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9133": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9134": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9135": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.093,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9136": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.431,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9137": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.425,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9138": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.557,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9139": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.551,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9140": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.314,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9141": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.115,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9142": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.225,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9143": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.543,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9144": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9145": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9146": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9147": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.014,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9148": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9149": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9150": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.515,
+        "veg_strength": 0.0,
+        "snow_potential": 0.283,
+        "source": "real_layers_inference"
+      },
+      "9151": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.633,
+        "veg_strength": 0.0,
+        "snow_potential": 0.674,
+        "source": "real_layers_inference"
+      },
+      "9152": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.657,
+        "veg_strength": 0.0,
+        "snow_potential": 0.712,
+        "source": "real_layers_inference"
+      },
+      "9153": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.439,
+        "veg_strength": 0.0,
+        "snow_potential": 0.094,
+        "source": "real_layers_inference"
+      },
+      "9154": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.473,
+        "veg_strength": 0.0,
+        "snow_potential": 0.185,
+        "source": "real_layers_inference"
+      },
+      "9155": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.483,
+        "veg_strength": 0.0,
+        "snow_potential": 0.186,
+        "source": "real_layers_inference"
+      },
+      "9156": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9157": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9158": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9159": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9160": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9161": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9162": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.719,
+        "veg_strength": 0.0,
+        "snow_potential": 0.939,
+        "source": "real_layers_inference"
+      },
+      "9163": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.734,
+        "veg_strength": 0.0,
+        "snow_potential": 1.0,
+        "source": "real_layers_inference"
+      },
+      "9164": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.733,
+        "veg_strength": 0.0,
+        "snow_potential": 1.0,
+        "source": "real_layers_inference"
+      },
+      "9165": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.721,
+        "veg_strength": 0.0,
+        "snow_potential": 0.973,
+        "source": "real_layers_inference"
+      },
+      "9166": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.72,
+        "veg_strength": 0.0,
+        "snow_potential": 0.959,
+        "source": "real_layers_inference"
+      },
+      "9167": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.712,
+        "veg_strength": 0.0,
+        "snow_potential": 0.998,
+        "source": "real_layers_inference"
+      },
+      "9168": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9169": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9170": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9171": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9172": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9173": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9174": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.522,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9175": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.539,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9176": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.536,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9177": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.428,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9178": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.376,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9179": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.287,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9180": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.42,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9181": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.43,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9182": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.336,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9183": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.003,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9184": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.126,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9185": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.202,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9186": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.575,
+        "veg_strength": 0.0,
+        "snow_potential": 0.413,
+        "source": "real_layers_inference"
+      },
+      "9187": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.608,
+        "veg_strength": 0.0,
+        "snow_potential": 0.489,
+        "source": "real_layers_inference"
+      },
+      "9188": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.605,
+        "veg_strength": 0.0,
+        "snow_potential": 0.483,
+        "source": "real_layers_inference"
+      },
+      "9189": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.727,
+        "veg_strength": 0.0,
+        "snow_potential": 0.924,
+        "source": "real_layers_inference"
+      },
+      "9190": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.719,
+        "veg_strength": 0.0,
+        "snow_potential": 0.86,
+        "source": "real_layers_inference"
+      },
+      "9191": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.632,
+        "veg_strength": 0.0,
+        "snow_potential": 0.605,
+        "source": "real_layers_inference"
+      },
+      "9192": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9193": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9194": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9195": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.09,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9196": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.272,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9197": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.111,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9198": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.528,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9199": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.523,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9200": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.529,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9201": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.514,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9202": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.531,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9203": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.504,
+        "veg_strength": 0.0,
+        "snow_potential": 0.001,
+        "source": "real_layers_inference"
+      },
+      "9204": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9205": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9206": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9207": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9208": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9209": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9210": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9211": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9212": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9213": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9214": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9215": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9216": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9217": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9218": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9219": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9220": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9221": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9222": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9223": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9224": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9225": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9226": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9227": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9228": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9229": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9230": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9231": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9232": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9233": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9234": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.529,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9235": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.543,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9236": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.536,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9237": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.54,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9238": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.532,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9239": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.506,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9240": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.197,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9241": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.263,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9242": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.46,
+        "veg_strength": 0.0,
+        "snow_potential": 0.088,
+        "source": "real_layers_inference"
+      },
+      "9243": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.409,
+        "veg_strength": 0.0,
+        "snow_potential": 0.035,
+        "source": "real_layers_inference"
+      },
+      "9244": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.221,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9245": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.104,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9246": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.526,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9247": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.529,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9248": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.541,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9249": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.526,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9250": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.529,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9251": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.544,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9252": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9253": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9254": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9255": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.209,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9256": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.402,
+        "veg_strength": 0.0,
+        "snow_potential": 0.201,
+        "source": "real_layers_inference"
+      },
+      "9257": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.196,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9258": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9259": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9260": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9261": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9262": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9263": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.001,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9264": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.105,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9265": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.138,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9266": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.508,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9267": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.489,
+        "veg_strength": 0.0,
+        "snow_potential": 0.017,
+        "source": "real_layers_inference"
+      },
+      "9268": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.525,
+        "veg_strength": 0.0,
+        "snow_potential": 0.059,
+        "source": "real_layers_inference"
+      },
+      "9269": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.52,
+        "veg_strength": 0.0,
+        "snow_potential": 0.07,
+        "source": "real_layers_inference"
+      },
+      "9270": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9271": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9272": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9273": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9274": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9275": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9276": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9277": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9278": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9279": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9280": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9281": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9282": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9283": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9284": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.001,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9285": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.027,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9286": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.131,
+        "veg_strength": 0.0,
+        "snow_potential": 0.004,
+        "source": "real_layers_inference"
+      },
+      "9287": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.026,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9288": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9289": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9290": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9291": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9292": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9293": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9294": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9295": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9296": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9297": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.132,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9298": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9299": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9300": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9301": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9302": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9303": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.697,
+        "veg_strength": 0.0,
+        "snow_potential": 1.0,
+        "source": "real_layers_inference"
+      },
+      "9304": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.715,
+        "veg_strength": 0.0,
+        "snow_potential": 1.0,
+        "source": "real_layers_inference"
+      },
+      "9305": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.729,
+        "veg_strength": 0.0,
+        "snow_potential": 1.0,
+        "source": "real_layers_inference"
+      },
+      "9306": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.726,
+        "veg_strength": 0.0,
+        "snow_potential": 1.0,
+        "source": "real_layers_inference"
+      },
+      "9307": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.725,
+        "veg_strength": 0.0,
+        "snow_potential": 0.953,
+        "source": "real_layers_inference"
+      },
+      "9308": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.703,
+        "veg_strength": 0.0,
+        "snow_potential": 0.875,
+        "source": "real_layers_inference"
+      },
+      "9309": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.631,
+        "veg_strength": 0.0,
+        "snow_potential": 0.504,
+        "source": "real_layers_inference"
+      },
+      "9310": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.597,
+        "veg_strength": 0.0,
+        "snow_potential": 0.427,
+        "source": "real_layers_inference"
+      },
+      "9311": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.571,
+        "veg_strength": 0.0,
+        "snow_potential": 0.257,
+        "source": "real_layers_inference"
+      },
+      "9312": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.537,
+        "veg_strength": 0.0,
+        "snow_potential": 0.202,
+        "source": "real_layers_inference"
+      },
+      "9313": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9314": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9315": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9316": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9317": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9318": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9319": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9320": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9321": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9322": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9323": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.531,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9324": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.544,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9325": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.546,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9326": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.525,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9327": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.537,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9328": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.482,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9329": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.458,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9330": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.521,
+        "veg_strength": 0.0,
+        "snow_potential": 0.155,
+        "source": "real_layers_inference"
+      },
+      "9331": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.534,
+        "veg_strength": 0.0,
+        "snow_potential": 0.25,
+        "source": "real_layers_inference"
+      },
+      "9332": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.582,
+        "veg_strength": 0.0,
+        "snow_potential": 0.394,
+        "source": "real_layers_inference"
+      },
+      "9333": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.191,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9334": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9335": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9336": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9337": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9338": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9339": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9340": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9341": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9342": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.22,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9343": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.522,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9344": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.522,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9345": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.525,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9346": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.528,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9347": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.5,
+        "veg_strength": 0.0,
+        "snow_potential": 0.005,
+        "source": "real_layers_inference"
+      },
+      "9348": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9349": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9350": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9351": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9352": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9353": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9354": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9355": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9356": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9357": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9358": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9359": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9360": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9361": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9362": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9363": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.576,
+        "veg_strength": 0.0,
+        "snow_potential": 0.41,
+        "source": "real_layers_inference"
+      },
+      "9364": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.598,
+        "veg_strength": 0.0,
+        "snow_potential": 0.44,
+        "source": "real_layers_inference"
+      },
+      "9365": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.581,
+        "veg_strength": 0.0,
+        "snow_potential": 0.425,
+        "source": "real_layers_inference"
+      },
+      "9366": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.593,
+        "veg_strength": 0.0,
+        "snow_potential": 0.456,
+        "source": "real_layers_inference"
+      },
+      "9367": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.67,
+        "veg_strength": 0.0,
+        "snow_potential": 0.723,
+        "source": "real_layers_inference"
+      },
+      "9368": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9369": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9370": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9371": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9372": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.246,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9373": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9374": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9375": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9376": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9377": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9378": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.247,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9379": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.317,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9380": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.351,
+        "veg_strength": 0.0,
+        "snow_potential": 0.035,
+        "source": "real_layers_inference"
+      },
+      "9381": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.248,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9382": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.009,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9383": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.541,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9384": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.522,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9385": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.547,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9386": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.535,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9387": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.531,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9388": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.113,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9389": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.113,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9390": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.113,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9391": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.129,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9392": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.454,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9393": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9394": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.361,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9395": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.147,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9396": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.398,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9397": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.135,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9398": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9399": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9400": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9401": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9402": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9403": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9404": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9405": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9406": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9407": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9408": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.595,
+        "veg_strength": 0.0,
+        "snow_potential": 0.586,
+        "source": "real_layers_inference"
+      },
+      "9409": {
+        "terrain": "snow_capped",
+        "movement_cost": 3.0,
+        "height_proxy": 0.616,
+        "veg_strength": 0.0,
+        "snow_potential": 0.666,
+        "source": "real_layers_inference"
+      },
+      "9410": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.575,
+        "veg_strength": 0.0,
+        "snow_potential": 0.438,
+        "source": "real_layers_inference"
+      },
+      "9411": {
+        "terrain": "mountains",
+        "movement_cost": 2.5,
+        "height_proxy": 0.531,
+        "veg_strength": 0.0,
+        "snow_potential": 0.341,
+        "source": "real_layers_inference"
+      },
+      "9412": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.429,
+        "veg_strength": 0.0,
+        "snow_potential": 0.085,
+        "source": "real_layers_inference"
+      },
+      "9413": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.516,
+        "veg_strength": 0.0,
+        "snow_potential": 0.244,
+        "source": "real_layers_inference"
+      },
+      "9414": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.506,
+        "veg_strength": 0.0,
+        "snow_potential": 0.182,
+        "source": "real_layers_inference"
+      },
+      "9415": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.425,
+        "veg_strength": 0.0,
+        "snow_potential": 0.007,
+        "source": "real_layers_inference"
+      },
+      "9416": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.479,
+        "veg_strength": 0.0,
+        "snow_potential": 0.03,
+        "source": "real_layers_inference"
+      },
+      "9417": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.438,
+        "veg_strength": 0.0,
+        "snow_potential": 0.04,
+        "source": "real_layers_inference"
+      },
+      "9418": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.49,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9419": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.449,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9420": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.382,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9421": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.412,
+        "veg_strength": 0.0,
+        "snow_potential": 0.012,
+        "source": "real_layers_inference"
+      },
+      "9422": {
+        "terrain": "hills",
+        "movement_cost": 1.6,
+        "height_proxy": 0.437,
+        "veg_strength": 0.0,
+        "snow_potential": 0.124,
+        "source": "real_layers_inference"
+      },
+      "9423": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9424": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.015,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9425": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.226,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9426": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.138,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9427": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.008,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9428": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9429": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9430": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9431": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9432": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9433": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9434": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9435": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9436": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      },
+      "9437": {
+        "terrain": "plains",
+        "movement_cost": 1.0,
+        "height_proxy": 0.0,
+        "veg_strength": 0.0,
+        "snow_potential": 0.0,
+        "source": "real_layers_inference"
+      }
+    }
+  },
+  "source": "real_layers_inference",
+  "count": 460
+}

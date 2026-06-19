@@ -43,6 +43,11 @@ See [docs/TECHNOLOGY_SYSTEM_DESIGN.md](../../docs/TECHNOLOGY_SYSTEM_DESIGN.md) f
   "base_cost_days": 120,
   "category": "armor",
   "ahead_of_time_penalty_per_year": 0.15,
+
+# New: knowledge diffusion & agent early unlock (2026 expansions, updated per feedback)
+# Diffusion (get_knowledge_diffusion_discount): Hybrid to protect vs single/small-nation rushes (count bonus only >=3 nations; normal 2yr time floor) BUT if LARGE # (>=5 nations have completed it), even only 1 year behind gets early catch-up discount bonus. Time ramp + count add when thresholds met. Prevents one-rush making everything cheap for others, while rewarding widespread adoption with earlier bonuses for advancing ahead penalty.
+# Agent trait early: get_early_unlock_years_bonus (e.g. breakthrough_visionary trait) reduces effective era_min when sponsoring agent assigned to tech_id. Not hard lock - enables alt-history "sooner" unlocks if conditions right.
+# Defend secrecy: new "defend_tech_secrecy" mission targets tech, enhances theft protection (Manhattan-style compartmentalization); theft logic checks for active defender agent on exact tech for extra block.
   "repeatable": false
 }
 ```

@@ -38,6 +38,7 @@ var preferred_mode: String = ""     # "land", "sea", "air" — hint for routing
 var created_turn: int = 0
 var last_delivery_turn: int = -1
 var total_delivered: float = 0.0
+var total_lost_to_interdiction: float = 0.0  # cumulative "cargo capacity" lost to interdiction (mitigated by regional convoy bonuses)
 
 var active: bool = true
 var suspended_reason: String = ""   # e.g. "interdicted", "route_blocked", "diplomatic_suspension"
@@ -47,7 +48,9 @@ var suspended_reason: String = ""   # e.g. "interdicted", "route_blocked", "dipl
 var metadata: Dictionary = {}
 
 func get_display_name() -> String:
-	return "%s → %s : %.1f %s / turn" % [from_tag, to_tag, quantity_per_turn, item_id]
+	var lost = total_lost_to_interdiction
+	var suffix = " (lost %.1f to interdiction)" % lost if lost > 0.01 else ""
+	return "%s → %s : %.1f %s / turn%s" % [from_tag, to_tag, quantity_per_turn, item_id, suffix]
 
 func is_ongoing() -> bool:
 	return active and quantity_per_turn > 0.0

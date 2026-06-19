@@ -83,13 +83,15 @@ func apply_national_effect(country_tag: String, effect_data: Dictionary) -> bool
 	if not effect.has("source"):
 		effect["source"] = "unknown"
 
-	if not country_modifiers.has(tag):
-		country_modifiers[tag] = []
-
-	# Remove any existing effect with the same ID (refresh behavior)
+	# Remove any existing effect with the same ID (refresh behavior).
+	# remove_effect() erases the country key when the last effect is removed — re-create the bucket before append.
 	remove_effect(tag, effect["effect_id"])
 
-	country_modifiers[tag].append(effect)
+	if not country_modifiers.has(tag):
+		var bucket: Array[Dictionary] = []
+		country_modifiers[tag] = bucket
+	var effects: Array[Dictionary] = country_modifiers[tag]
+	effects.append(effect)
 	national_modifier_applied.emit(tag, effect["effect_id"])
 	return true
 
@@ -136,9 +138,13 @@ func get_national_modifier(country_tag: String, key: String) -> float:
 ## Returns all currently active effects for a country.
 func get_active_effects(country_tag: String) -> Array[Dictionary]:
 	var tag := country_tag.strip_edges().to_upper()
+	var out: Array[Dictionary] = []
 	if not country_modifiers.has(tag):
-		return []
-	return (country_modifiers[tag] as Array).duplicate(true)
+		return out
+	for item in country_modifiers[tag] as Array:
+		if item is Dictionary:
+			out.append((item as Dictionary).duplicate(true))
+	return out
 
 
 ## Removes a specific effect by ID.
@@ -180,6 +186,7 @@ func get_production_modifiers(country_tag: String) -> Dictionary:
 		"retooling_days_multiplier": 1.0,
 		"cost_multiplier": 1.0,
 		"infrastructure_repair": 0.0,  # Consumed by MapManager repair system (tech + national focus support for infrastructure)
+		"resource_output_multiplier": 1.0,  # For agent resource discovery / exploration boosts
 	}
 
 	if typeof(TechnologyManager) != TYPE_NIL:
@@ -195,6 +202,12 @@ func get_production_modifiers(country_tag: String) -> Dictionary:
 					result["retooling_days_multiplier"] *= (1.0 + val)
 				"production_cost", "cost_multiplier":
 					result["cost_multiplier"] *= (1.0 + val)
+				# Layered/additive manufacturing (additive_manuf_1985): flexibility speeds retool/custom, reduces waste/cost
+				"production_flexibility":
+					result["retooling_days_multiplier"] *= maxf(0.5, 1.0 - val * 0.6)  # e.g. 0.25 -> ~15% faster retool
+					result["cost_multiplier"] *= maxf(0.6, 1.0 - val * 0.4)
+				"material_efficiency":
+					result["cost_multiplier"] *= maxf(0.5, 1.0 - val * 0.5)  # nanotech synergy too
 
 	if not country_modifiers.has(tag):
 		return result
@@ -212,12 +225,37 @@ func get_production_modifiers(country_tag: String) -> Dictionary:
 					result["retooling_days_multiplier"] *= (1.0 + val)
 				"production_cost", "cost_multiplier":
 					result["cost_multiplier"] *= (1.0 + val)
+				# Layered/additive manufacturing (additive_manuf_1985): flexibility speeds retool/custom, reduces waste/cost
+				"production_flexibility":
+					result["retooling_days_multiplier"] *= maxf(0.5, 1.0 - val * 0.6)  # e.g. 0.25 -> ~15% faster retool
+					result["cost_multiplier"] *= maxf(0.6, 1.0 - val * 0.4)
+				"material_efficiency":
+					result["cost_multiplier"] *= maxf(0.5, 1.0 - val * 0.5)  # nanotech synergy too
 				"stability":
 					# Simple stability effect: negative stability reduces output
 					if val < 0:
 						var penalty := clampf(absf(val) * 0.01, 0.0, 0.25)  # 1% per stability point, capped
 						result["output_multiplier"] *= (1.0 - penalty)
+				"resource_output", "resource_output_multiplier", "resource_production":
+					result["resource_output_multiplier"] *= (1.0 + val)
 
+	return result
+
+## Returns resource-relevant modifiers (for discovery, output from agents/exploration).
+func get_resource_modifiers(country_tag: String) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var result := {
+		"resource_output_multiplier": 1.0,
+	}
+	if tag.is_empty() or not country_modifiers.has(tag):
+		return result
+	for effect in country_modifiers[tag] as Array:
+		var mods: Dictionary = effect.get("modifiers", {})
+		for key in mods.keys():
+			var val := float(mods[key])
+			match key:
+				"resource_output", "resource_output_multiplier", "resource_production":
+					result["resource_output_multiplier"] *= (1.0 + val)
 	return result
 
 
@@ -234,6 +272,20 @@ func get_combat_modifiers(country_tag: String) -> Dictionary:
 		"encryption": 0.0,
 		"attrition_reduction": 0.0,
 		"interdiction_resistance": 0.0,
+		# New tech expansion wiring (biotech, sonic/CB, drones, scanners, shields, phasers, tele, layered, VR etc)
+		"infantry_enhancement": 0.0,
+		"soldier_enhancement": 0.0,
+		"precision_strike": 0.0,
+		"defensive_shielding": 0.0,
+		"energy_weapon_dmg": 0.0,
+		"area_denial": 0.0,
+		"non_lethal_control": 0.0,
+		"terror_factor": 0.0,
+		"detection_range": 0.0,
+		"stealth_detection": 0.0,
+		"rapid_deployment": 0.0,
+		"manpower_replacement": 0.0,
+		"training_efficiency": 0.0,
 	}
 
 	if not country_modifiers.has(tag):

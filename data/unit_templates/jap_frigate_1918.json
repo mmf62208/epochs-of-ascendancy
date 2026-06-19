@@ -1,10 +1,10 @@
 {
   "id": "jap_frigate_1918",
-  "name": "Tenryū-class Light Cruiser",
+  "name": "Tenry\u016b-class Light Cruiser",
   "design_family": "japanese_naval_1918",
   "base_type": "Naval",
   "size_category": "Medium",
-  "visual_archetype": "frigate",
+  "visual_archetype": "cruiser",
   "crew_required": 140,
   "base_training_level": 26,
   "max_experience_level": 100,

@@ -4,7 +4,7 @@
   "design_family": "us_naval_amphibious_historic",
   "base_type": "Naval",
   "size_category": "Heavy",
-  "visual_archetype": "carrier",
+  "visual_archetype": "destroyer",
   "crew_required": 1800,
   "base_training_level": 32,
   "max_experience_level": 100,

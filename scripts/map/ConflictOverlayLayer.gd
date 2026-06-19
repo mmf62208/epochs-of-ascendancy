@@ -80,6 +80,37 @@ func _draw() -> void:
 	var contested := _collect_contested()
 	for entry in contested:
 		_draw_contested_province(entry)
+	_draw_front_lines()
+
+
+func _draw_front_lines() -> void:
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
+		return
+	var drawn: Dictionary = {}
+	var sl := get_node_or_null("/root/ScenarioLoader") as ScenarioLoader
+	if sl == null:
+		return
+	for pid_var in sl.provinces.keys():
+		var a: int = int(pid_var)
+		var pa: Province = sl.provinces[a] as Province
+		if pa == null or pa.owner_tag.is_empty():
+			continue
+		for nb_var in MapManager.get_adjacent_provinces(a):
+			var b: int = int(nb_var)
+			if b <= a:
+				continue
+			var key := "%d_%d" % [mini(a, b), maxi(a, b)]
+			if drawn.has(key):
+				continue
+			var pb: Province = sl.provinces.get(b) as Province
+			if pb == null or pb.owner_tag.is_empty():
+				continue
+			if pa.owner_tag == pb.owner_tag:
+				continue
+			drawn[key] = true
+			var ca := MapManager.get_province_centroid(a)
+			var cb := MapManager.get_province_centroid(b)
+			draw_line(ca, cb, Color(1.0, 0.15, 0.12, 0.75), 3.0)
 
 
 func _collect_contested() -> Array:

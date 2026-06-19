@@ -10,7 +10,7 @@
 [node name="Label" type="Label" parent="."]
 offset_left = 20.0
 offset_top = 20.0
-text = "NATO Symbols Preview - Multiple Zooms (use DebugOverlay or attach debug gd)"
+text = "NATO + MapGen Debug: proposed children (green = river-cross from rivers.json). Run generate; attach DebugDrawer or use F10 Subdiv button on TestScenario for live map overlay."
 metadata/_edit_use_anchors_ = false
 
 [node name="Heli32" type="Sprite2D" parent="."]

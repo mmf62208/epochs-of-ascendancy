@@ -4,7 +4,7 @@
   "design_family": "experimental_rotary_pre_war",
   "base_type": "Air",
   "size_category": "Medium",
-  "visual_archetype": "helicopter",
+  "visual_archetype": "prop_fighter",
   "crew_required": 1,
   "base_training_level": 15,
   "max_experience_level": 80,

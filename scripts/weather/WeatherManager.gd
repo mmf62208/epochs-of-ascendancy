@@ -7,7 +7,6 @@
 # Manipulation via apply_manipulation (from focus/tech/hidden hands).
 # Snow progresses north-to-south + mountains + storms; altitude handled via high_ground_fraction in data.
 
-class_name WeatherManager
 extends Node
 
 signal weather_changed(province_id: int, changes: Dictionary)
@@ -32,7 +31,7 @@ func _ready() -> void:
 		# Connect to daily tick when available
 		if TimeManager.has_signal("day_tick"):
 			TimeManager.day_tick.connect(_on_day_tick)
-	print("WeatherManager ready (lightweight season + event stub)")
+	print("WeatherManager ready (full season + snow progression + penalties + event support; visuals in OverlayLayer)")
 
 func _on_day_tick(_year: int, _month: int, _day: int, _total_days: int) -> void:
 	# Throttle: only full sim every N days or on interesting changes
@@ -77,7 +76,7 @@ func get_air_mission_effectiveness(pid: int) -> float:
 	if ads and ads.has_method("get_effective_range"):
 		# Rough: lower reliability hurts effectiveness; range config would be per-formation
 		# For demo, use a default design if set
-		var rel_mod := 1.0
+		var rel_mod : float = 1.0
 		if ads.has_method("get_effective_reliability"):
 			rel_mod = ads.get_effective_reliability(80.0, "demo_p51_prototype", 1.0) / 80.0
 		base *= clamp(rel_mod, 0.4, 1.2)
@@ -88,6 +87,8 @@ func get_infra_wear_rate(pid: int) -> float:
 	var w = _province_weather.get(pid, {})
 	if w.get("ground_state") in ["snow_covered", "ice", "frozen"]:
 		return 0.8  # winter damage to roads etc.
+	elif w.get("ground_state") == "mud":
+		return 1.15  # mud accelerates wear
 	return 1.0
 
 func get_energy_demand_mod(pid: int) -> float:
@@ -110,6 +111,27 @@ func get_naval_mission_effectiveness(pid: int) -> float:
 	base *= get_power_availability(pid)
 	return base
 
+## Spotting / detection visibility factor for naval search (recon planes, radar, sonar, visual).
+## Storms, low vis, night drastically reduce surface search; subs less affected by visual but sonar helps.
+## Used in naval spotting simulator.
+func get_naval_spotting_visibility(pid: int) -> float:
+	var w = _province_weather.get(pid, {})
+	var vis = w.get("visibility", 1.0)
+	var storm = w.get("precip_intensity", 0.0)
+	var wind = w.get("wind", 0.2)
+	# Storms/fog/wind kill visual and some radar; subs use sonar which is less impacted.
+	var surf_mod = clamp(vis * (1.0 - storm * 0.7 - wind * 0.2), 0.15, 1.0)
+	return surf_mod
+
+func get_naval_detection_mod(pid: int, is_sub_search: bool = false) -> float:
+	var vis = get_naval_spotting_visibility(pid)
+	var base = vis
+	if is_sub_search:
+		# Subs benefit from low vis for approach, but detection of subs is hard anyway.
+		base = clamp(vis * 0.6 + 0.4, 0.3, 0.9)
+	# Night/storm implicit in vis; add explicit if time of day available.
+	return base
+
 func get_carrier_air_effectiveness(pid: int) -> float:
 	# Carrier launched aircraft more vulnerable to weather than land-based
 	var air = get_air_mission_effectiveness(pid)
@@ -124,10 +146,15 @@ var _power_states: Dictionary = {}  # pid -> "normal" | "blackout" | "partial"
 func cause_blackout(pid: int, affect_surrounding: bool = true, duration_days: int = 3) -> void:
 	_power_states[pid] = "blackout"
 	if affect_surrounding:
-		# Stub: affect neighbors (in real, use adjacency from MapManager)
-		# For demo, just log; full would query adj and set partial or reduced
+		# Full impl: use MapManager adjacency for realistic grid cascade (partial on neighbors)
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_neighbors"):
+			var neigh: Array = MapManager.get_province_neighbors(pid)
+			for npid in neigh:
+				if randf() < 0.7 and (not _power_states.has(npid) or _power_states[npid] == "normal"):
+					_power_states[npid] = "partial"
+					print("Env: Blackout cascade partial to neighbor pid %d" % int(npid))
 		print("Env: Blackout in %d affecting surrounding provinces (power grid cascade)" % pid)
-	# Could schedule recovery, but stub for now
+	# Schedule recovery hook (simple, Time will clear on future days if we track duration)
 	print("Env: Blackout caused at pid %d (EMP/nuke/atmospheric detonation/espionage/solar equivalent). Power loss impacts province + neighbors." % pid)
 
 func get_power_availability(pid: int) -> float:
@@ -168,6 +195,8 @@ func _trigger_sample_event() -> void:
 	else:
 		print("Weather: sample extreme event triggered (expand with real defs + damage)")
 	print("Env: Event %s (solar/EMP/nuke/espionage can cause blackout equiv to flare, affecting power in province + surrounding)" % etype)
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+		LeaderEventUI.post_news("Weather Event: " + etype.capitalize(), "Extreme weather/phenom in theater: %s. Affects movement/air/infra/power (see overlays)." % etype, "crisis")
 
 # Example: get summary for player tooltip / weather layer
 func get_conditions_summary(pid: int) -> String:
@@ -176,6 +205,8 @@ func get_conditions_summary(pid: int) -> String:
 	var s = "Temp %.0fC, %s, vis %.0f%%" % [w.get("temp", 10), g, w.get("visibility",1)*100]
 	if w.get("snow_coverage", 0) > 0.3:
 		s += " (snow %.0f%%" % (w.snow_coverage*100) + (", high ground" if w.get("high_ground", false) else "") + ")"
+	if w.get("snow_potential", 0) > 0.1:
+		s += " (high elev snow potential %.0f%% from layers)" % (w.snow_potential*100)
 	var pwr = get_power_availability(pid)
 	if pwr < 0.5:
 		s += " [BLACKOUT power loss]"
@@ -183,9 +214,14 @@ func get_conditions_summary(pid: int) -> String:
 	s += " Naval: %.0f%%" % (get_naval_mission_effectiveness(pid) * 100)
 	return s
 
-# Integrate power into infra etc.
+# Integrate power into infra etc. (full penalties for econ/combat)
 func get_infra_effectiveness(pid: int) -> float:
-	return get_power_availability(pid) * (1.0 - get_infra_wear_rate(pid) * 0.1)  # stub; power loss hurts infra ops, production, lights etc.
+	var pwr : float = get_power_availability(pid)
+	var wear : float = get_infra_wear_rate(pid)
+	var eff : float = pwr * (1.0 - (wear - 1.0) * 0.2)
+	if pwr < 0.5:
+		eff *= 0.6  # blackout drags production/combat infra hard
+	return clampf(eff, 0.1, 1.4)
 
 # Init a province from data layer (call from ScenarioLoader or MapManager load)
 func initialize_province(pid: int, baseline: Dictionary) -> void:
@@ -203,7 +239,15 @@ func initialize_province(pid: int, baseline: Dictionary) -> void:
 		"high_ground": hg > 0.3,
 		"high_ground_fraction": hg,
 		"lat": baseline.get("lat", 60 if is_northern else 50),
+		"snow_potential": baseline.get("snow_potential", 0.0),
 	}
+	# Boost initial snow_coverage from inferred snow_potential (from DEM layers) for high elevations
+	var w = _province_weather[pid]
+	var sp = baseline.get("snow_potential", 0.0)
+	if sp > 0.1:
+		w["snow_coverage"] = max(w.get("snow_coverage", 0.0), sp)
+		w["high_ground"] = true
+		w["high_ground_fraction"] = max(hg, sp)
 	_power_states[pid] = "normal"
 	# TODO: load real historical + terrain + lat from weather_climate_layer + solar modulation
 
@@ -220,6 +264,15 @@ func _simulate_day_impl(year: int, month: int, day: int) -> void:
 	# In real: per-province or per "northing" band + mountain bonus from terrain data.
 	for pid in _province_weather.keys():
 		var w = _province_weather[pid]
+		# World-class perf (HoI4 style): cull heavy daily per-prov to interesting set (player majors + neighbors + event zones); minor provinces light decay only. GDScript daily on 800+ would lag vs C++ state/MTTH.
+		var do_full_sim : bool = true
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_owner"):
+			var ow := MapManager.get_province_owner(int(pid))
+			if ow != "" and ow not in ["GER","FRA","ENG","USA","SOV","JAP","ITA","player"]:
+				if randf() > 0.25: do_full_sim = false
+		if not do_full_sim:
+			w["precip_intensity"] = max(0.0, float(w.get("precip_intensity", 0.0)) * 0.92)
+			continue
 		var lat = w.get("lat", 50)
 		var is_north = w.get("is_northern", lat > 55)
 		var hg_frac = w.get("high_ground_fraction", 0.0)
@@ -230,6 +283,10 @@ func _simulate_day_impl(year: int, month: int, day: int) -> void:
 		else:
 			snow_push = -0.008
 		var new_snow = clamp(w.get("snow_coverage", 0.0) + snow_push + (hg_frac * 0.01), 0.0, 1.0)
+		# Extra from snow_potential (inferred from layers for high elev)
+		var sp = w.get("snow_potential", 0.0)
+		if sp > 0.1:
+			new_snow = clamp(new_snow + sp * 0.005, 0.0, 1.0)
 		w["snow_coverage"] = new_snow
 		# Ground state
 		if new_snow > 0.65:
@@ -253,7 +310,22 @@ func _simulate_day_impl(year: int, month: int, day: int) -> void:
 			w["last_snow"] = new_snow
 			weather_changed.emit(pid, {"snow_coverage": new_snow, "ground": w["ground_state"]})
 
-	# Rare extreme (stub)
+		# Full penalties integration: apply weather-driven infra wear directly to province (beyond query; persistent until repair)
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province") and MapManager.has_method("update_province_infrastructure"):
+			var p = MapManager.get_province(pid)
+			if p != null and p.infrastructure > 0:
+				var wear : float = get_infra_wear_rate(pid)
+				if wear > 1.0 or (w.get("snow_coverage", 0) > 0.4):
+					var dmg : int = 0
+					if wear > 1.05: dmg = 1
+					if w.get("snow_coverage", 0) > 0.7: dmg += 1
+					if dmg > 0 and randf() < 0.15:
+						var new_inf : int = max(0, p.infrastructure - dmg)
+						MapManager.update_province_infrastructure(pid, new_inf)
+						if new_inf < p.infrastructure:
+							print("Weather: winter/mud wear damaged infra in pid %d (%d -> %d)" % [pid, p.infrastructure, new_inf])
+
+	# Rare extreme events (full support: typhoon etc trigger blackout/penalties; naval/air hit hard)
 	if randf() < 0.005:
 		_trigger_sample_event()
 
@@ -273,7 +345,7 @@ func load_save_state(state: Dictionary) -> void:
 func get_aggregate_snow_coverage() -> float:
 	if _province_weather.is_empty():
 		return 0.0
-	var total := 0.0
+	var total : float = 0.0
 	for v in _province_weather.values():
 		total += float(v.get("snow_coverage", 0.0))
 	return total / _province_weather.size()
@@ -281,3 +353,15 @@ func get_aggregate_snow_coverage() -> float:
 func get_province_snow(pid: int) -> float:
 	var w = _province_weather.get(pid, {})
 	return float(w.get("snow_coverage", 0.0))
+
+# New full penalty hook for econ/production (cold/mud/blackout hit output; called from GameData/Production if desired)
+func get_production_weather_mult(pid: int) -> float:
+	var w = _province_weather.get(pid, {})
+	var mult : float = 1.0
+	var g : String = str(w.get("ground_state", "dry"))
+	if g in ["frozen", "snow_covered", "mud"]:
+		mult *= 0.85 if g == "mud" else 0.92
+	var pwr : float = get_power_availability(pid)
+	if pwr < 0.5: mult *= 0.6
+	if w.get("visibility", 1.0) < 0.4: mult *= 0.9
+	return clampf(mult, 0.4, 1.1)

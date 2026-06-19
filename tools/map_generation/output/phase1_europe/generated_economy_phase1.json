@@ -1,6 +1,48 @@
 {
   "version": 1,
   "provinces": {
+    "82_c0": {
+      "population": 1482000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "82_c1": {
+      "population": 1482000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "82_c2": {
+      "population": 1482000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "82_c3": {
+      "population": 1482000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "82_c4": {
+      "population": 1482000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "82_c5": {
+      "population": 1482000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
     "73_c0": {
       "population": 1365000,
       "factories": 0,
@@ -16,6 +58,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "73_c2": {
+      "population": 1365000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "73_c3": {
+      "population": 1365000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "73_c4": {
+      "population": 1365000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "73_c5": {
       "population": 1365000,
       "factories": 0,
       "infrastructure": 1,
@@ -43,22 +106,22 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "82_c0": {
-      "population": 1482000,
+    "97_c3": {
+      "population": 507000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "82_c1": {
-      "population": 1482000,
+    "97_c4": {
+      "population": 507000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "82_c2": {
-      "population": 1482000,
+    "97_c5": {
+      "population": 507000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
@@ -79,6 +142,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "58_c2": {
+      "population": 1170000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "58_c3": {
+      "population": 1170000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "58_c4": {
+      "population": 1170000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "58_c5": {
       "population": 1170000,
       "factories": 0,
       "infrastructure": 1,
@@ -106,6 +190,27 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
+    "94_c3": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "94_c4": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "94_c5": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
     "35_c0": {
       "population": 871000,
       "factories": 0,
@@ -127,6 +232,279 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
+    "35_c3": {
+      "population": 871000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "35_c4": {
+      "population": 871000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "35_c5": {
+      "population": 871000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "77_c0": {
+      "population": 1417000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "77_c1": {
+      "population": 1417000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "77_c2": {
+      "population": 1417000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "77_c3": {
+      "population": 1417000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "77_c4": {
+      "population": 1417000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "77_c5": {
+      "population": 1417000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "80_c0": {
+      "population": 1456000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "80_c1": {
+      "population": 1456000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "80_c2": {
+      "population": 1456000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "80_c3": {
+      "population": 1456000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "80_c4": {
+      "population": 1456000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "80_c5": {
+      "population": 1456000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "16_c0": {
+      "population": 624000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "16_c1": {
+      "population": 624000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "16_c2": {
+      "population": 624000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "16_c3": {
+      "population": 624000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "16_c4": {
+      "population": 624000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "16_c5": {
+      "population": 624000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "24_c0": {
+      "population": 728000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "24_c1": {
+      "population": 728000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "24_c2": {
+      "population": 728000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "24_c3": {
+      "population": 728000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "24_c4": {
+      "population": 728000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "24_c5": {
+      "population": 728000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "32_c0": {
+      "population": 832000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "32_c1": {
+      "population": 832000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "32_c2": {
+      "population": 832000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "32_c3": {
+      "population": 832000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "32_c4": {
+      "population": 832000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "32_c5": {
+      "population": 832000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "66_c0": {
+      "population": 1274000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "66_c1": {
+      "population": 1274000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "66_c2": {
+      "population": 1274000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "66_c3": {
+      "population": 1274000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "66_c4": {
+      "population": 1274000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "66_c5": {
+      "population": 1274000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
     "93_c0": {
       "population": 455000,
       "factories": 0,
@@ -142,6 +520,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "93_c2": {
+      "population": 455000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "93_c3": {
+      "population": 455000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "93_c4": {
+      "population": 455000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "93_c5": {
       "population": 455000,
       "factories": 0,
       "infrastructure": 1,
@@ -169,22 +568,148 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "66_c0": {
-      "population": 1274000,
+    "47_c3": {
+      "population": 1027000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "66_c1": {
-      "population": 1274000,
+    "47_c4": {
+      "population": 1027000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "66_c2": {
-      "population": 1274000,
+    "47_c5": {
+      "population": 1027000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "20_c0": {
+      "population": 676000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "20_c1": {
+      "population": 676000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "20_c2": {
+      "population": 676000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "20_c3": {
+      "population": 676000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "20_c4": {
+      "population": 676000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "20_c5": {
+      "population": 676000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "46_c0": {
+      "population": 1014000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "46_c1": {
+      "population": 1014000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "46_c2": {
+      "population": 1014000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "46_c3": {
+      "population": 1014000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "46_c4": {
+      "population": 1014000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "46_c5": {
+      "population": 1014000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "61_c0": {
+      "population": 1209000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "61_c1": {
+      "population": 1209000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "61_c2": {
+      "population": 1209000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "61_c3": {
+      "population": 1209000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "61_c4": {
+      "population": 1209000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "61_c5": {
+      "population": 1209000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
@@ -205,6 +730,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "87_c2": {
+      "population": 1547000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "87_c3": {
+      "population": 1547000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "87_c4": {
+      "population": 1547000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "87_c5": {
       "population": 1547000,
       "factories": 0,
       "infrastructure": 1,
@@ -232,6 +778,27 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
+    "71_c3": {
+      "population": 1339000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "71_c4": {
+      "population": 1339000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "71_c5": {
+      "population": 1339000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
     "51_c0": {
       "population": 1079000,
       "factories": 0,
@@ -247,6 +814,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "51_c2": {
+      "population": 1079000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "51_c3": {
+      "population": 1079000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "51_c4": {
+      "population": 1079000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "51_c5": {
       "population": 1079000,
       "factories": 0,
       "infrastructure": 1,
@@ -274,22 +862,22 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "77_c0": {
-      "population": 1417000,
+    "65_c3": {
+      "population": 1261000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "77_c1": {
-      "population": 1417000,
+    "65_c4": {
+      "population": 1261000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "77_c2": {
-      "population": 1417000,
+    "65_c5": {
+      "population": 1261000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
@@ -310,6 +898,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "60_c2": {
+      "population": 1196000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "60_c3": {
+      "population": 1196000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "60_c4": {
+      "population": 1196000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "60_c5": {
       "population": 1196000,
       "factories": 0,
       "infrastructure": 1,
@@ -337,22 +946,22 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "80_c0": {
-      "population": 1456000,
+    "78_c3": {
+      "population": 1430000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "80_c1": {
-      "population": 1456000,
+    "78_c4": {
+      "population": 1430000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "80_c2": {
-      "population": 1456000,
+    "78_c5": {
+      "population": 1430000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
@@ -373,6 +982,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "96_c2": {
+      "population": 494000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "96_c3": {
+      "population": 494000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "96_c4": {
+      "population": 494000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "96_c5": {
       "population": 494000,
       "factories": 0,
       "infrastructure": 1,
@@ -400,6 +1030,27 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
+    "98_c3": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "98_c4": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "98_c5": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
     "74_c0": {
       "population": 1378000,
       "factories": 0,
@@ -415,6 +1066,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "74_c2": {
+      "population": 1378000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "74_c3": {
+      "population": 1378000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "74_c4": {
+      "population": 1378000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "74_c5": {
       "population": 1378000,
       "factories": 0,
       "infrastructure": 1,
@@ -442,6 +1114,27 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
+    "95_c3": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "95_c4": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "95_c5": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
     "75_c0": {
       "population": 1391000,
       "factories": 0,
@@ -457,6 +1150,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "75_c2": {
+      "population": 1391000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "75_c3": {
+      "population": 1391000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "75_c4": {
+      "population": 1391000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "75_c5": {
       "population": 1391000,
       "factories": 0,
       "infrastructure": 1,
@@ -484,6 +1198,27 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
+    "11_c3": {
+      "population": 559000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "11_c4": {
+      "population": 559000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "11_c5": {
+      "population": 559000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
     "12_c0": {
       "population": 572000,
       "factories": 0,
@@ -499,6 +1234,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "12_c2": {
+      "population": 572000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "12_c3": {
+      "population": 572000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "12_c4": {
+      "population": 572000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "12_c5": {
       "population": 572000,
       "factories": 0,
       "infrastructure": 1,
@@ -526,22 +1282,22 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "16_c0": {
-      "population": 624000,
+    "14_c3": {
+      "population": 598000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "16_c1": {
-      "population": 624000,
+    "14_c4": {
+      "population": 598000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "16_c2": {
-      "population": 624000,
+    "14_c5": {
+      "population": 598000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
@@ -568,22 +1324,22 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "20_c0": {
-      "population": 676000,
+    "17_c3": {
+      "population": 637000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "20_c1": {
-      "population": 676000,
+    "17_c4": {
+      "population": 637000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "20_c2": {
-      "population": 676000,
+    "17_c5": {
+      "population": 637000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
@@ -610,22 +1366,22 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "24_c0": {
-      "population": 728000,
+    "23_c3": {
+      "population": 715000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "24_c1": {
-      "population": 728000,
+    "23_c4": {
+      "population": 715000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "24_c2": {
-      "population": 728000,
+    "23_c5": {
+      "population": 715000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
@@ -646,6 +1402,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "26_c2": {
+      "population": 754000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "26_c3": {
+      "population": 754000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "26_c4": {
+      "population": 754000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "26_c5": {
       "population": 754000,
       "factories": 0,
       "infrastructure": 1,
@@ -673,6 +1450,27 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
+    "28_c3": {
+      "population": 780000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "28_c4": {
+      "population": 780000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "28_c5": {
+      "population": 780000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
     "29_c0": {
       "population": 793000,
       "factories": 0,
@@ -694,22 +1492,22 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "32_c0": {
-      "population": 832000,
+    "29_c3": {
+      "population": 793000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "32_c1": {
-      "population": 832000,
+    "29_c4": {
+      "population": 793000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "32_c2": {
-      "population": 832000,
+    "29_c5": {
+      "population": 793000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
@@ -730,6 +1528,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "36_c2": {
+      "population": 884000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "36_c3": {
+      "population": 884000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "36_c4": {
+      "population": 884000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "36_c5": {
       "population": 884000,
       "factories": 0,
       "infrastructure": 1,
@@ -757,6 +1576,27 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
+    "38_c3": {
+      "population": 910000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "38_c4": {
+      "population": 910000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "38_c5": {
+      "population": 910000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
     "40_c0": {
       "population": 936000,
       "factories": 0,
@@ -772,6 +1612,27 @@
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
     "40_c2": {
+      "population": 936000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "40_c3": {
+      "population": 936000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "40_c4": {
+      "population": 936000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "40_c5": {
       "population": 936000,
       "factories": 0,
       "infrastructure": 1,
@@ -799,6 +1660,27 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
+    "41_c3": {
+      "population": 949000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "41_c4": {
+      "population": 949000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "41_c5": {
+      "population": 949000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
     "42_c0": {
       "population": 962000,
       "factories": 0,
@@ -820,22 +1702,1443 @@
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "46_c0": {
-      "population": 1014000,
+    "42_c3": {
+      "population": 962000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "46_c1": {
-      "population": 1014000,
+    "42_c4": {
+      "population": 962000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
     },
-    "46_c2": {
-      "population": 1014000,
+    "42_c5": {
+      "population": 962000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "49_c0": {
+      "population": 1053000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "49_c1": {
+      "population": 1053000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "49_c2": {
+      "population": 1053000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "49_c3": {
+      "population": 1053000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "49_c4": {
+      "population": 1053000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "49_c5": {
+      "population": 1053000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "70_c0": {
+      "population": 1326000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "70_c1": {
+      "population": 1326000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "70_c2": {
+      "population": 1326000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "70_c3": {
+      "population": 1326000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "70_c4": {
+      "population": 1326000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "70_c5": {
+      "population": 1326000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "84_c0": {
+      "population": 1508000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "84_c1": {
+      "population": 1508000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "84_c2": {
+      "population": 1508000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "84_c3": {
+      "population": 1508000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "84_c4": {
+      "population": 1508000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "84_c5": {
+      "population": 1508000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "8_c0": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "8_c1": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "8_c2": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "8_c3": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "8_c4": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "8_c5": {
+      "population": 520000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "5_c0": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "5_c1": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "5_c2": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "5_c3": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "5_c4": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "5_c5": {
+      "population": 481000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "4_c0": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "4_c1": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "4_c2": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "4_c3": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "4_c4": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "4_c5": {
+      "population": 468000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "2_c0": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "2_c1": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "2_c2": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "2_c3": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "2_c4": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "2_c5": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "55_c0": {
+      "population": 1131000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "55_c1": {
+      "population": 1131000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "55_c2": {
+      "population": 1131000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "55_c3": {
+      "population": 1131000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "55_c4": {
+      "population": 1131000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "55_c5": {
+      "population": 1131000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "62_c0": {
+      "population": 1222000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "62_c1": {
+      "population": 1222000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "62_c2": {
+      "population": 1222000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "62_c3": {
+      "population": 1222000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "62_c4": {
+      "population": 1222000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "62_c5": {
+      "population": 1222000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "79_c0": {
+      "population": 1443000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "79_c1": {
+      "population": 1443000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "79_c2": {
+      "population": 1443000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "79_c3": {
+      "population": 1443000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "79_c4": {
+      "population": 1443000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "79_c5": {
+      "population": 1443000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "86_c0": {
+      "population": 1534000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "86_c1": {
+      "population": 1534000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "86_c2": {
+      "population": 1534000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "86_c3": {
+      "population": 1534000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "86_c4": {
+      "population": 1534000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "86_c5": {
+      "population": 1534000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "90_c0": {
+      "population": 416000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "90_c1": {
+      "population": 416000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "90_c2": {
+      "population": 416000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "90_c3": {
+      "population": 416000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "90_c4": {
+      "population": 416000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "90_c5": {
+      "population": 416000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "91_c0": {
+      "population": 429000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "91_c1": {
+      "population": 429000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "91_c2": {
+      "population": 429000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "91_c3": {
+      "population": 429000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "91_c4": {
+      "population": 429000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "91_c5": {
+      "population": 429000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "50_c0": {
+      "population": 1066000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "50_c1": {
+      "population": 1066000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "50_c2": {
+      "population": 1066000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "50_c3": {
+      "population": 1066000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "50_c4": {
+      "population": 1066000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "50_c5": {
+      "population": 1066000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "76_c0": {
+      "population": 1404000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "76_c1": {
+      "population": 1404000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "76_c2": {
+      "population": 1404000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "76_c3": {
+      "population": 1404000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "76_c4": {
+      "population": 1404000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "76_c5": {
+      "population": 1404000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "83_c0": {
+      "population": 1495000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "83_c1": {
+      "population": 1495000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "83_c2": {
+      "population": 1495000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "83_c3": {
+      "population": 1495000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "83_c4": {
+      "population": 1495000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "83_c5": {
+      "population": 1495000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "89_c0": {
+      "population": 1573000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "89_c1": {
+      "population": 1573000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "89_c2": {
+      "population": 1573000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "89_c3": {
+      "population": 1573000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "89_c4": {
+      "population": 1573000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "89_c5": {
+      "population": 1573000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "92_c0": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "92_c1": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "92_c2": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "92_c3": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "92_c4": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "92_c5": {
+      "population": 442000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "44_c0": {
+      "population": 988000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "44_c1": {
+      "population": 988000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "44_c2": {
+      "population": 988000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "44_c3": {
+      "population": 988000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "44_c4": {
+      "population": 988000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "45_c0": {
+      "population": 1001000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "45_c1": {
+      "population": 1001000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "45_c2": {
+      "population": 1001000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "45_c3": {
+      "population": 1001000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "45_c4": {
+      "population": 1001000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "48_c0": {
+      "population": 1040000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "48_c1": {
+      "population": 1040000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "48_c2": {
+      "population": 1040000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "48_c3": {
+      "population": 1040000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "48_c4": {
+      "population": 1040000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "52_c0": {
+      "population": 1092000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "52_c1": {
+      "population": 1092000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "52_c2": {
+      "population": 1092000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "52_c3": {
+      "population": 1092000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "52_c4": {
+      "population": 1092000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "53_c0": {
+      "population": 1105000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "53_c1": {
+      "population": 1105000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "53_c2": {
+      "population": 1105000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "53_c3": {
+      "population": 1105000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "53_c4": {
+      "population": 1105000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "54_c0": {
+      "population": 1118000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "54_c1": {
+      "population": 1118000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "54_c2": {
+      "population": 1118000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "54_c3": {
+      "population": 1118000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "54_c4": {
+      "population": 1118000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "56_c0": {
+      "population": 1144000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "56_c1": {
+      "population": 1144000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "56_c2": {
+      "population": 1144000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "56_c3": {
+      "population": 1144000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "56_c4": {
+      "population": 1144000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "57_c0": {
+      "population": 1157000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "57_c1": {
+      "population": 1157000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "57_c2": {
+      "population": 1157000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "57_c3": {
+      "population": 1157000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "57_c4": {
+      "population": 1157000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "59_c0": {
+      "population": 1183000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "59_c1": {
+      "population": 1183000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "59_c2": {
+      "population": 1183000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "59_c3": {
+      "population": 1183000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "59_c4": {
+      "population": 1183000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "63_c0": {
+      "population": 1235000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "63_c1": {
+      "population": 1235000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "63_c2": {
+      "population": 1235000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "63_c3": {
+      "population": 1235000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "63_c4": {
+      "population": 1235000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "64_c0": {
+      "population": 1248000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "64_c1": {
+      "population": 1248000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "64_c2": {
+      "population": 1248000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "64_c3": {
+      "population": 1248000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "64_c4": {
+      "population": 1248000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "67_c0": {
+      "population": 1287000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "67_c1": {
+      "population": 1287000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "67_c2": {
+      "population": 1287000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "67_c3": {
+      "population": 1287000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "67_c4": {
+      "population": 1287000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "68_c0": {
+      "population": 1300000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "68_c1": {
+      "population": 1300000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "68_c2": {
+      "population": 1300000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "68_c3": {
+      "population": 1300000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "68_c4": {
+      "population": 1300000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "69_c0": {
+      "population": 1313000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "69_c1": {
+      "population": 1313000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "69_c2": {
+      "population": 1313000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "69_c3": {
+      "population": 1313000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "69_c4": {
+      "population": 1313000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "72_c0": {
+      "population": 1352000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "72_c1": {
+      "population": 1352000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "72_c2": {
+      "population": 1352000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "72_c3": {
+      "population": 1352000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "72_c4": {
+      "population": 1352000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "81_c0": {
+      "population": 1469000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "81_c1": {
+      "population": 1469000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "81_c2": {
+      "population": 1469000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "81_c3": {
+      "population": 1469000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "81_c4": {
+      "population": 1469000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "88_c0": {
+      "population": 1560000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "88_c1": {
+      "population": 1560000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "88_c2": {
+      "population": 1560000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "88_c3": {
+      "population": 1560000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "88_c4": {
+      "population": 1560000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "99_c0": {
+      "population": 533000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "99_c1": {
+      "population": 533000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "99_c2": {
+      "population": 533000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "99_c3": {
+      "population": 533000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "99_c4": {
+      "population": 533000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "100_c0": {
+      "population": 546000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "100_c1": {
+      "population": 546000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "100_c2": {
+      "population": 546000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "100_c3": {
+      "population": 546000,
+      "factories": 0,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "100_c4": {
+      "population": 546000,
       "factories": 0,
       "infrastructure": 1,
       "development_level": 1,

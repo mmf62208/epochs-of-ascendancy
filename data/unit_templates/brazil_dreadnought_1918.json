@@ -1,10 +1,10 @@
 {
   "id": "brazil_dreadnought_1918",
-  "name": "São Paulo",
+  "name": "S\u00e3o Paulo",
   "design_family": "brazilian_naval_1918",
   "base_type": "Naval",
   "size_category": "Heavy",
-  "visual_archetype": "battleship",
+  "visual_archetype": "destroyer",
   "crew_required": 900,
   "base_training_level": 28,
   "max_experience_level": 100,

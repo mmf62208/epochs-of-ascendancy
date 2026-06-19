@@ -4,7 +4,7 @@
   "design_family": "swedish_naval_1936",
   "base_type": "Naval",
   "size_category": "Medium",
-  "visual_archetype": "cruiser",
+  "visual_archetype": "destroyer",
   "crew_required": 500,
   "base_training_level": 28,
   "max_experience_level": 100,

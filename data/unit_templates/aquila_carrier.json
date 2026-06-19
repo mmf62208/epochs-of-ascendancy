@@ -4,7 +4,7 @@
   "design_family": "italian_naval_ww2",
   "base_type": "Naval",
   "size_category": "Heavy",
-  "visual_archetype": "carrier",
+  "visual_archetype": "destroyer",
   "crew_required": 1400,
   "base_training_level": 28,
   "max_experience_level": 100,

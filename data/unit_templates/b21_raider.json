@@ -4,7 +4,7 @@
   "design_family": "us_air_twenty_twenties",
   "base_type": "Air",
   "size_category": "Heavy",
-  "visual_archetype": "bomber",
+  "visual_archetype": "prop_fighter",
   "crew_required": 2,
   "base_training_level": 42,
   "max_experience_level": 100,

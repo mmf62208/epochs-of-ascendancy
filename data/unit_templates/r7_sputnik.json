@@ -30,7 +30,8 @@
     "Communications": "sputnik1_bus"
   },
   "unlock_tech": [
-    "soviet_space_program"
+    "sputnik_satellite",
+    "v2_rocket"
   ],
   "can_mount_drones": false,
   "is_vehicle": true,

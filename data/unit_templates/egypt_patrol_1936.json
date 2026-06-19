@@ -4,7 +4,7 @@
   "design_family": "egyptian_naval_1936",
   "base_type": "Naval",
   "size_category": "Light",
-  "visual_archetype": "patrol",
+  "visual_archetype": "patrol_boat",
   "crew_required": 30,
   "base_training_level": 30,
   "max_experience_level": 100,

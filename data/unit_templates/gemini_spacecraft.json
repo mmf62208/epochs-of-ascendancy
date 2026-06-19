@@ -30,7 +30,7 @@
     "Engine": "j2_upper_stage_engine"
   },
   "unlock_tech": [
-    "us_crewed_space"
+    "human_spaceflight"
   ],
   "can_mount_drones": false,
   "is_vehicle": true,

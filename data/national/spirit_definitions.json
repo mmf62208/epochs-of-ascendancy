@@ -53,5 +53,72 @@
       "defence_factor": 0.06,
       "surrender_limit": 0.05
     }
+  },
+  "versailles_humiliation": {
+    "id": "versailles_humiliation",
+    "name": "Versailles Humiliation (or Equivalent)",
+    "description": "The dictated peace has left deep national grievance. Revanchism, political radicalization, and economic strain are seeded.",
+    "category": "diplomatic",
+    "modifiers": {
+      "stability": -8,
+      "war_support": 12,
+      "revanchism_weight": 1.5,
+      "production_speed": -0.04
+    }
+  },
+  "inclusion_at_the_table": {
+    "id": "inclusion_at_the_table",
+    "name": "Seat at the Table (Alt-History)",
+    "description": "Your nation (or its predecessors) secured real participation in the peace. Grievance is sharply reduced and new diplomatic/reconciliation paths are open.",
+    "category": "diplomatic",
+    "modifiers": {
+      "stability": 6,
+      "prestige": 5,
+      "revanchism_weight": 0.4,
+      "reconciliation_path": 1.0
+    }
+  },
+  "winners_burden": {
+    "id": "winners_burden",
+    "name": "Winners' Burden",
+    "description": "The costs and responsibilities of victory (occupation, enforcement, domestic expectations) weigh on the nation.",
+    "category": "diplomatic",
+    "modifiers": {
+      "stability": -3,
+      "prestige": 8,
+      "maintenance_cost": 0.06
+    }
+  },
+  "fragile_victory": {
+    "id": "fragile_victory",
+    "name": "Fragile Victory",
+    "description": "The peace feels incomplete or unstable. Future crises are more likely and public confidence is brittle.",
+    "category": "diplomatic",
+    "modifiers": {
+      "stability": -5,
+      "crisis_likelihood": 1.3
+    }
+  },
+  "reparations_strain": {
+    "id": "reparations_strain",
+    "name": "Reparations Strain",
+    "description": "Heavy ongoing payments or deliveries create persistent economic pressure and political tension.",
+    "category": "economic",
+    "modifiers": {
+      "factory_output": -0.06,
+      "stability": -4,
+      "hyperinflation_risk": 0.4
+    }
+  },
+  "reconciliation_opportunity": {
+    "id": "reconciliation_opportunity",
+    "name": "Reconciliation Opportunity",
+    "description": "The peace terms (or your nation's inclusion) have opened a narrow window for long-term stabilization and reduced revanchism.",
+    "category": "diplomatic",
+    "modifiers": {
+      "trade_opinion": 8,
+      "stability": 4,
+      "revanchism_weight": 0.5
+    }
   }
 }

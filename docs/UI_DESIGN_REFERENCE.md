@@ -131,3 +131,6 @@ Each entry should show:
 - Screen data resources: `scripts/ui_data/ProductionScreenData.gd`, `scripts/ui_data/LeaderScreenData.gd`
 - Backend builders: `ProductionManager.get_production_screen_data()`, `LeaderManager.get_leader_screen_data()`
 - Detailed specs: [PRODUCTION_ASSIGNMENT_SCREEN.md](PRODUCTION_ASSIGNMENT_SCREEN.md), [LEADER_ASSIGNMENT_SCREEN.md](LEADER_ASSIGNMENT_SCREEN.md)
+
+## 2026-06 Menu/TopInfoBar/LS decision + polish (per task)
+Menus: keep Production/Leaders/Tech/Diplomacy/Agents/Map as primary overhead for theme+loops (econ/mil/tech/dip/will/theater). resources+date right upper, speeds left. Consolidate save/settings/help (Policies/Dir) to Menu for room. Confirmed date right. LS polished w/ improved generated images (ascendant/agents etc epic jpgs) + visibility during world grand 471 stitch. Small graphic tweaks (e.g. date colors, bar widths) in code (TopInfoBar, LoadingScreen, Retrowave). See CURRENT_STATE, TopInfoBar.gd, LoadingScreen.gd.

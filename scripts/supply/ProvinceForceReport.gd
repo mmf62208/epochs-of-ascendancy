@@ -6,6 +6,10 @@ var land_by_tag: Dictionary = {}
 var air_by_tag: Dictionary = {}
 var naval_by_tag: Dictionary = {}
 var naval_at_port_by_tag: Dictionary = {}
+var sub_strength_by_tag: Dictionary = {}  # submarines harder to spot
+var surface_strength_by_tag: Dictionary = {}  # surface ships, carriers etc easier
+## For spotting sim: aggregate recon value (planes + radar ships + etc)
+var naval_recon_by_tag: Dictionary = {}
 ## Engineer / combat-engineer brigade equivalents (friendly repair crews).
 var engineers_by_tag: Dictionary = {}
 
@@ -26,6 +30,33 @@ func add_naval(tag: String, amount: float, at_port: bool) -> void:
 	naval_by_tag[tag] = float(naval_by_tag.get(tag, 0.0)) + amount
 	if at_port:
 		naval_at_port_by_tag[tag] = float(naval_at_port_by_tag.get(tag, 0.0)) + amount
+	# For demo, assume mix; in real would classify template
+	# Here, we'll use separate calls or heuristic later. Default surface for now.
+	surface_strength_by_tag[tag] = float(surface_strength_by_tag.get(tag, 0.0)) + amount * 0.8
+	sub_strength_by_tag[tag] = float(sub_strength_by_tag.get(tag, 0.0)) + amount * 0.2
+
+func add_sub_presence(tag: String, amount: float) -> void:
+	sub_strength_by_tag[tag] = float(sub_strength_by_tag.get(tag, 0.0)) + amount
+	naval_by_tag[tag] = float(naval_by_tag.get(tag, 0.0)) + amount
+
+func add_surface_presence(tag: String, amount: float) -> void:
+	surface_strength_by_tag[tag] = float(surface_strength_by_tag.get(tag, 0.0)) + amount
+	naval_by_tag[tag] = float(naval_by_tag.get(tag, 0.0)) + amount
+
+func add_naval_recon(tag: String, amount: float) -> void:
+	naval_recon_by_tag[tag] = float(naval_recon_by_tag.get(tag, 0.0)) + amount
+
+func total_naval(tag: String) -> float:
+	return float(naval_by_tag.get(tag, 0.0))
+
+func total_subs(tag: String) -> float:
+	return float(sub_strength_by_tag.get(tag, 0.0))
+
+func total_surface(tag: String) -> float:
+	return float(surface_strength_by_tag.get(tag, 0.0))
+
+func total_naval_recon(tag: String) -> float:
+	return float(naval_recon_by_tag.get(tag, 0.0))
 
 
 func total_land(tag: String) -> float:
@@ -56,3 +87,18 @@ func set_engineers(tag: String, amount: float) -> void:
 		engineers_by_tag.erase(t)
 	else:
 		engineers_by_tag[t] = amount
+
+func get_navy_total() -> float:
+	var t := 0.0
+	for v in naval_by_tag.values():
+		t += float(v)
+	return t
+
+var navy_total: float :
+	get = get_navy_total
+
+func get_naval_strength() -> Dictionary:
+	return naval_by_tag
+
+var naval_strength: Dictionary :
+	get = get_naval_strength

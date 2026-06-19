@@ -4,7 +4,7 @@
   "design_family": "uk_naval_ww2",
   "base_type": "Naval",
   "size_category": "Heavy",
-  "visual_archetype": "carrier",
+  "visual_archetype": "fleet_carrier",
   "crew_required": 1600,
   "base_training_level": 33,
   "max_experience_level": 100,

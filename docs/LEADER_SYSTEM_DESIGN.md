@@ -10,7 +10,7 @@
 
 The leader system in *Epochs of Ascendancy* should feel **alive, earned, and consequential**.
 
-- Leaders are not just stat sticks. They are **characters** who grow, specialize, develop flaws, and can become legends — or liabilities.
+- Leaders are not just stat sticks. They are **characters** who grow, specialize, develop flaws, and can become legends — or liabilities. Portraits (historical + gen) load in DetailScreen + Assignment lists (small icons); agent portraits too in their UI. Save/load hardened.
 - The system should feel **familiar to Hearts of Iron players** in structure (skills + traits + assignment), but **deeper and more dynamic** in execution.
 - Leaders should be shaped by **war, doctrine, national choices, and personal experience**.
 - Some traits should feel **rare and prestigious**. Others should feel like natural consequences of how you use a leader.

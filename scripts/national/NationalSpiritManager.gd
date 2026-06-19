@@ -56,6 +56,37 @@ func ensure_country_spirits(country_tag: String) -> void:
 	spirits_initialized.emit(tag)
 
 
+## Dynamic treaty / peace spirits (for 1918 Armistice outcomes + follow-ons). Allows runtime application of "versailles_humiliation", "inclusion_at_the_table" etc.
+## These are added to the country's active list even if not in the static "countries" filter of definitions.
+## Effects are read from spirit_definitions when building UI/modifiers (spirits are permanent-ish until removed by later events).
+func apply_treaty_spirit(country_tag: String, spirit_id: String) -> bool:
+	var tag := country_tag.strip_edges().to_upper()
+	var sid := spirit_id.strip_edges()
+	if not spirit_definitions.has(sid):
+		push_warning("NationalSpiritManager: Unknown spirit '%s' for treaty apply to %s" % [sid, tag])
+		return false
+	ensure_country_spirits(tag)  # ensure dict exists
+	if not country_spirits.has(tag):
+		country_spirits[tag] = []
+	if sid not in country_spirits[tag]:
+		country_spirits[tag].append(sid)
+		spirits_initialized.emit(tag)
+		print("NationalSpiritManager: Applied treaty spirit '%s' to %s" % [sid, tag])
+		# Notify screens if open
+		_on_modifier_changed(tag)
+		return true
+	return true  # already had it
+
+
+func remove_treaty_spirit(country_tag: String, spirit_id: String) -> void:
+	var tag := country_tag.strip_edges().to_upper()
+	var sid := spirit_id.strip_edges()
+	if country_spirits.has(tag) and sid in country_spirits[tag]:
+		country_spirits[tag].erase(sid)
+		_on_modifier_changed(tag)
+		print("NationalSpiritManager: Removed treaty spirit '%s' from %s" % [sid, tag])
+
+
 func get_spirits_screen_data(country_tag: String) -> NationalSpiritsScreenData:
 	var tag := country_tag.strip_edges().to_upper()
 	ensure_country_spirits(tag)
@@ -218,6 +249,9 @@ func get_spirit_production_modifiers(country_tag: String) -> Dictionary:
 		"reliability_multiplier": 1.0,
 		"retooling_days_multiplier": 1.0,
 		"cost_multiplier": 1.0,
+		# For layered/additive tech stacking with spirits
+		"production_flexibility": 0.0,
+		"material_efficiency": 0.0,
 	}
 
 	for spirit_id in country_spirits.get(tag, []) as Array:
@@ -236,6 +270,11 @@ func get_spirit_production_modifiers(country_tag: String) -> Dictionary:
 					result["retooling_days_multiplier"] *= (1.0 + val)
 				"production_cost", "cost_multiplier":
 					result["cost_multiplier"] *= (1.0 + val)
+				"production_flexibility":
+					result["retooling_days_multiplier"] *= maxf(0.6, 1.0 - val * 0.5)
+					result["cost_multiplier"] *= maxf(0.7, 1.0 - val * 0.3)
+				"material_efficiency":
+					result["cost_multiplier"] *= maxf(0.6, 1.0 - val * 0.4)
 
 	return result
 
@@ -248,7 +287,7 @@ func get_total_supply_consumption_modifier(country_tag: String) -> float:
 	total += float(spirit.get("supply_consumption", 0.0))
 
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var temp := NationalModifierManager.get_supply_modifiers(country_tag)
+		var temp: Dictionary = NationalModifierManager.get_supply_modifiers(country_tag)
 		total += float(temp.get("supply_consumption", 0.0))
 
 	return total
@@ -260,7 +299,7 @@ func get_total_attrition_reduction_modifier(country_tag: String) -> float:
 	total += float(spirit.get("attrition_reduction", 0.0))
 
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var temp := NationalModifierManager.get_supply_modifiers(country_tag)
+		var temp: Dictionary = NationalModifierManager.get_supply_modifiers(country_tag)
 		total += float(temp.get("attrition_reduction", 0.0))
 	return total
 
@@ -271,7 +310,7 @@ func get_total_interdiction_resistance_modifier(country_tag: String) -> float:
 	total += float(spirit.get("interdiction_resistance", 0.0))
 
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var temp := NationalModifierManager.get_supply_modifiers(country_tag)
+		var temp: Dictionary = NationalModifierManager.get_supply_modifiers(country_tag)
 		total += float(temp.get("interdiction_resistance", 0.0))
 	return total
 
@@ -318,6 +357,14 @@ func get_spirit_combat_modifiers(country_tag: String) -> Dictionary:
 		"attack_factor": 0.0,
 		"attrition_reduction": 0.0,
 		"interdiction_resistance": 0.0,
+		# Extended for new tech expansions (spirits + tech stack)
+		"infantry_enhancement": 0.0,
+		"soldier_enhancement": 0.0,
+		"defensive_shielding": 0.0,
+		"energy_weapon_dmg": 0.0,
+		"manpower_replacement": 0.0,
+		"rapid_deployment": 0.0,
+		"precision_strike": 0.0,
 	}
 
 	for spirit_id in country_spirits.get(tag, []) as Array:

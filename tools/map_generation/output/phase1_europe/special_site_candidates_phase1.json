@@ -1,6 +1,156 @@
 {
   "version": 1,
   "provinces": {
+    "82_c0": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 82
+    },
+    "82_c1": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 82
+    },
+    "82_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 82
+    },
+    "82_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 82
+    },
+    "82_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 82
+    },
+    "82_c5": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 82
+    },
     "73_c0": {
       "candidates": [
         {
@@ -52,6 +202,81 @@
       "parent_id": 73
     },
     "73_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 73
+    },
+    "73_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 73
+    },
+    "73_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 73
+    },
+    "73_c5": {
       "candidates": [
         {
           "type": "port",
@@ -151,7 +376,7 @@
       ],
       "parent_id": 97
     },
-    "82_c0": {
+    "97_c3": {
       "candidates": [
         {
           "type": "port",
@@ -174,9 +399,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 82
+      "parent_id": 97
     },
-    "82_c1": {
+    "97_c4": {
       "candidates": [
         {
           "type": "port",
@@ -199,9 +424,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 82
+      "parent_id": 97
     },
-    "82_c2": {
+    "97_c5": {
       "candidates": [
         {
           "type": "port",
@@ -224,7 +449,7 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 82
+      "parent_id": 97
     },
     "58_c0": {
       "candidates": [
@@ -277,6 +502,81 @@
       "parent_id": 58
     },
     "58_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 58
+    },
+    "58_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 58
+    },
+    "58_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 58
+    },
+    "58_c5": {
       "candidates": [
         {
           "type": "port",
@@ -376,6 +676,81 @@
       ],
       "parent_id": 94
     },
+    "94_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 94
+    },
+    "94_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 94
+    },
+    "94_c5": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 94
+    },
     "35_c0": {
       "candidates": [
         {
@@ -451,6 +826,711 @@
       ],
       "parent_id": 35
     },
+    "35_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 35
+    },
+    "35_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 35
+    },
+    "35_c5": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 35
+    },
+    "77_c0": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 77
+    },
+    "77_c1": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 77
+    },
+    "77_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 77
+    },
+    "77_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 77
+    },
+    "77_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 77
+    },
+    "77_c5": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 77
+    },
+    "80_c0": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 80
+    },
+    "80_c1": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 80
+    },
+    "80_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 80
+    },
+    "80_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 80
+    },
+    "80_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 80
+    },
+    "80_c5": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 80
+    },
+    "16_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 16
+    },
+    "16_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 16
+    },
+    "16_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 16
+    },
+    "16_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 16
+    },
+    "16_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 16
+    },
+    "16_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 16
+    },
+    "24_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 24
+    },
+    "24_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 24
+    },
+    "24_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 24
+    },
+    "24_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 24
+    },
+    "24_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 24
+    },
+    "24_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 24
+    },
+    "32_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 32
+    },
+    "32_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 32
+    },
+    "32_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 32
+    },
+    "32_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 32
+    },
+    "32_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 32
+    },
+    "32_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 32
+    },
+    "66_c0": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 66
+    },
+    "66_c1": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 66
+    },
+    "66_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 66
+    },
+    "66_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 66
+    },
+    "66_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 66
+    },
+    "66_c5": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 66
+    },
     "93_c0": {
       "candidates": [
         {
@@ -492,6 +1572,66 @@
       "parent_id": 93
     },
     "93_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 93
+    },
+    "93_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 93
+    },
+    "93_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 93
+    },
+    "93_c5": {
       "candidates": [
         {
           "type": "port",
@@ -571,7 +1711,7 @@
       ],
       "parent_id": 47
     },
-    "66_c0": {
+    "47_c3": {
       "candidates": [
         {
           "type": "port",
@@ -589,9 +1729,9 @@
           "reason": "Coastal air operations potential"
         }
       ],
-      "parent_id": 66
+      "parent_id": 47
     },
-    "66_c1": {
+    "47_c4": {
       "candidates": [
         {
           "type": "port",
@@ -609,9 +1749,9 @@
           "reason": "Coastal air operations potential"
         }
       ],
-      "parent_id": 66
+      "parent_id": 47
     },
-    "66_c2": {
+    "47_c5": {
       "candidates": [
         {
           "type": "port",
@@ -629,7 +1769,277 @@
           "reason": "Coastal air operations potential"
         }
       ],
-      "parent_id": 66
+      "parent_id": 47
+    },
+    "20_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 20
+    },
+    "20_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 20
+    },
+    "20_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 20
+    },
+    "20_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 20
+    },
+    "20_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 20
+    },
+    "20_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 20
+    },
+    "46_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 46
+    },
+    "46_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 46
+    },
+    "46_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 46
+    },
+    "46_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 46
+    },
+    "46_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 46
+    },
+    "46_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 46
+    },
+    "61_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 61
+    },
+    "61_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 61
+    },
+    "61_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 61
+    },
+    "61_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 61
+    },
+    "61_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 61
+    },
+    "61_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 61
     },
     "87_c0": {
       "candidates": [
@@ -672,6 +2082,66 @@
       "parent_id": 87
     },
     "87_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 87
+    },
+    "87_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 87
+    },
+    "87_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 87
+    },
+    "87_c5": {
       "candidates": [
         {
           "type": "port",
@@ -751,6 +2221,66 @@
       ],
       "parent_id": 71
     },
+    "71_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 71
+    },
+    "71_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 71
+    },
+    "71_c5": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 71
+    },
     "51_c0": {
       "candidates": [
         {
@@ -792,6 +2322,66 @@
       "parent_id": 51
     },
     "51_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 51
+    },
+    "51_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 51
+    },
+    "51_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 51
+    },
+    "51_c5": {
       "candidates": [
         {
           "type": "port",
@@ -871,7 +2461,7 @@
       ],
       "parent_id": 65
     },
-    "77_c0": {
+    "65_c3": {
       "candidates": [
         {
           "type": "port",
@@ -889,9 +2479,9 @@
           "reason": "Coastal air operations potential"
         }
       ],
-      "parent_id": 77
+      "parent_id": 65
     },
-    "77_c1": {
+    "65_c4": {
       "candidates": [
         {
           "type": "port",
@@ -909,9 +2499,9 @@
           "reason": "Coastal air operations potential"
         }
       ],
-      "parent_id": 77
+      "parent_id": 65
     },
-    "77_c2": {
+    "65_c5": {
       "candidates": [
         {
           "type": "port",
@@ -929,7 +2519,7 @@
           "reason": "Coastal air operations potential"
         }
       ],
-      "parent_id": 77
+      "parent_id": 65
     },
     "60_c0": {
       "candidates": [
@@ -972,6 +2562,66 @@
       "parent_id": 60
     },
     "60_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 60
+    },
+    "60_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 60
+    },
+    "60_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 60
+    },
+    "60_c5": {
       "candidates": [
         {
           "type": "port",
@@ -1051,7 +2701,7 @@
       ],
       "parent_id": 78
     },
-    "80_c0": {
+    "78_c3": {
       "candidates": [
         {
           "type": "port",
@@ -1069,9 +2719,9 @@
           "reason": "Coastal air operations potential"
         }
       ],
-      "parent_id": 80
+      "parent_id": 78
     },
-    "80_c1": {
+    "78_c4": {
       "candidates": [
         {
           "type": "port",
@@ -1089,9 +2739,9 @@
           "reason": "Coastal air operations potential"
         }
       ],
-      "parent_id": 80
+      "parent_id": 78
     },
-    "80_c2": {
+    "78_c5": {
       "candidates": [
         {
           "type": "port",
@@ -1109,7 +2759,7 @@
           "reason": "Coastal air operations potential"
         }
       ],
-      "parent_id": 80
+      "parent_id": 78
     },
     "96_c0": {
       "candidates": [
@@ -1152,6 +2802,66 @@
       "parent_id": 96
     },
     "96_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 96
+    },
+    "96_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 96
+    },
+    "96_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 96
+    },
+    "96_c5": {
       "candidates": [
         {
           "type": "port",
@@ -1231,6 +2941,66 @@
       ],
       "parent_id": 98
     },
+    "98_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 98
+    },
+    "98_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 98
+    },
+    "98_c5": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 98
+    },
     "74_c0": {
       "candidates": [
         {
@@ -1272,6 +3042,66 @@
       "parent_id": 74
     },
     "74_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 74
+    },
+    "74_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 74
+    },
+    "74_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 74
+    },
+    "74_c5": {
       "candidates": [
         {
           "type": "port",
@@ -1351,6 +3181,66 @@
       ],
       "parent_id": 95
     },
+    "95_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 95
+    },
+    "95_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 95
+    },
+    "95_c5": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 95
+    },
     "75_c0": {
       "candidates": [
         {
@@ -1392,6 +3282,66 @@
       "parent_id": 75
     },
     "75_c2": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 75
+    },
+    "75_c3": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 75
+    },
+    "75_c4": {
+      "candidates": [
+        {
+          "type": "port",
+          "tier": 1,
+          "reason": "Coastal child province"
+        },
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "airfield",
+          "tier": 1,
+          "reason": "Coastal air operations potential"
+        }
+      ],
+      "parent_id": 75
+    },
+    "75_c5": {
       "candidates": [
         {
           "type": "port",
@@ -1456,6 +3406,51 @@
       ],
       "parent_id": 11
     },
+    "11_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 11
+    },
+    "11_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 11
+    },
+    "11_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 11
+    },
     "12_c0": {
       "candidates": [
         {
@@ -1487,6 +3482,51 @@
       "parent_id": 12
     },
     "12_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 12
+    },
+    "12_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 12
+    },
+    "12_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 12
+    },
+    "12_c5": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1546,7 +3586,7 @@
       ],
       "parent_id": 14
     },
-    "16_c0": {
+    "14_c3": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1559,9 +3599,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 16
+      "parent_id": 14
     },
-    "16_c1": {
+    "14_c4": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1574,9 +3614,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 16
+      "parent_id": 14
     },
-    "16_c2": {
+    "14_c5": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1589,7 +3629,7 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 16
+      "parent_id": 14
     },
     "17_c0": {
       "candidates": [
@@ -1636,7 +3676,7 @@
       ],
       "parent_id": 17
     },
-    "20_c0": {
+    "17_c3": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1649,9 +3689,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 20
+      "parent_id": 17
     },
-    "20_c1": {
+    "17_c4": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1664,9 +3704,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 20
+      "parent_id": 17
     },
-    "20_c2": {
+    "17_c5": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1679,7 +3719,7 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 20
+      "parent_id": 17
     },
     "23_c0": {
       "candidates": [
@@ -1726,7 +3766,7 @@
       ],
       "parent_id": 23
     },
-    "24_c0": {
+    "23_c3": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1739,9 +3779,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 24
+      "parent_id": 23
     },
-    "24_c1": {
+    "23_c4": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1754,9 +3794,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 24
+      "parent_id": 23
     },
-    "24_c2": {
+    "23_c5": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1769,7 +3809,7 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 24
+      "parent_id": 23
     },
     "26_c0": {
       "candidates": [
@@ -1802,6 +3842,51 @@
       "parent_id": 26
     },
     "26_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 26
+    },
+    "26_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 26
+    },
+    "26_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 26
+    },
+    "26_c5": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1861,6 +3946,51 @@
       ],
       "parent_id": 28
     },
+    "28_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 28
+    },
+    "28_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 28
+    },
+    "28_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 28
+    },
     "29_c0": {
       "candidates": [
         {
@@ -1906,7 +4036,7 @@
       ],
       "parent_id": 29
     },
-    "32_c0": {
+    "29_c3": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1919,9 +4049,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 32
+      "parent_id": 29
     },
-    "32_c1": {
+    "29_c4": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1934,9 +4064,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 32
+      "parent_id": 29
     },
-    "32_c2": {
+    "29_c5": {
       "candidates": [
         {
           "type": "naval_base",
@@ -1949,7 +4079,7 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 32
+      "parent_id": 29
     },
     "36_c0": {
       "candidates": [
@@ -1982,6 +4112,51 @@
       "parent_id": 36
     },
     "36_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 36
+    },
+    "36_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 36
+    },
+    "36_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 36
+    },
+    "36_c5": {
       "candidates": [
         {
           "type": "naval_base",
@@ -2041,6 +4216,51 @@
       ],
       "parent_id": 38
     },
+    "38_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 38
+    },
+    "38_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 38
+    },
+    "38_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 38
+    },
     "40_c0": {
       "candidates": [
         {
@@ -2072,6 +4292,51 @@
       "parent_id": 40
     },
     "40_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 40
+    },
+    "40_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 40
+    },
+    "40_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 40
+    },
+    "40_c5": {
       "candidates": [
         {
           "type": "naval_base",
@@ -2131,6 +4396,51 @@
       ],
       "parent_id": 41
     },
+    "41_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 41
+    },
+    "41_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 41
+    },
+    "41_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 41
+    },
     "42_c0": {
       "candidates": [
         {
@@ -2176,7 +4486,7 @@
       ],
       "parent_id": 42
     },
-    "46_c0": {
+    "42_c3": {
       "candidates": [
         {
           "type": "naval_base",
@@ -2189,9 +4499,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 46
+      "parent_id": 42
     },
-    "46_c1": {
+    "42_c4": {
       "candidates": [
         {
           "type": "naval_base",
@@ -2204,9 +4514,9 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 46
+      "parent_id": 42
     },
-    "46_c2": {
+    "42_c5": {
       "candidates": [
         {
           "type": "naval_base",
@@ -2219,7 +4529,637 @@
           "reason": "Strategic chokepoint defense"
         }
       ],
-      "parent_id": 46
+      "parent_id": 42
+    },
+    "49_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 49
+    },
+    "49_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 49
+    },
+    "49_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 49
+    },
+    "49_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 49
+    },
+    "49_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 49
+    },
+    "49_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 49
+    },
+    "70_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 70
+    },
+    "70_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 70
+    },
+    "70_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 70
+    },
+    "70_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 70
+    },
+    "70_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 70
+    },
+    "70_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 70
+    },
+    "84_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 84
+    },
+    "84_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 84
+    },
+    "84_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 84
+    },
+    "84_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 84
+    },
+    "84_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 84
+    },
+    "84_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 84
+    },
+    "8_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 8
+    },
+    "8_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 8
+    },
+    "8_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 8
+    },
+    "8_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 8
+    },
+    "8_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 8
+    },
+    "8_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 8
+    },
+    "5_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 5
+    },
+    "5_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 5
+    },
+    "5_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 5
+    },
+    "5_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 5
+    },
+    "5_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 5
+    },
+    "5_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 5
+    },
+    "4_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 4
+    },
+    "4_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 4
+    },
+    "4_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 4
+    },
+    "4_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 4
+    },
+    "4_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 4
+    },
+    "4_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 4
+    },
+    "2_c0": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 2
+    },
+    "2_c1": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 2
+    },
+    "2_c2": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 2
+    },
+    "2_c3": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 2
+    },
+    "2_c4": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 2
+    },
+    "2_c5": {
+      "candidates": [
+        {
+          "type": "naval_base",
+          "tier": 1,
+          "reason": "Chokepoint or high naval value"
+        },
+        {
+          "type": "fortress",
+          "tier": 1,
+          "reason": "Strategic chokepoint defense"
+        }
+      ],
+      "parent_id": 2
     }
   }
 }

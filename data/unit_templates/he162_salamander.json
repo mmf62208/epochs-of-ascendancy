@@ -1,10 +1,10 @@
 {
   "id": "he162_salamander",
-  "name": "He 162 Volksjäger",
+  "name": "He 162 Volksj\u00e4ger",
   "design_family": "german_jet_ww2",
   "base_type": "Air",
   "size_category": "Light",
-  "visual_archetype": "jet_fighter",
+  "visual_archetype": "prop_fighter",
   "crew_required": 1,
   "base_training_level": 30,
   "max_experience_level": 100,

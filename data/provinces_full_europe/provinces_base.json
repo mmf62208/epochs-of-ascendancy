@@ -1,0 +1,7482 @@
+{
+  "meta": {
+    "version": 2,
+    "source": "sync_phase1_base_catalog.py",
+    "province_count": 460,
+    "geometry_authoritative": true
+  },
+  "provinces": [
+    {
+      "id": 1,
+      "name": "Jerusalem",
+      "terrain": "hills",
+      "core_for_tags": [
+        "ISR",
+        "PAL"
+      ],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8.0,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 730000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 3,
+      "name": "Ruhr Industrial Area",
+      "terrain": "hills",
+      "core_for_tags": [
+        "GER"
+      ],
+      "natural_resources": {
+        "resources": {
+          "coal": 950,
+          "iron": 280,
+          "steel": 150
+        },
+        "resource_score": 1380.0,
+        "primary_resource": "coal"
+      },
+      "population_base": 790000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 6,
+      "name": "Washington DC",
+      "terrain": "urban",
+      "core_for_tags": [
+        "USA"
+      ],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 120
+        },
+        "resource_score": 120.0,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 880000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 7,
+      "name": "Houston Energy Corridor",
+      "terrain": "urban",
+      "core_for_tags": [
+        "USA"
+      ],
+      "natural_resources": {
+        "resources": {
+          "oil": 1250
+        },
+        "resource_score": 1250.0,
+        "primary_resource": "oil"
+      },
+      "population_base": 910000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9,
+      "name": "Tokyo",
+      "terrain": "urban",
+      "core_for_tags": [
+        "JAP"
+      ],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 85
+        },
+        "resource_score": 85.0,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 970000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 10,
+      "name": "Beijing",
+      "terrain": "urban",
+      "core_for_tags": [
+        "CHN"
+      ],
+      "natural_resources": {
+        "resources": {
+          "coal": 180,
+          "rare_earths": 95
+        },
+        "resource_score": 275.0,
+        "primary_resource": "coal"
+      },
+      "population_base": 1000000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 13,
+      "name": "Baku Oil Fields",
+      "terrain": "plains",
+      "core_for_tags": [
+        "AZE"
+      ],
+      "natural_resources": {
+        "resources": {
+          "oil": 680
+        },
+        "resource_score": 680.0,
+        "primary_resource": "oil"
+      },
+      "population_base": 1090000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 15,
+      "name": "Silicon Valley",
+      "terrain": "urban",
+      "core_for_tags": [
+        "USA"
+      ],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 220
+        },
+        "resource_score": 220.0,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1150000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 18,
+      "name": "Istanbul",
+      "terrain": "urban",
+      "core_for_tags": [
+        "TUR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35.0,
+        "primary_resource": "coal"
+      },
+      "population_base": 1240000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 19,
+      "name": "Warsaw",
+      "terrain": "urban",
+      "core_for_tags": [
+        "POL"
+      ],
+      "natural_resources": {
+        "resources": {
+          "coal": 40
+        },
+        "resource_score": 40.0,
+        "primary_resource": "coal"
+      },
+      "population_base": 1270000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 21,
+      "name": "Rome",
+      "terrain": "urban",
+      "core_for_tags": [
+        "ITA"
+      ],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 1330000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 22,
+      "name": "Madrid",
+      "terrain": "urban",
+      "core_for_tags": [
+        "SPA"
+      ],
+      "natural_resources": {
+        "resources": {
+          "iron": 45
+        },
+        "resource_score": 45.0,
+        "primary_resource": "iron"
+      },
+      "population_base": 1360000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 25,
+      "name": "Seoul",
+      "terrain": "urban",
+      "core_for_tags": [
+        "KOR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 65
+        },
+        "resource_score": 65.0,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1450000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 27,
+      "name": "Johannesburg",
+      "terrain": "hills",
+      "core_for_tags": [
+        "SAF"
+      ],
+      "natural_resources": {
+        "resources": {
+          "coal": 80,
+          "iron": 55,
+          "rare_earths": 12
+        },
+        "resource_score": 147.0,
+        "primary_resource": "coal"
+      },
+      "population_base": 1510000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 30,
+      "name": "Sao Paulo",
+      "terrain": "urban",
+      "core_for_tags": [
+        "BRA"
+      ],
+      "natural_resources": {
+        "resources": {
+          "steel": 45,
+          "iron": 60
+        },
+        "resource_score": 105.0,
+        "primary_resource": "iron"
+      },
+      "population_base": 1600000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 31,
+      "name": "Volgograd",
+      "terrain": "urban",
+      "core_for_tags": [
+        "RUS"
+      ],
+      "natural_resources": {
+        "resources": {
+          "iron": 90
+        },
+        "resource_score": 90.0,
+        "primary_resource": "iron"
+      },
+      "population_base": 1630000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 33,
+      "name": "Hong Kong",
+      "terrain": "urban",
+      "core_for_tags": [
+        "CHN"
+      ],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 55
+        },
+        "resource_score": 55.0,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1690000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 34,
+      "name": "Singapore",
+      "terrain": "urban",
+      "core_for_tags": [
+        "SGP"
+      ],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 75
+        },
+        "resource_score": 75.0,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1720000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 37,
+      "name": "Ottawa",
+      "terrain": "urban",
+      "core_for_tags": [
+        "CAN"
+      ],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 1810000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 39,
+      "name": "Vancouver",
+      "terrain": "coastal",
+      "core_for_tags": [
+        "CAN"
+      ],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 25
+        },
+        "resource_score": 25.0,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1870000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 43,
+      "name": "Guangzhou",
+      "terrain": "urban",
+      "core_for_tags": [
+        "CHN"
+      ],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 95,
+          "rare_earths": 30
+        },
+        "resource_score": 125.0,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1990000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 85,
+      "name": "Damascus",
+      "terrain": "urban",
+      "core_for_tags": [
+        "SYR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "steel": 35,
+          "oil": 25
+        },
+        "resource_score": 60.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 3250000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9000,
+      "name": "Province 9000",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 176
+        },
+        "resource_score": 176,
+        "primary_resource": "oil"
+      },
+      "population_base": 1365000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9001,
+      "name": "Province 9001",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 176
+        },
+        "resource_score": 176,
+        "primary_resource": "oil"
+      },
+      "population_base": 1365000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9002,
+      "name": "Province 9002",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 176
+        },
+        "resource_score": 176,
+        "primary_resource": "oil"
+      },
+      "population_base": 1365000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9003,
+      "name": "Province 9003",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 176
+        },
+        "resource_score": 176,
+        "primary_resource": "oil"
+      },
+      "population_base": 1365000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9004,
+      "name": "Province 9004",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 176
+        },
+        "resource_score": 176,
+        "primary_resource": "oil"
+      },
+      "population_base": 1365000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9005,
+      "name": "Caracas",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 176
+        },
+        "resource_score": 176,
+        "primary_resource": "oil"
+      },
+      "population_base": 1365000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9006,
+      "name": "Province 9006",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 33
+        },
+        "resource_score": 33,
+        "primary_resource": "oil"
+      },
+      "population_base": 507000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9007,
+      "name": "Province 9007",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 33
+        },
+        "resource_score": 33,
+        "primary_resource": "oil"
+      },
+      "population_base": 507000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9008,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 33
+        },
+        "resource_score": 33,
+        "primary_resource": "oil"
+      },
+      "population_base": 507000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9009,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 33
+        },
+        "resource_score": 33,
+        "primary_resource": "oil"
+      },
+      "population_base": 507000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9010,
+      "name": "Province 9010",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 33
+        },
+        "resource_score": 33,
+        "primary_resource": "oil"
+      },
+      "population_base": 507000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9011,
+      "name": "Anchorage",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 33
+        },
+        "resource_score": 33,
+        "primary_resource": "oil"
+      },
+      "population_base": 507000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9012,
+      "name": "Province 9012",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1482000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9013,
+      "name": "Province 9013",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1482000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9014,
+      "name": "Province 9014",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1482000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9015,
+      "name": "Province 9015",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1482000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9016,
+      "name": "Province 9016",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1482000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9017,
+      "name": "Penang",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1482000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9018,
+      "name": "Province 9018",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "coal"
+      },
+      "population_base": 1170000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9019,
+      "name": "Province 9019",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "coal"
+      },
+      "population_base": 1170000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9020,
+      "name": "Province 9020",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "coal"
+      },
+      "population_base": 1170000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9021,
+      "name": "Province 9021",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "coal"
+      },
+      "population_base": 1170000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9022,
+      "name": "Province 9022",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "coal"
+      },
+      "population_base": 1170000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9023,
+      "name": "Auckland",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "coal"
+      },
+      "population_base": 1170000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9024,
+      "name": "Province 9024",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "nickel"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9025,
+      "name": "Province 9025",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "nickel"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9026,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "nickel"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9027,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "nickel"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9028,
+      "name": "Province 9028",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "nickel"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9029,
+      "name": "Santiago de Cuba",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "nickel"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9030,
+      "name": "Province 9030",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 871000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9031,
+      "name": "Province 9031",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 871000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9032,
+      "name": "Province 9032",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 871000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9033,
+      "name": "Province 9033",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 871000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9034,
+      "name": "Province 9034",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 871000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9035,
+      "name": "Cape Town",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 871000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9036,
+      "name": "Province 9036",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 154
+        },
+        "resource_score": 154,
+        "primary_resource": "oil"
+      },
+      "population_base": 455000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9037,
+      "name": "Province 9037",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 154
+        },
+        "resource_score": 154,
+        "primary_resource": "oil"
+      },
+      "population_base": 455000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9038,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 154
+        },
+        "resource_score": 154,
+        "primary_resource": "oil"
+      },
+      "population_base": 455000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9039,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 154
+        },
+        "resource_score": 154,
+        "primary_resource": "oil"
+      },
+      "population_base": 455000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9040,
+      "name": "Province 9040",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 154
+        },
+        "resource_score": 154,
+        "primary_resource": "oil"
+      },
+      "population_base": 455000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9041,
+      "name": "Maracaibo",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 154
+        },
+        "resource_score": 154,
+        "primary_resource": "oil"
+      },
+      "population_base": 455000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9042,
+      "name": "Province 9042",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9043,
+      "name": "Province 9043",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9044,
+      "name": "Province 9044",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9045,
+      "name": "Province 9045",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9046,
+      "name": "Province 9046",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9047,
+      "name": "Oslo",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9048,
+      "name": "Province 9048",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 66
+        },
+        "resource_score": 66,
+        "primary_resource": "oil"
+      },
+      "population_base": 1274000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9049,
+      "name": "Province 9049",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 66
+        },
+        "resource_score": 66,
+        "primary_resource": "oil"
+      },
+      "population_base": 1274000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9050,
+      "name": "Province 9050",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 66
+        },
+        "resource_score": 66,
+        "primary_resource": "oil"
+      },
+      "population_base": 1274000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9051,
+      "name": "Province 9051",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 66
+        },
+        "resource_score": 66,
+        "primary_resource": "oil"
+      },
+      "population_base": 1274000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9052,
+      "name": "Province 9052",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 66
+        },
+        "resource_score": 66,
+        "primary_resource": "oil"
+      },
+      "population_base": 1274000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9053,
+      "name": "Lagos",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 66
+        },
+        "resource_score": 66,
+        "primary_resource": "oil"
+      },
+      "population_base": 1274000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9054,
+      "name": "Province 9054",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 33,
+          "iron": 22
+        },
+        "resource_score": 55,
+        "primary_resource": "coal"
+      },
+      "population_base": 1547000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9055,
+      "name": "Province 9055",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 33,
+          "iron": 22
+        },
+        "resource_score": 55,
+        "primary_resource": "coal"
+      },
+      "population_base": 1547000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9056,
+      "name": "Province 9056",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 33,
+          "iron": 22
+        },
+        "resource_score": 55,
+        "primary_resource": "coal"
+      },
+      "population_base": 1547000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9057,
+      "name": "Province 9057",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 33,
+          "iron": 22
+        },
+        "resource_score": 55,
+        "primary_resource": "coal"
+      },
+      "population_base": 1547000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9058,
+      "name": "Province 9058",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 33,
+          "iron": 22
+        },
+        "resource_score": 55,
+        "primary_resource": "coal"
+      },
+      "population_base": 1547000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9059,
+      "name": "Durban",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 33,
+          "iron": 22
+        },
+        "resource_score": 55,
+        "primary_resource": "coal"
+      },
+      "population_base": 1547000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9060,
+      "name": "Province 9060",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 44
+        },
+        "resource_score": 44,
+        "primary_resource": "copper"
+      },
+      "population_base": 1339000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9061,
+      "name": "Province 9061",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 44
+        },
+        "resource_score": 44,
+        "primary_resource": "copper"
+      },
+      "population_base": 1339000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9062,
+      "name": "Province 9062",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 44
+        },
+        "resource_score": 44,
+        "primary_resource": "copper"
+      },
+      "population_base": 1339000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9063,
+      "name": "Province 9063",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 44
+        },
+        "resource_score": 44,
+        "primary_resource": "copper"
+      },
+      "population_base": 1339000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9064,
+      "name": "Province 9064",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 44
+        },
+        "resource_score": 44,
+        "primary_resource": "copper"
+      },
+      "population_base": 1339000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9065,
+      "name": "Lima",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 44
+        },
+        "resource_score": 44,
+        "primary_resource": "copper"
+      },
+      "population_base": 1339000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9066,
+      "name": "Province 9066",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9067,
+      "name": "Province 9067",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9068,
+      "name": "Province 9068",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9069,
+      "name": "Province 9069",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9070,
+      "name": "Province 9070",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9071,
+      "name": "Odessa",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9072,
+      "name": "Province 9072",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 19,
+          "rare_earths": 6
+        },
+        "resource_score": 25,
+        "primary_resource": "iron"
+      },
+      "population_base": 1261000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9073,
+      "name": "Province 9073",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 19,
+          "rare_earths": 6
+        },
+        "resource_score": 25,
+        "primary_resource": "iron"
+      },
+      "population_base": 1261000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9074,
+      "name": "Province 9074",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 19,
+          "rare_earths": 6
+        },
+        "resource_score": 25,
+        "primary_resource": "iron"
+      },
+      "population_base": 1261000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9075,
+      "name": "Province 9075",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 19,
+          "rare_earths": 6
+        },
+        "resource_score": 25,
+        "primary_resource": "iron"
+      },
+      "population_base": 1261000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9076,
+      "name": "Province 9076",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 19,
+          "rare_earths": 6
+        },
+        "resource_score": 25,
+        "primary_resource": "iron"
+      },
+      "population_base": 1261000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9077,
+      "name": "Trondheim",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 19,
+          "rare_earths": 6
+        },
+        "resource_score": 25,
+        "primary_resource": "iron"
+      },
+      "population_base": 1261000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9078,
+      "name": "Province 9078",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 1417000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9079,
+      "name": "Province 9079",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 1417000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9080,
+      "name": "Province 9080",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 1417000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9081,
+      "name": "Province 9081",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 1417000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9082,
+      "name": "Province 9082",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 1417000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9083,
+      "name": "Darwin",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 1417000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9084,
+      "name": "Province 9084",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "copper"
+      },
+      "population_base": 1196000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9085,
+      "name": "Province 9085",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "copper"
+      },
+      "population_base": 1196000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9086,
+      "name": "Province 9086",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "copper"
+      },
+      "population_base": 1196000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9087,
+      "name": "Province 9087",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "copper"
+      },
+      "population_base": 1196000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9088,
+      "name": "Province 9088",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "copper"
+      },
+      "population_base": 1196000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9089,
+      "name": "Manila",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "copper"
+      },
+      "population_base": 1196000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9090,
+      "name": "Province 9090",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "coal"
+      },
+      "population_base": 1430000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9091,
+      "name": "Province 9091",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "coal"
+      },
+      "population_base": 1430000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9092,
+      "name": "Province 9092",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "coal"
+      },
+      "population_base": 1430000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9093,
+      "name": "Province 9093",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "coal"
+      },
+      "population_base": 1430000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9094,
+      "name": "Province 9094",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "coal"
+      },
+      "population_base": 1430000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9095,
+      "name": "Christchurch",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "coal"
+      },
+      "population_base": 1430000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9096,
+      "name": "Province 9096",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "copper"
+      },
+      "population_base": 1456000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9097,
+      "name": "Province 9097",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "copper"
+      },
+      "population_base": 1456000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9098,
+      "name": "Province 9098",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "copper"
+      },
+      "population_base": 1456000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9099,
+      "name": "Province 9099",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "copper"
+      },
+      "population_base": 1456000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9100,
+      "name": "Province 9100",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "copper"
+      },
+      "population_base": 1456000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9101,
+      "name": "Cebu",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "copper"
+      },
+      "population_base": 1456000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9102,
+      "name": "Province 9102",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "tourism": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "tourism"
+      },
+      "population_base": 494000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9103,
+      "name": "Province 9103",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "tourism": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "tourism"
+      },
+      "population_base": 494000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9104,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "tourism": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "tourism"
+      },
+      "population_base": 494000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9105,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "tourism": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "tourism"
+      },
+      "population_base": 494000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9106,
+      "name": "Province 9106",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "tourism": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "tourism"
+      },
+      "population_base": 494000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9107,
+      "name": "Honolulu",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "tourism": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "tourism"
+      },
+      "population_base": 494000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9108,
+      "name": "Province 9108",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "geothermal": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "geothermal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9109,
+      "name": "Province 9109",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "geothermal": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "geothermal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9110,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "geothermal": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "geothermal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9111,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "geothermal": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "geothermal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9112,
+      "name": "Province 9112",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "geothermal": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "geothermal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9113,
+      "name": "Reykjavik",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "geothermal": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "geothermal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9114,
+      "name": "Province 9114",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "nickel"
+      },
+      "population_base": 1378000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9115,
+      "name": "Province 9115",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "nickel"
+      },
+      "population_base": 1378000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9116,
+      "name": "Province 9116",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "nickel"
+      },
+      "population_base": 1378000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9117,
+      "name": "Province 9117",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "nickel"
+      },
+      "population_base": 1378000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9118,
+      "name": "Province 9118",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "nickel"
+      },
+      "population_base": 1378000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9119,
+      "name": "Havana",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "nickel": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "nickel"
+      },
+      "population_base": 1378000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9120,
+      "name": "Province 9120",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "oil"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9121,
+      "name": "Province 9121",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "oil"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9122,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "oil"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9123,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "oil"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9124,
+      "name": "Province 9124",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "oil"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9125,
+      "name": "Colon",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "oil"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9126,
+      "name": "Province 9126",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 1391000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9127,
+      "name": "Province 9127",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 1391000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9128,
+      "name": "Province 9128",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 1391000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9129,
+      "name": "Province 9129",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 1391000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9130,
+      "name": "Province 9130",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 1391000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9131,
+      "name": "Panama Canal Zone",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {},
+      "population_base": 1391000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9132,
+      "name": "Province 9132",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 77,
+          "rare_earths": 24
+        },
+        "resource_score": 101,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 559000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9133,
+      "name": "Province 9133",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 77,
+          "rare_earths": 24
+        },
+        "resource_score": 101,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 559000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9134,
+      "name": "Province 9134",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 77,
+          "rare_earths": 24
+        },
+        "resource_score": 101,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 559000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9135,
+      "name": "Province 9135",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 77,
+          "rare_earths": 24
+        },
+        "resource_score": 101,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 559000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9136,
+      "name": "Province 9136",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 77,
+          "rare_earths": 24
+        },
+        "resource_score": 101,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 559000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9137,
+      "name": "Shanghai",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 77,
+          "rare_earths": 24
+        },
+        "resource_score": 101,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 559000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9138,
+      "name": "Province 9138",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 572000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9139,
+      "name": "Province 9139",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 572000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9140,
+      "name": "Province 9140",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 572000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9141,
+      "name": "Province 9141",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 572000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9142,
+      "name": "Province 9142",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 572000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9143,
+      "name": "New Delhi",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 572000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9144,
+      "name": "Province 9144",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 1347
+        },
+        "resource_score": 1347,
+        "primary_resource": "oil"
+      },
+      "population_base": 598000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9145,
+      "name": "Province 9145",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 1347
+        },
+        "resource_score": 1347,
+        "primary_resource": "oil"
+      },
+      "population_base": 598000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9146,
+      "name": "Province 9146",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 1347
+        },
+        "resource_score": 1347,
+        "primary_resource": "oil"
+      },
+      "population_base": 598000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9147,
+      "name": "Province 9147",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 1347
+        },
+        "resource_score": 1347,
+        "primary_resource": "oil"
+      },
+      "population_base": 598000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9148,
+      "name": "Province 9148",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 1347
+        },
+        "resource_score": 1347,
+        "primary_resource": "oil"
+      },
+      "population_base": 598000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9149,
+      "name": "Province 9149",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 1347
+        },
+        "resource_score": 1347,
+        "primary_resource": "oil"
+      },
+      "population_base": 598000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9150,
+      "name": "Province 9150",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 192,
+          "coal": 66
+        },
+        "resource_score": 258,
+        "primary_resource": "iron"
+      },
+      "population_base": 624000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9151,
+      "name": "Province 9151",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 192,
+          "coal": 66
+        },
+        "resource_score": 258,
+        "primary_resource": "iron"
+      },
+      "population_base": 624000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9152,
+      "name": "Province 9152",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 192,
+          "coal": 66
+        },
+        "resource_score": 258,
+        "primary_resource": "iron"
+      },
+      "population_base": 624000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9153,
+      "name": "Province 9153",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 192,
+          "coal": 66
+        },
+        "resource_score": 258,
+        "primary_resource": "iron"
+      },
+      "population_base": 624000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9154,
+      "name": "Province 9154",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 192,
+          "coal": 66
+        },
+        "resource_score": 258,
+        "primary_resource": "iron"
+      },
+      "population_base": 624000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9155,
+      "name": "Province 9155",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 192,
+          "coal": 66
+        },
+        "resource_score": 258,
+        "primary_resource": "iron"
+      },
+      "population_base": 624000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9156,
+      "name": "Province 9156",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 637000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9157,
+      "name": "Province 9157",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 637000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9158,
+      "name": "Province 9158",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 637000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9159,
+      "name": "Province 9159",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 637000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9160,
+      "name": "Province 9160",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 637000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9161,
+      "name": "St. Petersburg",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 637000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9162,
+      "name": "Province 9162",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "iron"
+      },
+      "population_base": 676000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9163,
+      "name": "Province 9163",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "iron"
+      },
+      "population_base": 676000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9164,
+      "name": "Province 9164",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "iron"
+      },
+      "population_base": 676000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9165,
+      "name": "Province 9165",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "iron"
+      },
+      "population_base": 676000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9166,
+      "name": "Province 9166",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "iron"
+      },
+      "population_base": 676000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9167,
+      "name": "Kiev",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "iron"
+      },
+      "population_base": 676000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9168,
+      "name": "Province 9168",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 715000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9169,
+      "name": "Province 9169",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 715000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9170,
+      "name": "Province 9170",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 715000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9171,
+      "name": "Province 9171",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 715000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9172,
+      "name": "Province 9172",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 715000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9173,
+      "name": "Cairo",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "oil"
+      },
+      "population_base": 715000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9174,
+      "name": "Province 9174",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 231
+        },
+        "resource_score": 231,
+        "primary_resource": "oil"
+      },
+      "population_base": 728000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9175,
+      "name": "Province 9175",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 231
+        },
+        "resource_score": 231,
+        "primary_resource": "oil"
+      },
+      "population_base": 728000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9176,
+      "name": "Province 9176",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 231
+        },
+        "resource_score": 231,
+        "primary_resource": "oil"
+      },
+      "population_base": 728000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9177,
+      "name": "Province 9177",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 231
+        },
+        "resource_score": 231,
+        "primary_resource": "oil"
+      },
+      "population_base": 728000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9178,
+      "name": "Province 9178",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 231
+        },
+        "resource_score": 231,
+        "primary_resource": "oil"
+      },
+      "population_base": 728000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9179,
+      "name": "Tehran",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 231
+        },
+        "resource_score": 231,
+        "primary_resource": "oil"
+      },
+      "population_base": 728000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9180,
+      "name": "Province 9180",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35,
+          "iron": 22
+        },
+        "resource_score": 57,
+        "primary_resource": "coal"
+      },
+      "population_base": 754000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9181,
+      "name": "Province 9181",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35,
+          "iron": 22
+        },
+        "resource_score": 57,
+        "primary_resource": "coal"
+      },
+      "population_base": 754000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9182,
+      "name": "Province 9182",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35,
+          "iron": 22
+        },
+        "resource_score": 57,
+        "primary_resource": "coal"
+      },
+      "population_base": 754000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9183,
+      "name": "Province 9183",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35,
+          "iron": 22
+        },
+        "resource_score": 57,
+        "primary_resource": "coal"
+      },
+      "population_base": 754000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9184,
+      "name": "Province 9184",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35,
+          "iron": 22
+        },
+        "resource_score": 57,
+        "primary_resource": "coal"
+      },
+      "population_base": 754000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9185,
+      "name": "Sydney",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35,
+          "iron": 22
+        },
+        "resource_score": 57,
+        "primary_resource": "coal"
+      },
+      "population_base": 754000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9186,
+      "name": "Province 9186",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "oil"
+      },
+      "population_base": 780000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9187,
+      "name": "Province 9187",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "oil"
+      },
+      "population_base": 780000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9188,
+      "name": "Province 9188",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "oil"
+      },
+      "population_base": 780000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9189,
+      "name": "Province 9189",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "oil"
+      },
+      "population_base": 780000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9190,
+      "name": "Province 9190",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "oil"
+      },
+      "population_base": 780000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9191,
+      "name": "Buenos Aires",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "oil"
+      },
+      "population_base": 780000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9192,
+      "name": "Province 9192",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 38
+        },
+        "resource_score": 38,
+        "primary_resource": "iron"
+      },
+      "population_base": 793000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9193,
+      "name": "Province 9193",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 38
+        },
+        "resource_score": 38,
+        "primary_resource": "iron"
+      },
+      "population_base": 793000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9194,
+      "name": "Province 9194",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 38
+        },
+        "resource_score": 38,
+        "primary_resource": "iron"
+      },
+      "population_base": 793000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9195,
+      "name": "Province 9195",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 38
+        },
+        "resource_score": 38,
+        "primary_resource": "iron"
+      },
+      "population_base": 793000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9196,
+      "name": "Province 9196",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 38
+        },
+        "resource_score": 38,
+        "primary_resource": "iron"
+      },
+      "population_base": 793000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9197,
+      "name": "Rio de Janeiro",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 38
+        },
+        "resource_score": 38,
+        "primary_resource": "iron"
+      },
+      "population_base": 793000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9198,
+      "name": "Province 9198",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 832000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9199,
+      "name": "Province 9199",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 832000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9200,
+      "name": "Province 9200",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 832000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9201,
+      "name": "Province 9201",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 832000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9202,
+      "name": "Province 9202",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 832000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9203,
+      "name": "Novosibirsk",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "coal"
+      },
+      "population_base": 832000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9204,
+      "name": "Province 9204",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 52
+        },
+        "resource_score": 52,
+        "primary_resource": "oil"
+      },
+      "population_base": 884000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9205,
+      "name": "Province 9205",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 52
+        },
+        "resource_score": 52,
+        "primary_resource": "oil"
+      },
+      "population_base": 884000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9206,
+      "name": "Province 9206",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 52
+        },
+        "resource_score": 52,
+        "primary_resource": "oil"
+      },
+      "population_base": 884000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9207,
+      "name": "Province 9207",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 52
+        },
+        "resource_score": 52,
+        "primary_resource": "oil"
+      },
+      "population_base": 884000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9208,
+      "name": "Province 9208",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 52
+        },
+        "resource_score": 52,
+        "primary_resource": "oil"
+      },
+      "population_base": 884000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9209,
+      "name": "Mexico City",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 52
+        },
+        "resource_score": 52,
+        "primary_resource": "oil"
+      },
+      "population_base": 884000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9210,
+      "name": "Province 9210",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 910000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9211,
+      "name": "Province 9211",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 910000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9212,
+      "name": "Province 9212",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 910000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9213,
+      "name": "Province 9213",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 910000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9214,
+      "name": "Province 9214",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 910000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9215,
+      "name": "Montreal",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "steel"
+      },
+      "population_base": 910000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9216,
+      "name": "Province 9216",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 6
+        },
+        "resource_score": 6,
+        "primary_resource": "coal"
+      },
+      "population_base": 936000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9217,
+      "name": "Province 9217",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 6
+        },
+        "resource_score": 6,
+        "primary_resource": "coal"
+      },
+      "population_base": 936000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9218,
+      "name": "Province 9218",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 6
+        },
+        "resource_score": 6,
+        "primary_resource": "coal"
+      },
+      "population_base": 936000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9219,
+      "name": "Province 9219",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 6
+        },
+        "resource_score": 6,
+        "primary_resource": "coal"
+      },
+      "population_base": 936000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9220,
+      "name": "Province 9220",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 6
+        },
+        "resource_score": 6,
+        "primary_resource": "coal"
+      },
+      "population_base": 936000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9221,
+      "name": "Helsinki",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 6
+        },
+        "resource_score": 6,
+        "primary_resource": "coal"
+      },
+      "population_base": 936000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9222,
+      "name": "Province 9222",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "steel"
+      },
+      "population_base": 949000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9223,
+      "name": "Province 9223",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "steel"
+      },
+      "population_base": 949000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9224,
+      "name": "Province 9224",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "steel"
+      },
+      "population_base": 949000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9225,
+      "name": "Province 9225",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "steel"
+      },
+      "population_base": 949000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9226,
+      "name": "Province 9226",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "steel"
+      },
+      "population_base": 949000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9227,
+      "name": "Chicago",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "steel"
+      },
+      "population_base": 949000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9228,
+      "name": "Province 9228",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 962000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9229,
+      "name": "Province 9229",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 962000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9230,
+      "name": "Province 9230",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 962000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9231,
+      "name": "Province 9231",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 962000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9232,
+      "name": "Province 9232",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 962000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9233,
+      "name": "Detroit",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 962000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9234,
+      "name": "Province 9234",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1014000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9235,
+      "name": "Province 9235",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1014000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9236,
+      "name": "Province 9236",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1014000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9237,
+      "name": "Province 9237",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1014000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9238,
+      "name": "Province 9238",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1014000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9239,
+      "name": "Bangalore",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1014000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9240,
+      "name": "Province 9240",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 1053000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9241,
+      "name": "Province 9241",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 1053000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9242,
+      "name": "Province 9242",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 1053000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9243,
+      "name": "Province 9243",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 1053000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9244,
+      "name": "Province 9244",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 1053000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9245,
+      "name": "Milan",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30,
+        "primary_resource": "steel"
+      },
+      "population_base": 1053000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9246,
+      "name": "Province 9246",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rice": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "rice"
+      },
+      "population_base": 1209000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9247,
+      "name": "Province 9247",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rice": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "rice"
+      },
+      "population_base": 1209000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9248,
+      "name": "Province 9248",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rice": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "rice"
+      },
+      "population_base": 1209000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9249,
+      "name": "Province 9249",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rice": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "rice"
+      },
+      "population_base": 1209000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9250,
+      "name": "Province 9250",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rice": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "rice"
+      },
+      "population_base": 1209000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9251,
+      "name": "Bangkok",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rice": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "rice"
+      },
+      "population_base": 1209000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9252,
+      "name": "Province 9252",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24,
+          "iron": 33
+        },
+        "resource_score": 57,
+        "primary_resource": "iron"
+      },
+      "population_base": 1326000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9253,
+      "name": "Province 9253",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24,
+          "iron": 33
+        },
+        "resource_score": 57,
+        "primary_resource": "iron"
+      },
+      "population_base": 1326000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9254,
+      "name": "Province 9254",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24,
+          "iron": 33
+        },
+        "resource_score": 57,
+        "primary_resource": "iron"
+      },
+      "population_base": 1326000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9255,
+      "name": "Province 9255",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24,
+          "iron": 33
+        },
+        "resource_score": 57,
+        "primary_resource": "iron"
+      },
+      "population_base": 1326000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9256,
+      "name": "Province 9256",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24,
+          "iron": 33
+        },
+        "resource_score": 57,
+        "primary_resource": "iron"
+      },
+      "population_base": 1326000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9257,
+      "name": "Sao Paulo",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 24,
+          "iron": 33
+        },
+        "resource_score": 57,
+        "primary_resource": "iron"
+      },
+      "population_base": 1326000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9258,
+      "name": "Province 9258",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 209
+        },
+        "resource_score": 209,
+        "primary_resource": "oil"
+      },
+      "population_base": 1508000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9259,
+      "name": "Province 9259",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 209
+        },
+        "resource_score": 209,
+        "primary_resource": "oil"
+      },
+      "population_base": 1508000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9260,
+      "name": "Province 9260",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 209
+        },
+        "resource_score": 209,
+        "primary_resource": "oil"
+      },
+      "population_base": 1508000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9261,
+      "name": "Province 9261",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 209
+        },
+        "resource_score": 209,
+        "primary_resource": "oil"
+      },
+      "population_base": 1508000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9262,
+      "name": "Province 9262",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 209
+        },
+        "resource_score": 209,
+        "primary_resource": "oil"
+      },
+      "population_base": 1508000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9263,
+      "name": "Baghdad",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 209
+        },
+        "resource_score": 209,
+        "primary_resource": "oil"
+      },
+      "population_base": 1508000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9264,
+      "name": "Province 9264",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 66,
+          "iron": 44
+        },
+        "resource_score": 110,
+        "primary_resource": "coal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9265,
+      "name": "Province 9265",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 66,
+          "iron": 44
+        },
+        "resource_score": 110,
+        "primary_resource": "coal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9266,
+      "name": "Province 9266",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 66,
+          "iron": 44
+        },
+        "resource_score": 110,
+        "primary_resource": "coal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9267,
+      "name": "Province 9267",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 66,
+          "iron": 44
+        },
+        "resource_score": 110,
+        "primary_resource": "coal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9268,
+      "name": "Province 9268",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 66,
+          "iron": 44
+        },
+        "resource_score": 110,
+        "primary_resource": "coal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9269,
+      "name": "Moscow",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 66,
+          "iron": 44
+        },
+        "resource_score": 110,
+        "primary_resource": "coal"
+      },
+      "population_base": 520000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9270,
+      "name": "Province 9270",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9271,
+      "name": "Province 9271",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9272,
+      "name": "Province 9272",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9273,
+      "name": "Province 9273",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9274,
+      "name": "Province 9274",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9275,
+      "name": "London",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 481000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9276,
+      "name": "Province 9276",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9277,
+      "name": "Province 9277",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9278,
+      "name": "Province 9278",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9279,
+      "name": "Province 9279",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9280,
+      "name": "Province 9280",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9281,
+      "name": "Paris",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 468000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9282,
+      "name": "Province 9282",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 44,
+          "iron": 19,
+          "steel": 13
+        },
+        "resource_score": 76,
+        "primary_resource": "coal"
+      },
+      "population_base": 442000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9283,
+      "name": "Province 9283",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 44,
+          "iron": 19,
+          "steel": 13
+        },
+        "resource_score": 76,
+        "primary_resource": "coal"
+      },
+      "population_base": 442000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9284,
+      "name": "Province 9284",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 44,
+          "iron": 19,
+          "steel": 13
+        },
+        "resource_score": 76,
+        "primary_resource": "coal"
+      },
+      "population_base": 442000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9285,
+      "name": "Province 9285",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 44,
+          "iron": 19,
+          "steel": 13
+        },
+        "resource_score": 76,
+        "primary_resource": "coal"
+      },
+      "population_base": 442000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9286,
+      "name": "Province 9286",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 44,
+          "iron": 19,
+          "steel": 13
+        },
+        "resource_score": 76,
+        "primary_resource": "coal"
+      },
+      "population_base": 442000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9287,
+      "name": "Berlin",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 44,
+          "iron": 19,
+          "steel": 13
+        },
+        "resource_score": 76,
+        "primary_resource": "coal"
+      },
+      "population_base": 442000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9288,
+      "name": "Province 9288",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 988000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9289,
+      "name": "Province 9289",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 988000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9290,
+      "name": "Province 9290",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 988000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9291,
+      "name": "Province 9291",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 988000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9292,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 35
+        },
+        "resource_score": 35,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 988000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9293,
+      "name": "Province 9293",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 22,
+          "semiconductors": 19
+        },
+        "resource_score": 41,
+        "primary_resource": "coal"
+      },
+      "population_base": 1001000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9294,
+      "name": "Province 9294",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 22,
+          "semiconductors": 19
+        },
+        "resource_score": 41,
+        "primary_resource": "coal"
+      },
+      "population_base": 1001000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9295,
+      "name": "Province 9295",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 22,
+          "semiconductors": 19
+        },
+        "resource_score": 41,
+        "primary_resource": "coal"
+      },
+      "population_base": 1001000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9296,
+      "name": "Province 9296",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 22,
+          "semiconductors": 19
+        },
+        "resource_score": 41,
+        "primary_resource": "coal"
+      },
+      "population_base": 1001000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9297,
+      "name": "Mumbai",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 22,
+          "semiconductors": 19
+        },
+        "resource_score": 41,
+        "primary_resource": "coal"
+      },
+      "population_base": 1001000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9298,
+      "name": "Province 9298",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 22
+        },
+        "resource_score": 22,
+        "primary_resource": "steel"
+      },
+      "population_base": 1040000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9299,
+      "name": "Province 9299",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 22
+        },
+        "resource_score": 22,
+        "primary_resource": "steel"
+      },
+      "population_base": 1040000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9300,
+      "name": "Province 9300",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 22
+        },
+        "resource_score": 22,
+        "primary_resource": "steel"
+      },
+      "population_base": 1040000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9301,
+      "name": "Province 9301",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 22
+        },
+        "resource_score": 22,
+        "primary_resource": "steel"
+      },
+      "population_base": 1040000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9302,
+      "name": "Rotterdam",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 22
+        },
+        "resource_score": 22,
+        "primary_resource": "steel"
+      },
+      "population_base": 1040000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9303,
+      "name": "Province 9303",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 27
+        },
+        "resource_score": 27,
+        "primary_resource": "coal"
+      },
+      "population_base": 1066000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9304,
+      "name": "Province 9304",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 27
+        },
+        "resource_score": 27,
+        "primary_resource": "coal"
+      },
+      "population_base": 1066000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9305,
+      "name": "Province 9305",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 27
+        },
+        "resource_score": 27,
+        "primary_resource": "coal"
+      },
+      "population_base": 1066000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9306,
+      "name": "Province 9306",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 27
+        },
+        "resource_score": 27,
+        "primary_resource": "coal"
+      },
+      "population_base": 1066000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9307,
+      "name": "Kharkiv",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 27
+        },
+        "resource_score": 27,
+        "primary_resource": "coal"
+      },
+      "population_base": 1066000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9308,
+      "name": "Province 9308",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 15
+        },
+        "resource_score": 15,
+        "primary_resource": "coal"
+      },
+      "population_base": 1092000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9309,
+      "name": "Province 9309",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 15
+        },
+        "resource_score": 15,
+        "primary_resource": "coal"
+      },
+      "population_base": 1092000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9310,
+      "name": "Province 9310",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 15
+        },
+        "resource_score": 15,
+        "primary_resource": "coal"
+      },
+      "population_base": 1092000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9311,
+      "name": "Province 9311",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 15
+        },
+        "resource_score": 15,
+        "primary_resource": "coal"
+      },
+      "population_base": 1092000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9312,
+      "name": "Ankara",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 15
+        },
+        "resource_score": 15,
+        "primary_resource": "coal"
+      },
+      "population_base": 1092000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9313,
+      "name": "Province 9313",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 209
+        },
+        "resource_score": 209,
+        "primary_resource": "oil"
+      },
+      "population_base": 1105000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9314,
+      "name": "Province 9314",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 209
+        },
+        "resource_score": 209,
+        "primary_resource": "oil"
+      },
+      "population_base": 1105000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9315,
+      "name": "Province 9315",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 209
+        },
+        "resource_score": 209,
+        "primary_resource": "oil"
+      },
+      "population_base": 1105000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9316,
+      "name": "Province 9316",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 209
+        },
+        "resource_score": 209,
+        "primary_resource": "oil"
+      },
+      "population_base": 1105000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9317,
+      "name": "Baghdad",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 209
+        },
+        "resource_score": 209,
+        "primary_resource": "oil"
+      },
+      "population_base": 1105000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9318,
+      "name": "Province 9318",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 286
+        },
+        "resource_score": 286,
+        "primary_resource": "oil"
+      },
+      "population_base": 1118000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9319,
+      "name": "Province 9319",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 286
+        },
+        "resource_score": 286,
+        "primary_resource": "oil"
+      },
+      "population_base": 1118000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9320,
+      "name": "Province 9320",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 286
+        },
+        "resource_score": 286,
+        "primary_resource": "oil"
+      },
+      "population_base": 1118000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9321,
+      "name": "Province 9321",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 286
+        },
+        "resource_score": 286,
+        "primary_resource": "oil"
+      },
+      "population_base": 1118000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9322,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 286
+        },
+        "resource_score": 286,
+        "primary_resource": "oil"
+      },
+      "population_base": 1118000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9323,
+      "name": "Province 9323",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "oil"
+      },
+      "population_base": 1131000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9324,
+      "name": "Province 9324",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "oil"
+      },
+      "population_base": 1131000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9325,
+      "name": "Province 9325",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "oil"
+      },
+      "population_base": 1131000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9326,
+      "name": "Province 9326",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "oil"
+      },
+      "population_base": 1131000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9327,
+      "name": "Jakarta",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "oil"
+      },
+      "population_base": 1131000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9328,
+      "name": "Province 9328",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 121
+        },
+        "resource_score": 121,
+        "primary_resource": "iron"
+      },
+      "population_base": 1144000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9329,
+      "name": "Province 9329",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 121
+        },
+        "resource_score": 121,
+        "primary_resource": "iron"
+      },
+      "population_base": 1144000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9330,
+      "name": "Province 9330",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 121
+        },
+        "resource_score": 121,
+        "primary_resource": "iron"
+      },
+      "population_base": 1144000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9331,
+      "name": "Province 9331",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 121
+        },
+        "resource_score": 121,
+        "primary_resource": "iron"
+      },
+      "population_base": 1144000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9332,
+      "name": "Perth",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 121
+        },
+        "resource_score": 121,
+        "primary_resource": "iron"
+      },
+      "population_base": 1144000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9333,
+      "name": "Province 9333",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "coal"
+      },
+      "population_base": 1157000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9334,
+      "name": "Province 9334",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "coal"
+      },
+      "population_base": 1157000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9335,
+      "name": "Province 9335",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "coal"
+      },
+      "population_base": 1157000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9336,
+      "name": "Province 9336",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "coal"
+      },
+      "population_base": 1157000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9337,
+      "name": "Brisbane",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "coal"
+      },
+      "population_base": 1157000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9338,
+      "name": "Province 9338",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 30,
+          "rare_earths": 9
+        },
+        "resource_score": 39,
+        "primary_resource": "coal"
+      },
+      "population_base": 1183000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9339,
+      "name": "Province 9339",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 30,
+          "rare_earths": 9
+        },
+        "resource_score": 39,
+        "primary_resource": "coal"
+      },
+      "population_base": 1183000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9340,
+      "name": "Province 9340",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 30,
+          "rare_earths": 9
+        },
+        "resource_score": 39,
+        "primary_resource": "coal"
+      },
+      "population_base": 1183000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9341,
+      "name": "Province 9341",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 30,
+          "rare_earths": 9
+        },
+        "resource_score": 39,
+        "primary_resource": "coal"
+      },
+      "population_base": 1183000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9342,
+      "name": "Hanoi",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 30,
+          "rare_earths": 9
+        },
+        "resource_score": 39,
+        "primary_resource": "coal"
+      },
+      "population_base": 1183000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9343,
+      "name": "Province 9343",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 22
+        },
+        "resource_score": 22,
+        "primary_resource": "oil"
+      },
+      "population_base": 1222000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9344,
+      "name": "Province 9344",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 22
+        },
+        "resource_score": 22,
+        "primary_resource": "oil"
+      },
+      "population_base": 1222000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9345,
+      "name": "Province 9345",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 22
+        },
+        "resource_score": 22,
+        "primary_resource": "oil"
+      },
+      "population_base": 1222000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9346,
+      "name": "Province 9346",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 22
+        },
+        "resource_score": 22,
+        "primary_resource": "oil"
+      },
+      "population_base": 1222000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9347,
+      "name": "Kuala Lumpur",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 22
+        },
+        "resource_score": 22,
+        "primary_resource": "oil"
+      },
+      "population_base": 1222000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9348,
+      "name": "Province 9348",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "iron"
+      },
+      "population_base": 1235000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9349,
+      "name": "Province 9349",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "iron"
+      },
+      "population_base": 1235000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9350,
+      "name": "Province 9350",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "iron"
+      },
+      "population_base": 1235000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9351,
+      "name": "Province 9351",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "iron"
+      },
+      "population_base": 1235000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9352,
+      "name": "Stockholm",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 11
+        },
+        "resource_score": 11,
+        "primary_resource": "iron"
+      },
+      "population_base": 1235000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9353,
+      "name": "Province 9353",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "steel"
+      },
+      "population_base": 1248000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9354,
+      "name": "Province 9354",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "steel"
+      },
+      "population_base": 1248000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9355,
+      "name": "Province 9355",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "steel"
+      },
+      "population_base": 1248000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9356,
+      "name": "Province 9356",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "steel"
+      },
+      "population_base": 1248000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9357,
+      "name": "Copenhagen",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "steel"
+      },
+      "population_base": 1248000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9358,
+      "name": "Province 9358",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 44,
+          "iron": 30,
+          "rare_earths": 6
+        },
+        "resource_score": 80,
+        "primary_resource": "coal"
+      },
+      "population_base": 1287000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9359,
+      "name": "Province 9359",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 44,
+          "iron": 30,
+          "rare_earths": 6
+        },
+        "resource_score": 80,
+        "primary_resource": "coal"
+      },
+      "population_base": 1287000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9360,
+      "name": "Province 9360",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 44,
+          "iron": 30,
+          "rare_earths": 6
+        },
+        "resource_score": 80,
+        "primary_resource": "coal"
+      },
+      "population_base": 1287000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9361,
+      "name": "Province 9361",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 44,
+          "iron": 30,
+          "rare_earths": 6
+        },
+        "resource_score": 80,
+        "primary_resource": "coal"
+      },
+      "population_base": 1287000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9362,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "coal": 44,
+          "iron": 30,
+          "rare_earths": 6
+        },
+        "resource_score": 80,
+        "primary_resource": "coal"
+      },
+      "population_base": 1287000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9363,
+      "name": "Province 9363",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "oil"
+      },
+      "population_base": 1300000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9364,
+      "name": "Province 9364",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "oil"
+      },
+      "population_base": 1300000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9365,
+      "name": "Province 9365",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "oil"
+      },
+      "population_base": 1300000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9366,
+      "name": "Province 9366",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "oil"
+      },
+      "population_base": 1300000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9367,
+      "name": "Buenos Aires",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "oil"
+      },
+      "population_base": 1300000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9368,
+      "name": "Province 9368",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 38
+        },
+        "resource_score": 38,
+        "primary_resource": "iron"
+      },
+      "population_base": 1313000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9369,
+      "name": "Province 9369",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 38
+        },
+        "resource_score": 38,
+        "primary_resource": "iron"
+      },
+      "population_base": 1313000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9370,
+      "name": "Province 9370",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 38
+        },
+        "resource_score": 38,
+        "primary_resource": "iron"
+      },
+      "population_base": 1313000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9371,
+      "name": "Province 9371",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 38
+        },
+        "resource_score": 38,
+        "primary_resource": "iron"
+      },
+      "population_base": 1313000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9372,
+      "name": "Rio de Janeiro",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 38
+        },
+        "resource_score": 38,
+        "primary_resource": "iron"
+      },
+      "population_base": 1313000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9373,
+      "name": "Province 9373",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1352000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9374,
+      "name": "Province 9374",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1352000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9375,
+      "name": "Province 9375",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1352000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9376,
+      "name": "Province 9376",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1352000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9377,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1352000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9378,
+      "name": "Province 9378",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 99,
+          "rare_earths": 12
+        },
+        "resource_score": 111,
+        "primary_resource": "iron"
+      },
+      "population_base": 1404000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9379,
+      "name": "Province 9379",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 99,
+          "rare_earths": 12
+        },
+        "resource_score": 111,
+        "primary_resource": "iron"
+      },
+      "population_base": 1404000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9380,
+      "name": "Province 9380",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 99,
+          "rare_earths": 12
+        },
+        "resource_score": 111,
+        "primary_resource": "iron"
+      },
+      "population_base": 1404000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9381,
+      "name": "Province 9381",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 99,
+          "rare_earths": 12
+        },
+        "resource_score": 111,
+        "primary_resource": "iron"
+      },
+      "population_base": 1404000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9382,
+      "name": "Adelaide",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "iron": 99,
+          "rare_earths": 12
+        },
+        "resource_score": 111,
+        "primary_resource": "iron"
+      },
+      "population_base": 1404000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9383,
+      "name": "Province 9383",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 19,
+          "oil": 13
+        },
+        "resource_score": 32,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1443000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9384,
+      "name": "Province 9384",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 19,
+          "oil": 13
+        },
+        "resource_score": 32,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1443000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9385,
+      "name": "Province 9385",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 19,
+          "oil": 13
+        },
+        "resource_score": 32,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1443000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9386,
+      "name": "Province 9386",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 19,
+          "oil": 13
+        },
+        "resource_score": 32,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1443000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9387,
+      "name": "Ho Chi Minh City",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "semiconductors": 19,
+          "oil": 13
+        },
+        "resource_score": 32,
+        "primary_resource": "semiconductors"
+      },
+      "population_base": 1443000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9388,
+      "name": "Province 9388",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 1469000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9389,
+      "name": "Province 9389",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 1469000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9390,
+      "name": "Province 9390",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 1469000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9391,
+      "name": "Province 9391",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 1469000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9392,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 8
+        },
+        "resource_score": 8,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 1469000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9393,
+      "name": "Province 9393",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 27
+        },
+        "resource_score": 27,
+        "primary_resource": "steel"
+      },
+      "population_base": 1495000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9394,
+      "name": "Province 9394",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 27
+        },
+        "resource_score": 27,
+        "primary_resource": "steel"
+      },
+      "population_base": 1495000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9395,
+      "name": "Province 9395",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 27
+        },
+        "resource_score": 27,
+        "primary_resource": "steel"
+      },
+      "population_base": 1495000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9396,
+      "name": "Province 9396",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 27
+        },
+        "resource_score": 27,
+        "primary_resource": "steel"
+      },
+      "population_base": 1495000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9397,
+      "name": "Isfahan",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 27
+        },
+        "resource_score": 27,
+        "primary_resource": "steel"
+      },
+      "population_base": 1495000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9398,
+      "name": "Province 9398",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "oil"
+      },
+      "population_base": 1534000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9399,
+      "name": "Province 9399",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "oil"
+      },
+      "population_base": 1534000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9400,
+      "name": "Province 9400",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "oil"
+      },
+      "population_base": 1534000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9401,
+      "name": "Province 9401",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "oil"
+      },
+      "population_base": 1534000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9402,
+      "name": "Abuja",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 46
+        },
+        "resource_score": 46,
+        "primary_resource": "oil"
+      },
+      "population_base": 1534000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9403,
+      "name": "Province 9403",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "steel"
+      },
+      "population_base": 1560000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9404,
+      "name": "Province 9404",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "steel"
+      },
+      "population_base": 1560000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9405,
+      "name": "Province 9405",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "steel"
+      },
+      "population_base": 1560000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9406,
+      "name": "Province 9406",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "steel"
+      },
+      "population_base": 1560000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9407,
+      "name": "Pretoria",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "steel"
+      },
+      "population_base": 1560000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9408,
+      "name": "Province 9408",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "steel"
+      },
+      "population_base": 1573000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9409,
+      "name": "Province 9409",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "steel"
+      },
+      "population_base": 1573000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9410,
+      "name": "Province 9410",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "steel"
+      },
+      "population_base": 1573000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9411,
+      "name": "Province 9411",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "steel"
+      },
+      "population_base": 1573000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9412,
+      "name": "Cordoba",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 19
+        },
+        "resource_score": 19,
+        "primary_resource": "steel"
+      },
+      "population_base": 1573000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9413,
+      "name": "Province 9413",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 49
+        },
+        "resource_score": 49,
+        "primary_resource": "copper"
+      },
+      "population_base": 416000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9414,
+      "name": "Province 9414",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 49
+        },
+        "resource_score": 49,
+        "primary_resource": "copper"
+      },
+      "population_base": 416000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9415,
+      "name": "Province 9415",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 49
+        },
+        "resource_score": 49,
+        "primary_resource": "copper"
+      },
+      "population_base": 416000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9416,
+      "name": "Province 9416",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 49
+        },
+        "resource_score": 49,
+        "primary_resource": "copper"
+      },
+      "population_base": 416000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9417,
+      "name": "Santiago",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "copper": 49
+        },
+        "resource_score": 49,
+        "primary_resource": "copper"
+      },
+      "population_base": 416000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9418,
+      "name": "Province 9418",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 22,
+          "semiconductors": 13
+        },
+        "resource_score": 35,
+        "primary_resource": "steel"
+      },
+      "population_base": 429000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9419,
+      "name": "Province 9419",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 22,
+          "semiconductors": 13
+        },
+        "resource_score": 35,
+        "primary_resource": "steel"
+      },
+      "population_base": 429000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9420,
+      "name": "Province 9420",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 22,
+          "semiconductors": 13
+        },
+        "resource_score": 35,
+        "primary_resource": "steel"
+      },
+      "population_base": 429000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9421,
+      "name": "Province 9421",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 22,
+          "semiconductors": 13
+        },
+        "resource_score": 35,
+        "primary_resource": "steel"
+      },
+      "population_base": 429000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9422,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "steel": 22,
+          "semiconductors": 13
+        },
+        "resource_score": 35,
+        "primary_resource": "steel"
+      },
+      "population_base": 429000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9423,
+      "name": "Province 9423",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "oil"
+      },
+      "population_base": 442000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9424,
+      "name": "Province 9424",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "oil"
+      },
+      "population_base": 442000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9425,
+      "name": "Province 9425",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "oil"
+      },
+      "population_base": 442000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9426,
+      "name": "Province 9426",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "oil"
+      },
+      "population_base": 442000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9427,
+      "name": "Cali",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 16
+        },
+        "resource_score": 16,
+        "primary_resource": "oil"
+      },
+      "population_base": 442000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9428,
+      "name": "Province 9428",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 533000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9429,
+      "name": "Province 9429",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 533000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9430,
+      "name": "Province 9430",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 533000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9431,
+      "name": "Province 9431",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 533000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9432,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "rare_earths": 13
+        },
+        "resource_score": 13,
+        "primary_resource": "rare_earths"
+      },
+      "population_base": 533000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9433,
+      "name": "Province 9433",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 374
+        },
+        "resource_score": 374,
+        "primary_resource": "oil"
+      },
+      "population_base": 546000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9434,
+      "name": "Province 9434",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 374
+        },
+        "resource_score": 374,
+        "primary_resource": "oil"
+      },
+      "population_base": 546000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9435,
+      "name": "Province 9435",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 374
+        },
+        "resource_score": 374,
+        "primary_resource": "oil"
+      },
+      "population_base": 546000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9436,
+      "name": "Province 9436",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 374
+        },
+        "resource_score": 374,
+        "primary_resource": "oil"
+      },
+      "population_base": 546000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9437,
+      "name": "New Settlement",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 374
+        },
+        "resource_score": 374,
+        "primary_resource": "oil"
+      },
+      "population_base": 546000,
+      "special_features": [],
+      "special_levels": {}
+    }
+  ]
+}

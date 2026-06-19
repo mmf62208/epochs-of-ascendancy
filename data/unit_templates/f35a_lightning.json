@@ -4,7 +4,7 @@
   "design_family": "us_air_twenty_tens",
   "base_type": "Air",
   "size_category": "Medium",
-  "visual_archetype": "fighter",
+  "visual_archetype": "jet_fighter",
   "crew_required": 1,
   "base_training_level": 40,
   "max_experience_level": 100,

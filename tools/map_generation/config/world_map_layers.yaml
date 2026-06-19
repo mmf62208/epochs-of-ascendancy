@@ -1,0 +1,106 @@
+# Real-world map layer generation — aligns with MapRenderer GRAND_THEATER_CANONICAL_BOUNDS (5000×2000).
+# Style: stylized grand-strategy readability (HOI4/EU4), not photorealistic clutter.
+# See docs/REAL_WORLD_MAP_LAYERS.md
+
+default_region: europe_grand_theater
+
+regions:
+  europe_grand_theater:
+    description: "Phase 1 Europe + naval theater (UK, Scand, Russia north, NAfrica/ME south)"
+    # Geographic bounds (WGS84). Aspect ~2.5 matches game canvas 5000×2000.
+    lon_min: -25.0
+    lon_max: 45.0
+    lat_min: 28.0
+    lat_max: 72.0
+    width: 5000
+    height: 2000
+    # Godot world-space alignment (MapRenderer.GRAND_THEATER_CANONICAL_BOUNDS)
+    game_bounds: {x: 0, y: 0, w: 5000, h: 2000}
+
+  world_full:
+    description: "Full Earth (future 1200–1500 province world)"
+    lon_min: -180.0
+    lon_max: 180.0
+    lat_min: -56.0
+    lat_max: 83.0
+    width: 8192
+    height: 4096
+    game_bounds: {x: 0, y: 0, w: 8192, h: 4096}
+
+data_sources:
+  elevation:
+    name: "NASA SRTM-derived Terrarium tiles (Mapzen/AWS open elevation tiles)"
+    url_pattern: "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
+    attribution: "Terrain tiles © Mapzen/Amazon; SRTM © NASA"
+  satellite:
+    name: "NASA VIIRS Blue Marble Shaded Relief + Bathymetry (GIBS WMTS)"
+    url_pattern: "https://map1.vis.earthdata.nasa.gov/wmts-webmerc/VIIRS_Blue_Marble_Shaded_Relief_Bathymetry/default/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg"
+    attribution: "NASA Earth Observatory / VIIRS Blue Marble"
+  rivers:
+    name: "Natural Earth 1:10m rivers & lake centerlines"
+    geojson_url: "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_rivers_lake_centerlines.geojson"
+    attribution: "Natural Earth © naturalearthdata.com"
+  land_mask:
+    name: "Natural Earth 1:10m land"
+    geojson_url: "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_land.geojson"
+    attribution: "Natural Earth © naturalearthdata.com"
+  lakes:
+    name: "Natural Earth 1:10m lakes (polygons for Great Lakes, Caspian, etc.)"
+    geojson_url: "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_lakes.geojson"
+    attribution: "Natural Earth © naturalearthdata.com"
+
+styling:
+  base:
+    desaturate: 0.55  # higher to reduce baked relief in satellite so our accurate DEM hillshade stands out as the mountains
+    parchment_tint: [235, 225, 205]
+    ocean_tint: [72, 108, 142]
+    land_brightness: 1.05
+  rivers:
+    color: [42, 98, 148, 220]
+    width_px: 2
+    major_width_px: 4
+    scale_rank_max: 6
+  elevation:
+    hillshade_strength: 1.1
+    mountain_threshold_m: 400  # lowered to capture highlands in Scotland, Iceland, Spain etc at z=5 resolution
+    hill_threshold_m: 50
+    mountain_tint: [115, 108, 98, 240]
+    hill_tint: [155, 148, 135, 210]  # stronger + lower thresh for visible higher elevations in more areas
+    # Directional hillshade for world-class relief (NW sun classic cartography)
+    hillshade_azimuth_deg: 315
+    hillshade_altitude_deg: 48
+    z_factor: 2.8
+  coast:
+    coast_color: [50, 78, 105, 95]  # subtle definition line for coasts, fjords, islands (helps readability)
+
+# Runtime LOD/zoom for layers (synced to MapRenderer/TerrainLayerStack for V/S fade at close zoom)
+lod:
+  veg_fade_start: 0.4   # below this scale (close zoom), fade vegetation layer for clean default
+  veg_fade_end: 1.4
+  snow_ref_fade_start: 0.6  # snow ref (S) fades later; main snow is dynamic weather
+  snow_ref_fade_end: 1.8
+  default_veg_alpha: 0.9
+  default_snow_ref_alpha: 0.85
+  vegetation:
+    # Very faint pastel green wash — subtle biome hint only. Default underlay omits or minimizes it for clean parchment + rivers + hills aesthetic.
+    # Toggle with V in-game for the faint layer (recommended: keep off for default "world class clean" look, or use at high zoom).
+    forest_color: [105, 138, 100, 55]  # slightly more visible for toggled V (still subtle)
+    jungle_color: [70, 105, 65, 55]
+    swamp_color: [95, 115, 85, 45]
+    forest_lat_min: 35
+    forest_lat_max: 65
+    jungle_lat_max: 35
+    swamp_elevation_max_m: 80
+    forest_z_min: 20  # lower to catch more northern UK/Scand lowlands/foothills for veg tint when toggled
+    # Note: Scotland/Iceland get some forest tint per lat 50-60 + z rules; low in samples due to varied terrain in box.
+
+output:
+  assets_dir: "assets/maps/layers"
+  data_dir: "data/map"
+  composite_name: "europe_grand_theater_composite.png"
+  base_name: "europe_base_stylized.png"
+  rivers_name: "europe_layer_rivers.png"
+  elevation_name: "europe_layer_elevation.png"
+  vegetation_name: "europe_layer_vegetation.png"
+  metadata_name: "layer_metadata.json"
+  rivers_json_name: "rivers.json"

@@ -4,7 +4,7 @@
   "design_family": "iraqi_naval_2026",
   "base_type": "Naval",
   "size_category": "Light",
-  "visual_archetype": "destroyer",
+  "visual_archetype": "patrol_boat",
   "crew_required": 25,
   "base_training_level": 30,
   "max_experience_level": 100,

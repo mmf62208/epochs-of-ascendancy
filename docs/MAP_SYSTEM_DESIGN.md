@@ -9,7 +9,7 @@
 
 ## Executive summary
 
-The project **already has the right HOI4-style foundation**: JSON-layered province data, polygon geometry in map pixel space, adjacency with straits, scenario overrides, and gameplay getters on `Province.gd`. The upgrade path is **not a rewrite**—it is **scaling data authoring, rendering performance, and map-native UX** while keeping `ScenarioLoader` + Manager autoloads as the integration hub.
+The project **already has the right HOI4-style foundation**: JSON-layered province data, polygon geometry in map pixel space, adjacency with straits, scenario overrides, and gameplay getters on `Province.gd`. **World-class default achieved**: ALWAYS whole-world stitched (grand underlay base, Europe 471 polys + river children NW overlay aligned, coarse rects clickable for Africa etc always in world view, elev/chunks mtns non-Eur). Scrollable with clamp + center_europe_inside_world. Polish defaults in MapRenderer/TestRunner for grand+coarse+chunks graphical startup. Phase1 children + pick post-prune fix no 840 mix. Early world forces. The upgrade path is **not a rewrite**—it is **scaling data authoring, rendering performance, and map-native UX** while keeping `ScenarioLoader` + Manager autoloads as the integration hub. 
 
 **Recommended posture:** Stabilize gameplay on the current ~90-province map, then invest in **Phase M1–M2 (data + rendering)** in parallel with deeper Combat/Supply, before attempting a full-world 3,000-province import.
 
@@ -557,3 +557,9 @@ tools/
 ---
 
 *This document should be updated when phase exit criteria are met or when province count targets change.*
+
+## Future: Ascendancy tree geo impacts on combat (stub per 2026-06 task)
+- Tree nodes (via geo queries in MapManager e.g. river_border, high_elev, chokepoint, continent coarse) can grant combat modifiers (e.g. river_def +0.05 if "Rhine Focus" chosen; mountain assault penalty reduce on Alps node).
+- Tie via BattleManager/Resolver context: pass ascendancy_geo_bonus from GameData/NMM computed from active initiatives + current theater geo (e.g. Europe vs Africa coarse). Lightly wired in AI target scoring + resolver power (guard has_method).
+- AI target choice (supply/infra/low org/weather) now + ascendancy geo score (e.g. target low-org but high ascend geo value prov for will boost) in main-loop BM.simulate + harness.
+- Stubs remain for full MapManager.get_geo_ascendancy_mod + GameData; partial impl in combat resolver/AI for 50+ polish. See CURRENT_STATE combat + Resolver/BM edits + TECHNOLOGY_SYSTEM_DESIGN.

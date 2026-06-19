@@ -83,7 +83,8 @@ func _setup_ui() -> void:
 func _on_retire_pressed() -> void:
 	LeaderManager.resolve_retirement(leader_id, true, false)
 	retirement_completed.emit(leader_id, "honors")
-	queue_free()
+	hide()
+	call_deferred("queue_free")
 
 
 func _on_stay_pressed() -> void:
@@ -94,7 +95,8 @@ func _on_stay_pressed() -> void:
 	else:
 		print("%s has decided to retire anyway." % leader.name)
 		retirement_completed.emit(leader_id, "retired_anyway")
-	queue_free()
+	hide()
+	call_deferred("queue_free")
 
 
 static func open_for_leader(target_leader_id: String) -> RetirementOfferPopup:

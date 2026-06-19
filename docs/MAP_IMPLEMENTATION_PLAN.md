@@ -139,6 +139,7 @@ var effective_width := p.get_combat_width_modifier() * (1.0 + MapManager.get_nat
 Build on the existing `docs/MAP_SYSTEM_DESIGN.md` M0–M5 skeleton. This plan **starts from the current post-Phase-1 state** and prioritizes **playable integration wins** before pure visuals.
 
 ### Phase 0.5 — Immediate Stabilization (1 week, parallel with other work)
+**Update (post recent work):** Map now has strong playtest surface for systems (relocation/settlement, policies, Golden): multi-province real effects, Province settlement_level, inspector/hover exposure of bonuses, MapRenderer tint + refresh, F10 one-click demographic test tools. This makes the ~phase1 territories a viable board for testing demographic engineering + combat/supply/victory interactions at playable level. Continue with M1 data scale + sea while using the new debug/inspector paths.
 **Goal:** Make the excellent recent ProvinceEffects + Supply/Combat wiring visible and robust on the current 100-province map.
 
 - Introduce **MapManager** autoload (skeleton + signals: `province_hovered`, `province_selected`, `province_effects_changed`).

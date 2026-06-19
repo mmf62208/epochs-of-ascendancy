@@ -30,8 +30,8 @@
     "Cargo": "falcon9_stage_package"
   },
   "unlock_tech": [
-    "commercial_space",
-    "reusable_rockets"
+    "expanse_rocket",
+    "satellite_network"
   ],
   "can_mount_drones": false,
   "is_vehicle": true,

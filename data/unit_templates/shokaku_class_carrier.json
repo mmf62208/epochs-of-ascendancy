@@ -1,10 +1,10 @@
 {
   "id": "shokaku_class_carrier",
-  "name": "Shōkaku-class",
+  "name": "Sh\u014dkaku-class",
   "design_family": "japanese_naval_ww2",
   "base_type": "Naval",
   "size_category": "Heavy",
-  "visual_archetype": "carrier",
+  "visual_archetype": "destroyer",
   "crew_required": 2000,
   "base_training_level": 36,
   "max_experience_level": 100,

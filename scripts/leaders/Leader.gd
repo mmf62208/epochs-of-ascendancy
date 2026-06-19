@@ -47,6 +47,8 @@ var trait_levels: Dictionary = {}  # trait_id -> level
 @export var training_path_level: int = 0
 @export var previous_training_path_id: String = ""
 
+@export var portrait_path: String = ""  # res:// path to portrait texture for UI (leader detail, assignment, etc.)
+
 
 func add_experience(amount: int, source: String = "", count_as_battle: bool = false) -> void:
 	if amount <= 0:

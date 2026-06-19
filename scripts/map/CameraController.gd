@@ -6,7 +6,7 @@ extends Node2D
 @export var target: Node2D
 @export var zoom_speed: float = 0.12
 @export var min_zoom: float = 0.15
-@export var max_zoom: float = 12.0  # Increased for higher zoom on the high-res larger grand theater map (8K+), to allow closer view of areas, terrain, counters, lines, weather overlays without losing detail.
+@export var max_zoom: float = MapCanvasConfig.MAX_CAMERA_ZOOM
 @export var enable_zoom: bool = true
 @export var enable_pan: bool = true
 @export var enable_wasd: bool = true
@@ -15,6 +15,9 @@ extends Node2D
 @export var edge_pan_margin: float = 36.0
 @export var edge_pan_speed: float = 720.0
 
+@export var enable_wrap: bool = true
+
+var _wrap_bounds: Rect2 = Rect2()
 var _target_zoom := 1.0
 var _is_panning := false
 
@@ -86,6 +89,17 @@ func _apply_wasd(delta: float) -> void:
 		move.y += 1.0
 	if move.length_squared() > 0.0001:
 		target.position += move.normalized() * wasd_speed * nav_delta
+		_apply_wrap()
+
+
+func _apply_wrap() -> void:
+	if not enable_wrap or _wrap_bounds.size.x <= 0.0:
+		return
+	target.position = MapCanvasConfig.wrap_position(target.position, _wrap_bounds)
+
+
+func set_wrap_bounds(bounds: Rect2) -> void:
+	_wrap_bounds = bounds
 
 
 func _apply_edge_pan(delta: float) -> void:
@@ -107,6 +121,7 @@ func _apply_edge_pan(delta: float) -> void:
 	if dir.length_squared() < 0.0001:
 		return
 	target.position += dir.normalized() * edge_pan_speed * nav_delta
+	_apply_wrap()
 
 
 func _input(event: InputEvent) -> void:
@@ -120,6 +135,7 @@ func _input(event: InputEvent) -> void:
 
 	if _is_panning and event is InputEventMouseMotion:
 		target.position += (event as InputEventMouseMotion).relative
+		_apply_wrap()
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -150,3 +166,16 @@ func _adjust_origin_for_uniform_zoom(old_s: float, new_s: float) -> void:
 	var mp := target.get_global_mouse_position()
 	var local_mouse := target.get_global_transform().affine_inverse() * mp
 	target.position += Vector2(local_mouse.x * (old_s - new_s), local_mouse.y * (old_s - new_s))
+
+## Center (and optionally zoom) the map view on a world position. Used for auto-centering after map tool changes
+## (settlement, infra invest, combat outcomes, etc.) so the player immediately sees the visual effect on the raster + polys.
+func center_on_position(world_pos: Vector2, zoom_level: float = -1.0, instant: bool = true) -> void:
+	if target == null:
+		return
+	target.position = world_pos
+	if zoom_level > 0.0:
+		var clamped := clampf(zoom_level, min_zoom, max_zoom)
+		_target_zoom = clamped
+		if instant:
+			target.scale = Vector2.ONE * clamped
+		# non-instant: _process lerp will handle toward _target_zoom

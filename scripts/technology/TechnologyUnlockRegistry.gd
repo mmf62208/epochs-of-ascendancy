@@ -47,7 +47,10 @@ func apply_unlock(
 			_apply_production_category_unlock(state, unlock, tech_id)
 		"rule_flag":
 			_append_unique(state, "rule_flags", str(unlock.get("flag", "")))
-		"building", "division_template", "equipment_module":
+		"building", "equipment_module":
+			_store_deferred_unlock(state, unlock_type, unlock)
+		"division_template":
+			_apply_division_template_unlock(state, unlock)
 			_store_deferred_unlock(state, unlock_type, unlock)
 		_:
 			push_warning(
@@ -75,6 +78,17 @@ func _apply_unit_design_unlock(state: Dictionary, unlock: Dictionary) -> void:
 		ids.append(str(unlock.get("template_id", "")))
 	for template_id in ids:
 		_append_unique(state, "unlocked_unit_designs", template_id)
+
+
+func _apply_division_template_unlock(state: Dictionary, unlock: Dictionary) -> void:
+	var ids: Array = []
+	if unlock.has("template_ids"):
+		for raw in unlock.get("template_ids", []) as Array:
+			ids.append(str(raw))
+	elif unlock.has("template_id"):
+		ids.append(str(unlock.get("template_id", "")))
+	for template_id in ids:
+		_append_unique(state, "unlocked_division_templates", template_id)
 
 
 func _apply_production_category_unlock(state: Dictionary, unlock: Dictionary, tech_id: String) -> void:

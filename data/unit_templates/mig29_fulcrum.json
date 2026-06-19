@@ -4,7 +4,7 @@
   "design_family": "soviet_air_eighties",
   "base_type": "Air",
   "size_category": "Medium",
-  "visual_archetype": "fighter",
+  "visual_archetype": "jet_fighter",
   "crew_required": 1,
   "base_training_level": 34,
   "max_experience_level": 100,

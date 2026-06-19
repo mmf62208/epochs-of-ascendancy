@@ -1,0 +1,6661 @@
+{
+  "name": "Phase 1 Europe Test (Full 350-450+ Territories)",
+  "start_date": "1936-01-01",
+  "description": "Test scenario using the procedurally expanded ~460-province full Europe map (350-450+ target, Phase 1 gen) (v3 closest-child wiring). Ownership inherited from original parents where possible. For map generation pipeline validation only.",
+  "use_province_data_dir": "provinces_phase1_test",
+  "provinces": [
+    {
+      "id": 9000,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 350000,
+      "natural_resources": {
+        "oil": 32
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 73 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9001,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 393750,
+      "natural_resources": {
+        "oil": 37
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 73 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9002,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 437500,
+      "natural_resources": {
+        "oil": 42
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 73 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9003,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 481250,
+      "natural_resources": {
+        "oil": 48
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 73 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9004,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 525000,
+      "natural_resources": {
+        "oil": 53
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 73 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9005,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 568750,
+      "natural_resources": {
+        "oil": 58
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 73 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9006,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 130000,
+      "natural_resources": {
+        "oil": 6
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 97 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9007,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 146250,
+      "natural_resources": {
+        "oil": 7
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 97 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9008,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 162500,
+      "natural_resources": {
+        "oil": 8
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 97 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9009,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 178750,
+      "natural_resources": {
+        "oil": 9
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 97 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9010,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 195000,
+      "natural_resources": {
+        "oil": 10
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 97 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9011,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 211250,
+      "natural_resources": {
+        "oil": 11
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 97 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9012,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 380000,
+      "natural_resources": {
+        "semiconductors": 4
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 82 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9013,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 427500,
+      "natural_resources": {
+        "semiconductors": 5
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 82 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9014,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 475000,
+      "natural_resources": {
+        "semiconductors": 6
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 82 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9015,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 522500,
+      "natural_resources": {
+        "semiconductors": 6
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 82 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9016,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 570000,
+      "natural_resources": {
+        "semiconductors": 7
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 82 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9017,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 617500,
+      "natural_resources": {
+        "semiconductors": 8
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 82 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9018,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 300000,
+      "natural_resources": {
+        "coal": 2
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 58 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9019,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 337500,
+      "natural_resources": {
+        "coal": 2
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 58 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9020,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 375000,
+      "natural_resources": {
+        "coal": 2
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 58 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9021,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 412500,
+      "natural_resources": {
+        "coal": 3
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 58 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9022,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 450000,
+      "natural_resources": {
+        "coal": 3
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 58 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9023,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 487500,
+      "natural_resources": {
+        "coal": 3
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 58 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9024,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 120000,
+      "natural_resources": {
+        "nickel": 2
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 94 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9025,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 135000,
+      "natural_resources": {
+        "nickel": 2
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 94 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9026,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 150000,
+      "natural_resources": {
+        "nickel": 3
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 94 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9027,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 165000,
+      "natural_resources": {
+        "nickel": 3
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 94 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9028,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 180000,
+      "natural_resources": {
+        "nickel": 4
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 94 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9029,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 195000,
+      "natural_resources": {
+        "nickel": 4
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 94 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9030,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 223333,
+      "natural_resources": {
+        "rare_earths": 1
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 35 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9031,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 251250,
+      "natural_resources": {
+        "rare_earths": 1
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 35 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9032,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 279166,
+      "natural_resources": {
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 35 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9033,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 307083,
+      "natural_resources": {
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 35 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9034,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 335000,
+      "natural_resources": {
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 35 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9035,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 362916,
+      "natural_resources": {
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 35 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9036,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 116666,
+      "natural_resources": {
+        "oil": 28
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 93 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9037,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 131250,
+      "natural_resources": {
+        "oil": 32
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 93 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9038,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 145833,
+      "natural_resources": {
+        "oil": 37
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 93 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9039,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 160416,
+      "natural_resources": {
+        "oil": 42
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 93 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9040,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 175000,
+      "natural_resources": {
+        "oil": 46
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 93 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9041,
+      "owner_tag": "VEN",
+      "controller_tag": "VEN",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 189583,
+      "natural_resources": {
+        "oil": 51
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 93 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9042,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 263333,
+      "natural_resources": {
+        "oil": 18
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 47 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9043,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 296250,
+      "natural_resources": {
+        "oil": 20
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 47 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9044,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 329166,
+      "natural_resources": {
+        "oil": 24
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 47 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9045,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 362083,
+      "natural_resources": {
+        "oil": 27
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 47 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9046,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 395000,
+      "natural_resources": {
+        "oil": 30
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 47 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9047,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 427916,
+      "natural_resources": {
+        "oil": 33
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 47 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9048,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 326666,
+      "natural_resources": {
+        "oil": 12
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 66 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9049,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 367500,
+      "natural_resources": {
+        "oil": 14
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 66 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9050,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 408333,
+      "natural_resources": {
+        "oil": 16
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 66 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9051,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 449166,
+      "natural_resources": {
+        "oil": 18
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 66 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9052,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 490000,
+      "natural_resources": {
+        "oil": 20
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 66 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9053,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 530833,
+      "natural_resources": {
+        "oil": 22
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 66 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9054,
+      "owner_tag": "SAF",
+      "controller_tag": "SAF",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 396666,
+      "natural_resources": {
+        "coal": 6,
+        "iron": 4
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 87 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9055,
+      "owner_tag": "SAF",
+      "controller_tag": "SAF",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 446250,
+      "natural_resources": {
+        "coal": 7,
+        "iron": 4
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 87 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9056,
+      "owner_tag": "SAF",
+      "controller_tag": "SAF",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 495833,
+      "natural_resources": {
+        "coal": 8,
+        "iron": 5
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 87 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9057,
+      "owner_tag": "SAF",
+      "controller_tag": "SAF",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 545416,
+      "natural_resources": {
+        "coal": 9,
+        "iron": 6
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 87 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9058,
+      "owner_tag": "SAF",
+      "controller_tag": "SAF",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 595000,
+      "natural_resources": {
+        "coal": 10,
+        "iron": 6
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 87 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9059,
+      "owner_tag": "SAF",
+      "controller_tag": "SAF",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 644583,
+      "natural_resources": {
+        "coal": 11,
+        "iron": 7
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 87 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9060,
+      "owner_tag": "PER",
+      "controller_tag": "PER",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 343333,
+      "natural_resources": {
+        "copper": 8
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 71 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9061,
+      "owner_tag": "PER",
+      "controller_tag": "PER",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 386250,
+      "natural_resources": {
+        "copper": 9
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 71 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9062,
+      "owner_tag": "PER",
+      "controller_tag": "PER",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 429166,
+      "natural_resources": {
+        "copper": 10
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 71 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9063,
+      "owner_tag": "PER",
+      "controller_tag": "PER",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 472083,
+      "natural_resources": {
+        "copper": 12
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 71 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9064,
+      "owner_tag": "PER",
+      "controller_tag": "PER",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 515000,
+      "natural_resources": {
+        "copper": 13
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 71 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9065,
+      "owner_tag": "PER",
+      "controller_tag": "PER",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 557916,
+      "natural_resources": {
+        "copper": 14
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 71 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9066,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 276666,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 51 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9067,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 311250,
+      "natural_resources": {
+        "oil": 5
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 51 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9068,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 345833,
+      "natural_resources": {
+        "oil": 6
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 51 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9069,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 380416,
+      "natural_resources": {
+        "oil": 6
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 51 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9070,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 415000,
+      "natural_resources": {
+        "oil": 7
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 51 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9071,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 449583,
+      "natural_resources": {
+        "oil": 8
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 51 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9072,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 323333,
+      "natural_resources": {
+        "iron": 3,
+        "rare_earths": 1
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 65 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9073,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 363750,
+      "natural_resources": {
+        "iron": 4,
+        "rare_earths": 1
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 65 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9074,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 404166,
+      "natural_resources": {
+        "iron": 4,
+        "rare_earths": 1
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 65 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9075,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 444583,
+      "natural_resources": {
+        "iron": 5,
+        "rare_earths": 1
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 65 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9076,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 485000,
+      "natural_resources": {
+        "iron": 5,
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 65 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9077,
+      "owner_tag": "NOR",
+      "controller_tag": "NOR",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 525416,
+      "natural_resources": {
+        "iron": 6,
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 65 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9078,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 363333,
+      "natural_resources": {
+        "oil": 3
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 77 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9079,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 408750,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 77 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9080,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 454166,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 77 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9081,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 499583,
+      "natural_resources": {
+        "oil": 5
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 77 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9082,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 545000,
+      "natural_resources": {
+        "oil": 5
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 77 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9083,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 590416,
+      "natural_resources": {
+        "oil": 6
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 77 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9084,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 306666,
+      "natural_resources": {
+        "copper": 2
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 60 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9085,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 345000,
+      "natural_resources": {
+        "copper": 2
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 60 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9086,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 383333,
+      "natural_resources": {
+        "copper": 3
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 60 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9087,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 421666,
+      "natural_resources": {
+        "copper": 3
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 60 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9088,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 460000,
+      "natural_resources": {
+        "copper": 4
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 60 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9089,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 498333,
+      "natural_resources": {
+        "copper": 4
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 60 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9090,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 366666,
+      "natural_resources": {
+        "coal": 2
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 78 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9091,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 412500,
+      "natural_resources": {
+        "coal": 2
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 78 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9092,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 458333,
+      "natural_resources": {
+        "coal": 3
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 78 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9093,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 504166,
+      "natural_resources": {
+        "coal": 3
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 78 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9094,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 550000,
+      "natural_resources": {
+        "coal": 4
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 78 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9095,
+      "owner_tag": "NZL",
+      "controller_tag": "NZL",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 595833,
+      "natural_resources": {
+        "coal": 4
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 78 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9096,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 373333,
+      "natural_resources": {
+        "copper": 3
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 80 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9097,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 420000,
+      "natural_resources": {
+        "copper": 3
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 80 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9098,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 466666,
+      "natural_resources": {
+        "copper": 4
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 80 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9099,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 513333,
+      "natural_resources": {
+        "copper": 4
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 80 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9100,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 560000,
+      "natural_resources": {
+        "copper": 5
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 80 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9101,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 606666,
+      "natural_resources": {
+        "copper": 5
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 80 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9102,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 126666,
+      "natural_resources": {
+        "tourism": 2
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 96 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9103,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 142500,
+      "natural_resources": {
+        "tourism": 2
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 96 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9104,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 158333,
+      "natural_resources": {
+        "tourism": 2
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 96 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9105,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 174166,
+      "natural_resources": {
+        "tourism": 3
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 96 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9106,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 190000,
+      "natural_resources": {
+        "tourism": 3
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 96 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9107,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 205833,
+      "natural_resources": {
+        "tourism": 3
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 96 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9108,
+      "owner_tag": "ISL",
+      "controller_tag": "ISL",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 133333,
+      "natural_resources": {
+        "geothermal": 3
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 98 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9109,
+      "owner_tag": "ISL",
+      "controller_tag": "ISL",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 150000,
+      "natural_resources": {
+        "geothermal": 3
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 98 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9110,
+      "owner_tag": "ISL",
+      "controller_tag": "ISL",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 166666,
+      "natural_resources": {
+        "geothermal": 4
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 98 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9111,
+      "owner_tag": "ISL",
+      "controller_tag": "ISL",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 183333,
+      "natural_resources": {
+        "geothermal": 4
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 98 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9112,
+      "owner_tag": "ISL",
+      "controller_tag": "ISL",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 200000,
+      "natural_resources": {
+        "geothermal": 5
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 98 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9113,
+      "owner_tag": "ISL",
+      "controller_tag": "ISL",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 216666,
+      "natural_resources": {
+        "geothermal": 5
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 98 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9114,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 353333,
+      "natural_resources": {
+        "nickel": 1
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 74 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9115,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 397500,
+      "natural_resources": {
+        "nickel": 1
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 74 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9116,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 441666,
+      "natural_resources": {
+        "nickel": 2
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 74 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9117,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 485833,
+      "natural_resources": {
+        "nickel": 2
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 74 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9118,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 530000,
+      "natural_resources": {
+        "nickel": 2
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 74 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9119,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 574166,
+      "natural_resources": {
+        "nickel": 2
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 74 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9120,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 123333,
+      "natural_resources": {
+        "oil": 1
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 95 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9121,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 138750,
+      "natural_resources": {
+        "oil": 1
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 95 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9122,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 154166,
+      "natural_resources": {
+        "oil": 2
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 95 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9123,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 169583,
+      "natural_resources": {
+        "oil": 2
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 95 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9124,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 185000,
+      "natural_resources": {
+        "oil": 2
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 95 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9125,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 200416,
+      "natural_resources": {
+        "oil": 2
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 95 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9126,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 356666,
+      "natural_resources": {},
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 75 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9127,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 401250,
+      "natural_resources": {},
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 75 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9128,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 445833,
+      "natural_resources": {},
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 75 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9129,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 490416,
+      "natural_resources": {},
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 75 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9130,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 535000,
+      "natural_resources": {},
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 75 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9131,
+      "owner_tag": "PAN",
+      "controller_tag": "PAN",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 579583,
+      "natural_resources": {},
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 75 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9132,
+      "owner_tag": "CHN",
+      "controller_tag": "CHN",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 143333,
+      "natural_resources": {
+        "semiconductors": 14,
+        "rare_earths": 4
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 11 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9133,
+      "owner_tag": "CHN",
+      "controller_tag": "CHN",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 161250,
+      "natural_resources": {
+        "semiconductors": 16,
+        "rare_earths": 5
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 11 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9134,
+      "owner_tag": "CHN",
+      "controller_tag": "CHN",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 179166,
+      "natural_resources": {
+        "semiconductors": 18,
+        "rare_earths": 6
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 11 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9135,
+      "owner_tag": "CHN",
+      "controller_tag": "CHN",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 197083,
+      "natural_resources": {
+        "semiconductors": 21,
+        "rare_earths": 6
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 11 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9136,
+      "owner_tag": "CHN",
+      "controller_tag": "CHN",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 215000,
+      "natural_resources": {
+        "semiconductors": 23,
+        "rare_earths": 7
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 11 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9137,
+      "owner_tag": "CHN",
+      "controller_tag": "CHN",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 232916,
+      "natural_resources": {
+        "semiconductors": 25,
+        "rare_earths": 8
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 11 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9138,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 146666,
+      "natural_resources": {
+        "coal": 6
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 12 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9139,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 165000,
+      "natural_resources": {
+        "coal": 7
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 12 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9140,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 183333,
+      "natural_resources": {
+        "coal": 8
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 12 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9141,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 201666,
+      "natural_resources": {
+        "coal": 9
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 12 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9142,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 220000,
+      "natural_resources": {
+        "coal": 10
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 12 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9143,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 238333,
+      "natural_resources": {
+        "coal": 11
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 12 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9144,
+      "owner_tag": "SAU",
+      "controller_tag": "SAU",
+      "development_level": 3,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 153333,
+      "natural_resources": {
+        "oil": 245
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 14 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9145,
+      "owner_tag": "SAU",
+      "controller_tag": "SAU",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 172500,
+      "natural_resources": {
+        "oil": 285
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 14 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9146,
+      "owner_tag": "SAU",
+      "controller_tag": "SAU",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 191666,
+      "natural_resources": {
+        "oil": 326
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 14 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9147,
+      "owner_tag": "SAU",
+      "controller_tag": "SAU",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 210833,
+      "natural_resources": {
+        "oil": 367
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 14 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9148,
+      "owner_tag": "SAU",
+      "controller_tag": "SAU",
+      "development_level": 3,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 230000,
+      "natural_resources": {
+        "oil": 408
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 14 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9149,
+      "owner_tag": "SAU",
+      "controller_tag": "SAU",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 249166,
+      "natural_resources": {
+        "oil": 449
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 14 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9150,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 160000,
+      "natural_resources": {
+        "iron": 35,
+        "coal": 12
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 16 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9151,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 180000,
+      "natural_resources": {
+        "iron": 40,
+        "coal": 14
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 16 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9152,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 3,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 200000,
+      "natural_resources": {
+        "iron": 46,
+        "coal": 16
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 16 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9153,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 220000,
+      "natural_resources": {
+        "iron": 52,
+        "coal": 18
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 16 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9154,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 240000,
+      "natural_resources": {
+        "iron": 58,
+        "coal": 20
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 16 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9155,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 260000,
+      "natural_resources": {
+        "iron": 64,
+        "coal": 22
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 16 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9156,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 163333,
+      "natural_resources": {
+        "steel": 4
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 17 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9157,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 183750,
+      "natural_resources": {
+        "steel": 5
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 17 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9158,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 204166,
+      "natural_resources": {
+        "steel": 6
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 17 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9159,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 224583,
+      "natural_resources": {
+        "steel": 6
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 17 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9160,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 245000,
+      "natural_resources": {
+        "steel": 7
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 17 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9161,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 265416,
+      "natural_resources": {
+        "steel": 8
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 17 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9162,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 173333,
+      "natural_resources": {
+        "iron": 5
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 20 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9163,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 195000,
+      "natural_resources": {
+        "iron": 6
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 20 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9164,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 216666,
+      "natural_resources": {
+        "iron": 7
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 20 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9165,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 238333,
+      "natural_resources": {
+        "iron": 8
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 20 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9166,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 260000,
+      "natural_resources": {
+        "iron": 9
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 20 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9167,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 281666,
+      "natural_resources": {
+        "iron": 10
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 20 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9168,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 183333,
+      "natural_resources": {
+        "oil": 3
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 23 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9169,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 206250,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 23 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9170,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 229166,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 23 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9171,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 252083,
+      "natural_resources": {
+        "oil": 5
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 23 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9172,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 275000,
+      "natural_resources": {
+        "oil": 5
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 23 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9173,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 297916,
+      "natural_resources": {
+        "oil": 6
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 23 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9174,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 186666,
+      "natural_resources": {
+        "oil": 42
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 24 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9175,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 210000,
+      "natural_resources": {
+        "oil": 49
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 24 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9176,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 233333,
+      "natural_resources": {
+        "oil": 56
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 24 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9177,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 256666,
+      "natural_resources": {
+        "oil": 63
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 24 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9178,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 280000,
+      "natural_resources": {
+        "oil": 70
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 24 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9179,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 303333,
+      "natural_resources": {
+        "oil": 77
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 24 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9180,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 193333,
+      "natural_resources": {
+        "coal": 6,
+        "iron": 4
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 26 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9181,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 217500,
+      "natural_resources": {
+        "coal": 7,
+        "iron": 4
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 26 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9182,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 241666,
+      "natural_resources": {
+        "coal": 8,
+        "iron": 5
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 26 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9183,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 265833,
+      "natural_resources": {
+        "coal": 9,
+        "iron": 6
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 26 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9184,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 290000,
+      "natural_resources": {
+        "coal": 10,
+        "iron": 6
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 26 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9185,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 314166,
+      "natural_resources": {
+        "coal": 11,
+        "iron": 7
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 26 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9186,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 200000,
+      "natural_resources": {
+        "oil": 2
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 28 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9187,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 225000,
+      "natural_resources": {
+        "oil": 2
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 28 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9188,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 250000,
+      "natural_resources": {
+        "oil": 3
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 28 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9189,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 275000,
+      "natural_resources": {
+        "oil": 3
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 28 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9190,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 300000,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 28 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9191,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 325000,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 28 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9192,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 203333,
+      "natural_resources": {
+        "iron": 7
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 29 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9193,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 228750,
+      "natural_resources": {
+        "iron": 8
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 29 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9194,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 254166,
+      "natural_resources": {
+        "iron": 9
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 29 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9195,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 279583,
+      "natural_resources": {
+        "iron": 10
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 29 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9196,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 305000,
+      "natural_resources": {
+        "iron": 11
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 29 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9197,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 330416,
+      "natural_resources": {
+        "iron": 12
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 29 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9198,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 213333,
+      "natural_resources": {
+        "coal": 6
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 32 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9199,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 240000,
+      "natural_resources": {
+        "coal": 7
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 32 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9200,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 266666,
+      "natural_resources": {
+        "coal": 8
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 32 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9201,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 293333,
+      "natural_resources": {
+        "coal": 9
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 32 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9202,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 320000,
+      "natural_resources": {
+        "coal": 10
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 32 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9203,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 346666,
+      "natural_resources": {
+        "coal": 11
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 32 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9204,
+      "owner_tag": "MEX",
+      "controller_tag": "MEX",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 226666,
+      "natural_resources": {
+        "oil": 9
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 36 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9205,
+      "owner_tag": "MEX",
+      "controller_tag": "MEX",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 255000,
+      "natural_resources": {
+        "oil": 11
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 36 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9206,
+      "owner_tag": "MEX",
+      "controller_tag": "MEX",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 283333,
+      "natural_resources": {
+        "oil": 12
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 36 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9207,
+      "owner_tag": "MEX",
+      "controller_tag": "MEX",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 311666,
+      "natural_resources": {
+        "oil": 14
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 36 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9208,
+      "owner_tag": "MEX",
+      "controller_tag": "MEX",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 340000,
+      "natural_resources": {
+        "oil": 15
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 36 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9209,
+      "owner_tag": "MEX",
+      "controller_tag": "MEX",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 368333,
+      "natural_resources": {
+        "oil": 17
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 36 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9210,
+      "owner_tag": "CAN",
+      "controller_tag": "CAN",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 233333,
+      "natural_resources": {
+        "steel": 4
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 38 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9211,
+      "owner_tag": "CAN",
+      "controller_tag": "CAN",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 262500,
+      "natural_resources": {
+        "steel": 5
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 38 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9212,
+      "owner_tag": "CAN",
+      "controller_tag": "CAN",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 291666,
+      "natural_resources": {
+        "steel": 6
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 38 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9213,
+      "owner_tag": "CAN",
+      "controller_tag": "CAN",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 320833,
+      "natural_resources": {
+        "steel": 6
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 38 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9214,
+      "owner_tag": "CAN",
+      "controller_tag": "CAN",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 350000,
+      "natural_resources": {
+        "steel": 7
+      },
+      "special_features": [],
+      "victory_points": 8,
+      "notes": "Generated child of province 38 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9215,
+      "owner_tag": "CAN",
+      "controller_tag": "CAN",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 379166,
+      "natural_resources": {
+        "steel": 8
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 38 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9216,
+      "owner_tag": "FIN",
+      "controller_tag": "FIN",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 240000,
+      "natural_resources": {
+        "coal": 1
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 40 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9217,
+      "owner_tag": "FIN",
+      "controller_tag": "FIN",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 270000,
+      "natural_resources": {
+        "coal": 1
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 40 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9218,
+      "owner_tag": "FIN",
+      "controller_tag": "FIN",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 300000,
+      "natural_resources": {
+        "coal": 1
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 40 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9219,
+      "owner_tag": "FIN",
+      "controller_tag": "FIN",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 330000,
+      "natural_resources": {
+        "coal": 1
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 40 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9220,
+      "owner_tag": "FIN",
+      "controller_tag": "FIN",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 360000,
+      "natural_resources": {
+        "coal": 2
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 40 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9221,
+      "owner_tag": "FIN",
+      "controller_tag": "FIN",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 390000,
+      "natural_resources": {
+        "coal": 2
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 40 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9222,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 243333,
+      "natural_resources": {
+        "steel": 6
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 41 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9223,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 273750,
+      "natural_resources": {
+        "steel": 7
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 41 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9224,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 304166,
+      "natural_resources": {
+        "steel": 8
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 41 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9225,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 334583,
+      "natural_resources": {
+        "steel": 9
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 41 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9226,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 365000,
+      "natural_resources": {
+        "steel": 10
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 41 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9227,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 395416,
+      "natural_resources": {
+        "steel": 11
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 41 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9228,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 246666,
+      "natural_resources": {
+        "steel": 5
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 42 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9229,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 277500,
+      "natural_resources": {
+        "steel": 6
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 42 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9230,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 308333,
+      "natural_resources": {
+        "steel": 7
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 42 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9231,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 339166,
+      "natural_resources": {
+        "steel": 8
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 42 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9232,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 370000,
+      "natural_resources": {
+        "steel": 9
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 42 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9233,
+      "owner_tag": "USA",
+      "controller_tag": "USA",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 400833,
+      "natural_resources": {
+        "steel": 10
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 42 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9234,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 260000,
+      "natural_resources": {
+        "semiconductors": 5
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 46 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9235,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 292500,
+      "natural_resources": {
+        "semiconductors": 6
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 46 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9236,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 325000,
+      "natural_resources": {
+        "semiconductors": 7
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 46 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9237,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 357500,
+      "natural_resources": {
+        "semiconductors": 8
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 46 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9238,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 390000,
+      "natural_resources": {
+        "semiconductors": 9
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 46 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9239,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 422500,
+      "natural_resources": {
+        "semiconductors": 10
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 46 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9240,
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 270000,
+      "natural_resources": {
+        "steel": 5
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 49 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9241,
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 303750,
+      "natural_resources": {
+        "steel": 6
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 49 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9242,
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 337500,
+      "natural_resources": {
+        "steel": 7
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 49 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9243,
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 371250,
+      "natural_resources": {
+        "steel": 8
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 49 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9244,
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 405000,
+      "natural_resources": {
+        "steel": 9
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 49 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9245,
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 438750,
+      "natural_resources": {
+        "steel": 10
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 49 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9246,
+      "owner_tag": "THA",
+      "controller_tag": "THA",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 310000,
+      "natural_resources": {
+        "rice": 3
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 61 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9247,
+      "owner_tag": "THA",
+      "controller_tag": "THA",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 348750,
+      "natural_resources": {
+        "rice": 3
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 61 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9248,
+      "owner_tag": "THA",
+      "controller_tag": "THA",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 387500,
+      "natural_resources": {
+        "rice": 4
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 61 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9249,
+      "owner_tag": "THA",
+      "controller_tag": "THA",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 426250,
+      "natural_resources": {
+        "rice": 4
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 61 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9250,
+      "owner_tag": "THA",
+      "controller_tag": "THA",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 465000,
+      "natural_resources": {
+        "rice": 5
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 61 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9251,
+      "owner_tag": "THA",
+      "controller_tag": "THA",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 503750,
+      "natural_resources": {
+        "rice": 5
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 61 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9252,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 340000,
+      "natural_resources": {
+        "steel": 4,
+        "iron": 6
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 70 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9253,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 382500,
+      "natural_resources": {
+        "steel": 5,
+        "iron": 7
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 70 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9254,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 425000,
+      "natural_resources": {
+        "steel": 6,
+        "iron": 8
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 70 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9255,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 467500,
+      "natural_resources": {
+        "steel": 6,
+        "iron": 9
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 70 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9256,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 510000,
+      "natural_resources": {
+        "steel": 7,
+        "iron": 10
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 70 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9257,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 552500,
+      "natural_resources": {
+        "steel": 8,
+        "iron": 11
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 70 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9258,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 386666,
+      "natural_resources": {
+        "oil": 38
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 84 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9259,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 435000,
+      "natural_resources": {
+        "oil": 44
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 84 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9260,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 483333,
+      "natural_resources": {
+        "oil": 50
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 84 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9261,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 531666,
+      "natural_resources": {
+        "oil": 57
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 84 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9262,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 580000,
+      "natural_resources": {
+        "oil": 63
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 84 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9263,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 628333,
+      "natural_resources": {
+        "oil": 69
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 84 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9264,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 133333,
+      "natural_resources": {
+        "coal": 12,
+        "iron": 8
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 8 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9265,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 150000,
+      "natural_resources": {
+        "coal": 14,
+        "iron": 9
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 8 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9266,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 166666,
+      "natural_resources": {
+        "coal": 16,
+        "iron": 10
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 8 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9267,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 183333,
+      "natural_resources": {
+        "coal": 18,
+        "iron": 12
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 8 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9268,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 200000,
+      "natural_resources": {
+        "coal": 20,
+        "iron": 13
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 8 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9269,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 216666,
+      "natural_resources": {
+        "coal": 22,
+        "iron": 14
+      },
+      "special_features": [],
+      "victory_points": 7,
+      "notes": "Generated child of province 8 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9270,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 123333,
+      "natural_resources": {
+        "coal": 11
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 5 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9271,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 138750,
+      "natural_resources": {
+        "coal": 12
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 5 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9272,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 154166,
+      "natural_resources": {
+        "coal": 14
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 5 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9273,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 169583,
+      "natural_resources": {
+        "coal": 16
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 5 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9274,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 185000,
+      "natural_resources": {
+        "coal": 18
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 5 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9275,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 200416,
+      "natural_resources": {
+        "coal": 20
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 5 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9276,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 120000,
+      "natural_resources": {
+        "iron": 5,
+        "steel": 3
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 4 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9277,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 135000,
+      "natural_resources": {
+        "iron": 6,
+        "steel": 3
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 4 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9278,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 150000,
+      "natural_resources": {
+        "iron": 7,
+        "steel": 4
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 4 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9279,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 165000,
+      "natural_resources": {
+        "iron": 8,
+        "steel": 4
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 4 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9280,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 180000,
+      "natural_resources": {
+        "iron": 9,
+        "steel": 5
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 4 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9281,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 195000,
+      "natural_resources": {
+        "iron": 10,
+        "steel": 5
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 4 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9282,
+      "owner_tag": "GER",
+      "controller_tag": "GER",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 113333,
+      "natural_resources": {
+        "coal": 8,
+        "iron": 3,
+        "steel": 2
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 2 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9283,
+      "owner_tag": "GER",
+      "controller_tag": "GER",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 127500,
+      "natural_resources": {
+        "coal": 9,
+        "iron": 4,
+        "steel": 2
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 2 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9284,
+      "owner_tag": "GER",
+      "controller_tag": "GER",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 141666,
+      "natural_resources": {
+        "coal": 10,
+        "iron": 4,
+        "steel": 3
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 2 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9285,
+      "owner_tag": "GER",
+      "controller_tag": "GER",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 155833,
+      "natural_resources": {
+        "coal": 12,
+        "iron": 5,
+        "steel": 3
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 2 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9286,
+      "owner_tag": "GER",
+      "controller_tag": "GER",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 170000,
+      "natural_resources": {
+        "coal": 13,
+        "iron": 5,
+        "steel": 4
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 2 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9287,
+      "owner_tag": "GER",
+      "controller_tag": "GER",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 184166,
+      "natural_resources": {
+        "coal": 14,
+        "iron": 6,
+        "steel": 4
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 2 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9288,
+      "owner_tag": "CHN",
+      "controller_tag": "CHN",
+      "development_level": 3,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 304000,
+      "natural_resources": {
+        "rare_earths": 7
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 44 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9289,
+      "owner_tag": "CHN",
+      "controller_tag": "CHN",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 342000,
+      "natural_resources": {
+        "rare_earths": 9
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 44 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9290,
+      "owner_tag": "CHN",
+      "controller_tag": "CHN",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 380000,
+      "natural_resources": {
+        "rare_earths": 10
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 44 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9291,
+      "owner_tag": "CHN",
+      "controller_tag": "CHN",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 418000,
+      "natural_resources": {
+        "rare_earths": 11
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 44 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9292,
+      "owner_tag": "CHN",
+      "controller_tag": "CHN",
+      "development_level": 3,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 456000,
+      "natural_resources": {
+        "rare_earths": 13
+      },
+      "special_features": [],
+      "victory_points": 9,
+      "notes": "Generated child of province 44 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9293,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 308000,
+      "natural_resources": {
+        "coal": 4,
+        "semiconductors": 4
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 45 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9294,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 346500,
+      "natural_resources": {
+        "coal": 5,
+        "semiconductors": 4
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 45 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9295,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 385000,
+      "natural_resources": {
+        "coal": 6,
+        "semiconductors": 5
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 45 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9296,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 423500,
+      "natural_resources": {
+        "coal": 7,
+        "semiconductors": 6
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 45 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9297,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 462000,
+      "natural_resources": {
+        "coal": 8,
+        "semiconductors": 7
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 45 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9298,
+      "owner_tag": "NLD",
+      "controller_tag": "NLD",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 320000,
+      "natural_resources": {
+        "steel": 4
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 48 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9299,
+      "owner_tag": "NLD",
+      "controller_tag": "NLD",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 360000,
+      "natural_resources": {
+        "steel": 5
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 48 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9300,
+      "owner_tag": "NLD",
+      "controller_tag": "NLD",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 400000,
+      "natural_resources": {
+        "steel": 6
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 48 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9301,
+      "owner_tag": "NLD",
+      "controller_tag": "NLD",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 440000,
+      "natural_resources": {
+        "steel": 7
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 48 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9302,
+      "owner_tag": "NLD",
+      "controller_tag": "NLD",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 480000,
+      "natural_resources": {
+        "steel": 8
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 48 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9303,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 328000,
+      "natural_resources": {
+        "coal": 6
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 50 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9304,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 369000,
+      "natural_resources": {
+        "coal": 7
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 50 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9305,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 410000,
+      "natural_resources": {
+        "coal": 8
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 50 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9306,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 451000,
+      "natural_resources": {
+        "coal": 9
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 50 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9307,
+      "owner_tag": "SOV",
+      "controller_tag": "SOV",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 492000,
+      "natural_resources": {
+        "coal": 10
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 50 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9308,
+      "owner_tag": "TUR",
+      "controller_tag": "TUR",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 336000,
+      "natural_resources": {
+        "coal": 3
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 52 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9309,
+      "owner_tag": "TUR",
+      "controller_tag": "TUR",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 378000,
+      "natural_resources": {
+        "coal": 3
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 52 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9310,
+      "owner_tag": "TUR",
+      "controller_tag": "TUR",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 420000,
+      "natural_resources": {
+        "coal": 4
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 52 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9311,
+      "owner_tag": "TUR",
+      "controller_tag": "TUR",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 462000,
+      "natural_resources": {
+        "coal": 5
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 52 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9312,
+      "owner_tag": "TUR",
+      "controller_tag": "TUR",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 504000,
+      "natural_resources": {
+        "coal": 5
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 52 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9313,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 340000,
+      "natural_resources": {
+        "oil": 45
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 53 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9314,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 382500,
+      "natural_resources": {
+        "oil": 53
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 53 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9315,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 425000,
+      "natural_resources": {
+        "oil": 60
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 53 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9316,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 467500,
+      "natural_resources": {
+        "oil": 68
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 53 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9317,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 510000,
+      "natural_resources": {
+        "oil": 76
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 53 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9318,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 344000,
+      "natural_resources": {
+        "oil": 62
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 54 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9319,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 387000,
+      "natural_resources": {
+        "oil": 72
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 54 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9320,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 3,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 430000,
+      "natural_resources": {
+        "oil": 83
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 54 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9321,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 473000,
+      "natural_resources": {
+        "oil": 93
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 54 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9322,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 516000,
+      "natural_resources": {
+        "oil": 104
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 54 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9323,
+      "owner_tag": "NLD",
+      "controller_tag": "NLD",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 348000,
+      "natural_resources": {
+        "oil": 10
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 55 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9324,
+      "owner_tag": "NLD",
+      "controller_tag": "NLD",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 391500,
+      "natural_resources": {
+        "oil": 11
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 55 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9325,
+      "owner_tag": "NLD",
+      "controller_tag": "NLD",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 435000,
+      "natural_resources": {
+        "oil": 13
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 55 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9326,
+      "owner_tag": "NLD",
+      "controller_tag": "NLD",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 478500,
+      "natural_resources": {
+        "oil": 15
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 55 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9327,
+      "owner_tag": "NLD",
+      "controller_tag": "NLD",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 522000,
+      "natural_resources": {
+        "oil": 17
+      },
+      "special_features": [],
+      "victory_points": 10,
+      "notes": "Generated child of province 55 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9328,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 352000,
+      "natural_resources": {
+        "iron": 26
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 56 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9329,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 396000,
+      "natural_resources": {
+        "iron": 30
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 56 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9330,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 440000,
+      "natural_resources": {
+        "iron": 35
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 56 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9331,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 484000,
+      "natural_resources": {
+        "iron": 39
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 56 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9332,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 528000,
+      "natural_resources": {
+        "iron": 44
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 56 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9333,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 356000,
+      "natural_resources": {
+        "coal": 10
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 57 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9334,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 400500,
+      "natural_resources": {
+        "coal": 11
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 57 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9335,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 445000,
+      "natural_resources": {
+        "coal": 13
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 57 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9336,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 489500,
+      "natural_resources": {
+        "coal": 15
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 57 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9337,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 534000,
+      "natural_resources": {
+        "coal": 17
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 57 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9338,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 364000,
+      "natural_resources": {
+        "coal": 6,
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 59 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9339,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 409500,
+      "natural_resources": {
+        "coal": 7,
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 59 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9340,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 455000,
+      "natural_resources": {
+        "coal": 8,
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 59 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9341,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 500500,
+      "natural_resources": {
+        "coal": 9,
+        "rare_earths": 3
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 59 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9342,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 546000,
+      "natural_resources": {
+        "coal": 11,
+        "rare_earths": 3
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 59 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9343,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 376000,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 62 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9344,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 423000,
+      "natural_resources": {
+        "oil": 5
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 62 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9345,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 470000,
+      "natural_resources": {
+        "oil": 6
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 62 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9346,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 517000,
+      "natural_resources": {
+        "oil": 7
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 62 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9347,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 564000,
+      "natural_resources": {
+        "oil": 8
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 62 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9348,
+      "owner_tag": "SWE",
+      "controller_tag": "SWE",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 380000,
+      "natural_resources": {
+        "iron": 2
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 63 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9349,
+      "owner_tag": "SWE",
+      "controller_tag": "SWE",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 427500,
+      "natural_resources": {
+        "iron": 2
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 63 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9350,
+      "owner_tag": "SWE",
+      "controller_tag": "SWE",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 475000,
+      "natural_resources": {
+        "iron": 3
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 63 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9351,
+      "owner_tag": "SWE",
+      "controller_tag": "SWE",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 522500,
+      "natural_resources": {
+        "iron": 3
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 63 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9352,
+      "owner_tag": "SWE",
+      "controller_tag": "SWE",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 570000,
+      "natural_resources": {
+        "iron": 4
+      },
+      "special_features": [],
+      "victory_points": 11,
+      "notes": "Generated child of province 63 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9353,
+      "owner_tag": "DNK",
+      "controller_tag": "DNK",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 384000,
+      "natural_resources": {
+        "steel": 1
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 64 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9354,
+      "owner_tag": "DNK",
+      "controller_tag": "DNK",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 432000,
+      "natural_resources": {
+        "steel": 2
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 64 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9355,
+      "owner_tag": "DNK",
+      "controller_tag": "DNK",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 480000,
+      "natural_resources": {
+        "steel": 2
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 64 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9356,
+      "owner_tag": "DNK",
+      "controller_tag": "DNK",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 528000,
+      "natural_resources": {
+        "steel": 2
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 64 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9357,
+      "owner_tag": "DNK",
+      "controller_tag": "DNK",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 576000,
+      "natural_resources": {
+        "steel": 3
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 64 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9358,
+      "owner_tag": "SAF",
+      "controller_tag": "SAF",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 396000,
+      "natural_resources": {
+        "coal": 9,
+        "iron": 6,
+        "rare_earths": 1
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 67 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9359,
+      "owner_tag": "SAF",
+      "controller_tag": "SAF",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 445500,
+      "natural_resources": {
+        "coal": 11,
+        "iron": 7,
+        "rare_earths": 1
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 67 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9360,
+      "owner_tag": "SAF",
+      "controller_tag": "SAF",
+      "development_level": 3,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 495000,
+      "natural_resources": {
+        "coal": 12,
+        "iron": 8,
+        "rare_earths": 1
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 67 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9361,
+      "owner_tag": "SAF",
+      "controller_tag": "SAF",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 544500,
+      "natural_resources": {
+        "coal": 14,
+        "iron": 9,
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 67 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9362,
+      "owner_tag": "SAF",
+      "controller_tag": "SAF",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 594000,
+      "natural_resources": {
+        "coal": 16,
+        "iron": 11,
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 67 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9363,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 400000,
+      "natural_resources": {
+        "oil": 3
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 68 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9364,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 450000,
+      "natural_resources": {
+        "oil": 3
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 68 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9365,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 500000,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 68 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9366,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 550000,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 68 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9367,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 600000,
+      "natural_resources": {
+        "oil": 5
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 68 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9368,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 404000,
+      "natural_resources": {
+        "iron": 8
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 69 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9369,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 454500,
+      "natural_resources": {
+        "iron": 9
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 69 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9370,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 505000,
+      "natural_resources": {
+        "iron": 11
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 69 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9371,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 555500,
+      "natural_resources": {
+        "iron": 12
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 69 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9372,
+      "owner_tag": "BRA",
+      "controller_tag": "BRA",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 606000,
+      "natural_resources": {
+        "iron": 14
+      },
+      "special_features": [],
+      "victory_points": 12,
+      "notes": "Generated child of province 69 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9373,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 416000,
+      "natural_resources": {
+        "oil": 5
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 72 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9374,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 468000,
+      "natural_resources": {
+        "oil": 6
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 72 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9375,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 520000,
+      "natural_resources": {
+        "oil": 7
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 72 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9376,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 3,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 572000,
+      "natural_resources": {
+        "oil": 8
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 72 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9377,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 624000,
+      "natural_resources": {
+        "oil": 9
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 72 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9378,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 432000,
+      "natural_resources": {
+        "iron": 21,
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 76 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9379,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 486000,
+      "natural_resources": {
+        "iron": 25,
+        "rare_earths": 3
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 76 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9380,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 540000,
+      "natural_resources": {
+        "iron": 28,
+        "rare_earths": 3
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 76 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9381,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 594000,
+      "natural_resources": {
+        "iron": 32,
+        "rare_earths": 3
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 76 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9382,
+      "owner_tag": "AUS",
+      "controller_tag": "AUS",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 648000,
+      "natural_resources": {
+        "iron": 36,
+        "rare_earths": 4
+      },
+      "special_features": [],
+      "victory_points": 13,
+      "notes": "Generated child of province 76 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9383,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 444000,
+      "natural_resources": {
+        "semiconductors": 4,
+        "oil": 3
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 79 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9384,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 499500,
+      "natural_resources": {
+        "semiconductors": 4,
+        "oil": 3
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 79 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9385,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 555000,
+      "natural_resources": {
+        "semiconductors": 5,
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 79 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9386,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 610500,
+      "natural_resources": {
+        "semiconductors": 6,
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 79 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9387,
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 666000,
+      "natural_resources": {
+        "semiconductors": 7,
+        "oil": 5
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 79 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9388,
+      "owner_tag": "THA",
+      "controller_tag": "THA",
+      "development_level": 3,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 452000,
+      "natural_resources": {
+        "rare_earths": 1
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 81 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9389,
+      "owner_tag": "THA",
+      "controller_tag": "THA",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 508500,
+      "natural_resources": {
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 81 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9390,
+      "owner_tag": "THA",
+      "controller_tag": "THA",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 565000,
+      "natural_resources": {
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 81 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9391,
+      "owner_tag": "THA",
+      "controller_tag": "THA",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 621500,
+      "natural_resources": {
+        "rare_earths": 2
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 81 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9392,
+      "owner_tag": "THA",
+      "controller_tag": "THA",
+      "development_level": 3,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 678000,
+      "natural_resources": {
+        "rare_earths": 3
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 81 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9393,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 460000,
+      "natural_resources": {
+        "steel": 6
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 83 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9394,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 517500,
+      "natural_resources": {
+        "steel": 7
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 83 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9395,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 575000,
+      "natural_resources": {
+        "steel": 8
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 83 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9396,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 632500,
+      "natural_resources": {
+        "steel": 9
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 83 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9397,
+      "owner_tag": "IRN",
+      "controller_tag": "IRN",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 690000,
+      "natural_resources": {
+        "steel": 10
+      },
+      "special_features": [],
+      "victory_points": 14,
+      "notes": "Generated child of province 83 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9398,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 472000,
+      "natural_resources": {
+        "oil": 10
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 86 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9399,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 531000,
+      "natural_resources": {
+        "oil": 11
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 86 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9400,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 590000,
+      "natural_resources": {
+        "oil": 13
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 86 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9401,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 649000,
+      "natural_resources": {
+        "oil": 15
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 86 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9402,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 708000,
+      "natural_resources": {
+        "oil": 17
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 86 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9403,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 480000,
+      "natural_resources": {
+        "steel": 4
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 88 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9404,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 540000,
+      "natural_resources": {
+        "steel": 4
+      },
+      "special_features": [],
+      "victory_points": 17,
+      "notes": "Generated child of province 88 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9405,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 600000,
+      "natural_resources": {
+        "steel": 5
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 88 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9406,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 6,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 660000,
+      "natural_resources": {
+        "steel": 6
+      },
+      "special_features": [],
+      "victory_points": 17,
+      "notes": "Generated child of province 88 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9407,
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "development_level": 7,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 720000,
+      "natural_resources": {
+        "steel": 7
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 88 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9408,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 484000,
+      "natural_resources": {
+        "steel": 4
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 89 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9409,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 544500,
+      "natural_resources": {
+        "steel": 4
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 89 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9410,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 605000,
+      "natural_resources": {
+        "steel": 5
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 89 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9411,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 665500,
+      "natural_resources": {
+        "steel": 6
+      },
+      "special_features": [],
+      "victory_points": 16,
+      "notes": "Generated child of province 89 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9412,
+      "owner_tag": "ARG",
+      "controller_tag": "ARG",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 726000,
+      "natural_resources": {
+        "steel": 7
+      },
+      "special_features": [],
+      "victory_points": 15,
+      "notes": "Generated child of province 89 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9413,
+      "owner_tag": "CHL",
+      "controller_tag": "CHL",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 128000,
+      "natural_resources": {
+        "copper": 10
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 90 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9414,
+      "owner_tag": "CHL",
+      "controller_tag": "CHL",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 144000,
+      "natural_resources": {
+        "copper": 12
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 90 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9415,
+      "owner_tag": "CHL",
+      "controller_tag": "CHL",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 160000,
+      "natural_resources": {
+        "copper": 14
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 90 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9416,
+      "owner_tag": "CHL",
+      "controller_tag": "CHL",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 176000,
+      "natural_resources": {
+        "copper": 16
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 90 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9417,
+      "owner_tag": "CHL",
+      "controller_tag": "CHL",
+      "development_level": 5,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 192000,
+      "natural_resources": {
+        "copper": 18
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 90 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9418,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 132000,
+      "natural_resources": {
+        "steel": 4,
+        "semiconductors": 3
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 91 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9419,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 148500,
+      "natural_resources": {
+        "steel": 5,
+        "semiconductors": 3
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 91 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9420,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 3,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 165000,
+      "natural_resources": {
+        "steel": 6,
+        "semiconductors": 4
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 91 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9421,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 181500,
+      "natural_resources": {
+        "steel": 7,
+        "semiconductors": 4
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 91 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9422,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 198000,
+      "natural_resources": {
+        "steel": 8,
+        "semiconductors": 5
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 91 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9423,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 7,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 136000,
+      "natural_resources": {
+        "oil": 3
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 92 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9424,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 153000,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 92 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9425,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 170000,
+      "natural_resources": {
+        "oil": 4
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 92 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9426,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 3,
+      "population": 187000,
+      "natural_resources": {
+        "oil": 5
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 92 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9427,
+      "owner_tag": "COL",
+      "controller_tag": "COL",
+      "development_level": 7,
+      "infrastructure": 3,
+      "factories": 4,
+      "population": 204000,
+      "natural_resources": {
+        "oil": 6
+      },
+      "special_features": [],
+      "victory_points": 4,
+      "notes": "Generated child of province 92 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9428,
+      "owner_tag": "DNK",
+      "controller_tag": "DNK",
+      "development_level": 3,
+      "infrastructure": 4,
+      "factories": 1,
+      "population": 164000,
+      "natural_resources": {
+        "rare_earths": 3
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 99 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9429,
+      "owner_tag": "DNK",
+      "controller_tag": "DNK",
+      "development_level": 4,
+      "infrastructure": 2,
+      "factories": 2,
+      "population": 184500,
+      "natural_resources": {
+        "rare_earths": 3
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 99 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9430,
+      "owner_tag": "DNK",
+      "controller_tag": "DNK",
+      "development_level": 5,
+      "infrastructure": 3,
+      "factories": 3,
+      "population": 205000,
+      "natural_resources": {
+        "rare_earths": 4
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 99 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9431,
+      "owner_tag": "DNK",
+      "controller_tag": "DNK",
+      "development_level": 6,
+      "infrastructure": 4,
+      "factories": 4,
+      "population": 225500,
+      "natural_resources": {
+        "rare_earths": 4
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 99 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9432,
+      "owner_tag": "DNK",
+      "controller_tag": "DNK",
+      "development_level": 3,
+      "infrastructure": 2,
+      "factories": 1,
+      "population": 246000,
+      "natural_resources": {
+        "rare_earths": 5
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 99 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9433,
+      "owner_tag": "CAN",
+      "controller_tag": "CAN",
+      "development_level": 4,
+      "infrastructure": 3,
+      "factories": 2,
+      "population": 168000,
+      "natural_resources": {
+        "oil": 81
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 100 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9434,
+      "owner_tag": "CAN",
+      "controller_tag": "CAN",
+      "development_level": 5,
+      "infrastructure": 4,
+      "factories": 3,
+      "population": 189000,
+      "natural_resources": {
+        "oil": 95
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 100 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9435,
+      "owner_tag": "CAN",
+      "controller_tag": "CAN",
+      "development_level": 6,
+      "infrastructure": 2,
+      "factories": 4,
+      "population": 210000,
+      "natural_resources": {
+        "oil": 108
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 100 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9436,
+      "owner_tag": "CAN",
+      "controller_tag": "CAN",
+      "development_level": 3,
+      "infrastructure": 3,
+      "factories": 1,
+      "population": 231000,
+      "natural_resources": {
+        "oil": 122
+      },
+      "special_features": [],
+      "victory_points": 6,
+      "notes": "Generated child of province 100 (owner inherited, attributes distributed)"
+    },
+    {
+      "id": 9437,
+      "owner_tag": "CAN",
+      "controller_tag": "CAN",
+      "development_level": 4,
+      "infrastructure": 4,
+      "factories": 2,
+      "population": 252000,
+      "natural_resources": {
+        "oil": 136
+      },
+      "special_features": [],
+      "victory_points": 5,
+      "notes": "Generated child of province 100 (owner inherited, attributes distributed)"
+    }
+  ]
+}

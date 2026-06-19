@@ -24,6 +24,16 @@ cd tools/map_generation
 python scripts/generate_europe_phase1.py
 ```
 
+### Real-world map layers (NASA elevation + Blue Marble + Natural Earth rivers)
+
+```bash
+cd tools/map_generation
+pip install -r requirements.txt   # Pillow only
+python3 scripts/build_real_world_map_layers.py
+```
+
+See `docs/REAL_WORLD_MAP_LAYERS.md` for layer toggles (U/H/V) and outputs.
+
 This currently produces a planning JSON with subdivision suggestions and protected straits.
 
 ## Next Development Steps

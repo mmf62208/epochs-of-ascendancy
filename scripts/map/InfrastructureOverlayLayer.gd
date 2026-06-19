@@ -31,7 +31,7 @@ extends Node2D
 ## triggering redraws and visual updates (roads thicken, cities grow, new sites appear with rings).
 var show_roads: bool = true
 var show_rails: bool = true
-var show_cities: bool = true
+var show_cities: bool = false  # Off by default — toggle C or F10; draw fallback was grey-box spam at playtest zoom.
 var show_sites: bool = true  # airfields/ports/shipyards etc. vector elements (runways, docks) on the SitesLayer
 var proposed_children: Array = []
 var proposed_data_loaded: bool = false
@@ -40,6 +40,7 @@ const PROPOSED_SPLIT_PATH := "res://tools/map_generation/output/phase1_europe/pr
 var infrastructure_manager: Node
 var special_site_manager: Node
 var map_manager: Node
+var game_data: Node = null  # for active_riots / pending_research culling (include event pids even if not visible)
 
 # Sub-layers for toggleable/editable infrastructure visuals.
 # These are Node2D children holding Line2D / other nodes for roads/rails/cities.
@@ -51,10 +52,24 @@ var rail_layer: Node2D
 var city_layer: Node2D
 var sites_layer: Node2D  # For airfields, ports, shipyards etc. as toggleable/editable vector elements (runways, docks) in addition to the icon drawing in _draw.
 
+## Era band for sparse 1918 vs default 1936 vs dense 2026+ infra visualization.
+var _last_era_band: int = -1
+var _infra_rebuild_scheduled: bool = false
+var _infra_light_rebuild_scheduled: bool = false
+var _last_infra_rebuild_msec: int = 0
+const INFRA_REBUILD_MIN_INTERVAL_MS := 1200
+## ColorRect city nodes (4500+) freeze pan/zoom; _draw fallback is cheaper for playtest.
+const BUILD_CITY_NODES := false
+const DRAW_CITY_FALLBACK := false  # When BUILD_CITY_NODES off, skip per-province grey rect fallback (was 472×N rects per redraw).
+const MAX_LAYER_PROVINCES := 120
+const MAX_CITY_BUILDINGS_PER_PROVINCE := 4
+
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
     special_site_manager = get_node_or_null("/root/SpecialSiteManager")
     map_manager = get_node_or_null("/root/MapManager")
+    if typeof(GameData) != TYPE_NIL:
+        game_data = GameData
     z_index = 8
 
     add_to_group("infrastructure_overlay")
@@ -65,6 +80,10 @@ func _ready():
     if map_manager and map_manager.has_signal("province_data_changed"):
         if not map_manager.province_data_changed.is_connected(_on_province_data_changed):
             map_manager.province_data_changed.connect(_on_province_data_changed)
+
+    if typeof(TimeManager) != TYPE_NIL:
+        if TimeManager.has_signal("game_year_advanced") and not TimeManager.game_year_advanced.is_connected(_on_game_year_advanced):
+            TimeManager.game_year_advanced.connect(_on_game_year_advanced)
 
     call_deferred("refresh_all")
     call_deferred("_try_load_proposed_splits")
@@ -124,33 +143,177 @@ func _update_sub_layer_visibilities() -> void:
         city_layer.visible = show_cities and z > 0.28
     if sites_layer:
         sites_layer.visible = show_sites and z > 0.32
+    _maybe_rebuild_for_era_change()
+
+
+func _get_map_year() -> int:
+    if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year"):
+        return int(TimeManager.get_current_year())
+    return 1936
+
+
+func _get_era_band(year: int) -> int:
+    if year <= 1924:
+        return 0  # sparse interwar / 1918
+    if year >= 2000:
+        return 2  # modern dense network
+    return 1  # 1925–1999 baseline (1936 theater default)
+
+
+## Thresholds and colors for era-appropriate road/rail/city density (same geometry, different visual era).
+func _get_era_infra_profile() -> Dictionary:
+    var year := _get_map_year()
+    var band := _get_era_band(year)
+    match band:
+        0:
+            return {
+                "label": "sparse_1918",
+                "year": year,
+                "road_infra_min": 5.0,
+                "rail_infra_min": 9.0,
+                "city_dev_min": 5.0,
+                "road_width_explicit": 2.0,
+                "road_width_implicit": 1.0,
+                "road_color_explicit": Color(0.52, 0.46, 0.36, 0.72),
+                "road_color_implicit": Color(0.58, 0.52, 0.42, 0.45),
+                "rail_color": Color(0.28, 0.24, 0.22, 0.75),
+                "rail_width": 1.8,
+                "rail_tie_step": 45.0,
+            }
+        2:
+            return {
+                "label": "dense_2026",
+                "year": year,
+                "road_infra_min": 2.0,
+                "rail_infra_min": 4.0,
+                "city_dev_min": 2.0,
+                "road_width_explicit": 4.0,
+                "road_width_implicit": 2.5,
+                "road_color_explicit": Color(0.32, 0.34, 0.38, 0.92),
+                "road_color_implicit": Color(0.38, 0.40, 0.44, 0.78),
+                "rail_color": Color(0.12, 0.14, 0.18, 0.95),
+                "rail_width": 3.0,
+                "rail_tie_step": 22.0,
+            }
+        _:
+            return {
+                "label": "standard_1936",
+                "year": year,
+                "road_infra_min": 3.0,
+                "rail_infra_min": 6.0,
+                "city_dev_min": 3.0,
+                "road_width_explicit": 3.0,
+                "road_width_implicit": 1.5,
+                "road_color_explicit": Color(0.4, 0.38, 0.35, 0.85),
+                "road_color_implicit": Color(0.42, 0.40, 0.37, 0.6),
+                "rail_color": Color(0.2, 0.2, 0.25, 0.9),
+                "rail_width": 2.5,
+                "rail_tie_step": 30.0,
+            }
+
+
+func _maybe_rebuild_for_era_change() -> void:
+    var band := _get_era_band(_get_map_year())
+    if band == _last_era_band:
+        return
+    _last_era_band = band
+    rebuild_all_infra_layers()
+
+
+func _on_game_year_advanced(_year: int) -> void:
+    _maybe_rebuild_for_era_change()
+
+
+## Public readout for harness / inspector (1918 sparse vs 1936 vs 2026 dense).
+func get_era_infra_profile() -> Dictionary:
+    return _get_era_infra_profile()
 
 # Simple view culling helper: only consider provinces near the current camera for node population.
-# This keeps node count reasonable (important for resource usage on larger maps or during many updates).
+# Enhanced for perf/scale: also force-include "active" provinces (player/major owned, border-ish via adj, high pop/econ if data, + crucially GameData active_riots / pending research ethics pids).
+# Keeps draw/node count low for 50T scale while event visuals (riots) always show when active.
 func _get_visible_provinces() -> Dictionary:
     if map_manager == null:
         return {}
     var cam := get_viewport().get_camera_2d()
-    if cam == null:
-        return map_manager.get_all_provinces()  # fallback full
-    var center := cam.get_screen_center_position()
-    var radius: float = 1200.0 / max(_get_current_zoom(), 0.1)  # larger radius when zoomed out
     var all: Dictionary = map_manager.get_all_provinces()
     var visible := {}
-    for pid in all:
-        var p = all[pid]
-        # Use safe centroid from MapManager (Province Resource has .coordinates, not .center; avoids "Invalid access on Resource (Province)")
-        var pc: Vector2 = map_manager.get_province_centroid(pid) if map_manager else Vector2.ZERO
-        if p and pc.distance_to(center) < radius:
-            visible[pid] = p
-    # also include direct neighbors of visible for connections that cross the edge
-    var adj = map_manager.get_adjacency_system()
-    if adj:
-        for pid in visible.keys():
-            for nb in adj.get_land_neighbors(pid):
-                if all.has(nb) and not visible.has(nb):
-                    visible[nb] = all[nb]
+    if cam == null:
+        # fallback but still apply event culling if possible
+        visible = all.duplicate()
+    else:
+        var center := cam.get_screen_center_position()
+        var radius: float = 1200.0 / max(_get_current_zoom(), 0.1)  # larger radius when zoomed out
+        for pid in all:
+            var p = all[pid]
+            # Use safe centroid from MapManager (Province Resource has .coordinates, not .center; avoids "Invalid access on Resource (Province)")
+            var pc: Vector2 = map_manager.get_province_centroid(pid) if map_manager else Vector2.ZERO
+            if p and pc.distance_to(center) < radius:
+                visible[pid] = p
+        # also include direct neighbors of visible for connections that cross the edge
+        var adj = map_manager.get_adjacency_system()
+        if adj:
+            for pid in visible.keys():
+                for nb in adj.get_land_neighbors(pid):
+                    if all.has(nb) and not visible.has(nb):
+                        visible[nb] = all[nb]
+    # Perf culling enhancement: force active event provinces (riots from GameData, pending research tags' capitals or owned) + majors/player for 50T scale (skip rand light provinces)
+    if game_data and game_data.has_method("get_provinces_with_active_riots"):
+        for pid in game_data.get_provinces_with_active_riots():
+            if all.has(pid) and not visible.has(pid):
+                visible[pid] = all[pid]
+    if game_data and game_data.has_method("get_tags_with_pending_research"):
+        for tag in game_data.get_tags_with_pending_research():
+            if map_manager and map_manager.has_method("get_provinces_by_owner"):
+                for opid in map_manager.call("get_provinces_by_owner", tag):
+                    if all.has(opid) and not visible.has(opid):
+                        visible[opid] = all[opid]
+    # Always include at least player tag if known (assume GER as default major for evidence)
+    var player_tags := ["GER", "FRA", "ENG", "SOV"]
+    for ptag in player_tags:
+        if map_manager and map_manager.has_method("get_provinces_by_owner"):
+            for pp in map_manager.call("get_provinces_by_owner", ptag):
+                if all.has(pp) and not visible.has(pp):
+                    visible[pp] = all[pp]
+                    if visible.size() > 80: break  # cap for headless perf
     return visible
+
+
+## Stable province set for road/rail/city node layers (never depends on camera — pan/zoom must not trigger rebuild storms).
+func _get_provinces_for_layers() -> Dictionary:
+    if map_manager == null:
+        return {}
+    var all: Dictionary = map_manager.get_all_provinces()
+    var out: Dictionary = {}
+    var major_tags: Array[String] = ["GER", "FRA", "ENG", "SOV", "USA", "ITA", "POL", "JAP"]
+    for tag in major_tags:
+        if map_manager.has_method("get_provinces_by_owner"):
+            for pid in map_manager.get_provinces_by_owner(tag):
+                if all.has(pid) and not out.has(pid):
+                    out[pid] = all[pid]
+    if game_data and game_data.has_method("get_provinces_with_active_riots"):
+        for pid in game_data.get_provinces_with_active_riots():
+            if all.has(pid):
+                out[pid] = all[pid]
+    if out.size() < MAX_LAYER_PROVINCES:
+        var ranked: Array[Dictionary] = []
+        for pid in all:
+            var p: Province = all[pid]
+            if p == null or p.is_sea or out.has(pid):
+                continue
+            ranked.append({
+                "pid": pid,
+                "score": p.development_level + p.factories * 2 + int(p.infrastructure),
+            })
+        ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+            return int(a.get("score", 0)) > int(b.get("score", 0))
+        )
+        for entry in ranked:
+            if out.size() >= MAX_LAYER_PROVINCES:
+                break
+            var pick_pid: int = int(entry.get("pid", -1))
+            if all.has(pick_pid):
+                out[pick_pid] = all[pick_pid]
+    return out
 
 ## Rebuild the road layer using explicit built roads from provinces (or fallback to infra level).
 ## Call this after any "build road" decision or project complete.
@@ -169,10 +332,13 @@ func rebuild_road_layer():
     if map_manager == null:
         return
 
-    var provinces = _get_visible_provinces()
+    var provinces = _get_provinces_for_layers()
     var adjacency = map_manager.get_adjacency_system()
     if adjacency == null or provinces.is_empty():
         return
+
+    var era: Dictionary = _get_era_infra_profile()
+    var road_min: float = float(era.get("road_infra_min", 3.0))
 
     var drawn := {}
     for pid in provinces:
@@ -194,13 +360,17 @@ func rebuild_road_layer():
             # Check explicit built_roads or fallback to high infra
             var has_explicit = (nid in p.built_road_neighbors) or (pid in (n.built_road_neighbors if n else []))
             var avg_infra = (p.infrastructure + n.infrastructure) / 2.0
-            if not has_explicit and avg_infra < 3:
+            if not has_explicit and avg_infra < road_min:
                 continue
             var c2 = map_manager.get_province_centroid(nid)
             var line := Line2D.new()
             line.points = [c1, c2]
-            line.width = 3.0 if has_explicit or avg_infra >= 6 else 1.5
-            line.default_color = Color(0.4, 0.38, 0.35, 0.85) if has_explicit else Color(0.42, 0.40, 0.37, 0.6)
+            if has_explicit or avg_infra >= road_min + 3.0:
+                line.width = float(era.get("road_width_explicit", 3.0))
+                line.default_color = era.get("road_color_explicit", Color(0.4, 0.38, 0.35, 0.85))
+            else:
+                line.width = float(era.get("road_width_implicit", 1.5))
+                line.default_color = era.get("road_color_implicit", Color(0.42, 0.40, 0.37, 0.6))
             line.z_index = 1
             line.set_meta("p1", pid)
             line.set_meta("p2", nid)
@@ -222,10 +392,14 @@ func rebuild_rail_layer():
     if map_manager == null:
         return
 
-    var provinces = _get_visible_provinces()
+    var provinces = _get_provinces_for_layers()
     var adjacency = map_manager.get_adjacency_system()
     if adjacency == null or provinces.is_empty():
         return
+
+    var era: Dictionary = _get_era_infra_profile()
+    var rail_min: float = float(era.get("rail_infra_min", 6.0))
+    var tie_step: float = float(era.get("rail_tie_step", 30.0))
 
     var drawn := {}
     for pid in provinces:
@@ -246,13 +420,13 @@ func rebuild_rail_layer():
                 continue
             var has_explicit = (nid in p.built_rail_neighbors) or (pid in (n.built_rail_neighbors if n else []))
             var avg_infra = (p.infrastructure + n.infrastructure) / 2.0
-            if not has_explicit and avg_infra < 6:
+            if not has_explicit and avg_infra < rail_min:
                 continue
             var c2 = map_manager.get_province_centroid(nid)
             var line := Line2D.new()
             line.points = [c1, c2]
-            line.width = 2.5
-            line.default_color = Color(0.2, 0.2, 0.25, 0.9)
+            line.width = float(era.get("rail_width", 2.5))
+            line.default_color = era.get("rail_color", Color(0.2, 0.2, 0.25, 0.9))
             line.z_index = 2
             line.set_meta("p1", pid)
             line.set_meta("p2", nid)
@@ -260,7 +434,7 @@ func rebuild_rail_layer():
             rail_layer.add_child(line)
             # Simple ties for rail look
             var dist = c1.distance_to(c2)
-            var steps = max(2, int(dist / 30))
+            var steps = max(2, int(dist / tie_step))
             for s in range(1, steps):
                 var t = float(s) / steps
                 var mid = c1.lerp(c2, t)
@@ -283,13 +457,15 @@ func rebuild_city_layer():
         city_layer.remove_child(k)
         k.queue_free()
 
-    if not show_cities:
+    if not show_cities or not BUILD_CITY_NODES:
         return
 
     if map_manager == null:
         return
 
-    var provinces = _get_visible_provinces()
+    var provinces = _get_provinces_for_layers()
+    var era: Dictionary = _get_era_infra_profile()
+    var city_dev_min: float = float(era.get("city_dev_min", 3.0))
     for pid in provinces:
         var p: Province = provinces[pid]
         if p == null or p.is_sea:
@@ -297,10 +473,10 @@ func rebuild_city_layer():
         var center = map_manager.get_province_centroid(pid)
         var dev = p.development_level
         var fact = p.factories
-        if dev < 3:
+        if dev < city_dev_min:
             continue
         var pop_factor = clampf(p.population / 500000.0, 0.5, 4.0)
-        var num = min(10, int(2 + dev * 0.8 + fact * 0.3 + pop_factor))
+        var num = mini(MAX_CITY_BUILDINGS_PER_PROVINCE, min(10, int(2 + dev * 0.8 + fact * 0.3 + pop_factor)))
         for i in range(num):
             var angle = (i * 2.3) + (pid % 5) * 0.5
             var dist = 4.0 + (i % 4) * 2.5 + (2.0 if dev > 6 else 0.0)
@@ -343,7 +519,7 @@ func rebuild_sites_layer():
     if map_manager == null:
         return
 
-    var provinces = _get_visible_provinces()
+    var provinces = _get_provinces_for_layers()
     for pid in provinces:
         var p: Province = provinces[pid]
         if p == null or p.is_sea:
@@ -447,11 +623,14 @@ func rebuild_sites_layer():
             sites_layer.add_child(pipe)
 
 func rebuild_all_infra_layers():
+    _last_era_band = _get_era_band(_get_map_year())
     rebuild_road_layer()
     rebuild_rail_layer()
-    rebuild_city_layer()
+    if BUILD_CITY_NODES:
+        rebuild_city_layer()
     rebuild_sites_layer()
-    queue_redraw()  # in case any immediate draw still used
+    queue_redraw()
+    _last_infra_rebuild_msec = Time.get_ticks_msec()
     # Helpful confirmation for tests/demos (visible in headless logs too). Only logs when counts actually change, to show evolution (e.g. sites ramping up after spawns) without spam.
     if OS.is_debug_build() or Engine.is_editor_hint():
         var road_count := road_layer.get_child_count() if road_layer else 0
@@ -464,7 +643,58 @@ func rebuild_all_infra_layers():
             var curr = Vector4i(road_count, rail_count, city_count, site_count)
             if curr != last:
                 set_meta("last_infra_layer_counts", curr)
-                print("InfrastructureOverlayLayer: Dynamic infra layers built (roads:%d rail-ties:%d cities:%d sites:%d). Toggle with R/T/C/Y or F10." % [road_count, rail_count, city_count, site_count])
+                var era_label := str(_get_era_infra_profile().get("label", "standard"))
+                print("InfrastructureOverlayLayer: Dynamic infra layers built (era=%s roads:%d rail-ties:%d cities:%d sites:%d). Toggle with R/T/C/Y or F10." % [era_label, road_count, rail_count, city_count, site_count])
+
+
+func rebuild_roads_rails_sites_only() -> void:
+    rebuild_road_layer()
+    rebuild_rail_layer()
+    rebuild_sites_layer()
+    queue_redraw()
+    _last_infra_rebuild_msec = Time.get_ticks_msec()
+
+
+func _schedule_rebuild_all_infra_layers() -> void:
+    _queue_infra_rebuild(false)
+
+
+func _schedule_rebuild_light_infra_layers() -> void:
+    _queue_infra_rebuild(true)
+
+
+func _queue_infra_rebuild(light_only: bool) -> void:
+    if light_only:
+        if _infra_light_rebuild_scheduled or _infra_rebuild_scheduled:
+            return
+    elif _infra_rebuild_scheduled:
+        return
+    var now := Time.get_ticks_msec()
+    var elapsed := now - _last_infra_rebuild_msec
+    if elapsed >= INFRA_REBUILD_MIN_INTERVAL_MS:
+        if light_only:
+            _deferred_rebuild_light_infra_layers()
+        else:
+            _deferred_rebuild_all_infra_layers()
+        return
+    if light_only:
+        _infra_light_rebuild_scheduled = true
+    else:
+        _infra_rebuild_scheduled = true
+    var wait_sec := maxf(float(INFRA_REBUILD_MIN_INTERVAL_MS - elapsed) / 1000.0, 0.05)
+    var cb := _deferred_rebuild_light_infra_layers if light_only else _deferred_rebuild_all_infra_layers
+    get_tree().create_timer(wait_sec).timeout.connect(cb, CONNECT_ONE_SHOT)
+
+
+func _deferred_rebuild_all_infra_layers() -> void:
+    _infra_rebuild_scheduled = false
+    _infra_light_rebuild_scheduled = false
+    rebuild_all_infra_layers()
+
+
+func _deferred_rebuild_light_infra_layers() -> void:
+    _infra_light_rebuild_scheduled = false
+    rebuild_roads_rails_sites_only()
 
 ## Public API for external editing/inspection of the layers (supports "editable as needed").
 ## E.g. from UI, AI, or debug tools: find a specific road node by pids and modify its width/color/points directly.
@@ -499,10 +729,10 @@ func find_site_nodes(province_id: int) -> Array:
 
 func _on_province_data_changed(_pid: int, what: String):
     if what in ["infrastructure", "development", "special_site", "infrastructure_project", "effects", "all"]:
-        # Rebuild node-based road/rail/city/sites layers when data that affects them changes (projects complete, dev upgrades, explicit builds, special sites like airfields/ports).
-        # This makes the map "come alive": new roads appear as Line2D children, cities densify, runways/docks added to SitesLayer, etc.
-        if what in ["infrastructure", "development", "infrastructure_project", "special_site", "all"]:
-            rebuild_all_infra_layers()
+        if what in ["development", "special_site", "all"]:
+            _schedule_rebuild_all_infra_layers()
+        elif what in ["infrastructure", "infrastructure_project"]:
+            _schedule_rebuild_light_infra_layers()
         else:
             queue_redraw()
 
@@ -644,51 +874,43 @@ func _draw():
         return
 
     var zoom := _get_current_zoom()
+    var draw_provs: Dictionary = _get_provinces_for_layers()
 
-    # NOTE: Roads, rails, and cities are now primarily rendered via dedicated sub-layers
-    # (RoadLayer / RailLayer / CityLayer as Node2D children with Line2D/ColorRect nodes).
-    # This enables:
-    # - Toggling via .visible (set_show_*/toggle_* now affect child visibility)
-    # - Editing: external code (MapManager.build_road_connection etc) mutates province built_* lists,
-    #   then calls rebuild_*_layer which adds/removes/modifies child nodes.
-    # The old draw methods below are kept for fallback/debug/proposed but skipped here to prevent
-    # duplicate geometry when sub-layers are present and visible.
-    # Special sites, infra markers, resources, and proposed splits still use immediate _draw.
-
-    # Sub-layers (roads/rails/cities/sites) draw their Node2D children when .visible.
-    # _draw_* are kept as fallback / for elements that are not (yet) node-ified (icons, resources, proposed splits).
-    # To avoid double visuals for cities when the sub-layer is populated, skip the draw path.
-    if show_cities:
+    # Sub-layer Node2D children handle roads/rails/sites when visible. Cities only via nodes or explicit fallback.
+    if show_cities and DRAW_CITY_FALLBACK:
         if not (city_layer and city_layer.get_child_count() > 0):
-            _draw_cities(zoom)
+            _draw_cities_culled(zoom, draw_provs)
 
-    # Draw simple resource icons (visible at reasonable zoom)
-    _draw_resource_icons(zoom)
+    _draw_resource_icons_culled(zoom, draw_provs)
 
-    # Phase 1 Map Generation debug visualization (debug builds only)
     if show_proposed_splits and OS.is_debug_build():
         _draw_proposed_splits(zoom)
 
-    var provinces = map_manager.get_all_provinces()
-
-    for province_id in provinces:
-        var province: Province = provinces[province_id]
+    for province_id in draw_provs:
+        var province: Province = draw_provs[province_id]
         if province == null:
             continue
 
         var center = map_manager.get_province_centroid(province_id)
 
-        # === Province Infrastructure Level ===
         var infra_level = province.infrastructure
         if infra_level >= 1:
             _draw_infrastructure_marker(center, infra_level)
 
-        # === Special Sites ===
+        if infrastructure_manager and infrastructure_manager.has_method("has_active_project") and infrastructure_manager.has_active_project(province_id):
+            var proj_prog := 0.0
+            if infrastructure_manager.has_method("get_project_progress"):
+                proj_prog = infrastructure_manager.get_project_progress(province_id)
+            var sabotaged := false
+            if infrastructure_manager.has_method("is_project_sabotaged"):
+                sabotaged = infrastructure_manager.is_project_sabotaged(province_id)
+            _draw_active_project_marker(center, proj_prog, sabotaged, infra_level)
+
         for i in range(province.special_sites.size()):
             var site: SpecialSite = province.special_sites[i]
             if site == null:
                 continue
-            var offset = Vector2(0, -28 - (i * 22))  # Stack sites above the province
+            var offset = Vector2(0, -28 - (i * 22))
             _draw_special_site(center + offset, site)
 
 
@@ -698,6 +920,30 @@ func _draw_infrastructure_marker(center: Vector2, level: int):
     
     var font = ThemeDB.fallback_font
     draw_string(font, pos - Vector2(4, -4), str(level), HORIZONTAL_ALIGNMENT_CENTER, -1, 12, Color.WHITE)
+
+
+## Draws pulsing build/construction marker + dashed progress ring for an active provincial investment project.
+## Uses real manager progress (0-1) and sabotage flag for color. Distinct from special_site rings but reuses dashed helper.
+func _draw_active_project_marker(center: Vector2, progress: float, sabotaged: bool, current_infra: int):
+    var base_pos := center + Vector2(0, -infra_icon_size * 1.35)  # stack above infra number marker
+    var col := Color(0.35, 0.85, 0.95, 0.95) if not sabotaged else Color(1.0, 0.55, 0.35, 0.95)
+    var icon := "⚒" if not sabotaged else "⚠"
+    var font := ThemeDB.fallback_font
+
+    # Pulsing background circle (breathing construction feel)
+    var pulse := 0.75 + sin(Time.get_ticks_msec() / 420.0) * 0.18
+    draw_circle(base_pos, 9.0 * pulse, Color(col, 0.12 * pulse))
+
+    # Main icon
+    draw_string(font, base_pos - Vector2(5, 6), icon, HORIZONTAL_ALIGNMENT_CENTER, -1, 15, col)
+
+    # Progress ring (dashed, partial by progress) using existing helper logic
+    var ring_r := 13.5
+    _draw_dashed_circle(base_pos, ring_r, col, 1.8, 10, clampf(progress, 0.0, 1.0))
+
+    # Small % label near
+    var pct := int(round(clampf(progress, 0.0, 1.0) * 100.0))
+    draw_string(font, base_pos + Vector2(10, -4), str(pct) + "%", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(col, 0.9))
 
 
 func _draw_special_site(pos: Vector2, site: SpecialSite):
@@ -783,14 +1029,16 @@ func _draw_dashed_circle(center: Vector2, radius: float, color: Color, width: fl
 # It is skipped in _draw if city_layer has children.
 # Visual "cities" that grow with development_level, population, factories.
 # Makes provinces feel alive with urban development. Toggleable/updated on dev changes.
-func _draw_cities(zoom: float = 1.0):
-    if not map_manager or not show_cities:
+func _draw_cities(zoom: float = 1.0) -> void:
+    _draw_cities_culled(zoom, _get_provinces_for_layers())
+
+
+func _draw_cities_culled(zoom: float, provinces: Dictionary) -> void:
+    if not map_manager or not show_cities or not DRAW_CITY_FALLBACK:
         return
 
     if zoom < 0.5:
         return
-
-    var provinces = map_manager.get_all_provinces()
 
     for province_id in provinces:
         var province: Province = provinces[province_id]
@@ -801,7 +1049,7 @@ func _draw_cities(zoom: float = 1.0):
         var dev = province.development_level
         var pop_factor = clampf(province.population / 500000.0, 0.5, 4.0)
         var fact = province.factories
-        var num_buildings = int(2 + dev * 0.8 + fact * 0.3 + pop_factor)
+        var num_buildings = mini(int(2 + dev * 0.8 + fact * 0.3 + pop_factor), MAX_CITY_BUILDINGS_PER_PROVINCE)
 
         for i in range(num_buildings):
             var angle = (i * 2.3) + (province_id % 5) * 0.5
@@ -821,15 +1069,16 @@ func _draw_cities(zoom: float = 1.0):
 
 # === Simple Resource Icons (map improvement for visibility) ===
 # Draws small indicators for primary resources when zoomed in.
-func _draw_resource_icons(zoom: float = 1.0):
+func _draw_resource_icons(zoom: float = 1.0) -> void:
+    _draw_resource_icons_culled(zoom, _get_provinces_for_layers())
+
+
+func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
     if not map_manager:
         return
 
-    # Only show resource icons when reasonably zoomed in
     if zoom < 0.75:
         return
-
-    var provinces = map_manager.get_all_provinces()
 
     for province_id in provinces:
         var province: Province = provinces[province_id]

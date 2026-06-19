@@ -56,6 +56,8 @@ func _ready() -> void:
 		if not TimeManager.game_day_advanced.is_connected(_on_game_day_advanced):
 			TimeManager.game_day_advanced.connect(_on_game_day_advanced)
 
+	# Agent polish note (high-value remaining): lobby_domestic_law (and future welfare/social) missions use duration_months from JSON (8mo example). Agent unavailable during (enforced by advance_missions). Real assign via AgentAssignmentScreen + Time advance triggers signal -> GameData.resolve. Test without demo button for full trade-off feel. Expand specific missions (e.g. "lobby_welfare_optimization") next if prioritized.
+
 	# Backward-compat during transition
 	if typeof(LeaderManager) != TYPE_NIL:
 		if not LeaderManager.game_year_advanced.is_connected(_on_game_year_advanced):
@@ -71,6 +73,8 @@ func _on_game_year_advanced(year: int) -> void:
 	# Advance missions by 12 months per year for MVP (research/mission cadence is still yearly-batched).
 	# Daily network growth + sabotage is handled separately via game_day_advanced (preferred path).
 	advance_missions(12)
+	# Yearly passive agent national impacts (in addition to daily for cumulative nation effects).
+	apply_agent_national_impacts()
 
 func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
 	# Daily updates for persistent agent networks + real sabotage effects (supply/infra).
@@ -99,8 +103,13 @@ func _load_mission_definitions() -> void:
 func get_agents_for_country(country_tag: String) -> Array[Agent]:
 	var tag := country_tag.strip_edges().to_upper()
 	if not agents.has(tag):
-		return []
-	return agents[tag] as Array[Agent]
+		return [] as Array[Agent]
+	var raw: Array = agents[tag]
+	var result: Array[Agent] = []
+	for item in raw:
+		if item is Agent:
+			result.append(item)
+	return result
 
 
 func get_agent(agent_id: String) -> Agent:
@@ -226,12 +235,19 @@ func _resolve_mission(agent: Agent) -> void:
 	if outcome == "success":
 		detection_chance *= 0.7
 
+	# Mission record affects spotting: high success builds "fame/profile" (more targeted), but good counter/stealth traits + record allow defending/staying active/hidden.
+	# "big part of the agent game is them being spotted and targeted and their ability to defend themselves or stay active and learn and grow."
+	var record_mod := agent.get_detection_risk_modifier()
+	detection_chance += record_mod  # Can be negative (defensive growth reduces risk)
+
 	# Encryption from radio_iii (national tech) reduces detection risk for this country's operations
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var mods := NationalModifierManager.get_combat_modifiers(agent.country_tag)
+		var mods: Dictionary = NationalModifierManager.get_combat_modifiers(agent.country_tag)
 		var enc := float(mods.get("encryption", 0.0))
 		if enc > 0.0:
 			detection_chance *= maxf(0.4, 1.0 - enc * 0.35)   # +1.0 encryption → ~35% lower detection chance
+	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(agent.country_tag, "advanced_sensors"):
+		detection_chance *= 0.8  # scanners/sensors tech improves counter-intel and detection (trade-off: emissions reveal position)
 
 	var detected := randf() < detection_chance
 
@@ -241,6 +257,23 @@ func _resolve_mission(agent: Agent) -> void:
 	if outcome in ["success", "partial"]:
 		agent.successful_missions += 1
 		agent.add_experience(90 if outcome == "success" else 45)
+
+		# Hone skills from missions - "missions agents go on to matter and help them hone their skills"
+		var skill_req := str(mission.get("skill_requirement", "intelligence"))
+		var hone_amt := 0.25 if outcome == "success" else 0.1
+		agent.hone_skill_from_mission(skill_req, hone_amt)
+
+		# Fun trait gain for world-class replay (agents evolve with role experience) - ties specialists to big projects/Ascendancy
+		_give_role_trait_from_mission(agent, mission_id, outcome)
+
+		# Mission record + high success on influence missions: extra internal Ascendancy pillar impact + story connection.
+		# "key agents and their impact and connection to your story. Along with their abilities to help with internal ascendancy."
+		var mission_cat: String = str(mission.get("category", ""))
+		if mission_cat == "influence" and agent.get_mission_record_bonus() > 0.1:
+			if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_agent_pillar_influence"):
+				var extra := int(2 * agent.get_mission_record_bonus() * 10)  # Scale with record
+				GameData.apply_agent_pillar_influence(agent.country_tag, "ascendancy", extra, "veteran_agent_influence")
+				print("  -> Veteran agent %s boosts internal Ascendancy by %d (mission record matters)" % [agent.name, extra])
 
 	mission_completed.emit(agent.agent_id, mission_id, outcome)
 
@@ -286,6 +319,10 @@ func _apply_mission_outcome(agent: Agent, mission: Dictionary, outcome: String, 
 			_apply_production_delay(agent, mission, outcome, magnitude)
 		"supply_disruption":
 			_apply_supply_disruption(agent, mission, outcome, magnitude)
+		"production_boost":
+			_apply_production_boost(agent, mission, outcome, magnitude)
+		"resource_discovery":
+			_apply_resource_discovery(agent, mission, outcome, magnitude)
 		"stability_damage":
 			_apply_stability_damage(country, magnitude)
 		"research_progress":
@@ -294,12 +331,41 @@ func _apply_mission_outcome(agent: Agent, mission: Dictionary, outcome: String, 
 			_establish_long_term_tech_intel(agent, mission, outcome)
 		"temporary_intel_bonus":
 			_apply_intel_bonus(country, magnitude)
+		"secret_space_funding":
+			_apply_secret_space_funding(agent, mission, outcome, magnitude, detected)
 		"enemy_agent_disruption":
 			_apply_enemy_agent_disruption(country, magnitude)
 		"enemy_intel_degradation":
+			_apply_enemy_intel_degradation(country, magnitude)
+		"policy_shift":
+			# High-value wiring for domestic policy/law missions (pro-natal, borders, fiat, sovereign wealth, etc.).
+			# Calls GameData to enact the change. Agent time was the cost (unavailable for other missions).
+			if typeof(GameData) != TYPE_NIL and GameData.has_method("resolve_agent_policy_mission"):
+				var policy_type := str(result.get("policy_type", mission.get("id", "").replace("lobby_", "")))
+				GameData.resolve_agent_policy_mission(agent.agent_id, policy_type, country, outcome, int(magnitude))
+		"police_type_shift":
+			if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_police_type"):
+				GameData.apply_police_type(country, "secret" if outcome == "success" else "local")
 			_degrade_enemy_intel(country, magnitude)
 		"tech_theft_protection":
 			_apply_tech_protection(agent, mission, magnitude)
+		# === New 1918 Diplomacy / Peace Conference effects (Phase 1) ===
+		"inclusion_leverage":
+			_apply_inclusion_leverage(agent, magnitude)
+		"minister_compromised":
+			_apply_minister_compromised(agent, magnitude)
+		"narrative_shift":
+			_apply_narrative_shift(country, magnitude)
+		"bargaining_leverage":
+			_apply_bargaining_leverage(agent, magnitude)
+		"enemy_leverage_blocked":
+			_apply_enemy_leverage_blocked(country, magnitude)
+		"grievance_backlash":
+			_apply_grievance_backlash(agent, magnitude)
+		"scandal_backlash":
+			_apply_scandal_backlash(agent, magnitude)
+		"term_modifier":
+			_apply_term_modifier(agent, magnitude)
 
 	# Intelligence missions populate intel cache
 	var intel_type := str(result.get("intel_type", ""))
@@ -307,6 +373,105 @@ func _apply_mission_outcome(agent: Agent, mission: Dictionary, outcome: String, 
 		_record_intelligence(country, intel_type, outcome)
 
 	print("Mission '%s' for %s resolved as %s (detected: %s)" % [mission_name, agent.name, outcome, detected])
+
+
+# === New Diplomacy / 1918 Peace Conference effect handlers (Phase 1) ===
+# These update GameData.peace_state and apply mechanical effects via NationalModifierManager
+# where appropriate. Conference-specific missions are the primary way Central Powers players
+# can change history (inclusion at the table, softened terms, etc.).
+
+func _apply_inclusion_leverage(agent: Agent, magnitude: float) -> void:
+	if typeof(GameData) != TYPE_NIL:
+		GameData.add_inclusion_leverage(agent.country_tag, int(magnitude), "agent_mission:" + agent.current_mission_id)
+	# Also give a small direct prestige/stability bump via NMM for the owning country
+	if typeof(NationalModifierManager) != TYPE_NIL:
+		var mod := {
+			"effect_id": "peace_inclusion_%s_%d" % [agent.country_tag, Time.get_unix_time_from_system()],
+			"source": "agent_mission",
+			"source_detail": "Diplomatic success — peace table leverage",
+			"modifiers": {"prestige": 4.0, "stability": 2.0},
+			"duration_months": 36
+		}
+		NationalModifierManager.apply_national_effect(agent.country_tag, mod)
+
+
+func _apply_minister_compromised(agent: Agent, magnitude: float) -> void:
+	if typeof(GameData) != TYPE_NIL:
+		GameData.add_inclusion_leverage(agent.country_tag, 18, "honeypot:" + agent.current_mission_id)
+	if typeof(NationalModifierManager) != TYPE_NIL:
+		var mod := {
+			"effect_id": "peace_minister_compromised_%s" % agent.country_tag,
+			"source": "agent_mission",
+			"source_detail": "Honeypot / compromise operation",
+			"modifiers": {"prestige": 6.0},
+			"duration_months": 24
+		}
+		NationalModifierManager.apply_national_effect(agent.country_tag, mod)
+	print("Peace: Minister compromised by %s — strong conference influence generated." % agent.name)
+
+
+func _apply_narrative_shift(country: String, magnitude: float) -> void:
+	if typeof(GameData) != TYPE_NIL:
+		# Narrative shifts reduce grievance for our side or increase for targets
+		GameData.add_grievance(country, -int(magnitude * 0.5), "narrative_influence")
+	if typeof(NationalModifierManager) != TYPE_NIL:
+		var mod := {
+			"effect_id": "peace_narrative_%s" % country,
+			"source": "agent_mission",
+			"source_detail": "Public narrative operation",
+			"modifiers": {"stability": 1.5},
+			"duration_months": 18
+		}
+		NationalModifierManager.apply_national_effect(country, mod)
+
+
+func _apply_bargaining_leverage(agent: Agent, magnitude: float) -> void:
+	if typeof(GameData) != TYPE_NIL:
+		GameData.add_inclusion_leverage(agent.country_tag, int(magnitude), "leak_operation")
+	print("Peace: Bargaining leverage generated by leak from %s." % agent.name)
+
+
+func _apply_enemy_leverage_blocked(country: String, magnitude: float) -> void:
+	if typeof(GameData) != TYPE_NIL:
+		# Reduce enemy inclusion if we can identify (for simplicity, small global effect or log)
+		# In full system we'd have target_tag on the mission.
+		GameData.add_inclusion_leverage(country, -int(magnitude * 0.6), "counter_conference")
+	print("Peace: Enemy conference leverage blocked for operations from %s." % country)
+
+
+func _apply_grievance_backlash(agent: Agent, magnitude: float) -> void:
+	if typeof(GameData) != TYPE_NIL:
+		GameData.add_grievance(agent.country_tag, int(magnitude), "failed_inclusion_attempt")
+	if typeof(NationalModifierManager) != TYPE_NIL:
+		var mod := {
+			"effect_id": "peace_backlash_%s" % agent.country_tag,
+			"source": "agent_mission",
+			"source_detail": "Exposed or failed diplomatic push",
+			"modifiers": {"stability": -3.0},
+			"duration_months": 12
+		}
+		NationalModifierManager.apply_national_effect(agent.country_tag, mod)
+
+
+func _apply_scandal_backlash(agent: Agent, magnitude: float) -> void:
+	if typeof(GameData) != TYPE_NIL:
+		GameData.add_grievance(agent.country_tag, int(magnitude * 0.7), "honeypot_scandal")
+	if typeof(NationalModifierManager) != TYPE_NIL:
+		var mod := {
+			"effect_id": "peace_scandal_%s" % agent.country_tag,
+			"source": "agent_mission",
+			"source_detail": "Honeypot operation exposed",
+			"modifiers": {"prestige": -5.0, "stability": -4.0},
+			"duration_months": 18
+		}
+		NationalModifierManager.apply_national_effect(agent.country_tag, mod)
+	print("Peace: Scandal backlash from failed honeypot by %s." % agent.name)
+
+
+func _apply_term_modifier(agent: Agent, magnitude: float) -> void:
+	if typeof(GameData) != TYPE_NIL:
+		GameData.add_inclusion_leverage(agent.country_tag, int(magnitude), "bribe_or_influence")
+	print("Peace: Direct term modifier influence from %s (%.0f)." % [agent.name, magnitude])
 
 
 func set_current_year(year: int) -> void:
@@ -442,7 +607,7 @@ func _process_network_action(net: AgentNetwork, months: int) -> void:
 
 	# Encryption (from radio_iii etc.) reduces network detection risk for the owning country
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var mods := NationalModifierManager.get_combat_modifiers(net.controlling_country)
+		var mods: Dictionary = NationalModifierManager.get_combat_modifiers(net.controlling_country)
 		var enc := float(mods.get("encryption", 0.0))
 		if enc > 0.0:
 			detection_chance *= maxf(0.5, 1.0 - enc * 0.4)
@@ -483,7 +648,7 @@ func _process_network_action_daily(net: AgentNetwork) -> String:
 
 	# Apply encryption reduction (same as monthly path)
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var mods := NationalModifierManager.get_combat_modifiers(net.controlling_country)
+		var mods: Dictionary = NationalModifierManager.get_combat_modifiers(net.controlling_country)
 		var enc := float(mods.get("encryption", 0.0))
 		if enc > 0.0:
 			detection_chance *= maxf(0.5, 1.0 - enc * 0.4)
@@ -617,9 +782,19 @@ func _apply_daily_network_province_effects(net: AgentNetwork) -> String:
 
 
 func _estimate_enemy_pressure(province_id: int) -> float:
-	# Placeholder - in a full implementation this would query CombatPresenceRegistry / ProvinceForceReport
-	# For now return a random value between 0.1 and 0.8 to simulate enemy presence
-	return randf_range(0.15, 0.75)
+	# Polished: query real forces if available (Battle/CombatPresence or Map forces), fallback rand for detection risk
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_owner"):
+		var owner := str(MapManager.get_province_owner(province_id))
+		var player := ""
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+			player = LeaderManager.get_player_country_tag()
+		if owner != "" and owner != player:
+			# Higher pressure if enemy owned (more counter-intel)
+			return randf_range(0.45, 0.85)
+	# Try combat registry stub if present (for stationed enemy)
+	if typeof(Engine) != TYPE_NIL and Engine.has_singleton("CombatPresenceRegistry") or (get_tree() and get_tree().root.get_node_or_null("/root/CombatPresenceRegistry")):
+		return randf_range(0.3, 0.7)
+	return randf_range(0.15, 0.65)  # baseline for neutral/owned
 
 
 ## Returns the effectiveness (0.0 - 1.5+) of an active supply_disruption network in the given province, if any.
@@ -640,18 +815,28 @@ func _handle_network_detection(net: AgentNetwork) -> void:
 	net.local_operatives = max(0, net.local_operatives - 2)
 
 	var roll := randf()
+	var owner := net.controlling_country
 	if roll < 0.25:
 		lead.status = "captured"
 		print("Network in province %d was compromised — lead agent %s captured!" % [net.province_id, lead.name])
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.post_news("Agent Network Compromised", "%s network in pid %d detected & lead captured. Persistent effects ended." % [owner, net.province_id], "espionage")
+			LeaderEventUI.show_toast("Enemy agents captured in network (pid %d)" % net.province_id, 4.0)
 	elif roll < 0.55:
 		net.strength *= 0.5
 		print("Network in province %d suffered major losses from detection." % net.province_id)
+		if typeof(LeaderEventUI) != TYPE_NIL and owner == (LeaderManager.get_player_country_tag() if typeof(LeaderManager)!=TYPE_NIL else ""):
+			LeaderEventUI.post_news("Network Losses", "Your network in pid %d suffered detection losses. Strength halved." % net.province_id, "espionage")
 	else:
 		print("Network in province %d was detected but survived with reduced strength." % net.province_id)
+		if typeof(LeaderEventUI) != TYPE_NIL and owner == (LeaderManager.get_player_country_tag() if typeof(LeaderManager)!=TYPE_NIL else ""):
+			LeaderEventUI.show_toast("Network detected but active (pid %d, reduced)." % net.province_id, 3.0)
 
 	if net.strength < 8.0:
 		networks.erase(net.province_id)
 		print("Network in province %d has been dismantled." % net.province_id)
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.post_news("Network Dismantled", "Agent network in pid %d fully dismantled by detection/counter-intel." % net.province_id, "espionage")
 
 
 func get_target_countries_for(country_tag: String) -> Array[String]:
@@ -668,7 +853,7 @@ func get_mission_categories() -> Array[String]:
 	for mission in mission_definitions.values():
 		if typeof(mission) != TYPE_DICTIONARY:
 			continue
-		var cat := str((mission as Dictionary).get("category", "")).strip_edges().to_lower()
+		var cat: String = str((mission as Dictionary).get("category", "")).strip_edges().to_lower()
 		if not cat.is_empty():
 			categories[cat] = true
 	var result: Array[String] = []
@@ -704,6 +889,19 @@ func get_eligible_missions_for_agent(
 			if mission_id == "infiltrate_research_lab":
 				if not TechnologyManager.has_tech_unlock(agent.country_tag, "agent_mission", "infiltrate_research_lab"):
 					continue
+			if mission_id == "fund_secret_space_program":
+				if not TechnologyManager.has_rule_flag(agent.country_tag, "secret_funding") and not TechnologyManager.has_tech_unlock(agent.country_tag, "rule_flag", "secret_funding"):
+					continue
+			if mission_id == "steal_space_intel":
+				if not (TechnologyManager.has_tech_unlock(agent.country_tag, "rule_flag", "allow_satellites") or TechnologyManager.is_tech_completed(agent.country_tag, "v2_rocket") or TechnologyManager.is_tech_completed(agent.country_tag, "sputnik_satellite")):
+					continue
+
+		# Respect 1918 conference pre/during window missions (Phase 1/2): only available in ~1918-early1919 window for high-stakes diplomacy leverage.
+		# Outside window, conference_window_only missions are hidden (prevents polluting normal agent picker; special get_diplomacy... still usable if forced).
+		var conf_only := bool(mission.get("conference_window_only", false))
+		if conf_only and typeof(self) != TYPE_NIL and has_method("is_1918_conference_window_active"):
+			if not is_1918_conference_window_active():
+				continue
 
 		rows.append(_mission_row_for_agent(agent, str(mission_id), mission))
 
@@ -819,7 +1017,10 @@ func _agent_to_summary(agent: Agent) -> Dictionary:
 		"missions_completed": agent.total_missions_completed,
 		"successful_missions": agent.successful_missions,
 		"compromised_until_year": agent.compromised_until_year,
+		"portrait_path": agent.portrait_path,
 		"mission_history": history_slice,
+		"record_bonus": agent.get_mission_record_bonus(),  # World-class: record hones performance, affects Ascendancy/story impact
+		"veteran_status": "Legendary" if agent.get_mission_record_bonus() > 0.2 else ("Veteran" if agent.total_missions_completed > 5 else "Rookie"),
 		"can_assign_mission": agent.is_available(),
 		"is_compromised": agent.status == "compromised",
 		"is_inactive": agent.is_inactive(),
@@ -891,9 +1092,15 @@ func _handle_post_mission_risk(agent: Agent, detected: bool, outcome: String) ->
 
 	# Failure or partial + detection
 	if roll < 0.25:
-		agent.status = "killed"
-		print("  -> %s was killed during the mission." % agent.name)
-		agent_killed.emit(agent.agent_id, country)
+		# Defend/stay active: Good mission record + stealth traits give chance to avoid worst (learn/grow even if targeted).
+		var defend := agent.get_mission_record_bonus() + agent.get_trait_bonus("stay_hidden") + agent.get_trait_bonus("counter_intelligence") * 0.5
+		if randf() < defend * 0.5:
+			print("  -> %s defended/stayed active despite detection (record + traits saved them)." % agent.name)
+			_set_agent_compromised(agent, 1)
+		else:
+			agent.status = "killed"
+			print("  -> %s was killed during the mission." % agent.name)
+			agent_killed.emit(agent.agent_id, country)
 	elif roll < 0.55:
 		agent.status = "captured"
 		print("  -> %s was captured." % agent.name)
@@ -923,6 +1130,107 @@ func _release_expired_compromised_agents() -> void:
 			agent.compromised_until_year = 0
 			invalidate_agent_cache(agent.country_tag)
 			print("AgentManager: %s recovered from compromise." % agent.name)
+
+# Role trait gain on success (makes specialists evolve and become more valuable for big projects/Ascendancy)
+func _give_role_trait_from_mission(agent: Agent, mission_id: String, outcome: String) -> void:
+	if not mission_definitions.has(mission_id) or outcome == "failure":
+		return
+	var mission: Dictionary = mission_definitions[mission_id]
+	var cat: String = str(mission.get("category", ""))
+	var skill_req := str(mission.get("skill_requirement", "")).to_lower()
+
+	var possible_trait := ""
+	match [cat, skill_req]:
+		["technology", "technology"]:
+			possible_trait = "master_researcher"
+		["sabotage", "sabotage"]:
+			possible_trait = "saboteur_expert"
+		["intelligence", "intelligence"]:
+			possible_trait = "ghost_operator" if randf() > 0.5 else "master_researcher"
+		["influence", _]:
+			possible_trait = "diplomatic_visionary"
+		["counter_intelligence", "counter_intelligence"]:
+			possible_trait = "counter_intel_specialist"
+		["influence", "influence"]:
+			possible_trait = "industrial_specialist" if randf() > 0.4 else "production_expert"
+		["intelligence", _]:
+			possible_trait = "resource_explorer" if randf() > 0.5 else "prospector"
+		["technology", _]:
+			possible_trait = "production_expert" if randf() > 0.6 else "industrial_specialist"
+
+	if possible_trait != "" and possible_trait not in agent.traits and randf() < 0.25:  # rare, earned
+		agent.traits.append(possible_trait)
+		print("Agent %s earned trait: %s (role mastery from missions)" % [agent.name, possible_trait])
+
+
+# Apply passive national impacts from active agents' attributes (skills + traits).
+# This makes agents an extension of the player's will: their different attributes (e.g. high influence boosts Ascendancy/mandate, industrial boosts production, tech boosts research) have direct ongoing impact to the nation.
+# Called daily; small scaled effects to avoid overpower. Uses NMM for persistence.
+func apply_agent_national_impacts() -> void:
+	if typeof(NationalModifierManager) == TYPE_NIL:
+		return
+	for country_tag in agents.keys():
+		var tag: String = country_tag.strip_edges().to_upper()
+		var active_agents: Array[Agent] = []
+		for a in get_agents_for_country(tag):
+			if a.is_available() or a.is_on_mission():  # active if not captured/killed
+				active_agents.append(a)
+		if active_agents.is_empty():
+			continue
+		# Aggregate impacts
+		var ascend_bonus: float = 0.0
+		var prod_bonus: float = 0.0
+		var res_bonus: float = 0.0
+		var research_bonus: float = 0.0
+		var mil_bonus: float = 0.0
+		for a in active_agents:
+			ascend_bonus += a.get_national_impact_bonus("ascendancy") * (1.0 + (a.level - 1) * 0.1 + a.get_mission_record_bonus() * 0.5)
+			prod_bonus += a.get_national_impact_bonus("production") * (1.0 + (a.level - 1) * 0.1 + a.get_mission_record_bonus() * 0.5)
+			res_bonus += a.get_national_impact_bonus("resource") * (1.0 + (a.level - 1) * 0.1 + a.get_mission_record_bonus() * 0.5)
+			research_bonus += a.get_national_impact_bonus("research") * (1.0 + (a.level - 1) * 0.1 + a.get_mission_record_bonus() * 0.5)
+			mil_bonus += a.get_national_impact_bonus("military") * (1.0 + (a.level - 1) * 0.1 + a.get_mission_record_bonus() * 0.5)
+		# Apply small daily scaled (will be monthly in tick, but here daily for responsiveness)
+		var daily_scale := 0.033  # ~1/30 for monthly equivalent if called daily
+		if ascend_bonus > 0.001:
+			NationalModifierManager.apply_national_effect(tag, {
+				"effect_id": "%s_agent_national_influence" % tag,
+				"source": "agent_national_influence",
+				"source_detail": "Active agents' influence attributes",
+				"modifiers": {"ascendancy": ascend_bonus * daily_scale, "prestige": ascend_bonus * daily_scale * 0.5},
+				"duration_months": 1,
+				"remaining_months": 1
+			})
+		if prod_bonus > 0.001:
+			NationalModifierManager.apply_national_effect(tag, {
+				"effect_id": "%s_agent_industrial_support" % tag,
+				"source": "agent_industrial_support",
+				"source_detail": "Active agents' industrial traits/skills",
+				"modifiers": {"output_multiplier": prod_bonus * daily_scale},
+				"duration_months": 1,
+				"remaining_months": 1
+			})
+		if res_bonus > 0.001:
+			NationalModifierManager.apply_national_effect(tag, {
+				"effect_id": "%s_agent_resource_influence" % tag,
+				"source": "agent_resource_influence",
+				"source_detail": "Active agents' exploration/resource traits",
+				"modifiers": {"resource_output_multiplier": res_bonus * daily_scale},
+				"duration_months": 1,
+				"remaining_months": 1
+			})
+		if research_bonus > 0.001:
+			# Boost research via tech or direct (could feed to TM)
+			if typeof(TechnologyManager) != TYPE_NIL:
+				TechnologyManager.apply_tech_intel_bonus(tag, research_bonus * 0.5, "agent_research_influence")
+		if mil_bonus > 0.001:
+			NationalModifierManager.apply_national_effect(tag, {
+				"effect_id": "%s_agent_military_influence" % tag,
+				"source": "agent_military_influence",
+				"source_detail": "Active agents' military attributes",
+				"modifiers": {"army_org_factor": mil_bonus * daily_scale * 0.5},
+				"duration_months": 1,
+				"remaining_months": 1
+			})
 
 
 func get_recent_operations(country_tag: String, limit: int = RECENT_OPERATIONS_UI_LIMIT) -> Array[Dictionary]:
@@ -1320,6 +1628,87 @@ func _apply_stability_damage(target_country: String, magnitude: float) -> void:
 		print("  [EFFECT] %s internal stability damaged by %.1f (Influence) — NationalModifierManager not available" % [target_country, magnitude])
 
 
+func _apply_production_boost(agent: Agent, mission: Dictionary, outcome: String, base_magnitude: float) -> void:
+	if typeof(NationalModifierManager) == TYPE_NIL:
+		print("    -> (No NationalModifierManager) Production boost would have applied")
+		return
+
+	var magnitude: float = base_magnitude
+	if outcome == "success":
+		magnitude *= 1.0
+	elif outcome == "partial":
+		magnitude *= 0.6
+	else:
+		return
+
+	# Skill scaling: influence or tech for production focus
+	var skill: int = max(agent.get_skill("influence"), agent.get_skill("technology"))
+	var skill_factor: float = 0.8 + (float(skill) * 0.03)
+	magnitude *= skill_factor
+
+	# Trait bonus for production/resource agents
+	magnitude += (agent.get_trait_bonus("production") * 0.5 if agent.has_method("get_trait_bonus") else 0.0)
+
+	var bonus: float = clampf(magnitude, 0.05, 0.30)
+	var duration: int = 6 if outcome == "success" else 4
+
+	var effect := {
+		"source": "agent_production_boost",
+		"source_detail": "Industrial optimization / espionage",
+		"modifiers": {
+			"output_multiplier": bonus,
+			"production_speed": bonus * 0.7,
+			"factory_output": bonus * 0.5
+		},
+		"duration_months": duration,
+		"remaining_months": duration,
+		"is_debuff": false
+	}
+
+	NationalModifierManager.apply_national_effect(agent.country_tag, effect)
+
+	var msg := "    -> Applied production boost to %s (+%.0f%% output/speed for %d months)" % [agent.country_tag, bonus * 100, duration]
+	print(msg)
+
+
+func _apply_resource_discovery(agent: Agent, mission: Dictionary, outcome: String, base_magnitude: float) -> void:
+	if typeof(NationalModifierManager) == TYPE_NIL:
+		print("    -> (No NationalModifierManager) Resource discovery would have applied")
+		return
+
+	var magnitude: float = base_magnitude
+	if outcome == "success":
+		magnitude *= 1.0
+	elif outcome == "partial":
+		magnitude *= 0.5
+	else:
+		return
+
+	var skill: int = agent.get_skill("intelligence")
+	var skill_factor: float = 0.85 + (float(skill) * 0.025)
+	magnitude *= skill_factor
+
+	var bonus: float = clampf(magnitude, 0.05, 0.25)
+	var duration: int = 8 if outcome == "success" else 5
+
+	var effect := {
+		"source": "agent_resource_exploration",
+		"source_detail": "Prospecting / resource intelligence",
+		"modifiers": {
+			"resource_output": bonus,  # Assuming this mod exists or falls to general output
+			"supply_efficiency": bonus * 0.4
+		},
+		"duration_months": duration,
+		"remaining_months": duration,
+		"is_debuff": false
+	}
+
+	NationalModifierManager.apply_national_effect(agent.country_tag, effect)
+
+	var msg := "    -> Applied resource discovery boost to %s (+%.0f%% for %d months)" % [agent.country_tag, bonus * 100, duration]
+	print(msg)
+
+
 func _apply_research_theft(
 	agent: Agent,
 	mission: Dictionary,
@@ -1375,6 +1764,32 @@ func _establish_long_term_tech_intel(agent: Agent, mission: Dictionary, outcome:
 
 func _apply_intel_bonus(actor_country: String, magnitude: float) -> void:
 	print("  [EFFECT] %s gained temporary intelligence bonus (+%.0f)" % [actor_country, magnitude])
+
+
+func _apply_secret_space_funding(agent: Agent, mission: Dictionary, outcome: String, magnitude: float, detected: bool = false) -> void:
+	if outcome == "failure":
+		if detected and typeof(TechnologyManager) != TYPE_NIL:
+			# Scandal risk if secret program exposed
+			if TechnologyManager.has_rule_flag(agent.country_tag, "secret_funding"):
+				print("  [SCANDAL] Secret space funding exposed for %s" % agent.country_tag)
+		return
+	var bonus := magnitude
+	var effective_mult := 1.0
+	if typeof(TechnologyManager) != TYPE_NIL:
+		# Apply as tech intel bonus, stronger if secret_funding flag present
+		effective_mult = 1.5 if TechnologyManager.has_rule_flag(agent.country_tag, "secret_funding") or TechnologyManager.has_tech_unlock(agent.country_tag, "rule_flag", "secret_funding") else 1.0
+		TechnologyManager.apply_tech_intel_bonus(
+			agent.country_tag,
+			bonus * effective_mult,
+			"secret_space_funding:" + str(mission.get("id", "black_budget")),
+		)
+		# Also unlock clandestine flag if not already via tech path
+		if TechnologyManager.has_method("grant_temporary_rule_flag"):
+			TechnologyManager.grant_temporary_rule_flag(agent.country_tag, "allow_clandestine_space_assets", 180)
+	print(
+		"  [SECRET SPACE] %s black-funded space progress +%.2f (mult %.1f) via %s"
+		% [agent.country_tag, bonus, effective_mult, agent.name]
+	)
 
 
 # Simple intelligence cache for future systems (Supply, Combat, Diplomacy)
@@ -1482,6 +1897,10 @@ func _apply_enemy_agent_disruption(target_country: String, magnitude: float) -> 
 	print("  [COUNTER-INTEL] %s sweep: disrupted %d enemy networks, cleared effects in %d provinces (mag %.1f)" % [tag, disrupted, cleared_effects, magnitude])
 
 
+func _apply_enemy_intel_degradation(actor_country: String, magnitude: float) -> void:
+	_degrade_enemy_intel(actor_country, magnitude)
+
+
 func _degrade_enemy_intel(actor_country: String, magnitude: float) -> void:
 	# This is an offensive counter-intel success — degrade the *enemy's* intel on us
 	var enemies = []  # In a real game we'd have a list of relevant opponents
@@ -1501,3 +1920,44 @@ func _apply_tech_protection(agent: Agent, mission: Dictionary, magnitude: float)
 		"  [COUNTER-INTEL] %s research protected until %d"
 		% [agent.country_tag, _current_year + years]
 	)
+
+
+# === Public Peace / Conference API (Phase 1) ===
+# These are called by future PeaceConferenceScreen, ScenarioLoader 1918 hook,
+# and debug tools. They leverage the GameData.peace_state we just wired.
+
+func is_1918_conference_window_active() -> bool:
+	# Simple time-based gate for 1918 start. Real version will use PeaceState + scenario.
+	if typeof(TimeManager) != TYPE_NIL:
+		var y := TimeManager.get_current_year()
+		return y <= 1919
+	return true  # fallback for early testing
+
+func get_diplomacy_missions_for_conference(agent_id: String) -> Array[Dictionary]:
+	# Returns only diplomacy / conference-relevant missions for the picker.
+	var all := get_eligible_missions_for_agent(agent_id)
+	var filtered := []
+	for m in all:
+		var cat: String = str(m.get("category", "")).to_lower()
+		if cat in ["diplomacy", "influence"] or m.get("conference_window_only", false):
+			filtered.append(m)
+	return filtered
+
+func apply_1918_conference_resolution(player_country: String, term_choices: Dictionary) -> Dictionary:
+	var leverage := 0
+	if typeof(GameData) != TYPE_NIL:
+		leverage = GameData.get_inclusion_leverage(player_country)
+	# Add delegation score simulation for Phase 1 (real UI will pass real score)
+	var summary := {}
+	if typeof(GameData) != TYPE_NIL:
+		summary = GameData.apply_conference_resolution_1918(player_country, term_choices, leverage)
+	return summary
+
+func get_peace_summary_snippet(country_tag: String) -> String:
+	if typeof(GameData) != TYPE_NIL:
+		var ps: Dictionary = GameData.get_peace_state()
+		var lev: int = GameData.get_inclusion_leverage(country_tag)
+		if ps.get("conference_1918_completed", false):
+			return "1918 Peace resolved (leverage used: %d)" % lev
+		return "Pre-conference / leverage: %d" % lev
+	return "No peace state"

@@ -218,7 +218,7 @@ func _update_detail_for_mission(mission_id: String) -> void:
 			chance_pct = int(float(row.get("success_chance", 0.0)) * 100.0)
 			break
 
-	var preview := AgentMissionImpact.get_impact_preview(mission)
+	var preview: Dictionary = AgentMissionImpact.get_impact_preview(mission)
 	var impact_block := (
 		"\n\n— If successful —\n%s\n\n— Partial —\n%s\n\n— Failure —\n%s"
 		% [
@@ -301,7 +301,8 @@ func _finalize_mission_assignment(mission_id: String, tech_id: String) -> void:
 			],
 			"espionage",
 		)
-	queue_free()
+	hide()
+	call_deferred("queue_free")
 
 
 func _refresh_agent_screen() -> void:
@@ -311,4 +312,5 @@ func _refresh_agent_screen() -> void:
 
 
 func _on_cancel_pressed() -> void:
-	queue_free()
+	hide()
+	call_deferred("queue_free")

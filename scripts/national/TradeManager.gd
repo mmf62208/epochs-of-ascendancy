@@ -887,6 +887,32 @@ func accept_offer(offer_id: String) -> bool:
 		offer.get("metadata", {}).duplicate(true),
 	)
 
+	# Black market / illicit deals feed the Hidden Hand (corruption, mob, prohibition-era profits, deep state networks launder influence to the complex).
+	# Represents real world "follow the money" where shadow trade empowers unaccountable powers.
+	var vis = offer.get("visibility", TradeVisibility.PUBLIC)
+	var meta = offer.get("metadata", {})
+	if vis == TradeVisibility.BLACK or str(meta.get("generated_by", "")) == "black_market" or str(meta.get("notes", "")).to_lower().contains("black"):
+		var feed := 0.07
+		var risk := float(meta.get("exposure_risk", 0.5))
+		feed += risk * 0.06
+		# Value scale if available
+		var val := float(offer.get("value_offered", 0.0)) + float(offer.get("value_requested", 0.0))
+		if val > 100.0:
+			feed += min(0.05, val / 5000.0)
+		if typeof(GameData) != TYPE_NIL:
+			if GameData.has_method("increase_hand_influence"):
+				for t in [from, to]:
+					if t == "" or t == "BLACK_MARKET": continue
+					GameData.increase_hand_influence(t, feed * (0.65 if t == from else 0.35))
+			else:
+				if not GameData.peace_state.has("hand_influence"):
+					GameData.peace_state["hand_influence"] = {}
+				for t in [from, to]:
+					if t == "" or t == "BLACK_MARKET": continue
+					var cur := float(GameData.peace_state["hand_influence"].get(t, 0.0))
+					GameData.peace_state["hand_influence"][t] = clamp(cur + feed * (0.65 if t == from else 0.35), 0.0, 1.0)
+			print("[BLACK MARKET FEEDS HAND] Illicit/shadow trade profits laundered to Hidden Hand (mob/prohibition/deep state corruption model). +hand_influence (systemic influence grows).")
+
 	# === New: Create ongoing TradeFlows for appropriate items (lightweight transit foundation) ===
 	_create_trade_flows_for_accepted_offer(offer)
 
@@ -977,6 +1003,24 @@ func _try_assign_supply_route_to_flow(flow: TradeFlow) -> void:
 		flow.metadata["route_uses_sea"] = plan.uses_port
 		flow.metadata["route_uses_air"] = plan.uses_airport
 
+		# Naval range multiplier from full controlled regions can further protect sea-based trade routes (convoy safety)
+		if plan.uses_port and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+			var reg_b := MapManager.get_active_regional_control_bonuses(flow.from_tag)
+			var n_mult := float(reg_b.get("naval_range_multiplier", 1.0))
+			if n_mult > 1.0 and plan.interdiction_chance > 0.0:
+				var sea_red := clampf((n_mult - 1.0) * 0.4, 0.0, 0.4)
+				flow.metadata["route_interdiction_chance"] = plan.interdiction_chance * (1.0 - sea_red)
+				flow.metadata["naval_protection"] = sea_red
+
+		# port_capacity bonus for sea trade (full control of ports boosts effective cargo for trade flows)
+		if plan.uses_port and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+			var reg_b2 := MapManager.get_active_regional_control_bonuses(flow.from_tag)
+			var port_b := float(reg_b2.get("port_capacity", 0.0))
+			if port_b > 0.0:
+				flow.metadata["port_capacity_bonus"] = port_b
+				# boost the plan cargo for this flow (trade specific)
+				plan.cargo_tons_per_day *= (1.0 + port_b)
+
 ## =============================================================================
 ## TRADEFLOW LIFECYCLE & MOVEMENT
 ## =============================================================================
@@ -1003,6 +1047,21 @@ func advance_trade_flows(current_turn: int) -> void:
 		# Only perform actual delivery for the player country for now (AI countries remain abstract).
 		if flow.to_tag == _get_player_country_tag():
 			var amount := flow.quantity_per_turn
+
+			# Apply regional convoy protection bonus to delivered amount (full control boosts effective trade throughput)
+			if flow.metadata.has("regional_convoy_protection"):
+				amount *= (1.0 + float(flow.metadata["regional_convoy_protection"]))
+
+			# Basic route attrition simulation for cargo loss (future full sim): small loss based on route risk, mitigated by protection
+			if not flow.route_plan_id.is_empty() and typeof(SupplyManager) != TYPE_NIL:
+				var plan := SupplyManager.get_route(flow.route_plan_id)
+				if plan:
+					var risk := float(plan.interdiction_chance)
+					var prot := float(flow.metadata.get("regional_convoy_protection", 0.0))
+					if risk > 0.01:
+						var attrition := risk * 0.05 * (1.0 - prot * 0.8)  # mitigated by protection
+						amount *= (1.0 - attrition)
+						flow.metadata["last_route_attrition"] = attrition
 
 			if flow.item_type == TradeItemType.RESOURCE:
 				# Direct access is the established pattern in TradeManager for resources
@@ -1089,9 +1148,54 @@ func interdict_trade_flow(flow_id: String, interdictor_type: String, loss_fracti
 			effective_loss = clamp(loss_fraction * 0.6 + route_risk * 0.4, 0.0, 1.0)
 			flow.metadata["last_interdiction_route_risk"] = route_risk
 
+	# Regional convoy / naval bonuses reduce effective trade interdiction loss (full control of chokepoints/home regions like British Isles protects convoys)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+		var reg_b := MapManager.get_active_regional_control_bonuses(flow.from_tag)
+		var c_eff := float(reg_b.get("convoy_efficiency", 0.0))
+		var n_mult := float(reg_b.get("naval_range_multiplier", 1.0))
+		var c_prot := float(reg_b.get("convoy_protection", 0.0))
+		var total_red: float = c_eff + c_prot + max(0.0, n_mult - 1.0) * 0.3
+		if total_red > 0.0:
+			var reg_red := clampf(total_red * 0.5, 0.0, 0.6)
+			effective_loss *= (1.0 - reg_red)
+			flow.metadata["regional_convoy_protection"] = reg_red
+
+	# Specific for interdictor types: e.g. submarine_range / convoy_defense counters sub/air interdiction
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+		var reg_b2 := MapManager.get_active_regional_control_bonuses(flow.from_tag)
+		if interdictor_type.to_lower().contains("sub"):
+			var sub_prot := float(reg_b2.get("submarine_range", 0.0)) + float(reg_b2.get("convoy_defense", 0.0))
+			if sub_prot > 0.0:
+				effective_loss *= (1.0 - clampf(sub_prot * 0.4, 0.0, 0.5))
+		elif interdictor_type.to_lower().contains("air") or interdictor_type.to_lower().contains("convoy"):
+			var air_prot := float(reg_b2.get("convoy_protection", 0.0))
+			if air_prot > 0.0:
+				effective_loss *= (1.0 - clampf(air_prot * 0.3, 0.0, 0.4))
+
 	# Apply loss to the flow's delivery rate
 	var previous_rate := flow.quantity_per_turn
 	flow.quantity_per_turn *= (1.0 - effective_loss)
+
+	# Accumulate actual lost cargo capacity (for UI, history, economic impact tracking)
+	var lost_this := previous_rate * effective_loss
+	flow.total_lost_to_interdiction += lost_this
+	if not flow.metadata.has("total_lost_to_interdiction"):
+		flow.metadata["total_lost_to_interdiction"] = 0.0
+	flow.metadata["total_lost_to_interdiction"] = flow.total_lost_to_interdiction
+
+	# Actual one-time cargo loss simulation for player (goods destroyed in transit this event; rate reduction handles ongoing)
+	# Mitigated already in effective_loss via regional convoy bonuses above.
+	if flow.to_tag == _get_player_country_tag():
+		var one_time_lost := lost_this * 3.0  # heuristic "in-transit" amount
+		if flow.item_type == TradeItemType.RESOURCE:
+			var st := ProductionManager.national_stockpile
+			st[flow.item_id] = max(0.0, float(st.get(flow.item_id, 0.0)) - one_time_lost)
+			flow.metadata["one_time_transit_loss"] = one_time_lost
+		elif flow.item_type == TradeItemType.EQUIPMENT:
+			# Direct for demo; in full would use a safe deduct method
+			if ProductionManager.national_equipment_stockpile.has(flow.item_id):
+				ProductionManager.national_equipment_stockpile[flow.item_id] = max(0, int(ProductionManager.national_equipment_stockpile[flow.item_id]) - int(one_time_lost))
+			flow.metadata["one_time_transit_loss"] = one_time_lost
 
 	# Record history in metadata (with route awareness)
 	if not flow.metadata.has("interdiction_history"):
@@ -1104,8 +1208,12 @@ func interdict_trade_flow(flow_id: String, interdictor_type: String, loss_fracti
 		"effective_loss": effective_loss,
 		"previous_rate": previous_rate,
 		"new_rate": flow.quantity_per_turn,
-		"had_route": not flow.route_plan_id.is_empty()
+		"had_route": not flow.route_plan_id.is_empty(),
+		"lost_this_turn": lost_this,
+		"cumulative_lost": flow.total_lost_to_interdiction
 	}
+	if flow.metadata.has("regional_convoy_protection"):
+		history_entry["regional_protection"] = flow.metadata["regional_convoy_protection"]
 
 	if not flow.route_plan_id.is_empty():
 		history_entry["route_id"] = flow.route_plan_id
@@ -1696,7 +1804,13 @@ func _format_trade_flow_cargo_line(flow: TradeFlow) -> String:
 				kind = "GOODS"
 	if nm.is_empty():
 		return "%.1f %s/turn" % [qty, kind.to_lower()]
-	return "%s %.1f/turn (%s)" % [nm, qty, kind.to_lower()]
+	var extra := ""
+	if flow.total_lost_to_interdiction > 0.01:
+		extra = " [lost %.1f to interdiction]" % flow.total_lost_to_interdiction
+	if flow.metadata.has("regional_convoy_protection"):
+		var prot := float(flow.metadata["regional_convoy_protection"])
+		extra += " (protected +%.0f%% by full regions)" % (prot * 100)
+	return "%s %.1f/turn (%s)%s" % [nm, qty, kind.to_lower(), extra]
 
 
 func collect_trade_flow_summaries_for_map_province(
@@ -1763,6 +1877,112 @@ func collect_trade_flow_summaries_for_map_province(
 ## Count of flows with an assigned route touching `province_id` (use for chip `×N`; prefer `cap` in collect for UI).
 func count_trade_flows_on_map_province(province_id: int, viewer_country_tag: String = "") -> int:
 	return collect_trade_flow_summaries_for_map_province(province_id, viewer_country_tag, 9999).size()
+
+
+## === Save/Load for Trade (offers + flows with regional convoy state) ===
+## Persists active offers (diplomacy value) and TradeFlows (with lost_to_interdiction, metadata including regional_convoy_protection, route_interdiction_chance adjusted by full control).
+## On apply, re-creates flows, re-assigns routes (to pick up current regional bonuses), re-emits signals for UI/map refresh.
+func get_save_data() -> Dictionary:
+	var offers_data := _offers.duplicate(true)  # dicts of items etc are serializable
+	var flows_data := {}
+	for fid in _trade_flows:
+		var f: TradeFlow = _trade_flows[fid]
+		flows_data[fid] = {
+			"flow_id": f.flow_id,
+			"offer_id": f.offer_id,
+			"from_tag": f.from_tag,
+			"to_tag": f.to_tag,
+			"item_type": f.item_type,
+			"item_id": f.item_id,
+			"quantity_per_turn": f.quantity_per_turn,
+			"delivery_cadence": f.delivery_cadence,
+			"route_plan_id": f.route_plan_id,
+			"preferred_mode": f.preferred_mode,
+			"created_turn": f.created_turn,
+			"last_delivery_turn": f.last_delivery_turn,
+			"total_delivered": f.total_delivered,
+			"total_lost_to_interdiction": f.total_lost_to_interdiction,
+			"active": f.active,
+			"suspended_reason": f.suspended_reason,
+			"metadata": f.metadata.duplicate(true)
+		}
+	return {
+		"offers": offers_data,
+		"flows": flows_data,
+		"current_year": _current_year
+	}
+
+func apply_save_data(data: Dictionary) -> void:
+	if data == null or data.is_empty():
+		return
+	_offers = data.get("offers", {}).duplicate(true)
+	# Rebuild indexes
+	_offers_by_from.clear()
+	_offers_by_to.clear()
+	for oid in _offers:
+		var o: Dictionary = _offers[oid]
+		var fr := _norm_tag(o.get("from_tag", ""))
+		var tt := _norm_tag(o.get("to_tag", ""))
+		_index_offer(oid, fr, tt)
+
+	_trade_flows.clear()
+	var flows_d = data.get("flows", {})
+	for fid in flows_d:
+		var fd: Dictionary = flows_d[fid]
+		var f := TradeFlow.new()
+		f.flow_id = fd.get("flow_id", "")
+		f.offer_id = fd.get("offer_id", "")
+		f.from_tag = fd.get("from_tag", "")
+		f.to_tag = fd.get("to_tag", "")
+		f.item_type = fd.get("item_type", 0)
+		f.item_id = fd.get("item_id", "")
+		f.quantity_per_turn = fd.get("quantity_per_turn", 0.0)
+		f.delivery_cadence = fd.get("delivery_cadence", 1)
+		f.route_plan_id = fd.get("route_plan_id", "")
+		f.preferred_mode = fd.get("preferred_mode", "")
+		f.created_turn = fd.get("created_turn", 0)
+		f.last_delivery_turn = fd.get("last_delivery_turn", -1)
+		f.total_delivered = fd.get("total_delivered", 0.0)
+		f.total_lost_to_interdiction = fd.get("total_lost_to_interdiction", 0.0)
+		f.active = fd.get("active", true)
+		f.suspended_reason = fd.get("suspended_reason", "")
+		f.metadata = fd.get("metadata", {}).duplicate(true)
+		_trade_flows[fid] = f
+
+		# Re-assign route to pick up current regional convoy bonuses (full control may have changed)
+		_try_assign_supply_route_to_flow(f)
+
+	_current_year = data.get("current_year", 0)
+
+	# Re-emit for UI/map layers to refresh trade flows with (possibly updated) protection metadata
+	for fid in _trade_flows:
+		var f = _trade_flows[fid]
+		trade_flow_created.emit(fid, f.from_tag, f.to_tag, f.item_id, f.quantity_per_turn)  # reuse signal for refresh
+
+	# Note: offers may need re-evaluation of fairness if regional changed, but for now on demand in UI
+
+func reset_for_new_scenario() -> void:
+	_offers.clear()
+	_offers_by_from.clear()
+	_offers_by_to.clear()
+	_trade_flows.clear()
+	# Re-init any other state if needed
+
+## Debug harness helper for demoing convoy protection
+func debug_create_demo_trade_flow(from: String, to: String, item: String, qty: float) -> String:
+	var f := TradeFlow.new()
+	f.flow_id = "demo_" + str(randi() % 100000)
+	f.from_tag = from
+	f.to_tag = to
+	f.item_type = 0  # RESOURCE placeholder; real would use enum
+	f.item_id = item
+	f.quantity_per_turn = qty
+	f.active = true
+	_trade_flows[f.flow_id] = f
+	_try_assign_supply_route_to_flow(f)
+	trade_flow_created.emit(f.flow_id, from, to, item, qty)
+	return f.flow_id
+
 
 
 ## =============================================================================
@@ -2296,6 +2516,12 @@ func _calculate_item_value(item: Dictionary, for_country: String) -> float:
 
 		TradeItemType.RESOURCE:
 			var rate := float(RESOURCE_BASE_RATES.get(id, 1.0))
+			# Regional resource bonus if full control of relevant regions (e.g. iron/aluminum in Scandinavia full -> better value for trade)
+			if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+				var reg := MapManager.get_active_regional_control_bonuses(for_country)
+				var res_b: Dictionary = reg.get("resource_bonus", {})
+				if typeof(res_b) == TYPE_DICTIONARY and res_b.has(id):
+					rate *= (1.0 + float(res_b[id]))
 			# Desperation / shortage pressure (hook into ProductionManager later)
 			return rate * qty
 
@@ -2321,7 +2547,7 @@ func _calculate_item_value(item: Dictionary, for_country: String) -> float:
 			# Intel value scales with quantity and current strategic need (recon gap)
 			var base := 80.0 * qty
 			if typeof(NationalModifierManager) != TYPE_NIL:
-				var current_recon := NationalModifierManager.get_national_modifier(for_country, "reconnaissance")
+				var current_recon: float = NationalModifierManager.get_national_modifier(for_country, "reconnaissance")
 				if current_recon < 0.5:  # poor recon — intel is more valuable
 					base *= 1.6
 			# Bonus if high enemy presence (from Supply/Combat context — simplified check)

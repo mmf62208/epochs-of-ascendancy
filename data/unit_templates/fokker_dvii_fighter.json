@@ -4,7 +4,7 @@
   "design_family": "german_air_ww1",
   "base_type": "Air",
   "size_category": "Light",
-  "visual_archetype": "fighter",
+  "visual_archetype": "biplane_fighter",
   "crew_required": 1,
   "base_training_level": 22,
   "max_experience_level": 80,

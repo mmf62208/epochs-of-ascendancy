@@ -4,7 +4,7 @@
   "design_family": "uk_naval_ww2",
   "base_type": "Naval",
   "size_category": "SuperHeavy",
-  "visual_archetype": "battleship",
+  "visual_archetype": "destroyer",
   "crew_required": 1200,
   "base_training_level": 36,
   "max_experience_level": 100,

@@ -75,8 +75,10 @@ func _on_confirm_pressed() -> void:
 		var main_screen := get_tree().get_first_node_in_group("production_screen")
 		if main_screen != null and main_screen.has_method("refresh_screen"):
 			main_screen.refresh_screen()
-	queue_free()
+	hide()
+	call_deferred("queue_free")
 
 
 func _on_cancel_pressed() -> void:
-	queue_free()
+	hide()
+	call_deferred("queue_free")

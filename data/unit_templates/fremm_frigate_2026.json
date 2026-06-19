@@ -4,7 +4,7 @@
   "design_family": "french_naval_2026",
   "base_type": "Naval",
   "size_category": "Medium",
-  "visual_archetype": "destroyer",
+  "visual_archetype": "frigate",
   "crew_required": 108,
   "base_training_level": 36,
   "max_experience_level": 100,

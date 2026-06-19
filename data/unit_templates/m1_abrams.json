@@ -4,7 +4,7 @@
   "design_family": "us_armored_eighties",
   "base_type": "Armored",
   "size_category": "Heavy",
-  "visual_archetype": "medium_tank",
+  "visual_archetype": "light_tank",
   "crew_required": 4,
   "base_training_level": 36,
   "max_experience_level": 100,

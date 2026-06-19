@@ -5906,282 +5906,276 @@
     },
     "9000": {
       "resources": {
-        "oil": 176
+        "semiconductors": 24
       },
-      "resource_score": 176,
-      "primary_resource": "oil"
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
     },
     "9001": {
       "resources": {
-        "oil": 176
+        "semiconductors": 24
       },
-      "resource_score": 176,
-      "primary_resource": "oil"
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
     },
     "9002": {
       "resources": {
+        "semiconductors": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
+    },
+    "9003": {
+      "resources": {
+        "semiconductors": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
+    },
+    "9004": {
+      "resources": {
+        "semiconductors": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
+    },
+    "9005": {
+      "resources": {
+        "semiconductors": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "semiconductors"
+    },
+    "9006": {
+      "resources": {
         "oil": 176
       },
       "resource_score": 176,
       "primary_resource": "oil"
     },
-    "9003": {
-      "resources": {
-        "oil": 33
-      },
-      "resource_score": 33,
-      "primary_resource": "oil"
-    },
-    "9004": {
-      "resources": {
-        "oil": 33
-      },
-      "resource_score": 33,
-      "primary_resource": "oil"
-    },
-    "9005": {
-      "resources": {
-        "oil": 33
-      },
-      "resource_score": 33,
-      "primary_resource": "oil"
-    },
-    "9006": {
-      "resources": {
-        "semiconductors": 24
-      },
-      "resource_score": 24,
-      "primary_resource": "semiconductors"
-    },
     "9007": {
       "resources": {
-        "semiconductors": 24
+        "oil": 176
       },
-      "resource_score": 24,
-      "primary_resource": "semiconductors"
+      "resource_score": 176,
+      "primary_resource": "oil"
     },
     "9008": {
       "resources": {
-        "semiconductors": 24
+        "oil": 176
       },
-      "resource_score": 24,
-      "primary_resource": "semiconductors"
+      "resource_score": 176,
+      "primary_resource": "oil"
     },
     "9009": {
       "resources": {
-        "coal": 11
+        "oil": 176
       },
-      "resource_score": 11,
-      "primary_resource": "coal"
+      "resource_score": 176,
+      "primary_resource": "oil"
     },
     "9010": {
       "resources": {
-        "coal": 11
+        "oil": 176
       },
-      "resource_score": 11,
-      "primary_resource": "coal"
+      "resource_score": 176,
+      "primary_resource": "oil"
     },
     "9011": {
       "resources": {
+        "oil": 176
+      },
+      "resource_score": 176,
+      "primary_resource": "oil"
+    },
+    "9012": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9013": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9014": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9015": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9016": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9017": {
+      "resources": {
+        "oil": 33
+      },
+      "resource_score": 33,
+      "primary_resource": "oil"
+    },
+    "9018": {
+      "resources": {
         "coal": 11
       },
       "resource_score": 11,
       "primary_resource": "coal"
     },
-    "9012": {
-      "resources": {
-        "nickel": 13
-      },
-      "resource_score": 13,
-      "primary_resource": "nickel"
-    },
-    "9013": {
-      "resources": {
-        "nickel": 13
-      },
-      "resource_score": 13,
-      "primary_resource": "nickel"
-    },
-    "9014": {
-      "resources": {
-        "nickel": 13
-      },
-      "resource_score": 13,
-      "primary_resource": "nickel"
-    },
-    "9015": {
-      "resources": {
-        "rare_earths": 8
-      },
-      "resource_score": 8,
-      "primary_resource": "rare_earths"
-    },
-    "9016": {
-      "resources": {
-        "rare_earths": 8
-      },
-      "resource_score": 8,
-      "primary_resource": "rare_earths"
-    },
-    "9017": {
-      "resources": {
-        "rare_earths": 8
-      },
-      "resource_score": 8,
-      "primary_resource": "rare_earths"
-    },
-    "9018": {
-      "resources": {
-        "oil": 154
-      },
-      "resource_score": 154,
-      "primary_resource": "oil"
-    },
     "9019": {
       "resources": {
-        "oil": 154
+        "coal": 11
       },
-      "resource_score": 154,
-      "primary_resource": "oil"
+      "resource_score": 11,
+      "primary_resource": "coal"
     },
     "9020": {
       "resources": {
-        "oil": 154
+        "coal": 11
       },
-      "resource_score": 154,
-      "primary_resource": "oil"
+      "resource_score": 11,
+      "primary_resource": "coal"
     },
     "9021": {
       "resources": {
-        "oil": 99
+        "coal": 11
       },
-      "resource_score": 99,
-      "primary_resource": "oil"
+      "resource_score": 11,
+      "primary_resource": "coal"
     },
     "9022": {
       "resources": {
-        "oil": 99
+        "coal": 11
       },
-      "resource_score": 99,
-      "primary_resource": "oil"
+      "resource_score": 11,
+      "primary_resource": "coal"
     },
     "9023": {
       "resources": {
-        "oil": 99
+        "coal": 11
       },
-      "resource_score": 99,
-      "primary_resource": "oil"
+      "resource_score": 11,
+      "primary_resource": "coal"
     },
     "9024": {
       "resources": {
-        "oil": 66
+        "nickel": 13
       },
-      "resource_score": 66,
-      "primary_resource": "oil"
+      "resource_score": 13,
+      "primary_resource": "nickel"
     },
     "9025": {
       "resources": {
-        "oil": 66
+        "nickel": 13
       },
-      "resource_score": 66,
-      "primary_resource": "oil"
+      "resource_score": 13,
+      "primary_resource": "nickel"
     },
     "9026": {
       "resources": {
-        "oil": 66
+        "nickel": 13
       },
-      "resource_score": 66,
-      "primary_resource": "oil"
+      "resource_score": 13,
+      "primary_resource": "nickel"
     },
     "9027": {
       "resources": {
-        "coal": 33,
-        "iron": 22
+        "nickel": 13
       },
-      "resource_score": 55,
-      "primary_resource": "coal"
+      "resource_score": 13,
+      "primary_resource": "nickel"
     },
     "9028": {
       "resources": {
-        "coal": 33,
-        "iron": 22
+        "nickel": 13
       },
-      "resource_score": 55,
-      "primary_resource": "coal"
+      "resource_score": 13,
+      "primary_resource": "nickel"
     },
     "9029": {
       "resources": {
-        "coal": 33,
-        "iron": 22
+        "nickel": 13
       },
-      "resource_score": 55,
-      "primary_resource": "coal"
+      "resource_score": 13,
+      "primary_resource": "nickel"
     },
     "9030": {
       "resources": {
-        "copper": 44
+        "rare_earths": 8
       },
-      "resource_score": 44,
-      "primary_resource": "copper"
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
     },
     "9031": {
       "resources": {
-        "copper": 44
+        "rare_earths": 8
       },
-      "resource_score": 44,
-      "primary_resource": "copper"
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
     },
     "9032": {
       "resources": {
-        "copper": 44
+        "rare_earths": 8
       },
-      "resource_score": 44,
-      "primary_resource": "copper"
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
     },
     "9033": {
       "resources": {
-        "oil": 24
+        "rare_earths": 8
       },
-      "resource_score": 24,
-      "primary_resource": "oil"
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
     },
     "9034": {
       "resources": {
-        "oil": 24
+        "rare_earths": 8
       },
-      "resource_score": 24,
-      "primary_resource": "oil"
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
     },
     "9035": {
       "resources": {
-        "oil": 24
+        "rare_earths": 8
       },
-      "resource_score": 24,
-      "primary_resource": "oil"
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
     },
     "9036": {
       "resources": {
-        "iron": 19,
-        "rare_earths": 6
+        "oil": 19
       },
-      "resource_score": 25,
-      "primary_resource": "iron"
+      "resource_score": 19,
+      "primary_resource": "oil"
     },
     "9037": {
       "resources": {
-        "iron": 19,
-        "rare_earths": 6
+        "oil": 19
       },
-      "resource_score": 25,
-      "primary_resource": "iron"
+      "resource_score": 19,
+      "primary_resource": "oil"
     },
     "9038": {
       "resources": {
-        "iron": 19,
-        "rare_earths": 6
+        "oil": 19
       },
-      "resource_score": 25,
-      "primary_resource": "iron"
+      "resource_score": 19,
+      "primary_resource": "oil"
     },
     "9039": {
       "resources": {
@@ -6206,152 +6200,863 @@
     },
     "9042": {
       "resources": {
-        "copper": 13
+        "copper": 16
       },
-      "resource_score": 13,
+      "resource_score": 16,
       "primary_resource": "copper"
     },
     "9043": {
       "resources": {
-        "copper": 13
+        "copper": 16
       },
-      "resource_score": 13,
+      "resource_score": 16,
       "primary_resource": "copper"
     },
     "9044": {
       "resources": {
+        "copper": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "copper"
+    },
+    "9045": {
+      "resources": {
+        "copper": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "copper"
+    },
+    "9046": {
+      "resources": {
+        "copper": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "copper"
+    },
+    "9047": {
+      "resources": {
+        "copper": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "copper"
+    },
+    "9048": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9049": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9050": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9051": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9052": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9053": {
+      "resources": {
+        "iron": 192,
+        "coal": 66
+      },
+      "resource_score": 258,
+      "primary_resource": "iron"
+    },
+    "9054": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9055": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9056": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9057": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9058": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9059": {
+      "resources": {
+        "oil": 231
+      },
+      "resource_score": 231,
+      "primary_resource": "oil"
+    },
+    "9060": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9061": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9062": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9063": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9064": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9065": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9066": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9067": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9068": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9069": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9070": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9071": {
+      "resources": {
+        "oil": 66
+      },
+      "resource_score": 66,
+      "primary_resource": "oil"
+    },
+    "9072": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9073": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9074": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9075": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9076": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9077": {
+      "resources": {
+        "oil": 154
+      },
+      "resource_score": 154,
+      "primary_resource": "oil"
+    },
+    "9078": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9079": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9080": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9081": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9082": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9083": {
+      "resources": {
+        "oil": 99
+      },
+      "resource_score": 99,
+      "primary_resource": "oil"
+    },
+    "9084": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9085": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9086": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9087": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9088": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9089": {
+      "resources": {
+        "iron": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "iron"
+    },
+    "9090": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9091": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9092": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9093": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9094": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9095": {
+      "resources": {
+        "semiconductors": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "semiconductors"
+    },
+    "9096": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9097": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9098": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9099": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9100": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9101": {
+      "resources": {
+        "rice": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "rice"
+    },
+    "9102": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9103": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9104": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9105": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9106": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9107": {
+      "resources": {
+        "coal": 33,
+        "iron": 22
+      },
+      "resource_score": 55,
+      "primary_resource": "coal"
+    },
+    "9108": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9109": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9110": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9111": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9112": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9113": {
+      "resources": {
+        "copper": 44
+      },
+      "resource_score": 44,
+      "primary_resource": "copper"
+    },
+    "9114": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9115": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9116": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9117": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9118": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9119": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9120": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9121": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9122": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9123": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9124": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9125": {
+      "resources": {
+        "iron": 19,
+        "rare_earths": 6
+      },
+      "resource_score": 25,
+      "primary_resource": "iron"
+    },
+    "9126": {
+      "resources": {
         "copper": 13
       },
       "resource_score": 13,
       "primary_resource": "copper"
     },
-    "9045": {
+    "9127": {
+      "resources": {
+        "copper": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "copper"
+    },
+    "9128": {
+      "resources": {
+        "copper": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "copper"
+    },
+    "9129": {
+      "resources": {
+        "copper": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "copper"
+    },
+    "9130": {
+      "resources": {
+        "copper": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "copper"
+    },
+    "9131": {
+      "resources": {
+        "copper": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "copper"
+    },
+    "9132": {
       "resources": {
         "coal": 13
       },
       "resource_score": 13,
       "primary_resource": "coal"
     },
-    "9046": {
+    "9133": {
       "resources": {
         "coal": 13
       },
       "resource_score": 13,
       "primary_resource": "coal"
     },
-    "9047": {
+    "9134": {
       "resources": {
         "coal": 13
       },
       "resource_score": 13,
       "primary_resource": "coal"
     },
-    "9048": {
+    "9135": {
       "resources": {
-        "copper": 16
+        "coal": 13
       },
-      "resource_score": 16,
-      "primary_resource": "copper"
+      "resource_score": 13,
+      "primary_resource": "coal"
     },
-    "9049": {
+    "9136": {
       "resources": {
-        "copper": 16
+        "coal": 13
       },
-      "resource_score": 16,
-      "primary_resource": "copper"
+      "resource_score": 13,
+      "primary_resource": "coal"
     },
-    "9050": {
+    "9137": {
       "resources": {
-        "copper": 16
+        "coal": 13
       },
-      "resource_score": 16,
-      "primary_resource": "copper"
+      "resource_score": 13,
+      "primary_resource": "coal"
     },
-    "9051": {
-      "resources": {
-        "tourism": 11
-      },
-      "resource_score": 11,
-      "primary_resource": "tourism"
-    },
-    "9052": {
+    "9138": {
       "resources": {
         "tourism": 11
       },
       "resource_score": 11,
       "primary_resource": "tourism"
     },
-    "9053": {
+    "9139": {
       "resources": {
         "tourism": 11
       },
       "resource_score": 11,
       "primary_resource": "tourism"
     },
-    "9054": {
+    "9140": {
+      "resources": {
+        "tourism": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "tourism"
+    },
+    "9141": {
+      "resources": {
+        "tourism": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "tourism"
+    },
+    "9142": {
+      "resources": {
+        "tourism": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "tourism"
+    },
+    "9143": {
+      "resources": {
+        "tourism": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "tourism"
+    },
+    "9144": {
       "resources": {
         "geothermal": 16
       },
       "resource_score": 16,
       "primary_resource": "geothermal"
     },
-    "9055": {
+    "9145": {
       "resources": {
         "geothermal": 16
       },
       "resource_score": 16,
       "primary_resource": "geothermal"
     },
-    "9056": {
+    "9146": {
       "resources": {
         "geothermal": 16
       },
       "resource_score": 16,
       "primary_resource": "geothermal"
     },
-    "9057": {
+    "9147": {
+      "resources": {
+        "geothermal": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "geothermal"
+    },
+    "9148": {
+      "resources": {
+        "geothermal": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "geothermal"
+    },
+    "9149": {
+      "resources": {
+        "geothermal": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "geothermal"
+    },
+    "9150": {
       "resources": {
         "nickel": 8
       },
       "resource_score": 8,
       "primary_resource": "nickel"
     },
-    "9058": {
+    "9151": {
       "resources": {
         "nickel": 8
       },
       "resource_score": 8,
       "primary_resource": "nickel"
     },
-    "9059": {
+    "9152": {
       "resources": {
         "nickel": 8
       },
       "resource_score": 8,
       "primary_resource": "nickel"
     },
-    "9060": {
+    "9153": {
+      "resources": {
+        "nickel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "nickel"
+    },
+    "9154": {
+      "resources": {
+        "nickel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "nickel"
+    },
+    "9155": {
+      "resources": {
+        "nickel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "nickel"
+    },
+    "9156": {
       "resources": {
         "oil": 8
       },
       "resource_score": 8,
       "primary_resource": "oil"
     },
-    "9061": {
+    "9157": {
       "resources": {
         "oil": 8
       },
       "resource_score": 8,
       "primary_resource": "oil"
     },
-    "9062": {
+    "9158": {
       "resources": {
         "oil": 8
       },
       "resource_score": 8,
       "primary_resource": "oil"
     },
-    "9066": {
+    "9159": {
+      "resources": {
+        "oil": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "oil"
+    },
+    "9160": {
+      "resources": {
+        "oil": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "oil"
+    },
+    "9161": {
+      "resources": {
+        "oil": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "oil"
+    },
+    "9168": {
       "resources": {
         "semiconductors": 77,
         "rare_earths": 24
@@ -6359,7 +7064,7 @@
       "resource_score": 101,
       "primary_resource": "semiconductors"
     },
-    "9067": {
+    "9169": {
       "resources": {
         "semiconductors": 77,
         "rare_earths": 24
@@ -6367,7 +7072,7 @@
       "resource_score": 101,
       "primary_resource": "semiconductors"
     },
-    "9068": {
+    "9170": {
       "resources": {
         "semiconductors": 77,
         "rare_earths": 24
@@ -6375,157 +7080,199 @@
       "resource_score": 101,
       "primary_resource": "semiconductors"
     },
-    "9069": {
+    "9171": {
+      "resources": {
+        "semiconductors": 77,
+        "rare_earths": 24
+      },
+      "resource_score": 101,
+      "primary_resource": "semiconductors"
+    },
+    "9172": {
+      "resources": {
+        "semiconductors": 77,
+        "rare_earths": 24
+      },
+      "resource_score": 101,
+      "primary_resource": "semiconductors"
+    },
+    "9173": {
+      "resources": {
+        "semiconductors": 77,
+        "rare_earths": 24
+      },
+      "resource_score": 101,
+      "primary_resource": "semiconductors"
+    },
+    "9174": {
       "resources": {
         "coal": 35
       },
       "resource_score": 35,
       "primary_resource": "coal"
     },
-    "9070": {
+    "9175": {
       "resources": {
         "coal": 35
       },
       "resource_score": 35,
       "primary_resource": "coal"
     },
-    "9071": {
+    "9176": {
       "resources": {
         "coal": 35
       },
       "resource_score": 35,
       "primary_resource": "coal"
     },
-    "9072": {
+    "9177": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9178": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9179": {
+      "resources": {
+        "coal": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "coal"
+    },
+    "9180": {
       "resources": {
         "oil": 1347
       },
       "resource_score": 1347,
       "primary_resource": "oil"
     },
-    "9073": {
+    "9181": {
       "resources": {
         "oil": 1347
       },
       "resource_score": 1347,
       "primary_resource": "oil"
     },
-    "9074": {
+    "9182": {
       "resources": {
         "oil": 1347
       },
       "resource_score": 1347,
       "primary_resource": "oil"
     },
-    "9075": {
+    "9183": {
       "resources": {
-        "iron": 192,
-        "coal": 66
+        "oil": 1347
       },
-      "resource_score": 258,
-      "primary_resource": "iron"
+      "resource_score": 1347,
+      "primary_resource": "oil"
     },
-    "9076": {
+    "9184": {
       "resources": {
-        "iron": 192,
-        "coal": 66
+        "oil": 1347
       },
-      "resource_score": 258,
-      "primary_resource": "iron"
+      "resource_score": 1347,
+      "primary_resource": "oil"
     },
-    "9077": {
+    "9185": {
       "resources": {
-        "iron": 192,
-        "coal": 66
+        "oil": 1347
       },
-      "resource_score": 258,
-      "primary_resource": "iron"
+      "resource_score": 1347,
+      "primary_resource": "oil"
     },
-    "9078": {
+    "9186": {
       "resources": {
         "steel": 24
       },
       "resource_score": 24,
       "primary_resource": "steel"
     },
-    "9079": {
+    "9187": {
       "resources": {
         "steel": 24
       },
       "resource_score": 24,
       "primary_resource": "steel"
     },
-    "9080": {
+    "9188": {
       "resources": {
         "steel": 24
       },
       "resource_score": 24,
       "primary_resource": "steel"
     },
-    "9081": {
+    "9189": {
       "resources": {
-        "iron": 30
+        "steel": 24
       },
-      "resource_score": 30,
-      "primary_resource": "iron"
+      "resource_score": 24,
+      "primary_resource": "steel"
     },
-    "9082": {
+    "9190": {
       "resources": {
-        "iron": 30
+        "steel": 24
       },
-      "resource_score": 30,
-      "primary_resource": "iron"
+      "resource_score": 24,
+      "primary_resource": "steel"
     },
-    "9083": {
+    "9191": {
       "resources": {
-        "iron": 30
+        "steel": 24
       },
-      "resource_score": 30,
-      "primary_resource": "iron"
+      "resource_score": 24,
+      "primary_resource": "steel"
     },
-    "9084": {
-      "resources": {
-        "oil": 19
-      },
-      "resource_score": 19,
-      "primary_resource": "oil"
-    },
-    "9085": {
+    "9192": {
       "resources": {
         "oil": 19
       },
       "resource_score": 19,
       "primary_resource": "oil"
     },
-    "9086": {
+    "9193": {
       "resources": {
         "oil": 19
       },
       "resource_score": 19,
       "primary_resource": "oil"
     },
-    "9087": {
+    "9194": {
       "resources": {
-        "oil": 231
+        "oil": 19
       },
-      "resource_score": 231,
+      "resource_score": 19,
       "primary_resource": "oil"
     },
-    "9088": {
+    "9195": {
       "resources": {
-        "oil": 231
+        "oil": 19
       },
-      "resource_score": 231,
+      "resource_score": 19,
       "primary_resource": "oil"
     },
-    "9089": {
+    "9196": {
       "resources": {
-        "oil": 231
+        "oil": 19
       },
-      "resource_score": 231,
+      "resource_score": 19,
       "primary_resource": "oil"
     },
-    "9090": {
+    "9197": {
+      "resources": {
+        "oil": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "oil"
+    },
+    "9198": {
       "resources": {
         "coal": 35,
         "iron": 22
@@ -6533,7 +7280,7 @@
       "resource_score": 57,
       "primary_resource": "coal"
     },
-    "9091": {
+    "9199": {
       "resources": {
         "coal": 35,
         "iron": 22
@@ -6541,7 +7288,7 @@
       "resource_score": 57,
       "primary_resource": "coal"
     },
-    "9092": {
+    "9200": {
       "resources": {
         "coal": 35,
         "iron": 22
@@ -6549,194 +7296,1812 @@
       "resource_score": 57,
       "primary_resource": "coal"
     },
-    "9093": {
+    "9201": {
+      "resources": {
+        "coal": 35,
+        "iron": 22
+      },
+      "resource_score": 57,
+      "primary_resource": "coal"
+    },
+    "9202": {
+      "resources": {
+        "coal": 35,
+        "iron": 22
+      },
+      "resource_score": 57,
+      "primary_resource": "coal"
+    },
+    "9203": {
+      "resources": {
+        "coal": 35,
+        "iron": 22
+      },
+      "resource_score": 57,
+      "primary_resource": "coal"
+    },
+    "9204": {
       "resources": {
         "oil": 13
       },
       "resource_score": 13,
       "primary_resource": "oil"
     },
-    "9094": {
+    "9205": {
       "resources": {
         "oil": 13
       },
       "resource_score": 13,
       "primary_resource": "oil"
     },
-    "9095": {
+    "9206": {
       "resources": {
         "oil": 13
       },
       "resource_score": 13,
       "primary_resource": "oil"
     },
-    "9096": {
+    "9207": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9208": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9209": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9210": {
       "resources": {
         "iron": 38
       },
       "resource_score": 38,
       "primary_resource": "iron"
     },
-    "9097": {
+    "9211": {
       "resources": {
         "iron": 38
       },
       "resource_score": 38,
       "primary_resource": "iron"
     },
-    "9098": {
+    "9212": {
       "resources": {
         "iron": 38
       },
       "resource_score": 38,
       "primary_resource": "iron"
     },
-    "9099": {
+    "9213": {
       "resources": {
-        "coal": 35
+        "iron": 38
       },
-      "resource_score": 35,
-      "primary_resource": "coal"
+      "resource_score": 38,
+      "primary_resource": "iron"
     },
-    "9100": {
+    "9214": {
       "resources": {
-        "coal": 35
+        "iron": 38
       },
-      "resource_score": 35,
-      "primary_resource": "coal"
+      "resource_score": 38,
+      "primary_resource": "iron"
     },
-    "9101": {
+    "9215": {
       "resources": {
-        "coal": 35
+        "iron": 38
       },
-      "resource_score": 35,
-      "primary_resource": "coal"
+      "resource_score": 38,
+      "primary_resource": "iron"
     },
-    "9102": {
+    "9216": {
       "resources": {
         "oil": 52
       },
       "resource_score": 52,
       "primary_resource": "oil"
     },
-    "9103": {
+    "9217": {
       "resources": {
         "oil": 52
       },
       "resource_score": 52,
       "primary_resource": "oil"
     },
-    "9104": {
+    "9218": {
       "resources": {
         "oil": 52
       },
       "resource_score": 52,
       "primary_resource": "oil"
     },
-    "9105": {
+    "9219": {
+      "resources": {
+        "oil": 52
+      },
+      "resource_score": 52,
+      "primary_resource": "oil"
+    },
+    "9220": {
+      "resources": {
+        "oil": 52
+      },
+      "resource_score": 52,
+      "primary_resource": "oil"
+    },
+    "9221": {
+      "resources": {
+        "oil": 52
+      },
+      "resource_score": 52,
+      "primary_resource": "oil"
+    },
+    "9222": {
       "resources": {
         "steel": 24
       },
       "resource_score": 24,
       "primary_resource": "steel"
     },
-    "9106": {
+    "9223": {
       "resources": {
         "steel": 24
       },
       "resource_score": 24,
       "primary_resource": "steel"
     },
-    "9107": {
+    "9224": {
       "resources": {
         "steel": 24
       },
       "resource_score": 24,
       "primary_resource": "steel"
     },
-    "9108": {
+    "9225": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9226": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9227": {
+      "resources": {
+        "steel": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "steel"
+    },
+    "9228": {
       "resources": {
         "coal": 6
       },
       "resource_score": 6,
       "primary_resource": "coal"
     },
-    "9109": {
+    "9229": {
       "resources": {
         "coal": 6
       },
       "resource_score": 6,
       "primary_resource": "coal"
     },
-    "9110": {
+    "9230": {
       "resources": {
         "coal": 6
       },
       "resource_score": 6,
       "primary_resource": "coal"
     },
-    "9111": {
+    "9231": {
+      "resources": {
+        "coal": 6
+      },
+      "resource_score": 6,
+      "primary_resource": "coal"
+    },
+    "9232": {
+      "resources": {
+        "coal": 6
+      },
+      "resource_score": 6,
+      "primary_resource": "coal"
+    },
+    "9233": {
+      "resources": {
+        "coal": 6
+      },
+      "resource_score": 6,
+      "primary_resource": "coal"
+    },
+    "9234": {
       "resources": {
         "steel": 35
       },
       "resource_score": 35,
       "primary_resource": "steel"
     },
-    "9112": {
+    "9235": {
       "resources": {
         "steel": 35
       },
       "resource_score": 35,
       "primary_resource": "steel"
     },
-    "9113": {
+    "9236": {
       "resources": {
         "steel": 35
       },
       "resource_score": 35,
       "primary_resource": "steel"
     },
-    "9114": {
+    "9237": {
+      "resources": {
+        "steel": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9238": {
+      "resources": {
+        "steel": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9239": {
+      "resources": {
+        "steel": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9240": {
       "resources": {
         "steel": 30
       },
       "resource_score": 30,
       "primary_resource": "steel"
     },
-    "9115": {
+    "9241": {
       "resources": {
         "steel": 30
       },
       "resource_score": 30,
       "primary_resource": "steel"
     },
-    "9116": {
+    "9242": {
       "resources": {
         "steel": 30
       },
       "resource_score": 30,
       "primary_resource": "steel"
     },
-    "9117": {
+    "9243": {
       "resources": {
-        "semiconductors": 30
+        "steel": 30
       },
       "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9244": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9245": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9246": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9247": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9248": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9249": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9250": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9251": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30,
+      "primary_resource": "steel"
+    },
+    "9252": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9253": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9254": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9255": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9256": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9257": {
+      "resources": {
+        "steel": 24,
+        "iron": 33
+      },
+      "resource_score": 57,
+      "primary_resource": "iron"
+    },
+    "9258": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9259": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9260": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9261": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9262": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9263": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9264": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9265": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9266": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9267": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9268": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9269": {
+      "resources": {
+        "coal": 66,
+        "iron": 44
+      },
+      "resource_score": 110,
+      "primary_resource": "coal"
+    },
+    "9270": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9271": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9272": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9273": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9274": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9275": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9276": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9277": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9278": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9279": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9280": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9281": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9282": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9283": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9284": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9285": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9286": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9287": {
+      "resources": {
+        "coal": 44,
+        "iron": 19,
+        "steel": 13
+      },
+      "resource_score": 76,
+      "primary_resource": "coal"
+    },
+    "9288": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9289": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9290": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9291": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9292": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9293": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9294": {
+      "resources": {
+        "oil": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "oil"
+    },
+    "9295": {
+      "resources": {
+        "oil": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "oil"
+    },
+    "9296": {
+      "resources": {
+        "oil": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "oil"
+    },
+    "9297": {
+      "resources": {
+        "oil": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "oil"
+    },
+    "9298": {
+      "resources": {
+        "oil": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "oil"
+    },
+    "9299": {
+      "resources": {
+        "oil": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "oil"
+    },
+    "9300": {
+      "resources": {
+        "semiconductors": 19,
+        "oil": 13
+      },
+      "resource_score": 32,
       "primary_resource": "semiconductors"
     },
-    "9118": {
+    "9301": {
       "resources": {
-        "semiconductors": 30
+        "semiconductors": 19,
+        "oil": 13
       },
-      "resource_score": 30,
+      "resource_score": 32,
       "primary_resource": "semiconductors"
     },
-    "9119": {
+    "9302": {
       "resources": {
-        "semiconductors": 30
+        "semiconductors": 19,
+        "oil": 13
       },
-      "resource_score": 30,
+      "resource_score": 32,
       "primary_resource": "semiconductors"
+    },
+    "9303": {
+      "resources": {
+        "semiconductors": 19,
+        "oil": 13
+      },
+      "resource_score": 32,
+      "primary_resource": "semiconductors"
+    },
+    "9304": {
+      "resources": {
+        "semiconductors": 19,
+        "oil": 13
+      },
+      "resource_score": 32,
+      "primary_resource": "semiconductors"
+    },
+    "9305": {
+      "resources": {
+        "semiconductors": 19,
+        "oil": 13
+      },
+      "resource_score": 32,
+      "primary_resource": "semiconductors"
+    },
+    "9306": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9307": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9308": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9309": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9310": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9311": {
+      "resources": {
+        "oil": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "oil"
+    },
+    "9312": {
+      "resources": {
+        "copper": 49
+      },
+      "resource_score": 49,
+      "primary_resource": "copper"
+    },
+    "9313": {
+      "resources": {
+        "copper": 49
+      },
+      "resource_score": 49,
+      "primary_resource": "copper"
+    },
+    "9314": {
+      "resources": {
+        "copper": 49
+      },
+      "resource_score": 49,
+      "primary_resource": "copper"
+    },
+    "9315": {
+      "resources": {
+        "copper": 49
+      },
+      "resource_score": 49,
+      "primary_resource": "copper"
+    },
+    "9316": {
+      "resources": {
+        "copper": 49
+      },
+      "resource_score": 49,
+      "primary_resource": "copper"
+    },
+    "9317": {
+      "resources": {
+        "copper": 49
+      },
+      "resource_score": 49,
+      "primary_resource": "copper"
+    },
+    "9318": {
+      "resources": {
+        "steel": 22,
+        "semiconductors": 13
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9319": {
+      "resources": {
+        "steel": 22,
+        "semiconductors": 13
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9320": {
+      "resources": {
+        "steel": 22,
+        "semiconductors": 13
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9321": {
+      "resources": {
+        "steel": 22,
+        "semiconductors": 13
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9322": {
+      "resources": {
+        "steel": 22,
+        "semiconductors": 13
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9323": {
+      "resources": {
+        "steel": 22,
+        "semiconductors": 13
+      },
+      "resource_score": 35,
+      "primary_resource": "steel"
+    },
+    "9324": {
+      "resources": {
+        "coal": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "coal"
+    },
+    "9325": {
+      "resources": {
+        "coal": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "coal"
+    },
+    "9326": {
+      "resources": {
+        "coal": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "coal"
+    },
+    "9327": {
+      "resources": {
+        "coal": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "coal"
+    },
+    "9328": {
+      "resources": {
+        "coal": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "coal"
+    },
+    "9329": {
+      "resources": {
+        "coal": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "coal"
+    },
+    "9330": {
+      "resources": {
+        "iron": 99,
+        "rare_earths": 12
+      },
+      "resource_score": 111,
+      "primary_resource": "iron"
+    },
+    "9331": {
+      "resources": {
+        "iron": 99,
+        "rare_earths": 12
+      },
+      "resource_score": 111,
+      "primary_resource": "iron"
+    },
+    "9332": {
+      "resources": {
+        "iron": 99,
+        "rare_earths": 12
+      },
+      "resource_score": 111,
+      "primary_resource": "iron"
+    },
+    "9333": {
+      "resources": {
+        "iron": 99,
+        "rare_earths": 12
+      },
+      "resource_score": 111,
+      "primary_resource": "iron"
+    },
+    "9334": {
+      "resources": {
+        "iron": 99,
+        "rare_earths": 12
+      },
+      "resource_score": 111,
+      "primary_resource": "iron"
+    },
+    "9335": {
+      "resources": {
+        "iron": 99,
+        "rare_earths": 12
+      },
+      "resource_score": 111,
+      "primary_resource": "iron"
+    },
+    "9336": {
+      "resources": {
+        "steel": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "steel"
+    },
+    "9337": {
+      "resources": {
+        "steel": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "steel"
+    },
+    "9338": {
+      "resources": {
+        "steel": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "steel"
+    },
+    "9339": {
+      "resources": {
+        "steel": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "steel"
+    },
+    "9340": {
+      "resources": {
+        "steel": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "steel"
+    },
+    "9341": {
+      "resources": {
+        "steel": 27
+      },
+      "resource_score": 27,
+      "primary_resource": "steel"
+    },
+    "9342": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9343": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9344": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9345": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9346": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9347": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9348": {
+      "resources": {
+        "oil": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "oil"
+    },
+    "9349": {
+      "resources": {
+        "oil": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "oil"
+    },
+    "9350": {
+      "resources": {
+        "oil": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "oil"
+    },
+    "9351": {
+      "resources": {
+        "oil": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "oil"
+    },
+    "9352": {
+      "resources": {
+        "oil": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "oil"
+    },
+    "9353": {
+      "resources": {
+        "oil": 16
+      },
+      "resource_score": 16,
+      "primary_resource": "oil"
+    },
+    "9354": {
+      "resources": {
+        "rare_earths": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "rare_earths"
+    },
+    "9355": {
+      "resources": {
+        "rare_earths": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "rare_earths"
+    },
+    "9356": {
+      "resources": {
+        "rare_earths": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "rare_earths"
+    },
+    "9357": {
+      "resources": {
+        "rare_earths": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "rare_earths"
+    },
+    "9358": {
+      "resources": {
+        "rare_earths": 35
+      },
+      "resource_score": 35,
+      "primary_resource": "rare_earths"
+    },
+    "9359": {
+      "resources": {
+        "coal": 22,
+        "semiconductors": 19
+      },
+      "resource_score": 41,
+      "primary_resource": "coal"
+    },
+    "9360": {
+      "resources": {
+        "coal": 22,
+        "semiconductors": 19
+      },
+      "resource_score": 41,
+      "primary_resource": "coal"
+    },
+    "9361": {
+      "resources": {
+        "coal": 22,
+        "semiconductors": 19
+      },
+      "resource_score": 41,
+      "primary_resource": "coal"
+    },
+    "9362": {
+      "resources": {
+        "coal": 22,
+        "semiconductors": 19
+      },
+      "resource_score": 41,
+      "primary_resource": "coal"
+    },
+    "9363": {
+      "resources": {
+        "coal": 22,
+        "semiconductors": 19
+      },
+      "resource_score": 41,
+      "primary_resource": "coal"
+    },
+    "9364": {
+      "resources": {
+        "steel": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "steel"
+    },
+    "9365": {
+      "resources": {
+        "steel": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "steel"
+    },
+    "9366": {
+      "resources": {
+        "steel": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "steel"
+    },
+    "9367": {
+      "resources": {
+        "steel": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "steel"
+    },
+    "9368": {
+      "resources": {
+        "steel": 22
+      },
+      "resource_score": 22,
+      "primary_resource": "steel"
+    },
+    "9369": {
+      "resources": {
+        "coal": 15
+      },
+      "resource_score": 15,
+      "primary_resource": "coal"
+    },
+    "9370": {
+      "resources": {
+        "coal": 15
+      },
+      "resource_score": 15,
+      "primary_resource": "coal"
+    },
+    "9371": {
+      "resources": {
+        "coal": 15
+      },
+      "resource_score": 15,
+      "primary_resource": "coal"
+    },
+    "9372": {
+      "resources": {
+        "coal": 15
+      },
+      "resource_score": 15,
+      "primary_resource": "coal"
+    },
+    "9373": {
+      "resources": {
+        "coal": 15
+      },
+      "resource_score": 15,
+      "primary_resource": "coal"
+    },
+    "9374": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9375": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9376": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9377": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9378": {
+      "resources": {
+        "oil": 209
+      },
+      "resource_score": 209,
+      "primary_resource": "oil"
+    },
+    "9379": {
+      "resources": {
+        "oil": 286
+      },
+      "resource_score": 286,
+      "primary_resource": "oil"
+    },
+    "9380": {
+      "resources": {
+        "oil": 286
+      },
+      "resource_score": 286,
+      "primary_resource": "oil"
+    },
+    "9381": {
+      "resources": {
+        "oil": 286
+      },
+      "resource_score": 286,
+      "primary_resource": "oil"
+    },
+    "9382": {
+      "resources": {
+        "oil": 286
+      },
+      "resource_score": 286,
+      "primary_resource": "oil"
+    },
+    "9383": {
+      "resources": {
+        "oil": 286
+      },
+      "resource_score": 286,
+      "primary_resource": "oil"
+    },
+    "9384": {
+      "resources": {
+        "iron": 121
+      },
+      "resource_score": 121,
+      "primary_resource": "iron"
+    },
+    "9385": {
+      "resources": {
+        "iron": 121
+      },
+      "resource_score": 121,
+      "primary_resource": "iron"
+    },
+    "9386": {
+      "resources": {
+        "iron": 121
+      },
+      "resource_score": 121,
+      "primary_resource": "iron"
+    },
+    "9387": {
+      "resources": {
+        "iron": 121
+      },
+      "resource_score": 121,
+      "primary_resource": "iron"
+    },
+    "9388": {
+      "resources": {
+        "iron": 121
+      },
+      "resource_score": 121,
+      "primary_resource": "iron"
+    },
+    "9389": {
+      "resources": {
+        "coal": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "coal"
+    },
+    "9390": {
+      "resources": {
+        "coal": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "coal"
+    },
+    "9391": {
+      "resources": {
+        "coal": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "coal"
+    },
+    "9392": {
+      "resources": {
+        "coal": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "coal"
+    },
+    "9393": {
+      "resources": {
+        "coal": 46
+      },
+      "resource_score": 46,
+      "primary_resource": "coal"
+    },
+    "9394": {
+      "resources": {
+        "coal": 30,
+        "rare_earths": 9
+      },
+      "resource_score": 39,
+      "primary_resource": "coal"
+    },
+    "9395": {
+      "resources": {
+        "coal": 30,
+        "rare_earths": 9
+      },
+      "resource_score": 39,
+      "primary_resource": "coal"
+    },
+    "9396": {
+      "resources": {
+        "coal": 30,
+        "rare_earths": 9
+      },
+      "resource_score": 39,
+      "primary_resource": "coal"
+    },
+    "9397": {
+      "resources": {
+        "coal": 30,
+        "rare_earths": 9
+      },
+      "resource_score": 39,
+      "primary_resource": "coal"
+    },
+    "9398": {
+      "resources": {
+        "coal": 30,
+        "rare_earths": 9
+      },
+      "resource_score": 39,
+      "primary_resource": "coal"
+    },
+    "9399": {
+      "resources": {
+        "iron": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "iron"
+    },
+    "9400": {
+      "resources": {
+        "iron": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "iron"
+    },
+    "9401": {
+      "resources": {
+        "iron": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "iron"
+    },
+    "9402": {
+      "resources": {
+        "iron": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "iron"
+    },
+    "9403": {
+      "resources": {
+        "iron": 11
+      },
+      "resource_score": 11,
+      "primary_resource": "iron"
+    },
+    "9404": {
+      "resources": {
+        "steel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "steel"
+    },
+    "9405": {
+      "resources": {
+        "steel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "steel"
+    },
+    "9406": {
+      "resources": {
+        "steel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "steel"
+    },
+    "9407": {
+      "resources": {
+        "steel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "steel"
+    },
+    "9408": {
+      "resources": {
+        "steel": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "steel"
+    },
+    "9409": {
+      "resources": {
+        "coal": 44,
+        "iron": 30,
+        "rare_earths": 6
+      },
+      "resource_score": 80,
+      "primary_resource": "coal"
+    },
+    "9410": {
+      "resources": {
+        "coal": 44,
+        "iron": 30,
+        "rare_earths": 6
+      },
+      "resource_score": 80,
+      "primary_resource": "coal"
+    },
+    "9411": {
+      "resources": {
+        "coal": 44,
+        "iron": 30,
+        "rare_earths": 6
+      },
+      "resource_score": 80,
+      "primary_resource": "coal"
+    },
+    "9412": {
+      "resources": {
+        "coal": 44,
+        "iron": 30,
+        "rare_earths": 6
+      },
+      "resource_score": 80,
+      "primary_resource": "coal"
+    },
+    "9413": {
+      "resources": {
+        "coal": 44,
+        "iron": 30,
+        "rare_earths": 6
+      },
+      "resource_score": 80,
+      "primary_resource": "coal"
+    },
+    "9414": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9415": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9416": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9417": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9418": {
+      "resources": {
+        "oil": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "oil"
+    },
+    "9419": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9420": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9421": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9422": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9423": {
+      "resources": {
+        "iron": 38
+      },
+      "resource_score": 38,
+      "primary_resource": "iron"
+    },
+    "9424": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9425": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9426": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9427": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9428": {
+      "resources": {
+        "oil": 24
+      },
+      "resource_score": 24,
+      "primary_resource": "oil"
+    },
+    "9429": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9430": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9431": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9432": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9433": {
+      "resources": {
+        "rare_earths": 8
+      },
+      "resource_score": 8,
+      "primary_resource": "rare_earths"
+    },
+    "9434": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9435": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9436": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9437": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9438": {
+      "resources": {
+        "steel": 19
+      },
+      "resource_score": 19,
+      "primary_resource": "steel"
+    },
+    "9439": {
+      "resources": {
+        "rare_earths": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "rare_earths"
+    },
+    "9440": {
+      "resources": {
+        "rare_earths": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "rare_earths"
+    },
+    "9441": {
+      "resources": {
+        "rare_earths": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "rare_earths"
+    },
+    "9442": {
+      "resources": {
+        "rare_earths": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "rare_earths"
+    },
+    "9443": {
+      "resources": {
+        "rare_earths": 13
+      },
+      "resource_score": 13,
+      "primary_resource": "rare_earths"
+    },
+    "9444": {
+      "resources": {
+        "oil": 374
+      },
+      "resource_score": 374,
+      "primary_resource": "oil"
+    },
+    "9445": {
+      "resources": {
+        "oil": 374
+      },
+      "resource_score": 374,
+      "primary_resource": "oil"
+    },
+    "9446": {
+      "resources": {
+        "oil": 374
+      },
+      "resource_score": 374,
+      "primary_resource": "oil"
+    },
+    "9447": {
+      "resources": {
+        "oil": 374
+      },
+      "resource_score": 374,
+      "primary_resource": "oil"
+    },
+    "9448": {
+      "resources": {
+        "oil": 374
+      },
+      "resource_score": 374,
+      "primary_resource": "oil"
     }
   }
 }

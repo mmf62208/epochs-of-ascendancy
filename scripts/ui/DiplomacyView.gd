@@ -108,9 +108,9 @@ func _ready() -> void:
 	popup_centered(Vector2(1000, 620))
 
 	# Subtle open animation
-	modulate.a = 0.0
+	margin.modulate.a = 0.0
 	var tw := create_tween()
-	tw.tween_property(self, "modulate:a", 1.0, 0.12)
+	tw.tween_property(margin, "modulate:a", 1.0, 0.12)
 
 func _build_dynamic_ui() -> void:
 	# Player info
@@ -193,6 +193,116 @@ func _build_dynamic_ui() -> void:
 	rel_note.add_theme_color_override("font_color", Color(0.65, 0.7, 0.8))
 	rel_vbox.add_child(rel_note)
 
+	# 1918 Peace / Armistice Treaty Status (Phase 2+ surface in Diplomacy per DESIGN_1918_ARMISTICE... ; live leverage/terms/grievance for 50+ turn playtest feedback)
+	var treaty_panel := PanelContainer.new()
+	RetrowaveTheme.style_detail_panel(treaty_panel)
+	main_vbox.add_child(treaty_panel)
+	var treaty_vbox := VBoxContainer.new()
+	treaty_vbox.add_theme_constant_override("separation", 3)
+	treaty_panel.add_child(treaty_vbox)
+	var treaty_header := Label.new()
+	treaty_header.text = "1918 Armistice Treaty Status + Ripples"
+	RetrowaveTheme.style_column_header(treaty_header)
+	treaty_vbox.add_child(treaty_header)
+	var treaty_label := Label.new()
+	treaty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
+		var ps: Dictionary = GameData.get_peace_state()
+		var ptag := _player_country
+		var lev := GameData.get_inclusion_leverage(ptag) if GameData.has_method("get_inclusion_leverage") else 0
+		var gr := int(ps.get("grievance", {}).get(ptag, 0))
+		var completed := ps.get("conference_1918_completed", false)
+		var terms: Dictionary = ps.get("term_choices", {})
+		var seat := str(terms.get("central_powers_seating", "pre-conference" if not completed else "resolved"))
+		if completed:
+			treaty_label.text = "Resolved. Lev used:%d Grievance:%d Seating:%s | %d terms recorded. Follow-ons (1919-1925) via TimeManager/year advance. Tech gates + spirits active. Use Agent diplomacy pre-resolve in replays for alt-history." % [lev, gr, seat, terms.size()]
+		else:
+			treaty_label.text = "Pre-conference. Inclusion leverage:%d (Central Powers: run 'Secure Seat', 'Honeypot', 'Bribe Minister' via Agents screen — high influence skill). Grievance:%d. F10 > Peace Conf to design deal. Ripples to tech/spirits/agents/leaders." % [lev, gr]
+	else:
+		treaty_label.text = "Peace state unavailable (init on 1918 scenario)."
+	RetrowaveTheme.style_body_label(treaty_label)
+	treaty_vbox.add_child(treaty_label)
+
+	# === New: Agent Networks Status + Diplomatic Actions (flesh out beyond trade/1918 stub; persistent effects + detection surfaced)
+	var agent_panel := PanelContainer.new()
+	RetrowaveTheme.style_detail_panel(agent_panel)
+	main_vbox.add_child(agent_panel)
+	var agent_vbox := VBoxContainer.new()
+	agent_vbox.add_theme_constant_override("separation", 3)
+	agent_panel.add_child(agent_vbox)
+	var agent_header := Label.new()
+	agent_header.text = "Agent Networks & Operations (Persistent Effects + Detection)"
+	RetrowaveTheme.style_column_header(agent_header)
+	agent_vbox.add_child(agent_header)
+	var agent_status := Label.new()
+	if typeof(AgentManager) != TYPE_NIL:
+		var nets := AgentManager.get_networks_for_country(_player_country) if AgentManager.has_method("get_networks_for_country") else []
+		var net_text := "Your active networks: %d (supply/infra sabotage + intel; daily effects via Time)" % nets.size()
+		if nets.size() > 0:
+			net_text += " — Focuses: " + str(nets[0].focus if nets[0].has("focus") else "mixed")
+		agent_status.text = net_text
+		# Detection risk surface (polish persistent detection)
+		if nets.size() > 0 and "detection_risk_accumulated" in nets[0]:
+			agent_status.text += " | Detection risk accum: %.1f%%" % (float(nets[0].detection_risk_accumulated) * 100)
+	else:
+		agent_status.text = "Agent networks: use Agents screen to establish for persistent province pressure (effects persist, detection can dismantle)."
+	RetrowaveTheme.style_body_label(agent_status)
+	agent_vbox.add_child(agent_status)
+	var net_note := Label.new()
+	net_note.text = "Networks apply daily sabotage (depot throughput down, infra chip). Counter via missions or time decay. Detection posts news + reduces strength."
+	net_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	RetrowaveTheme.style_body_label(net_note)
+	net_note.add_theme_color_override("font_color", Color(0.65, 0.7, 0.8))
+	agent_vbox.add_child(net_note)
+
+	# Diplomatic Action buttons (flesh more features: actions launch toasts/news + optional dialogue; stub opinion/alliances)
+	var dip_actions := HBoxContainer.new()
+	dip_actions.add_theme_constant_override("separation", 8)
+	agent_vbox.add_child(dip_actions)
+	var guarantee_btn := Button.new()
+	guarantee_btn.text = "Guarantee Independence"
+	guarantee_btn.custom_minimum_size.x = 140
+	RetrowaveTheme.style_secondary_button(guarantee_btn)
+	guarantee_btn.pressed.connect(func():
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.post_news("Diplomatic Guarantee", "You guarantee %s independence. +Prestige for player, tension with rivals. (Agent ops can enforce or sabotage.)" % _selected_country, "diplomatic")
+			LeaderEventUI.show_toast("Guarantee issued to " + _selected_country + " — relations shifted.", 4.0)
+	)
+	dip_actions.add_child(guarantee_btn)
+
+	var alliance_btn := Button.new()
+	alliance_btn.text = "Propose Alliance"
+	alliance_btn.custom_minimum_size.x = 120
+	RetrowaveTheme.style_secondary_button(alliance_btn)
+	alliance_btn.pressed.connect(func():
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.post_news("Alliance Proposal", "Alliance offer to %s sent. Trade + mutual defense hooks. Success depends on current relations/leverage (use agents)." % _selected_country, "diplomatic")
+			LeaderEventUI.show_toast("Alliance proposal to " + _selected_country, 3.0)
+		# Optional dialogue launch for flavor
+		if typeof(DialogueManager) != TYPE_NIL:
+			var dip_res = load("res://data/peace/population_policies.dialogue")  # reuse any; real would have dip specific
+			if dip_res:
+				DialogueManager.show_dialogue_balloon(dip_res, "welfare_burden_crisis")  # placeholder branch for demo; future dedicated
+	)
+	dip_actions.add_child(alliance_btn)
+
+	var intel_btn := Button.new()
+	intel_btn.text = "Request Intel Share"
+	intel_btn.custom_minimum_size.x = 120
+	RetrowaveTheme.style_secondary_button(intel_btn)
+	intel_btn.pressed.connect(func():
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.show_toast("Intel request to " + _selected_country + " (agent networks boost success chance).", 3.0)
+			LeaderEventUI.post_news("Intel Exchange", "Requesting shared intel from %s via diplomatic channel + agent support." % _selected_country, "espionage")
+	)
+	dip_actions.add_child(intel_btn)
+
+	# Stub opinion/relations display (flesh; future real RelationsManager, now heuristic from trade + hand)
+	var opinion_label := Label.new()
+	opinion_label.text = "Opinion (stub): Neutral (+0; future: deltas from deals, guarantees, agent influence, hand exposure)"
+	RetrowaveTheme.style_body_label(opinion_label)
+	agent_vbox.add_child(opinion_label)
+
 	# Bottom buttons (reuse existing nodes from .tscn)
 	refresh_btn.text = "Refresh"
 	trade_btn.text = "View Deals in Trade Market"
@@ -244,9 +354,9 @@ func _refresh_view() -> void:
 	var offers := []
 	if typeof(TradeManager) != TYPE_NIL:
 		offers = TradeManager.get_market_offers_display_data(
-			country_tag = _player_country,
-			other_party_tag = _selected_country,
-			for_country_for_fairness = _player_country
+			_player_country,
+			_selected_country,
+			_player_country
 		)
 
 	# Apply lightweight bilateral filter
@@ -328,6 +438,12 @@ func _refresh_view() -> void:
 				flows_label.add_theme_color_override("font_color", Color(1.0, 0.6, 0.4))
 			else:
 				flows_label.add_theme_color_override("font_color", Color(0.4, 0.85, 0.6))
+
+			# Show convoy protection from full regional control (trade/convoy wiring)
+			if flows.size() > 0:
+				var tf = flows[0]
+				if tf.total_lost_to_interdiction > 0.01 or tf.metadata.has("regional_convoy_protection"):
+					text += " | prot: %.0f%% lost: %.1f" % [100.0 * float(tf.metadata.get("regional_convoy_protection", 0.0)), tf.total_lost_to_interdiction]
 
 			flows_label.text = text
 			RetrowaveTheme.style_body_label(flows_label)
@@ -426,7 +542,7 @@ func _add_bilateral_offer_row(offer_data: Dictionary) -> void:
 	RetrowaveTheme.style_row_label(items_label)
 	center.add_child(items_label)
 
-	var fairness := offer_data.get("fairness", {})
+	var fairness: Dictionary = offer_data.get("fairness", {})
 	if not fairness.is_empty():
 		var f_label := Label.new()
 		var score := float(fairness.get("score", 1.0))
@@ -468,7 +584,7 @@ func _add_bilateral_offer_row(offer_data: Dictionary) -> void:
 func _summarize_items(items: Array) -> String:
 	if items.is_empty():
 		return "Nothing"
-	var first := items[0]
+	var first: Dictionary = items[0]
 	var name := str(first.get("display_short", first.get("id", "?")))
 	if items.size() > 1:
 		return name + " +" + str(items.size() - 1)
@@ -520,7 +636,7 @@ func _populate_relations_metrics(player_tag: String, other_tag: String, current_
 	relations_metrics.add_child(activity_label)
 
 	# Metric 4: Simple Activity Level (lightweight heuristic)
-	var total_activity := summary.get("active_offers", 0) + counter_count
+	var total_activity: int = int(summary.get("active_offers", 0)) + counter_count
 	var level_label := Label.new()
 	var level_text := ""
 	var level_color := Color(0.7, 0.75, 0.85)

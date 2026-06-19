@@ -4,7 +4,7 @@
   "design_family": "us_naval_cold_war",
   "base_type": "Naval",
   "size_category": "Heavy",
-  "visual_archetype": "carrier",
+  "visual_archetype": "destroyer",
   "crew_required": 4200,
   "base_training_level": 34,
   "max_experience_level": 100,

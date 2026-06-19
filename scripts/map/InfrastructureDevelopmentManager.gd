@@ -8,7 +8,7 @@
 ##
 ## Register as autoload "InfrastructureDevelopmentManager" after MapManager and before heavy UI.
 ##
-## Status: Skeleton + Phase A foundation. Not yet wired into TimeManager or UI.
+## Status: Phase A/B/C complete + polish for 50+ turn integrated playtest (inspector full w/ bar/cancel/ETA/modifiers; map active-project visuals; AI auto-invest daily+harness; persist; toasts; pop/econ wire on complete; balance gates). Wired globally + signals. Ready.
 
 extends Node
 
@@ -187,6 +187,16 @@ func can_start_project(province_id: int, axis: String, investor_tag: String) -> 
 		result.reason = "You must control the province to invest in it."
 		return result
 
+	# Stability gate per DESIGN (low/unstable < ~30 makes projects risky or blocked for flavor + balance)
+	if typeof(NationalModifierManager) != TYPE_NIL:
+		var stab := float(NationalModifierManager.get_national_modifier(tag, "stability"))
+		if stab < -0.35:  # very negative stability blocks (unrest, strikes)
+			result.reason = "National stability too low for major investment (%.0f%%)." % (stab * 100.0 + 50.0)
+			return result
+		if stab < 0.0:
+			# light warning in preview (slows via modifiers anyway)
+			pass
+
 	var current_level := p.infrastructure if axis == "infrastructure" else p.development_level
 	var max_for_era := _get_era_max(tag, axis)
 
@@ -205,8 +215,14 @@ func can_start_project(province_id: int, axis: String, investor_tag: String) -> 
 	result.work_per_day = preview_work
 	result.eta_days = int(ceil(100.0 / maxf(0.1, preview_work))) if preview_work > 0 else 60
 
-	# TODO: Check actual Political Power / national construction capacity here
-	# For now we assume the caller (UI) will validate PP.
+	var active_for_country := _count_active_projects_for(tag)
+	var capacity := _national_construction_capacity(tag)
+	if active_for_country >= capacity:
+		result.reason = "National construction capacity reached (%d/%d active projects)." % [active_for_country, capacity]
+		return result
+	if cost > _available_political_power(tag):
+		result.reason = "Insufficient political power (need %d, have ~%d)." % [cost, _available_political_power(tag)]
+		return result
 
 	result.ok = true
 	result.reason = "Ready to start %s investment toward level %d." % [axis, current_level + gap]
@@ -215,7 +231,7 @@ func can_start_project(province_id: int, axis: String, investor_tag: String) -> 
 
 func start_infrastructure_project(province_id: int, target_level: int, investor_tag: String) -> ProvincialProject:
 	"""Main entry point from UI / AI. Returns the project or null on failure."""
-	var preview := can_start_project(province_id, "infrastructure", investor_tag)
+	var preview: Dictionary = can_start_project(province_id, "infrastructure", investor_tag)
 	if not preview.get("ok", false):
 		push_warning("InfrastructureDevelopmentManager: cannot start project — %s" % preview.get("reason", "unknown"))
 		return null
@@ -245,6 +261,12 @@ func start_infrastructure_project(province_id: int, target_level: int, investor_
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
 		MapManager.notify_province_changed(province_id, "infrastructure_project")
 
+	# Event hook: player feedback on starting investment (makes the action feel consequential immediately).
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+		var prov: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+		var pname := prov.name if prov else str(province_id)
+		LeaderEventUI.post_news("Investment Started", "%s begins infrastructure project in %s (target level %d)." % [proj.owner_tag, pname, target_level], "infrastructure")
+
 	print("InfrastructureDevelopmentManager: started infra project on province %d (target %d) for %s" % [province_id, target_level, proj.owner_tag])
 	return proj
 
@@ -256,6 +278,9 @@ func cancel_project(province_id: int, reason: String = "player_cancelled") -> bo
 	proj.status = "cancelled"
 	active_projects.erase(province_id)
 	project_cancelled.emit(province_id, reason)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
+		MapManager.notify_province_changed(province_id, "infrastructure_project")
+		MapManager.notify_province_changed(province_id, "effects")
 	return true
 
 
@@ -287,6 +312,11 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 
 		if delta > 0.001:
 			project_progress_updated.emit(pid, proj, delta)
+			# Light event feedback for playability (avoid spam; only on significant chunks or high %).
+			if (int(proj.progress) % 25 == 0 or proj.progress > 90) and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				var prov: Province = MapManager.get_province(pid) if typeof(MapManager) != TYPE_NIL else null
+				var pname := prov.name if prov else str(pid)
+				LeaderEventUI.show_toast("%s infra project ~%d%% complete (ETA %d days)" % [pname, int(proj.progress), proj.get_eta_days()], 2.0)
 
 		if proj.progress >= 100.0:
 			to_complete.append({"pid": pid, "proj": proj})
@@ -294,6 +324,11 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 	# Complete outside the iteration
 	for item in to_complete:
 		_complete_project(int(item.pid), item.proj)
+
+	# Auto AI investment consideration (low rate for natural 50+ turn playtest evolution; non-player countries develop cores).
+	# Uses same validation/Mandate path. Throttled to prevent spam.
+	if randi() % 5 == 0:  # roughly every 5 days across sim
+		ai_consider_daily_invests([], 0.08)
 
 
 func apply_sabotage_to_province(province_id: int, chip_amount: float, source: String = "agent_network") -> void:
@@ -311,6 +346,12 @@ func apply_sabotage_to_province(province_id: int, chip_amount: float, source: St
 
 	if proj.progress < 5.0 and proj.status == "active":
 		proj.status = "sabotaged"
+
+	# Event hook: sabotage is agent-driven, surface as news for player (Hidden Hand flavor).
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+		var prov: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+		var pname := prov.name if prov else str(province_id)
+		LeaderEventUI.post_news("Infrastructure Sabotaged", "Project in %s hit by %s (%.1f work lost). Progress set back." % [pname, source, work_lost], "sabotage")
 
 
 ## === Internal helpers (MVP — will grow) ===
@@ -353,6 +394,13 @@ func _refresh_project_modifiers(proj: ProvincialProject, province: Province) -> 
 		if tech_speed != 0.0:
 			proj.modifiers["tech"] = tech_speed
 
+	# Regional control build speed (full control of industrial regions e.g. Western Germany gives infrastructure_build_speed bonus; wired as next step for scenario connections)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+		var reg := MapManager.get_active_regional_control_bonuses(proj.owner_tag)
+		var build_sp := float(reg.get("infrastructure_build_speed", 0.0))
+		if build_sp != 0.0:
+			proj.modifiers["regional"] = build_sp
+
 	# Current sabotage from agent networks (the duel)
 	if typeof(AgentManager) != TYPE_NIL:
 		var net = AgentManager.networks.get(proj.province_id)
@@ -385,17 +433,31 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 		# Fallback for unknown axes
 		pass
 
+	# Wire to pop/econ (per goals + DESIGN): infra upgrade attracts population (industrialization pull) + labor for future production.
+	# Uses direct mutate + notify (pop is runtime in Province; settlement also boosted for org/attrit/supply combat payoff).
+	if p.population > 0:
+		var pop_influx := maxi(800, int(p.population * 0.012 + new_level * 180))
+		p.population += pop_influx
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
+		MapManager.notify_province_changed(province_id, "population")
+	# Also nudge settlement for immediate "our industrial heartland grows" (ties to existing 2.5%/sett combat def etc).
+	if p.settlement_level < 3.0:
+		p.settlement_level = clampf(p.settlement_level + 0.04, 0.0, 5.0)
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
+			MapManager.notify_province_changed(province_id, "settlement")
+
 	proj.status = "complete"
 	active_projects.erase(province_id)
 
 	project_completed.emit(province_id, new_level, axis, proj)
 
-	# Rich toast / news hook (if NewsFeed or similar exists)
-	# Use get_node_or_null to avoid parser errors for non-existent autoloads
-	var news_feed = get_node_or_null("/root/NewsFeed")
-	if news_feed != null:  # soft dependency
-		# news_feed.add_entry(...) — implement when news system is ready
-		pass
+	# Flesh out events: post news + toast on infra complete (player-visible payoff for investment; ties to supply/combat width/org recovery).
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+		var prov: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+		var pname := prov.name if prov else str(province_id)
+		LeaderEventUI.post_news("Infrastructure Complete", "%s project finished in %s (now level %d). Local supply, org recovery, and combat width improved for %s." % [axis.capitalize(), pname, new_level, proj.owner_tag], "infrastructure")
+		if LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast("Investment complete in %s: %s now level %d" % [pname, axis, new_level], 4.0)
 
 	print("InfrastructureDevelopmentManager: COMPLETED %s project on province %d → level %d for %s" % [axis, province_id, new_level, proj.owner_tag])
 
@@ -503,7 +565,7 @@ func is_project_sabotaged(province_id: int) -> bool:
 
 ## Starts a construction project that will result in a SpecialSite when completed.
 func start_special_site_project(province_id: int, site_id: String, investor_tag: String) -> ProvincialProject:
-	var preview := can_start_project(province_id, "special_site", investor_tag)
+	var preview: Dictionary = can_start_project(province_id, "special_site", investor_tag)
 	if not preview.get("ok", false):
 		push_warning("Cannot start special site project: " + str(preview.get("reason")))
 		return null
@@ -626,7 +688,7 @@ func start_special_site_upgrade_project(province_id: int, current_site: SpecialS
 		return null
 
 	var target_id := current_site.get_upgrade_target_id()
-	var preview := can_start_project(province_id, "special_site_upgrade", investor_tag)
+	var preview: Dictionary = can_start_project(province_id, "special_site_upgrade", investor_tag)
 	if not preview.get("ok", false):
 		return null
 
@@ -762,7 +824,7 @@ func get_project_status(province_id: int) -> Dictionary:
 ## Convenience for the most common case (InfoPanel "Invest" button).
 ## Returns { success: bool, reason: String, project: ProvincialProject? }
 func try_start_infrastructure_investment(province_id: int, investor_tag: String) -> Dictionary:
-	var preview := can_start_project(province_id, "infrastructure", investor_tag)
+	var preview: Dictionary = can_start_project(province_id, "infrastructure", investor_tag)
 	if not preview.get("ok", false):
 		return {
 			"success": false,
@@ -770,8 +832,18 @@ func try_start_infrastructure_investment(province_id: int, investor_tag: String)
 			"preview": preview
 		}
 
-	# TODO (Phase B): Real Political Power spend here.
-	# For now we just proceed (the design assumes the UI or a NationalLedger will gate PP later).
+	# Real Political Power / Mandate spend (high-value wiring for player investment loop)
+	var pp_cost := int(preview.get("cost_pp", 0))
+	if typeof(GameData) != TYPE_NIL:
+		# Validate Mandate (primary for infra)
+		var ps: Dictionary = GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
+		var current_mand := int(ps.get("mandate", {}).get(investor_tag, 0))
+		if current_mand < pp_cost:
+			return {"success": false, "reason": "Insufficient Mandate (%d < %d)" % [current_mand, pp_cost], "preview": preview}
+		# Spend Mandate (primary for infra); small Ascendancy cost
+		GameData.apply_pillar_shift(investor_tag, "mandate", -pp_cost, "infra_invest_" + str(province_id))
+		# Optional small ascendancy cost/gain
+		GameData.apply_pillar_shift(investor_tag, "ascendancy", -int(pp_cost * 0.3), "infra_invest_prestige")
 
 	# Compute sensible target (current +1 for MVP)
 	var p_for_target: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
@@ -812,3 +884,108 @@ func should_show_investment_button(province_id: int, player_tag: String) -> bool
 		return false
 
 	return true
+
+
+## AI helper (called from DebugOverlay AI sim turns, TestRunner headless demos, or daily if extended).
+## AI countries aggressively develop core / high-value low-infra provinces (per DESIGN Phase D).
+## Uses same try_start so Mandate spend + full validation (engineer, tech, stab) applies.
+## Probabilistic to avoid spam; prefers provinces with factories or high pop or in core.
+func ai_consider_daily_invests(ai_country_tags: Array = [], chance_per_country: float = 0.35) -> int:
+	var started := 0
+	if ai_country_tags.is_empty():
+		# Fallback: discover some non-player tags from MapManager
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_provinces"):
+			var all_p := MapManager.get_all_provinces()
+			var seen := {}
+			for pid in all_p:
+				var pr: Province = all_p[pid]
+				if pr and not pr.owner_tag.is_empty():
+					seen[pr.owner_tag] = true
+			ai_country_tags = seen.keys()
+			# crude: filter player later if known
+	if ai_country_tags.is_empty():
+		return 0
+
+	var player := ""
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_player_tag"):
+		player = GameData.get_player_tag()
+
+	for raw_tag in ai_country_tags:
+		var tag := str(raw_tag).strip_edges().to_upper()
+		if tag.is_empty() or tag == player:
+			continue
+		if randf() > chance_per_country:
+			continue  # probabilistic throttle for 50+ turn playtest feel
+
+		# Collect candidate provinces for this AI: owned/controller, lowish infra, prefer core + factories
+		var candidates: Array = []
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_provinces"):
+			var allp := MapManager.get_all_provinces()
+			for pidv in allp:
+				var pid := int(pidv)
+				var pr: Province = allp[pidv]
+				if pr == null: continue
+				if pr.owner_tag.to_upper() != tag and pr.controller_tag.to_upper() != tag: continue
+				if has_active_project(pid): continue
+				if pr.infrastructure >= _get_era_max(tag, "infrastructure") - 1: continue
+				var score := 10.0
+				score -= float(pr.infrastructure) * 0.6  # prefer lower infra
+				var is_core := false
+				if pr.core_for.size() > 0:
+					is_core = pr.owner_tag.to_upper() == str(pr.core_for[0]).to_upper()
+				if is_core:
+					score += 8.0
+				score += float(pr.factories) * 1.5
+				score += float(pr.population) / 200000.0
+				candidates.append({"pid": pid, "score": score, "prov": pr})
+
+		if candidates.is_empty():
+			continue
+		candidates.sort_custom(func(a, b): return a.score > b.score)
+		# Try top 1-2
+		for i in range(min(2, candidates.size())):
+			var c: Dictionary = candidates[i]
+			var pid: int = c.pid
+			var preview := can_start_project(pid, "infrastructure", tag)
+			if preview.get("ok", false):
+				# Use try_ for full Mandate/econ spend + event hooks (same as player)
+				if has_method("try_start_infrastructure_investment"):
+					var res: Dictionary = try_start_infrastructure_investment(pid, tag)
+					if res.get("success", false):
+						started += 1
+						print("InfrastructureDevelopmentManager: AI %s auto-started infra invest on #%d (ETA %s)" % [tag, pid, str(res.get("eta_days", "?"))])
+						break  # one per country per consider tick
+	return started
+
+
+func _count_active_projects_for(country_tag: String) -> int:
+	var tag := country_tag.strip_edges().to_upper()
+	var n := 0
+	for proj in active_projects.values():
+		if str(proj.owner_tag).to_upper() == tag and str(proj.status) == "active":
+			n += 1
+	return n
+
+
+func _national_construction_capacity(country_tag: String) -> int:
+	var tag := country_tag.strip_edges().to_upper()
+	var cap := 3
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_public_cohesion"):
+		var coh: int = int(GameData.get_public_cohesion(tag))
+		cap += clampi(coh / 25, 0, 4)
+	return cap
+
+
+func _available_political_power(country_tag: String) -> int:
+	var tag := country_tag.strip_edges().to_upper()
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_political_power"):
+		return int(GameData.get_political_power(tag))
+	# Proxy: factories + dev on owned provinces minus active project load
+	var pp := 50
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):
+		for pid in MapManager.get_provinces_by_owner(tag):
+			var p: Province = MapManager.get_province(int(pid))
+			if p != null:
+				pp += p.factories * 8 + int(p.development_level) * 2
+	pp -= _count_active_projects_for(tag) * 12
+	return maxi(pp, 0)

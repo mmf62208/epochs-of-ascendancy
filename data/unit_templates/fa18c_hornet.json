@@ -4,7 +4,7 @@
   "design_family": "us_carrier_air_modern",
   "base_type": "Air",
   "size_category": "Medium",
-  "visual_archetype": "fighter",
+  "visual_archetype": "dive_bomber",
   "crew_required": 1,
   "base_training_level": 37,
   "max_experience_level": 100,

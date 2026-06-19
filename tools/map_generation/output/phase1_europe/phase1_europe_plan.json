@@ -9,210 +9,160 @@
     "island_groups": 16
   },
   "subdivision": {
-    "candidates_ranked": 40,
-    "children_proposed": 120,
-    "unique_parents_subdivided": 40
+    "candidates_ranked": 78,
+    "children_proposed": 449,
+    "unique_parents_subdivided": 78
   },
   "high_priority_candidates": [
     {
+      "province_id": 82,
+      "priority_score": 8.432,
+      "river_cross_score": 0.9,
+      "natural_border_reason": "river_cross"
+    },
+    {
       "province_id": 73,
       "priority_score": 8.176,
-      "suggested_splits": 3,
-      "naval_importance": 2.17,
-      "is_coastal": true,
-      "is_chokepoint": true
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 97,
       "priority_score": 7.56,
-      "suggested_splits": 3,
-      "naval_importance": 1.95,
-      "is_coastal": true,
-      "is_chokepoint": true
-    },
-    {
-      "province_id": 82,
-      "priority_score": 7.532,
-      "suggested_splits": 3,
-      "naval_importance": 1.94,
-      "is_coastal": true,
-      "is_chokepoint": true
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 58,
       "priority_score": 7.476,
-      "suggested_splits": 3,
-      "naval_importance": 1.92,
-      "is_coastal": true,
-      "is_chokepoint": true
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 94,
       "priority_score": 7.476,
-      "suggested_splits": 3,
-      "naval_importance": 1.92,
-      "is_coastal": true,
-      "is_chokepoint": true
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 35,
       "priority_score": 7.448,
-      "suggested_splits": 3,
-      "naval_importance": 1.91,
-      "is_coastal": true,
-      "is_chokepoint": true
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
+    },
+    {
+      "province_id": 77,
+      "priority_score": 7.064,
+      "river_cross_score": 1.8,
+      "natural_border_reason": "river_cross"
+    },
+    {
+      "province_id": 80,
+      "priority_score": 7.036,
+      "river_cross_score": 1.8,
+      "natural_border_reason": "river_cross"
+    },
+    {
+      "province_id": 16,
+      "priority_score": 6.44,
+      "river_cross_score": 1.8,
+      "natural_border_reason": "river_cross"
+    },
+    {
+      "province_id": 24,
+      "priority_score": 6.44,
+      "river_cross_score": 1.8,
+      "natural_border_reason": "river_cross"
+    },
+    {
+      "province_id": 32,
+      "priority_score": 6.44,
+      "river_cross_score": 1.8,
+      "natural_border_reason": "river_cross"
+    },
+    {
+      "province_id": 66,
+      "priority_score": 6.36,
+      "river_cross_score": 0.9,
+      "natural_border_reason": "river_cross"
     },
     {
       "province_id": 93,
       "priority_score": 5.824,
-      "suggested_splits": 3,
-      "naval_importance": 1.33,
-      "is_coastal": true,
-      "is_chokepoint": false
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 47,
       "priority_score": 5.6,
-      "suggested_splits": 3,
-      "naval_importance": 1.25,
-      "is_coastal": true,
-      "is_chokepoint": false
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
-      "province_id": 66,
-      "priority_score": 5.46,
-      "suggested_splits": 3,
-      "naval_importance": 1.2,
-      "is_coastal": true,
-      "is_chokepoint": false
+      "province_id": 20,
+      "priority_score": 5.54,
+      "river_cross_score": 0.9,
+      "natural_border_reason": "river_cross"
+    },
+    {
+      "province_id": 46,
+      "priority_score": 5.54,
+      "river_cross_score": 0.9,
+      "natural_border_reason": "river_cross"
+    },
+    {
+      "province_id": 61,
+      "priority_score": 5.54,
+      "river_cross_score": 0.9,
+      "natural_border_reason": "river_cross"
     },
     {
       "province_id": 87,
       "priority_score": 5.404,
-      "suggested_splits": 3,
-      "naval_importance": 1.18,
-      "is_coastal": true,
-      "is_chokepoint": false
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 71,
       "priority_score": 5.376,
-      "suggested_splits": 3,
-      "naval_importance": 1.17,
-      "is_coastal": true,
-      "is_chokepoint": false
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 51,
       "priority_score": 5.292,
-      "suggested_splits": 3,
-      "naval_importance": 1.14,
-      "is_coastal": true,
-      "is_chokepoint": false
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 65,
       "priority_score": 5.292,
-      "suggested_splits": 3,
-      "naval_importance": 1.14,
-      "is_coastal": true,
-      "is_chokepoint": false
-    },
-    {
-      "province_id": 77,
-      "priority_score": 5.264,
-      "suggested_splits": 3,
-      "naval_importance": 1.13,
-      "is_coastal": true,
-      "is_chokepoint": false
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 60,
       "priority_score": 5.236,
-      "suggested_splits": 3,
-      "naval_importance": 1.12,
-      "is_coastal": true,
-      "is_chokepoint": false
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 78,
       "priority_score": 5.236,
-      "suggested_splits": 3,
-      "naval_importance": 1.12,
-      "is_coastal": true,
-      "is_chokepoint": false
-    },
-    {
-      "province_id": 80,
-      "priority_score": 5.236,
-      "suggested_splits": 3,
-      "naval_importance": 1.12,
-      "is_coastal": true,
-      "is_chokepoint": false
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 96,
       "priority_score": 5.236,
-      "suggested_splits": 3,
-      "naval_importance": 1.12,
-      "is_coastal": true,
-      "is_chokepoint": false
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     },
     {
       "province_id": 98,
       "priority_score": 5.236,
-      "suggested_splits": 3,
-      "naval_importance": 1.12,
-      "is_coastal": true,
-      "is_chokepoint": false
-    },
-    {
-      "province_id": 74,
-      "priority_score": 5.208,
-      "suggested_splits": 3,
-      "naval_importance": 1.11,
-      "is_coastal": true,
-      "is_chokepoint": false
-    },
-    {
-      "province_id": 95,
-      "priority_score": 5.208,
-      "suggested_splits": 3,
-      "naval_importance": 1.11,
-      "is_coastal": true,
-      "is_chokepoint": false
-    },
-    {
-      "province_id": 75,
-      "priority_score": 5.18,
-      "suggested_splits": 3,
-      "naval_importance": 1.1,
-      "is_coastal": true,
-      "is_chokepoint": false
-    },
-    {
-      "province_id": 11,
-      "priority_score": 4.64,
-      "suggested_splits": 3,
-      "naval_importance": 1.3,
-      "is_coastal": false,
-      "is_chokepoint": true
-    },
-    {
-      "province_id": 12,
-      "priority_score": 4.64,
-      "suggested_splits": 3,
-      "naval_importance": 1.3,
-      "is_coastal": false,
-      "is_chokepoint": true
-    },
-    {
-      "province_id": 14,
-      "priority_score": 4.64,
-      "suggested_splits": 3,
-      "naval_importance": 1.3,
-      "is_coastal": false,
-      "is_chokepoint": true
+      "river_cross_score": 0.0,
+      "natural_border_reason": ""
     }
   ],
   "top_naval_importance": [

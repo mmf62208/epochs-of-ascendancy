@@ -153,7 +153,7 @@ This screen should be powered primarily by `LeaderScreenData`.
 ## 7. Future Enhancements
 
 - Drag-and-drop assignment (optional, click-based should remain primary)
-- Leader portraits
+- Leader portraits ✅ implemented: small icons in list rows + header col (24px TextureRect from summary portrait_path); DetailScreen full. Agent portraits in AgentAssignmentScreen too. Save/load hardened.
 - Historical leader bios and flavor text
 - Ability to promote leaders
 - Special events tied to leader traits or experience (e.g., "Desert Fox" gaining bonuses in desert campaigns)

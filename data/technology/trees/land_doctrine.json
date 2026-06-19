@@ -20,11 +20,41 @@
     },
     "unlocks": [
       { "type": "doctrine_key", "key": "infiltration" },
-      { "type": "doctrine_key", "key": "stormtrooper" }
+      { "type": "doctrine_key", "key": "stormtrooper" },
+      { "type": "doctrine_key", "key": "attrition_warfare" }
     ],
     "ui": {
-      "short_effect": "Unlocks Infiltration & Stormtrooper schools",
-      "flavor": "Staff colleges codify breakthrough tactics for the next war."
+      "short_effect": "Unlocks Infiltration, Stormtrooper & Attrition schools (WWI roots)",
+      "flavor": "Staff colleges codify breakthrough tactics for the next war. Post-1918 lessons from trenches, Hutier, and artillery."
+    }
+  },
+  "methodical_battle_study": {
+    "id": "methodical_battle_study",
+    "name": "Methodical Battle & Firepower Doctrine",
+    "domain": "land_doctrine",
+    "tree_id": "land_doctrine_core",
+    "node_kind": "doctrine",
+    "column": 0,
+    "row": 1,
+    "tier": 2,
+    "era_min": 1920,
+    "era_max": 1940,
+    "epoch": "interwar",
+    "prerequisites": ["land_doctrine_i"],
+    "mutually_exclusive_with": ["mobile_warfare_study"],
+    "research": {
+      "base_cost_days": 70,
+      "category": "land_doctrine",
+      "ahead_of_time_penalty_per_year": 0.09,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "doctrine_key", "key": "fortification_specialist" },
+      { "type": "doctrine_key", "key": "joint_fire_coordination" }
+    ],
+    "ui": {
+      "short_effect": "French methodical battle / firepower school; unlocks fort & artillery paths",
+      "flavor": "Deliberate, artillery-heavy, set-piece attacks. Maginot Line + elastic defense alt-history. Rewards prepared defense."
     }
   },
   "mobile_warfare_study": {
@@ -36,10 +66,11 @@
     "column": 1,
     "row": 0,
     "tier": 2,
-    "era_min": 1936,
+    "era_min": 1930,
     "era_max": 1970,
     "epoch": "industrial_war",
     "prerequisites": ["land_doctrine_i"],
+    "mutually_exclusive_with": ["methodical_battle_study"],
     "research": {
       "base_cost_days": 65,
       "category": "land_doctrine",
@@ -48,11 +79,40 @@
     },
     "unlocks": [
       { "type": "doctrine_key", "key": "mobile_warfare" },
-      { "type": "doctrine_key", "key": "mass_assault" }
+      { "type": "doctrine_key", "key": "mass_assault" },
+      { "type": "doctrine_key", "key": "blitzkrieg" }
     ],
     "ui": {
-      "short_effect": "School of Maneuver & Layered Defense paths",
-      "flavor": "Deep battle and elastic defense enter doctrine manuals."
+      "short_effect": "School of Maneuver, Deep Battle & Blitzkrieg paths",
+      "flavor": "Guderian/Tukhachevsky ideas mature. Speed, echeloned attack, exploitation. Rewards aggressive mobile playstyles."
+    }
+  },
+  "combined_arms_interwar": {
+    "id": "combined_arms_interwar",
+    "name": "Combined Arms Integration",
+    "domain": "land_doctrine",
+    "tree_id": "land_doctrine_core",
+    "node_kind": "doctrine",
+    "column": 1,
+    "row": 1,
+    "tier": 3,
+    "era_min": 1934,
+    "era_max": 1960,
+    "epoch": "industrial_war",
+    "prerequisites": ["mobile_warfare_study", "radio_i"],
+    "research": {
+      "base_cost_days": 75,
+      "category": "land_doctrine",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "doctrine_key", "key": "combined_arms_school" },
+      { "type": "doctrine_key", "key": "joint_fire_coordination" }
+    ],
+    "ui": {
+      "short_effect": "Infantry-armor-artillery-air coordination school",
+      "flavor": "Real combined-arms (historical German 1939-41 edge). Unlocks elite training paths across branches."
     }
   },
   "network_centric_study": {
@@ -67,7 +127,7 @@
     "era_min": 1990,
     "era_max": 2040,
     "epoch": "information",
-    "prerequisites": ["mobile_warfare_study"],
+    "prerequisites": ["mobile_warfare_study", "combined_arms_interwar"],
     "research": {
       "base_cost_days": 80,
       "category": "land_doctrine",
@@ -81,6 +141,34 @@
     "ui": {
       "short_effect": "Information-era leader training paths",
       "flavor": "C4ISR integration reshapes command and joint fires."
+    }
+  },
+  "deep_battle_advanced": {
+    "id": "deep_battle_advanced",
+    "name": "Operational Art & Deep Battle Advanced",
+    "domain": "land_doctrine",
+    "tree_id": "land_doctrine_core",
+    "node_kind": "doctrine",
+    "column": 0,
+    "row": 2,
+    "tier": 3,
+    "era_min": 1936,
+    "era_max": 1980,
+    "epoch": "industrial_war",
+    "prerequisites": ["mobile_warfare_study"],
+    "research": {
+      "base_cost_days": 90,
+      "category": "land_doctrine",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "doctrine_key", "key": "deep_battle" },
+      { "type": "division_capability", "capability": "airborne" }
+    ],
+    "ui": {
+      "short_effect": "Soviet-style multi-echelon deep ops + airborne capability",
+      "flavor": "Tukhachevsky legacy. Successive waves + operational maneuver groups. Rewards mass + coordination over pure speed."
     }
   }
 }

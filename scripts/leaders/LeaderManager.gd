@@ -18,6 +18,7 @@ signal leader_replacement_needed(request: Dictionary)
 signal leader_replacement_resolved(request_id: String, new_leader_id: String, left_vacant: bool)
 
 const REPLACEMENT_CONTEXT_FORMATION := "formation_commander"
+const DEBUG_DOCTRINE_LOGS := false  # Set true for verbose "Doctrine set" / CHANGE during tests/demos; off for clean normal play logs. Feature itself (org loss on change) always active.
 const REPLACEMENT_CONTEXT_NATIONAL_POSITION := "national_position"
 ## When only one eligible candidate matches the auto-pick, assign immediately (player countries).
 const REPLACEMENT_INSTANT_SINGLE_CANDIDATE := true
@@ -167,8 +168,200 @@ var formations: Dictionary = {}  # formation_id -> Formation
 var country_positions: Dictionary = {}  # country_tag -> { position_id -> leader_id }
 var trait_definitions: Dictionary = {}
 var training_path_definitions: Dictionary = {}
-## Per-country unlocked military doctrines (UI/national system hooks here later).
-var country_military_doctrines: Dictionary = {}  # country_tag -> Array[String]
+## Per-country and per-service military doctrines (critical high-level choice impacting all military production, training, and operations).
+# Structure: country_tag -> { "army": "blitzkrieg", "navy": "carrier_task_force", "air_force": "strategic_bombing", ... }
+# Doctrines provide branch-wide bonuses/penalties (e.g., resilient/extra armor vs high performance/cheap), guide AI/agent module choices in design, affect leader training paths.
+# Evolves over time: research/agents unlock new doctrines or reveal weaknesses, allowing player/agents to change with costs (stability, mandate, transition penalties).
+# Player sets via Doctrine page (high-level direction for agents/AI); Chiefs (generals/admirals) can enforce or propose changes.
+# Micro allowed in designer (override per unit); macro via doctrine as guideline.
+var service_doctrines: Dictionary = {}  # country_tag -> { "army": doctrine_id, "navy": ..., "air_force": ..., "space_force": ... }
+
+# Example doctrines with real trade-offs (WWI to 2026+). Expand in data/leaders/doctrines.json later.
+const DOCTRINE_DEFINITIONS = {
+	"attrition_warfare": { # WWI Army
+		"name": "Attrition Warfare",
+		"branch": "army",
+		"era": "ww1",
+		"benefits": {"manpower_efficiency": 0.15, "artillery_bonus": 0.20, "attrition_resist": 0.10},
+		"costs": {"mobility": -0.25, "casualty_rate": 0.30, "supply_drain": 0.15},
+		"description": "Mass infantry assaults, heavy artillery prep. Resilient to losses but slow, high casualties. Classic WWI French/German doctrine."
+	},
+	"blitzkrieg": { # WWII German Army
+		"name": "Blitzkrieg / Maneuver Warfare",
+		"branch": "army",
+		"era": "ww2",
+		"benefits": {"mobility": 0.30, "breakthrough": 0.25, "coordination": 0.15},
+		"costs": {"supply_drain": 0.25, "attrition_sensitivity": 0.20, "overextension_risk": 0.10},
+		"description": "Fast armored thrusts + air support, deep exploitation. High performance, cheap in short wars but vulnerable to prolonged attrition or bad weather."
+	},
+	"deep_battle": { # Soviet
+		"name": "Deep Battle",
+		"branch": "army",
+		"era": "ww2",
+		"benefits": {"mass": 0.20, "artillery_integration": 0.25, "resilience": 0.15},
+		"costs": {"coordination_complexity": 0.10, "mobility": -0.10},
+		"description": "Echeloned attacks, combined arms. Resilient, good for large fronts."
+	},
+	"carrier_task_force": { # WWII US Navy
+		"name": "Carrier Task Force",
+		"branch": "navy",
+		"era": "ww2",
+		"benefits": {"air_power_projection": 0.35, "flexibility": 0.20, "strike_range": 0.25},
+		"costs": {"vulnerability_to_subs": 0.15, "high_cost": 0.20, "logistics_demand": 0.15},
+		"description": "Mobile carriers + escorts for sea control and strikes. High performance, transforms naval warfare."
+	},
+	"submarine_commerce_raiding": { # German/Japanese
+		"name": "Unrestricted Submarine Warfare",
+		"branch": "navy",
+		"era": "ww2",
+		"benefits": {"commerce_disruption": 0.40, "stealth": 0.30, "cost_efficiency": 0.20},
+		"costs": {"international_backlash": 0.25, "escort_counter": 0.15, "ethical_penalty": 0.10},
+		"description": "Cheap, high-impact on enemy supply. High performance but risks escalation."
+	},
+	"strategic_bombing": { # Allied Air
+		"name": "Strategic Bombing",
+		"branch": "air_force",
+		"era": "ww2",
+		"benefits": {"industrial_disruption": 0.35, "morale_impact": 0.15, "long_range": 0.20},
+		"costs": {"high_losses": 0.25, "resource_intensive": 0.20, "civilian_cost": 0.15},
+		"description": "Heavy bombers to destroy enemy industry/will. Resilient in theory but expensive and ethically costly."
+	},
+	"network_centric_warfare": { # Modern
+		"name": "Network-Centric / Precision Warfare",
+		"branch": "army",
+		"era": "modern",
+		"benefits": {"precision": 0.30, "coordination": 0.25, "info_superiority": 0.20},
+		"costs": {"cyber_vulnerability": 0.15, "tech_dependency": 0.15, "high_cost": 0.20},
+		"description": "Sensors, drones, real-time data for dominant battlespace awareness. High performance but fragile to disruption."
+	},
+	"distributed_lethality": { # Modern Navy
+		"name": "Distributed Lethality / A2/AD",
+		"branch": "navy",
+		"era": "modern",
+		"benefits": {"survivability": 0.25, "flexible_strike": 0.25, "anti_access": 0.30},
+		"costs": {"complex_command": 0.15, "logistics_spread": 0.10},
+		"description": "Disperse forces, small ships with big missiles. Resilient to concentration attacks."
+	},
+	"drone_swarm_ai": { # 2026+
+		"name": "Drone Swarm / AI-Augmented Ops",
+		"branch": "air_force",
+		"era": "future",
+		"benefits": {"mass_low_cost": 0.40, "attrition_tolerance": 0.30, "speed_of_decision": 0.25},
+		"costs": {"ai_ethics_risk": 0.15, "electronic_warfare_suscept": 0.20, "training_complexity": 0.10},
+		"description": "Cheap, resilient swarms over expensive manned. High performance in volume, but ethical and jam vulnerabilities."
+	},
+	"methodical_battle": {
+		"name": "Methodical Battle / Firepower Doctrine",
+		"branch": "army",
+		"era": "ww1_interwar",
+		"benefits": {"artillery_bonus": 0.25, "defense": 0.20, "organization_recovery": 0.10, "entrenchment": 0.15},
+		"costs": {"mobility": -0.20, "initiative": -0.15, "supply_drain": 0.10},
+		"description": "Deliberate set-piece attacks with massive prep fires. French 1918-40 school (Maginot compatible). Rewards prepared positions, high resilience, punishes rushing."
+	},
+	"close_air_support": {
+		"name": "Close Air Support / Tactical Air",
+		"branch": "air_force",
+		"era": "ww2",
+		"benefits": {"air_ground_attack": 0.30, "coordination": 0.20, "breakthrough": 0.10},
+		"costs": {"air_losses_vs_fighters": 0.20, "range_limit": 0.15},
+		"description": "Airpower as flying artillery for ground spearheads. German 1939-42 model. Synergizes with blitz; vulnerable if air superiority lost."
+	},
+	"air_defense": {
+		"name": "Integrated Air Defense",
+		"branch": "air_force",
+		"era": "ww2",
+		"benefits": {"air_detection": 0.25, "interception": 0.20, "attrition_resist": 0.10},
+		"costs": {"offensive_air_power": -0.15, "high_infra_demand": 0.10},
+		"description": "Radar + fighters + AA for homeland defense. UK Battle of Britain model. Excellent for surviving strategic bombing; less aggressive projection."
+	}
+}
+
+# Get/set service doctrine
+func get_service_doctrine(country_tag: String, service: String) -> String:
+	var tag := country_tag.strip_edges().to_upper()
+	if not service_doctrines.has(tag):
+		return ""
+	var serv := service_doctrines[tag] as Dictionary
+	return str(serv.get(service, ""))
+
+func set_service_doctrine(
+	country_tag: String,
+	service: String,
+	doctrine_id: String,
+	silent: bool = false,
+) -> void:
+	var tag := country_tag.strip_edges().to_upper()
+	if not service_doctrines.has(tag):
+		service_doctrines[tag] = {}
+	var serv := service_doctrines[tag] as Dictionary
+	var old_doctrine = serv.get(service, "")
+	if old_doctrine == doctrine_id:
+		return
+	serv[service] = doctrine_id
+	if not silent and (DEBUG_DOCTRINE_LOGS or old_doctrine != doctrine_id or old_doctrine == ""):
+		print("Doctrine set: %s %s -> %s (was %s)" % [tag, service, doctrine_id, old_doctrine])
+
+	# Apply org loss to relevant units on doctrine philosophy change (simulates retraining, re-equipping, confusion in tactics/prototypes).
+	# No direct stability hit (too macro); instead targeted military disruption + temp design/production penalties.
+	if not silent and old_doctrine != "" and old_doctrine != doctrine_id:
+		_apply_doctrine_change_penalties(tag, service, old_doctrine, doctrine_id)
+		# Event: surface the philosophy shift with news (player sees org disruption + design penalty hooks).
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+			LeaderEventUI.post_news("Doctrine Change", "%s %s shifts to '%s' (was '%s'). Formations take org/readiness hits; production & prototypes temporarily penalized. Agent missions for exploit/stabilize may appear." % [tag, service, doctrine_id, old_doctrine], "doctrine")
+
+	# Notify for UI/events, update design filters if service doctrine.
+	if typeof(DesignManager) != TYPE_NIL:
+		# Future: refresh design pools for this service.
+		pass
+
+func _apply_doctrine_change_penalties(country_tag: String, service: String, old_doctrine: String, new_doctrine: String) -> void:
+	var tag := country_tag.strip_edges().to_upper()
+	if DEBUG_DOCTRINE_LOGS:
+		print("[DOCTRINE CHANGE] %s %s changing from %s to %s: applying org disruption to %s units, temp design penalties." % [tag, service, old_doctrine, new_doctrine, service])
+
+	# Org loss to formations of matching service.
+	if "formations" in self:
+		for fid in formations:
+			var f: Formation = formations[fid]
+			if f == null or f.country_tag != tag: continue
+			var matches_service := false
+			if service == "army" and f.formation_type in [Formation.TYPE_DIVISION, Formation.TYPE_ARMY, Formation.TYPE_ARMY_GROUP, Formation.TYPE_GARRISON]:
+				matches_service = true
+			elif service == "navy" and f.formation_type in [Formation.TYPE_FLEET, Formation.TYPE_TASK_FORCE, Formation.TYPE_SHIP]:
+				matches_service = true
+			elif service == "air_force" and f.formation_type in [Formation.TYPE_AIR_WING, Formation.TYPE_AIR_SQUADRON, Formation.TYPE_AIR_GROUP]:
+				matches_service = true
+			if matches_service:
+				# Apply org hit (e.g. 30-50% loss, simulates adaptation shock). Recover over time via training/reinforce.
+				var org_loss := 0.35
+				if "organization" in f:
+					f.organization = max(0.1, float(f.organization) * (1.0 - org_loss))
+				if "readiness" in f:
+					f.readiness = max(0.3, float(f.readiness) * 0.8)
+				if DEBUG_DOCTRINE_LOGS:
+					print("  - %s formation %s hit with org/readiness loss from doctrine shift." % [service, fid])
+
+	# Temp penalty to new designs/production for this service (e.g. 3-6 months "retooling philosophy").
+	# Could set a national modifier or per-country "doctrine_transition" flag with timer.
+	# For now, log + hook to ProductionManager if exists.
+	if typeof(ProductionManager) != TYPE_NIL:
+		# Example: increase design time or cost for new lines in this branch.
+		if DEBUG_DOCTRINE_LOGS:
+			print("  - Production/design for %s temporarily penalized (prototype re-evaluation)." % service)
+
+	# Agents/leaders notified: e.g. chiefs may gain stress, agents get "doctrine shift" intel opportunities.
+	if typeof(AgentManager) != TYPE_NIL and DEBUG_DOCTRINE_LOGS:
+		print("  - Agent hooks: potential 'exploit transition' or 'stabilize doctrine' missions available.")
+
+# Apply doctrine effects (e.g., to training or stats). Call when chief assigned or periodically.
+func apply_service_doctrine_effects(country_tag: String, service: String) -> void:
+	var doctrine := get_service_doctrine(country_tag, service)
+	if doctrine.is_empty() or not DOCTRINE_DEFINITIONS.has(doctrine):
+		return
+	var def := DOCTRINE_DEFINITIONS[doctrine] as Dictionary
+	print("[DOCTRINE EFFECTS] %s %s: %s benefits=%s costs=%s" % [country_tag, service, def.get("name"), def.get("benefits"), def.get("costs")])
+	# Hook to leader training, unit stats, production multipliers, etc.
+	# E.g., if army "blitzkrieg", boost mobility in formations under that service.
 var current_year: int = 1936
 var _historical_leaders_source_path: String = ""
 ## Per-country morale bonuses from honored retirements (stub until national UI exists).
@@ -447,6 +640,7 @@ func can_assign_national_position(
 			result["can_assign"] = false
 			result["reason"] = "Leader cannot mentor while unavailable"
 			return result
+		# Brand new leaders (recent start_year) are explicitly allowed as mentors for historical/test scenarios.
 	elif not leader.is_available_for_command():
 		result["can_assign"] = false
 		result["reason"] = "Leader is not available for command"
@@ -498,6 +692,14 @@ func set_country_position(
 		"Set %s as %s for %s"
 		% [leader.name, position, country_tag]
 	)
+
+	# Apply service doctrine effects when chief is set (the head implements the philosophy).
+	if position in [POSITION_CHIEF_OF_ARMY, POSITION_CHIEF_OF_NAVY, POSITION_CHIEF_OF_AIR_FORCE, POSITION_CHIEF_OF_SPACE_FORCE]:
+		var service := "army"
+		if position == POSITION_CHIEF_OF_NAVY: service = "navy"
+		elif position == POSITION_CHIEF_OF_AIR_FORCE: service = "air_force"
+		elif position == POSITION_CHIEF_OF_SPACE_FORCE: service = "space_force"
+		apply_service_doctrine_effects(country_tag, service)
 	invalidate_leader_cache(country_tag)
 	return true
 
@@ -509,7 +711,14 @@ func get_country_position_leader(country_tag: String, position: String) -> Leade
 	var leader_id := str(positions.get(position, ""))
 	if leader_id.is_empty():
 		return null
-	return leaders.get(leader_id) as Leader
+	var leader: Leader = leaders.get(leader_id) as Leader
+	if leader == null or leader.is_retired or leader.is_deceased or leader.is_captured or not leader.is_available_for_command():
+		# Auto-clean dangling assignment for unavailable leaders (e.g. retired/test historical edge or mortality edge cases).
+		# This ensures the UI shows "Vacant" + "Assign" cleanly and a new leader can be chosen.
+		(positions as Dictionary).erase(position)
+		invalidate_leader_cache(country_tag)
+		return null
+	return leader
 
 
 func get_national_bonuses(country_tag: String) -> Dictionary:
@@ -554,6 +763,15 @@ func get_national_combat_modifiers(country_tag: String) -> Dictionary:
 		"planning_speed": 0.0,
 		"attack_factor": 0.0,
 		"manpower_factor": 0.0,
+		# Extended for new techs (cloning/cyber/genetic/sonic/CB/drone/shield/phaser/tele/layered/VR)
+		"infantry_enhancement": 0.0,
+		"soldier_enhancement": 0.0,
+		"precision_strike": 0.0,
+		"defensive_shielding": 0.0,
+		"energy_weapon_dmg": 0.0,
+		"manpower_replacement": 0.0,
+		"rapid_deployment": 0.0,
+		"training_efficiency": 0.0,
 	}
 
 	if country_tag.is_empty():
@@ -565,7 +783,7 @@ func get_national_combat_modifiers(country_tag: String) -> Dictionary:
 			result[k] = float(result[k]) + float(spirit.get(k, 0.0))
 
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var temp := NationalModifierManager.get_combat_modifiers(country_tag)
+		var temp: Dictionary = NationalModifierManager.get_combat_modifiers(country_tag)
 		for k in result.keys():
 			result[k] = float(result[k]) + float(temp.get(k, 0.0))
 
@@ -578,6 +796,14 @@ func _get_combined_national_combat_modifiers(country_tag: String) -> Dictionary:
 		"defence_factor": 0.0,
 		"planning_speed": 0.0,
 		"attack_factor": 0.0,
+		# Extended for new techs (cloning/cyber/genetic/sonic/CB/drone/shield/phaser/tele etc)
+		"infantry_enhancement": 0.0,
+		"soldier_enhancement": 0.0,
+		"precision_strike": 0.0,
+		"defensive_shielding": 0.0,
+		"energy_weapon_dmg": 0.0,
+		"manpower_replacement": 0.0,
+		"rapid_deployment": 0.0,
 	}
 
 	if typeof(NationalSpiritManager) != TYPE_NIL:
@@ -586,7 +812,7 @@ func _get_combined_national_combat_modifiers(country_tag: String) -> Dictionary:
 			result[key] = float(result[key]) + float(spirit_mods.get(key, 0.0))
 
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var temp_mods := NationalModifierManager.get_combat_modifiers(country_tag)
+		var temp_mods: Dictionary = NationalModifierManager.get_combat_modifiers(country_tag)
 		for key in result.keys():
 			result[key] = float(result[key]) + float(temp_mods.get(key, 0.0))
 
@@ -672,6 +898,8 @@ func is_leader_entry_active_for_year(entry: Dictionary, year: int) -> bool:
 func get_yearly_death_chance(leader: Leader) -> float:
 	if leader == null or leader.is_deceased or leader.is_retired:
 		return 0.0
+	if _is_brand_new(leader):
+		return 0.0
 	var age := get_leader_age(leader)
 	var base := _base_chance_for_age(age, "death")
 	base *= _mortality_situation_multiplier(leader, true)
@@ -683,6 +911,8 @@ func get_yearly_death_chance(leader: Leader) -> float:
 
 func get_yearly_retirement_chance(leader: Leader) -> float:
 	if leader == null or leader.is_deceased or leader.is_retired:
+		return 0.0
+	if _is_brand_new(leader):
 		return 0.0
 	var age := get_leader_age(leader)
 	var base := _base_chance_for_age(age, "retire")
@@ -697,6 +927,12 @@ func _base_chance_for_age(age: int, kind: String) -> float:
 		if age < int(bracket.get("max_age", 999)):
 			return float(bracket.get(kind, 0.0))
 	return 0.0
+
+## Brand-new historical leaders (e.g. Patton with start_year == scenario year) are protected from immediate mortality/retirement offers.
+func _is_brand_new(leader: Leader) -> bool:
+	if leader == null or leader.start_year <= 0:
+		return false
+	return get_current_year() - leader.start_year < 2
 
 
 func get_combat_death_chance_per_battle(leader: Leader, intensity: float = 1.0) -> float:
@@ -828,20 +1064,28 @@ func check_leader_mortality(year: int = -1) -> Array[Dictionary]:
 	if year > 0:
 		set_current_year(year)
 	var events: Array[Dictionary] = []
+	# Prune any pending retirements for brand new leaders (defensive against timing/advance edges so Patton etc. don't offer retire immediately).
+	var to_prune: Array[String] = []
+	for rid in pending_retirements:
+		var l: Leader = leaders.get(rid)
+		if l and _is_brand_new(l):
+			to_prune.append(rid)
+	for rid in to_prune:
+		pending_retirements.erase(rid)
 	for leader_id in leaders.keys():
 		var leader: Leader = leaders[leader_id] as Leader
 		if leader == null or not leader.is_available_for_command():
 			continue
 		if leader_id in pending_retirements:
 			continue
-
+		if _is_brand_new(leader):
+			continue  # brand new leaders (e.g. Patton 1936 start) protected from death/retire offers for first ~2 years
 		var death_chance := get_yearly_death_chance(leader)
 		if randf() < death_chance:
 			_remove_leader(leader_id, "natural", true)
 			events.append({"type": "death", "leader_id": leader_id, "cause": "natural"})
 			leader_died.emit(leader_id, "natural")
 			continue
-
 		var retire_chance := get_yearly_retirement_chance(leader)
 		if randf() < retire_chance:
 			pending_retirements.append(leader_id)
@@ -1436,6 +1680,7 @@ func get_leader_summary(leader_id: String) -> Dictionary:
 		"is_deceased": leader.is_deceased,
 		"assigned_army_id": leader.assigned_army_id,
 		"is_in_officer_training": leader.is_in_officer_training,
+		"portrait_path": leader.portrait_path,
 	}
 
 
@@ -1922,14 +2167,14 @@ func get_training_path_definition(path_id: String) -> Dictionary:
 
 
 func get_training_path_max_level(path_id: String) -> int:
-	var def := get_training_path_definition(path_id)
+	var def: Dictionary = get_training_path_definition(path_id)
 	if def.is_empty():
 		return 0
 	return maxi(int(def.get("max_level", 3)), 1)
 
 
 func get_training_path_doctrine_requirement(path_id: String) -> String:
-	var def := get_training_path_definition(path_id)
+	var def: Dictionary = get_training_path_definition(path_id)
 	return str(def.get("doctrine_requirement", ""))
 
 
@@ -1982,8 +2227,8 @@ func get_leader_training_path_combat_modifiers(leader_id: String) -> Dictionary:
 func get_leader_final_combat_stats(leader_id: String, base_stats: Dictionary) -> Dictionary:
 	if leader_id.is_empty():
 		return base_stats.duplicate()
-	var resolver := CombatResolver.new()
-	var stats := resolver.apply_training_path_combat_bonuses(leader_id, base_stats)
+	var resolver: CombatResolver = CombatResolver.new()
+	var stats: Dictionary = resolver.apply_training_path_combat_bonuses(leader_id, base_stats)
 	resolver.free()
 	return stats
 
@@ -2175,7 +2420,7 @@ func get_leader_training_path_summary(leader_id: String) -> Dictionary:
 			"effects_text": "",
 		}
 
-	var def := get_training_path_definition(leader.training_path_id)
+	var def: Dictionary = get_training_path_definition(leader.training_path_id)
 	var effects := get_leader_training_path_effects(leader)
 	return {
 		"path_id": leader.training_path_id,
@@ -2262,36 +2507,39 @@ func _load_training_path_definitions() -> void:
 
 
 func get_country_military_doctrines(country_tag: String) -> Array[String]:
+	# Legacy shim for old Array API. Returns list of all service doctrines for country.
 	var tag := str(country_tag)
-	if not country_military_doctrines.has(tag):
+	if not service_doctrines.has(tag):
 		return []
-	var raw: Variant = country_military_doctrines[tag]
-	if typeof(raw) != TYPE_ARRAY:
-		return []
+	var serv := service_doctrines[tag] as Dictionary
 	var out: Array[String] = []
-	for entry in raw as Array:
-		var doctrine_id := str(entry)
-		if not doctrine_id.is_empty() and not out.has(doctrine_id):
-			out.append(doctrine_id)
+	for s in serv:
+		var d := str(serv[s])
+		if not d.is_empty() and not out.has(d):
+			out.append(d)
 	return out
 
 
-func set_country_military_doctrine(country_tag: String, doctrine_id: String, active: bool) -> void:
-	var tag := str(country_tag)
-	var doctrine := str(doctrine_id)
-	if tag.is_empty() or doctrine.is_empty():
-		return
-	var list: Array[String] = get_country_military_doctrines(tag)
+func set_country_military_doctrine(
+	country_tag: String,
+	doctrine_id: String,
+	active: bool,
+	silent: bool = false,
+) -> void:
+	# Legacy: set on army for simplicity. Prefer set_service_doctrine.
 	if active:
-		if not list.has(doctrine):
-			list.append(doctrine)
-	else:
-		list.erase(doctrine)
-	country_military_doctrines[tag] = list
+		set_service_doctrine(country_tag, "army", doctrine_id, silent)
 
 
 func country_has_military_doctrine(country_tag: String, doctrine_id: String) -> bool:
-	return get_country_military_doctrines(country_tag).has(str(doctrine_id))
+	var tag := str(country_tag)
+	if not service_doctrines.has(tag):
+		return false
+	var serv := service_doctrines[tag] as Dictionary
+	for s in serv:
+		if str(serv[s]) == doctrine_id:
+			return true
+	return false
 
 
 func leader_meets_training_path_doctrine(leader: Leader, path_id: String) -> bool:
@@ -2600,7 +2848,7 @@ func set_officer_training_leader(country_tag: String, leader_id: String, apply_c
 			% [leader_id, tag]
 		)
 		return false
-	if not leader.is_available_for_command() and not leader.is_in_officer_training:
+	if not leader.is_available_for_command() and not leader.is_in_officer_training and not _is_brand_new(leader):
 		return false
 
 	var prior_mentor_id := str(officer_training_leader_id.get(tag, ""))
@@ -2633,21 +2881,50 @@ func set_officer_training_leader(country_tag: String, leader_id: String, apply_c
 
 
 ## Returns the mentor assigned to Officer Training for a country (if any).
+## Auto-cleans dangling unavailable (retired/deceased/captured or !available unless brand-new) so UI cards show "Vacant"/"Assign" and new leaders (cadets) can be assigned without stale Patton/retire state.
 func get_officer_training_leader(country_tag: String = "") -> Leader:
 	var tag := country_tag.strip_edges().to_upper()
+	var leader: Leader = null
+	var leader_id := ""
 	if not tag.is_empty() and country_positions.has(tag):
 		var positions: Dictionary = country_positions[tag] as Dictionary
-		var leader_id := str(positions.get(POSITION_OFFICER_TRAINING, ""))
+		leader_id = str(positions.get(POSITION_OFFICER_TRAINING, ""))
 		if not leader_id.is_empty():
-			return get_leader(leader_id) as Leader
-
-	for leader_key in leaders.keys():
-		var leader: Leader = leaders[leader_key] as Leader
-		if leader == null or not leader.is_in_officer_training:
-			continue
-		if tag.is_empty() or leader.country_tag == tag:
-			return leader
-	return null
+			leader = get_leader(leader_id) as Leader
+	if leader == null:
+		# Fallback scan (legacy is_in_officer_training flag)
+		for leader_key in leaders.keys():
+			var l: Leader = leaders[leader_key] as Leader
+			if l == null or not l.is_in_officer_training:
+				continue
+			if tag.is_empty() or l.country_tag == tag:
+				leader = l
+				leader_id = l.leader_id
+				break
+	if leader == null:
+		return null
+	# Clean if bad state (retired etc). Brand-new protected (start_year recent) are kept even if !is_available_for_command during intro.
+	var should_clear := false
+	if leader.is_retired or leader.is_deceased or leader.is_captured or leader.is_injured:
+		should_clear = true
+	elif leader.is_in_officer_training and leader.duty_post == "training":
+		# Active training mentors are intentionally unavailable for field command.
+		pass
+	elif not leader.is_available_for_command():
+		# Allow brand new exceptions (Patton 1936 etc)
+		if not (leader.start_year > 0 and get_current_year() - leader.start_year < 2):
+			should_clear = true
+	if should_clear:
+		# Remove from tracking so next get + UI sees Vacant and assign works
+		if country_positions.has(tag):
+			(country_positions[tag] as Dictionary).erase(POSITION_OFFICER_TRAINING)
+		officer_training_leader_id.erase(tag)
+		leader.is_in_officer_training = false
+		if leader.duty_post == "training":
+			leader.duty_post = "active"
+		invalidate_leader_cache(tag)
+		return null
+	return leader
 
 
 ## Clears the Officer Training assignment for a country.
@@ -2691,6 +2968,11 @@ func get_save_data() -> Dictionary:
 			"stationed_province_id": f.stationed_province_id,
 			"is_training": f.is_training,
 			"is_in_combat": f.is_in_combat,
+			"training_progress": f.training_progress,
+			"is_trained": f.is_trained,
+			"organization": f.organization,
+			"readiness": f.readiness,
+			"strength": f.strength,
 		}
 
 	return {
@@ -2701,6 +2983,7 @@ func get_save_data() -> Dictionary:
 		"pending_retirements": pending_retirements.duplicate(true),
 		"pending_leader_replacements": pending_leader_replacements.duplicate(true),
 		"player_country_tag": player_country_tag,
+		"service_doctrines": service_doctrines.duplicate(true),
 	}
 
 func apply_save_data(data: Dictionary) -> void:
@@ -2726,7 +3009,11 @@ func apply_save_data(data: Dictionary) -> void:
 			l.logistics_skill = int(ld.get("logistics_skill", 3))
 			l.planning_skill = int(ld.get("planning_skill", 3))
 			l.initiative_skill = int(ld.get("initiative_skill", 3))
-			l.traits = (ld.get("traits", []) as Array).duplicate()
+			var raw_lt = ld.get("traits", [])
+			l.traits = []
+			if raw_lt is Array:
+				for t in raw_lt:
+					l.traits.append(str(t))
 			l.experience = int(ld.get("experience", 0))
 			l.total_experience_earned = int(ld.get("total_experience_earned", 0))
 			l.battles_fought = int(ld.get("battles_fought", 0))
@@ -2745,6 +3032,7 @@ func apply_save_data(data: Dictionary) -> void:
 			l.previous_training_path_id = str(ld.get("previous_training_path_id", ""))
 			l.last_xp_gain_time = int(ld.get("last_xp_gain_time", 0))
 			l.last_xp_source = str(ld.get("last_xp_source", ""))
+			l.portrait_path = str(ld.get("portrait_path", ld.get("portrait", "")))
 			if ld.has("trait_levels"):
 				l.trait_levels = (ld.get("trait_levels", {}) as Dictionary).duplicate(true)
 			# Add other fields (officer training quality etc.) as they become critical
@@ -2755,11 +3043,18 @@ func apply_save_data(data: Dictionary) -> void:
 	if data.has("officer_training_leader_id"):
 		officer_training_leader_id = (data["officer_training_leader_id"] as Dictionary).duplicate(true)
 	if data.has("pending_retirements"):
-		pending_retirements = (data["pending_retirements"] as Array).duplicate(true)
+		pending_retirements = []
+		for x in (data["pending_retirements"] as Array):
+			pending_retirements.append(str(x))
 	if data.has("pending_leader_replacements"):
-		pending_leader_replacements = (data["pending_leader_replacements"] as Array).duplicate(true)
+		pending_leader_replacements = []
+		for x in (data["pending_leader_replacements"] as Array):
+			pending_leader_replacements.append(x if x is Dictionary else {})
 	if data.has("player_country_tag"):
 		player_country_tag = str(data["player_country_tag"])
+
+	if data.has("service_doctrines"):
+		service_doctrines = (data["service_doctrines"] as Dictionary).duplicate(true)
 
 	if data.has("formations"):
 		var fdata: Dictionary = data["formations"] as Dictionary
@@ -2776,6 +3071,11 @@ func apply_save_data(data: Dictionary) -> void:
 			f.stationed_province_id = int(fd.get("stationed_province_id", -1))
 			f.is_training = bool(fd.get("is_training", false))
 			f.is_in_combat = bool(fd.get("is_in_combat", false))
+			f.training_progress = float(fd.get("training_progress", 0.0))
+			f.is_trained = bool(fd.get("is_trained", false))
+			f.organization = float(fd.get("organization", 1.0))
+			f.readiness = float(fd.get("readiness", 1.0))
+			f.strength = float(fd.get("strength", 1.0))
 			formations[f.formation_id] = f
 		print("LeaderManager: Restored %d formation locations" % fdata.size())
 
@@ -3318,19 +3618,19 @@ func get_trait_definition(trait_id: String) -> Dictionary:
 
 
 func get_trait_max_level(trait_id: String) -> int:
-	var def := get_trait_definition(trait_id)
+	var def: Dictionary = get_trait_definition(trait_id)
 	if def.is_empty():
 		return 1
 	return maxi(int(def.get("max_level", 1)), 1)
 
 
 func get_trait_rarity(trait_id: String) -> String:
-	var def := get_trait_definition(trait_id)
+	var def: Dictionary = get_trait_definition(trait_id)
 	return str(def.get("rarity", "common"))
 
 
 func get_trait_effects_at_level(trait_id: String, level: int) -> Dictionary:
-	var def := get_trait_definition(trait_id)
+	var def: Dictionary = get_trait_definition(trait_id)
 	if def.is_empty():
 		return {}
 	var by_level: Variant = def.get("effects_by_level", {})
@@ -3368,7 +3668,7 @@ func count_traits_by_rarity(leader: Leader, rarity: String) -> int:
 
 
 func traits_conflict(leader: Leader, trait_id: String) -> bool:
-	var def := get_trait_definition(trait_id)
+	var def: Dictionary = get_trait_definition(trait_id)
 	if def.is_empty():
 		return false
 	var exclusive: Variant = def.get("exclusive_with", [])

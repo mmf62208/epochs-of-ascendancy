@@ -1,0 +1,54 @@
+# victory_integration.dialogue
+# Real sample for costs of victory, land integration, asymmetrical ops, and international reactions.
+# Launched from state chart on "Collapsed" or "Integration" states, or from phases demo after harsh terms.
+# Uses pillars (Ascendancy, Cohesion, Mandate) and allows agency via agents, claims, etc.
+# Asymmetrical: options for special ops, scientist extraction, etc.
+
+~ victory_costs
+
+The war is won, but now comes the price of victory. Enforcing the peace or annexing territory carries costs to your own Ascendancy, Cohesion, and Mandate — and the world is watching.
+
+{prior_terms.get("central_powers_seating", "") == "full_exclusion"} The harsh exclusion path you chose in 1918 has already sowed seeds of resentment. Integration will be harder, and other powers may see you as the new aggressor.
+
+- Annex and Occupy (High Resistance Path)
+  do GameData.apply_victory_cost("annex", "high_resistance")
+  The territory resists fiercely. Base resistance high due to development and prior Cohesion. Spend Mandate on garrisons, Ascendancy on pacification ops. Asymmetrical option: Deploy star agents for "Special Pacification" to reduce cost by 50%.
+  => integration_options
+
+- Create Puppet / Set Free with Support (Subject Path)
+  do GameData.apply_victory_cost("puppet", "medium")
+  You prop up a new government or "free" state. Ongoing Mandate commitment to keep them stable. If they succeed, you gain Mandate and Ascendancy. If they fail, backlash hits your Cohesion and Ascendancy. Agent "Regime Support" missions can bolster.
+  => end
+
+- Extract Concessions & Talent (Asymmetrical Path)
+  do GameData.apply_victory_cost("extract", "low")
+  Take scientists, tech, resources without full occupation (like historical Paperclip or submarine deals). Boost your tech/industry (agent development category shines here). Low direct territory cost, but high international "aggressor" perception if justification low. Trade agreements (no-nukes, tariffs) can mitigate.
+  => end
+
+=> END
+
+~ integration_options
+
+How do you integrate the new lands? Resistance = (dev + (100 - prior_local_cohesion) + cultural_distance - ancestral_claims - population_ties_bonus). Other nations' reaction weighted by their Cohesion (principled high-Cohesion states disapprove more) and your justification (self-defense/ancestral/population vs naked aggression).
+
+- Heavy Hand (Garrisons + Force)
+  do GameData.apply_integration("heavy", resistance)
+  High immediate Mandate/Ascendancy cost. Military factories allocation forced higher (Cohesion low makes this painful). Lowers local Cohesion further, risks revolt. But quick control. Agent "Operator" teams for special ops can assassinate leaders or extract more value asymmetrically.
+  => end
+
+- Hearts and Minds (Propaganda + Investment)
+  do GameData.apply_integration("hearts", resistance)
+  Spend Ascendancy and economy output on infrastructure, media control (Elite/Public Cohesion groups). Slower, but builds long-term Mandate and can flip local groups. Hidden Hand may counter by funding divisions in Public Sentiment.
+  => end
+
+- Hybrid with Agent Crafted Mandate
+  do GameData.apply_integration("hybrid", resistance)
+  Use diplomats/agents to craft local "Mandate" (select event choices like "Economic Partnership Mandate" vs "Security Guarantee"). Agents in "Diplomacy" or "Industry" categories shine. Cost split across pillars. Allows trade deals, tech sharing (advanced subs for no-nuke pacts).
+  => end
+
+=> END
+
+~ end
+
+The costs have been applied. Your pillars shift. Other nations react based on justification. The grand campaign continues — agency through agents, focuses, and choices can mitigate or turn these costs into opportunities. Watch Cohesion groups for Hidden Hand subversion.
+=> END

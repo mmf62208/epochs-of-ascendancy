@@ -415,28 +415,36 @@ def run_phase1_europe(output_dir: Path):
     europe_connections //= 2
     print(f"Of which ~{europe_connections} are internal to the current Europe seed set.")
 
-    # 4. Use subdivision_utils to rank provinces for splitting (now using improved naval data)
-    print("\nRanking provinces for subdivision (naval-weighted, relaxed for coarse seed)...")
+    # 4. Use subdivision_utils to rank provinces for splitting (now using improved naval data + real rivers from layers for natural borders)
+    print("\nRanking provinces for subdivision (naval-weighted + real-rivers natural borders, relaxed for coarse seed)...")
+    real_rivers = subdivision_utils.load_real_rivers()  # loads data/map/rivers.json (or _world) for river-cross aware scoring
+    print(f"  Loaded {len(real_rivers)} major real river polylines for natural border guidance.")
     ranked = subdivision_utils.rank_provinces_for_subdivision(
-        europe_ids, geometry, naval_data
+        europe_ids, geometry, naval_data, real_rivers
     )
 
     suggestions = []
     split_proposals = []
 
-    for pid, score in ranked[:40]:
-        num_splits = subdivision_utils.suggest_number_of_splits(pid, geometry, naval_data)
+    # Aggressive expansion for full 350-450 Europe playtest territories (target from Phase1 config)
+    # Subdivide many more parents + bump splits (edits to subdivision_utils + here)
+    for pid, score in ranked[:90]:
+        num_splits = subdivision_utils.suggest_number_of_splits(pid, geometry, naval_data, real_rivers)
+        num_splits = min(6, max(3, num_splits + 1))  # force denser
+        river_cross = round(subdivision_utils.compute_river_cross_score(pid, geometry, real_rivers), 2) if real_rivers else 0.0
         suggestions.append({
             "province_id": pid,
             "priority_score": round(score, 3),
             "suggested_splits": num_splits,
             "naval_importance": round(naval_data["naval_importance_scores"].get(pid, 0.0), 2),
             "is_coastal": pid in naval_data.get("coastal_provinces", []),
-            "is_chokepoint": pid in naval_data.get("potential_chokepoints", [])
+            "is_chokepoint": pid in naval_data.get("potential_chokepoints", []),
+            "river_cross_score": river_cross,  # real layers: >0 means major river crosses -> prefer split for natural border
+            "natural_border_reason": "river_cross" if river_cross > 0.5 else ""
         })
 
         proposals = subdivision_utils.generate_split_geometry(
-            pid, geometry, naval_data, num_splits
+            pid, geometry, naval_data, num_splits, real_rivers
         )
         split_proposals.extend(proposals)
 
@@ -497,7 +505,10 @@ def run_phase1_europe(output_dir: Path):
             "points": proposal["suggested_points"],
             "label_anchor": proposal.get("suggested_center", proposal["suggested_points"][0]),
             "suggested_center": proposal.get("suggested_center"),
-            "approx_area": proposal.get("approx_area", 0)
+            "approx_area": proposal.get("approx_area", 0),
+            "notes": proposal.get("notes", ""),
+            "river_aware": proposal.get("river_aware", False),
+            "naval_importance": proposal.get("naval_importance", 0)
         })
 
         # Terrain
@@ -620,7 +631,10 @@ def run_phase1_europe(output_dir: Path):
             "children_proposed": len(split_proposals),
             "unique_parents_subdivided": len(parents_to_subdivide)
         },
-        "high_priority_candidates": suggestions[:25],
+        "high_priority_candidates": [
+            {"province_id": pid, "priority_score": round(score, 3), "river_cross_score": round(subdivision_utils.compute_river_cross_score(pid, geometry, real_rivers), 2) if real_rivers else 0.0, "natural_border_reason": "river_cross" if real_rivers and subdivision_utils.compute_river_cross_score(pid, geometry, real_rivers) > 0.5 else ""}
+            for pid, score in ranked[:25]
+        ],
         "top_naval_importance": [
             {"id": pid, "score": round(score, 2), "coastal": pid in naval_data.get("coastal_provinces", [])}
             for pid, score in sorted(naval_data.get("naval_importance_scores", {}).items(),
@@ -646,6 +660,11 @@ def run_phase1_europe(output_dir: Path):
         ]
     }
 
+    # Force high_priority with river data for plan (drive natural borders visibility)
+    plan["high_priority_candidates"] = [
+        {"province_id": pid, "priority_score": round(score, 3), "river_cross_score": round(subdivision_utils.compute_river_cross_score(pid, geometry, real_rivers), 2) if real_rivers else 0.0, "natural_border_reason": "river_cross" if real_rivers and subdivision_utils.compute_river_cross_score(pid, geometry, real_rivers) > 0.5 else ""}
+        for pid, score in ranked[:25]
+    ]
     (output_dir / "phase1_europe_plan.json").write_text(json.dumps(plan, indent=2), encoding="utf-8")
     print(f"\nWrote updated phase1_europe_plan.json")
 
@@ -661,9 +680,39 @@ def run_phase1_europe(output_dir: Path):
 
     print("\nRecommended next actions:")
     print("  1. Inspect the new JSON layers in output/phase1_europe/")
-    print("  2. Add a simple Godot debug overlay to render proposed_children_geometry.json")
+    print("  2. (implemented) Godot debug overlay to render proposed_children_geometry.json + sample river-cross: tools/map_generation/debug_proposed_children.gd (draws polys, green for river e.g. 82; works in IconPreviewTest.tscn), MapRenderer.debug_spawn_subdiv_draw_children() (Line2D + labels, auto-spawned in TestScenario harness + via DebugOverlay Subdiv button).")
     print("  3. Improve automatic strait/chokepoint discovery in naval_analysis.py")
     print("  4. Continue generating more naval-focused Special Site definitions")
+    print("  5. Apply full proposals (449 children) + adjacency repair to reach 350-450 Europe provinces target using the river/elev natural borders.")
+
+    # Push subdivision: output sample subdivided geometry using some proposals (river-aware children added for test)
+    sample_geo = {
+        "version": geometry.get("version", 5),
+        "provinces": [dict(p) for p in geometry.get("provinces", [])],
+        "meta": {
+            "note": "sample with river-aware subdiv children from real layers (rivers.json cross)",
+            "source": "generate_europe_phase1 + real_rivers"
+        }
+    }
+    # push integration: carry terrain from inference layer to children (snow_capped etc preserved)
+    terrain_data = {}
+    if TERRAIN_LAYER.exists():
+        tl = load_json(TERRAIN_LAYER)
+        terrain_data = tl.get("province_terrain_layer", tl).get("provinces", {})
+    for prop in split_proposals[:5]:
+        parent_tid = str(prop["parent_id"])
+        child = {
+            "id": f"{prop['parent_id']}_c{prop.get('child_index', 0)}",
+            "points": prop["suggested_points"],
+            "parent_id": prop["parent_id"],
+            "notes": prop.get("notes", []),
+            "terrain": terrain_data.get(parent_tid, {}).get("terrain", "plains"),
+            "river_aware": prop.get("river_aware", False)
+        }
+        sample_geo["provinces"].append(child)
+    with open(output_dir / "sample_subdivided_geometry.json", "w", encoding="utf-8") as f:
+        json.dump(sample_geo, f, indent=2)
+    print(f"Wrote sample_subdivided_geometry.json with {len(split_proposals[:5])} river-cross children (guided by real rivers.json for natural borders + terrain inference carry; test for apply)")
 
 if __name__ == "__main__":
     run_phase1_europe(OUTPUT_DIR)

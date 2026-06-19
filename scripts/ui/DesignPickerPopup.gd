@@ -844,6 +844,19 @@ func _design_row_tooltip(
 		var role := DesignManager.get_lifecycle_role(design_id)
 		if not role.is_empty():
 			lines.append("Role: %s" % role.replace("_", " "))
+	# Visual model flavor for choosing base in designer (different models for #engines, fighter/bomber types, carrier variants, jets vs prop, biplanes, ship sizes/types/eras, tank light/med/heavy per era, helos/transports)
+	if GameData.design_data != null:
+		var template: UnitTemplate = GameData.design_data.get_template(design_id)
+		if template != null and not template.visual_archetype.is_empty():
+			lines.append("Base Visual Model: " + template.visual_archetype + " (affects map icons + designer flavor; modules customize further for special variants)")
+		# Doctrine suggestions (from 3-option assessment): choose for memorable trade-offs (rugged vs lightweight vs compartmentalized) then tune armor/hull.
+		if typeof(DesignManager) != TYPE_NIL:
+			var doctrines = DesignManager.get_available_doctrines()
+			if doctrines.size() > 0:
+				var doctrine_names: PackedStringArray = []
+				for d in doctrines.slice(0, 3):
+					doctrine_names.append(str(d.get("name", "")))
+				lines.append("Design Doctrines available: " + ", ".join(doctrine_names))
 	match status:
 		DesignManager.DesignStatus.PREVIOUSLY_USED:
 			lines.append("Previously used in this role — still authorized for production.")
@@ -1028,12 +1041,20 @@ func _design_list_label(
 	):
 		ship = "  ·  ⚓"
 
+	# Add visual model flavor for base model choice in designer (different fighters/bombers by engines, carrier variants, jets vs prop, biplanes, ship sizes, tank classes/eras etc.)
+	var vis := ""
+	if GameData.design_data != null:
+		var template: UnitTemplate = GameData.design_data.get_template(design_id)
+		if template != null and not template.visual_archetype.is_empty():
+			vis = " · " + _truncate_list_label(template.visual_archetype, 18)
+
 	if locked_section:
-		var line := "%s  ·  %s  ·  %s%s" % [
+		var line := "%s  ·  %s  ·  %s%s%s" % [
 			_truncate_list_label(_lock_suffix(design_id), 24),
 			display,
 			badge,
 			ship,
+			vis,
 		]
 		return _truncate_list_label(line)
 
@@ -1370,8 +1391,10 @@ func _on_confirm_pressed() -> void:
 	warning.new_design = selected_design
 	get_tree().root.add_child(warning)
 	warning.popup_centered()
-	queue_free()
+	hide()
+	call_deferred("queue_free")
 
 
 func _on_cancel_pressed() -> void:
-	queue_free()
+	hide()
+	call_deferred("queue_free")

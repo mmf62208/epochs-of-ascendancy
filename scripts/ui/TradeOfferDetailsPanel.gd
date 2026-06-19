@@ -17,6 +17,7 @@ extends Window
 var _current_offer_id: String = ""
 var _player_country: String = "USA"
 
+@onready var margin: MarginContainer = $Margin
 @onready var title_label: Label = $Margin/MainVBox/TitleLabel
 @onready var parties_label: Label = $Margin/MainVBox/PartiesLabel
 @onready var risk_label: Label = $Margin/MainVBox/RiskLabel
@@ -70,7 +71,7 @@ func show_details(offer_id: String, for_country: String = "") -> void:
 
 	_current_offer_id = offer_id
 
-	var data := {}
+	var data: Dictionary = {}
 	if typeof(TradeManager) != TYPE_NIL:
 		data = TradeManager.get_offer_display_data(offer_id, _player_country)
 
@@ -95,9 +96,9 @@ func show_details(offer_id: String, for_country: String = "") -> void:
 	popup_centered(Vector2(800, 600))
 
 	# Subtle open animation for better feel
-	modulate.a = 0.0
+	margin.modulate.a = 0.0
 	var tw := create_tween()
-	tw.tween_property(self, "modulate:a", 1.0, 0.12)
+	tw.tween_property(margin, "modulate:a", 1.0, 0.12)
 
 func _populate_from_data(data: Dictionary) -> void:
 	title_label.text = "Offer Details"
@@ -110,7 +111,7 @@ func _populate_from_data(data: Dictionary) -> void:
 
 	# Risk (Black Market)
 	if data.get("visibility") == "BLACK":
-		var risk_cat := data.get("risk_category", "medium")
+		var risk_cat: String = str(data.get("risk_category", "medium"))
 		risk_label.text = "Risk Level: %s (%.0f%%)" % [risk_cat.capitalize(), data.get("risk_level", 0) * 100]
 		if risk_cat == "extreme":
 			risk_label.add_theme_color_override("font_color", Color(1.0, 0.3, 0.3))
@@ -177,7 +178,7 @@ func _populate_from_data(data: Dictionary) -> void:
 		_add_item_row(requested_vbox, item)
 
 	# Fairness & Risk section with better hierarchy
-	var fairness := data.get("fairness", {})
+	var fairness: Dictionary = data.get("fairness", {})
 	if not fairness.is_empty():
 		var score := float(fairness.get("score", 1.0))
 		fairness_label.text = "Fairness: %.2f" % score
@@ -211,7 +212,7 @@ func _populate_from_data(data: Dictionary) -> void:
 			add_child(trade_label)
 
 	# Enable/disable action buttons based on status
-	var is_proposed := data.get("status") == "PROPOSED"
+	var is_proposed: bool = data.get("status") == "PROPOSED"
 	accept_btn.disabled = not is_proposed
 	reject_btn.disabled = not is_proposed
 	counter_btn.disabled = not is_proposed
@@ -237,7 +238,7 @@ func _add_item_row(parent: VBoxContainer, item: Dictionary) -> void:
 
 func _on_accept_pressed() -> void:
 	if typeof(TradeManager) != TYPE_NIL and _current_offer_id != "":
-		var success := TradeManager.accept_offer(_current_offer_id)
+		var success: bool = TradeManager.accept_offer(_current_offer_id)
 		if success and typeof(LeaderEventUI) != TYPE_NIL:
 			LeaderEventUI.show_toast("Offer accepted!", 2.5)
 		hide()
@@ -254,7 +255,7 @@ func _on_counter_pressed() -> void:
 	if typeof(TradeManager) == TYPE_NIL or _current_offer_id.is_empty():
 		return
 
-	var data := TradeManager.get_offer_display_data(_current_offer_id, _player_country)
+	var data: Dictionary = TradeManager.get_offer_display_data(_current_offer_id, _player_country)
 	if data.is_empty() or data.get("error"):
 		return
 
@@ -277,8 +278,8 @@ func _show_counter_preview(data: Dictionary) -> void:
 
 	# Store original data for comparison
 	_counter_original_data = data
-	_counter_edited_offered = data.get("requested", []).map(func(i): return i.duplicate(true))
-	_counter_edited_requested = data.get("offered", []).map(func(i): return i.duplicate(true))
+	_counter_edited_offered = (data.get("requested", []) as Array).map(func(i): return i.duplicate(true))
+	_counter_edited_requested = (data.get("offered", []) as Array).map(func(i): return i.duplicate(true))
 
 	# Main preview container
 	_counter_preview_container = VBoxContainer.new()
@@ -399,7 +400,7 @@ func _build_counter_side_section(header_text: String, items: Array, is_offering_
 
 	var header := Label.new()
 	header.text = header_text
-	header.add_theme_color_override("font_color", is_offering_side ? Color(0.5, 0.85, 1.0) : Color(1.0, 0.7, 0.5))
+	header.add_theme_color_override("font_color", Color(0.5, 0.85, 1.0) if is_offering_side else Color(1.0, 0.7, 0.5))
 	RetrowaveTheme.style_body_label(header)
 	section.add_child(header)
 
@@ -411,11 +412,11 @@ func _build_counter_side_section(header_text: String, items: Array, is_offering_
 
 # Builds a single editable item row with quantity controls and remove
 func _build_counter_item_row(items: Array, index: int, is_offering_side: bool) -> HBoxContainer:
-	var item = items[index]
-	var original_item = null
+	var item: Dictionary = items[index]
+	var original_item: Dictionary = {}
 
 	# Find matching original item for comparison (by id)
-	var original_list = is_offering_side ? _counter_original_data.get("requested", []) : _counter_original_data.get("offered", [])
+	var original_list: Array = _counter_original_data.get("requested", []) if is_offering_side else _counter_original_data.get("offered", [])
 	for orig in original_list:
 		if orig.get("id") == item.get("id"):
 			original_item = orig
@@ -480,13 +481,13 @@ func _build_counter_item_row(items: Array, index: int, is_offering_side: bool) -
 	return row
 
 func _adjust_counter_quantity(items: Array, index: int, delta: int, is_offering_side: bool) -> void:
-	var current_qty := float(items[index].get("quantity", 0))
-	var new_qty := max(0.0, current_qty + delta)
+	var current_qty: float = float((items[index] as Dictionary).get("quantity", 0))
+	var new_qty: float = maxf(0.0, current_qty + delta)
 	items[index]["quantity"] = new_qty
 	_refresh_counter_preview_ui()
 
 func _set_counter_quantity(items: Array, index: int, text: String, is_offering_side: bool) -> void:
-	var new_qty := max(0.0, text.to_float())
+	var new_qty: float = maxf(0.0, text.to_float())
 	items[index]["quantity"] = new_qty
 
 func _remove_counter_item(items: Array, index: int, is_offering_side: bool) -> void:
@@ -549,7 +550,7 @@ func _apply_bulk_scale(mode: String) -> void:
 
 	for arr in [_counter_edited_offered, _counter_edited_requested]:
 		for it in arr:
-			var q := float(it.get("quantity", 0))
+			var q: float = float((it as Dictionary).get("quantity", 0))
 			it["quantity"] = max(0.0, q * factor)
 
 	_refresh_counter_preview_ui()
@@ -600,8 +601,8 @@ func _load_saved_preset() -> void:
 			LeaderEventUI.show_toast("No saved preset yet. Use 'Save Current' first.", 2.0, true)
 		return
 
-	_counter_edited_offered = _saved_counter_preset.get("offered", []).map(func(i): return i.duplicate(true))
-	_counter_edited_requested = _saved_counter_preset.get("requested", []).map(func(i): return i.duplicate(true))
+	_counter_edited_offered = (_saved_counter_preset.get("offered", []) as Array).map(func(i): return i.duplicate(true))
+	_counter_edited_requested = (_saved_counter_preset.get("requested", []) as Array).map(func(i): return i.duplicate(true))
 	_refresh_counter_preview_ui()
 
 	if typeof(LeaderEventUI) != TYPE_NIL:
@@ -609,18 +610,18 @@ func _load_saved_preset() -> void:
 
 func _create_reversed_counter(data: Dictionary) -> void:
 	# Use the live edited arrays if they exist (from the new editor)
-	var final_offered := _counter_edited_offered if _counter_edited_offered.size() > 0 else data.get("requested", [])
-	var final_requested := _counter_edited_requested if _counter_edited_requested.size() > 0 else data.get("offered", [])
+	var final_offered: Array = _counter_edited_offered if _counter_edited_offered.size() > 0 else data.get("requested", [])
+	var final_requested: Array = _counter_edited_requested if _counter_edited_requested.size() > 0 else data.get("offered", [])
 
 	# Convert back to plain dicts for the manager (in case they have extra UI keys)
-	var clean_offered := final_offered.map(func(i): return {
+	var clean_offered: Array = final_offered.map(func(i): return {
 		"type": i.get("type"),
 		"id": i.get("id"),
 		"quantity": i.get("quantity"),
 		"quality_modifier": i.get("quality_modifier", 1.0),
 		"metadata": i.get("metadata", {})
 	})
-	var clean_requested := final_requested.map(func(i): return {
+	var clean_requested: Array = final_requested.map(func(i): return {
 		"type": i.get("type"),
 		"id": i.get("id"),
 		"quantity": i.get("quantity"),
@@ -628,7 +629,7 @@ func _create_reversed_counter(data: Dictionary) -> void:
 		"metadata": i.get("metadata", {})
 	})
 
-	var new_id := TradeManager.create_counter_offer(_current_offer_id, clean_offered, clean_requested)
+	var new_id: String = TradeManager.create_counter_offer(_current_offer_id, clean_offered, clean_requested)
 	if new_id != "":
 		if typeof(LeaderEventUI) != TYPE_NIL:
 			LeaderEventUI.show_toast("Counter-offer created and added to the market!", 3.0)

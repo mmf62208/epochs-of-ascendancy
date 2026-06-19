@@ -4,7 +4,7 @@
   "design_family": "japanese_paper_ww2",
   "base_type": "Armored",
   "size_category": "Medium",
-  "visual_archetype": "medium_tank",
+  "visual_archetype": "light_tank",
   "crew_required": 5,
   "base_training_level": 30,
   "max_experience_level": 100,

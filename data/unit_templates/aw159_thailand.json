@@ -4,7 +4,7 @@
   "design_family": "thai_naval_helo_2026",
   "base_type": "Air",
   "size_category": "Medium",
-  "visual_archetype": "helicopter",
+  "visual_archetype": "prop_fighter",
   "crew_required": 2,
   "base_training_level": 36,
   "max_experience_level": 100,

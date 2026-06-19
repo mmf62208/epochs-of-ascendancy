@@ -18,6 +18,11 @@ var valid_leader_types: Array[String] = []
 var _eligible_leader_ids: Array[String] = []
 var selected_leader_id: String = ""
 
+func _leader_is_brand_new(leader: Leader) -> bool:
+	if leader == null or leader.start_year <= 0 or typeof(LeaderManager) == TYPE_NIL:
+		return false
+	return LeaderManager.get_current_year() - leader.start_year < 2
+
 
 func _ready() -> void:
 	visible = false
@@ -113,6 +118,7 @@ func _load_leaders() -> void:
 			position_key == LeaderManager.POSITION_OFFICER_TRAINING
 			and not leader.is_available_for_command()
 			and not leader.is_in_officer_training
+			and not _leader_is_brand_new(leader)
 		):
 			continue
 		if valid_types.size() > 0 and not valid_types.has(leader.leader_type):
@@ -219,7 +225,11 @@ func _on_confirm_pressed() -> void:
 			selected_leader_id,
 		)
 		if not bool(check.get("can_assign", false)):
-			push_warning("Cannot assign position: %s" % check.get("reason", "unknown"))
+			var reason := str(check.get("reason", "unknown"))
+			push_warning("Cannot assign position: %s" % reason)
+			# Visible feedback so user knows why assign "did not work" (e.g. availability edge) and can pick another.
+			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Cannot assign %s: %s" % [position_key.replace("_", " "), reason], 3.0, true)
 			return
 
 		var assigned := false
@@ -234,10 +244,14 @@ func _on_confirm_pressed() -> void:
 			)
 		if assigned:
 			_refresh_leader_screen()
+		else:
+			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Assign failed (internal). Try another leader.", 2.5, true)
 	else:
 		leader_selected.emit(selected_leader_id)
 
-	queue_free()
+	hide()
+	call_deferred("queue_free")
 
 
 func _refresh_leader_screen() -> void:
@@ -247,4 +261,5 @@ func _refresh_leader_screen() -> void:
 
 
 func _on_cancel_pressed() -> void:
-	queue_free()
+	hide()
+	call_deferred("queue_free")

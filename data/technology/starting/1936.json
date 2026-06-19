@@ -1,7 +1,7 @@
 {
   "scenario": "1936",
   "defaults": {
-    "completed": ["basic_machine_tools"],
+    "completed": ["basic_machine_tools", "electric_power_generation_1890", "smokeless_powder_1884", "assembly_line_production_1913", "early_radio_telegraphy_1895", "dreadnought_revolution_1906", "chemical_industry_1909", "military_aviation_industry_1911", "tank_prototypes_1916", "port_shipyard_i", "steam_propulsion_1880", "early_gas_engines_1905", "diesel_engine_1912", "synthetic_fuel_1917"],
     "research_slots": 2
   },
   "countries": {
@@ -12,40 +12,116 @@
         "tank_plant_i",
         "port_shipyard_i",
         "airframe_1918",
-        "airframe_1936"
+        "airframe_1936",
+        "aircraft_industry_ii_1935",
+        "assembly_line_production_1913",
+        "military_aviation_industry_1911",
+        "tank_prototypes_1916",
+        "dreadnought_revolution_1906"
       ],
       "research_slots": 3
     },
     "GER": {
-      "completed": ["radio_i", "land_doctrine_i", "mobile_warfare_study", "tank_plant_i"],
+      "completed": [
+        "radio_i",
+        "land_doctrine_i",
+        "mobile_warfare_study",
+        "tank_plant_i",
+        "assembly_line_production_1913",
+        "synthetic_materials_1917",
+        "chemical_industry_1909",
+        "tank_prototypes_1916",
+        "military_aviation_industry_1911",
+        "airframe_1918",
+        "airframe_1936",
+        "aircraft_industry_ii_1935",
+        "port_shipyard_i",
+        "dreadnought_revolution_1906"
+      ],
       "research_slots": 3
     },
     "ENG": {
-      "completed": ["radio_i", "land_doctrine_i", "port_shipyard_i", "patrol_frigate_1936"],
+      "completed": [
+        "radio_i",
+        "land_doctrine_i",
+        "port_shipyard_i",
+        "dreadnought_revolution_1906",
+        "assembly_line_production_1913",
+        "military_aviation_industry_1911",
+        "airframe_1918",
+        "airframe_1936",
+        "aircraft_industry_ii_1935",
+        "tank_prototypes_1916",
+        "radar_prototype_1935"
+      ],
       "research_slots": 3
     },
     "FRA": {
-      "completed": ["radio_i", "land_doctrine_i", "tank_plant_i"],
+      "completed": [
+        "radio_i",
+        "land_doctrine_i",
+        "tank_plant_i",
+        "methodical_battle_study",
+        "assembly_line_production_1913",
+        "tank_prototypes_1916",
+        "airframe_1918",
+        "dreadnought_revolution_1906",
+        "port_shipyard_i"
+      ],
       "research_slots": 3
     },
     "SOV": {
-      "completed": ["land_doctrine_i", "mobile_warfare_study", "tank_plant_i"],
+      "completed": [
+        "land_doctrine_i",
+        "mobile_warfare_study",
+        "tank_plant_i",
+        "assembly_line_production_1913",
+        "tank_prototypes_1916",
+        "airframe_1936",
+        "infantry_weapons_ii_1930"
+      ],
       "research_slots": 3
     },
     "JAP": {
-      "completed": ["land_doctrine_i", "port_shipyard_i", "patrol_frigate_1936"],
+      "completed": [
+        "land_doctrine_i",
+        "port_shipyard_i",
+        "dreadnought_revolution_1906",
+        "military_aviation_industry_1911",
+        "airframe_1918",
+        "airframe_1936",
+        "aircraft_industry_ii_1935",
+        "carrier_experiments_1918"
+      ],
       "research_slots": 3
     },
     "ITA": {
-      "completed": ["radio_i", "land_doctrine_i", "port_shipyard_i"],
+      "completed": [
+        "radio_i",
+        "land_doctrine_i",
+        "port_shipyard_i",
+        "dreadnought_revolution_1906",
+        "airframe_1918",
+        "tank_prototypes_1916"
+      ],
       "research_slots": 2
     },
     "POL": {
-      "completed": ["land_doctrine_i"],
+      "completed": [
+        "land_doctrine_i",
+        "tank_prototypes_1916",
+        "airframe_1918",
+        "infantry_weapons_ii_1930"
+      ],
       "research_slots": 2
     },
     "CAN": {
-      "completed": ["radio_i", "port_shipyard_i"],
+      "completed": [
+        "radio_i",
+        "port_shipyard_i",
+        "assembly_line_production_1913",
+        "airframe_1918"
+      ],
       "research_slots": 2
     }
   }

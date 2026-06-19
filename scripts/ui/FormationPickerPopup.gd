@@ -121,8 +121,10 @@ func _on_assign_pressed() -> void:
 		if main_screen != null and main_screen.has_method("refresh_screen"):
 			main_screen.call("refresh_screen")
 
-	queue_free()
+	hide()
+	call_deferred("queue_free")
 
 
 func _on_cancel_pressed() -> void:
-	queue_free()
+	hide()
+	call_deferred("queue_free")

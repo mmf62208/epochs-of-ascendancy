@@ -4,7 +4,7 @@
   "design_family": "new_zealand_army_1918_armor",
   "base_type": "Armored",
   "size_category": "Heavy",
-  "visual_archetype": "heavy_tank",
+  "visual_archetype": "ww1_tank",
   "crew_required": 4,
   "base_training_level": 12,
   "max_experience_level": 100,

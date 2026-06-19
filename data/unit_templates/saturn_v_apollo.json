@@ -34,8 +34,8 @@
     "LifeSupport": "apollo_csm_capsule"
   },
   "unlock_tech": [
-    "apollo_program",
-    "lunar_landing"
+    "moon_landing",
+    "human_spaceflight"
   ],
   "can_mount_drones": false,
   "is_vehicle": true,

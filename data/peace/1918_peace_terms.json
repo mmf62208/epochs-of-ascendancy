@@ -1,0 +1,209 @@
+{
+  "conference_id": "1918_armistice",
+  "name": "Armistice & Peace Conference (1918-11-11 onward)",
+  "description": "The negotiations that will shape (or rewrite) the post-Great War order. Historical path excludes the Central Powers; alt-history paths require significant effort, especially via agents.",
+  "historical_note": "In reality Germany, Austria-Hungary, and the Ottoman Empire were not seated as equals. This is a major divergence point.",
+  "term_buckets": {
+    "central_powers_seating": {
+      "label": "Treatment of Central Powers at the Table",
+      "options": [
+        {
+          "id": "full_exclusion",
+          "label": "HISTORICAL — Full Exclusion",
+          "description": "Germany, Austria-Hungary, and Ottoman Empire are dictated to with no substantive seat. Classic Versailles-style process.",
+          "historical": true,
+          "effects": {
+            "grievance": { "GER": 50, "TUR": 40, "AH": 35 },
+            "entente_prestige": 12,
+            "winner_stability": 8,
+            "inclusion_leverage_required": 0
+          }
+        },
+        {
+          "id": "limited_observers",
+          "label": "Limited Observers",
+          "description": "Central Powers granted observer status and limited voice on secondary matters.",
+          "historical": false,
+          "effects": {
+            "grievance": { "GER": 25, "TUR": 20 },
+            "entente_prestige": 4,
+            "inclusion_leverage_required": 25
+          }
+        },
+        {
+          "id": "full_participants",
+          "label": "Full Participants (Major Alt-History)",
+          "description": "Central Powers seated as negotiating parties. Real concessions possible. High risk of Entente domestic backlash.",
+          "historical": false,
+          "effects": {
+            "grievance": { "GER": 5, "TUR": 5 },
+            "entente_prestige": -8,
+            "winner_stability": -5,
+            "reconciliation_path_unlocked": true,
+            "inclusion_leverage_required": 65
+          }
+        }
+      ]
+    },
+    "reparations_germany": {
+      "label": "German Reparations",
+      "options": [
+        {
+          "id": "harsh_versailles",
+          "label": "HISTORICAL — Harsh (Full Liability + Heavy Schedule)",
+          "description": "Full war guilt, massive total, strict in-kind deliveries. Classic driver of later crises.",
+          "historical": true,
+          "effects": {
+            "grievance": { "GER": 35 },
+            "economic_pressure_ger": 25,
+            "hyperinflation_risk": 0.7
+          }
+        },
+        {
+          "id": "moderate",
+          "label": "Moderate (Reduced Total, Longer Timeline)",
+          "description": "Significant but survivable burden with more room for recovery.",
+          "historical": false,
+          "effects": {
+            "grievance": { "GER": 15 },
+            "economic_pressure_ger": 10
+          }
+        },
+        {
+          "id": "lenient_reconstruction",
+          "label": "Lenient / Reconstruction-Tied",
+          "description": "Lower totals or payments linked to productive investment and trade. Much better long-term stability.",
+          "historical": false,
+          "effects": {
+            "grievance": { "GER": -5 },
+            "economic_pressure_ger": 2,
+            "reconciliation_path_unlocked": true
+          }
+        }
+      ]
+    },
+    "military_restrictions": {
+      "label": "Military Restrictions & Disarmament",
+      "options": [
+        {
+          "id": "strict_historical",
+          "label": "HISTORICAL — Strict Limits + Demilitarized Zones",
+          "description": "Severe caps on army size, navy, air power, and forbidden zones. Strong tech gating for Germany.",
+          "historical": true,
+          "effects": {
+            "grievance": { "GER": 20 },
+            "tech_lock_strength": "high",
+            "rearmament_focus_weight": 1.4
+          }
+        },
+        {
+          "id": "moderate_inspections",
+          "label": "Moderate Limits + Inspection Regime",
+          "description": "Noticeable restrictions but with clearer path to revision.",
+          "historical": false,
+          "effects": {
+            "grievance": { "GER": 8 },
+            "tech_lock_strength": "medium"
+          }
+        },
+        {
+          "id": "minimal",
+          "label": "Minimal / Symbolic",
+          "description": "Largely face-saving limits. Major alt-history military recovery path opens early.",
+          "historical": false,
+          "effects": {
+            "grievance": { "GER": -3 },
+            "tech_lock_strength": "low",
+            "rearmament_focus_weight": 0.6
+          }
+        }
+      ]
+    },
+    "territorial_adjustments": {
+      "label": "Territorial & Colonial Adjustments",
+      "options": [
+        {
+          "id": "historical_versailles",
+          "label": "HISTORICAL — Full Alsace-Lorraine to FRA, Polish Corridor, mandates in Africa/ME",
+          "description": "Classic carve-up. Seeds revanchism and instability in successor regions.",
+          "historical": true,
+          "effects": {
+            "grievance": { "GER": 25, "TUR": 15 },
+            "colony_loss": true
+          }
+        },
+        {
+          "id": "moderate_revisions",
+          "label": "Moderate Revisions (some plebiscites or retained cores)",
+          "description": "Reduced territorial penalties; alt-history path eases long-term claims.",
+          "historical": false,
+          "effects": {
+            "grievance": { "GER": 10, "TUR": 5 },
+            "reconciliation_path_unlocked": true
+          }
+        }
+      ]
+    },
+    "league_structure": {
+      "label": "League of Nations / International Order",
+      "options": [
+        {
+          "id": "weak_league",
+          "label": "HISTORICAL — Weak League (US absent, limited enforcement)",
+          "description": "Toothless body. Good for revanchists later.",
+          "historical": true,
+          "effects": {
+            "league_strength": 0.3,
+            "enforcement_difficulty": 1.5
+          }
+        },
+        {
+          "id": "stronger_pact",
+          "label": "Stronger Structure / Regional Pacts",
+          "description": "More effective (or more subvertable) international framework.",
+          "historical": false,
+          "effects": {
+            "league_strength": 0.7,
+            "reconciliation_path_unlocked": true
+          }
+        }
+      ]
+    },
+    "war_guilt": {
+      "label": "War Guilt Language & Symbolic Terms",
+      "options": [
+        {
+          "id": "harsh_guilt",
+          "label": "HISTORICAL — Explicit War Guilt + Article 231",
+          "description": "Symbolic humiliation drives domestic politics for decades.",
+          "historical": true,
+          "effects": {
+            "grievance": { "GER": 15 },
+            "prestige_hit": 10
+          }
+        },
+        {
+          "id": "no_guilt_clause",
+          "label": "No Explicit Guilt / Shared Responsibility Language",
+          "description": "Major alt-history softening; reduces radicalization fuel.",
+          "historical": false,
+          "effects": {
+            "grievance": { "GER": 3 },
+            "reconciliation_path_unlocked": true
+          }
+        }
+      ]
+    }
+  },
+  "notes_for_implementation": "Phase 0/1 data: 7 term buckets now (core + territorial/league/guilt). Resolution combines delegation score + pre-conference agent leverage + chosen terms + small random element. All historical options are explicitly flagged for UI badges and AI historical weighting. More (economic, Ottoman details) in Phase 6.",
+  "successor_mappings": {
+    "TUR": {
+      "historical_exclusion": ["TUR", "SYR", "PAL", "EGY", "ISR"],
+      "description": "Ottoman Empire partitions into successor states and mandates. Player may choose to continue as the core Turkish Republic remnant or any of the new entities (historical or alt stash opportunities)."
+    },
+    "GER": {
+      "historical_exclusion": ["GER"],
+      "description": "German Empire heavily constrained; core GER tag remains primary playable remnant."
+    }
+  }
+}

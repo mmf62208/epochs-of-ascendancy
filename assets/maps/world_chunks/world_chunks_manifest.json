@@ -1,0 +1,359 @@
+{
+  "version": 1,
+  "chunk_size": [
+    4096,
+    2048
+  ],
+  "overlap": 96,
+  "chunks": {
+    "clean_underlay": [
+      {
+        "id": 0,
+        "file": "assets/maps/world_chunks/world_chunk_00_world_grand_theater_clean.png",
+        "pixel_rect": [
+          0,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": 1,
+        "file": "assets/maps/world_chunks/world_chunk_01_world_grand_theater_clean.png",
+        "pixel_rect": [
+          4048,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          0
+        ]
+      },
+      {
+        "id": 2,
+        "file": "assets/maps/world_chunks/world_chunk_02_world_grand_theater_clean.png",
+        "pixel_rect": [
+          0,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          2000
+        ]
+      },
+      {
+        "id": 3,
+        "file": "assets/maps/world_chunks/world_chunk_03_world_grand_theater_clean.png",
+        "pixel_rect": [
+          4048,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          2000
+        ]
+      }
+    ],
+    "base": [
+      {
+        "id": 0,
+        "file": "assets/maps/world_chunks/world_chunk_00_world_base_stylized.png",
+        "pixel_rect": [
+          0,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": 1,
+        "file": "assets/maps/world_chunks/world_chunk_01_world_base_stylized.png",
+        "pixel_rect": [
+          4048,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          0
+        ]
+      },
+      {
+        "id": 2,
+        "file": "assets/maps/world_chunks/world_chunk_02_world_base_stylized.png",
+        "pixel_rect": [
+          0,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          2000
+        ]
+      },
+      {
+        "id": 3,
+        "file": "assets/maps/world_chunks/world_chunk_03_world_base_stylized.png",
+        "pixel_rect": [
+          4048,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          2000
+        ]
+      }
+    ],
+    "rivers": [
+      {
+        "id": 0,
+        "file": "assets/maps/world_chunks/world_chunk_00_world_layer_rivers.png",
+        "pixel_rect": [
+          0,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": 1,
+        "file": "assets/maps/world_chunks/world_chunk_01_world_layer_rivers.png",
+        "pixel_rect": [
+          4048,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          0
+        ]
+      },
+      {
+        "id": 2,
+        "file": "assets/maps/world_chunks/world_chunk_02_world_layer_rivers.png",
+        "pixel_rect": [
+          0,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          2000
+        ]
+      },
+      {
+        "id": 3,
+        "file": "assets/maps/world_chunks/world_chunk_03_world_layer_rivers.png",
+        "pixel_rect": [
+          4048,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          2000
+        ]
+      }
+    ],
+    "elevation": [
+      {
+        "id": 0,
+        "file": "assets/maps/world_chunks/world_chunk_00_world_layer_elevation.png",
+        "pixel_rect": [
+          0,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": 1,
+        "file": "assets/maps/world_chunks/world_chunk_01_world_layer_elevation.png",
+        "pixel_rect": [
+          4048,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          0
+        ]
+      },
+      {
+        "id": 2,
+        "file": "assets/maps/world_chunks/world_chunk_02_world_layer_elevation.png",
+        "pixel_rect": [
+          0,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          2000
+        ]
+      },
+      {
+        "id": 3,
+        "file": "assets/maps/world_chunks/world_chunk_03_world_layer_elevation.png",
+        "pixel_rect": [
+          4048,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          2000
+        ]
+      }
+    ],
+    "vegetation": [
+      {
+        "id": 0,
+        "file": "assets/maps/world_chunks/world_chunk_00_world_layer_vegetation.png",
+        "pixel_rect": [
+          0,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": 1,
+        "file": "assets/maps/world_chunks/world_chunk_01_world_layer_vegetation.png",
+        "pixel_rect": [
+          4048,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          0
+        ]
+      },
+      {
+        "id": 2,
+        "file": "assets/maps/world_chunks/world_chunk_02_world_layer_vegetation.png",
+        "pixel_rect": [
+          0,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          2000
+        ]
+      },
+      {
+        "id": 3,
+        "file": "assets/maps/world_chunks/world_chunk_03_world_layer_vegetation.png",
+        "pixel_rect": [
+          4048,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          2000
+        ]
+      }
+    ],
+    "snow_mask": [
+      {
+        "id": 0,
+        "file": "assets/maps/world_chunks/world_chunk_00_snow_mask.png",
+        "pixel_rect": [
+          0,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          0
+        ]
+      },
+      {
+        "id": 1,
+        "file": "assets/maps/world_chunks/world_chunk_01_snow_mask.png",
+        "pixel_rect": [
+          4048,
+          0,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          0
+        ]
+      },
+      {
+        "id": 2,
+        "file": "assets/maps/world_chunks/world_chunk_02_snow_mask.png",
+        "pixel_rect": [
+          0,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          0,
+          2000
+        ]
+      },
+      {
+        "id": 3,
+        "file": "assets/maps/world_chunks/world_chunk_03_snow_mask.png",
+        "pixel_rect": [
+          4048,
+          2000,
+          4144,
+          2096
+        ],
+        "world_pixel_origin": [
+          4048,
+          2000
+        ]
+      }
+    ]
+  },
+  "has_chunk_rivers": true
+}

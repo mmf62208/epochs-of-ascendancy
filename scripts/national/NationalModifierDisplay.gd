@@ -18,6 +18,16 @@ const MODIFIER_HELP: Dictionary = {
 	"stability": "National stability — unrest and compliance.",
 	"prestige_gain": "Prestige from operations and diplomacy.",
 	"consumer_goods": "Civilian goods factories dedicated to needs (higher = more strain).",
+	# Recent tech expansions (minimal high-impact wiring)
+	"production_flexibility": "Production retool speed and custom/field fab efficiency (layered additive manufacturing).",
+	"infantry_enhancement": "Enhanced infantry performance from cybernetics/prosthetics.",
+	"soldier_enhancement": "Super-soldier quality from human genetic enhancement.",
+	"manpower_replacement": "Artificial/cloned manpower pool/reinforce boost (cloning tech).",
+	"defensive_shielding": "Energy barrier protection for units/space habs (deflector shields).",
+	"energy_weapon_dmg": "Directed energy/phaser damage bonus.",
+	"rapid_deployment": "Instant teleport/rapid deployment logistics (matter transporters).",
+	"detection_range": "Advanced multi-spectral scanner/sensor awareness.",
+	"ethics_risk": "Increased research ethics backlash/cohesion hit risk (biotech/CB/sonic).",
 }
 
 

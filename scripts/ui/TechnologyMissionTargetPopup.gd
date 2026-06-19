@@ -116,8 +116,10 @@ func _on_confirm_pressed() -> void:
 	if _selected_tech_id.is_empty():
 		return
 	target_selected.emit(_selected_tech_id)
-	queue_free()
+	hide()
+	call_deferred("queue_free")
 
 
 func _on_cancel_pressed() -> void:
-	queue_free()
+	hide()
+	call_deferred("queue_free")

@@ -4,7 +4,7 @@
   "design_family": "iranian_army_2026_armor",
   "base_type": "Armored",
   "size_category": "Medium",
-  "visual_archetype": "medium_tank",
+  "visual_archetype": "light_tank",
   "crew_required": 3,
   "base_training_level": 36,
   "max_experience_level": 100,

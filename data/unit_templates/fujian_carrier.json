@@ -4,7 +4,7 @@
   "design_family": "chinese_naval_twenty_twenties",
   "base_type": "Naval",
   "size_category": "Heavy",
-  "visual_archetype": "carrier",
+  "visual_archetype": "destroyer",
   "crew_required": 2600,
   "base_training_level": 36,
   "max_experience_level": 100,

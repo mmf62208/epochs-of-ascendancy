@@ -59,7 +59,7 @@
 - Full combat resolver using `get_final_combat_stats()`.
 - Combined arms bonuses.
 - Fortification levels and engineer construction.
-- Weather and day/night cycles.
+- Weather and day/night cycles (mud/rain/snow/precip/vis full penalties + air CAS/interdict in resolver for world-class main loop).
 - Leader traits and doctrine effects.
 
 ## Combat Width & Infrastructure

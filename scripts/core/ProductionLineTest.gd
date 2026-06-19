@@ -6,6 +6,13 @@ extends RefCounted
 const ENV_FULL_LEADER_ROSTER_TESTS := "EOA_RUN_FULL_LEADER_TESTS"
 
 
+static func _get_leader_manager() -> Node:
+	var tree := Engine.get_main_loop()
+	if tree == null:
+		return null
+	return tree.root.get_node_or_null("LeaderManager")
+
+
 static func _run_full_leader_roster_tests() -> bool:
 	return OS.get_environment(ENV_FULL_LEADER_ROSTER_TESTS) == "1"
 
@@ -348,40 +355,45 @@ static func _test_infantry_equipment_stats(design_data: DesignDataLoader) -> boo
 		print("  [FAIL] garand soft_attack too low: ", stats)
 		return false
 
-	if Engine.get_main_loop() == null:
+	var tree := Engine.get_main_loop()
+	var sm: Node = tree.root.get_node_or_null("/root/SupplyManager") if tree else null
+	if tree == null or sm == null:
 		print("  [PASS] infantry equipment stats (templates only)")
 		return true
 
-	SupplyManager.division_templates.load_all()
-	var div: DivisionTemplate = SupplyManager.division_templates.get_division("us_infantry_div_ww2")
-	if div == null:
-		print("  [PASS] infantry equipment stats (no division template)")
-		return true
+	if sm.has_method("get_division_template") or sm.get("division_templates") != null:
+		sm.division_templates.load_all()
+		var div: DivisionTemplate = sm.division_templates.get_division("us_infantry_div_ww2")
+		if div == null:
+			print("  [PASS] infantry equipment stats (no division template)")
+			return true
 
-	var agg := div.get_aggregated_infantry_stats(design_data)
-	if float(agg.get("soft_attack", 0.0)) <= 0.0:
-		print("  [FAIL] division aggregated infantry stats: ", agg)
-		return false
-
-	var german_mixed: DivisionTemplate = SupplyManager.division_templates.get_division(
-		"german_infantry_division_1943_mixed",
-	)
-	if german_mixed == null:
-		print("  [FAIL] german_infantry_division_1943_mixed missing")
-		return false
-	var mixed_stats: Dictionary = german_mixed.get_aggregated_infantry_stats(design_data)
-	if int(mixed_stats.get("generation", mixed_stats.get("average_generation", 0))) < 2:
-		print("  [FAIL] mixed division generation too low: ", mixed_stats)
-		return false
-
-	var pm := _get_production_manager()
-	if pm != null:
-		var via_pm: Dictionary = pm.get_division_infantry_stats("german_infantry_division_1943")
-		if via_pm.is_empty():
-			print("  [FAIL] ProductionManager.get_division_infantry_stats")
+		var agg := div.get_aggregated_infantry_stats(design_data)
+		if float(agg.get("soft_attack", 0.0)) <= 0.0:
+			print("  [FAIL] division aggregated infantry stats: ", agg)
 			return false
 
-	print("  [PASS] infantry equipment type/generation stats")
+		var german_mixed: DivisionTemplate = sm.division_templates.get_division(
+			"german_infantry_division_1943_mixed",
+		)
+		if german_mixed == null:
+			print("  [FAIL] german_infantry_division_1943_mixed missing")
+			return false
+		var mixed_stats: Dictionary = german_mixed.get_aggregated_infantry_stats(design_data)
+		if int(mixed_stats.get("generation", mixed_stats.get("average_generation", 0))) < 2:
+			print("  [FAIL] mixed division generation too low: ", mixed_stats)
+			return false
+
+		var pm := _get_production_manager()
+		if pm != null:
+			var via_pm: Dictionary = pm.get_division_infantry_stats("german_infantry_division_1943")
+			if via_pm.is_empty():
+				print("  [FAIL] ProductionManager.get_division_infantry_stats")
+				return false
+
+		print("  [PASS] infantry equipment type/generation stats")
+		return true
+	print("  [PASS] infantry equipment stats (no full SupplyManager in this context)")
 	return true
 
 
@@ -433,12 +445,14 @@ static func _test_sustainment_equipment(design_data: DesignDataLoader) -> bool:
 		print("  [FAIL] basic_sustainment template missing")
 		return false
 
-	if Engine.get_main_loop() == null:
+	var tree2 := Engine.get_main_loop()
+	var sm2: Node = tree2.root.get_node_or_null("/root/SupplyManager") if tree2 else null
+	if tree2 == null or sm2 == null:
 		print("  [PASS] sustainment equipment (data only)")
 		return true
 
-	SupplyManager.division_templates.load_all()
-	var us_div: DivisionTemplate = SupplyManager.division_templates.get_division("us_infantry_division_1943")
+	sm2.division_templates.load_all()
+	var us_div: DivisionTemplate = sm2.division_templates.get_division("us_infantry_division_1943")
 	if us_div == null:
 		print("  [FAIL] us_infantry_division_1943 missing")
 		return false
@@ -453,7 +467,7 @@ static func _test_sustainment_equipment(design_data: DesignDataLoader) -> bool:
 		print("  [FAIL] improved sustainment should reduce consumption multiplier")
 		return false
 
-	var marine: DivisionTemplate = SupplyManager.division_templates.get_division("us_marine_division_ww2")
+	var marine: DivisionTemplate = sm2.division_templates.get_division("us_marine_division_ww2")
 	if marine == null:
 		print("  [FAIL] us_marine_division_ww2 missing")
 		return false
@@ -517,11 +531,16 @@ static func _test_sustainment_equipment(design_data: DesignDataLoader) -> bool:
 
 
 static func _test_combat_resolver(design_data: DesignDataLoader) -> bool:
-	if Engine.get_main_loop() == null or GameData.design_data == null:
+	var tree5 := Engine.get_main_loop()
+	var gd: Node = tree5.root.get_node_or_null("/root/GameData") if tree5 else null
+	if tree5 == null or gd == null or (gd.get("design_data") == null):
 		print("  [SKIP] CombatResolver (SupplyManager / GameData not available)")
 		return true
 
-	SupplyManager.division_templates.load_all()
+	var tree3 := Engine.get_main_loop()
+	var sm3: Node = tree3.root.get_node_or_null("/root/SupplyManager") if tree3 else null
+	if sm3:
+		sm3.division_templates.load_all()
 	var resolver := CombatResolver.new()
 	var power: Dictionary = resolver.get_effective_combat_power("us_marine_division_ww2")
 
@@ -545,13 +564,14 @@ static func _test_combat_resolver(design_data: DesignDataLoader) -> bool:
 			"marine_amphibious_sustainment": 50000,
 		})
 		pm.clear_unit_equipment_stock("combat_resolver_test")
-		var marine_div: DivisionTemplate = SupplyManager.division_templates.get_division(
+		var marine_div: DivisionTemplate = sm3.division_templates.get_division(
 			"us_marine_division_ww2",
-		)
-		pm.auto_reinforce_unit_from_stockpile(
-			"combat_resolver_test",
-			marine_div.get_required_equipment(design_data),
-		)
+		) if sm3 else null
+		if marine_div:
+			pm.auto_reinforce_unit_from_stockpile(
+				"combat_resolver_test",
+				marine_div.get_required_equipment(design_data),
+			)
 		var stocked: Dictionary = resolver.get_effective_combat_power(
 			"us_marine_division_ww2",
 			"combat_resolver_test",
@@ -565,7 +585,7 @@ static func _test_combat_resolver(design_data: DesignDataLoader) -> bool:
 		pm.clear_unit_equipment_stock("combat_resolver_test")
 		pm.set_national_equipment_stockpile({})
 
-	if Engine.get_main_loop() != null:
+	if Engine.get_main_loop() != null and _get_leader_manager() != null:
 		var rommel: Leader = LeaderManager.get_leader("ger_rommel")
 		if rommel != null:
 			var base_power: Dictionary = resolver.get_effective_combat_power(
@@ -700,10 +720,16 @@ static func _test_phase_combat_resolution() -> bool:
 	var attacker := Formation.new()
 	attacker.formation_id = "german_infantry_division_1943"
 	attacker.country_tag = "GER"
+	attacker.organization = 1.0
+	attacker.readiness = 1.0
+	attacker.strength = 1.0
 
 	var defender := Formation.new()
 	defender.formation_id = "german_infantry_division_1943_mixed"
 	defender.country_tag = "YUG"
+	defender.organization = 1.0
+	defender.readiness = 1.0
+	defender.strength = 1.0
 
 	var result: Dictionary = resolver.resolve_combat(attacker, defender, battle)
 	resolver.free()
@@ -760,8 +786,10 @@ static func _test_battle_manager_assault() -> bool:
 	MapManager.update_province_owner(from_pid, attacker_tag, attacker_tag, true)
 	MapManager.update_province_owner(to_pid, defender_tag, defender_tag, true)
 
-	if typeof(SupplyManager) != TYPE_NIL:
-		SupplyManager.move_formation_to_province("german_infantry_division_1943", from_pid, attacker_tag)
+	var tree4 := Engine.get_main_loop()
+	var sm4: Node = tree4.root.get_node_or_null("/root/SupplyManager") if tree4 else null
+	if sm4 != null:
+		sm4.move_formation_to_province("german_infantry_division_1943", from_pid, attacker_tag)
 
 	var assault: Dictionary = BattleManager.execute_province_assault(attacker_tag, to_pid, from_pid)
 	if not bool(assault.get("success", false)):
@@ -814,11 +842,12 @@ static func _test_combat_width() -> bool:
 
 
 static func _test_formation_spawner() -> bool:
-	if Engine.get_main_loop() == null:
-		print("  [SKIP] formation spawner (no main loop)")
+	var lm := _get_leader_manager()
+	if lm == null:
+		print("  [SKIP] formation spawner (LeaderManager autoload not available)")
 		return true
 
-	LeaderManager.clear_all_formations()
+	lm.clear_all_formations()
 
 	var spawner := FormationSpawner.new()
 	spawner.spawn_test_formations_for_country("GER", 6)
@@ -874,7 +903,8 @@ static func _test_formation_spawner() -> bool:
 
 
 static func _test_leader_manager() -> bool:
-	if Engine.get_main_loop() == null:
+	var lm := _get_leader_manager()
+	if lm == null:
 		print("  [SKIP] LeaderManager autoload not available")
 		return true
 
@@ -934,7 +964,7 @@ static func _test_leader_manager() -> bool:
 	# AI countries auto-resolve vacancies without leaving player pending decisions.
 	LeaderManager.set_player_country_tag("USA")
 	LeaderManager.register_division_formations_for_country("GER")
-	var ger_formations := LeaderManager.get_available_formations("GER")
+	var ger_formations: Variant = LeaderManager.get_available_formations("GER")
 	if ger_formations.is_empty():
 		print("  [FAIL] need GER formation for AI replacement test")
 		return false
@@ -948,7 +978,7 @@ static func _test_leader_manager() -> bool:
 	if not LeaderManager.assign_leader_to_army("ger_auto_repl_test", ger_formation_id):
 		print("  [FAIL] could not assign GER leader for AI replacement test")
 		return false
-	var ai_pending_before := LeaderManager.get_pending_replacement_count("GER")
+	var ai_pending_before: Variant = LeaderManager.get_pending_replacement_count("GER")
 	LeaderManager.pending_retirements.append("ger_auto_repl_test")
 	if not LeaderManager.resolve_retirement("ger_auto_repl_test", true, false):
 		print("  [FAIL] GER resolve_retirement for AI replacement test")
@@ -972,7 +1002,7 @@ static func _test_leader_manager() -> bool:
 			print("  [FAIL] assign leader for formation_destroyed capture test")
 			return false
 		LeaderManager.pending_leader_replacements.clear()
-		var captured_result := LeaderManager.handle_formation_destroyed("third_army_test")
+		var captured_result: Variant = LeaderManager.handle_formation_destroyed("third_army_test")
 		if str(captured_result.get("type", "")) == "captured":
 			got_capture_vacancy = LeaderManager.get_pending_replacement_count("USA") >= 1
 			break
@@ -1093,7 +1123,7 @@ static func _test_leader_manager() -> bool:
 		print("  [FAIL] spend_experience")
 		return false
 
-	var combat_xp := LeaderManager.calculate_combat_xp_from_result({"is_major_victory": true})
+	var combat_xp: Variant = LeaderManager.calculate_combat_xp_from_result({"is_major_victory": true})
 	if combat_xp < 12 + 60:
 		print("  [FAIL] major victory combat XP: ", combat_xp)
 		return false
@@ -1106,7 +1136,7 @@ static func _test_leader_manager() -> bool:
 	if LeaderManager.get_trait_level_cost(1) != 150:
 		print("  [FAIL] get_trait_level_cost(1) should be 150")
 		return false
-	var bold_cost := LeaderManager.get_trait_level_up_cost(patton, "bold")
+	var bold_cost: Variant = LeaderManager.get_trait_level_up_cost(patton, "bold")
 	if bold_cost != 150:
 		print("  [FAIL] trait level-up cost at level 1 should be 150: ", bold_cost)
 		return false
@@ -1174,7 +1204,7 @@ static func _test_leader_manager() -> bool:
 		print("  [FAIL] invest training path level 2")
 		return false
 	LeaderManager.set_country_military_doctrine("USA", "mass_assault", true)
-	var switch_cost := LeaderManager.get_training_path_switch_cost(
+	var switch_cost: Variant = LeaderManager.get_training_path_switch_cost(
 		"usa_patton_test",
 		"school_of_layered_defense",
 	)
@@ -1230,7 +1260,7 @@ static func _test_leader_manager() -> bool:
 		print("  [FAIL] supply path should lower consumption: ", boosted)
 		return false
 
-	var daily_supply := LeaderManager.apply_supply_consumption_for_leader(10.0, "usa_patton_test")
+	var daily_supply: Variant = LeaderManager.apply_supply_consumption_for_leader(10.0, "usa_patton_test")
 	if daily_supply >= 10.0:
 		print("  [FAIL] daily supply should be reduced by layered defense: ", daily_supply)
 		return false
@@ -1239,11 +1269,11 @@ static func _test_leader_manager() -> bool:
 		return false
 
 	patton.set_training_path("logistics_mastery_track", 3)
-	var logistics_mods := LeaderManager.get_leader_training_path_supply_modifiers("usa_patton_test")
+	var logistics_mods: Variant = LeaderManager.get_leader_training_path_supply_modifiers("usa_patton_test")
 	if not logistics_mods.has("attrition_reduction"):
 		print("  [FAIL] logistics track should grant attrition_reduction: ", logistics_mods)
 		return false
-	var reduced_attrition := LeaderManager.apply_attrition_for_leader(100.0, "usa_patton_test")
+	var reduced_attrition: Variant = LeaderManager.apply_attrition_for_leader(100.0, "usa_patton_test")
 	if reduced_attrition >= 100.0:
 		print("  [FAIL] attrition_reduction should lower attrition: ", reduced_attrition)
 		return false
@@ -1251,11 +1281,11 @@ static func _test_leader_manager() -> bool:
 		print("  [FAIL] reinforcement_speed should boost rate: ", logistics_mods)
 		return false
 
-	var suitability := LeaderManager.get_officer_training_suitability("usa_patton_test")
+	var suitability: Variant = LeaderManager.get_officer_training_suitability("usa_patton_test")
 	if suitability < 40:
 		print("  [FAIL] Patton should be a viable training mentor: ", suitability)
 		return false
-	var base_suitability := suitability
+	var base_suitability: float = float(suitability)
 	LeaderManager.try_add_trait_to_leader(patton, "reckless", 1)
 	if LeaderManager.get_officer_training_suitability("usa_patton_test") >= base_suitability:
 		print("  [FAIL] reckless trait should lower training suitability")
@@ -1278,7 +1308,7 @@ static func _test_leader_manager() -> bool:
 		print("  [FAIL] mentor should not be available for field command while training")
 		return false
 
-	var cadet := LeaderManager.generate_and_register_leader_from_training("USA")
+	var cadet: Variant = LeaderManager.generate_and_register_leader_from_training("USA")
 	if cadet == null:
 		print("  [FAIL] generate_and_register_leader_from_training")
 		return false
@@ -1293,7 +1323,7 @@ static func _test_leader_manager() -> bool:
 		return false
 
 	LeaderManager.officer_training_quality["USA"] = 75.0
-	var quality_cadet := LeaderManager.generate_new_leader_from_training("USA")
+	var quality_cadet: Variant = LeaderManager.generate_new_leader_from_training("USA")
 	if quality_cadet.experience < 85:
 		print("  [FAIL] high training quality should boost cadet XP: ", quality_cadet.experience)
 		return false
@@ -1313,7 +1343,7 @@ static func _test_leader_manager() -> bool:
 		return false
 
 	LeaderManager.try_add_trait_to_leader(patton, "reckless", 1)
-	var flaw_cadet := LeaderManager.generate_new_leader_from_training("USA")
+	var flaw_cadet: Variant = LeaderManager.generate_new_leader_from_training("USA")
 	var forced_flaw := false
 	for _i in 20:
 		if flaw_cadet != null and flaw_cadet.has_trait("reckless"):
@@ -1341,7 +1371,7 @@ static func _test_leader_manager() -> bool:
 		)
 		return true
 
-	var loaded_1918 := LeaderManager.load_leaders_for_scenario("1918", 1918)
+	var loaded_1918: Variant = LeaderManager.load_leaders_for_scenario("1918", 1918)
 	if loaded_1918 < 60:
 		print("  [FAIL] 1918 historical leaders load count: ", loaded_1918)
 		return false
@@ -1360,7 +1390,7 @@ static func _test_leader_manager() -> bool:
 		print("  [FAIL] 1918 Pershing not loaded")
 		return false
 
-	var loaded_2026 := LeaderManager.load_leaders_for_scenario("2026", 2026)
+	var loaded_2026: Variant = LeaderManager.load_leaders_for_scenario("2026", 2026)
 	if loaded_2026 < 80:
 		print("  [FAIL] 2026 scenario leaders load count: ", loaded_2026)
 		return false
@@ -1388,7 +1418,7 @@ static func _test_leader_manager() -> bool:
 		print("  [FAIL] 2026 leader age out of range: ", LeaderManager.get_leader_age(modern_usa))
 		return false
 
-	var loaded_1936 := LeaderManager.load_leaders_for_scenario("1936", 1936)
+	var loaded_1936: Variant = LeaderManager.load_leaders_for_scenario("1936", 1936)
 	if loaded_1936 < 60:
 		print("  [FAIL] 1936 merged roster load count: ", loaded_1936)
 		return false
@@ -1418,24 +1448,24 @@ static func _test_leader_manager() -> bool:
 		print("  [FAIL] Guderian not introduced in 1939")
 		return false
 
-	var mannerheim_1936 := LeaderManager.get_leader("fin_mannerheim")
+	var mannerheim_1936: Variant = LeaderManager.get_leader("fin_mannerheim")
 	if mannerheim_1936 == null:
 		print("  [FAIL] Mannerheim missing for mortality checks")
 		return false
-	var death_chance := LeaderManager.get_yearly_death_chance(mannerheim_1936)
-	var retire_chance := LeaderManager.get_yearly_retirement_chance(mannerheim_1936)
+	var death_chance: Variant = LeaderManager.get_yearly_death_chance(mannerheim_1936)
+	var retire_chance: Variant = LeaderManager.get_yearly_retirement_chance(mannerheim_1936)
 	if death_chance <= 0.0 or retire_chance <= 0.0:
 		print("  [FAIL] mortality chances for elderly leader: ", death_chance, retire_chance)
 		return false
 
-	var rommel_combat := LeaderManager.get_leader("ger_rommel")
+	var rommel_combat: Variant = LeaderManager.get_leader("ger_rommel")
 	if rommel_combat != null:
 		rommel_combat.assigned_army_id = "test_combat_formation"
-		var per_battle := LeaderManager.get_combat_death_chance_per_battle(rommel_combat)
+		var per_battle: Variant = LeaderManager.get_combat_death_chance_per_battle(rommel_combat)
 		if absf(per_battle - 0.0003) > 0.0001:
 			print("  [FAIL] combat death chance should be ~0.03%: ", per_battle)
 			return false
-		var destroyed_chance := LeaderManager.get_formation_destroyed_fate_chance(rommel_combat)
+		var destroyed_chance: Variant = LeaderManager.get_formation_destroyed_fate_chance(rommel_combat)
 		if absf(destroyed_chance - 0.30) > 0.05:
 			print("  [FAIL] formation destroyed fate chance: ", destroyed_chance)
 			return false

@@ -65,7 +65,7 @@ func get_all_site_ids() -> Array[String]:
 ## Creates a fully populated SpecialSite instance from a definition.
 ## Applies construction state, effects, and visual metadata.
 func create_special_site(site_id: String, province_id: int, owner_tag: String) -> SpecialSite:
-	var def := get_site_definition(site_id)
+	var def: Dictionary = get_site_definition(site_id)
 	if def.is_empty():
 		push_error("SpecialSiteManager: Unknown site_id '%s'" % site_id)
 		return null
@@ -141,7 +141,7 @@ func get_constructible_sites_for_province(province: Province) -> Array[String]:
 	var current_infra := province.infrastructure
 
 	for site_id in site_definitions.keys():
-		var def := site_definitions[site_id] as Dictionary
+		var def: Dictionary = site_definitions[site_id] as Dictionary
 		var cons := def.get("construction", {}) as Dictionary
 		var req_infra := int(cons.get("required_infra_level", 1))
 

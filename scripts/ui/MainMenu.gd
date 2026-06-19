@@ -395,7 +395,14 @@ func _handle_menu_option(option: String) -> void:
 		"help":
 			_show_help_dialog()
 		"refresh_infra_visuals":
-			DebugOverlay.toggle()
+			if typeof(DebugOverlay) != TYPE_NIL:
+				DebugOverlay.toggle()
+			else:
+				# fallback: find live instance (DebugOverlay is usually manually added, not autoload)
+				var root := get_tree().root if get_tree() else null
+				var dbg := root.get_node_or_null("DebugOverlay") if root else null
+				if dbg and dbg.has_method("toggle"):
+					dbg.toggle()
 		_:
 			_set_status("Option: %s" % option)
 
@@ -633,7 +640,8 @@ func _close_with_fade() -> void:
 		await tw.finished
 	_pause_game(false)
 	menu_closed.emit()
-	queue_free()
+	hide()
+	call_deferred("queue_free")
 
 
 func _return_to_scenario_start() -> void:

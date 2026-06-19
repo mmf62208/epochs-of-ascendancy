@@ -51,7 +51,8 @@ const NATIONAL_POSITIONS: Array[Dictionary] = [
 ]
 
 const HEADER_SPECS: Array[Dictionary] = [
-	{"text": "Name", "width": 168},
+	{"text": "", "width": 28},  # portrait icon col
+	{"text": "Name", "width": 140},
 	{"text": "Status", "width": 88},
 	{"text": "Type", "width": 72},
 	{"text": "Skills", "width": 128},
@@ -320,6 +321,12 @@ func _populate_national_positions() -> void:
 
 func _create_officer_training_card() -> Control:
 	var training_leader := LeaderManager.get_officer_training_leader(country_tag)
+	# Auto-clean bad/unavailable mentor (retired, deceased, captured, or otherwise unavailable) so card shows clean "Vacant"/"Assign"
+	# like national position cards. Brand-new leaders are intentionally allowed (even if is_available_for_command is edge false during intro).
+	if training_leader != null and not _leader_valid_for_officer_training(training_leader):
+		LeaderManager.clear_officer_training_leader(country_tag)
+		training_leader = null
+
 	var quality_info := LeaderManager.get_officer_training_quality_display(country_tag)
 	var debuff_months := LeaderManager.get_officer_training_debuff_months(country_tag)
 	var cadet_cost := LeaderManager.get_officer_training_cadet_prestige_cost()
@@ -339,9 +346,12 @@ func _create_officer_training_card() -> Control:
 	RetrowaveTheme.style_column_header(title)
 	vbox.add_child(title)
 
+	var is_vacant := training_leader == null or (training_leader != null and not _leader_valid_for_officer_training(training_leader))
 	var leader_name := Label.new()
-	leader_name.text = training_leader.name if training_leader != null else "Unassigned"
+	leader_name.text = "Vacant" if is_vacant else training_leader.name
 	leader_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	if is_vacant:
+		leader_name.modulate = RetrowaveTheme.WARNING
 	leader_name.add_theme_font_size_override("font_size", 13)
 	RetrowaveTheme.style_row_label(leader_name)
 	vbox.add_child(leader_name)
@@ -380,7 +390,7 @@ func _create_officer_training_card() -> Control:
 	hbox.add_theme_constant_override("separation", 6)
 
 	var change_btn := Button.new()
-	change_btn.text = "Assign" if training_leader == null else "Change"
+	change_btn.text = "Assign" if is_vacant else "Change"
 	change_btn.custom_minimum_size = Vector2(70, 24)
 	RetrowaveTheme.style_secondary_button(change_btn)
 	change_btn.pressed.connect(_on_assign_officer_training_pressed)
@@ -443,10 +453,11 @@ func _create_national_position_card(
 	RetrowaveTheme.style_column_header(title)
 	vbox.add_child(title)
 
+	var is_vacant := leader == null or (leader != null and (leader.is_retired or leader.is_deceased or not leader.is_available_for_command()))
 	var leader_name := Label.new()
-	leader_name.text = leader.name if leader != null else "Unassigned"
+	leader_name.text = "Vacant" if is_vacant else leader.name
 	leader_name.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	if leader == null and position_key == LeaderManager.POSITION_CHIEF_OF_ARMY:
+	if is_vacant and position_key == LeaderManager.POSITION_CHIEF_OF_ARMY:
 		leader_name.modulate = RetrowaveTheme.WARNING
 	RetrowaveTheme.style_row_label(leader_name)
 	vbox.add_child(leader_name)
@@ -456,7 +467,7 @@ func _create_national_position_card(
 	btn_row.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	var change_btn := Button.new()
-	change_btn.text = "Change"
+	change_btn.text = "Assign" if is_vacant else "Change"
 	RetrowaveTheme.style_secondary_button(change_btn)
 	change_btn.pressed.connect(_on_change_national_position.bind(position_key))
 	btn_row.add_child(change_btn)
@@ -490,6 +501,24 @@ func _on_change_national_position(position_key: String) -> void:
 			picker.position_key = position_key
 			picker.dialog_title = "Assign %s" % display_name,
 	)
+
+## Local validity for officer training mentor display/assignment (mirrors can_assign + brand-new exception).
+## Used to show "Vacant"/"Assign" cleanly and auto-clear bad state so user can assign a fresh/new leader (e.g. cadet) without seeing stale "retiring" mentor.
+func _leader_valid_for_officer_training(leader: Leader) -> bool:
+	if leader == null:
+		return false
+	if leader.is_injured or leader.is_captured or leader.is_retired or leader.is_deceased:
+		return false
+	# Brand new (recent start_year, e.g. Patton in 1936 start) are allowed as mentors even during intro window.
+	# (Duplicate lightweight check to avoid calling private; mirrors LeaderManager._is_brand_new + popup logic.)
+	if leader.start_year > 0 and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_current_year"):
+		var cy: int = LeaderManager.get_current_year()
+		if cy - leader.start_year < 2:
+			return true
+	if not leader.is_available_for_command():
+		# Non-brand-new unavailable are invalid for mentor.
+		return false
+	return true
 
 
 # =====================
@@ -545,7 +574,20 @@ func _populate_unassigned_formations() -> void:
 func _create_leader_row(summary: Dictionary) -> HBoxContainer:
 	var hbox := HBoxContainer.new()
 	hbox.custom_minimum_size = Vector2(0, ROW_HEIGHT)
-	hbox.add_theme_constant_override("separation", 8)
+	hbox.add_theme_constant_override("separation", 4)
+
+	# Portrait icon (new leader portraits support in list UIs)
+	var p_rect := TextureRect.new()
+	p_rect.custom_minimum_size = Vector2(24, 24)
+	p_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	p_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var ppath := str(summary.get("portrait_path", ""))
+	if ppath != "" and ResourceLoader.exists(ppath):
+		var tex := load(ppath) as Texture2D
+		if tex:
+			p_rect.texture = tex
+	p_rect.visible = p_rect.texture != null
+	hbox.add_child(p_rect)
 
 	var name_btn := Button.new()
 	var leader_name := str(summary.get("name", "Unknown"))
@@ -554,7 +596,7 @@ func _create_leader_row(summary: Dictionary) -> HBoxContainer:
 	name_btn.text = leader_name
 	name_btn.flat = true
 	name_btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	name_btn.custom_minimum_size = Vector2(168, 0)
+	name_btn.custom_minimum_size = Vector2(140, 0)
 	name_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	name_btn.clip_text = true
 	_style_leader_name_button(name_btn)

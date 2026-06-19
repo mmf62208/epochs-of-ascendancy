@@ -75,6 +75,13 @@ func _draw_single_route(plan: SupplyRoutePlan, colors_cfg: Dictionary, is_trade_
 		color = ProvinceMapVisuals.COLOR_TRADE_CORRIDOR
 		color.a = base_a
 		w = maxf(1.0, line_width * clampf(trade_corridor_width_scale, 0.22, 0.52))
+		# Regional convoy protection makes trade corridors more prominent (thicker/brighter) when owner has full naval/chokepoint regions
+		if plan.owner_tag and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+			var reg := MapManager.get_active_regional_control_bonuses(plan.owner_tag)
+			var prot := float(reg.get("convoy_efficiency", 0.0)) + float(reg.get("convoy_protection", 0.0))
+			if prot > 0.0:
+				color.a = clampf(color.a * (1.0 + prot * 0.8), 0.08, 0.8)
+				w = maxf(w, line_width * (1.0 + prot * 0.4))
 	var points: PackedVector2Array = PackedVector2Array()
 	for pid in plan.province_path:
 		if _centroids.has(pid):
@@ -96,7 +103,14 @@ func _color_for_plan(plan: SupplyRoutePlan, colors_cfg: Dictionary) -> Color:
 		var a := 0.9
 		if raw.size() >= 4:
 			a = float(raw[3])
-		return Color(float(raw[0]), float(raw[1]), float(raw[2]), a)
+		var col := Color(float(raw[0]), float(raw[1]), float(raw[2]), a)
+		# Tint trade corridors greener if high convoy protection from full regions
+		if plan.represents_trade_flow and plan.owner_tag and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+			var reg := MapManager.get_active_regional_control_bonuses(plan.owner_tag)
+			var prot := float(reg.get("convoy_efficiency", 0.0)) + float(reg.get("convoy_protection", 0.0))
+			if prot > 0.0:
+				col = col.lerp(Color(0.2, 0.8, 0.3), clampf(prot * 0.5, 0.0, 0.5))
+		return col
 	return Color(0.4, 0.9, 0.5, 0.9)
 
 

@@ -321,7 +321,7 @@ func _strip_bbcode_tags(text: String) -> String:
 func _count_entries_by_domain(tag: String, era_key: String) -> Dictionary:
 	if typeof(TechnologyManager) == TYPE_NIL:
 		return {}
-	var preview := TechnologyManager.get_technology_screen_data(tag, "all", "", era_key)
+	var preview = TechnologyManager.get_technology_screen_data(tag, "all", "", era_key)
 	var counts: Dictionary = {}
 	var status_counts: Dictionary = {}
 	for entry in preview.research_entries:
@@ -401,7 +401,7 @@ func _on_cancel_pressed() -> void:
 func refresh_screen() -> void:
 	if typeof(TechnologyManager) == TYPE_NIL:
 		return
-	var preview := TechnologyManager.get_technology_screen_data(
+	var preview = TechnologyManager.get_technology_screen_data(
 		country_tag,
 		_domain_filter_id,
 		_selected_tech_id,

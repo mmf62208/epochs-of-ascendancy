@@ -3,12 +3,14 @@
 [ext_resource type="Script" path="res://scripts/ui/TopInfoBar.gd" id="1_topbar"]
 
 [node name="TopInfoBar" type="Control"]
-custom_minimum_size = Vector2(0, 64)
+custom_minimum_size = Vector2(0, 84)
 layout_mode = 3
 anchors_preset = 10
 anchor_right = 1.0
-offset_bottom = 64.0
+offset_top = 0.0
+offset_bottom = 84.0
 grow_horizontal = 2
+grow_vertical = 0
 script = ExtResource("1_topbar")
 player_country_tag = "USA"
 
@@ -27,17 +29,15 @@ layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
+offset_top = 6.0
+offset_bottom = -6.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 16
+theme_override_constants/separation = 8
 
 [node name="LeftContainer" type="HBoxContainer" parent="ContentRow"]
 layout_mode = 2
 theme_override_constants/separation = 12
-
-[node name="DateTimeLabel" type="Label" parent="ContentRow/LeftContainer"]
-layout_mode = 2
-text = "1 Jan 1936"
 
 [node name="TimeSpeedContainer" type="HBoxContainer" parent="ContentRow/LeftContainer"]
 layout_mode = 2
@@ -67,6 +67,13 @@ text = "3x"
 layout_mode = 2
 custom_minimum_size = Vector2(36, 32)
 text = "4x"
+
+[node name="DateTimeLabel" type="Label" parent="ContentRow/LeftContainer"]
+layout_mode = 2
+custom_minimum_size = Vector2(210, 28)
+size_flags_horizontal = 0
+text = "1 Jan 1936"
+horizontal_alignment = 0
 
 [node name="CenterContainer" type="HBoxContainer" parent="ContentRow"]
 layout_mode = 2

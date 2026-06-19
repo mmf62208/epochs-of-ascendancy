@@ -458,12 +458,18 @@ def build_new_geometry(
         old_id = child["id"]
         if old_id not in id_remap:
             continue
+        river_aware = bool(child.get("river_aware", False))
+        base_notes = child.get("notes", f"Generated Phase 1 child of {child['parent_id']}")
+        notes = base_notes
+        if river_aware and "river-cross" not in base_notes:
+            notes += " (river-cross natural border guidance from real rivers.json)"
         new_entry = {
             "id": id_remap[old_id],
             "parent_id": child["parent_id"],
             "points": child["points"],
             "label_anchor": child.get("label_anchor", child.get("suggested_center", child["points"][0])),
-            "notes": f"Generated Phase 1 child of {child['parent_id']}"
+            "notes": notes,
+            "river_aware": river_aware
         }
         new_provinces.append(new_entry)
 
@@ -652,9 +658,9 @@ def main():
         original_owners = {}
 
     test_scenario = {
-        "name": "Phase 1 Europe Test (Expanded Map v3)",
+        "name": "Phase 1 Europe Test (Full 350-450+ Territories)",
         "start_date": "1936-01-01",
-        "description": "Test scenario using the procedurally expanded 180-province Europe map (v3 closest-child wiring). Ownership inherited from original parents where possible. For map generation pipeline validation only.",
+        "description": "Test scenario using the procedurally expanded ~460-province full Europe map (350-450+ target, Phase 1 gen) (v3 closest-child wiring). Ownership inherited from original parents where possible. For map generation pipeline validation only.",
         "use_province_data_dir": "provinces_phase1_test",
         "provinces": []
     }
@@ -759,9 +765,9 @@ def main():
 
     # Write the scenario that tells the loader to use the custom data dir
     persistent_scenario = {
-        "name": "Phase 1 Europe Test (Expanded Map v3)",
+        "name": "Phase 1 Europe Test (Full 350-450+ Territories)",
         "start_date": "1936-01-01",
-        "description": "Persistent test scenario for the procedurally generated 180-province Europe map. Uses custom province data in provinces_phase1_test/.",
+        "description": "Zero-interference playtest harness: Persistent test scenario for the procedurally generated ~460-province dense Europe map (Phase1 target 350-450 full territories). All systems (settlement, welfare cultural war, HH pressure, Italy unholy, pandemics, toasts/PolicyLaw, Golden/combat/supply/agents) enabled on real map. Use TestScenario + F10 harness. No further setup needed. Uses custom province data in provinces_phase1_test/.",
         "use_province_data_dir": "provinces_phase1_test",
         "provinces": test_scenario["provinces"]  # reuse the overrides we just built
     }
@@ -776,7 +782,7 @@ def main():
 
     print("\nNext steps:")
     print("  - Use the new 'Load Phase 1 Europe Test Scenario' button in Godot DebugOverlay (F10).")
-    print("  - The test scenario + v3 layers give you a persistent, playable 180-province map for validation.")
+    print("  - The test scenario + v3 layers give you a persistent, playable 471-province full Europe map (126 river_aware children, natural river borders) for validation + zero-interference harness (F10 buttons for policies/reloc/time/pressure logs). Ready for day-of-testing.")
 
 
 if __name__ == "__main__":

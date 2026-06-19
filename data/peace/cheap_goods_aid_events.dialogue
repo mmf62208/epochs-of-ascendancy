@@ -1,0 +1,39 @@
+# cheap_goods_aid_events.dialogue
+# Sample for trade-offs (cheap exports: short Cohesion boost, long factory erosion) and aid corruption (wasted into Hidden Hand).
+# Launched from TradeErosion/AidCorruption states in chart or demo buttons. Makes building industry/Cohesion feel impactful with narrative choices and risks.
+
+~ cheap_exports_choice
+
+Cheap goods flood in from abroad via Trade Envoy deal. Your people celebrate short-term (public Cohesion surges – cheap stuff makes life easier now). But factories erode over time (deindustrialization narrative – long-term Mandate and industrial_base hit). Trade-off: Accept for immediate happiness or reject to protect long-term strength?
+
+- Accept the Deal (Short Public Cohesion + , Long Erosion)
+  do GameData.accept_cheap_exports_deal("trade_envoy", "AsiaPartner")
+  People are happy now (riots down), but industrial base slowly decays. Hidden Hand may exploit eroded institutional Cohesion. Fun tension: Short-term relief vs long-term weakness.
+  => end
+
+- Reject and Protect Industry (No Short Boost, Preserve Base)
+  do GameData.apply_pillar_shift("player", "mandate", 5, "protected_industry")
+  No immediate Cohesion from cheap goods, but factories hold strong. Long-term Mandate gain from self-reliance. Trade-off: Harder now, stronger later.
+  => end
+
+=> END
+
+~ aid_corruption_choice
+
+You send aid to a struggling nation (or receive it). Short-term Cohesion boost for them (or your Mandate prestige if giving). But high risk of waste and corruption siphoned into Hidden Hand (erodes their elite/public groups, possible scandal hitting your Ascendancy). Narrative: Aid as tool or trap?
+
+- Send/Accept Aid (Short Boost, Corruption Risk)
+  do GameData.send_country_aid("aid_agent", "FailedState", 10)
+  Short Cohesion or Mandate gain, but 60% chance wasted into Hidden Hand (groups eroded, scandals). Makes 'helping' a tense choice with real narrative depth (corruption, lost influence).
+  => end
+
+- Refuse Aid (No Boost, Avoid Risk)
+  do GameData.apply_pillar_shift("player", "ascendancy", 3, "principled_stand")
+  No short-term help, but avoid corruption trap. Hidden Hand less able to exploit. Trade-off: Miss opportunity, but cleaner long-term.
+  => end
+
+=> END
+
+~ end
+
+The choice has played out. Your pillars shift visibly – cheap goods or aid create short-term relief with long-term costs or Hidden Hand gains. Players feel the difference through agent decisions and trade-offs in the grand campaign.

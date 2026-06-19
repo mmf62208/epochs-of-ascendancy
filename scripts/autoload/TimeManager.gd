@@ -226,6 +226,13 @@ func advance_days(days: float) -> void:
 		total_days_elapsed += 1
 		game_day_advanced.emit(current_year, current_month, current_day)
 
+		# Main-loop AI combat for non-player majors (world-class: scored targets on supply/infra/low-org + weather mud/snow avoid + ascend geo stub + chain/flank; promoted from F10 harness base).
+		# Wired to daily for autonomous AI battle initiation (not debug-only) -- enables integrated 50+ turn playtesting with wars, captures, recovery, econ/peace ties.
+		# Uses BattleManager.simulate_daily_ai_combat (limited actions, real execute_province_assault + chain path, weather/infra/org aware).
+		# Polish: caps + player skip prevent spam; full weather/air/terrain in resolver feeds outcomes.
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("simulate_daily_ai_combat"):
+			BattleManager.simulate_daily_ai_combat()
+
 		if crossed_month:
 			# Emit monthly tick signal whenever we cross into a new month (fires on day 1 of the new month)
 			game_month_advanced.emit(current_year, current_month)

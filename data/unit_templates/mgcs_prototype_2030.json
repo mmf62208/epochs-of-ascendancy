@@ -4,7 +4,7 @@
   "design_family": "german_armored_twenty_thirties",
   "base_type": "Armored",
   "size_category": "Heavy",
-  "visual_archetype": "medium_tank",
+  "visual_archetype": "light_tank",
   "crew_required": 3,
   "base_training_level": 42,
   "max_experience_level": 100,

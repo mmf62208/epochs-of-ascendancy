@@ -4,7 +4,7 @@
   "design_family": "south_african_naval_1936",
   "base_type": "Naval",
   "size_category": "Light",
-  "visual_archetype": "patrol",
+  "visual_archetype": "destroyer",
   "crew_required": 35,
   "base_training_level": 30,
   "max_experience_level": 100,
