@@ -4960,15 +4960,17 @@ func show_battle_aar(result: Dictionary = {}) -> void:
 			"odds_attacker_win": 62.0,
 			"winner": "GER",
 			"attacker_casualties": 145, "defender_casualties": 98,
-			"key_factors": ["air_superiority", "leader_impact_high", "fort_mod_def_1.2", "supply_mod_att_0.8", "special_mountain"],
+						"key_factors": ["air_superiority", "overwhelming_air_dominance", "leader_impact_high", "fort_mod_def_1.2", "supply_mod_att_0.8", "special_mountain", "space_strike", "orbital_guided"],
 			"leader_att": "Rommel (+18% attack/org)",
 			"leader_def": "Manstein (+12% def)",
 			"units_att": ["Panzer x2", "Inf x5", "CAS support"],
 			"units_def": ["Fortified Inf x4", "Mountain x1"],
-			"modifiers_detail": ["+15% air CAS", "-8% night", "+22% defending fort", "+5% terrain", "Leader bonus decisive"],
-			"outcome": "GER breakthrough, province captured. Encirclement risk for remaining FRA.",
+			"modifiers_detail": ["+15% air CAS", "-8% night", "+22% defending fort", "+5% terrain", "Leader bonus decisive", "+18% orbital strike (guided munitions)", "Space recon precision +12%"],
+			"air_dominance_level": "full",
+			"air_power_ratio": 4.2,
+			"outcome": "GER breakthrough, province captured. Encirclement risk for remaining FRA. " + "Overwhelming air superiority achieved - enemy grounded at high cost.",
 			"date": "1940-05"
-		}
+
 	var win := Window.new()
 	win.title = "Battle AAR: %s vs %s (%s)" % [result.get("attacker_tag","?"), result.get("defender_tag","?"), result.get("date","")]
 	win.size = Vector2(650, 480)
@@ -4990,9 +4992,19 @@ func show_battle_aar(result: Dictionary = {}) -> void:
 	var factors := Label.new()
 	factors.text = "Key factors: %s" % ", ".join(result.get("key_factors", []))
 	vb.add_child(factors)
+
 	var mods := Label.new()
 	mods.text = "Major modifiers: %s" % ", ".join(result.get("modifiers_detail", result.get("key_factors",[])))
 	vb.add_child(mods)
+	var air_dom := Label.new()
+	var adl := str(result.get("air_dominance_level", ""))
+	var aratio := float(result.get("air_power_ratio", 0.0))
+	air_dom.text = "Air dominance: %s (power ratio %.1f:1)" % [adl if adl else "n/a", aratio]
+	if adl == "full":
+		air_dom.text += " - Overwhelming air superiority achieved - enemy grounded at high cost"
+	elif adl == "partial":
+		air_dom.text += " - Enemy air presence allows limited ops despite disadvantage"
+	vb.add_child(air_dom)
 	var cas := Label.new()
 	cas.text = "Casualties: Att %s vs Def %s" % [result.get("attacker_casualties","?"), result.get("defender_casualties","?")]
 	vb.add_child(cas)
@@ -5001,8 +5013,25 @@ func show_battle_aar(result: Dictionary = {}) -> void:
 	outc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	vb.add_child(outc)
 	var note := Label.new()
-	note.text = "(Full replayable log / unit combat histories available in Formation/Leader inspectors. Balance: these are the biggest impact items.)"
+	note.text = "(Full replayable log / unit combat histories available in Formation/Leader inspectors. Balance: these are the biggest impact items. Space gives edge but costly to maintain, not instant win.)"
 	vb.add_child(note)
+	# Unit combat logs section (follows units like leaders; date/province/result/key factors from log_combat in BM/Formation)
+	var unit_logs := Label.new()
+	unit_logs.text = "Unit logs sample: [1940-05 Prov82 win key_factors:air_superiority,space_strike,leader_impact | leader:Rommel | outcome:Breakthrough guided dev on troops]"
+	unit_logs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(unit_logs)
+
+	var space_note := ""
+	if result.get("space_strike_bonus", 0.0) > 0.0 or "space" in str(result.get("special","")) or result.get("space_support_active", false):
+		space_note = " | Orbital strike support active - guided munitions devastating troops (space recon precision advantage)"
+		var sl := Label.new()
+		sl.text = "Space: " + space_note
+		vb.add_child(sl)
+	if "space_strike" in result.get("key_factors", []) or result.get("orbital_guided_munitions", 0.0) > 0.0:
+		var sg := Label.new()
+		sg.text = "Guided from orbit: high precision +soft/hard on troops; area denial + morale hits for non-space units"
+		vb.add_child(sg)
+
 	var close := Button.new()
 	close.text = "Close AAR"
 	close.pressed.connect(win.queue_free)

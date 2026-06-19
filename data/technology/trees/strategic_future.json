@@ -103,7 +103,8 @@
     ],
     "ui": {
       "short_effect": "Megaproject: orbital yards & faster production",
-      "flavor": "Zero-g assembly lines for frigates and strategic lift."
+      "flavor": "Zero-g assembly lines for frigates and strategic lift.",
+      "icon": "res://assets/graphics/icons/space/space_station_shipyard.png"
     }
   },
   "agi_battle_management": {

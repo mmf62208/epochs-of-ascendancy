@@ -11,7 +11,9 @@
     "era_min": 1916,
     "era_max": 1935,
     "epoch": "pre_war",
-    "prerequisites": ["basic_machine_tools"],
+    "prerequisites": [
+      "basic_machine_tools"
+    ],
     "research": {
       "base_cost_days": 70,
       "category": "armor",
@@ -19,7 +21,12 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "unit_design", "template_ids": ["usa_armor_1918"] }
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "usa_armor_1918"
+        ]
+      }
     ],
     "ui": {
       "short_effect": "M1917 light tank family",
@@ -38,7 +45,9 @@
     "era_min": 2020,
     "era_max": 2050,
     "epoch": "near_future",
-    "prerequisites": ["medium_tank_ii"],
+    "prerequisites": [
+      "medium_tank_ii"
+    ],
     "research": {
       "base_cost_days": 140,
       "category": "armor",
@@ -46,8 +55,17 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "unit_design", "template_ids": ["usa_mbt_2026"] },
-      { "type": "production_category", "category": "main_battle_tank", "min_factory_type": "tank_plant" }
+      {
+        "type": "unit_design",
+        "template_ids": [
+          "usa_mbt_2026"
+        ]
+      },
+      {
+        "type": "production_category",
+        "category": "main_battle_tank",
+        "min_factory_type": "tank_plant"
+      }
     ],
     "ui": {
       "short_effect": "M1A2 SEPv3+ main battle tank design",

@@ -2,7 +2,8 @@ class_name SupplyIntelBridge
 extends RefCounted
 
 ## Converts combat presence + map control into SupplyManager enemy_presence entries.
-
+## Enhanced: now populates continuous air_power_ratio + powers (from registry assets).
+## enemy_air_superiority kept for compat but scaled for overwhelming majority requirement (3:1-5:1).
 
 static func refresh_manager(
 	manager: Node,
@@ -45,6 +46,10 @@ static func _presence_for_province(
 		"enemy_air_superiority": 0.0,
 		"enemy_naval_at_port": false,
 		"enemy_brigade_equiv": 0.0,
+		"air_power_ratio": 1.0,
+		"our_air_power": 0.0,
+		"enemy_air_power": 0.0,
+		"air_dominance_level": "none",
 	}
 
 	var friendly_air := 0.0
@@ -55,10 +60,23 @@ static func _presence_for_province(
 		else:
 			enemy_air += report.total_air(tag)
 
-	if enemy_air > 0.0:
-		var ratio := enemy_air / maxf(friendly_air + enemy_air, 1.0)
+	presence["our_air_power"] = friendly_air
+	presence["enemy_air_power"] = enemy_air
+
+	if friendly_air + enemy_air > 0.01:
+		var air_p_ratio := friendly_air / maxf(enemy_air, 0.01)
+		presence["air_power_ratio"] = air_p_ratio
+		var dom_level := report.air_dominance_level(friendly_tag) if report.has_method("air_dominance_level") else "none"
+		presence["air_dominance_level"] = dom_level
+
+		# legacy scaled for compat + continuous feel: overwhelming needed
+		# e.g. enemy 4:1 adv = high enemy_air_superiority; our 3:1 makes enemy_air_superiority low
+		var enemy_ratio := enemy_air / maxf(friendly_air + enemy_air, 1.0)
 		var scale := float(rules.get_block("intel").get("air_threat_from_superiority_ratio", 10.0))
-		presence["enemy_air_superiority"] = clampf(ratio * scale, 0.0, scale)
+		if enemy_ratio > 0.75:  # ~3:1 enemy adv
+			presence["enemy_air_superiority"] = clampf(enemy_ratio * scale * 1.2, 0.0, scale * 1.5)
+		else:
+			presence["enemy_air_superiority"] = clampf(enemy_ratio * scale * 0.7, 0.0, scale)
 
 		# Deeper wiring to AircraftDesignSystem: immature designs or poor range configs reduce effective air superiority
 		# (prototypes have lower reliability/range impact). Human can improve via iteration/agents.

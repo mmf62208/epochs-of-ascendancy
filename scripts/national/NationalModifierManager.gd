@@ -295,6 +295,9 @@ func get_combat_modifiers(country_tag: String) -> Dictionary:
 		"defensive_shielding": 0.0,
 		"energy_weapon_dmg": 0.0,
 		"area_denial": 0.0,
+		"space_strike_bonus": 0.0,
+		"orbital_guided_munitions": 0.0,  # for preview/resolver: orbital strikes as special support or direct attacks, high prec guided impacts
+		"space_support_factor": 0.0,
 		"non_lethal_control": 0.0,
 		"terror_factor": 0.0,
 		"detection_range": 0.0,

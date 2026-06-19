@@ -210,9 +210,43 @@ func clear_force_registry() -> void:
 	force_registry.clear()
 
 
+func get_combat_presence_registry() -> CombatPresenceRegistry:
+	## Exposed for ProvinceInsight battle previews, CombatResolver air calcs, etc.
+	return force_registry
+
+func get_air_power_ratio(province_id: int, friendly_tag: String = "") -> float:
+	## Continuous air power ratio (friendly/enemy) for the province using registry assets.
+	## For full mission/doctrine/tech weighted power, use AirMissionProfile + formations in ProvinceInsight/Resolver.
+	if friendly_tag.is_empty():
+		friendly_tag = player_tag
+	var report := force_registry.get_report(province_id)
+	return report.get_air_power_ratio(friendly_tag) if report.has_method("get_air_power_ratio") else 1.0
+
+
 func refresh_intel_from_forces() -> void:
 	SupplyIntelBridge.refresh_manager(self, player_tag, force_registry, provinces, hubs, rules)
 	_apply_agent_intelligence_modifiers()
+
+
+func _process_air_missions(days: float = 1.0) -> void:
+	## Called from debug harness / daily for air formations on missions (CAS/INTERDICTION/AIR_SUPERIORITY etc).
+	## Updates presence or applies direct effects (e.g. INTERDICTION mission boosts enemy route interdict).
+	## For full: would factor range from AirMissionProfile + ADS, weather, basing.
+	if days <= 0.0 or typeof(LeaderManager) == TYPE_NIL:
+		return
+	# Simple: air on INTERDICTION mission in a province adds to effective "air interdiction threat" for enemies (via presence proxy)
+	for f in LeaderManager.get_formations_for_country(player_tag):
+		if f == null or f.get_category() != "air": continue
+		var mid := f.current_air_mission if "current_air_mission" in f else ""
+		if mid != "INTERDICTION": continue
+		var pid := int(f.get("stationed_province_id", -1))
+		if pid < 0: continue
+		var stren := float(f.get("strength", 1.0)) * 0.8  # mission effect
+		# boost enemy view if we add "virtual" threat; for now just log + slight registry if wanted
+		if OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1":
+			print("[AIR MISSION] %s INTERDICTION str%.1f at %d (would raise enemy supply cost in area)" % [f.formation_id, stren, pid])
+	# Also process for other countries if sim
+	print("[AIR] _process_air_missions tick (missions factor into power via Profile in combat/preview; supply costs always via calc)")
 
 
 func set_enemy_presence(province_id: int, presence: Dictionary) -> void:
@@ -292,14 +326,41 @@ func _get_base_supply_consumption(formation_id: String) -> float:
 
 ## Daily supply use for a formation, including training-path supply_consumption modifiers
 ## and national spirit / temporary modifier effects.
+## Enhanced: air contested airspace adds extra drain (disadv much higher; full sup also costly to maintain for large regions).
 func calculate_daily_supply_consumption(formation_id: String) -> float:
 	var base_consumption := _get_base_supply_consumption(formation_id)
 
 	# Apply national spirit + temporary modifier effects
 	base_consumption = _apply_national_supply_modifiers(formation_id, base_consumption)
 
+	# Air contested / air ops cost multiplier (uses registry for ratio + profile for mission weighting)
+	var formation := get_formation(formation_id)
+	var prov_id := -1
+	if formation != null:
+		prov_id = int(formation.get("stationed_province_id", -1))
+		if prov_id < 0 and division_deployments.has(formation_id):
+			prov_id = int((division_deployments[formation_id] as Dictionary).get("province_id", -1))
+	if prov_id >= 0:
+		var ratio := get_air_power_ratio(prov_id, formation.country_tag if formation and "country_tag" in formation else player_tag)
+		var is_adv := ratio >= 1.0
+		var prof := AirMissionProfile.new(formation_id, formation.get_air_design_id() if formation and formation.has_method("get_air_design_id") else "", formation.air_range_config if formation and "air_range_config" in formation else "COMBAT_LOAD")
+		var air_mult := prof.get_contested_airspace_cost_mult(ratio, is_adv)
+		base_consumption *= air_mult
+		if air_mult > 1.4 and OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1":
+			print("[AIR COST] contested airspace x%.2f applied for %s (ratio %.2f) at %d" % [air_mult, formation_id, ratio, prov_id])
+
 	if typeof(LeaderManager) == TYPE_NIL:
 		return maxf(base_consumption, 0.1)
+
+	var leader_id := ""
+	if formation != null and formation.has_leader():
+		leader_id = formation.leader_id
+	elif not formation_id.is_empty():
+		leader_id = LeaderManager.resolve_leader_id_for_formation(formation_id)
+
+	if not leader_id.is_empty():
+		return LeaderManager.apply_supply_consumption_for_leader(base_consumption, leader_id)
+	return maxf(base_consumption, 0.1)
 
 	var leader_id := ""
 	var formation := get_formation(formation_id)
@@ -383,6 +444,7 @@ func advance_supply_day(days: float = 1.0) -> void:
 	# Naval recon from fleets in sea zones (1 chance per day per seazone presence)
 	_process_naval_recon(days)
 
+	_process_air_missions(days)
 	var attrition := get_attrition_cargo_summary()
 	var attrition_tons := float(attrition.get("total_tons", 0.0)) * days
 	for key in _routes:
@@ -1081,6 +1143,21 @@ func _plan_route(
 	if total_interdiction_resist > 0.0:
 		var reduction := clampf(total_interdiction_resist * 0.65, 0.0, 0.60)
 		plan.interdiction_chance *= (1.0 - reduction)
+
+	# Air superiority integration: high *our* air adv protects our supply from enemy interdiction (we strafe their strike aircraft, contest airspace).
+	# Uses continuous ratio; overwhelming not strictly needed for some protection, but better adv = stronger effect.
+	# Matches design: slight adv does not ground enemy, but high adv increases their costs + our protection.
+	var our_air_adv := 0.0
+	for pth in plan.province_path:
+		var r := get_air_power_ratio(int(pth), player_tag)
+		our_air_adv = max(our_air_adv, r)
+	if our_air_adv > 1.2:
+		var protect := clampf( (our_air_adv - 1.0) * 0.12 , 0.0, 0.65)
+		if our_air_adv >= 3.5:
+			protect = max(protect, 0.55)  # strong protection with overwhelming
+		plan.interdiction_chance *= (1.0 - protect)
+		if OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1":
+			print("[AIR INTERDICT] our air adv x%.2f reduced our interdict chance by %.0f%%" % [our_air_adv, protect*100])
 
 	# === Reinforcement speed from ProvinceEffects / getters + national ===
 	var route_reinforce := _calculate_route_reinforcement_modifier(plan.province_path, player_tag)

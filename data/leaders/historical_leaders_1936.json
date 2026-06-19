@@ -70,7 +70,7 @@
     },
     {
       "leader_id": "ger_doenitz",
-      "name": "Karl Dönitz",
+      "name": "Karl D\u00f6nitz",
       "country_tag": "GER",
       "leader_type": "admiral",
       "attack_skill": 6,
@@ -155,7 +155,7 @@
     },
     {
       "leader_id": "ger_goering",
-      "name": "Hermann Göring",
+      "name": "Hermann G\u00f6ring",
       "country_tag": "GER",
       "leader_type": "air_marshal",
       "attack_skill": 5,
@@ -194,7 +194,8 @@
         "political_general": 1
       },
       "birth_year": 1896,
-      "start_year": 1935
+      "start_year": 1935,
+      "portrait": "res://assets/graphics/portraits/leaders/zhukov.png"
     },
     {
       "leader_id": "sov_timoshenko",
@@ -628,7 +629,7 @@
     },
     {
       "leader_id": "fra_darlan",
-      "name": "François Darlan",
+      "name": "Fran\u00e7ois Darlan",
       "country_tag": "FRA",
       "leader_type": "admiral",
       "attack_skill": 6,
@@ -775,7 +776,7 @@
     },
     {
       "leader_id": "pol_rydz_smigly",
-      "name": "Edward Rydz-Śmigły",
+      "name": "Edward Rydz-\u015amig\u0142y",
       "country_tag": "POL",
       "leader_type": "general",
       "attack_skill": 6,

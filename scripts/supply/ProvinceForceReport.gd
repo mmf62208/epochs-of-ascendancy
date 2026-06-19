@@ -35,10 +35,24 @@ func total_land(tag: String) -> float:
 func total_air(tag: String) -> float:
 	return float(air_by_tag.get(tag, 0.0))
 
+
+## Returns air power ratio (friendly / enemy) using assets in registry.
+## Used for continuous scale (not binary flag). 3:1 to 5:1 typically needed for full suppression in large provinces.
+func get_air_power_ratio(friendly_tag: String) -> float:
+	var f := 0.0
+	var e := 0.0
+	for t in air_by_tag:
+		var val := float(air_by_tag[t])
+		if str(t) == friendly_tag:
+			f += val
+		else:
+			e += val
+	return f / maxf(e, 0.01)
+
+
 func get_air_dominance_for(tag: String) -> float:
-	# Scale 0-1: fraction of air power controlled by tag vs total in province.
-	# For dominance: needs high ratio (e.g. >0.8 or 4:1+) to fully suppress enemy air ops in large region.
-	# Slight advantage (0.6) allows enemy ops but costly (penalties to effect, higher losses).
+	# Legacy 0-1 fraction my/total. Kept for compat; prefer get_air_power_ratio for new continuous calcs.
+	# For dominance in large regions: ratio 3:1 ~0.75 fraction, 4:1~0.8, 5:1~0.83+
 	var my = total_air(tag)
 	var total = my
 	for t in air_by_tag.keys():
@@ -48,12 +62,15 @@ func get_air_dominance_for(tag: String) -> float:
 		return 1.0
 	return my / total
 
+
 func air_dominance_level(tag: String) -> String:
-	# For tips/UI: none/partial/full based on dominance.
-	var dom = get_air_dominance_for(tag)
-	if dom > 0.8:
+	# Continuous scale: none/partial/full . Uses ratio thresholds for overwhelming majority needed.
+	# Slight adv (e.g. 1.2:1) = none (enemy can still CAS/interdict with +cost -effect).
+	# ~3:1-5:1 or dom>~0.75-0.83 for full. Even full is costly to attacker (high losses, supply drain).
+	var ratio := get_air_power_ratio(tag)
+	if ratio >= 4.0:  # overwhelming e.g. 4:1+
 		return "full"
-	elif dom > 0.55:
+	elif ratio >= 1.8:  # partial adv allows limited enemy ops
 		return "partial"
 	else:
 		return "none"

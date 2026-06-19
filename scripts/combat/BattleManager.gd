@@ -45,6 +45,14 @@ func can_assault_province(
 	source["target_name"] = target.name
 	source["defender_tag"] = defender_tag
 	source["attacker_tag"] = tag
+	# Carry air dominance from ProvinceInsight for battle context (used in result merge + logs + AAR)
+	if typeof(ProvinceInsight) != TYPE_NIL and typeof(MapManager) != TYPE_NIL:
+		var from_p: Province = MapManager.get_province(from_province_id) if from_province_id >= 0 else target
+		if from_p:
+			var bprev := ProvinceInsight.get_battle_preview(from_p, target)
+			source["air_dominance_level"] = bprev.get("air_dominance_level", "none")
+			source["air_power_ratio"] = bprev.get("air_power_ratio", 1.0)
+			source["air_superiority_attacker"] = bprev.get("air_superiority", false)
 	return source
 
 
@@ -134,6 +142,9 @@ func execute_province_assault(
 	if typeof(DebugOverlay) != TYPE_NIL and (str(result.get("attacker_tag","")) == "player" or str(result.get("defender_tag","")) == "player"):
 		DebugOverlay.call_deferred("show_battle_aar", result)
 
+	# Space ground integration note for AAR/tips
+	if result.get("space_strike_bonus", 0.0) > 0.05:
+		print("[BATTLEMANAGER SPACE] Orbital strike active in assault: guided munitions edge applied (costly to maintain, not instant win)")
 	# Unit combat log: record for involved units (like leaders). Only most important factors.
 	_log_unit_combat(fid, from_pid, target_province_id, result, "attacker")
 	if result.has("defender_formation_id"):
@@ -167,6 +178,18 @@ func _log_unit_combat(formation_id: String, province: int, other_province: int, 
 		factors.append("out_of_supply")
 	if bool(result.get("air_superiority_attacker", false)):
 		factors.append("we_have_air_superiority" if role=="attacker" else "enemy_air_supremacy")
+	var adl := str(result.get("air_dominance_level", ""))
+	if adl == "full":
+		factors.append("overwhelming_air_superiority" if role=="attacker" else "enemy_air_dominance_full")
+	elif adl == "partial":
+		factors.append("partial_air_advantage" if role=="attacker" else "enemy_partial_air_advantage")
+	elif result.get("enemy_air", false) or adl == "none":
+		factors.append("enemy_air_presence_limits_ops")
+	if result.get("space_strike_bonus", 0.0) > 0.0 or "space" in str(result.get("special","")) or result.get("space_support_active", false):
+		factors.append("orbital_strike_support" if role=="attacker" else "enemy_orbital_strike")
+		factors.append("space_guided_munitions_precision")
+	if "space_capable" in str(result.get("space_wiring", {})):
+		factors.append("space_capable_unit_enhanced_by_orbital")
 	if "amphib" in str(result.get("special", "")):
 		factors.append("amphibious_assault_extra_org_loss")
 	if float(result.get("fort_mod", 1.0)) > 1.1:
