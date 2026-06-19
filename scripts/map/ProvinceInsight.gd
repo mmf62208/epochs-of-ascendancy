@@ -5072,9 +5072,18 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 		if d and d.fill_ratio() < 0.4:
 			supply_mod = 0.65
 
-	# Air (placeholder; wire to air missions)
-	var air_supp := randf() > 0.55
-	var enemy_air := not air_supp and randf() > 0.4
+	# Air dominance for large regions: use CombatPresenceRegistry for realistic scale.
+	# Overwhelming majority (dom >0.8 ~4:1+) needed for full suppression; slight adv allows ops but costly.
+	var air_dom := 0.5
+	var reg = _combat_presence_registry()
+	if reg != null and reg.has_method("get_report"):
+		var att_tag = "player"  # in preview context, assume or pass
+		if "attacker_tag" in get_script().get_script_method_list(): pass # placeholder
+		var rpt = reg.call("get_report", attacker.id)
+		if rpt and rpt.has_method("get_air_dominance_for"):
+			air_dom = rpt.call("get_air_dominance_for", att_tag)
+	var air_supp := air_dom > 0.55
+	var enemy_air := air_dom < 0.8  # even at 0.7, enemy can still operate with costs
 
 	# Encircled approx (low supply or isolated)
 	var encircled := supply_mod < 0.7 or randf() < 0.1
@@ -5213,6 +5222,13 @@ static func _battle_preview_block(
 		tips.append("We have air superiority (CAS bonus active)")
 	if preview.get("enemy_air", false):
 		tips.append("The enemy enjoys air supremacy (harassment penalty)")
+	# Air dominance note for large provinces
+	if "air_dom" in preview:
+		var dom = float(preview.get("air_dom", 0.5))
+		if dom > 0.8:
+			tips.append("Overwhelming air dominance - enemy ops heavily suppressed at high cost")
+		elif dom > 0.55:
+			tips.append("Air advantage but region large - enemy can still conduct limited ops (costly)")
 	if "amphib" in str(preview.get("special", "")):
 		tips.append("Conducting amphibious assault — our units suffer additional organizational loss")
 	if preview.get("fort_mod", 1.0) > 1.3:
@@ -5229,6 +5245,10 @@ static func _battle_preview_block(
 		tips.append("Leader impact is significant in this battle")
 	if "mountain" in str(preview.get("special", "")):
 		tips.append("Mountain warfare — specialists have edge")
+	if preview.get("space_strike", false):
+		tips.append("Orbital strike support active — guided munitions have much greater impacts on troops")
+	if preview.get("guided_munitions_bonus", 0.0) > 0.1:
+		tips.append("Guided munitions bonus for advanced units (space comms/tech)")
 	if tips.size() > 0:
 		block += "\n  %sKey situation: %s[/color]" % [COLOR_MUTED, " · ".join(tips)]
 	# Most important: odds, key units/leaders if standout, major modifiers.
@@ -5328,6 +5348,15 @@ static func _supply_manager() -> Node:
 	if tree == null:
 		return null
 	return tree.root.get_node_or_null("SupplyManager")
+
+static func _combat_presence_registry() -> Node:
+	var tree := Engine.get_main_loop()
+	if tree == null:
+		return null
+	var sm = tree.root.get_node_or_null("SupplyManager")
+	if sm and sm.has_method("get_combat_presence_registry"):
+		return sm.call("get_combat_presence_registry")
+	return null
 
 
 static func _scenario_loader() -> ScenarioLoader:

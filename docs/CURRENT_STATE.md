@@ -1,6 +1,6 @@
 # Current State of Epochs of Ascendancy
 
-**Last updated:** 2026-06-19 (ALL 4 agents completed successfully in /home/mikef/eoa-goals-worktree: 
+**Last updated:** 2026-06-19 + continued (balance, more tips, full AAR panel, more art portraits/space/tech icons): ALL 4 agents completed + new in /home/mikef/eoa-goals-worktree: 
 1. Events: 5 dedicated backlash processes + full chains/persist/UI/resolver/Test (cloning/genetic/bio-sonic/VR/phaser-tele prestige+accident).
 2. Space wiring: scanners/tele/shields/phasers/secret_fleet/power_armor/life-reuse/fusion live in GameData/Resolver/Supply/TM/Agent/TestRunner + logs.
 3. Layered prod: per-line current_production_layer + _LAYER_TRADES (mass/auto/additive/nano) in ProductionLine/PM/NMM + UI previews/buttons in AssignmentScreen + F10 inspect + TestRunner 50T exercise.
