@@ -82,6 +82,16 @@ func _apply_screen_theme() -> void:
 	RetrowaveTheme.style_summary_metric(daily_output_label)
 	RetrowaveTheme.style_search(search_edit)
 	search_edit.placeholder_text = "Search design or province..."
+	# Space designer access integrated here (visible/unlocked via space_designer_unlocked tech)
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("has_rule_flag") and GameData.call("has_rule_flag", "player", "space_designer_unlocked"):
+		var space_btn := Button.new()
+		space_btn.text = "🛸 Design Space (Sat/Station/Ship)"
+		space_btn.pressed.connect(func():
+			var pop := preload("res://scripts/ui/SpaceDesignPopup.gd").new()
+			get_tree().root.add_child(pop)
+			pop.set_player_tag("player")
+		)
+		top_row.add_child(space_btn)
 	RetrowaveTheme.style_filter_option(status_filter)
 	RetrowaveTheme.style_filter_option(type_filter)
 	RetrowaveTheme.style_detail_panel(detail_panel)

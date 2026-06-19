@@ -71,6 +71,7 @@ const LAND_MISSION_ARTILLERY_PREP := "ARTILLERY_PREP"  # Pre-bombard before assa
 @export var is_in_combat: bool = false
 @export var training_progress: float = 0.0  # days invested in training (full daily advance per roadmap)
 @export var is_trained: bool = false  # reached threshold for combat bonus (readiness/org/xp)
+@export var combat_log: Array[Dictionary] = []  # per-unit combat history: {date, province_id, result, key_factors: Array[String], leader: String, outcome: String} - follows unit like leader logs
 ## Map province where this formation is stationed (division movement / engineer repair).
 @export var stationed_province_id: int = -1
 
@@ -465,3 +466,18 @@ func get_attached_air_bonus(mission_context: String = "") -> float:
 ## Get mission intensity cost (supplies/fuel for high ops, e.g. round-the-clock airbase needs more supplies).
 func get_mission_supply_cost(base_cost: float = 1.0) -> float:
 	return base_cost * (0.7 + mission_intensity * 0.5)  # higher intensity more costly.
+
+func log_combat(date: String, province_id: int, result: String, key_factors: Array[String], leader: String = "", outcome: String = "") -> void:
+	# Log important combat action for this unit (date, province, result, key impactful factors only - not overwhelming)
+	if not combat_log is Array:
+		combat_log = []
+	combat_log.append({
+		"date": date,
+		"province_id": province_id,
+		"result": result,
+		"key_factors": key_factors,  # e.g. ["our_forces_outnumbered", "we_have_air_superiority", "enemy_fortified", "leader_impact_high"]
+		"leader": leader,
+		"outcome": outcome
+	})
+	if combat_log.size() > 15:  # limit for performance/display
+		combat_log = combat_log.slice(-15)

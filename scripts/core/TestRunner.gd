@@ -1715,6 +1715,9 @@ func _run_headless_policy_settle_cycles() -> void:
 			if mapr.has_method("debug_preview_combat_vs_adjacent"):
 				mapr.call("debug_preview_combat_vs_adjacent")
 				print("  [ACTION] Preview combat vs adjacent (real Province + ProvinceInsight.get_battle_preview + BattleManager.can_assault). Settlement def bonus / getters / welfare drag / loyalty in logs.")
+				# Demo AAR panel for full details
+				if typeof(DebugOverlay) != TYPE_NIL and DebugOverlay.has_method("show_battle_aar"):
+					DebugOverlay.call_deferred("show_battle_aar", {"attacker_tag":"GER", "defender_tag":"FRA", "odds_attacker_win":58.0, "winner":"GER", "key_factors":["air_superiority","leader_impact","fort_mod"], "units_att":["Inf x3","Tank x1"], "units_def":["Fort Inf x2"], "outcome":"Breakthrough, key factors visible in AAR."})
 			# NEW actions
 			if mapr.has_method("debug_invest_infra_selected_province"):
 				mapr.call("debug_invest_infra_selected_province")

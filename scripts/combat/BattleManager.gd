@@ -172,7 +172,57 @@ func execute_province_assault(
 
 	apply_combat_outcome(result, fid, from_pid)
 	battle_resolved.emit(result)
+
+	# Auto AAR for player if involved (accessible panel)
+	if typeof(DebugOverlay) != TYPE_NIL and (str(result.get("attacker_tag","")) == "player" or str(result.get("defender_tag","")) == "player"):
+		DebugOverlay.call_deferred("show_battle_aar", result)
+
+	# Unit combat log: record for involved units (like leaders). Only most important factors.
+	_log_unit_combat(fid, from_pid, target_province_id, result, "attacker")
+	if result.has("defender_formation_id"):
+		_log_unit_combat(str(result.get("defender_formation_id", "")), target_province_id, from_pid, result, "defender")
+
 	return {"success": true, "result": result}
+
+func _log_unit_combat(formation_id: String, province: int, other_province: int, result: Dictionary, role: String) -> void:
+	if formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return
+	var fm = LeaderManager.get_formation(formation_id) if LeaderManager.has_method("get_formation") else null
+	if fm == null or not fm.has_method("log_combat"):
+		return
+	var date := ""
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_date_string"):
+		date = TimeManager.call("get_current_date_string")
+	elif typeof(GameData) != TYPE_NIL:
+		date = "%04d-%02d" % [GameData.get_current_year(), GameData.get_current_month()]
+	var winner := str(result.get("winner", ""))
+	var res_str := "win" if winner == (result.get("attacker_tag", "") if role=="attacker" else result.get("defender_tag", "")) else "loss"
+	var captured := bool(result.get("province_control_change", false))
+	if captured:
+		res_str = "captured" if role == "defender" else "victory"
+	# Key impactful factors only (clear, not overwhelming)
+	var factors: Array[String] = []
+	if float(result.get("attacker_power", 0)) < float(result.get("defender_power", 0)) * 0.7:
+		factors.append("our_forces_outnumbered" if role=="attacker" else "enemy_outnumbered")
+	if bool(result.get("encircled", false)):
+		factors.append("forces_encircled" if role=="attacker" else "enemy_surrounded")
+	if float(result.get("supply_mod", 1.0)) < 0.6:
+		factors.append("out_of_supply")
+	if bool(result.get("air_superiority_attacker", false)):
+		factors.append("we_have_air_superiority" if role=="attacker" else "enemy_air_supremacy")
+	if "amphib" in str(result.get("special", "")):
+		factors.append("amphibious_assault_extra_org_loss")
+	if float(result.get("fort_mod", 1.0)) > 1.1:
+		factors.append("enemy_fortified" if role=="attacker" else "we_are_fortified_dug_in")
+	if result.get("counterattack", false):
+		factors.append("enemy_counterattacking")
+	# Leader impact
+	var ldr := str(result.get("leader_bonus", ""))
+	if not ldr.is_empty():
+		factors.append("leader_impact_" + ldr.to_lower().replace(" ", "_"))
+	var outcome := "Casualties: %s vs %s" % [result.get("attacker_casualties", "?"), result.get("defender_casualties", "?")]
+	fm.log_combat(date, province, res_str, factors, str(result.get("leader_name", "")), outcome)
+	print("[UNIT COMBAT LOG] %s logged combat at %d: %s factors=%s" % [formation_id, province, res_str, factors])
 
 
 ## World-class enhancement: chain/flanking assault helper for multi-province operations.

@@ -2105,6 +2105,11 @@ func _build_ui() -> void:
 	)
 	harness_section.add_child(preview_combat_btn)
 
+	var aar_btn := Button.new()
+	aar_btn.text = "📜 Show Battle AAR Panel (full details: units, leaders, all factors, logs - accessible from preview/inspector)"
+	aar_btn.pressed.connect(func(): show_battle_aar({}))
+	harness_section.add_child(aar_btn)
+
 	# NEW Phase 2 direct actions on selected/clicked (build on debug_* + real APIs; F10 harness + inspector click flow; live 460 updates)
 	var invest_infra_btn := Button.new()
 	invest_infra_btn.text = "🏗️ Invest Infra here (real InfraDevManager + layer rebuild + density tint preview)"
@@ -2183,6 +2188,96 @@ func _build_ui() -> void:
 			toast_map_debug("30d econ+war sim (fallback drive) started. See logs for progress.")
 	)
 	harness_section.add_child(run_30d_econ_war_btn)
+
+	# === Future Tech / Mech Designer / Biotech F10 (per 2026-06-18 review: simple UI/choices, force for new techs, observe, mech stub popup) ===
+	# Smallest: buttons to force key techs (cloning/sonic/nano/phaser/scanner/shield/tele etc) + observe prints.
+	# "Force space firsts", "Inspect layered effects". Mech: force unlock + simple variant choice popup (reuse LeaderEventUI toast style + inline Window; persist choice, wire to divs).
+	var tech_force_label := Label.new()
+	tech_force_label.text = "Future Tech Force + Observe (mech designer stub, biotech agents, new techs):"
+	tech_force_label.add_theme_font_size_override("font_size", 10)
+	harness_section.add_child(tech_force_label)
+
+	var force_techs_btn := Button.new()
+	force_techs_btn.text = "🔬 Force Key New Techs (cloning/sonic/nano/phaser/scanner/shield/tele/drone/power/cyber)"
+	force_techs_btn.custom_minimum_size = Vector2(420, 26)
+	force_techs_btn.pressed.connect(func():
+		var ptag := _debug_player_country_tag()
+		if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("edit_tech_progress"):
+			var techs := ["cloning_tech_1980", "sonic_weapons_1970", "nanotech_fab_2020", "phasers_torpedoes_2030", "scanners_sensors_1975", "deflector_shields_1995", "teleporters_2025", "drone_swarm_1980", "battle_power_armor_1970", "cybernetics_prosthetics_1975", "additive_manufacturing_1985"]
+			for tid in techs:
+				TechnologyManager.call("edit_tech_progress", ptag, tid, 0.0, true)
+		print("[F10 TECH FORCE] Key future/biotech/techs forced for %s" % ptag)
+		# observe prints
+		_print_tech_observe(ptag)
+		toast_map_debug("New techs forced (cloning+). Check console for mp/space/combat/ethics/layer + use F10 inspect.")
+	)
+	harness_section.add_child(force_techs_btn)
+
+	var observe_btn := Button.new()
+	observe_btn.text = "👁 Observe (print mp pool, space milestones, combat stats, ethics, layer if any)"
+	observe_btn.pressed.connect(func():
+		_print_tech_observe(_debug_player_country_tag())
+	)
+	harness_section.add_child(observe_btn)
+
+	var space_first_btn := Button.new()
+	space_first_btn.text = "🚀 Force Space Firsts (all 8 milestones + secret/mech)"
+	space_first_btn.pressed.connect(func():
+		var ptag := _debug_player_country_tag()
+		var gd := get_node_or_null("/root/GameData")
+		if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("edit_tech_progress"):
+			for tid in ["sputnik_satellite","moon_landing","space_station","moon_base","mars_landing","mars_base","expanse_rocket","mech_designer"]:
+				TechnologyManager.call("edit_tech_progress", ptag, tid, 0.0, true)
+		if gd and gd.has_method("process_space_race_events"):
+			gd.call("process_space_race_events", 1957, 10)
+			gd.call("process_space_race_events", 1969, 7)
+			gd.call("process_space_race_events", 1973, 1)
+			gd.call("process_space_race_events", 1985, 3)
+		if gd and "peace_state" in gd:
+			gd.peace_state["secret_space_programs"][ptag] = true
+			gd.peace_state["mech_designer_unlocked"][ptag] = true
+		print("[F10 SPACE FIRSTS] All milestones + secret/mech forced.")
+		toast_map_debug("Space firsts + mech unlock forced. Check news/toasts/pillars.")
+	)
+	harness_section.add_child(space_first_btn)
+
+	var layered_inspect_btn := Button.new()
+	layered_inspect_btn.text = "📊 Inspect Layered Effects (NMM production_flex + consumer/VR + new mods)"
+	layered_inspect_btn.pressed.connect(func():
+		var ptag := _debug_player_country_tag()
+		if typeof(NationalModifierManager) != TYPE_NIL:
+			var mods = NationalModifierManager.get_combat_modifiers(ptag) if NationalModifierManager.has_method("get_combat_modifiers") else {}
+			print("[F10 LAYERED INSPECT] %s mods sample: %s" % [ptag, str(mods).substr(0,300)])
+		var gd := get_node_or_null("/root/GameData")
+		if gd and gd.has_method("get_peace_state"):
+			var ps = gd.call("get_peace_state")
+			print("[F10 LAYERED] consumer/VR flags or notes: ", ps.get("notes", []) if "notes" in ps else "n/a")
+		toast_map_debug("Layered inspect printed (NMM flex + flags).")
+	)
+	harness_section.add_child(layered_inspect_btn)
+
+	# Space Designer button - full UI integration
+	var space_btn := Button.new()
+	space_btn.text = "🛸 Open Space Designer (Sat/Station/Ship - requires space_designer_unlocked tech)"
+	space_btn.pressed.connect(_open_space_designer)
+	harness_section.add_child(space_btn)
+
+	# Simple Mech Designer stub (from F10 or unlock): popup choice diesel/steam/steampunk alt for armor/mech. Persist choice. Wire note to div templates.
+	var mech_designer_btn := Button.new()
+	mech_designer_btn.text = "🤖 Force Mech Designer Unlock + Open Variant Choice (diesel/steam/steampunk stub popup)"
+	mech_designer_btn.pressed.connect(func():
+		var ptag := _debug_player_country_tag()
+		var gd := get_node_or_null("/root/GameData")
+		if gd:
+			if not gd.peace_state.has("mech_designer_unlocked"):
+				gd.peace_state["mech_designer_unlocked"] = {}
+			gd.peace_state["mech_designer_unlocked"][ptag] = true
+			if not gd.peace_state.has("mech_variant_choice"):
+				gd.peace_state["mech_variant_choice"] = {}
+			_show_mech_variant_choice_popup(ptag, gd)
+		toast_map_debug("Mech designer unlocked + choice popup. Persisted; affects future div templates/special mech units.")
+	)
+	harness_section.add_child(mech_designer_btn)
 
 	# New world-class: direct chain/flank assault button using enhanced BM (multi-province flanking via adjacent after capture).
 	var chain_btn := Button.new()
@@ -4784,3 +4879,134 @@ func _drive_local_30d_playtest_sim() -> void:
 			var memm := float(OS.get_static_memory_usage()) / (1024.0*1024.0)
 			print("[30D FALLBACK PROGRESS] Day %d/30 | assaults~%d | rec=%d | prod~%d | infra=%d | popGER=%.1fM | mem=%.1f" % [day, assaults, recs, prods, infras, popg/1e6, memm])
 	print("=== [F10 FALLBACK 30D SIM] COMPLETE (see full TestRunner 50t for longer headless CI). ===")
+
+# === Added helpers for F10 future tech / mech designer / observe (smallest useful per task) ===
+func _print_tech_observe(ptag: String) -> void:
+	print("\n=== [F10 OBSERVE %s] ===" % ptag)
+	if typeof(GameData) != TYPE_NIL:
+		var gd := get_node_or_null("/root/GameData")
+		if gd and gd.has_method("get_peace_state"):
+			var ps := gd.call("get_peace_state")
+			print("[MP POOL approx] from pop update if run; peace pop GER/USA sample:", (ps.get("population", {}) as Dictionary).get(ptag, "?"))
+			print("[SPACE MILESTONES] ", ps.get("space_milestones", {}))
+			print("[MECH/SECRET] unlocked=", ps.get("mech_designer_unlocked", {}).get(ptag), " variant_choice=", ps.get("mech_variant_choice", {}).get(ptag), " secret_fleet=", ps.get("secret_fleet_combat_bonus", {}).get(ptag))
+			print("[BIOTECH FLAGS] intel=", ps.get("biotech_intel", {}).get(ptag), " scanner=", ps.get("scanner_intel_flags", {}).get(ptag))
+	if typeof(TechnologyManager) != TYPE_NIL:
+		print("[ETHICS/COH sample] rule_flags cloning/sonic/cb:", TechnologyManager.has_rule_flag(ptag, "cloning"), TechnologyManager.has_rule_flag(ptag, "sonic_weapons"), TechnologyManager.has_rule_flag(ptag, "chemical_biological_weapons"))
+		print("[LAYER if NMM] production_flex etc via NMM combat_mods if avail")
+		var mods := {}
+		if typeof(NationalModifierManager) != TYPE_NIL and NationalModifierManager.has_method("get_combat_modifiers"):
+			mods = NationalModifierManager.get_combat_modifiers(ptag)
+		print("[COMBAT STATS sample] ", str(mods).substr(0, 220))
+	print("=== END OBSERVE ===\n")
+
+func _show_mech_variant_choice_popup(tag: String, gd: Node) -> void:
+	# Simple stub popup (LeaderEventUI style toast + inline Window; reuse patterns no new tscn). Choices diesel/steam/steampunk alt for armor/mech templates.
+	# Persist choice in peace_state; wire note to division templates/special mech units (e.g. future Formation or template use variant stats).
+	# From F10 or unlock of mech_designer_unlocked.
+	var win := Window.new()
+	win.title = "Mech Designer - %s (Alt-History Variant)" % tag
+	win.size = Vector2i(520, 220)
+	win.unresizable = true
+	add_child(win)  # under overlay for now
+	var vb := VBoxContainer.new()
+	vb.set_anchors_preset(Control.PRESET_FULL_RECT)
+	win.add_child(vb)
+	var lbl := Label.new()
+	lbl.text = "Choose dieselpunk/steampunk/steam variant for mech/armor templates.\nPersisted. Affects special mech units + division caps."
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(lbl)
+	for v in ["diesel", "steam", "steampunk"]:
+		var b := Button.new()
+		b.text = "Select " + v.capitalize() + " Mech Variant"
+		b.pressed.connect(func():
+			if not gd.peace_state.has("mech_variant_choice"):
+				gd.peace_state["mech_variant_choice"] = {}
+			gd.peace_state["mech_variant_choice"][tag] = v
+			print("[MECH DESIGNER] %s chose variant: %s (persisted; wire to div templates or special units e.g. power_battle_armor path)" % [tag, v])
+			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Mech variant set to " + v + " for " + tag + " (designer choice persisted)", 4.0)
+			win.queue_free()
+		)
+		vb.add_child(b)
+	var cancel := Button.new()
+	cancel.text = "Cancel (keep default dieselpunk)"
+	cancel.pressed.connect(func(): win.queue_free())
+	vb.add_child(cancel)
+	win.popup_centered()
+	print("[MECH DESIGNER STUB] Popup shown for %s variant choice (diesel/steam/steampunk)." % tag)
+func _open_space_designer() -> void:
+	# Check unlock via tech/rule_flag
+	var unlocked := false
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("has_rule_flag"):
+		unlocked = GameData.call("has_rule_flag", "player", "space_designer_unlocked")
+	if not unlocked:
+		toast_map_debug("Space Designer locked. Research 'space_design_basic' or orbital techs first.")
+		return
+	
+	var popup := preload("res://scripts/ui/SpaceDesignPopup.gd").new()
+	get_tree().root.add_child(popup)
+	popup.set_player_tag("player" if "player" in get_tree().root.get("peace_state", {}) else "USA")
+	toast_map_debug("Space Designer opened. Choose base, add modules (propulsion, sensors, life support), finalize to unlock custom design for production.")
+
+func show_battle_aar(result: Dictionary = {}) -> void:
+	# Specific accessible AAR panel (full details when clicked from preview/inspector/post-battle).
+	# Shows all factors, units, leaders, logs, outcomes. Not in hover (too much); clear in preview, deep here.
+	if result.is_empty():
+		# Demo sample
+		result = {
+			"attacker_tag": "GER", "defender_tag": "FRA",
+			"from_province_id": 82, "target_province_id": 101,
+			"odds_attacker_win": 62.0,
+			"winner": "GER",
+			"attacker_casualties": 145, "defender_casualties": 98,
+			"key_factors": ["air_superiority", "leader_impact_high", "fort_mod_def_1.2", "supply_mod_att_0.8", "special_mountain"],
+			"leader_att": "Rommel (+18% attack/org)",
+			"leader_def": "Manstein (+12% def)",
+			"units_att": ["Panzer x2", "Inf x5", "CAS support"],
+			"units_def": ["Fortified Inf x4", "Mountain x1"],
+			"modifiers_detail": ["+15% air CAS", "-8% night", "+22% defending fort", "+5% terrain", "Leader bonus decisive"],
+			"outcome": "GER breakthrough, province captured. Encirclement risk for remaining FRA.",
+			"date": "1940-05"
+		}
+	var win := Window.new()
+	win.title = "Battle AAR: %s vs %s (%s)" % [result.get("attacker_tag","?"), result.get("defender_tag","?"), result.get("date","")]
+	win.size = Vector2(650, 480)
+	var vb := VBoxContainer.new()
+	win.add_child(vb)
+	vb.add_child(Label.new()) # spacer
+	var title := Label.new()
+	title.text = "After Action Report - Clickable full details (most important first)"
+	vb.add_child(title)
+	var odds := Label.new()
+	odds.text = "Est. odds: %.0f%% attacker win | Winner: %s" % [float(result.get("odds_attacker_win",50)), result.get("winner","?")]
+	vb.add_child(odds)
+	var units := Label.new()
+	units.text = "Units: Att %s | Def %s" % [str(result.get("units_att",[])), str(result.get("units_def",[]))]
+	vb.add_child(units)
+	var leaders := Label.new()
+	leaders.text = "Leaders: Att %s | Def %s" % [result.get("leader_att",""), result.get("leader_def","")]
+	vb.add_child(leaders)
+	var factors := Label.new()
+	factors.text = "Key factors: %s" % ", ".join(result.get("key_factors", []))
+	vb.add_child(factors)
+	var mods := Label.new()
+	mods.text = "Major modifiers: %s" % ", ".join(result.get("modifiers_detail", result.get("key_factors",[])))
+	vb.add_child(mods)
+	var cas := Label.new()
+	cas.text = "Casualties: Att %s vs Def %s" % [result.get("attacker_casualties","?"), result.get("defender_casualties","?")]
+	vb.add_child(cas)
+	var outc := Label.new()
+	outc.text = "Outcome: " + str(result.get("outcome", "Battle resolved."))
+	outc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(outc)
+	var note := Label.new()
+	note.text = "(Full replayable log / unit combat histories available in Formation/Leader inspectors. Balance: these are the biggest impact items.)"
+	vb.add_child(note)
+	var close := Button.new()
+	close.text = "Close AAR"
+	close.pressed.connect(win.queue_free)
+	vb.add_child(close)
+	get_tree().root.add_child(win)
+	win.popup_centered()
+	print("[AAR PANEL] Full battle AAR shown for %s" % result.get("target_province_id", -1))
