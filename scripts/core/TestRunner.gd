@@ -3271,19 +3271,44 @@ func _force_space_race_evidence_prints() -> void:
 	# 1918 alt in follow ons (Versailles)
 	if gd.has_method("process_peace_follow_ons"):
 		gd.call("process_peace_follow_ons", 1919)
+	# 1910 start stub test (if EOA_1910_TEST=1 or evidence; leverages existing 1918 roster via chain + lower OOB in 1910.json)
+	if OS.get_environment("EOA_1910_TEST").strip_edges() == "1" or _wants_headless_evidence():
+		print("[1910 START TEST] Attempt load_scenario 1910 for pre-war buildup (AUH/RUS/SER owners, lower tech/factories, 1910 date). Leader chain reuses 1918 for active seniors.")
+		if loader and loader.has_method("load_scenario"):
+			var ok1910 = await loader.load_scenario("1910")
+			print("  1910 load success:", ok1910, " (start_date from json 1910-01-01; use for alt July Crisis paths later)")
+			if ok1910 and gd and gd.has_method("process_1910_crisis_events"):
+				gd.call("process_1910_crisis_events", 1912, 10, "1910")  # stub example
+		else:
+			print("  1910 loader not ready in this context.")
 	print("[SPACE EVIDENCE FORCE] Done - check logs for [SPACE RACE EVENT], first_satellite/moon etc, protests, secret fleet, ethics space, Versailles Treaty alt, pillar/news, program choice, mech designer. Full 8+ milestones + alts integrated.")
 
-	# === HISTORICAL COMBAT TESTING (WWI/WWII recs) ===
-	# Extend for Marne 1914 (trench/attrition), Verdun (artillery grind), Stalingrad (urban/winter/supply), Midway (naval/air carrier dominance).
-	# Gaps identified: logistics for endurance (supply lines affect org over turns), chem/bio (gas from tech, morale/attrit), naval deep (beyond air), battle espionage (sabotage pre-fight), full combined arms (inf+armor+art+air+space synergies visible), leader initiative (flank chance), persistent weather, supply interdiction mid-battle.
-	# Recs: add LogisticsChain in BM for multi-turn supply drain; chem in special units/resolver (area denial); espionage missions pre-battle; expand combined_arms in NMM/Resolver; initiative for flanking in preview.
-	# Compare HoI4 (width/terrain/air/supply/doctrine factors detailed) + Terra Invicta (space-ground, design/intel in combat).
-	print("[HISTORICAL COMBAT TEST] Starting WWI/WWII sims - force OOB, run resolver, log AAR/tips/unit logs for gaps.")
-	# Stub: force Marne-like (inf/art vs inf, trench terrain, gas if tech)
-	if typeof(CombatResolver) != TYPE_NIL:
-		var r: CombatResolver = CombatResolver.new()
-		# Assume forces set in harness or 50T
-		var p_marne: Dictionary = r.get_effective_combat_power("german_infantry_division_1943_mixed", "trench", "", "plains")  # proxy
-		print("  [MARNE 1914 proxy] GER inf vs trench: power ~%.1f (attrition grind expected; gap: no persistent supply drain for prolonged battle)" % float(p_marne.get("soft_attack",0)))
-		r.free()
-	print("[HISTORICAL TEST] Gaps/recs logged. See full in /tmp/combat-history-testing-summary.md from agent. Add to BM: logistics endurance, chem, battle sabo, initiative flank, weather persist.")
+	# === HISTORICAL COMBAT TESTING (WWI/WWII recs) - expanded ===
+	# Test if current system can recreate feel of key battles. Use resolver + ProvinceInsight preview for odds/power/tips/factors (air/space/fort/leader/supply/terrain/special units). Log unit combat_logs via BM if wired.
+	# Gaps from sims vs history: see prints + recs below. Run with EOA_HEADLESS_EVIDENCE=1 for full.
+	print("[HISTORICAL COMBAT TEST] Expanded WWI/WWII proxy recreations (Marne, Verdun, Stalingrad, Midway).")
+	var hr := CombatResolver.new() if typeof(CombatResolver) != TYPE_NIL else null
+	if hr:
+		# MARNE 1914: open terrain + early trench, mass inf/art vs prepared, stalled offensive, high mutual loss.
+		var pma = hr.get_effective_combat_power("german_infantry_division_1943_mixed", "trench", "", "plains")
+		var pmd = hr.get_effective_combat_power("french_infantry_division_1940_mixed", "trench", "", "plains")
+		print("  [MARNE 1914] Att GER ~soft%.1f vs Def FRA trench ~%.1f (odds %.2f:1; historical stall/attrit). Gap: no chem gas (1915+ tech area denial), no persistent multi-turn supply drain for 5-9 day ops (Verdun 10 months worse)." % [float(pma.get("soft_attack",0)), float(pmd.get("soft_attack",0)), float(pma.get("soft_attack",1))/max(1,float(pmd.get("soft_attack",1))) ])
+
+		# VERDUN: fort + arty grind, counter battery, 'bleed white'.
+		var pva = hr.get_effective_combat_power("german_infantry_division_1943_mixed", "fort", "artillery_expert", "hills")
+		var pvd = hr.get_effective_combat_power("french_infantry_division_1940_mixed", "fort", "", "hills")
+		print("  [VERDUN] Att GER arty/fort ~%.1f vs Def FRA ~%.1f (fort mod strong; gap: no cumulative org/supply interdiction over weeks, no battle-level espionage/sabo to weaken forts pre-assault).")
+
+		# STALINGRAD: urban winter, encirclement, supply cut from air/ground, surrender after prolonged.
+		var psa = hr.get_effective_combat_power("german_infantry_division_1943_mixed", "urban", "", "plains")
+		var psd = hr.get_effective_combat_power("soviet_infantry_division_1943_mixed", "urban", "winter_specialist", "plains")
+		print("  [STALINGRAD] GER urban vs SOV winter/encircled ~ att%.1f def%.1f (out_of_supply + encircled tips should show; gap: no mid-battle persistent interdiction, weak combined_arms explicit (armor+arty+inf synergies), leader init for breakout/flank chance not modeled beyond skills).")
+
+		# MIDWAY: carrier air, scouting/intel, decisive strike despite odds.
+		var pmair = hr.get_effective_combat_power("usa_carrier_air_group_1943", "", "naval_aviation_expert", "ocean")
+		var pmdair = hr.get_effective_combat_power("japanese_carrier_air_group_1942", "", "", "ocean")
+		print("  [MIDWAY] US air dominance vs JAP ~%.1f vs %.1f (4:1+ full air sup should suppress; gap: naval shallow (no sub/escort positioning or damage control in sea province), intel/espionage (codebreak) not in preview, air ops costly even slight adv only for land provinces not sea).")
+
+		hr.free()
+	print("[HISTORICAL TEST] Gaps/recs: 1. LogisticsChain/BM for endurance drain (Verdun/Marne months). 2. Chem/bio from tech as special area denial in Resolver. 3. Pre-battle agent sabotage/espionage missions affecting fort/readiness. 4. Explicit combined_arms + leader_initiative flank in NMM/preview (HoI4 width/doctrine feel). 5. Deepen naval (task groups, subs in BM for ocean pids). 6. Persistent weather/supply interdiction mid-battle. 7. Full unit+leader logs always in AAR (already partial). Compare: HoI4 has detailed visible factors+width+air/supply; TI has space+design+intel. Our preview/AAR/tips/air(4:1)/space(guided) already excellent base. Add above -> world class satisfying combat sandbox. See docs + /tmp for agent summary.")
+	print("[HISTORICAL COMBAT TEST] Done.")

@@ -5381,10 +5381,10 @@ static func _battle_preview_block(
 		tips.append("Orbital strike support active — guided munitions have much greater impacts on troops")
 	if preview.get("guided_munitions_bonus", 0.0) > 0.1:
 		tips.append("Guided munitions bonus for advanced units (space comms/tech)")
+	tips.append("See full AAR (F10) for unit combat logs (Formation.combat_log: date/province/result/key factors/leader), leader impacts, modifiers with % values, space/air effects")
 	if tips.size() > 0:
 		block += "\n  %sKey situation: %s[/color]" % [COLOR_MUTED, " · ".join(tips)]
 	# Update tips to reference AAR for full specificity (unit logs from Formation, leader, modifiers %, space/air)
-	tips.append("See full AAR (F10) for unit combat logs (Formation.combat_log: date/province/result/key factors/leader), leader impacts, modifiers with % values, space/air effects")
 	# Accessibility for full AAR (not in hover to avoid overwhelm; click/F10 for deep)
 	block += "\n  %s[Press F10 for full AAR] — unit combat logs, leader impacts, full modifiers %% list, space/air effects, tips. Balance: air dominance 4:1+ full suppress; space high precision impact but maintenance costly, not instant win.[/color]" % COLOR_MUTED
 	# Most important: odds, key units/leaders if standout, major modifiers.

@@ -1,0 +1,43 @@
+{
+  "name": "1910 - The Gathering Storm",
+  "start_date": "1910-01-01",
+  "description": "The world on the eve of the Great War: empires at their zenith, colonial rivalries, arms races, and fragile alliances. Balkan crises loom; players can shape or avert the spark of 1914.",
+  "provinces": [
+	{"id": 1, "owner_tag": "TUR", "controller_tag": "TUR", "factories": 6, "development_level": 2.8, "infrastructure": 3, "special_features": ["capital"], "special_levels": {}},
+	{"id": 2, "owner_tag": "GER", "controller_tag": "GER", "factories": 55, "development_level": 6.0, "infrastructure": 7, "special_features": ["capital", "fort"], "special_levels": {"fort": 4}},
+	{"id": 3, "owner_tag": "GER", "controller_tag": "GER", "factories": 80, "development_level": 6.5, "infrastructure": 8, "special_features": ["coal_plant", "major_factory"], "special_levels": {"coal_plant": 4}},
+	{"id": 4, "owner_tag": "FRA", "controller_tag": "FRA", "factories": 60, "development_level": 6.2, "infrastructure": 7, "special_features": ["capital", "airfield"], "special_levels": {"airfield": 2}},
+	{"id": 5, "owner_tag": "ENG", "controller_tag": "ENG", "factories": 75, "development_level": 7.0, "infrastructure": 8, "special_features": ["capital", "port"], "special_levels": {"port": 6}},
+	{"id": 6, "owner_tag": "USA", "controller_tag": "USA", "factories": 35, "development_level": 7.5, "infrastructure": 8, "special_features": ["capital"], "special_levels": {}},
+	{"id": 7, "owner_tag": "USA", "controller_tag": "USA", "factories": 22, "development_level": 6.2, "infrastructure": 6, "special_features": ["oil_rig"], "special_levels": {}},
+	{"id": 8, "owner_tag": "RUS", "controller_tag": "RUS", "factories": 25, "development_level": 4.2, "infrastructure": 5, "special_features": ["capital"], "special_levels": {}},
+	{"id": 9, "owner_tag": "JAP", "controller_tag": "JAP", "factories": 30, "development_level": 5.0, "infrastructure": 6, "special_features": ["capital", "port"], "special_levels": {"port": 5}},
+	{"id": 18, "owner_tag": "TUR", "controller_tag": "TUR", "factories": 25, "development_level": 4.2, "infrastructure": 5, "special_features": ["capital", "port"], "special_levels": {"port": 5}},
+	{"id": 19, "owner_tag": "AUH", "controller_tag": "AUH", "factories": 18, "development_level": 5.5, "infrastructure": 6, "special_features": ["capital"], "special_levels": {}},
+	{"id": 21, "owner_tag": "ITA", "controller_tag": "ITA", "factories": 35, "development_level": 5.0, "infrastructure": 6, "special_features": ["capital"], "special_levels": {}},
+	{"id": 23, "owner_tag": "ENG", "controller_tag": "ENG", "factories": 15, "development_level": 3.0, "infrastructure": 4, "special_features": ["port"], "special_levels": {"port": 4}},
+	{"id": 28, "owner_tag": "ARG", "controller_tag": "ARG", "factories": 15, "development_level": 4.2, "infrastructure": 5, "special_features": ["capital"], "special_levels": {}},
+	{"id": 37, "owner_tag": "ENG", "controller_tag": "ENG", "factories": 18, "development_level": 4.8, "infrastructure": 6, "special_features": ["capital"], "special_levels": {}},
+	{"id": 40, "owner_tag": "RUS", "controller_tag": "RUS", "factories": 10, "development_level": 4.0, "infrastructure": 5, "special_features": ["capital"], "special_levels": {}},
+	{"id": 48, "owner_tag": "NLD", "controller_tag": "NLD", "factories": 22, "development_level": 5.5, "infrastructure": 7, "special_features": ["port"], "special_levels": {"port": 6}},
+	{"id": 69, "owner_tag": "BRA", "controller_tag": "BRA", "factories": 20, "development_level": 3.8, "infrastructure": 5, "special_features": ["port"], "special_levels": {"port": 4}},
+	{"id": 85, "owner_tag": "FRA", "controller_tag": "FRA", "factories": 10, "development_level": 3.5, "infrastructure": 4, "special_features": [], "special_levels": {}},
+	{"id": 86, "owner_tag": "ENG", "controller_tag": "ENG", "factories": 12, "development_level": 3.2, "infrastructure": 4, "special_features": [], "special_levels": {}},
+	{"id": 88, "owner_tag": "ENG", "controller_tag": "ENG", "factories": 15, "development_level": 4.0, "infrastructure": 5, "special_features": ["port"], "special_levels": {"port": 5}}
+  ],
+  "countries": [
+	{"tag": "GER", "name": "German Empire", "color": "#8B0000", "capital_province_id": 2, "major_power": true, "industrial_weight": 2, "key_provinces": [2, 3], "ideology": "monarchy", "current_tech_level": 5, "focus_tree_path": "res://data/focus_trees/germany_1910.json", "stability": 75.0, "war_support": 40.0},
+	{"tag": "FRA", "name": "French Third Republic", "color": "#0000CD", "capital_province_id": 4, "ideology": "democracy", "current_tech_level": 6, "focus_tree_path": "res://data/focus_trees/france_1910.json", "stability": 70.0, "war_support": 35.0},
+	{"tag": "ENG", "name": "British Empire", "color": "#FF0000", "capital_province_id": 5, "major_power": true, "naval_power": true, "industrial_weight": 2, "key_provinces": [5], "ideology": "democracy", "current_tech_level": 7, "focus_tree_path": "res://data/focus_trees/uk_1910.json", "stability": 80.0, "war_support": 30.0},
+	{"tag": "USA", "name": "United States of America", "color": "#00BFFF", "capital_province_id": 6, "major_power": true, "industrial_weight": 2, "key_provinces": [6], "ideology": "democracy", "current_tech_level": 7, "focus_tree_path": "res://data/focus_trees/usa_1910.json", "stability": 85.0, "war_support": 20.0},
+	{"tag": "RUS", "name": "Russian Empire", "color": "#8B0000", "capital_province_id": 8, "major_power": true, "industrial_weight": 2, "key_provinces": [8], "ideology": "monarchy", "current_tech_level": 4, "focus_tree_path": "res://data/focus_trees/russia_1910.json", "stability": 55.0, "war_support": 45.0},
+	{"tag": "AUH", "name": "Austria-Hungary", "color": "#FFD700", "capital_province_id": 19, "major_power": true, "industrial_weight": 1, "key_provinces": [19], "ideology": "monarchy", "current_tech_level": 5, "focus_tree_path": "res://data/focus_trees/austria_hungary_1910.json", "stability": 50.0, "war_support": 55.0},
+	{"tag": "ITA", "name": "Kingdom of Italy", "color": "#008000", "capital_province_id": 21, "ideology": "monarchy", "current_tech_level": 5, "focus_tree_path": "res://data/focus_trees/italy_1910.json", "stability": 60.0, "war_support": 40.0},
+	{"tag": "JAP", "name": "Empire of Japan", "color": "#FF4500", "capital_province_id": 9, "major_power": true, "naval_power": true, "industrial_weight": 1, "key_provinces": [9], "ideology": "monarchy", "current_tech_level": 6, "focus_tree_path": "res://data/focus_trees/japan_1910.json", "stability": 70.0, "war_support": 45.0},
+	{"tag": "TUR", "name": "Ottoman Empire", "color": "#A52A2A", "capital_province_id": 18, "ideology": "monarchy", "current_tech_level": 3, "focus_tree_path": "res://data/focus_trees/ottoman_1910.json", "stability": 40.0, "war_support": 60.0},
+	{"tag": "SER", "name": "Kingdom of Serbia", "color": "#DC143C", "capital_province_id": 20, "ideology": "monarchy", "current_tech_level": 3, "focus_tree_path": "res://data/focus_trees/serbia_1910.json", "stability": 45.0, "war_support": 65.0},
+	{"tag": "NLD", "name": "Netherlands", "color": "#FF0000", "capital_province_id": 48, "ideology": "democracy", "current_tech_level": 6, "focus_tree_path": "res://data/focus_trees/netherlands_1910.json", "stability": 75.0, "war_support": 25.0},
+	{"tag": "ARG", "name": "Argentina", "color": "#75AADB", "capital_province_id": 28, "ideology": "democracy", "current_tech_level": 4, "focus_tree_path": "res://data/focus_trees/argentina_1910.json", "stability": 65.0, "war_support": 30.0},
+	{"tag": "BRA", "name": "Brazil", "color": "#00A859", "capital_province_id": 69, "ideology": "democracy", "current_tech_level": 4, "focus_tree_path": "res://data/focus_trees/brazil_1910.json", "stability": 60.0, "war_support": 35.0}
+  ]
+}

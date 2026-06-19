@@ -465,17 +465,20 @@ func _create_agent_row(summary: Dictionary) -> PanelContainer:
 	row.add_theme_constant_override("separation", 6)
 	outer.add_child(row)
 
-	# Agent portrait (new support; agent_male/female from generator + save hardened)
-	var ap_rect := TextureRect.new()
-	ap_rect.custom_minimum_size = Vector2(22, 22)
-	ap_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-	ap_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	# Wire agent portraits from art-batch (new elite/double/visionary)
 	var apath := str(summary.get("portrait_path", ""))
-	if apath != "" and ResourceLoader.exists(apath):
-		var atex := load(apath) as Texture2D
-		if atex: ap_rect.texture = atex
-	ap_rect.visible = ap_rect.texture != null
-	row.add_child(ap_rect)
+	if not apath.is_empty():
+		var ptex := TextureRect.new()
+		ptex.custom_minimum_size = Vector2(32, 32)
+		ptex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+		ptex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		if ResourceLoader.exists(apath):
+			var tex := load(apath) as Texture2D
+			if tex:
+				ptex.texture = tex
+		else:
+			ptex.modulate = Color(0.6, 0.6, 0.7)  # placeholder tint
+		row.add_child(ptex)
 
 	var badge := str(summary.get("status_badge", ""))
 	if not badge.is_empty():

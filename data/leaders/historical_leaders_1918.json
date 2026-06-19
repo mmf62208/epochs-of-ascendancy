@@ -23,7 +23,7 @@
       "birth_year": 1847,
       "start_year": 1914,
       "end_year": 1919,
-      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
+      "portrait": "res://assets/graphics/portraits/leaders/ger_fuehrer.png"
     },
     {
       "leader_id": "ger_ludendorff",
@@ -46,7 +46,7 @@
       "birth_year": 1865,
       "start_year": 1914,
       "end_year": 1919,
-      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
+      "portrait": "res://assets/graphics/portraits/leaders/ger_fuehrer.png"
     },
     {
       "leader_id": "ger_hutier",
@@ -91,7 +91,8 @@
       },
       "birth_year": 1863,
       "start_year": 1914,
-      "end_year": 1919
+      "end_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/ger_fuehrer.png"
     },
     {
       "leader_id": "fra_foch",
@@ -203,7 +204,8 @@
       },
       "birth_year": 1861,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/uk_marshal.png"
     },
     {
       "leader_id": "eng_plumer",
@@ -225,7 +227,8 @@
       },
       "birth_year": 1857,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/uk_marshal.png"
     },
     {
       "leader_id": "eng_beatty",
@@ -247,7 +250,8 @@
       },
       "birth_year": 1871,
       "start_year": 1914,
-      "end_year": 1927
+      "end_year": 1927,
+      "portrait": "res://assets/graphics/portraits/leaders/uk_marshal.png"
     },
     {
       "leader_id": "eng_trenchard",
@@ -269,7 +273,8 @@
       },
       "birth_year": 1873,
       "start_year": 1915,
-      "end_year": 1930
+      "end_year": 1930,
+      "portrait": "res://assets/graphics/portraits/leaders/uk_marshal.png"
     },
     {
       "leader_id": "usa_pershing",
@@ -291,7 +296,8 @@
       },
       "birth_year": 1860,
       "start_year": 1917,
-      "end_year": 1924
+      "end_year": 1924,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "usa_liggett",
@@ -313,7 +319,8 @@
       },
       "birth_year": 1863,
       "start_year": 1918,
-      "end_year": 1925
+      "end_year": 1925,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "usa_sims",
@@ -334,7 +341,8 @@
       },
       "birth_year": 1858,
       "start_year": 1917,
-      "end_year": 1922
+      "end_year": 1922,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "usa_mitchell",
@@ -356,7 +364,8 @@
       },
       "birth_year": 1879,
       "start_year": 1918,
-      "end_year": 1936
+      "end_year": 1936,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "sov_trotsky",
@@ -378,7 +387,8 @@
       },
       "birth_year": 1879,
       "start_year": 1917,
-      "end_year": 1940
+      "end_year": 1940,
+      "portrait": "res://assets/graphics/portraits/leaders/sov_marshal.png"
     },
     {
       "leader_id": "sov_brusilov",
@@ -400,7 +410,8 @@
       },
       "birth_year": 1853,
       "start_year": 1914,
-      "end_year": 1926
+      "end_year": 1926,
+      "portrait": "res://assets/graphics/portraits/leaders/sov_marshal.png"
     },
     {
       "leader_id": "sov_tukhachevsky",
@@ -422,7 +433,8 @@
       },
       "birth_year": 1893,
       "start_year": 1920,
-      "end_year": 1940
+      "end_year": 1940,
+      "portrait": "res://assets/graphics/portraits/leaders/sov_marshal.png"
     },
     {
       "leader_id": "sov_budyonny",
@@ -443,7 +455,8 @@
         "bold": 1
       },
       "birth_year": 1883,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/sov_marshal.png"
     },
     {
       "leader_id": "ita_diaz",
@@ -466,7 +479,7 @@
       "birth_year": 1865,
       "start_year": 1917,
       "end_year": 1924,
-      "portrait": "res://assets/graphics/portraits/agents/agent_italian.png"
+      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
     },
     {
       "leader_id": "ita_cadorna",
@@ -489,7 +502,7 @@
       "birth_year": 1850,
       "start_year": 1914,
       "end_year": 1918,
-      "portrait": "res://assets/graphics/portraits/agents/agent_italian.png"
+      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
     },
     {
       "leader_id": "ita_thaon",
@@ -511,7 +524,7 @@
       "birth_year": 1857,
       "start_year": 1914,
       "end_year": 1920,
-      "portrait": "res://assets/graphics/portraits/agents/agent_italian.png"
+      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
     },
     {
       "leader_id": "jap_uehara",
@@ -600,7 +613,8 @@
         "mountain_specialist": 2
       },
       "birth_year": 1881,
-      "start_year": 1915
+      "start_year": 1915,
+      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
     },
     {
       "leader_id": "tur_cevat",
@@ -622,7 +636,8 @@
       },
       "birth_year": 1870,
       "start_year": 1914,
-      "end_year": 1922
+      "end_year": 1922,
+      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
     },
     {
       "leader_id": "tur_sanders",
@@ -644,7 +659,8 @@
       },
       "birth_year": 1855,
       "start_year": 1915,
-      "end_year": 1919
+      "end_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
     },
     {
       "leader_id": "pol_pilsudski",
@@ -733,7 +749,8 @@
       },
       "birth_year": 1879,
       "start_year": 1918,
-      "end_year": 1926
+      "end_year": 1926,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "ukr_grebenko",
@@ -754,7 +771,8 @@
       },
       "birth_year": 1885,
       "start_year": 1918,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "fin_mannerheim",
@@ -775,7 +793,8 @@
         "iron_will": 1
       },
       "birth_year": 1867,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "fin_osterman",
@@ -796,7 +815,8 @@
       },
       "birth_year": 1876,
       "start_year": 1918,
-      "end_year": 1925
+      "end_year": 1925,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nor_hvidsten",
@@ -817,7 +837,8 @@
       },
       "birth_year": 1871,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nor_laurentzon",
@@ -838,7 +859,8 @@
       },
       "birth_year": 1865,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "swe_horn",
@@ -859,7 +881,8 @@
       },
       "birth_year": 1855,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "swe_prince",
@@ -880,7 +903,8 @@
       },
       "birth_year": 1882,
       "start_year": 1918,
-      "end_year": 1930
+      "end_year": 1930,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "dnk_host",
@@ -901,7 +925,8 @@
       },
       "birth_year": 1871,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "dnk_werther",
@@ -921,7 +946,8 @@
       },
       "birth_year": 1855,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nld_snijders",
@@ -942,7 +968,8 @@
       },
       "birth_year": 1860,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nld_winkelman",
@@ -963,7 +990,8 @@
       },
       "birth_year": 1874,
       "start_year": 1918,
-      "end_year": 1940
+      "end_year": 1940,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "saf_smuts",
@@ -984,7 +1012,8 @@
         "charismatic": 1
       },
       "birth_year": 1870,
-      "start_year": 1914
+      "start_year": 1914,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "saf_lukin",
@@ -1005,7 +1034,8 @@
       },
       "birth_year": 1862,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "aus_monash",
@@ -1027,7 +1057,8 @@
       },
       "birth_year": 1865,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "aus_birdwood",
@@ -1048,7 +1079,8 @@
       },
       "birth_year": 1865,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nzl_russell",
@@ -1069,7 +1101,8 @@
       },
       "birth_year": 1868,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nzl_godley",
@@ -1090,7 +1123,8 @@
       },
       "birth_year": 1867,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "can_currie",
@@ -1112,7 +1146,8 @@
       },
       "birth_year": 1875,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "can_byng",
@@ -1134,7 +1169,8 @@
       },
       "birth_year": 1862,
       "start_year": 1914,
-      "end_year": 1935
+      "end_year": 1935,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "arg_dellepiane",
@@ -1155,7 +1191,8 @@
       },
       "birth_year": 1875,
       "start_year": 1914,
-      "end_year": 1925
+      "end_year": 1925,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "arg_heras",
@@ -1176,7 +1213,8 @@
       },
       "birth_year": 1868,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "bra_goes",
@@ -1197,7 +1235,8 @@
       },
       "birth_year": 1871,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "bra_fernandes",
@@ -1218,7 +1257,8 @@
       },
       "birth_year": 1875,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "mex_obregon",
@@ -1240,7 +1280,8 @@
       },
       "birth_year": 1880,
       "start_year": 1914,
-      "end_year": 1928
+      "end_year": 1928,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "mex_gonzalez",
@@ -1261,7 +1302,8 @@
       },
       "birth_year": 1873,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "chl_altamirano",
@@ -1282,7 +1324,8 @@
       },
       "birth_year": 1875,
       "start_year": 1914,
-      "end_year": 1925
+      "end_year": 1925,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "chl_lagos",
@@ -1302,7 +1345,8 @@
       },
       "birth_year": 1873,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "egy_allenby",
@@ -1324,7 +1368,8 @@
       },
       "birth_year": 1861,
       "start_year": 1917,
-      "end_year": 1925
+      "end_year": 1925,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "egy_watson",
@@ -1345,7 +1390,8 @@
       },
       "birth_year": 1870,
       "start_year": 1917,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "irn_reza",
@@ -1366,7 +1412,8 @@
         "political_general": 1
       },
       "birth_year": 1878,
-      "start_year": 1921
+      "start_year": 1921,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "irn_firuz",
@@ -1387,7 +1434,8 @@
       },
       "birth_year": 1878,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "isr_jabotinsky",
@@ -1409,7 +1457,8 @@
       },
       "birth_year": 1880,
       "start_year": 1918,
-      "end_year": 1940
+      "end_year": 1940,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "isr_trumpeldor",
@@ -1431,7 +1480,8 @@
       },
       "birth_year": 1880,
       "start_year": 1917,
-      "end_year": 1918
+      "end_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "pal_wavell",
@@ -1453,7 +1503,8 @@
       },
       "birth_year": 1883,
       "start_year": 1918,
-      "end_year": 1940
+      "end_year": 1940,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "pal_shea",
@@ -1474,7 +1525,8 @@
       },
       "birth_year": 1870,
       "start_year": 1918,
-      "end_year": 1925
+      "end_year": 1925,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nga_lugard",
@@ -1495,7 +1547,8 @@
       },
       "birth_year": 1858,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "syr_gouraud",
@@ -1517,7 +1570,8 @@
       },
       "birth_year": 1867,
       "start_year": 1914,
-      "end_year": 1925
+      "end_year": 1925,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "syr_de_castelnau",
@@ -1538,7 +1592,8 @@
       },
       "birth_year": 1851,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "isl_jonsson",
@@ -1559,7 +1614,8 @@
       },
       "birth_year": 1885,
       "start_year": 1918,
-      "end_year": 1930
+      "end_year": 1930,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "grl_knud",
@@ -1580,7 +1636,8 @@
       },
       "birth_year": 1879,
       "start_year": 1918,
-      "end_year": 1930
+      "end_year": 1930,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "sov_kolchak_1918",
@@ -1601,7 +1658,8 @@
       },
       "birth_year": 1874,
       "start_year": 1918,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/sov_general.png"
     },
     {
       "leader_id": "sov_alksnis_1918",
@@ -1622,7 +1680,8 @@
       },
       "birth_year": 1897,
       "start_year": 1918,
-      "end_year": 1938
+      "end_year": 1938,
+      "portrait": "res://assets/graphics/portraits/leaders/sov_general.png"
     },
     {
       "leader_id": "ger_bolten_1918",
@@ -1642,7 +1701,8 @@
         "artillery_expert": 1
       },
       "birth_year": 1880,
-      "start_year": 1916
+      "start_year": 1916,
+      "portrait": "res://assets/graphics/portraits/leaders/ger_fuehrer.png"
     },
     {
       "leader_id": "usa_march_1918",
@@ -1663,7 +1723,8 @@
       },
       "birth_year": 1864,
       "start_year": 1918,
-      "end_year": 1924
+      "end_year": 1924,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "usa_benson_1918",
@@ -1684,7 +1745,8 @@
       },
       "birth_year": 1855,
       "start_year": 1917,
-      "end_year": 1922
+      "end_year": 1922,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "eng_rawlinson_1918",
@@ -1704,7 +1766,8 @@
         "artillery_expert": 1
       },
       "birth_year": 1864,
-      "start_year": 1916
+      "start_year": 1916,
+      "portrait": "res://assets/graphics/portraits/leaders/uk_marshal.png"
     },
     {
       "leader_id": "eng_keyes_1918",
@@ -1724,7 +1787,8 @@
         "sea_wolf": 1
       },
       "birth_year": 1872,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/uk_marshal.png"
     },
     {
       "leader_id": "fra_guillaumat_1918",
@@ -1787,7 +1851,7 @@
       },
       "birth_year": 1855,
       "start_year": 1917,
-      "portrait": "res://assets/graphics/portraits/agents/agent_italian.png"
+      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
     },
     {
       "leader_id": "ita_arma_di_1918",
@@ -1808,7 +1872,7 @@
       },
       "birth_year": 1869,
       "start_year": 1918,
-      "portrait": "res://assets/graphics/portraits/agents/agent_italian.png"
+      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
     },
     {
       "leader_id": "jap_kato_kanji_1918",
@@ -1890,7 +1954,8 @@
         "cautious": 1
       },
       "birth_year": 1875,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "tur_cakmak_1918",
@@ -1910,7 +1975,8 @@
         "iron_will": 1
       },
       "birth_year": 1876,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
     },
     {
       "leader_id": "tur_recep_1918",
@@ -1929,7 +1995,8 @@
         "cautious": 2
       },
       "birth_year": 1889,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
     },
     {
       "leader_id": "nld_beatty_style_1918",
@@ -1948,7 +2015,8 @@
         "blockade_runner": 2
       },
       "birth_year": 1868,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nld_air_1918",
@@ -1967,7 +2035,8 @@
         "cautious": 1
       },
       "birth_year": 1888,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "can_air_1918",
@@ -1986,7 +2055,8 @@
         "bold": 1
       },
       "birth_year": 1892,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "can_navy_1918",
@@ -2005,7 +2075,8 @@
         "cautious": 2
       },
       "birth_year": 1870,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "aus_birdwood_1918",
@@ -2025,7 +2096,8 @@
         "cautious": 1
       },
       "birth_year": 1865,
-      "start_year": 1916
+      "start_year": 1916,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "aus_air_1918",
@@ -2045,7 +2117,8 @@
         "aggressive": 1
       },
       "birth_year": 1890,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "saf_smuts_1918",
@@ -2065,7 +2138,8 @@
         "methodical": 1
       },
       "birth_year": 1870,
-      "start_year": 1917
+      "start_year": 1917,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "saf_navy_1918",
@@ -2084,7 +2158,8 @@
         "cautious": 1
       },
       "birth_year": 1875,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nor_navy_1918",
@@ -2103,7 +2178,8 @@
         "arctic_bear": 2
       },
       "birth_year": 1878,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "swe_navy_1918",
@@ -2123,7 +2199,8 @@
         "blockade_runner": 1
       },
       "birth_year": 1872,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "dnk_navy_1918",
@@ -2142,7 +2219,8 @@
         "cautious": 2
       },
       "birth_year": 1888,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "irn_navy_1918",
@@ -2161,7 +2239,8 @@
         "cautious": 1
       },
       "birth_year": 1880,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "egy_air_1918",
@@ -2180,7 +2259,8 @@
         "bold": 1
       },
       "birth_year": 1890,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "arg_nav_1918",
@@ -2200,7 +2280,8 @@
         "cautious": 1
       },
       "birth_year": 1860,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "arg_air_1918",
@@ -2219,7 +2300,8 @@
         "bold": 1
       },
       "birth_year": 1864,
-      "start_year": 1917
+      "start_year": 1917,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "aus_nav_1918",
@@ -2239,7 +2321,8 @@
         "cautious": 1
       },
       "birth_year": 1868,
-      "start_year": 1917
+      "start_year": 1917,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "bra_air_1918",
@@ -2258,7 +2341,8 @@
         "bold": 1
       },
       "birth_year": 1882,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "chl_air_1918",
@@ -2277,7 +2361,8 @@
         "bold": 1
       },
       "birth_year": 1869,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "dnk_air_1918",
@@ -2296,7 +2381,8 @@
         "bold": 1
       },
       "birth_year": 1883,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "egy_nav_1918",
@@ -2316,7 +2402,8 @@
         "cautious": 1
       },
       "birth_year": 1866,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "fin_air_1918",
@@ -2335,7 +2422,8 @@
         "bold": 1
       },
       "birth_year": 1878,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "fra_air_1918",
@@ -2375,7 +2463,8 @@
         "cautious": 1
       },
       "birth_year": 1874,
-      "start_year": 1917
+      "start_year": 1917,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "grl_air_1918",
@@ -2394,7 +2483,8 @@
         "bold": 1
       },
       "birth_year": 1860,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "irn_air_1918",
@@ -2413,7 +2503,8 @@
         "bold": 1
       },
       "birth_year": 1875,
-      "start_year": 1917
+      "start_year": 1917,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "isl_nav_1918",
@@ -2433,7 +2524,8 @@
         "cautious": 1
       },
       "birth_year": 1872,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "isl_air_1918",
@@ -2452,7 +2544,8 @@
         "bold": 1
       },
       "birth_year": 1865,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "isr_nav_1918",
@@ -2472,7 +2565,8 @@
         "cautious": 1
       },
       "birth_year": 1860,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "isr_air_1918",
@@ -2491,7 +2585,8 @@
         "bold": 1
       },
       "birth_year": 1873,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "mex_nav_1918",
@@ -2511,7 +2606,8 @@
         "cautious": 1
       },
       "birth_year": 1868,
-      "start_year": 1917
+      "start_year": 1917,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "mex_air_1918",
@@ -2530,7 +2626,8 @@
         "bold": 1
       },
       "birth_year": 1865,
-      "start_year": 1916
+      "start_year": 1916,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nga_nav_1918",
@@ -2550,7 +2647,8 @@
         "cautious": 1
       },
       "birth_year": 1881,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nga_air_1918",
@@ -2569,7 +2667,8 @@
         "bold": 1
       },
       "birth_year": 1871,
-      "start_year": 1916
+      "start_year": 1916,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nor_air_1918",
@@ -2588,7 +2687,8 @@
         "bold": 1
       },
       "birth_year": 1871,
-      "start_year": 1917
+      "start_year": 1917,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nzl_nav_1918",
@@ -2608,7 +2708,8 @@
         "cautious": 1
       },
       "birth_year": 1876,
-      "start_year": 1916
+      "start_year": 1916,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "nzl_air_1918",
@@ -2627,7 +2728,8 @@
         "bold": 1
       },
       "birth_year": 1861,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "pal_nav_1918",
@@ -2647,7 +2749,8 @@
         "cautious": 1
       },
       "birth_year": 1871,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "pal_air_1918",
@@ -2666,7 +2769,8 @@
         "bold": 1
       },
       "birth_year": 1860,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "pol_nav_1918",
@@ -2706,7 +2810,8 @@
         "bold": 1
       },
       "birth_year": 1861,
-      "start_year": 1916
+      "start_year": 1916,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "swe_air_1918",
@@ -2725,7 +2830,8 @@
         "bold": 1
       },
       "birth_year": 1865,
-      "start_year": 1916
+      "start_year": 1916,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "syr_nav_1918",
@@ -2745,7 +2851,8 @@
         "cautious": 1
       },
       "birth_year": 1863,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "syr_air_1918",
@@ -2764,7 +2871,8 @@
         "bold": 1
       },
       "birth_year": 1880,
-      "start_year": 1916
+      "start_year": 1916,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "tur_air_1918",
@@ -2783,7 +2891,8 @@
         "bold": 1
       },
       "birth_year": 1866,
-      "start_year": 1917
+      "start_year": 1917,
+      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
     },
     {
       "leader_id": "ukr_nav_1918",
@@ -2803,7 +2912,8 @@
         "cautious": 1
       },
       "birth_year": 1861,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     },
     {
       "leader_id": "ukr_air_1918",
@@ -2822,7 +2932,8 @@
         "bold": 1
       },
       "birth_year": 1876,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
     }
   ]
 }

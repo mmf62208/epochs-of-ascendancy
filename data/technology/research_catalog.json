@@ -29,7 +29,10 @@
     "area": "air",
     "description": "Unlocks improved fighter and CAS designs.",
     "cost_years": 2.0,
-    "status": "locked"
+    "status": "locked",
+    "ui": {
+      "icon": "res://assets/graphics/icons/tech/ai_awakening.png"
+    }
   },
   "space_design_basic": {
     "id": "space_design_basic",
@@ -38,5 +41,60 @@
     "cost_years": 4,
     "status": "locked",
     "era": 1955
+  },
+  "genetic_engineering_1970": {
+    "id": "genetic_engineering_1970",
+    "name": "Genetic Engineering 1970",
+    "area": "land",
+    "description": "Wired from art-batch new icon.",
+    "cost_years": 3.0,
+    "status": "locked",
+    "ui": {
+      "icon": "res://assets/graphics/icons/tech/genetic_engineering.png"
+    }
+  },
+  "ai_awakening": {
+    "id": "ai_awakening",
+    "name": "Ai Awakening",
+    "area": "future",
+    "description": "Wired from art-batch new icon.",
+    "cost_years": 3.0,
+    "status": "locked",
+    "ui": {
+      "icon": "res://assets/graphics/icons/tech/ai_awakening.png"
+    }
+  },
+  "special_forces": {
+    "id": "special_forces",
+    "name": "Special Forces",
+    "area": "land",
+    "description": "Wired from art-batch new icon.",
+    "cost_years": 3.0,
+    "status": "locked",
+    "ui": {
+      "icon": "res://assets/graphics/icons/tech/special_forces.png"
+    }
+  },
+  "guided_munitions": {
+    "id": "guided_munitions",
+    "name": "Guided Munitions",
+    "area": "land",
+    "description": "Wired from art-batch new icon.",
+    "cost_years": 3.0,
+    "status": "locked",
+    "ui": {
+      "icon": "res://assets/graphics/icons/tech/guided_munitions.png"
+    }
+  },
+  "orbital_strike": {
+    "id": "orbital_strike",
+    "name": "Orbital Strike",
+    "area": "future",
+    "description": "Wired from art-batch new icon.",
+    "cost_years": 3.0,
+    "status": "locked",
+    "ui": {
+      "icon": "res://assets/graphics/icons/tech/orbital_strike.png"
+    }
   }
 }
