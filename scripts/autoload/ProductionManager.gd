@@ -159,6 +159,67 @@ func create_line(line_id: String) -> ProductionLine:
 	return line
 
 
+
+# === Layered production per-line API (minimal wiring for player/AI choice + tech rule_flag unlocks) ===
+func get_available_production_layers(country_tag: String) -> Array[String]:
+	var layers: Array[String] = ["mass"]
+	var tag := country_tag.strip_edges().to_upper()
+	if typeof(TechnologyManager) != TYPE_NIL:
+		if TechnologyManager.has_rule_flag(tag, "mass_production"):
+			if not "mass" in layers: layers.append("mass")
+		if TechnologyManager.has_rule_flag(tag, "automated_production"):
+			layers.append("automated")
+		if TechnologyManager.has_rule_flag(tag, "additive_manuf"):
+			layers.append("additive")
+		if TechnologyManager.has_rule_flag(tag, "nanotech"):
+			layers.append("nano")
+	return layers
+
+func is_production_layer_unlocked(country_tag: String, layer: String) -> bool:
+	var tag := country_tag.strip_edges().to_upper()
+	var l := layer.to_lower()
+	if l == "mass":
+		return true
+	if typeof(TechnologyManager) == TYPE_NIL:
+		return false
+	if l == "automated":
+		return TechnologyManager.has_rule_flag(tag, "automated_production")
+	if l == "additive":
+		return TechnologyManager.has_rule_flag(tag, "additive_manuf")
+	if l == "nano":
+		return TechnologyManager.has_rule_flag(tag, "nanotech")
+	return false
+
+func get_line_production_layer(line_id: String) -> String:
+	var line := get_line(line_id)
+	if line == null:
+		return "mass"
+	return line.get_current_layer()
+
+func set_line_production_layer(line_id: String, layer: String) -> Dictionary:
+	var line := get_line(line_id)
+	if line == null:
+		return {"success": false, "error": "unknown_line"}
+	var owner := _get_line_owner_tag(line)
+	if owner.is_empty():
+		# allow during init
+		pass
+	elif not is_production_layer_unlocked(owner, layer):
+		return {"success": false, "error": "layer_locked", "layer": layer, "required_flag": _layer_to_flag(layer)}
+	var res := line.set_production_layer(layer)
+	if res.get("success", false):
+		_refresh_line_modifiers(line)  # pick up NMM layer fold
+		invalidate_production_cache(owner)
+	return res
+
+func _layer_to_flag(layer: String) -> String:
+	match layer.to_lower():
+		"mass": return "mass_production"
+		"automated": return "automated_production"
+		"additive": return "additive_manuf"
+		"nano": return "nanotech"
+	return ""
+
 func remove_line(line_id: String) -> bool:
 	if not _lines.has(line_id):
 		return false
@@ -1005,7 +1066,7 @@ func _resolve_modifiers_for_line(line: ProductionLine) -> ProductionModifiers:
 	# === National Spirit + Temporary Modifier Integration (Option B) ===
 	var owner_tag := _get_line_owner_tag(line)
 	if not owner_tag.is_empty():
-		var national_mods := _get_national_production_modifiers(owner_tag)
+		var national_mods := _get_national_production_modifiers(owner_tag, line.get_current_layer() if line else "")
 		if national_mods.get("output_multiplier", 1.0) != 1.0:
 			mods.output_multiplier *= float(national_mods["output_multiplier"])
 		if national_mods.get("reliability_multiplier", 1.0) != 1.0:
@@ -1089,7 +1150,7 @@ func _get_line_owner_tag(line: ProductionLine) -> String:
 	return factory.owner_tag
 
 
-func _get_national_production_modifiers(country_tag: String) -> Dictionary:
+func _get_national_production_modifiers(country_tag: String, production_layer: String = "") -> Dictionary:
 	var result := {
 		"output_multiplier": 1.0,
 		"reliability_multiplier": 1.0,
@@ -1356,8 +1417,19 @@ func get_factory_summary(factory_id: int) -> Dictionary:
 		"assigned_lines": f.assigned_lines.size(),
 		"assigned_line_ids": f.assigned_lines.duplicate(),
 		"current_damage": f.current_damage,
+		"line_layers": _get_line_layers_for_factory(f),
 	}
 
+
+
+func _get_line_layers_for_factory(factory: Factory) -> Dictionary:
+	var res := {}
+	if factory == null: return res
+	for lid in factory.assigned_lines:
+		var ln := get_line(lid)
+		if ln:
+			res[lid] = ln.get_current_layer()
+	return res
 
 func get_country_production_overview(country_tag: String) -> Dictionary:
 	var factories := get_all_factories_for_country(country_tag)
@@ -1652,6 +1724,7 @@ func get_save_data() -> Dictionary:
 			"production_progress": line.production_progress,
 			"current_template_id": line.current_template_id,
 			"factory_id": line.factory_id,
+			"production_layer": line.current_production_layer if "current_production_layer" in line else "mass",
 		}
 
 	return {
@@ -1702,6 +1775,11 @@ func apply_save_data(data: Dictionary) -> void:
 				# factory_id usually set at creation; restore if present
 				if ld.has("factory_id"):
 					line.factory_id = int(ld["factory_id"])
+				# persist per-line layer for layered prod
+				if ld.has("production_layer"):
+					line.current_production_layer = str(ld.get("production_layer", "mass"))
+				elif "current_production_layer" in line:
+					line.current_production_layer = "mass"
 
 	clear_all_caches()
 	print("ProductionManager: Save data applied (%d lines)" % (data.get("lines", {}).size() if data.has("lines") else 0))

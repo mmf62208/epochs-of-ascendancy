@@ -291,10 +291,12 @@ func _apply_theme() -> void:
 
 	# Debug overlay quick toggle (only in debug builds) -- we put "Debug (F10)" inside the compact MenuButton
 	# to save top bar space. F10 / Ctrl+Shift+R still work globally.
-	if OS.is_debug_build() and debug_button == null:
+	var is_headless_ev := OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1"
+	if OS.is_debug_build() and debug_button == null and not is_headless_ev:
 		# Pre-create the overlay (hidden) so hotkeys and other systems can find it immediately.
 		# Use the static toggle/hide which now prefers adding under UILayer for proper screen-space behavior.
 		# Deferred to avoid any early tree/window issues on Linux/X11.
+		# Guard for headless 50T evidence runs (pre-existing "toggle" on GDScript error); skip precreate entirely under EOA_HEADLESS_EVIDENCE.
 		call_deferred("_deferred_precreate_debug")
 
 
@@ -331,7 +333,8 @@ func _setup_compact_menu() -> void:
 	popup.add_item("Map (current view)", 7)
 	popup.add_separator()
 	popup.add_item("Exit to Desktop", 5)
-	if OS.is_debug_build():
+	var is_headless_ev := OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1"
+	if OS.is_debug_build() and not is_headless_ev:
 		popup.add_separator()
 		popup.add_item("Debug (F10)", 4)
 
@@ -358,7 +361,8 @@ func _on_menu_item_pressed(id: int) -> void:
 		5:
 			get_tree().quit()
 		4:
-			if OS.is_debug_build():
+			var is_headless_ev2 := OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1"
+			if OS.is_debug_build() and not is_headless_ev2:
 				call_deferred("_deferred_debug_toggle")
 		6:
 			# Consolidated Policies/Dir access (keeps primary overhead to exact 6: Prod/Leaders/Tech/Dip/Agents/Map)
@@ -446,7 +450,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	# Global debug hotkey — opens the dedicated Debug Overlay
 	if event.keycode == KEY_F10 or (event.ctrl_pressed and event.shift_pressed and event.keycode == KEY_R):
-		call_deferred("_deferred_debug_toggle")
+		var is_headless_ev3 := OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1"
+		if not is_headless_ev3:
+			call_deferred("_deferred_debug_toggle")
 		get_viewport().set_input_as_handled()
 		return
 	# Dev convenience keybinds (F5/F6/F9/ESC)

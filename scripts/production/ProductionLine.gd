@@ -32,6 +32,7 @@ var production_progress: float = 0.0
 var active_refinement: RefinementProject = null
 ## Overrides template module_loadout for weapon/cargo slots (empty string clears a slot).
 var custom_module_loadout: Dictionary = {}
+var current_production_layer: String = "mass"  # "mass", "automated", "additive", "nano" — per-line paradigm for layered production trades (wired from tech rule_flags)
 
 var _design_data: DesignDataLoader = null
 var _rules: Dictionary = {}
@@ -70,6 +71,11 @@ func refresh_design_production_cost() -> void:
 			template, _design_data, get_effective_loadout()
 		)
 		daily_resource_cost = template.get_daily_resource_cost_dict()
+		# Apply per-line layer cost trade (higher burn for mass/nano, etc) to base PP cost and daily res
+		var lcm := get_layer_cost_multiplier()
+		design_production_cost *= lcm
+		for res in daily_resource_cost:
+			daily_resource_cost[res] = float(daily_resource_cost[res]) * lcm
 	required_progress = design_production_cost
 
 
@@ -125,6 +131,9 @@ func set_template(template_id: String) -> Dictionary:
 		result["similarity"] = similarity
 		result["retooling_days"] = RetoolingCalculator.compute_retooling_days(similarity, _rules)
 		retooling_days_remaining = result["retooling_days"]
+		# Apply layer retool/flex trade (additive/nano faster retool for custom/flex)
+		retooling_days_remaining *= get_layer_retool_multiplier()
+		result["retooling_days"] = retooling_days_remaining
 		production_progress = 0.0
 		template_changed.emit(current_template_id, template_id, retooling_days_remaining)
 	elif current_template_id != template_id:
@@ -248,7 +257,9 @@ func get_reliability_profile() -> ReliabilityProfile:
 
 
 func get_effective_reliability() -> float:
-	return get_reliability_profile().effective_reliability
+	var base := get_reliability_profile().effective_reliability
+	# Layer quality trade (mass lower, nano/additive higher precision/custom)
+	return base * get_layer_quality_multiplier()
 
 
 func list_refinement_options() -> Array[Dictionary]:
@@ -301,6 +312,8 @@ func get_days_per_unit() -> float:
 		var mod: EquipmentModule = _design_data.get_module(module_id)
 		if mod != null:
 			base_days += mod.production_time * 0.15
+	# Layer speed trade: mass faster bulk (lower days), nano slower
+	base_days /= get_layer_speed_multiplier()
 	return maxf(base_days, 1.0)
 
 
@@ -314,6 +327,10 @@ func get_production_cost() -> Dictionary:
 		var mod: EquipmentModule = _design_data.get_module(module_id)
 		if mod != null:
 			_merge_cost(total, mod.cost)
+	# Layer cost trade also felt here (for UI previews)
+	var lcm := get_layer_cost_multiplier()
+	for k in total:
+		total[k] = float(total[k]) * lcm
 	return total
 
 
@@ -522,5 +539,57 @@ func _factory_manager() -> Node:
 	return tree.root.get_node_or_null("/root/FactoryManager")
 
 
+
+# === Layered production paradigm state + trades (per-line choice for epochs; smallest change to feel speed/quality/cost/time/flex/retool trades) ===
+const _LAYER_TRADES := {
+	"mass": {"speed": 1.15, "quality": 0.90, "cost": 1.10, "retool": 1.0, "precision": 0.85, "desc": "+speed/bulk output, lower quality/custom, higher res burn"},
+	"automated": {"speed": 1.05, "quality": 1.05, "cost": 1.0, "retool": 0.95, "precision": 1.0, "desc": "balanced speed + flexibility"},
+	"additive": {"speed": 0.85, "quality": 1.20, "cost": 1.15, "retool": 0.75, "precision": 1.25, "desc": "high flex/precision/custom (advanced/low vol), slower bulk, +power/rare"},
+	"nano": {"speed": 0.60, "quality": 1.40, "cost": 1.35, "retool": 0.60, "precision": 1.50, "desc": "ultimate precision/flex but high power/rare/ethics risk, very slow for mass"},
+}
+
+func get_current_layer() -> String:
+	return current_production_layer if current_production_layer in _LAYER_TRADES else "mass"
+
+func set_production_layer(layer: String) -> Dictionary:
+	var result := {"success": false, "old_layer": current_production_layer, "new_layer": layer, "trades": {} }
+	if not _LAYER_TRADES.has(layer):
+		result["error"] = "invalid_layer"
+		return result
+	current_production_layer = layer
+	# Refresh costs (PP + daily res) to reflect layer cost trade; rescale progress % to keep same completion
+	var old_cost := design_production_cost
+	refresh_design_production_cost()
+	if old_cost > 0.001 and design_production_cost > 0.001 and progress > 0.0:
+		progress = clampf(progress * (design_production_cost / old_cost), 0.0, design_production_cost)
+	result["success"] = true
+	result["trades"] = get_layer_trades_preview()
+	return result
+
+func get_layer_trades_preview() -> Dictionary:
+	var l := get_current_layer()
+	var t : Dictionary = _LAYER_TRADES.get(l, {}).duplicate(true)
+	t["layer"] = l
+	t["unlocked"] = true  # refined by PM/UI via rule_flags
+	return t
+
+func get_layer_speed_multiplier() -> float:
+	return float(_LAYER_TRADES.get(get_current_layer(), {}).get("speed", 1.0))
+
+func get_layer_cost_multiplier() -> float:
+	return float(_LAYER_TRADES.get(get_current_layer(), {}).get("cost", 1.0))
+
+func get_layer_quality_multiplier() -> float:
+	return float(_LAYER_TRADES.get(get_current_layer(), {}).get("quality", 1.0))
+
+func get_layer_retool_multiplier() -> float:
+	return float(_LAYER_TRADES.get(get_current_layer(), {}).get("retool", 1.0))
+
+
 func get_daily_resource_cost() -> Dictionary:
-	return daily_resource_cost.duplicate(true)
+	var d := daily_resource_cost.duplicate(true)
+	# Ensure layer cost trade reflected (e.g. mass/nano higher burn)
+	var lcm := get_layer_cost_multiplier()
+	for k in d:
+		d[k] = float(d[k]) * lcm
+	return d

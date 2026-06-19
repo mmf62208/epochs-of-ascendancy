@@ -178,7 +178,7 @@ func clear_all_modifiers() -> void:
 
 ## Returns a dictionary of production-relevant modifiers for a country.
 ## This aggregates all active temporary effects and can be extended for stability baseline later.
-func get_production_modifiers(country_tag: String) -> Dictionary:
+func get_production_modifiers(country_tag: String, production_layer: String = "") -> Dictionary:
 	var tag := country_tag.strip_edges().to_upper()
 	var result := {
 		"output_multiplier": 1.0,
@@ -239,6 +239,39 @@ func get_production_modifiers(country_tag: String) -> Dictionary:
 				"resource_output", "resource_output_multiplier", "resource_production":
 					result["resource_output_multiplier"] *= (1.0 + val)
 
+	# Per-line layered production paradigm (mass/automated/additive/nano) — extend NMM for layer-specific (called per-line from PM resolve, folds into output/reliab/cost/retool like flex)
+	if production_layer and not str(production_layer).is_empty():
+		var l := str(production_layer).to_lower()
+		var ls := 1.0; var lq := 1.0; var lc := 1.0; var lr := 1.0
+		if l == "mass":
+			ls = 1.15; lq = 0.90; lc = 1.10
+		elif l == "automated":
+			ls = 1.05; lq = 1.05; lr = 0.95
+		elif l == "additive":
+			ls = 0.85; lq = 1.20; lc = 1.15; lr = 0.75
+		elif l == "nano":
+			ls = 0.60; lq = 1.40; lc = 1.35; lr = 0.60
+		result["output_multiplier"] *= ls
+		result["reliability_multiplier"] *= lq
+		result["cost_multiplier"] *= lc
+		result["retooling_days_multiplier"] *= lr
+	return result
+
+## Returns resource-relevant modifiers (for discovery, output from agents/exploration).
+func get_resource_modifiers(country_tag: String) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var result := {
+		"resource_output_multiplier": 1.0,
+	}
+	if tag.is_empty() or not country_modifiers.has(tag):
+		return result
+	for effect in country_modifiers[tag] as Array:
+		var mods: Dictionary = effect.get("modifiers", {})
+		for key in mods.keys():
+			var val := float(mods[key])
+			match key:
+				"resource_output", "resource_output_multiplier", "resource_production":
+					result["resource_output_multiplier"] *= (1.0 + val)
 	return result
 
 ## Returns resource-relevant modifiers (for discovery, output from agents/exploration).

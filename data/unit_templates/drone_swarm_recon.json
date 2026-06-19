@@ -1,0 +1,34 @@
+{
+  "id": "drone_swarm_recon",
+  "name": "Drone Swarm (Recon/Strike)",
+  "base_type": "Support",
+  "size_category": "Swarm",
+  "visual_archetype": "drone",
+  "crew_required": 0,
+  "base_training_level": 10,
+  "max_experience_level": 80,
+  "base_stats": {
+    "speed": 120,
+    "reliability": 55,
+    "fuel_consumption": 3,
+    "supply_need": 5,
+    "armor": 5,
+    "top_armor": 2,
+    "hardness": 10,
+    "recon": 45,
+    "stealth": 30
+  },
+  "slots": {
+    "Sensor": { "max": 1 },
+    "Payload": { "max": 2 }
+  },
+  "unlock_tech": [ "drone_swarm_1980" ],
+  "is_vehicle": false,
+  "is_drone_swarm": true,
+  "description": "Autonomous drone swarm for recon, harassment and precision strike. Low cost, high attrit risk.",
+  "production_category": "drone",
+  "era": "future",
+  "modules": [],
+  "production_cost": 28.0,
+  "daily_resource_cost": { "aluminum": 0.8, "electronics": 1.2, "rare_earth": 0.1 }
+}

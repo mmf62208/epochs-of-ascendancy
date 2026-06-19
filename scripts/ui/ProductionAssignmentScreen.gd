@@ -129,6 +129,7 @@ func _on_day_advanced(_report: Dictionary) -> void:
 
 
 func refresh_screen() -> void:
+	_clear_layer_buttons()
 	current_data = ProductionManager.get_production_screen_data(country_tag, false)
 	_update_summary_bar()
 	_apply_filters()
@@ -298,7 +299,61 @@ func _on_details_pressed(summary: Dictionary) -> void:
 		int(summary.get("max_lines", 1)),
 	]
 	text += "Daily Output: %.1f" % float(summary.get("daily_output_estimate", 0.0))
+	# Layered prod per-line state + preview trades (speed/quality/cost etc)
+	var line_layers: Dictionary = summary.get("line_layers", {})
+	if line_layers.size() > 0:
+		text += "
+--- Production Layers (per line) ---
+"
+		for lid in line_layers:
+			var lyr := str(line_layers[lid])
+			text += "  Line %s: %s
+" % [str(lid), lyr]
+			# preview via PM if avail
+			if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("get_line"):
+				var ln = ProductionManager.get_line(str(lid))
+				if ln and ln.has_method("get_layer_trades_preview"):
+					var tr := ln.get_layer_trades_preview()
+					text += "    trades: speed x%.2f qual x%.2f cost x%.2f retool x%.2f (%s)
+" % [float(tr.get("speed",1)), float(tr.get("quality",1)), float(tr.get("cost",1)), float(tr.get("retool",1)), str(tr.get("desc",""))]
 	detail_label.text = text
+
+	# Add/Set layer buttons for live choice (re-uses assigned lines; minimal UI extension)
+	_clear_layer_buttons()
+	var owner := str(summary.get("owner_tag", ""))
+	var avail: Array = []
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("get_available_production_layers"):
+		avail = ProductionManager.get_available_production_layers(owner)
+	var line_ids: Array = summary.get("assigned_line_ids", [])
+	if line_ids.size() == 0:
+		line_ids = summary.get("assigned_line_ids", [])
+	for lyr in ["mass", "automated", "additive", "nano"]:
+		var btn := Button.new()
+		btn.text = "Set %s" % lyr
+		btn.custom_minimum_size = Vector2(70, 22)
+		if lyr in avail or lyr == "mass":
+			RetrowaveTheme.style_primary_button(btn) if RetrowaveTheme else null
+		else:
+			btn.disabled = true
+		btn.pressed.connect(func():
+			if line_ids.size() > 0:
+				var first_lid := str(line_ids[0])
+				if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("set_line_production_layer"):
+					var r := ProductionManager.set_line_production_layer(first_lid, lyr)
+					if r.get("success", false):
+						_toast_layer("Line %s set to %s (trades applied)" % [first_lid, lyr])
+						refresh_screen()
+					else:
+						_toast_layer("Cannot set %s: %s" % [lyr, str(r.get("error", r))])
+			else:
+				_toast_layer("No lines on this factory to set layer")
+		)
+		# parent to detail panel area
+		detail_panel.add_child(btn)
+		if not has_meta("layer_btns"): set_meta("layer_btns", [])
+		var btns: Array = get_meta("layer_btns")
+		btns.append(btn)
+
 
 
 func _on_change_pressed(summary: Dictionary) -> void:
@@ -316,6 +371,19 @@ func _on_change_pressed(summary: Dictionary) -> void:
 	get_tree().root.add_child(picker)
 	picker.popup_centered()
 
+
+
+func _clear_layer_buttons():
+	if has_meta("layer_btns"):
+		for b in get_meta("layer_btns"):
+			if is_instance_valid(b): b.queue_free()
+		set_meta("layer_btns", [])
+
+func _toast_layer(msg: String):
+	print("[LAYER UI] ", msg)
+	if detail_label:
+		detail_label.text += "
+" + msg
 
 func _on_filter_changed(_value: Variant = null) -> void:
 	_apply_filters()
