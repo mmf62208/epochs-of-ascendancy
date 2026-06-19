@@ -130,6 +130,10 @@ func execute_province_assault(
 	apply_combat_outcome(result, fid, from_pid)
 	battle_resolved.emit(result)
 
+	# Auto AAR for player if involved (accessible panel)
+	if typeof(DebugOverlay) != TYPE_NIL and (str(result.get("attacker_tag","")) == "player" or str(result.get("defender_tag","")) == "player"):
+		DebugOverlay.call_deferred("show_battle_aar", result)
+
 	# Unit combat log: record for involved units (like leaders). Only most important factors.
 	_log_unit_combat(fid, from_pid, target_province_id, result, "attacker")
 	if result.has("defender_formation_id"):

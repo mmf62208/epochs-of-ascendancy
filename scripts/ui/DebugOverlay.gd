@@ -2105,6 +2105,11 @@ func _build_ui() -> void:
 	)
 	harness_section.add_child(preview_combat_btn)
 
+	var aar_btn := Button.new()
+	aar_btn.text = "📜 Show Battle AAR Panel (full details: units, leaders, all factors, logs - accessible from preview/inspector)"
+	aar_btn.pressed.connect(func(): show_battle_aar({}))
+	harness_section.add_child(aar_btn)
+
 	# NEW Phase 2 direct actions on selected/clicked (build on debug_* + real APIs; F10 harness + inspector click flow; live 460 updates)
 	var invest_infra_btn := Button.new()
 	invest_infra_btn.text = "🏗️ Invest Infra here (real InfraDevManager + layer rebuild + density tint preview)"
@@ -4943,3 +4948,65 @@ func _open_space_designer() -> void:
 	get_tree().root.add_child(popup)
 	popup.set_player_tag("player" if "player" in get_tree().root.get("peace_state", {}) else "USA")
 	toast_map_debug("Space Designer opened. Choose base, add modules (propulsion, sensors, life support), finalize to unlock custom design for production.")
+
+func show_battle_aar(result: Dictionary = {}) -> void:
+	# Specific accessible AAR panel (full details when clicked from preview/inspector/post-battle).
+	# Shows all factors, units, leaders, logs, outcomes. Not in hover (too much); clear in preview, deep here.
+	if result.is_empty():
+		# Demo sample
+		result = {
+			"attacker_tag": "GER", "defender_tag": "FRA",
+			"from_province_id": 82, "target_province_id": 101,
+			"odds_attacker_win": 62.0,
+			"winner": "GER",
+			"attacker_casualties": 145, "defender_casualties": 98,
+			"key_factors": ["air_superiority", "leader_impact_high", "fort_mod_def_1.2", "supply_mod_att_0.8", "special_mountain"],
+			"leader_att": "Rommel (+18% attack/org)",
+			"leader_def": "Manstein (+12% def)",
+			"units_att": ["Panzer x2", "Inf x5", "CAS support"],
+			"units_def": ["Fortified Inf x4", "Mountain x1"],
+			"modifiers_detail": ["+15% air CAS", "-8% night", "+22% defending fort", "+5% terrain", "Leader bonus decisive"],
+			"outcome": "GER breakthrough, province captured. Encirclement risk for remaining FRA.",
+			"date": "1940-05"
+		}
+	var win := Window.new()
+	win.title = "Battle AAR: %s vs %s (%s)" % [result.get("attacker_tag","?"), result.get("defender_tag","?"), result.get("date","")]
+	win.size = Vector2(650, 480)
+	var vb := VBoxContainer.new()
+	win.add_child(vb)
+	vb.add_child(Label.new()) # spacer
+	var title := Label.new()
+	title.text = "After Action Report - Clickable full details (most important first)"
+	vb.add_child(title)
+	var odds := Label.new()
+	odds.text = "Est. odds: %.0f%% attacker win | Winner: %s" % [float(result.get("odds_attacker_win",50)), result.get("winner","?")]
+	vb.add_child(odds)
+	var units := Label.new()
+	units.text = "Units: Att %s | Def %s" % [str(result.get("units_att",[])), str(result.get("units_def",[]))]
+	vb.add_child(units)
+	var leaders := Label.new()
+	leaders.text = "Leaders: Att %s | Def %s" % [result.get("leader_att",""), result.get("leader_def","")]
+	vb.add_child(leaders)
+	var factors := Label.new()
+	factors.text = "Key factors: %s" % ", ".join(result.get("key_factors", []))
+	vb.add_child(factors)
+	var mods := Label.new()
+	mods.text = "Major modifiers: %s" % ", ".join(result.get("modifiers_detail", result.get("key_factors",[])))
+	vb.add_child(mods)
+	var cas := Label.new()
+	cas.text = "Casualties: Att %s vs Def %s" % [result.get("attacker_casualties","?"), result.get("defender_casualties","?")]
+	vb.add_child(cas)
+	var outc := Label.new()
+	outc.text = "Outcome: " + str(result.get("outcome", "Battle resolved."))
+	outc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(outc)
+	var note := Label.new()
+	note.text = "(Full replayable log / unit combat histories available in Formation/Leader inspectors. Balance: these are the biggest impact items.)"
+	vb.add_child(note)
+	var close := Button.new()
+	close.text = "Close AAR"
+	close.pressed.connect(win.queue_free)
+	vb.add_child(close)
+	get_tree().root.add_child(win)
+	win.popup_centered()
+	print("[AAR PANEL] Full battle AAR shown for %s" % result.get("target_province_id", -1))
