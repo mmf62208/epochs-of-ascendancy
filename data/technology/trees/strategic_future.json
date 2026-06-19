@@ -105,7 +105,8 @@
       "short_effect": "Megaproject: orbital yards & faster production",
       "flavor": "Zero-g assembly lines for frigates and strategic lift.",
       "icon": "res://assets/graphics/icons/space/space_station_shipyard.png"
-    }
+    },
+    "icon": "res://assets/graphics/icons/tech/orbital_strike.png"
   },
   "agi_battle_management": {
     "id": "agi_battle_management",
@@ -370,7 +371,8 @@
       "icon": "res://assets/graphics/icons/space_race/space_station.png",
       "short_effect": "Orbital station for long term ops",
       "flavor": "Skylab/Mir style - research and staging post in orbit."
-    }
+    },
+    "icon": "res://assets/graphics/icons/tech/special_forces.png"
   },
   "mars_landing": {
     "id": "mars_landing",
@@ -594,7 +596,8 @@
     "ui": {
       "short_effect": "Early AI for command and robotics",
       "flavor": "Pioneering AI for space and mech coordination."
-    }
+    },
+    "icon": "res://assets/graphics/icons/tech/ai_awakening.png"
   },
   "satellite_network": {
     "id": "satellite_network",
@@ -758,7 +761,8 @@
       "theft_target": true,
       "sabotage_delay_days": 90,
       "intel_domain": "technology"
-    }
+    },
+    "icon": "res://assets/graphics/icons/tech/orbital_strike.png"
   },
   "nuclear_thermal_engine": {
     "id": "nuclear_thermal_engine",
@@ -1698,7 +1702,8 @@
       "short_effect": "Variable setting energy weapons and smart torpedoes for ships/ground. Precise, scalable lethality.",
       "flavor": "Trek phasers (stun to vaporize) + photon/quantum torpedoes. After missiles/lasers. Trade-off: power hog, heat management, overkill ethics, requires mature shields/scanners first, insane R&D cost.",
       "icon": "res://assets/graphics/icons/tech/phaser_torpedo_combat_64.png"
-    }
+    },
+    "icon": "res://assets/graphics/icons/tech/guided_munitions.png"
   },
   "space_design_basic": {
     "id": "space_design_basic",

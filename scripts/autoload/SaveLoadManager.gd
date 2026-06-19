@@ -546,6 +546,7 @@ func _dict_to_agent(d: Dictionary) -> Agent:
 	a.assigned_target_tech_id = str(d.get("assigned_target_tech_id", ""))
 	a.birth_year = int(d.get("birth_year", 1900))
 	a.start_year = int(d.get("start_year", 1930))
+	a.portrait_path = str(d.get("portrait_path", ""))
 
 	# Runtime
 	a.compromised_until_year = int(d.get("compromised_until_year", 0))

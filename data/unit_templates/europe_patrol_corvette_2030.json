@@ -64,5 +64,6 @@
     "aluminum": 4.84,
     "fuel": 7.26,
     "electronics": 1.94
-  }
+  },
+  "icon": "res://assets/graphics/icons/space/ship_corvette.png"
 }

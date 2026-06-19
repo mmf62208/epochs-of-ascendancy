@@ -47,6 +47,14 @@ static func generate_agent(country_tag: String, year: int = 1936) -> Agent:
 	agent.current_mission_id = ""
 	agent.mission_progress = 0.0
 
+	# Wire new art-batch agent portraits
+	agent_portraits = [
+		"res://assets/graphics/portraits/agents/double_agent.png",
+		"res://assets/graphics/portraits/agents/elite_spy.png",
+		"res://assets/graphics/portraits/agents/visionary_scientist.png",
+	]
+	agent.portrait_path = agent_portraits[randi() % agent_portraits.size()]
+
 	return agent
 
 

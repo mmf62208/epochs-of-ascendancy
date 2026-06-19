@@ -335,7 +335,6 @@ func _validate_attack_source(
 		"attack_power": float(best.get("attack_power", 0.0)),
 	}
 
-
 func _pick_strongest_division(
 	divisions: Array[Dictionary],
 	from_prov: Province,
@@ -472,3 +471,230 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 	var title := "Province captured" if captured else "Battle: %s" % outcome
 	var body := "%s vs %s at %s" % [attacker, defender, target_name if not target_name.is_empty() else str(pid)]
 	LeaderEventUI.post_news(title, body, "combat")
+
+
+## === HISTORICAL + MAIN-LOOP EXTENSIONS (for combat testing vs real history, 50T AI, naval) ===
+## Pragmatic additions to support direct OOB setup for WWI/WWII battles and referenced calls in harness/docs.
+## These enable recreating Marne/Verdun (attrition), Stalingrad (urban winter supply), Midway (naval air), D-Day (amphib).
+
+func execute_chain_assault_or_flank(attacker_tag: String, initial_target: int, staging_from: int = -1, max_depth: int = 2) -> Array:
+	"""Chain/flank support for multi-province ops and AI (historical flanking like Manstein or D-Day lodgement expansion)."""
+	var results: Array = []
+	var current_from := staging_from
+	var target := initial_target
+	for d in range(max(1, max_depth)):
+		var can := can_assault_province(attacker_tag, target, current_from)
+		if not bool(can.get("ok", false)):
+			break
+		var res := execute_province_assault(attacker_tag, target, current_from)
+		results.append(res)
+		if not bool(res.get("success", false)):
+			break
+		var rdict := res.get("result", {}) if res.has("result") and typeof(res.get("result",{})) == TYPE_DICTIONARY else res
+		if bool(rdict.get("province_control_change", false)):
+			current_from = target
+			# Flank/chain: pick next adjacent enemy if possible (for historical deep battle or exploitation)
+			if typeof(MapManager) != TYPE_NIL:
+				var adjs := MapManager.get_adjacent_provinces(target)
+				var found_next := false
+				for aidv in adjs:
+					var aid := int(aidv)
+					var ap: Province = MapManager.get_province(aid)
+					if ap != null and not ap.is_sea and ap.owner_tag != "" and ap.owner_tag != attacker_tag:
+						target = aid
+						found_next = true
+						break
+				if not found_next:
+					break  # no easy flank
+		else:
+			break
+	return results
+
+func simulate_daily_ai_combat() -> void:
+	"""Main-loop autonomous AI combat for 50+ turn integrated playtests (promoted from harness; scored on supply/infra/low-org + weather + chain)."""
+	# Prefer DebugOverlay for full scored logic (weather/geo aware); fallback simple.
+	var dbg := get_node_or_null("/root/DebugOverlay")
+	if dbg != null and dbg.has_method("_simulate_ai_combat_turn"):
+		dbg.call("_simulate_ai_combat_turn")
+		print("[BM DAILY AI] delegated to DebugOverlay _simulate (full scoring + chain + weather).")
+		return
+	# Fallback direct (for pure BM headless without UI)
+	print("[BM DAILY AI] fallback simple AI assaults (limited). Extend via TestRunner historical harness for full OOB realism.")
+	var mm := get_node_or_null("/root/MapManager")
+	if mm == null or not mm.has_method("get_provinces_by_owner"):
+		return
+	var ai_tags := ["GER", "SOV", "JAP", "ITA"]
+	for tag in ai_tags:
+		var owned: Array = mm.call("get_provinces_by_owner", tag)
+		if owned.size() < 1: continue
+		var fromp := int(owned[0])
+		var adjs := mm.call("get_adjacent_provinces", fromp)
+		for aidv in adjs:
+			var aid := int(aidv)
+			var p: Province = mm.call("get_province", aid) if mm.has_method("get_province") else null
+			if p == null or p.owner_tag == tag or p.owner_tag == "": continue
+			var can: Dictionary = can_assault_province(tag, aid, fromp)
+			if bool(can.get("ok", false)):
+				var cres := execute_chain_assault_or_flank(tag, aid, fromp, 1)
+				print("[BM DAILY AI FALLBACK] %s chain assault on %d -> %d results" % [tag, aid, cres.size()])
+				break
+
+func execute_naval_engagement(attacker_tag: String, defender_tag: String, sea_province_id: int, intensity: float = 0.5, has_submarines: bool = false, bad_weather: bool = false) -> Dictionary:
+	"""Deeper naval integration stub for Midway 1942 etc. Uses registry air/ship presence, weather, subs for carrier/sub battles. Logs factors for AAR."""
+	var sm := get_node_or_null("/root/SupplyManager")
+	var att_air := 5.0
+	var def_air := 3.0
+	var att_naval := 12.0
+	var def_naval := 9.0
+	if sm != null and sm.has_method("get_combat_presence_registry"):
+		var reg := sm.call("get_combat_presence_registry")
+		if reg != null:
+			var rpt := reg.get_report(sea_province_id)
+			if rpt != null:
+				att_air = float(rpt.total_air(attacker_tag) if rpt.has_method("total_air") else att_air)
+				def_air = 0.0
+				if "air_by_tag" in rpt:
+					for tg in rpt.air_by_tag.keys():
+						if str(tg) != attacker_tag:
+							def_air += float(rpt.air_by_tag[tg])
+				att_naval = float(rpt.navy_total if "navy_total" in rpt else att_naval) * (1.4 if "JAP" in attacker_tag or "USA" in attacker_tag else 1.0)  # carrier weight
+				if "naval_strength" in rpt:
+					for tg in rpt.naval_strength.keys():
+						if str(tg) != attacker_tag:
+							def_naval += float(rpt.naval_strength[tg])
+	var w_mult := 0.65 if bad_weather else 1.0
+	var sub_mult := 1.25 if has_submarines else 1.0
+	var att_score := (att_air * 1.8 + att_naval * 0.9) * intensity * w_mult * sub_mult
+	var def_score := (def_air * 1.8 + def_naval * 0.9) * intensity * w_mult
+	var winner_tag := attacker_tag if att_score >= def_score else defender_tag
+	var margin := absf(att_score - def_score) / maxf(max(att_score, def_score), 1.0)
+	var result := {
+		"winner": winner_tag,
+		"attacker_tag": attacker_tag,
+		"defender_tag": defender_tag,
+		"sea_province_id": sea_province_id,
+		"attacker_score": att_score,
+		"defender_score": def_score,
+		"air_ratio": att_air / maxf(def_air, 0.01),
+		"has_submarines": has_submarines,
+		"bad_weather": bad_weather,
+		"intensity": intensity,
+		"outcome": "major_victory" if margin > 0.25 else "minor_victory",
+		"key_factors": ["carrier_air_dominance" if att_air > def_air * 1.5 else "surface_gunnery", "submarine_ambush" if has_submarines else "no_sub_factor", "storm_degrades_air" if bad_weather else "clear_skies"],
+		"casualties": { "attacker": int(120 + randf() * 180), "defender": int(90 + randf() * 220) },  # planes + ships abstract
+		"notes": "Proxy naval/air for historical (Midway: US dive bombers + intel key vs IJN). Expand with full ship templates + task groups."
+	}
+	print("[BM NAVAL ENGAGEMENT] %s vs %s @sea%d | winner=%s att_score=%.1f def=%.1f airR=%.1f subs=%s storm=%s" % [
+		attacker_tag, defender_tag, sea_province_id, winner_tag, att_score, def_score, result["air_ratio"], has_submarines, bad_weather
+	])
+	# Attach to combat logs if formations involved (future)
+	return result
+
+func force_historical_oob_for_battle(battle_key: String, year: int = 1942, custom_pids: Dictionary = {}) -> Dictionary:
+	"""Force realistic OOB at representative provinces for history testing (called by TestRunner sims). Updates owners, deploys formations from templates, assigns historical leaders, seeds air/naval presence, sets weather proxy."""
+	print("[BM HIST OOB] Forcing OOB for battle=%s year=%d" % [battle_key, year])
+	if typeof(MapManager) == TYPE_NIL or typeof(SupplyManager) == TYPE_NIL or typeof(LeaderManager) == TYPE_NIL:
+		return {"ok": false, "reason": "Managers unavailable"}
+	var mm := MapManager
+	var sm := SupplyManager
+	var lm := LeaderManager
+
+	# Defaults / overrides via custom_pids e.g. {"staging": 3, "target": 4}
+	var staging := int(custom_pids.get("staging", 3))
+	var target := int(custom_pids.get("target", 4))
+	var sea := int(custom_pids.get("sea", 999))
+
+	var att_tag := "GER"
+	var def_tag := "FRA"
+	var att_divs := ["german_infantry_division_1943", "german_infantry_division_1943_mixed"]
+	var def_divs := ["us_infantry_div_ww2"]  # proxy; use FRA if templates have country filter
+	var air_att := 8.0
+	var air_def := 2.0
+	var use_subs := false
+	var stormy := false
+
+	match battle_key.to_lower():
+		"marne", "marne_1914":
+			att_tag = "GER"; def_tag = "FRA"
+			att_divs = ["german_infantry_division_1943_mixed", "german_infantry_division_1943"]
+			def_divs = ["us_infantry_div_ww2"]
+			air_att = 0.5; air_def = 0.2  # early air limited
+			# 1914 leaders proxy via 1918
+		"verdun", "verdun_1916":
+			att_tag = "GER"; def_tag = "FRA"
+			att_divs = ["german_infantry_division_1943_mixed"]
+			def_divs = ["us_infantry_div_ww2"]
+			air_att = 1.0; air_def = 0.8
+		"stalingrad", "stalingrad_1942":
+			att_tag = "GER"; def_tag = "SOV"
+			att_divs = ["german_infantry_division_1943_mixed", "german_infantry_division_1943"]
+			def_divs = ["us_infantry_div_ww2"]
+			air_att = 6.0; air_def = 4.0
+			staging = int(custom_pids.get("staging", 31)) # Volgograd proxy
+			target = int(custom_pids.get("target", 31))
+			stormy = true
+		"midway", "midway_1942":
+			att_tag = "JAP"; def_tag = "USA"
+			att_divs = []
+			def_divs = []
+			air_att = 15.0; air_def = 12.0
+			use_subs = true
+			sea = int(custom_pids.get("sea", 999))
+			staging = sea; target = sea
+		"dday", "d_day", "normandy", "overlord":
+			att_tag = "USA"; def_tag = "GER"
+			att_divs = ["us_infantry_div_ww2"]
+			def_divs = ["german_infantry_division_1943_mixed"]
+			air_att = 18.0; air_def = 3.0
+			# coastal from custom or default
+			staging = int(custom_pids.get("staging", 5)) # proxy coast/ENG
+			target = int(custom_pids.get("target", 4)) # Paris area coast proxy
+
+	# Force owners (attacker staging friendly, target enemy)
+	if mm.has_method("update_province_owner"):
+		mm.call("update_province_owner", staging, att_tag, att_tag, true)
+		mm.call("update_province_owner", target, def_tag, def_tag, true)
+		if sea != staging:
+			mm.call("update_province_owner", sea, "SEA", "SEA", true)  # neutral sea
+
+	# Deploy land forces (use div templates)
+	sm.call("ensure_division_formations_for_country", att_tag)
+	sm.call("ensure_division_formations_for_country", def_tag)
+	for d in att_divs:
+		sm.call("move_formation_to_province", d, staging, att_tag)
+	for d in def_divs:
+		sm.call("move_formation_to_province", d, target, def_tag)
+
+	# Air presence for preview/resolver CAS
+	sm.call("clear_force_registry") if sm.has_method("clear_force_registry") else null
+	var reg = sm.call("get_combat_presence_registry") if sm.has_method("get_combat_presence_registry") else null
+	if reg:
+		reg.add_air_presence(target, att_tag, air_att)
+		reg.add_air_presence(target, def_tag, air_def)
+		if battle_key.to_lower() in ["midway", "dday"]:
+			reg.add_naval_presence(sea, att_tag, 12.0 if att_tag=="USA" or att_tag=="JAP" else 8.0, false)
+			reg.add_naval_presence(sea, def_tag, 10.0 if def_tag=="USA" or def_tag=="JAP" else 7.0, use_subs)
+
+	# Historical leader assign (use available historical; match era loosely)
+	if lm.has_method("get_leaders_for_country"):
+		var att_leaders := lm.call("get_leaders_for_country", att_tag)
+		if att_leaders.size() > 0 and att_divs.size() > 0:
+			var lid := att_leaders[0].leader_id if "leader_id" in att_leaders[0] else ""
+			if lid != "" and lm.has_method("assign_leader_to_formation"):
+				lm.call("assign_leader_to_formation", lid, att_divs[0])
+		var def_leaders := lm.call("get_leaders_for_country", def_tag)
+		if def_leaders.size() > 0 and def_divs.size() > 0:
+			var dlid := def_leaders[0].leader_id if "leader_id" in def_leaders[0] else ""
+			if dlid != "" and lm.has_method("assign_leader_to_formation"):
+				lm.call("assign_leader_to_formation", dlid, def_divs[0])
+
+	# Weather proxy via Time or WM if settable
+	if stormy and typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("force_event_for_test"):
+		WeatherManager.call("force_event_for_test", target, "blizzard")  # or mud/rain for WWI
+
+	# Time set for leader/tech gating
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_current_year"):
+		TimeManager.call("set_current_year", year)
+
+	print("[BM HIST OOB] Deployed: %s@%d (%s divs + air %.1f) vs %s@%d (%s divs + air %.1f) sea=%d subs=%s storm=%s" % [att_tag, staging, att_divs, air_att, def_tag, target, def_divs, air_def, sea, use_subs, stormy])
+	return {"ok": true, "att_tag": att_tag, "def_tag": def_tag, "staging": staging, "target": target, "sea": sea, "year": year}

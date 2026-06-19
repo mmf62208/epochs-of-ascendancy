@@ -28,6 +28,8 @@ var assigned_province_id: int = 0    # Used when the agent is running a province
 @export var birth_year: int = 1900
 @export var start_year: int = 1930
 
+@export var portrait_path: String = ""  # res://assets/graphics/portraits/agents/xxx.png for UI (AgentAssignment, detail)
+
 var total_missions_completed: int = 0
 var successful_missions: int = 0
 

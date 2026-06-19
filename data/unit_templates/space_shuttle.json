@@ -51,5 +51,6 @@
     "aluminum": 11.55,
     "electronics": 9.24,
     "fuel": 4.62
-  }
+  },
+  "icon": "res://assets/graphics/icons/space/ship_carrier.png"
 }

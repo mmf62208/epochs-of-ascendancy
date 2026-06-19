@@ -31,7 +31,8 @@
     "ui": {
       "short_effect": "M1917 light tank family",
       "flavor": "First mass-produced armor for the American Expeditionary Forces."
-    }
+    },
+    "icon": "res://assets/graphics/icons/tech/special_forces.png"
   },
   "modern_mbt_program": {
     "id": "modern_mbt_program",
@@ -70,6 +71,7 @@
     "ui": {
       "short_effect": "M1A2 SEPv3+ main battle tank design",
       "flavor": "Composite armor, active protection, and networked fire control for peer conflict."
-    }
+    },
+    "icon": "res://assets/graphics/icons/tech/genetic_engineering.png"
   }
 }

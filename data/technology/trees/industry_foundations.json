@@ -1514,7 +1514,8 @@
       "short_effect": "On-demand printing of parts/weapons/structures; +flexibility, lower waste.",
       "flavor": "Layered 3D/additive. Enables rapid prototyping, field repairs, complex geometries. Trade-off: slower for mass bulk items vs traditional lines, material purity critical, IP theft risk via agents.",
       "icon": "res://assets/graphics/icons/tech/genetic_engineering_crops.png"
-    }
+    },
+    "icon": "res://assets/graphics/icons/tech/genetic_engineering.png"
   },
   "nanotech_fab_2020": {
     "id": "nanotech_fab_2020",
@@ -1559,7 +1560,8 @@
       "short_effect": "Molecular-level manufacturing; ultra-precise, efficient, enables advanced materials/armor/weapons.",
       "flavor": "Nanobots/self-assembling. Game-changer for custom high-perf gear, space habitats, bio-interfaces. Trade-off: extreme compute/power/rare resource need, ethics (grey goo fears, genetic crossover), slow initial ramp.",
       "icon": "res://assets/graphics/icons/tech/cloning_vat.png"
-    }
+    },
+    "icon": "res://assets/graphics/icons/tech/special_forces.png"
   },
   "consumer_electronics_1955": {
     "id": "consumer_electronics_1955",

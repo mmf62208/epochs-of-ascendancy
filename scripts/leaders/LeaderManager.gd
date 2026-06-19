@@ -102,13 +102,16 @@ const TRAINING_PATH_SWITCH_COST_PER_LEVEL := 150
 const HISTORICAL_LEADERS_1936_PATH := "res://data/leaders/historical_leaders_1936.json"
 const HISTORICAL_LEADERS_1918_PATH := "res://data/leaders/historical_leaders_1918.json"
 const HISTORICAL_LEADERS_2026_PATH := "res://data/leaders/historical_leaders_2026.json"
+const HISTORICAL_LEADERS_1910_PATH := HISTORICAL_LEADERS_1918_PATH  # reuse 1918 roster (year filter active leaders); create dedicated 1910.json for pre-war exclusives if needed
 const SCENARIO_LEADER_PATHS: Dictionary = {
 	"1918": HISTORICAL_LEADERS_1918_PATH,
 	"1936": HISTORICAL_LEADERS_1936_PATH,
 	"2026": HISTORICAL_LEADERS_2026_PATH,
+	"1910": HISTORICAL_LEADERS_1910_PATH,
 }
-## Earlier-era rosters merged forward; later files override same leader_id. 2026 is isolated.
+## Earlier-era rosters merged forward; later files override same leader_id. 2026 is isolated. 1910 reuses 1918 for continuity (many pre-1914 leaders active).
 const SCENARIO_LEADER_ROSTER_CHAIN: Dictionary = {
+	"1910": [HISTORICAL_LEADERS_1910_PATH],
 	"1918": [HISTORICAL_LEADERS_1918_PATH],
 	"1936": [HISTORICAL_LEADERS_1918_PATH, HISTORICAL_LEADERS_1936_PATH],
 	"2026": [HISTORICAL_LEADERS_2026_PATH],

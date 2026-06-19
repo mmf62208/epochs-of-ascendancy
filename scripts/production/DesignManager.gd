@@ -106,6 +106,29 @@ const SPACE_VISUAL_ARCHETYPES: Array[String] = [
 	"super_heavy",
 ]
 
+const SPACE_ICON_MAP: Dictionary = {
+	"satellite": "res://assets/graphics/icons/space/satellite_recon.png",
+	"space_station": "res://assets/graphics/icons/space/space_station_hab.png",
+	"spacecraft": "res://assets/graphics/icons/space/ship_expanse.png",
+	"corvette": "res://assets/graphics/icons/space/ship_corvette.png",
+	"carrier": "res://assets/graphics/icons/space/ship_carrier.png",
+	"cruiser": "res://assets/graphics/icons/space/ship_cruiser.png",
+	"destroyer": "res://assets/graphics/icons/space/ship_destroyer.png",
+}
+func get_space_icon_for_template(template: UnitTemplate, design_id: String = "") -> String:
+	var arch := str(template.visual_archetype if template else "").to_lower()
+	if arch in SPACE_ICON_MAP:
+		return SPACE_ICON_MAP[arch]
+	for key in SPACE_ICON_MAP:
+		if key in design_id.to_lower() or key in arch:
+			return SPACE_ICON_MAP[key]
+	# fallback new icons
+	if "sat" in design_id.to_lower() or "gps" in design_id.to_lower() or "starlink" in design_id.to_lower():
+		return "res://assets/graphics/icons/space/satellite_comms.png"
+	if "station" in design_id.to_lower() or "mir" in design_id.to_lower():
+		return "res://assets/graphics/icons/space/space_station_shipyard.png"
+	return "res://assets/graphics/icons/space/ship_corvette.png"
+
 ## country_tag (upper) -> design_id -> true
 var _used_designs: Dictionary = {}
 

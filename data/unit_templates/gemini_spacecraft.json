@@ -46,5 +46,6 @@
     "aluminum": 11.0,
     "electronics": 8.8,
     "fuel": 4.4
-  }
+  },
+  "icon": "res://assets/graphics/icons/space/ship_expanse.png"
 }
