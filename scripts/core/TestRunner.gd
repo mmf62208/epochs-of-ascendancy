@@ -1417,36 +1417,6 @@ func _run_continued_system_demos() -> void:
 	print("TestRunner: Air profile demo: range=", prof.get_effective_range(1000), " mod=", prof.get_mission_modifier())
 
 
-	# === AIR COMBAT DOMINANCE SIM (task requirement: heavy CAS vs balanced vs minimal vs ground) ===
-	print("=== AIR COMBAT DOMINANCE SIM: heavy CAS / balanced air sup / minimal vs ground ===")
-	var sm_test := get_node_or_null("/root/SupplyManager")
-	if sm_test and sm_test.has_method("clear_force_registry"):
-		sm_test.call("clear_force_registry")
-		var reg_test = sm_test.get("force_registry")
-		if reg_test:
-			# Scenario: province 101 battle, GER attacker vs FRA defender
-			# Minimal air (GER low, FRA some) -> none dominance
-			reg_test.add_air_presence(101, "GER", 1.5)
-			reg_test.add_air_presence(101, "FRA", 4.0)
-			if sm_test.has_method("refresh_intel_from_forces"):
-				sm_test.call("refresh_intel_from_forces")
-			var p_att := MapManager.get_province(100) if typeof(MapManager) != TYPE_NIL else null
-			var p_def := MapManager.get_province(101) if typeof(MapManager) != TYPE_NIL else null
-			if p_att and p_def and typeof(ProvinceInsight) != TYPE_NIL:
-				var prev := ProvinceInsight.get_battle_preview(p_att, p_def)
-				print("  MINIMAL air: ratio=%.2f dom=%s (expect none/partial, enemy air allows ops)" % [float(prev.get("air_power_ratio",0)), prev.get("air_dominance_level","?")])
-			# Heavy air sup for GER (many dedicated) -> full
-			reg_test.add_air_presence(101, "GER", 20.0)  # boost GER
-			if sm_test.has_method("refresh_intel_from_forces"):
-				sm_test.call("refresh_intel_from_forces")
-			if p_att and p_def and typeof(ProvinceInsight) != TYPE_NIL:
-				var prev2 := ProvinceInsight.get_battle_preview(p_att, p_def)
-				print("  HEAVY air sup: ratio=%.2f dom=%s (expect full, overwhelming suppresses at cost)" % [float(prev2.get("air_power_ratio",0)), prev2.get("air_dominance_level","?")])
-			# Balanced: CAS heavy (mission weight lower) vs pure sup
-			print("  BALANCED note: AIR_SUPERIORITY mission in formations weights ~1.9x in compute_air_power (via Profile); CAS 0.65x; use formations + registry for full test.")
-			print("  Also tests: Supply calc uses get_contested_airspace_cost_mult (disadv >2.5x, full sup ~1.6x drain); interdiction scales with ratio; Resolver CAS mult + night/weather.")
-	print("=== AIR SIM COMPLETE ===")
-
 func _resolve_player_tag() -> String:
 	var tag := player_tag
 	if loader == null:
@@ -1787,8 +1757,12 @@ func _run_headless_policy_settle_cycles() -> void:
 				mapr.call("debug_preview_combat_vs_adjacent")
 				print("  [ACTION] Preview combat vs adjacent (real Province + ProvinceInsight.get_battle_preview + BattleManager.can_assault). Settlement def bonus / getters / welfare drag / loyalty in logs.")
 				# Demo AAR panel for full details
-				if typeof(DebugOverlay) != TYPE_NIL and DebugOverlay.has_method("show_battle_aar"):
-					DebugOverlay.call_deferred("show_battle_aar", {"attacker_tag":"GER", "defender_tag":"FRA", "odds_attacker_win":58.0, "winner":"GER", "key_factors":["overwhelming_air_superiority","air_superiority","leader_impact","fort_mod"], "air_dominance_level":"full","air_power_ratio":4.5, "units_att":["Inf x3","Tank x1","CAS heavy"], "units_def":["Fort Inf x2"], "outcome":"Breakthrough, key factors visible in AAR. Overwhelming air superiority achieved - enemy grounded at high cost."})
+				var tree := Engine.get_main_loop() as SceneTree
+				if tree != null:
+					for node in tree.get_nodes_in_group("debug_overlay"):
+						if node.has_method("show_battle_aar"):
+							node.call_deferred("show_battle_aar", {"attacker_tag":"GER", "defender_tag":"FRA", "odds_attacker_win":58.0, "winner":"GER", "key_factors":["air_superiority","leader_impact","fort_mod"], "units_att":["Inf x3","Tank x1"], "units_def":["Fort Inf x2"], "outcome":"Breakthrough, key factors visible in AAR."})
+							break
 			# NEW actions
 			if mapr.has_method("debug_invest_infra_selected_province"):
 				mapr.call("debug_invest_infra_selected_province")
@@ -3300,24 +3274,4 @@ func _force_space_race_evidence_prints() -> void:
 	# 1918 alt in follow ons (Versailles)
 	if gd.has_method("process_peace_follow_ons"):
 		gd.call("process_peace_follow_ons", 1919)
-	
-	# === SPACE GROUND COMBAT SIM (inline for safety) ===
-	print("  [SPACE-GROUND SIM] resolver + NMM + GameData strike + unit specs (marine coastal, space+guided vs mass, space variant vs classic)")
-	if typeof(CombatResolver) != TYPE_NIL and typeof(GameData) != TYPE_NIL and typeof(NationalModifierManager) != TYPE_NIL:
-		var r := CombatResolver.new()
-		if GameData.has_method("apply_space_strike_bonus"):
-			GameData.apply_space_strike_bonus("TESTSPACE", 0.11)
-		var ne := {"effect_id":"spg_test", "source":"designer_space", "modifiers":{"space_strike_bonus":0.09, "orbital_guided_munitions":0.07}, "duration_months":6, "remaining_months":6}
-		NationalModifierManager.apply_national_effect("TESTSPACE", ne)
-		var nsp := NationalModifierManager.get_combat_modifiers("TESTSPACE")
-		var p1 := r.get_effective_combat_power("us_marine_division_ww2", "", "", "coast")
-		var p2 := r.get_effective_combat_power("german_infantry_division_1943_mixed", "", "", "coast")
-		print("    marine_coastal vs std: soft %.1f vs %.1f (marine amphib +edge expected)" % [float(p1.get("soft_attack",0)), float(p2.get("soft_attack",0))])
-		var p3 := r.get_effective_combat_power("german_infantry_division_1943_mixed", "", "", "plains")
-		var boosted := float(p3.get("soft_attack",1)) * (1.0 + float(nsp.get("space_strike_bonus",0.1))*1.3 )
-		print("    space+guided vs mass: base~%.1f -> boosted~%.1f (edge from orbital strikes/guided; +recon/precision)" % [float(p3.get("soft_attack",1)), boosted])
-		print("    [BALANCE] Space edge satisfying (10-25% power via designer sats/stations) but costly (supply for space_capable, not instant win; counters via shields). Marine favored coastal; space_capable enhanced by orbital vs classic. HoI4-style factors + space flavor.")
-		r.free()
-	print("  [SPACE-GROUND SIM] done")
-
 	print("[SPACE EVIDENCE FORCE] Done - check logs for [SPACE RACE EVENT], first_satellite/moon etc, protests, secret fleet, ethics space, Versailles Treaty alt, pillar/news, program choice, mech designer. Full 8+ milestones + alts integrated.")

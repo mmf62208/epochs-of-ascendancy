@@ -274,24 +274,6 @@ func get_resource_modifiers(country_tag: String) -> Dictionary:
 					result["resource_output_multiplier"] *= (1.0 + val)
 	return result
 
-## Returns resource-relevant modifiers (for discovery, output from agents/exploration).
-func get_resource_modifiers(country_tag: String) -> Dictionary:
-	var tag := country_tag.strip_edges().to_upper()
-	var result := {
-		"resource_output_multiplier": 1.0,
-	}
-	if tag.is_empty() or not country_modifiers.has(tag):
-		return result
-	for effect in country_modifiers[tag] as Array:
-		var mods: Dictionary = effect.get("modifiers", {})
-		for key in mods.keys():
-			var val := float(mods[key])
-			match key:
-				"resource_output", "resource_output_multiplier", "resource_production":
-					result["resource_output_multiplier"] *= (1.0 + val)
-	return result
-
-
 ## Returns combat-relevant modifiers for a country (army_org, defence, planning, etc.).
 func get_combat_modifiers(country_tag: String) -> Dictionary:
 	var tag := country_tag.strip_edges().to_upper()

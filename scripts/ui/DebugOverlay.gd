@@ -86,6 +86,7 @@ func _ready() -> void:
 		queue_free()
 		return
 	instance = self
+	add_to_group("debug_overlay")
 
 	name = "DebugOverlay"
 	visible = false
@@ -507,8 +508,8 @@ func _build_ui() -> void:
 	recruit_btn.text = "👥 Recruit from pop (GER: use manpower pool derived from pop*conscript; see strain/cohesion hit + reinforce feed)"
 	recruit_btn.pressed.connect(func():
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("recruit_units"):
-			var ok := GameData.recruit_units("GER", 800)
-			var rec := GameData.get_available_recruits("GER") if GameData.has_method("get_available_recruits") else 0
+			var ok: bool = GameData.recruit_units("GER", 800)
+			var rec: int = GameData.get_available_recruits("GER") if GameData.has_method("get_available_recruits") else 0
 			toast_map_debug("Recruit from pop for GER: success=%s, recruits left=%d. Check cohesion (strain), TopInfoBar/Policy recruits, F10 nation stats. Pool now drives reinforce/width." % [ok, rec])
 		else:
 			toast_map_debug("GameData.recruit_units not available.")
@@ -521,7 +522,7 @@ func _build_ui() -> void:
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("process_monthly_demographic_erosion"):
 			for i in 6:
 				GameData.process_monthly_demographic_erosion(1936, ((i % 12) + 1))
-			var ps := GameData.get_peace_state()
+			var ps: Dictionary = GameData.get_peace_state()
 			var pops := ""
 			for t in ["GER", "FRA", "USA"]:
 				var p := float(ps.get("population", {}).get(t, 0))
@@ -761,7 +762,7 @@ func _build_ui() -> void:
 				var stock := ProductionManager.get_country_equipment_stockpile(tag) if ProductionManager.has_method("get_country_equipment_stockpile") else {}
 				var pop := 0.0
 				if typeof(GameData) != TYPE_NIL:
-					var ps := GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
+					var ps: Dictionary = GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
 					pop = float(ps.get("population", {}).get(tag, 0))
 				lines.append("%s: pop=%.1fM, stock=%d, forms=%d" % [tag, pop/1e6, stock.size(), fcnt])
 		toast_map_debug("Nation overview (scenario data + runtime): " + (", ".join(lines) if lines.size()>0 else "none"))

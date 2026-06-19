@@ -174,8 +174,8 @@ func _on_minimap_input(event: InputEvent) -> void:
 		var local: Vector2 = _draw_area.get_local_mouse_position()
 		var r := _draw_area.get_rect()
 		var xf := _minimap_transform(r)
-		var wx := (local.x - xf["ox"]) / xf["s"]
-		var wy := (local.y - xf["oy"]) / xf["s"]
+		var wx: float = (local.x - float(xf["ox"])) / float(xf["s"])
+		var wy: float = (local.y - float(xf["oy"])) / float(xf["s"])
 		_camera.global_position = Vector2(wx, wy)
 		_draw_area.queue_redraw()
 	elif event is InputEventMouseMotion and (event as InputEventMouseMotion).button_mask & MOUSE_BUTTON_MASK_LEFT:

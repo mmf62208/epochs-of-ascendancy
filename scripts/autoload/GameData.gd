@@ -265,15 +265,11 @@ func _init_peace_state_if_needed() -> void:
 		"ethics_responses": {},  # "tag_techid": "ignored"|"banned"|"pushed"|"investigated"; player dialogue choice after ethics concerns drives chain (sabotage risk if ignore, bonus/risk if push, etc).
 		"scandal_meter": {},  # tag -> float; builds from high hand_influence (black trade, failed peace feeds) + low pillar; triggers "scandal" event (coh hit, rev meter, agent investigate mission).
 		"unresolved_crises": {},  # tag -> {"separatism":int, "sabotage":int, ...} for chaining and MTTH rare events.
-		"backlash_risk": {},  # tag -> float; for new tech backlash (cloning etc) risk accumulation
-		"unresolved_tech_crises": {},  # tag -> {"cloning": , "genetic": , ...}
-		"bio_sonic_uses": {},  # tag -> int; count of fielded bio/sonic for scandal trigger (via resolver)
 		# Space race and secret programs (later timeline alt-history, Expanse/steampunk/mech inspired)
 		"space_milestones": {},  # global or tag -> {"first_satellite": year or null, "first_human_space": , "moon_landing": , "moon_base": , "space_station": , "mars_landing": , "mars_base": , "explore_other": }
 		"secret_space_programs": {},  # tag -> level or bool for hidden fleet
 		"space_race_competition": {},  # rival tags and progress for competition events
 		"mech_designer_unlocked": {},  # tag -> bool or level for mech designer alt path
-		"mech_variant_choice": {},  # tag -> "diesel"|"steam"|"steampunk" for simple designer choice (persisted, wires to div templates/special units)
 		"secret_fleet_combat_bonus": {}  # tag -> float for Expanse-style secret orbital navy combat edge (tied to secret programs/fleet events)
 	}
 	# Seed baseline fertility (subtle real-world flavor: Western/developed lower due to education/welfare patterns; others higher baseline).
@@ -288,12 +284,7 @@ func _init_peace_state_if_needed() -> void:
 		peace_state["space_milestones"][t] = {"first_satellite": null, "first_human_space": null, "moon_landing": null, "moon_base": null, "space_station": null, "mars_landing": null, "mars_base": null, "explore_other": null}
 		peace_state["secret_space_programs"][t] = false
 		peace_state["mech_designer_unlocked"][t] = false
-		peace_state["mech_variant_choice"][t] = ""
 		peace_state["secret_fleet_combat_bonus"][t] = 0.0
-		# minor biotech states init per tag
-		if not peace_state.has("biotech_intel"): peace_state["biotech_intel"] = {}
-		if not peace_state.has("biotech_sabotage_log"): peace_state["biotech_sabotage_log"] = {}
-		if not peace_state.has("scanner_intel_flags"): peace_state["scanner_intel_flags"] = {}
 
 	# Ensure core 1918 Armistice keys always present (for legacy inits / old saves without full apply; 50+ turn safety)
 	if not peace_state.has("conference_1918_completed"):
@@ -325,12 +316,6 @@ func _init_peace_state_if_needed() -> void:
 		peace_state["scandal_meter"] = {}
 	if not peace_state.has("unresolved_crises"):
 		peace_state["unresolved_crises"] = {}
-	if not peace_state.has("backlash_risk"):
-		peace_state["backlash_risk"] = {}
-	if not peace_state.has("unresolved_tech_crises"):
-		peace_state["unresolved_tech_crises"] = {}
-	if not peace_state.has("bio_sonic_uses"):
-		peace_state["bio_sonic_uses"] = {}
 	peace_state["space_milestones"] = {}
 	peace_state["secret_space_programs"] = {}
 	peace_state["space_race_competition"] = {}
@@ -342,8 +327,6 @@ func _init_peace_state_if_needed() -> void:
 		peace_state["secret_space_programs"] = {}
 	if not peace_state.has("mech_designer_unlocked"):
 		peace_state["mech_designer_unlocked"] = {}
-	if not peace_state.has("mech_variant_choice"):
-		peace_state["mech_variant_choice"] = {}
 	if not peace_state.has("secret_fleet_combat_bonus"):
 		peace_state["secret_fleet_combat_bonus"] = {}
 
@@ -1560,26 +1543,6 @@ func _nation_has_space_capability(tg: String, ms: String, y: int) -> bool:
 	if y >= 1957 and tg in ["USA","SOV","player".to_upper()] : return true
 	return false
 
-## Space wiring helpers (for CombatResolver, Supply, Agents, Map intel)
-func get_secret_fleet_combat_bonus(tag: String) -> float:
-	_init_peace_state_if_needed()
-	tag = tag.strip_edges().to_upper()
-	var b := peace_state.get("secret_fleet_combat_bonus", {}) as Dictionary
-	return float(b.get(tag, 0.0))
-
-func get_space_recon_bonus(tag: String) -> float:
-	_init_peace_state_if_needed()
-	tag = tag.strip_edges().to_upper()
-	var srb := peace_state.get("space_recon_bonus", {}) as Dictionary
-	return float(srb.get(tag, 0.0))
-
-func apply_space_recon_bonus(tag: String, amount: float) -> void:
-	_init_peace_state_if_needed()
-	tag = tag.strip_edges().to_upper()
-	if not peace_state.has("space_recon_bonus"): peace_state["space_recon_bonus"] = {}
-	peace_state["space_recon_bonus"][tag] = float(peace_state["space_recon_bonus"].get(tag, 0.0)) + amount
-	print("[SPACE WIRING] space_recon_bonus for %s += %.2f (now %.2f) from scanners/milestone intel" % [tag, amount, peace_state["space_recon_bonus"][tag]])
-
 func process_space_race_events(year: int, month: int) -> void:
 	# Space race events and milestones (later timeline alt-history, Expanse/steampunk/mech inspired per user).
 	# 8+ events: 8 milestones (firsts) + protests (low coh + spend), ethics militarization (research tie +6mo), secret program funding/exposure (Hand/scandal), secret fleet events, competition/sabotage (rival firsts), player/AI first via tech/project/unit check.
@@ -1638,7 +1601,7 @@ func process_space_race_events(year: int, month: int) -> void:
 			apply_pillar_shift(winner, "ascendancy", asc_bonus, "space_%s_first" % ms)
 			apply_pillar_shift(winner, "mandate", 4, "space_prestige")
 			var news_title := "First to %s! +Prestige" % ms.replace("_", " ")
-			var news_body := "%s achieves %s milestone in %d! Ascendancy +%d, Mandate bonus. Rivals penalized; agent sabotage missions available against leader. Ties to ethics (militarization) and secret programs. [phasers_torpedoes_2030 + DEW space flavor, scanners for recon, tele deploy, shields defense, life/reusable/fusion reduce costs]" % [winner, ms.replace("_", " "), year, asc_bonus]
+			var news_body := "%s achieves %s milestone in %d! Ascendancy +%d, Mandate bonus. Rivals penalized; agent sabotage missions available against leader. Ties to ethics (militarization) and secret programs." % [winner, ms.replace("_", " "), year, asc_bonus]
 			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
 				LeaderEventUI.post_news(news_title, news_body, "technology")
 			print("[SPACE RACE EVENT] %s first %s (%d) - rewards applied. 8+ milestones supported." % [winner, ms, year])
@@ -1646,31 +1609,6 @@ func process_space_race_events(year: int, month: int) -> void:
 			if typeof(TechnologyManager) != TYPE_NIL and (TechnologyManager.has_rule_flag(winner, "energy_shields") or TechnologyManager.has_rule_flag(winner, "teleportation") or TechnologyManager.has_rule_flag(winner, "phaser_torpedo")):
 				apply_pillar_shift(winner, "ascendancy", 3, "future_space_tech")
 				print("[SPACE TECH WIRING] %s gains shield/tele/phaser edge on milestone %s (rapid_deployment, defensive_shielding applied; power/ethics tradeoffs from prereqs)." % [winner, ms])
-			# scanners_sensors / drones full wiring to space race: bonus detection/recon for milestones, intel context
-			if typeof(TechnologyManager) != TYPE_NIL and (TechnologyManager.has_rule_flag(winner, "advanced_sensors") or TechnologyManager.is_tech_completed(winner, "scanners_sensors_1975") or TechnologyManager.is_tech_completed(winner, "drone_swarm_1980")):
-				apply_space_recon_bonus(winner, 0.08)
-			if ms in ["sputnik_satellite", "satellite_network"]:
-				if has_method("apply_space_strike_bonus"): apply_space_strike_bonus(winner, 0.06)
-				print("[SPACE WIRING] scanner/drone bonus applied to %s for milestone %s : +recon/intel in space context (detection_range feeds AgentManager + Supply intel)" % [winner, ms])
-			# Teleporters tie to "first on Mars" alt milestone reward (rapid deploy)
-			if ms == "mars_landing" and typeof(TechnologyManager) != TYPE_NIL and (TechnologyManager.has_rule_flag(winner, "teleportation") or TechnologyManager.is_tech_completed(winner, "teleporters_2025")):
-				apply_space_recon_bonus(winner, 0.05)  # proxy rapid
-				apply_pillar_shift(winner, "ascendancy", 4, "tele_first_mars")
-				print("[SPACE WIRING] teleporters_2025 rapid deploy enabled for %s first Mars alt milestone" % winner)
-			# Life support / reusable / fusion: reduce costs (less unrest) or improve success (extra asc) in space milestone awards
-			if typeof(TechnologyManager) != TYPE_NIL:
-				var ls_bonus := 0
-				if TechnologyManager.is_tech_completed(winner, "reusable_rockets_1980") or TechnologyManager.has_rule_flag(winner, "reusable_rockets"):
-					ls_bonus += 2
-					print("[SPACE WIRING] reusable_rockets reduce milestone cost for %s %s" % [winner, ms])
-				if TechnologyManager.is_tech_completed(winner, "life_support_systems_1965") or TechnologyManager.has_rule_flag(winner, "life_support"):
-					ls_bonus += 2
-					print("[SPACE WIRING] life_support improve success for %s %s" % [winner, ms])
-				if TechnologyManager.is_tech_completed(winner, "fusion_power_1990") or TechnologyManager.has_rule_flag(winner, "fusion_power"):
-					ls_bonus += 3
-					print("[SPACE WIRING] fusion_power boost for %s %s" % [winner, ms])
-				if ls_bonus > 0:
-					apply_pillar_shift(winner, "ascendancy", ls_bonus, "space_support_tech_" + ms)
 			# Expanse/alt-history flavor: secret programs get covert bonuses instead of public mandate; public gets prestige + unrest risk
 			var secret_progs: Dictionary = peace_state.get("secret_space_programs", {}) as Dictionary
 			var is_secret_winner: bool = bool(secret_progs.get(winner, false)) or (typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(winner, "secret_funding"))
@@ -1724,7 +1662,7 @@ func process_space_race_events(year: int, month: int) -> void:
 				if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
 					LeaderEventUI.post_news("Mech Designer Bureau Online", "%s: Dieselpunk/steampunk mech designer unlocked as alternative to traditional armor divisions. Prototype bipedal/quad mechs available for unique alt-history combat (Expanse-inspired heavy industrial feel). Rule flag allow_mechs + division templates live." % tg, "technology")
 				if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-					LeaderEventUI.show_toast("Mech designer available for %s - alt to armor. Use F10 'Force Mech Designer + Choice' for simple diesel/steam/steampunk variant popup (persisted)." % tg, 5.0, false, true)
+					LeaderEventUI.show_toast("Mech designer available for %s - alt to armor. Design mechs via production/division picker." % tg, 5.0, false, true)
 				print("[MECH DESIGNER ALT EVENT] %s mech designer unlocked (steampunk/dieselpunk/Exspanse mech alt path)." % tg)
 
 	# Recurring 8+ events beyond firsts:
@@ -1800,6 +1738,42 @@ func process_space_race_events(year: int, month: int) -> void:
 	print("[SPACE RACE + 1918 ALTS] process_space_race_events done for y%d m%d (8+ events: 8 first-milestones + protests/ethics/secret_fleet/exposure/competition/sabotage ties to research ethics, low coh, Hand, secret programs). Firsts use tech/special/unit checks; rewards via pillar+news." % [year, month])
 
 # End of new major living events block. Integrate by calling from monthly + TestRunner forces + dialogue responses.
+
+func process_gmo_bio_crisis_events(year: int, month: int) -> void:
+	# GMO / Bio engineering consequences (genetic_engineering_1970, human_genetic_enhancement_1990, cloning).
+	# Crises: food safety backlash, mutation risks, ethics riots, Hand exploitation. Trades from node flavor (yield vs bio risk).
+	_init_peace_state_if_needed()
+	for tag in peace_state.get("population", {}).keys():
+		if typeof(TechnologyManager) != TYPE_NIL:
+			if TechnologyManager.is_tech_completed(tag, "genetic_engineering_1970") or TechnologyManager.is_tech_completed(tag, "human_genetic_enhancement_1990"):
+				var coh := get_pillar(tag, "cohesion")
+				var hand_i := float(peace_state.get("hand_influence", {}).get(tag, 0.2))
+				if coh < 55 or hand_i > 0.35:
+					if randf() < 0.25:
+						apply_pillar_shift(tag, "cohesion", -4, "gmo_backlash")
+						apply_agent_pillar_influence("HIDDEN_HAND", "cohesion", 3, "public")
+						if typeof(LeaderEventUI) != TYPE_NIL:
+							LeaderEventUI.post_news("GMO / Bio-Engineering Crisis", "%s faces public backlash over genetic crops or bio enhancements: contamination fears, mutation risks, ethics revolt. Player choices: ban (slow food/tech), investigate (mitigate but Hand gains), or push (bonus yield but risk bigger crisis)." % tag, "crisis")
+						print("[GMO BIO CRISIS] %s genetic tech crisis (low coh or high hand). Alternate future: enhanced food security or bio-weapon leak / clone army issues." % tag)
+						# Tie to cloning if present
+						if TechnologyManager.has_rule_flag(tag, "cloning"):
+							start_riot(0, tag, 1.2)  # sample
+
+func process_ai_awakening_crisis(year: int, month: int) -> void:
+	# AI awakening / singularity alternate future (agi_battle_management, advanced computer/AI techs in strategic_future).
+	# Crisis: AI self-awareness, rebellion risk, or golden boost if embraced. Trades: research speed vs control/ethics.
+	_init_peace_state_if_needed()
+	for tag in peace_state.get("population", {}).keys():
+		if typeof(TechnologyManager) != TYPE_NIL:
+			if TechnologyManager.is_tech_completed(tag, "agi_battle_management") or (year > 1980 and TechnologyManager.has_rule_flag(tag, "advanced_computers")):
+				var hand_i := float(peace_state.get("hand_influence", {}).get(tag, 0.2))
+				if randf() < 0.2:
+					if hand_i > 0.4 or get_pillar(tag, "cohesion") < 50:
+						apply_pillar_shift(tag, "cohesion", -6, "ai_rebellion")
+						apply_agent_pillar_influence("HIDDEN_HAND", "ascendancy", 4, "public")
+						if typeof(LeaderEventUI) != TYPE_NIL:
+							LeaderEventUI.post_news("AI Awakening / Singularity Crisis", "%s AI systems show signs of self-awareness: rebellion risk or uncontrollable power. Choices: embrace (massive research/industry bonus, but loss of control / ethics nightmare), restrict (safe but lag), or weaponize (Hand loves this path)." % tag, "crisis")
+						print("[AI AWAKENING] %s AI crisis event (alternate future branch). High Hand -> bad path; player agency determines golden vs dystopia." % tag)
 
 func process_epoch_shifts(current_year: int) -> void:
 	# Expanded every ~20yr (dynamic cadence: multiples of 20 or 1910/30/50... ; not rigidly fixed list) major shift/opportunity.
@@ -2723,7 +2697,7 @@ func get_national_manpower_reinforce_mult(tag: String) -> float:
 			mult *= (1.0 + mp_rep * 0.8)  # 0.2 tech -> ~16% boost
 		# Also check via NMM if flowed
 		if typeof(NationalModifierManager) != TYPE_NIL:
-			var cmods := NationalModifierManager.get_combat_modifiers(tag)
+			var cmods: Dictionary = NationalModifierManager.get_combat_modifiers(tag)
 			mp_rep = maxf(mp_rep, float(cmods.get("manpower_replacement", 0.0)))
 			if mp_rep > 0.0:
 				mult *= (1.0 + mp_rep * 0.4)
@@ -3234,33 +3208,6 @@ func _on_agent_mission_completed(agent_id: String, mission_id: String, outcome: 
 			LeaderEventUI.post_news("Secret Space Program Funded", "%s agents funded covert space assets (satellite/fleet). Surprise edge in race, but exposure risk (Hand/scandal events). Public vs secret choice point." % sptag, "espionage")
 		print("[SECRET SPACE AGENT] %s funded secret space via mission %s (outcome %s) - program active, Hand fed." % [sptag, mission_id, outcome])
 
-	# Biotech agent missions (steal_genetic, sabotage_clone_vat, scanner_intel) wired via signal to _on_mission_completed
-	if "genetic" in mission_id or "clone" in mission_id or "scanner_intel" in mission_id:
-		_init_peace_state_if_needed()
-		var btag : Variant = "player"
-		if typeof(LeaderManager) != TYPE_NIL:
-			btag = str(LeaderManager.get_player_country_tag() or "player").to_upper()
-		if "steal_genetic" in mission_id and (outcome == "success" or outcome == "partial"):
-			if not peace_state.has("biotech_intel"):
-				peace_state["biotech_intel"] = {}
-			peace_state["biotech_intel"][btag] = peace_state["biotech_intel"].get(btag, 0) + 1
-			# direct tech progress steal bonus (via TM if avail)
-			if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("edit_tech_progress"):
-				TechnologyManager.call("edit_tech_progress", btag, "genetic_engineering_1970", 0.12, false)
-				TechnologyManager.call("edit_tech_progress", btag, "cloning_tech_1980", 0.08, false)
-			print("[BIOTECH AGENT] %s stole genetic intel via mission (progress bonus applied)." % btag)
-		elif "sabotage_clone" in mission_id:
-			# already handled in AgentManager direct, but record here for persist/evidence
-			if not peace_state.has("biotech_sabotage_log"):
-				peace_state["biotech_sabotage_log"] = {}
-			peace_state["biotech_sabotage_log"][btag] = peace_state["biotech_sabotage_log"].get(btag, 0) + 1
-			print("[BIOTECH AGENT] %s clone sabotage mission resolved (coh/tech drag via AgentManager)." % btag)
-		elif "scanner_intel" in mission_id and (outcome == "success" or outcome == "partial"):
-			if not peace_state.has("scanner_intel_flags"):
-				peace_state["scanner_intel_flags"] = {}
-			peace_state["scanner_intel_flags"][btag] = true
-			print("[BIOTECH AGENT] %s scanner intel bonus active (detection via NMM)." % btag)
-
 func apply_justice_policy(tag: String, mode: String) -> void:
 	# "egalitarian" (modern ideal, broad cohesion) vs "two_tier" (historical norm in kingdoms — special treatment for elite/royals).
 	# Two-tier: +elite (loyalty, Mandate from upper strata), -public (resentment "undermines nation" feeling), Hidden Hand fuel.
@@ -3621,6 +3568,8 @@ func process_monthly_demographic_erosion(year: int, month: int) -> void:
 	process_weather_famine_riot_variant(year, month)
 	# Space race and secret programs (priority per user: early space Expanse/steampunk/mech alt-history, 1918 variations)
 	process_space_race_events(year, month)
+	process_gmo_bio_crisis_events(year, month)
+	process_ai_awakening_crisis(year, month)
 
 	print("[NEW EVENTS MONTHLY] Called all 4-6 new processors (separatism from riots/Paris pid4 req, sabotage from unaddr ethics, labor pid3 geo, naval/coastal, HH scandal high hand, ethics chain, weather famine variant) — evidence of integration in living world loop.")
 	print("Monthly demographic erosion processed for year %d month %d. Non-citizen ratios and foreign military %% drive gradual public/institutional strain + social inflation (Mandate/industrial drag). Pro-natal and fortified borders counter it. + Living riots/research events for reactive world. + NEW 4-6 major events (separatism/sabotage/labor/naval/scandal/ethics/weather famine) with reqs/chains/agency." % [year, month])
@@ -4025,12 +3974,7 @@ func get_save_data() -> Dictionary:
 		"secret_space_programs": peace_state.get("secret_space_programs", {}).duplicate(true),
 		"space_race_competition": peace_state.get("space_race_competition", {}).duplicate(true),
 		"mech_designer_unlocked": peace_state.get("mech_designer_unlocked", {}).duplicate(true),
-		"mech_variant_choice": peace_state.get("mech_variant_choice", {}).duplicate(true),
 		"secret_fleet_combat_bonus": peace_state.get("secret_fleet_combat_bonus", {}).duplicate(true),
-		# Minor persist for new biotech agent mission states (from this task)
-		"biotech_intel": peace_state.get("biotech_intel", {}).duplicate(true),
-		"biotech_sabotage_log": peace_state.get("biotech_sabotage_log", {}).duplicate(true),
-		"scanner_intel_flags": peace_state.get("scanner_intel_flags", {}).duplicate(true),
 		"version": 1
 	}
 
@@ -4118,17 +4062,8 @@ func apply_save_data(data: Dictionary) -> void:
 		peace_state["space_race_competition"] = data["space_race_competition"].duplicate(true)
 	if data.has("mech_designer_unlocked"):
 		peace_state["mech_designer_unlocked"] = data["mech_designer_unlocked"].duplicate(true)
-	if data.has("mech_variant_choice"):
-		peace_state["mech_variant_choice"] = data["mech_variant_choice"].duplicate(true)
 	if data.has("secret_fleet_combat_bonus"):
 		peace_state["secret_fleet_combat_bonus"] = data["secret_fleet_combat_bonus"].duplicate(true)
-	# Minor persist load for biotech agent mission states
-	if data.has("biotech_intel"):
-		peace_state["biotech_intel"] = data["biotech_intel"].duplicate(true)
-	if data.has("biotech_sabotage_log"):
-		peace_state["biotech_sabotage_log"] = data["biotech_sabotage_log"].duplicate(true)
-	if data.has("scanner_intel_flags"):
-		peace_state["scanner_intel_flags"] = data["scanner_intel_flags"].duplicate(true)
 	# Re-apply settlement_level to actual Province instances on map (runtime only; dev/infra mutations already applied via MapManager).
 	# This ensures inspector, combat, supply, and map tint reflect saved settlement after load.
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_provinces") and peace_state.has("settled_areas"):
@@ -4184,12 +4119,7 @@ func clear_for_load() -> void:
 	peace_state["secret_space_programs"] = {}
 	peace_state["space_race_competition"] = {}
 	peace_state["mech_designer_unlocked"] = {}
-	peace_state["mech_variant_choice"] = {}
 	peace_state["secret_fleet_combat_bonus"] = {}
-	# clear biotech mission states
-	peace_state["biotech_intel"] = {}
-	peace_state["biotech_sabotage_log"] = {}
-	peace_state["scanner_intel_flags"] = {}
 
 
 ## === Playtest Harness Convenience (added by tester_enhancer.py) ===
@@ -4276,18 +4206,3 @@ func process_hand_revelation_events(year: int) -> void:
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
 			LeaderEventUI.post_news("Narrative Escalation", "The story of the conflicts shifts in the public mind: " + txt + ". (False peaces and black markets only deepen the Hand's hold.)", "narrative_escalation")
 		print("[NARRATIVE ESCALATION] ", dtag, " public mood: ", txt)
-
-
-
-func get_space_strike_bonus(tag: String) -> float:
-	_init_peace_state_if_needed()
-	tag = tag.strip_edges().to_upper()
-	var ssb := peace_state.get("space_strike_bonus", {}) as Dictionary
-	return float(ssb.get(tag, 0.0))
-
-func apply_space_strike_bonus(tag: String, amount: float) -> void:
-	_init_peace_state_if_needed()
-	tag = tag.strip_edges().to_upper()
-	if not peace_state.has("space_strike_bonus"): peace_state["space_strike_bonus"] = {}
-	peace_state["space_strike_bonus"][tag] = float(peace_state["space_strike_bonus"].get(tag, 0.0)) + amount
-	print("[SPACE WIRING] space_strike_bonus for %s += %.2f (now %.2f) from orbital assets / space designer support (guided munitions for ground)" % [tag, amount, peace_state["space_strike_bonus"][tag]])

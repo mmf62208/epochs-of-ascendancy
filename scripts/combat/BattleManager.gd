@@ -182,8 +182,13 @@ func execute_province_assault(
 	battle_resolved.emit(result)
 
 	# Auto AAR for player if involved (accessible panel)
-	if typeof(DebugOverlay) != TYPE_NIL and (str(result.get("attacker_tag","")) == "player" or str(result.get("defender_tag","")) == "player"):
-		DebugOverlay.call_deferred("show_battle_aar", result)
+	if str(result.get("attacker_tag", "")) == "player" or str(result.get("defender_tag", "")) == "player":
+		var tree := Engine.get_main_loop() as SceneTree
+		if tree != null:
+			for node in tree.get_nodes_in_group("debug_overlay"):
+				if node.has_method("show_battle_aar"):
+					node.call_deferred("show_battle_aar", result)
+					break
 
 	# Space ground integration note for AAR/tips
 	if result.get("space_strike_bonus", 0.0) > 0.05:

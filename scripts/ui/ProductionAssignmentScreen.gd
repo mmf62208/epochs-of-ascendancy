@@ -91,7 +91,8 @@ func _apply_screen_theme() -> void:
 			get_tree().root.add_child(pop)
 			pop.set_player_tag("player")
 		)
-		top_row.add_child(space_btn)
+		var filter_bar: HBoxContainer = $MarginContainer/VBoxContainer/FilterBar
+		filter_bar.add_child(space_btn)
 	RetrowaveTheme.style_filter_option(status_filter)
 	RetrowaveTheme.style_filter_option(type_filter)
 	RetrowaveTheme.style_detail_panel(detail_panel)
