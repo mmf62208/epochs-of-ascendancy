@@ -39,7 +39,9 @@ var _rules: Dictionary = {}
 ## National resource pool used to pay refinement / shakedown project costs (steel, fuel, etc.).
 var national_stockpile: Dictionary = {}
 # === National equipment stockpile (finished designs / small arms / vehicles) ===
-var national_equipment_stockpile: Dictionary = {}  # equipment_id -> int amount
+var national_equipment_stockpile: Dictionary = {}  # equipment_id -> int amount (legacy/global fallback)
+var country_equipment_stockpiles: Dictionary = {}  # country_tag -> {equipment_id: int amount} for per-nation starting equipment, OOB stockpiles etc.
+var country_civilian_goods: Dictionary = {}  # country_tag -> int goods (civilian output from factories; drives happiness per roadmap)
 ## unit_id -> { equipment_template_id: count } currently assigned to the formation.
 var _unit_equipment_stock: Dictionary = {}
 
@@ -156,6 +158,67 @@ func create_line(line_id: String) -> ProductionLine:
 	line_registered.emit(line_id)
 	return line
 
+
+
+# === Layered production per-line API (minimal wiring for player/AI choice + tech rule_flag unlocks) ===
+func get_available_production_layers(country_tag: String) -> Array[String]:
+	var layers: Array[String] = ["mass"]
+	var tag := country_tag.strip_edges().to_upper()
+	if typeof(TechnologyManager) != TYPE_NIL:
+		if TechnologyManager.has_rule_flag(tag, "mass_production"):
+			if not "mass" in layers: layers.append("mass")
+		if TechnologyManager.has_rule_flag(tag, "automated_production"):
+			layers.append("automated")
+		if TechnologyManager.has_rule_flag(tag, "additive_manuf"):
+			layers.append("additive")
+		if TechnologyManager.has_rule_flag(tag, "nanotech"):
+			layers.append("nano")
+	return layers
+
+func is_production_layer_unlocked(country_tag: String, layer: String) -> bool:
+	var tag := country_tag.strip_edges().to_upper()
+	var l := layer.to_lower()
+	if l == "mass":
+		return true
+	if typeof(TechnologyManager) == TYPE_NIL:
+		return false
+	if l == "automated":
+		return TechnologyManager.has_rule_flag(tag, "automated_production")
+	if l == "additive":
+		return TechnologyManager.has_rule_flag(tag, "additive_manuf")
+	if l == "nano":
+		return TechnologyManager.has_rule_flag(tag, "nanotech")
+	return false
+
+func get_line_production_layer(line_id: String) -> String:
+	var line := get_line(line_id)
+	if line == null:
+		return "mass"
+	return line.get_current_layer()
+
+func set_line_production_layer(line_id: String, layer: String) -> Dictionary:
+	var line := get_line(line_id)
+	if line == null:
+		return {"success": false, "error": "unknown_line"}
+	var owner := _get_line_owner_tag(line)
+	if owner.is_empty():
+		# allow during init
+		pass
+	elif not is_production_layer_unlocked(owner, layer):
+		return {"success": false, "error": "layer_locked", "layer": layer, "required_flag": _layer_to_flag(layer)}
+	var res := line.set_production_layer(layer)
+	if res.get("success", false):
+		_refresh_line_modifiers(line)  # pick up NMM layer fold
+		invalidate_production_cache(owner)
+	return res
+
+func _layer_to_flag(layer: String) -> String:
+	match layer.to_lower():
+		"mass": return "mass_production"
+		"automated": return "automated_production"
+		"additive": return "additive_manuf"
+		"nano": return "nanotech"
+	return ""
 
 func remove_line(line_id: String) -> bool:
 	if not _lines.has(line_id):
@@ -395,10 +458,98 @@ func set_national_equipment_stockpile(stock: Dictionary) -> void:
 func get_national_equipment_stockpile() -> Dictionary:
 	return national_equipment_stockpile.duplicate(true)
 
+# === Per-country equipment stockpiles (for scenario-driven starting OOBs, equipment, factories output per nation) ===
+func set_country_equipment_stockpile(country_tag: String, stock: Dictionary) -> void:
+	var tag := country_tag.strip_edges().to_upper()
+	if stock.is_empty():
+		country_equipment_stockpiles.erase(tag)
+		return
+	country_equipment_stockpiles[tag] = stock.duplicate(true)
+
+func add_to_country_equipment_stockpile(country_tag: String, equipment_id: String, amount: int) -> void:
+	if amount <= 0 or equipment_id.is_empty() or country_tag.is_empty():
+		return
+	var tag := country_tag.strip_edges().to_upper()
+	if not country_equipment_stockpiles.has(tag):
+		country_equipment_stockpiles[tag] = {}
+	var s: Dictionary = country_equipment_stockpiles[tag]
+	if not s.has(equipment_id):
+		s[equipment_id] = 0
+	s[equipment_id] = int(s[equipment_id]) + amount
+	equipment_added_to_stockpile.emit(equipment_id, amount)
+
+func take_from_country_equipment_stockpile(country_tag: String, equipment_id: String, amount: int) -> int:
+	if amount <= 0 or equipment_id.is_empty() or country_tag.is_empty():
+		return 0
+	var tag := country_tag.strip_edges().to_upper()
+	if not country_equipment_stockpiles.has(tag):
+		return 0
+	var s: Dictionary = country_equipment_stockpiles[tag]
+	if not s.has(equipment_id):
+		return 0
+	var available := int(s[equipment_id])
+	var taken: int = min(available, amount)
+	s[equipment_id] = available - taken
+	if int(s[equipment_id]) <= 0:
+		s.erase(equipment_id)
+	equipment_taken_from_stockpile.emit(equipment_id, taken)
+	return taken
+
+# Civilian goods (roadmap): separate from mil equipment. Produced by setting line design to "civilian_consumer_goods".
+# On complete, effects happiness (via GameData) + national stock for potential UI/wiring to supply.
+func add_civilian_goods(country_tag: String, amount: int) -> void:
+	if amount <= 0 or country_tag.is_empty():
+		return
+	var tag := country_tag.strip_edges().to_upper()
+	if not country_civilian_goods.has(tag):
+		country_civilian_goods[tag] = 0
+	country_civilian_goods[tag] = int(country_civilian_goods[tag]) + amount
+	print("Production: added %d civilian_goods to %s (total %d). Happiness effects applied via GameData." % [amount, tag, country_civilian_goods[tag]])
+
+func get_civilian_goods(country_tag: String) -> int:
+	var tag := country_tag.strip_edges().to_upper()
+	return int(country_civilian_goods.get(tag, 0))
+
+func get_country_equipment_stockpile(country_tag: String) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	if not country_equipment_stockpiles.has(tag):
+		return {}
+	return country_equipment_stockpiles[tag].duplicate(true)
+
+func get_or_create_country_equipment_stockpile(country_tag: String) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	if not country_equipment_stockpiles.has(tag):
+		country_equipment_stockpiles[tag] = {}
+	return country_equipment_stockpiles[tag]
 
 func _on_production_completed(_line_id: String, design_id: String, count: int) -> void:
-	add_to_national_stockpile(design_id, count)
-	print("Production complete: %s × %d added to national stockpile" % [design_id, count])
+	var line := get_line(_line_id)
+	var owner_tag := ""
+	if line != null and line.factory_id > 0 and typeof(FactoryManager) != TYPE_NIL:
+		var fac: Variant = FactoryManager.get_factory(line.factory_id)
+		if fac != null and "owner_tag" in fac:
+			owner_tag = str(fac.owner_tag).strip_edges().to_upper()
+	if owner_tag != "":
+		if design_id.begins_with("civilian_"):
+			add_civilian_goods(owner_tag, count)
+			# Also feed GameData for pop happiness/mandate effects (civilian output -> pop)
+			if typeof(GameData) != TYPE_NIL and GameData.has_method("produce_civilian_goods"):
+				GameData.produce_civilian_goods(owner_tag, count)
+			print("Civilian production complete: %s × %d goods for %s (happiness/cohesion/mandate + local supply wiring hook)." % [design_id, count, owner_tag])
+		else:
+			add_to_country_equipment_stockpile(owner_tag, design_id, count)
+			print("Production complete: %s × %d added to %s stockpile" % [design_id, count, owner_tag])
+		# Wiring prod output -> prov supply (factories in controlled prov boost local depot for supply/combat/recovery)
+		if line != null and line.factory_id > 0 and typeof(FactoryManager) != TYPE_NIL:
+			var facv: Variant = FactoryManager.get_factory(line.factory_id)
+			if facv != null and "province_id" in facv:
+				var pid := int(facv.province_id)
+				if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("boost_depot_from_production"):
+					var boost_amt := count * (2 if design_id.begins_with("civilian_") else 1)
+					SupplyManager.call("boost_depot_from_production", pid, owner_tag, boost_amt)
+	else:
+		add_to_national_stockpile(design_id, count)
+		print("Production complete: %s × %d added to national stockpile" % [design_id, count])
 
 
 # === Equipment shortages (formation readiness / organization) ===
@@ -503,7 +654,7 @@ func _is_sustainment_equipment_id(equipment_id: String) -> bool:
 func _is_infantry_equipment_id(equipment_id: String) -> bool:
 	if GameData.design_data == null:
 		return equipment_id.begins_with("infantry_")
-	var template := GameData.design_data.get_infantry_equipment(equipment_id)
+	var template: UnitTemplate = GameData.design_data.get_infantry_equipment(equipment_id)
 	return template != null
 
 
@@ -586,12 +737,25 @@ func get_division_final_combat_stats(division_template_id: String, unit_id: Stri
 
 
 func request_equipment_for_unit(unit_id: String, equipment_id: String, amount: int) -> int:
-	var taken := take_from_national_stockpile(equipment_id, amount)
-	if taken > 0:
-		var current := get_unit_equipment_stock(unit_id)
-		current[equipment_id] = int(current.get(equipment_id, 0)) + taken
-		set_unit_equipment_stock(unit_id, current)
-	return taken
+	var country := ""
+	if typeof(LeaderManager) != TYPE_NIL:
+		var f: Formation = LeaderManager.get_formation(unit_id)
+		if f != null and f.country_tag != "":
+			country = f.country_tag
+	if country != "":
+		var taken := take_from_country_equipment_stockpile(country, equipment_id, amount)
+		if taken > 0:
+			var current := get_unit_equipment_stock(unit_id)
+			current[equipment_id] = int(current.get(equipment_id, 0)) + taken
+			set_unit_equipment_stock(unit_id, current)
+		return taken
+	else:
+		var taken := take_from_national_stockpile(equipment_id, amount)
+		if taken > 0:
+			var current := get_unit_equipment_stock(unit_id)
+			current[equipment_id] = int(current.get(equipment_id, 0)) + taken
+			set_unit_equipment_stock(unit_id, current)
+		return taken
 
 
 func set_unit_priority_reinforcement(unit_id: String, enabled: bool) -> void:
@@ -684,7 +848,7 @@ func get_line_resource_cost_for_days(line_id: String, days: float) -> Dictionary
 func get_design_resource_preview(design_id: String) -> Dictionary:
 	var daily_cost: Dictionary = {}
 	if GameData.design_data != null:
-		var template := GameData.design_data.get_template(design_id)
+		var template: UnitTemplate = GameData.design_data.get_template(design_id)
 		if template != null:
 			daily_cost = ProductionCostCalculator.resolve_daily_resource_cost(template)
 	return {
@@ -782,6 +946,16 @@ func evaluate_line_resources(line_id: String, days: float) -> Dictionary:
 		return {"output_multiplier": 1.0, "afforded": true, "fill_ratio": 1.0, "cost_paid": {}}
 
 	var needed := get_line_resource_cost_for_days(line_id, days)
+	# Apply agent resource discovery / output multiplier to reduce effective resource consumption (more efficient extraction/gathering)
+	var line_owner := ""
+	var l := get_line(line_id)
+	if l:
+		line_owner = l.owner_tag
+	var national_mods := _get_national_production_modifiers(line_owner, "") if line_owner else {"resource_output_multiplier": 1.0}
+	var res_eff := float(national_mods.get("resource_output_multiplier", 1.0))
+	if res_eff > 1.0:
+		for r in needed:
+			needed[r] = float(needed[r]) / res_eff  # lower consumption
 	if needed.is_empty():
 		apply_resource_shortage(line_id, 1.0, 1.0)
 		return {"output_multiplier": 1.0, "afforded": true, "fill_ratio": 1.0, "cost_paid": {}}
@@ -862,7 +1036,7 @@ func start_line_refinement(line_id: String, project_id: String, pay_upfront: boo
 	if not bool(eligibility.get("can_start", false)):
 		return {"success": false, "reason": str(eligibility.get("reason", "blocked"))}
 
-	var def := GameData.design_data.get_refinement_def(project_id)
+	var def: Dictionary = GameData.design_data.get_refinement_def(project_id)
 	var cost: Dictionary = def.get("cost", {}) if typeof(def.get("cost", {})) == TYPE_DICTIONARY else {}
 	if pay_upfront and not cost.is_empty() and not pay_cost(cost):
 		return {"success": false, "reason": "cannot_afford", "cost": cost}
@@ -892,7 +1066,7 @@ func _resolve_modifiers_for_line(line: ProductionLine) -> ProductionModifiers:
 	# === National Spirit + Temporary Modifier Integration (Option B) ===
 	var owner_tag := _get_line_owner_tag(line)
 	if not owner_tag.is_empty():
-		var national_mods := _get_national_production_modifiers(owner_tag)
+		var national_mods := _get_national_production_modifiers(owner_tag, line.get_current_layer() if line else "")
 		if national_mods.get("output_multiplier", 1.0) != 1.0:
 			mods.output_multiplier *= float(national_mods["output_multiplier"])
 		if national_mods.get("reliability_multiplier", 1.0) != 1.0:
@@ -901,8 +1075,12 @@ func _resolve_modifiers_for_line(line: ProductionLine) -> ProductionModifiers:
 			mods.retooling_days_multiplier *= float(national_mods["retooling_days_multiplier"])
 		if national_mods.get("cost_multiplier", 1.0) != 1.0:
 			mods.cost_multiplier *= float(national_mods["cost_multiplier"])
+		if national_mods.get("resource_output_multiplier", 1.0) != 1.0:
+			# Resource boost from agents can mitigate shortages or boost effective output
+			mods.output_multiplier *= float(national_mods["resource_output_multiplier"])
+			mods.resource_shortage_penalty = min(1.0, mods.resource_shortage_penalty * float(national_mods["resource_output_multiplier"])) if mods.has("resource_shortage_penalty") else 1.0
 
-	var template := line.get_current_template()
+	var template: UnitTemplate = line.get_current_template()
 	if template != null and not template.design_family.is_empty():
 		mods.design_family_output_bonus = _compute_family_output_bonus(template.design_family)
 		mods.design_family_output_bonus += _compute_cross_line_synergy(template.design_family)
@@ -942,7 +1120,7 @@ func _count_active_lines_for_family(family_id: String) -> int:
 	var count := 0
 	for line_id in _lines:
 		var line: ProductionLine = _lines[line_id]
-		var template := line.get_current_template()
+		var template: UnitTemplate = line.get_current_template()
 		if template != null and template.design_family == family_id:
 			count += 1
 	return count
@@ -959,7 +1137,7 @@ func _same_family_retool_discount(previous_template_id: String, new_template_id:
 
 
 func _template_design_family(template_id: String) -> String:
-	var template := GameData.design_data.get_template(template_id)
+	var template: UnitTemplate = GameData.design_data.get_template(template_id)
 	return template.design_family if template != null else ""
 
 
@@ -972,12 +1150,13 @@ func _get_line_owner_tag(line: ProductionLine) -> String:
 	return factory.owner_tag
 
 
-func _get_national_production_modifiers(country_tag: String) -> Dictionary:
+func _get_national_production_modifiers(country_tag: String, production_layer: String = "") -> Dictionary:
 	var result := {
 		"output_multiplier": 1.0,
 		"reliability_multiplier": 1.0,
 		"retooling_days_multiplier": 1.0,
 		"cost_multiplier": 1.0,
+		"resource_output_multiplier": 1.0,  # From agent exploration/discovery
 	}
 
 	if country_tag.is_empty():
@@ -993,11 +1172,32 @@ func _get_national_production_modifiers(country_tag: String) -> Dictionary:
 
 	# Temporary modifiers (including stability effects)
 	if typeof(NationalModifierManager) != TYPE_NIL:
-		var temp_mods := NationalModifierManager.get_production_modifiers(country_tag)
+		var temp_mods: Dictionary = NationalModifierManager.get_production_modifiers(country_tag)
 		result["output_multiplier"] *= float(temp_mods.get("output_multiplier", 1.0))
 		result["reliability_multiplier"] *= float(temp_mods.get("reliability_multiplier", 1.0))
 		result["retooling_days_multiplier"] *= float(temp_mods.get("retooling_days_multiplier", 1.0))
 		result["cost_multiplier"] *= float(temp_mods.get("cost_multiplier", 1.0))
+		result["resource_output_multiplier"] *= float(temp_mods.get("resource_output_multiplier", 1.0))
+
+	# Regional control bonuses (full control of industrial heartlands like Western Germany / Low Countries gives factory_output %)
+	# Wired as part of scenario connections + map integration (high value: makes securing key regions affect national production)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
+		var regional := MapManager.get_active_regional_control_bonuses(country_tag)
+		var f_out := float(regional.get("factory_output", 0.0))
+		if f_out > 0.0:
+			result["output_multiplier"] *= (1.0 + f_out)
+		# infrastructure_build_speed could wire to construction projects later
+
+	# Agent production boost from specialists assigned (e.g. industrial trait agents provide ongoing if "supporting" industry, via assignment or recent mission)
+	# This allows agents to boost production based on type (trait) without full mission duration.
+	if typeof(AgentManager) != TYPE_NIL:
+		for ag: Agent in AgentManager.get_agents_for_country(country_tag):
+			if ag.traits.has("industrial_specialist") or ag.traits.has("production_expert"):
+				result["output_multiplier"] *= 1.05  # small persistent from specialist agents
+				break
+			if ag.traits.has("resource_explorer") or ag.traits.has("prospector"):
+				result["resource_output_multiplier"] *= 1.05
+				break
 
 	return result
 
@@ -1008,10 +1208,10 @@ func _on_line_unit_completed(
 	_profile: ReliabilityProfile,
 	_line_id: String,
 ) -> void:
-	var template := GameData.design_data.get_template(template_id)
+	var template: UnitTemplate = GameData.design_data.get_template(template_id)
 	if template == null or template.design_family.is_empty():
 		return
-	var family_id := template.design_family
+	var family_id: String = template.design_family
 	var total := int(_family_units_produced.get(family_id, 0)) + 1
 	_family_units_produced[family_id] = total
 	family_experience_changed.emit(family_id, total)
@@ -1217,8 +1417,19 @@ func get_factory_summary(factory_id: int) -> Dictionary:
 		"assigned_lines": f.assigned_lines.size(),
 		"assigned_line_ids": f.assigned_lines.duplicate(),
 		"current_damage": f.current_damage,
+		"line_layers": _get_line_layers_for_factory(f),
 	}
 
+
+
+func _get_line_layers_for_factory(factory: Factory) -> Dictionary:
+	var res := {}
+	if factory == null: return res
+	for lid in factory.assigned_lines:
+		var ln := get_line(lid)
+		if ln:
+			res[lid] = ln.get_current_layer()
+	return res
 
 func get_country_production_overview(country_tag: String) -> Dictionary:
 	var factories := get_all_factories_for_country(country_tag)
@@ -1464,7 +1675,7 @@ func get_effective_daily_output(design_id: String) -> float:
 
 func get_design_production_info(design_id: String) -> Dictionary:
 	var factories := get_factories_producing(design_id)
-	var template := GameData.design_data.get_template(design_id) if GameData.design_data else null
+	var template: UnitTemplate = GameData.design_data.get_template(design_id) if GameData.design_data else null
 	var breakdown: Dictionary = (
 		template.get_production_cost_breakdown(GameData.design_data)
 		if template != null
@@ -1513,12 +1724,14 @@ func get_save_data() -> Dictionary:
 			"production_progress": line.production_progress,
 			"current_template_id": line.current_template_id,
 			"factory_id": line.factory_id,
+			"production_layer": line.current_production_layer if "current_production_layer" in line else "mass",
 		}
 
 	return {
 		"production_stance": production_stance,
 		"national_stockpile": national_stockpile.duplicate(true),
 		"national_equipment_stockpile": national_equipment_stockpile.duplicate(true),
+		"country_equipment_stockpiles": country_equipment_stockpiles.duplicate(true),
 		"unit_equipment_stock": _unit_equipment_stock.duplicate(true),
 		"active_modifiers": _active_modifiers.duplicate(true),
 		"lines": lines_data,
@@ -1532,6 +1745,8 @@ func apply_save_data(data: Dictionary) -> void:
 		national_stockpile = (data["national_stockpile"] as Dictionary).duplicate(true)
 	if data.has("national_equipment_stockpile"):
 		national_equipment_stockpile = (data["national_equipment_stockpile"] as Dictionary).duplicate(true)
+	if data.has("country_equipment_stockpiles"):
+		country_equipment_stockpiles = (data["country_equipment_stockpiles"] as Dictionary).duplicate(true)
 	if data.has("unit_equipment_stock"):
 		_unit_equipment_stock = (data["unit_equipment_stock"] as Dictionary).duplicate(true)
 	if data.has("active_modifiers"):
@@ -1560,6 +1775,11 @@ func apply_save_data(data: Dictionary) -> void:
 				# factory_id usually set at creation; restore if present
 				if ld.has("factory_id"):
 					line.factory_id = int(ld["factory_id"])
+				# persist per-line layer for layered prod
+				if ld.has("production_layer"):
+					line.current_production_layer = str(ld.get("production_layer", "mass"))
+				elif "current_production_layer" in line:
+					line.current_production_layer = "mass"
 
 	clear_all_caches()
 	print("ProductionManager: Save data applied (%d lines)" % (data.get("lines", {}).size() if data.has("lines") else 0))
@@ -1605,6 +1825,13 @@ func advance_production(days: float) -> void:
 
 		var concentration: float = get_concentration_bonus(line.design_id)
 		var slot_rush: float = get_concentrated_production_multiplier(line.factory_id, line.design_id)
+		# Pop labor (new leap forward): countries with larger population provide more labor, boosting factory output (ties pop policies/growth to production).
+		var pop_labor := 1.0
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
+			var ps: Dictionary = GameData.get_peace_state()
+			var p := float(ps.get("population", {}).get(factory.owner_tag, 0.0))
+			if p > 0:
+				pop_labor = clampf(1.0 + (p / 100000000.0) * 0.2, 1.0, 1.5)
 		var daily_points: float = (
 			_get_base_daily_points()
 			* base_efficiency
@@ -1612,6 +1839,7 @@ func advance_production(days: float) -> void:
 			* shortage_eff
 			* concentration
 			* slot_rush
+			* pop_labor
 			* days
 		)
 		line.add_progress(daily_points)
@@ -1632,7 +1860,7 @@ func get_line_progress_info(line_id: String) -> Dictionary:
 	var line := get_line(line_id)
 	if line == null:
 		return {}
-	var template := line.get_current_template()
+	var template: UnitTemplate = line.get_current_template()
 	var cost_breakdown: Dictionary = (
 		template.get_production_cost_breakdown(GameData.design_data, line.get_effective_loadout())
 		if template != null

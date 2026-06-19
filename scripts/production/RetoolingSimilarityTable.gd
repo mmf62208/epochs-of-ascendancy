@@ -49,7 +49,7 @@ static func map_production_category_to_group(category: String) -> String:
 static func category_group_for_design(design_id: String) -> String:
 	if design_id.is_empty() or GameData.design_data == null:
 		return "tank_afv"
-	var template := GameData.design_data.get_template(design_id)
+	var template: UnitTemplate = GameData.design_data.get_template(design_id)
 	if template == null:
 		return "tank_afv"
 	return map_production_category_to_group(template.get_inferred_production_category())

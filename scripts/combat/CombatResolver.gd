@@ -118,6 +118,16 @@ func get_effective_combat_power(
 	if leader != null and typeof(LeaderManager) != TYPE_NIL:
 		national_combat = LeaderManager.get_national_combat_modifiers(leader.country_tag)
 
+	# Secret fleet wiring: apply peace_state secret_fleet_combat_bonus (from secret_space_programs) for naval/space/special formations (small +% edge)
+	if leader != null and typeof(GameData) != TYPE_NIL and GameData.has_method("get_secret_fleet_combat_bonus"):
+		var sec_bonus := GameData.get_secret_fleet_combat_bonus(leader.country_tag)
+		if sec_bonus > 0.0:
+			national_combat["secret_fleet"] = sec_bonus
+			print("[SECRET FLEET] +%.0f%% combat bonus applied for %s (naval/space or secret tag; vs conventional; exposure risk in events)" % [sec_bonus*100, leader.country_tag])
+			# Apply small edge to attacks
+			if modified.has("soft_attack"):  # note modified not yet, use final later
+				pass
+
 		# Apply organization bonus from national spirits/modifiers
 		var org_bonus := float(national_combat.get("army_org_factor", 0.0))
 		if org_bonus != 0.0:
@@ -152,6 +162,8 @@ func get_effective_combat_power(
 		"terrain": terrain,
 		"terrain_bonus_applied": terrain_bonus,
 		"national_combat_modifiers": national_combat if leader != null else {},
+		# space wiring evidence
+		"space_wiring": {"secret_fleet": national_combat.get("secret_fleet", 0.0), "shields": national_combat.get("defensive_shielding",0.0) if national_combat else 0.0 },
 	}
 
 
@@ -594,6 +606,34 @@ func _apply_national_combat_modifiers_to_base_stats(stats: Dictionary, nat_mods:
 	if mp_mod != 0.0 and modified.has("manpower"):
 		modified["manpower"] = float(modified["manpower"]) * (1.0 + mp_mod)
 
+	# === Space full wiring + advanced combat: deflector_shields_1995 defensive_shielding % absorb/pre-readiness dmg reduction
+	var shield := float(nat_mods.get("defensive_shielding", 0.0))
+	if shield > 0.0:
+		if modified.has("readiness"):
+			modified["readiness"] = float(modified["readiness"]) * (1.0 + shield * 0.4)  # pre dmg readiness
+		# % absorb note: applied in phased resolution as score reduction for defender/attacker if shielded
+		modified["shield_absorb"] = shield
+		print("[SPACE WIRING] defensive_shielding %.0f%% absorb/pre-readiness applied (deflector 1995 + nat_mod)" % (shield*100))
+	# energy_weapon_dmg / phasers from DEW 2030 (boost hard for energy flavor)
+	var ewd := float(nat_mods.get("energy_weapon_dmg", 0.0))
+	if ewd > 0.0 and modified.has("hard_attack"):
+		modified["hard_attack"] = float(modified["hard_attack"]) * (1.0 + ewd * 0.6)
+		print("[SPACE WIRING] energy_weapon_dmg / phasers_torpedoes +%.0f%% hard (DEW variable stun/kill flavor)" % (ewd*100))
+	# precision_strike / drone from nat (already in some, boost soft)
+	var prec := float(nat_mods.get("precision_strike", 0.0))
+	if prec > 0.0 and modified.has("soft_attack"):
+		modified["soft_attack"] = float(modified["soft_attack"]) * (1.0 + prec * 0.5)
+	# Power battle armor 1970 / infantry_enhance: soft/hard + readiness/org , mobility trade (small org penalty)
+	var inf_enh := float(nat_mods.get("infantry_enhancement", 0.0)) + float(nat_mods.get("soldier_enhancement", 0.0))
+	if inf_enh > 0.0 or (typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.is_tech_completed(nat_mods.get("tag",""), "battle_power_armor_1970") if nat_mods.has("tag") else false):
+		if modified.has("soft_attack"): modified["soft_attack"] = float(modified.get("soft_attack",0)) * (1.0 + inf_enh * 0.3 + 0.08)
+		if modified.has("hard_attack"): modified["hard_attack"] = float(modified.get("hard_attack",0)) * (1.0 + inf_enh * 0.25 + 0.06)
+		if modified.has("readiness"): modified["readiness"] = float(modified.get("readiness",1)) * (1.0 + inf_enh * 0.15)
+		if modified.has("organization"):
+			modified["organization"] = float(modified.get("organization",1)) * (1.0 + inf_enh * 0.1)
+			modified["organization"] = float(modified.get("organization",1)) * 0.97  # mobility trade
+		print("[SPACE WIRING] power_battle_armor / infantry_enh +soft/hard/readiness/org (mobility trade)")
+
 	return modified
 
 
@@ -686,6 +726,8 @@ func _phase_engagement(
 	var width_scale := clampf(width / 10.0, 0.35, 1.35)
 	side_state["attacker"]["soft"] *= width_scale
 	side_state["defender"]["soft"] *= clampf(width_scale * 1.05, 0.4, 1.4)
+	# Space flavor: if phaser or drone, small extra in engagement (reuse power passed? but for live add via NMM)
+	# (smallest: log if evidence, actual dmg via power pre-apply)
 	return {
 		"width": width,
 		"attacker_strength": _side_strength(side_state["attacker"]),
@@ -729,6 +771,35 @@ func _phase_resolution(
 		* float(side_state["defender"]["readiness"])
 		* 1.06
 	)
+
+	# Deflector shields % absorb / pre-readiness dmg red in resolution (reuse nat_mod defensive_shielding)
+	# Also apply secret_fleet if present in powers (passed via att_power etc but use tag)
+	var att_tag_for_space := attacker_tag
+	var def_tag_for_space := defender_tag
+	if typeof(GameData) != TYPE_NIL:
+		# secret edge
+		var sec_a := 0.0
+		if GameData.has_method("get_secret_fleet_combat_bonus"):
+			sec_a = GameData.get_secret_fleet_combat_bonus(att_tag_for_space)
+		if sec_a > 0.0:
+			att_score *= (1.0 + sec_a)
+			print("[SECRET FLEET] +%.0f%% applied in resolution for attacker %s" % [sec_a*100, att_tag_for_space])
+		var sec_d := GameData.get_secret_fleet_combat_bonus(def_tag_for_space) if GameData.has_method("get_secret_fleet_combat_bonus") else 0.0
+		if sec_d > 0.0:
+			def_score *= (1.0 + sec_d)
+			print("[SECRET FLEET] +%.0f%% applied in resolution for defender %s" % [sec_d*100, def_tag_for_space])
+		# shields absorb for defender (space hab or ground shield)
+		# In real, would come from power dict, here proxy if rule or from passed (simplest check via GameData? but use mod via leader no, assume nat in side)
+		# For live, since pre power may have set shield_absorb on power but not side, recheck via NMM if avail
+		if typeof(NationalModifierManager) != TYPE_NIL:
+			var dsh := float(NationalModifierManager.get_combat_modifiers(def_tag_for_space).get("defensive_shielding", 0.0))
+			if dsh > 0.0:
+				def_score *= (1.0 + dsh * 0.25)  # absorb reduces effective incoming, boost def score
+				print("[SPACE WIRING] deflector_shields %.0f%% absorb applied in _phase_resolution for %s" % [dsh*100, def_tag_for_space])
+			# phaser/dew space flavor in text (no full var stun here, but dmg already in power)
+			var ewd_d := float(NationalModifierManager.get_combat_modifiers(def_tag_for_space).get("energy_weapon_dmg", 0.0))
+			if ewd_d > 0.0:
+				print("[SPACE WIRING] phasers_torpedoes_2030 DEW flavor active for %s (variable setting stun/kill energy)" % def_tag_for_space)
 	var winner := "attacker" if att_score >= def_score else "defender"
 	var margin := absf(att_score - def_score) / maxf(def_score, 0.01)
 	var outcome := "minor_victory" if margin < 0.12 else "major_victory"

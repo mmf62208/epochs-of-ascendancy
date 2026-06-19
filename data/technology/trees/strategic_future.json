@@ -11,7 +11,9 @@
     "era_min": 2038,
     "era_max": 2055,
     "epoch": "far_future",
-    "prerequisites": ["network_centric_study"],
+    "prerequisites": [
+      "network_centric_study"
+    ],
     "research": {
       "base_cost_days": 160,
       "category": "strategic",
@@ -19,7 +21,11 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "modifier", "stat": "reconnaissance", "value": 0.12 }
+      {
+        "type": "modifier",
+        "stat": "reconnaissance",
+        "value": 0.12
+      }
     ],
     "ui": {
       "short_effect": "+12% reconnaissance from quantum ISR",
@@ -38,7 +44,9 @@
     "era_min": 2042,
     "era_max": 2055,
     "epoch": "far_future",
-    "prerequisites": ["quantum_sensing"],
+    "prerequisites": [
+      "quantum_sensing"
+    ],
     "research": {
       "base_cost_days": 280,
       "category": "strategic",
@@ -46,8 +54,15 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "modifier", "stat": "factory_output", "value": 0.15 },
-      { "type": "rule_flag", "flag": "fusion_power_industry" }
+      {
+        "type": "modifier",
+        "stat": "factory_output",
+        "value": 0.15
+      },
+      {
+        "type": "rule_flag",
+        "flag": "fusion_power_industry"
+      }
     ],
     "ui": {
       "short_effect": "Megaproject: +15% factory output",
@@ -66,7 +81,9 @@
     "era_min": 2045,
     "era_max": 2055,
     "epoch": "far_future",
-    "prerequisites": ["fusion_grid"],
+    "prerequisites": [
+      "fusion_grid"
+    ],
     "research": {
       "base_cost_days": 320,
       "category": "strategic",
@@ -74,8 +91,15 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "rule_flag", "flag": "allow_orbital_shipyard_conversion" },
-      { "type": "modifier", "stat": "production_speed", "value": 0.1 }
+      {
+        "type": "rule_flag",
+        "flag": "allow_orbital_shipyard_conversion"
+      },
+      {
+        "type": "modifier",
+        "stat": "production_speed",
+        "value": 0.1
+      }
     ],
     "ui": {
       "short_effect": "Megaproject: orbital yards & faster production",
@@ -94,7 +118,9 @@
     "era_min": 2048,
     "era_max": 2055,
     "epoch": "far_future",
-    "prerequisites": ["orbital_shipyard_program"],
+    "prerequisites": [
+      "orbital_shipyard_program"
+    ],
     "research": {
       "base_cost_days": 360,
       "category": "strategic",
@@ -102,12 +128,1575 @@
       "repeatable": false
     },
     "unlocks": [
-      { "type": "doctrine_key", "key": "drone_warfare" },
-      { "type": "modifier", "stat": "initiative", "value": 2.0 }
+      {
+        "type": "doctrine_key",
+        "key": "drone_warfare"
+      },
+      {
+        "type": "modifier",
+        "stat": "initiative",
+        "value": 2.0
+      }
     ],
     "ui": {
       "short_effect": "Megaproject: Drone Warfare school + initiative",
       "flavor": "Autonomous swarms and machine-speed command eclipse human OODA loops."
+    }
+  },
+  "v2_rocket": {
+    "id": "v2_rocket",
+    "name": "V-2 Rocket Program",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 0,
+    "row": 5,
+    "tier": 1,
+    "era_min": 1943,
+    "era_max": 1955,
+    "epoch": "early_space",
+    "prerequisites": [
+      "rocketry_foundations"
+    ],
+    "research": {
+      "base_cost_days": 180,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "allow_ballistic_missiles"
+      },
+      {
+        "type": "modifier",
+        "stat": "reconnaissance",
+        "value": 0.05
+      }
+    ],
+    "ui": {
+      "icon": "res://assets/graphics/icons/space_race/steampunk_rocket.png",
+      "short_effect": "Unlocks early rockets, +5% recon",
+      "flavor": "Ballistic missiles open the door to space and long range strikes. Alt-history steampunk variants possible."
+    }
+  },
+  "sputnik_satellite": {
+    "id": "sputnik_satellite",
+    "name": "Sputnik Satellite",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 1,
+    "row": 5,
+    "tier": 2,
+    "era_min": 1955,
+    "era_max": 1965,
+    "epoch": "early_space",
+    "prerequisites": [
+      "v2_rocket"
+    ],
+    "research": {
+      "base_cost_days": 120,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "reconnaissance",
+        "value": 0.1
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_satellites"
+      }
+    ],
+    "ui": {
+      "icon": "res://assets/graphics/icons/space_race/first_spaceflight.png",
+      "short_effect": "First satellite milestone, +10% recon",
+      "flavor": "Be the first to orbit - massive prestige and space race ignition. Secret or public options."
+    }
+  },
+  "human_spaceflight": {
+    "id": "human_spaceflight",
+    "name": "Human Spaceflight",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 2,
+    "row": 5,
+    "tier": 3,
+    "era_min": 1960,
+    "era_max": 1970,
+    "epoch": "early_space",
+    "prerequisites": [
+      "sputnik_satellite"
+    ],
+    "research": {
+      "base_cost_days": 240,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.18,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "ascendancy",
+        "value": 5
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_manned_space"
+      }
+    ],
+    "ui": {
+      "icon": "res://assets/graphics/icons/space_race/first_spaceflight.png",
+      "short_effect": "Milestone: +5 Ascendancy, unlock manned space",
+      "flavor": "First humans in orbit - huge public or secret prestige. Expanse-style capsule feel."
+    }
+  },
+  "moon_landing": {
+    "id": "moon_landing",
+    "name": "Moon Landing",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 0,
+    "row": 6,
+    "tier": 4,
+    "era_min": 1965,
+    "era_max": 1975,
+    "epoch": "early_space",
+    "prerequisites": [
+      "human_spaceflight"
+    ],
+    "research": {
+      "base_cost_days": 300,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.2,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "ascendancy",
+        "value": 10
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_lunar_operations"
+      }
+    ],
+    "ui": {
+      "icon": "res://assets/graphics/icons/space_race/moon_landing.png",
+      "short_effect": "Major milestone: +10 Ascendancy, lunar ops",
+      "flavor": "One small step - massive global impact. First to land wins the race."
+    }
+  },
+  "moon_base": {
+    "id": "moon_base",
+    "name": "Moon Base",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 1,
+    "row": 6,
+    "tier": 5,
+    "era_min": 1970,
+    "era_max": 1985,
+    "epoch": "early_space",
+    "prerequisites": [
+      "moon_landing"
+    ],
+    "research": {
+      "base_cost_days": 400,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.22,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "industrial_base",
+        "value": 5
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_moon_base"
+      }
+    ],
+    "ui": {
+      "icon": "res://assets/graphics/icons/space_race/moon_base.png",
+      "short_effect": "Permanent moon presence, +5 industrial",
+      "flavor": "Establish humanity's first offworld foothold."
+    }
+  },
+  "space_station": {
+    "id": "space_station",
+    "name": "Space Station",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 2,
+    "row": 6,
+    "tier": 4,
+    "era_min": 1970,
+    "era_max": 1980,
+    "epoch": "early_space",
+    "prerequisites": [
+      "human_spaceflight"
+    ],
+    "research": {
+      "base_cost_days": 280,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.18,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "reconnaissance",
+        "value": 0.08
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_space_station"
+      }
+    ],
+    "ui": {
+      "icon": "res://assets/graphics/icons/space_race/space_station.png",
+      "short_effect": "Orbital station for long term ops",
+      "flavor": "Skylab/Mir style - research and staging post in orbit."
+    }
+  },
+  "mars_landing": {
+    "id": "mars_landing",
+    "name": "Mars Landing",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 0,
+    "row": 7,
+    "tier": 6,
+    "era_min": 1980,
+    "era_max": 1995,
+    "epoch": "early_space",
+    "prerequisites": [
+      "moon_base",
+      "space_station"
+    ],
+    "research": {
+      "base_cost_days": 500,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.25,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "ascendancy",
+        "value": 15
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_mars_operations"
+      }
+    ],
+    "ui": {
+      "icon": "res://assets/graphics/icons/space_race/mars_landing.png",
+      "short_effect": "Historic: +15 Ascendancy, Mars ops",
+      "flavor": "First boots on the Red Planet - the next giant leap."
+    }
+  },
+  "mars_base": {
+    "id": "mars_base",
+    "name": "Mars Base",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 1,
+    "row": 7,
+    "tier": 7,
+    "era_min": 1990,
+    "era_max": 2010,
+    "epoch": "early_space",
+    "prerequisites": [
+      "mars_landing"
+    ],
+    "research": {
+      "base_cost_days": 600,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.25,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "industrial_base",
+        "value": 8
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_mars_base"
+      }
+    ],
+    "ui": {
+      "short_effect": "Mars colony start, +8 industrial",
+      "flavor": "Permanent presence on Mars."
+    }
+  },
+  "mech_prototype": {
+    "id": "mech_prototype",
+    "name": "Mech Prototype",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 3,
+    "row": 5,
+    "tier": 3,
+    "era_min": 1945,
+    "era_max": 1960,
+    "epoch": "early_space",
+    "prerequisites": [
+      "v2_rocket"
+    ],
+    "research": {
+      "base_cost_days": 200,
+      "category": "land",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "allow_mechs"
+      },
+      {
+        "type": "modifier",
+        "stat": "combat_width",
+        "value": -0.05
+      }
+    ],
+    "ui": {
+      "short_effect": "Unlock mech units, -5% combat width",
+      "flavor": "Bipedal or quad mechs for alt-history warfare. Dieselpunk and Expanse inspired designs."
+    }
+  },
+  "dieselpunk_mech": {
+    "id": "dieselpunk_mech",
+    "name": "Dieselpunk Mech",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 4,
+    "row": 5,
+    "tier": 4,
+    "era_min": 1950,
+    "era_max": 1970,
+    "epoch": "early_space",
+    "prerequisites": [
+      "mech_prototype"
+    ],
+    "research": {
+      "base_cost_days": 250,
+      "category": "land",
+      "ahead_of_time_penalty_per_year": 0.18,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "allow_advanced_mechs"
+      },
+      {
+        "type": "modifier",
+        "stat": "org_recovery",
+        "value": 0.1
+      }
+    ],
+    "ui": {
+      "short_effect": "Advanced mechs with steampunk/dieselpunk flair",
+      "flavor": "Heavy industrial mechs for the alt-history battlefield."
+    }
+  },
+  "secret_space_program": {
+    "id": "secret_space_program",
+    "name": "Secret Space Program",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 2,
+    "row": 7,
+    "tier": 5,
+    "era_min": 1955,
+    "era_max": 1975,
+    "epoch": "early_space",
+    "prerequisites": [
+      "human_spaceflight"
+    ],
+    "research": {
+      "base_cost_days": 350,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.2,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "allow_secret_space_fleet"
+      },
+      {
+        "type": "modifier",
+        "stat": "ascendancy",
+        "value": 5
+      }
+    ],
+    "ui": {
+      "short_effect": "Secret space assets and navy, hidden prestige",
+      "flavor": "Develop hidden space fleet. Keep secret for surprise or go public for bonuses. Secret funding via black market."
+    }
+  },
+  "ai_research": {
+    "id": "ai_research",
+    "name": "AI Research",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 3,
+    "row": 6,
+    "tier": 4,
+    "era_min": 1960,
+    "era_max": 1980,
+    "epoch": "early_space",
+    "prerequisites": [
+      "human_spaceflight"
+    ],
+    "research": {
+      "base_cost_days": 280,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.2,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "initiative",
+        "value": 1.0
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_ai_battle_mgmt"
+      }
+    ],
+    "ui": {
+      "short_effect": "Early AI for command and robotics",
+      "flavor": "Pioneering AI for space and mech coordination."
+    }
+  },
+  "satellite_network": {
+    "id": "satellite_network",
+    "name": "Satellite Network",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 1,
+    "row": 7,
+    "tier": 4,
+    "era_min": 1965,
+    "era_max": 1980,
+    "epoch": "early_space",
+    "prerequisites": [
+      "sputnik_satellite"
+    ],
+    "research": {
+      "base_cost_days": 220,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "reconnaissance",
+        "value": 0.15
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_satellite_network"
+      }
+    ],
+    "ui": {
+      "short_effect": "Global satcom and ISR network",
+      "flavor": "Persistent eyes and ears from orbit."
+    }
+  },
+  "expanse_rocket": {
+    "id": "expanse_rocket",
+    "name": "Expanse Rocket Drive",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 3,
+    "row": 7,
+    "tier": 6,
+    "era_min": 1970,
+    "era_max": 1990,
+    "epoch": "early_space",
+    "prerequisites": [
+      "mars_landing"
+    ],
+    "research": {
+      "base_cost_days": 400,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.22,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "naval_speed",
+        "value": 0.2
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_expanse_style_drives"
+      }
+    ],
+    "ui": {
+      "short_effect": "Advanced drives for space combat and travel",
+      "flavor": "Expanse-inspired high efficiency chemical/fusion drives for the space navy."
+    }
+  },
+  "rocketry_foundations": {
+    "id": "rocketry_foundations",
+    "name": "Rocketry Foundations",
+    "domain": "space_equipment",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 0,
+    "row": 4,
+    "tier": 0,
+    "era_min": 1938,
+    "era_max": 1950,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "aircraft_industry_ii_1935"
+    ],
+    "research": {
+      "base_cost_days": 140,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "air_ground_attack",
+        "value": 0.05
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_rocket_prototypes"
+      }
+    ],
+    "ui": {
+      "short_effect": "Precursor rocketry for V2 and beyond; enables early missile tests",
+      "flavor": "1930s-40s solid/liquid fuel experiments, von Braun et al alt-history. Links air industry to space race. Dieselpunk variants for alt branches."
+    },
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 60,
+      "intel_domain": "technology"
+    }
+  },
+  "orbital_station": {
+    "id": "orbital_station",
+    "name": "Orbital Station Program",
+    "domain": "space_equipment",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 2,
+    "row": 6,
+    "tier": 4,
+    "era_min": 1965,
+    "era_max": 1975,
+    "epoch": "early_space",
+    "prerequisites": [
+      "human_spaceflight",
+      "satellite_network"
+    ],
+    "research": {
+      "base_cost_days": 260,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.16,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "reconnaissance",
+        "value": 0.08
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_orbital_station"
+      },
+      {
+        "type": "building",
+        "building_id": "orbital_lab"
+      }
+    ],
+    "ui": {
+      "icon": "res://assets/graphics/icons/space_race/space_station.png",
+      "short_effect": "Permanent orbital presence, +8% recon, lab building",
+      "flavor": "Skylab / Salyut style station. Public prestige or secret military platform choice."
+    },
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 90,
+      "intel_domain": "technology"
+    }
+  },
+  "nuclear_thermal_engine": {
+    "id": "nuclear_thermal_engine",
+    "name": "Nuclear Thermal Propulsion",
+    "domain": "space_equipment",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 3,
+    "row": 6,
+    "tier": 5,
+    "era_min": 1968,
+    "era_max": 1980,
+    "epoch": "early_space",
+    "prerequisites": [
+      "moon_landing",
+      "expanse_rocket"
+    ],
+    "research": {
+      "base_cost_days": 300,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.2,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "supply_efficiency",
+        "value": 0.1
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_nuclear_thermal"
+      }
+    ],
+    "ui": {
+      "short_effect": "NTR engines for efficient interplanetary transfer",
+      "flavor": "Rover program alt-history NERVA style. Boosts space logistics and production of heavy payloads."
+    }
+  },
+  "mars_probe": {
+    "id": "mars_probe",
+    "name": "Mars Probe Series",
+    "domain": "space_equipment",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 1,
+    "row": 6,
+    "tier": 3,
+    "era_min": 1965,
+    "era_max": 1975,
+    "epoch": "early_space",
+    "prerequisites": [
+      "moon_landing"
+    ],
+    "research": {
+      "base_cost_days": 150,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.14,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "reconnaissance",
+        "value": 0.07
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_mars_probes"
+      }
+    ],
+    "ui": {
+      "short_effect": "Uncrewed Mars missions, +7% recon from deep space intel",
+      "flavor": "Mariner/Viking style probes. Public science or secret military observation variants."
+    }
+  },
+  "mech_designer": {
+    "id": "mech_designer",
+    "name": "Mech Designer Bureau",
+    "domain": "land_equipment",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 0,
+    "row": 7,
+    "tier": 2,
+    "era_min": 1948,
+    "era_max": 1965,
+    "epoch": "industrial_war",
+    "prerequisites": [
+      "mech_prototype",
+      "rocketry_foundations"
+    ],
+    "research": {
+      "base_cost_days": 220,
+      "category": "armor",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "division_capability",
+        "capability": "mech_division"
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_dieselpunk_mechs"
+      },
+      {
+        "type": "division_template",
+        "template_id": "mech_division_proto"
+      }
+    ],
+    "ui": {
+      "short_effect": "Mech designer unlocks diesel/steam powered walker divisions + capability",
+      "flavor": "Alt-history dedicated bureau for giant dieselpunk mechs. Steampunk branch option via rule."
+    },
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 70
+    }
+  },
+  "ai_ethics": {
+    "id": "ai_ethics",
+    "name": "AI Ethics & Safeguards",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 4,
+    "row": 5,
+    "tier": 3,
+    "era_min": 1960,
+    "era_max": 1975,
+    "epoch": "early_space",
+    "prerequisites": [
+      "ai_research"
+    ],
+    "research": {
+      "base_cost_days": 180,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "initiative",
+        "value": 0.5
+      },
+      {
+        "type": "rule_flag",
+        "flag": "ai_ethics_compliance"
+      }
+    ],
+    "ui": {
+      "short_effect": "Ethical AI reduces risks, small initiative boost, ethics flag for later tech",
+      "flavor": "Ties space AI and robotics to national ethics pillars and Ascendancy choices. Secret programs may bypass for short term edge."
+    }
+  },
+  "public_space_program": {
+    "id": "public_space_program",
+    "name": "Public Space Program",
+    "domain": "space_equipment",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 1,
+    "row": 7,
+    "tier": 4,
+    "era_min": 1957,
+    "era_max": 1970,
+    "epoch": "early_space",
+    "prerequisites": [
+      "sputnik_satellite",
+      "human_spaceflight"
+    ],
+    "mutually_exclusive_with": [
+      "secret_funding_space"
+    ],
+    "research": {
+      "base_cost_days": 200,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.13,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "ascendancy",
+        "value": 0.15
+      },
+      {
+        "type": "modifier",
+        "stat": "prestige",
+        "value": 0.1
+      },
+      {
+        "type": "rule_flag",
+        "flag": "public_space_funding"
+      },
+      {
+        "type": "division_capability",
+        "capability": "public_astronaut_corps"
+      }
+    ],
+    "ui": {
+      "short_effect": "Public funding: +Ascendancy/prestige, open recruitment, faster diffusion",
+      "flavor": "Apollo-style open program. High visibility boosts national morale and soft power but exposes to enemy agents."
+    },
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 30,
+      "intel_domain": "technology"
+    }
+  },
+  "secret_funding_space": {
+    "id": "secret_funding_space",
+    "name": "Secretly Funded Black Budget Space",
+    "domain": "space_equipment",
+    "tree_id": "strategic_future",
+    "node_kind": "project",
+    "column": 2,
+    "row": 7,
+    "tier": 4,
+    "era_min": 1957,
+    "era_max": 1970,
+    "epoch": "early_space",
+    "prerequisites": [
+      "sputnik_satellite",
+      "human_spaceflight"
+    ],
+    "mutually_exclusive_with": [
+      "public_space_program"
+    ],
+    "research": {
+      "base_cost_days": 280,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.18,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "secret_funding"
+      },
+      {
+        "type": "rule_flag",
+        "flag": "allow_clandestine_space_assets"
+      },
+      {
+        "type": "modifier",
+        "stat": "reconnaissance",
+        "value": 0.12
+      }
+    ],
+    "ui": {
+      "icon": "res://assets/graphics/icons/space_race/secret_space.png",
+      "short_effect": "Secret funding: hidden progress, +recon from covert sats, stealthier space units",
+      "flavor": "Black projects, compartmentalized. Ties to Agent black market / intel ops for funding. Lower public Ascendancy but huge strategic surprise. High theft value if exposed."
+    },
+    "agent": {
+      "theft_target": true,
+      "sabotage_delay_days": 120,
+      "intel_domain": "technology",
+      "counter_intel_node": "secure_research_facility"
+    },
+    "tradeoffs": {
+      "benefits": "Secrecy, surprise first strike capability, agent synergy for black funding missions",
+      "costs": "Slower open tech diffusion, higher internal cost, risk of scandals or purges on discovery",
+      "consequences": "If stolen, enemy gains secret space edge + exposes your program for political damage"
+    }
+  },
+  "nuclear_marine_propulsion_1955": {
+    "id": "nuclear_marine_propulsion_1955",
+    "name": "Nuclear Marine Propulsion (Subs & Carriers)",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 4,
+    "row": 5,
+    "tier": 4,
+    "era_min": 1950,
+    "era_max": 1980,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "uranium_enrichment_1942",
+      "computer_controlled_engines_1965",
+      "diesel_engine_1912"
+    ],
+    "research": {
+      "base_cost_days": 140,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.18,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "submarine_range",
+        "value": 0.25
+      },
+      {
+        "type": "rule_flag",
+        "flag": "nuclear_propulsion"
+      },
+      {
+        "type": "module_unlock",
+        "module_ids": [
+          "ge_s9g_reactor",
+          "westinghouse_s5w_reactor"
+        ]
+      }
+    ],
+    "ui": {
+      "short_effect": "True unlimited endurance for subs and big carriers. Ultimate blue-water projection - but needs rare uranium + heavy industry + computers.",
+      "flavor": "Nautilus and Enterprise era. Only nations that invested in enrichment, computers, and had the industrial base can field them. Not everyone can put a reactor in a hull or rocket. Huge advantage if you get here first; ethics and accident risks are real.",
+      "icon": "res://assets/graphics/icons/engines/nuclear_marine_reactor.png"
+    }
+  },
+  "uranium_enrichment_1942": {
+    "id": "uranium_enrichment_1942",
+    "name": "Uranium Mining, Processing & Enrichment",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 3,
+    "row": 5,
+    "tier": 3,
+    "era_min": 1939,
+    "era_max": 1970,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "synthetic_fuel_1917"
+    ],
+    "research": {
+      "base_cost_days": 120,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.2,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "resource",
+        "resource": "uranium",
+        "bonus": 0.2
+      },
+      {
+        "type": "rule_flag",
+        "flag": "nuclear_fuel"
+      },
+      {
+        "type": "modifier",
+        "stat": "power_plant_output",
+        "value": 0.1
+      }
+    ],
+    "ui": {
+      "short_effect": "Unlocks uranium as strategic resource. Enables nuclear engines/power. Provinces with uranium deposits become critical.",
+      "flavor": "Manhattan + postwar. Local uranium + processing = independent nuke path. Without it you are dependent on trade or conquest. Pairs with computers for safe control; without good electronics, nuclear programs are risky and slow.",
+      "icon": "res://assets/graphics/icons/engines/rare_earth_refinery.png"
+    }
+  },
+  "rare_earth_materials_1950": {
+    "id": "rare_earth_materials_1950",
+    "name": "Rare Earth Refining & Advanced Materials",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 2,
+    "row": 5,
+    "tier": 3,
+    "era_min": 1945,
+    "era_max": 1985,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "synthetic_fuel_1917"
+    ],
+    "research": {
+      "base_cost_days": 95,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "resource",
+        "resource": "rare_earths",
+        "bonus": 0.15
+      },
+      {
+        "type": "modifier",
+        "stat": "jet_engine_efficiency",
+        "value": 0.08
+      },
+      {
+        "type": "rule_flag",
+        "flag": "advanced_materials"
+      }
+    ],
+    "ui": {
+      "short_effect": "Rare earths (from map deposits) enable better magnets, electronics, jet blades, nuclear components.",
+      "flavor": "Modern engines (jets, precision diesels, electric) and electronics depend on them. Control of rare_earth provinces or synthesis gives permanent edge in late-game propulsion and robotics. Early paths without this lag in the jet/nuclear age.",
+      "icon": "res://assets/graphics/icons/engines/rare_earth_refinery.png"
+    }
+  },
+  "computer_controlled_engines_1965": {
+    "id": "computer_controlled_engines_1965",
+    "name": "Computer-Controlled Engines & Avionics (FADEC, Nuclear Controls)",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 4,
+    "row": 4,
+    "tier": 4,
+    "era_min": 1960,
+    "era_max": 1990,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "rare_earth_materials_1950",
+      "jet_engine_foundations_1944"
+    ],
+    "research": {
+      "base_cost_days": 100,
+      "category": "electronics",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "fuel_efficiency",
+        "value": 0.07
+      },
+      {
+        "type": "rule_flag",
+        "flag": "computerized_propulsion"
+      },
+      {
+        "type": "modifier",
+        "stat": "robotics_potential",
+        "value": 0.1
+      }
+    ],
+    "ui": {
+      "short_effect": "Digital engine control boosts efficiency + reliability for jets/nuclear. Prereq for advanced robotics & safe nuke use.",
+      "flavor": "The great equalizer or divider: good computers let you squeeze more from any engine and make nuclear safe/controllable. No computers = no great robotics, no reliable FADEC jets, riskier reactors. Choosing to lag electronics means your fancy engines underperform and you can't pivot to drone/robot future.",
+      "icon": "res://assets/graphics/icons/engines/jet_fadec_computer.png"
+    }
+  },
+  "fuel_cell_electric_propulsion": {
+    "id": "fuel_cell_electric_propulsion",
+    "name": "Fuel Cell Electric Propulsion (AIP Subs)",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 5,
+    "row": 5,
+    "tier": 4,
+    "era_min": 1970,
+    "era_max": 2000,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "computer_controlled_engines_1965",
+      "rare_earth_materials_1950"
+    ],
+    "research": {
+      "base_cost_days": 120,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "submarine_range",
+        "value": 0.15
+      },
+      {
+        "type": "rule_flag",
+        "flag": "fuel_cell_propulsion"
+      },
+      {
+        "type": "modifier",
+        "stat": "fuel_efficiency",
+        "value": 0.1
+      }
+    ],
+    "ui": {
+      "short_effect": "Advanced AIP for subs: silent, long endurance on fuel cells. Requires computers + rare earths.",
+      "flavor": "Modern diesel-electric evolution to fuel cells for air-independent propulsion. Great for stealth subs without nuclear.",
+      "icon": "res://assets/graphics/icons/engines/fuel_cell_electric_64.png"
+    }
+  },
+  "reusable_rockets_1980": {
+    "id": "reusable_rockets_1980",
+    "name": "Reusable Rockets & Spaceplane Systems",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 6,
+    "row": 5,
+    "tier": 5,
+    "era_min": 1975,
+    "era_max": 2010,
+    "epoch": "information_age",
+    "prerequisites": [
+      "expanse_rocket",
+      "computer_controlled_engines_1965"
+    ],
+    "research": {
+      "base_cost_days": 160,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "reusable_space_access"
+      },
+      {
+        "type": "modifier",
+        "stat": "space_program_cost",
+        "value": -0.3
+      },
+      {
+        "type": "modifier",
+        "stat": "space_milestone_speed",
+        "value": 0.2
+      }
+    ],
+    "ui": {
+      "short_effect": "Reusable boosters/shuttles: dramatically cheaper space access, faster moon/mars milestones.",
+      "flavor": "Space Shuttle / Falcon 9 style reusability. Huge technological and economic hurdle. Transforms space race and orbital ops. Requires advanced materials, computers, engines. Trade-off: development cost/time vs one-shot reliability; if fails, sets program back years.",
+      "icon": "res://assets/graphics/icons/tech/reusable_rocket.png"
+    }
+  },
+  "life_support_systems_1965": {
+    "id": "life_support_systems_1965",
+    "name": "Closed-Loop Life Support & Habitation (Space/Civilian)",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 5,
+    "row": 4,
+    "tier": 4,
+    "era_min": 1960,
+    "era_max": 1990,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "high_altitude_life_support",
+      "computer_controlled_engines_1965"
+    ],
+    "research": {
+      "base_cost_days": 110,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "space_hab_efficiency",
+        "value": 0.25
+      },
+      {
+        "type": "rule_flag",
+        "flag": "advanced_life_support"
+      },
+      {
+        "type": "building",
+        "building_id": "space_habitat_module"
+      }
+    ],
+    "ui": {
+      "short_effect": "Advanced recycling, oxygen, radiation shielding for long-duration space, subs, high-alt, NBC civilian.",
+      "flavor": "Closed ecosystems for moon bases, Mars, long subs, or sealed cities. Enables sustainable presence beyond short hops. Cross-benefit to civilian (disaster shelters, arctic). Resource/power hungry; trade-off vs open systems or short missions.",
+      "icon": "res://assets/graphics/icons/tech/life_support_hab.png"
+    }
+  },
+  "fusion_power_1990": {
+    "id": "fusion_power_1990",
+    "name": "Fusion Power Reactors (Civilian/Military)",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 6,
+    "row": 4,
+    "tier": 5,
+    "era_min": 1985,
+    "era_max": 2030,
+    "epoch": "information_age",
+    "prerequisites": [
+      "uranium_enrichment_1942",
+      "computer_controlled_engines_1965",
+      "rare_earth_materials_1950"
+    ],
+    "research": {
+      "base_cost_days": 200,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.2,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "fusion_power"
+      },
+      {
+        "type": "modifier",
+        "stat": "energy_output",
+        "value": 0.4
+      },
+      {
+        "type": "modifier",
+        "stat": "space_power",
+        "value": 0.3
+      },
+      {
+        "type": "building",
+        "building_id": "fusion_plant"
+      }
+    ],
+    "ui": {
+      "short_effect": "Clean high-density fusion power for grids, ships, space, lasers/railguns. Ultimate energy.",
+      "flavor": "Tokamak or inertial confinement breakthroughs. Transforms everything: unlimited-ish power, no uranium dependency long-term, enables DEW and heavy industry. Insanely hard/expensive; trade-off vs proven fission/nuclear thermal. If achieved, game-changer for late game dominance.",
+      "icon": "res://assets/graphics/icons/tech/fusion_reactor.png"
+    }
+  },
+  "directed_energy_weapons_1985": {
+    "id": "directed_energy_weapons_1985",
+    "name": "Directed Energy Weapons (Lasers, Railguns)",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 4,
+    "row": 5,
+    "tier": 5,
+    "era_min": 1980,
+    "era_max": 2025,
+    "epoch": "information_age",
+    "prerequisites": [
+      "fusion_power_1990",
+      "rare_earth_materials_1950",
+      "computer_controlled_engines_1965"
+    ],
+    "research": {
+      "base_cost_days": 180,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.18,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "dew_weapons"
+      },
+      {
+        "type": "modifier",
+        "stat": "energy_weapon_dmg",
+        "value": 0.35
+      },
+      {
+        "type": "equipment_module",
+        "module_id": "hel_mdi_laser"
+      }
+    ],
+    "ui": {
+      "short_effect": "Ship/air/ground lasers and railguns: speed-of-light precision fire, no ammo per shot (but power hungry).",
+      "flavor": "HEL and EM railguns. Game-changing vs missiles, aircraft, armor. Requires massive power (fusion ideal), cooling, targeting computers. Trade-off: vulnerable to atmospheric conditions, high initial cost, power drain on platform. Alt-history if early investment in energy tech.",
+      "icon": "res://assets/graphics/icons/tech/directed_energy_laser.png"
+    }
+  },
+  "electric_hydraulic_alt_1960": {
+    "id": "electric_hydraulic_alt_1960",
+    "name": "Electric Drive Motors & Battery/Hydraulic Alternatives",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 3,
+    "row": 4,
+    "tier": 4,
+    "era_min": 1955,
+    "era_max": 1990,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "advanced_batteries_or_fuel_cell",
+      "rare_earth_materials_1950"
+    ],
+    "research": {
+      "base_cost_days": 95,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "vehicle_efficiency",
+        "value": 0.15
+      },
+      {
+        "type": "rule_flag",
+        "flag": "electric_drive"
+      },
+      {
+        "type": "modifier",
+        "stat": "tank_silent_run",
+        "value": 0.2
+      }
+    ],
+    "ui": {
+      "short_effect": "Electric motors + advanced batteries/fuel cells as alt to hydraulic/mechanical. On-demand power, quieter, efficient.",
+      "flavor": "Hybrid-electric or pure electric drives for tanks, ships, subs. Better torque, stealth (no engine noise), regen braking. Trade-off vs traditional diesel/hydraulic (battery weight, charging infra in field, cold weather performance). Synergizes with fuel cell or fusion power.",
+      "icon": ""
+    }
+  },
+  "drone_swarm_1980": {
+    "id": "drone_swarm_1980",
+    "name": "Autonomous Drone Swarms & UAV Networks",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 2,
+    "row": 6,
+    "tier": 4,
+    "era_min": 1975,
+    "era_max": 2010,
+    "epoch": "information_age",
+    "prerequisites": [
+      "consumer_electronics_1955",
+      "computer_controlled_engines_1965"
+    ],
+    "research": {
+      "base_cost_days": 100,
+      "category": "air",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "reconnaissance",
+        "value": 0.15
+      },
+      {
+        "type": "modifier",
+        "stat": "precision_strike",
+        "value": 0.1
+      },
+      {
+        "type": "rule_flag",
+        "flag": "drone_warfare"
+      },
+      {
+        "type": "division_capability",
+        "capability": "drone_swarm"
+      }
+    ],
+    "ui": {
+      "short_effect": "Cheap expendable drones for recon, strike, EW. +flexibility, low risk to pilots.",
+      "flavor": "Predator/Reaper to micro-swarms. Saturates defenses, persistent ISR. Trade-off: jamming vulnerability, ethical 'video game' killing, proliferation to non-state actors, high bandwidth/electronics demand.",
+      "icon": "res://assets/graphics/icons/tech/drone_swarm.png"
+    }
+  },
+  "scanners_sensors_1975": {
+    "id": "scanners_sensors_1975",
+    "name": "Advanced Scanners & Multi-Spectral Sensors",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 1,
+    "row": 6,
+    "tier": 4,
+    "era_min": 1970,
+    "era_max": 2000,
+    "epoch": "cold_war",
+    "prerequisites": [
+      "radar_prototype_1935",
+      "sonar_1938",
+      "consumer_electronics_1955"
+    ],
+    "research": {
+      "base_cost_days": 90,
+      "category": "electronics",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "detection_range",
+        "value": 0.2
+      },
+      {
+        "type": "modifier",
+        "stat": "stealth_detection",
+        "value": 0.15
+      },
+      {
+        "type": "rule_flag",
+        "flag": "advanced_sensors"
+      }
+    ],
+    "ui": {
+      "short_effect": "Hyperspectral, quantum, bio-sensors for superior intel across domains (land/sea/air/space).",
+      "flavor": "Star Trek-style tricorders/scanners. Sees through walls, detects life/chemicals/submarines from orbit. Trade-off: massive data processing (computers), power draw, detectable emissions, privacy/ethics nightmare for domestic use.",
+      "icon": "res://assets/graphics/icons/tech/advanced_scanner.png"
+    }
+  },
+  "deflector_shields_1995": {
+    "id": "deflector_shields_1995",
+    "name": "Deflector Shields & Energy Barriers",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 3,
+    "row": 6,
+    "tier": 5,
+    "era_min": 1990,
+    "era_max": 2025,
+    "epoch": "information_age",
+    "prerequisites": [
+      "fusion_power_1990",
+      "directed_energy_weapons_1985",
+      "life_support_systems_1965"
+    ],
+    "research": {
+      "base_cost_days": 140,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.15,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "defensive_shielding",
+        "value": 0.25
+      },
+      {
+        "type": "rule_flag",
+        "flag": "energy_shields"
+      },
+      {
+        "type": "modifier",
+        "stat": "space_hab_defense",
+        "value": 0.2
+      }
+    ],
+    "ui": {
+      "short_effect": "Plasma/magnetic/energy fields protecting ships, bases, cities from kinetics/energy.",
+      "flavor": "Lower-level Trek tech before full phasers/torps. Absorbs/disperses damage. Trade-off: enormous power (fusion critical), heat/EM signature, limited duration, ineffective vs some exotics (e.g., bio), maintenance complex.",
+      "icon": "res://assets/graphics/icons/tech/deflector_shield.png"
+    }
+  },
+  "teleporters_2025": {
+    "id": "teleporters_2025",
+    "name": "Matter Transporters & Teleportation",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 4,
+    "row": 6,
+    "tier": 5,
+    "era_min": 2015,
+    "era_max": 2040,
+    "epoch": "information_age",
+    "prerequisites": [
+      "deflector_shields_1995",
+      "nanotech_fab_2020",
+      "fusion_power_1990"
+    ],
+    "research": {
+      "base_cost_days": 180,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.2,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "rule_flag",
+        "flag": "teleportation"
+      },
+      {
+        "type": "modifier",
+        "stat": "rapid_deployment",
+        "value": 0.3
+      },
+      {
+        "type": "division_capability",
+        "capability": "teleport_infantry"
+      }
+    ],
+    "ui": {
+      "short_effect": "Instant personnel/material transport across distances. Game-changing logistics/combat.",
+      "flavor": "Star Trek transporters. Bypasses terrain, enables surprise assaults, space-to-ground. Trade-off: extreme energy/precision (nanotech/compute), Heisenberg risks (duplication/death), ethics (is it the same person?), range limits, jamming/disruption deadly.",
+      "icon": "res://assets/graphics/icons/tech/teleporter_pad.png"
+    }
+  },
+  "phasers_torpedoes_2030": {
+    "id": "phasers_torpedoes_2030",
+    "name": "Phasers, Disruptors & Guided Energy Torpedoes",
+    "domain": "strategic_future",
+    "tree_id": "strategic_future",
+    "node_kind": "research",
+    "column": 5,
+    "row": 6,
+    "tier": 5,
+    "era_min": 2025,
+    "era_max": 2050,
+    "epoch": "information_age",
+    "prerequisites": [
+      "teleporters_2025",
+      "directed_energy_weapons_1985",
+      "fusion_power_1990"
+    ],
+    "research": {
+      "base_cost_days": 200,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.18,
+      "repeatable": false
+    },
+    "unlocks": [
+      {
+        "type": "modifier",
+        "stat": "energy_weapon_dmg",
+        "value": 0.3
+      },
+      {
+        "type": "rule_flag",
+        "flag": "phaser_torpedo"
+      },
+      {
+        "type": "equipment_module",
+        "module_id": "hel_mdi_laser"
+      }
+    ],
+    "ui": {
+      "short_effect": "Variable setting energy weapons and smart torpedoes for ships/ground. Precise, scalable lethality.",
+      "flavor": "Trek phasers (stun to vaporize) + photon/quantum torpedoes. After missiles/lasers. Trade-off: power hog, heat management, overkill ethics, requires mature shields/scanners first, insane R&D cost.",
+      "icon": "res://assets/graphics/icons/tech/phaser_torpedo_combat_64.png"
     }
   }
 }

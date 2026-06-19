@@ -16,10 +16,47 @@ var _active_replacement_popup: LeaderReplacementPickerPopup = null
 var _toast_layer: CanvasLayer
 var _toast_container: VBoxContainer
 
+# Preloaded custom icons for event toasts (beyond unicode); riot for crisis/riot cats per graphics wiring.
+var _riot_crowd_icon: Texture2D = null
+var _space_icon: Texture2D = null
+var _secret_space_icon: Texture2D = null
+var _mech_icon: Texture2D = null
+var _human_enh_icon: Texture2D = null
+var _sonic_icon: Texture2D = null
+var _versailles_icon: Texture2D = null
+
 
 func _ready() -> void:
 	_ensure_toast_layer()
 	_connect_leader_signals()
+	if _riot_crowd_icon == null:
+		_riot_crowd_icon = load("res://assets/graphics/icons/events/riot_crowd_64.png") as Texture2D
+		if _riot_crowd_icon == null:
+			push_warning("LeaderEventUI: Failed to load riot_crowd_64.png for custom toast icons")
+	if _space_icon == null:
+		_space_icon = load("res://assets/graphics/icons/space_race/space_race_milestones_graph_64.png") as Texture2D
+		if _space_icon == null:
+			_space_icon = load("res://assets/graphics/icons/space_race/first_spaceflight.png") as Texture2D  # fallback
+	if _secret_space_icon == null:
+		_secret_space_icon = load("res://assets/graphics/icons/space_race/secret_space_fleet_warship_64.png") as Texture2D
+		if _secret_space_icon == null:
+			_secret_space_icon = load("res://assets/graphics/icons/space_race/secret_space.png") as Texture2D
+	if _mech_icon == null:
+		_mech_icon = load("res://assets/graphics/units/mechs/mech_designer_hangar_64.png") as Texture2D
+		if _mech_icon == null:
+			_mech_icon = load("res://assets/graphics/units/mechs/mech_designer_icon.png") as Texture2D
+	if _human_enh_icon == null:
+		_human_enh_icon = load("res://assets/graphics/icons/tech/human_genetic_enhancement_64.png") as Texture2D
+		if _human_enh_icon == null:
+			_human_enh_icon = load("res://assets/graphics/icons/tech/human_genetic_enhancement.png") as Texture2D
+	if _sonic_icon == null:
+		_sonic_icon = load("res://assets/graphics/icons/events/sonic_riot_combat_64.png") as Texture2D
+		if _sonic_icon == null:
+			_sonic_icon = load("res://assets/graphics/icons/tech/sonic_riot_combat_64.png") as Texture2D
+	if _versailles_icon == null:
+		_versailles_icon = load("res://assets/graphics/icons/peace/versailles_alt_1919_peace_64.png") as Texture2D
+		if _versailles_icon == null:
+			_versailles_icon = load("res://assets/graphics/icons/peace/versailles_treaty.png") as Texture2D
 
 
 func _connect_leader_signals() -> void:
@@ -53,7 +90,9 @@ func _ensure_toast_layer() -> void:
 
 
 ## Simple toast for save/menu/system feedback (non-news).
-func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = false) -> void:
+# Enhanced for important messages (toasts first): Always has close/dismiss X. For is_important, adds "Respond" button (e.g. opens PolicyLawScreen or launches dialogue for welfare/crisis choices).
+# Clean, interactive, fun: Player informed immediately, can dismiss or act on cultural war / policy decisions.
+func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = false, is_important: bool = false, on_respond: Callable = Callable()) -> void:
 	_ensure_toast_layer()
 	var entry := {
 		"title": "Notice" if not is_error else "Error",
@@ -62,6 +101,8 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 	}
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(380, 0)
+	var icon2 := "📢" if not is_error else "⛔"
+	var cat2 := "system" if not is_error else "error"
 	if is_error:
 		var err_style := StyleBoxFlat.new()
 		err_style.bg_color = Color("#2a1520")
@@ -71,6 +112,15 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 		panel.add_theme_stylebox_override("panel", err_style)
 	else:
 		RetrowaveTheme.style_detail_panel(panel)
+	if entry.get("category") == "hand":
+		var hand_style := StyleBoxFlat.new()
+		hand_style.bg_color = Color(0.1, 0.05, 0.15)
+		hand_style.border_color = Color(0.6, 0.4, 0.8, 0.6)
+		hand_style.set_border_width_all(2)
+		hand_style.set_corner_radius_all(4)
+		panel.add_theme_stylebox_override("panel", hand_style)
+		# Add simple icon for system toasts
+		icon2 = "ℹ️"
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 10)
@@ -83,18 +133,102 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 	vbox.add_theme_constant_override("separation", 4)
 	margin.add_child(vbox)
 
+	var title_row := HBoxContainer.new()
+	# Custom riot icon TextureRect support also in simple show_toast path (e.g. direct "Riots: ..." calls from GameData)
+	if ("riot" in message.to_lower() or is_important) and _riot_crowd_icon != null:
+		var tr := TextureRect.new()
+		tr.texture = _riot_crowd_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(16, 16)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		title_row.add_child(tr)
+	elif ("space" in message.to_lower() or "moon" in message.to_lower() or "mars" in message.to_lower() or "secret space" in message.to_lower()) and (_space_icon != null or _secret_space_icon != null):
+		var tr := TextureRect.new()
+		tr.texture = _secret_space_icon if "secret" in message.to_lower() else _space_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(16, 16)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		title_row.add_child(tr)
+	elif "mech" in message.to_lower() and _mech_icon != null:
+		var tr := TextureRect.new()
+		tr.texture = _mech_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(16, 16)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		title_row.add_child(tr)
+	elif ("human" in message.to_lower() or "genetic" in message.to_lower() or "enhancement" in message.to_lower()) and _human_enh_icon != null:
+		var tr := TextureRect.new()
+		tr.texture = _human_enh_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(16, 16)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		title_row.add_child(tr)
+	elif ("sonic" in message.to_lower() or "riot" in message.to_lower()) and _sonic_icon != null:
+		var tr := TextureRect.new()
+		tr.texture = _sonic_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(16, 16)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		title_row.add_child(tr)
+	elif ("versailles" in message.to_lower() or "1919" in message.to_lower() or "1918 peace" in message.to_lower()) and _versailles_icon != null:
+		var tr := TextureRect.new()
+		tr.texture = _versailles_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(16, 16)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		title_row.add_child(tr)
+	else:
+		var icon_lbl := Label.new()
+		icon_lbl.text = icon2 + " "
+		icon_lbl.add_theme_font_size_override("font_size", 13)
+		title_row.add_child(icon_lbl)
 	var title_label := Label.new()
 	title_label.text = str(entry.get("title", "Notice"))
 	RetrowaveTheme.style_column_header(title_label)
 	if is_error:
 		title_label.add_theme_color_override("font_color", RetrowaveTheme.WARNING)
-	vbox.add_child(title_label)
+	title_row.add_child(title_label)
+
+	# Close/dismiss X for all toasts (user request for important messages).
+	var close_btn := Button.new()
+	close_btn.text = "×"
+	close_btn.custom_minimum_size = Vector2(20, 20)
+	close_btn.pressed.connect(func(): 
+		if panel.get_parent():
+			panel.get_parent().remove_child(panel)
+			panel.queue_free()
+	)
+	title_row.add_child(close_btn)
+	vbox.add_child(title_row)
 
 	var body_label := Label.new()
 	body_label.text = str(entry.get("body", ""))
 	body_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	RetrowaveTheme.style_body_label(body_label)
 	vbox.add_child(body_label)
+
+	# For important (e.g. welfare/cultural crisis, depop narratives): Respond button for interactive play (opens policy or dialogue).
+	if is_important:
+		var respond_btn := Button.new()
+		respond_btn.text = "Respond / View Policies"
+		respond_btn.custom_minimum_size = Vector2(150, 24)
+		respond_btn.pressed.connect(func():
+			if on_respond.is_valid():
+				on_respond.call()
+			else:
+				# Default: open PolicyLawScreen if available (via TopInfoBar or direct).
+				if typeof(TopInfoBar) != TYPE_NIL:
+					var bar = TopInfoBar.find_in_tree(get_tree())
+					if bar and bar.has_method("_on_policies_pressed"):  # if wired
+						bar._on_policies_pressed()
+				# Fallback: toast reminder.
+				show_toast("Open Policy / Law screen to adjust welfare/social services and respond to the cultural decision.", 4.0)
+			# Dismiss after respond.
+			if panel.get_parent():
+				panel.get_parent().remove_child(panel)
+				panel.queue_free()
+		)
+		vbox.add_child(respond_btn)
 
 	_toast_container.add_child(panel)
 	while _toast_container.get_child_count() > 4:
@@ -135,6 +269,36 @@ func _show_toast(entry: Dictionary) -> void:
 	panel.custom_minimum_size = Vector2(380, 0)
 	RetrowaveTheme.style_detail_panel(panel)
 
+	# Better per-category styling + icons (unicode for event visual polish; tie to portraits later in lists)
+	var cat := str(entry.get("category", "general")).to_lower()
+	var icon := "📰"
+	match cat:
+		"war", "combat", "military": icon = "⚔️"
+		"diplomatic", "espionage", "hand_event", "revelation": icon = "🤝"
+		"crisis", "death", "capture": icon = "⚠️"
+		"infrastructure", "econ": icon = "🏗️"
+		"technology", "training": icon = "🔬"
+		"hand_glimmer", "revelation_aid_player", "targeted", "narrative_escalation": icon = "👁️"
+		"system", "golden": icon = "✨"
+		"retirement", "intro": icon = "👤"
+		"separatism", "independence": icon = "🏴"
+		"sabotage", "sabotage_event": icon = "🛠️"
+		"scandal", "manufactured": icon = "📰"
+		"mutiny", "naval", "coastal": icon = "⚓"
+		"famine", "weather_extreme": icon = "🌾"
+	var cat_color := Color(0.8, 0.85, 0.95)
+	if cat in ["war", "combat", "crisis", "death"]: cat_color = Color(0.95, 0.6, 0.55)
+	elif cat in ["diplomatic", "revelation", "golden"]: cat_color = Color(0.5, 0.85, 0.7)
+	elif "hand" in cat or "espionage" in cat: cat_color = Color(0.9, 0.7, 0.4)
+	elif cat in ["separatism", "mutiny", "famine"]: cat_color = Color(0.85, 0.55, 0.55)
+	elif cat in ["sabotage", "scandal"]: cat_color = Color(0.75, 0.65, 0.45)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.12, 0.13, 0.18, 0.95)
+	style.border_color = cat_color
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(4)
+	panel.add_theme_stylebox_override("panel", style)
+
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 10)
 	margin.add_theme_constant_override("margin_top", 8)
@@ -150,10 +314,67 @@ func _show_toast(entry: Dictionary) -> void:
 	header.add_theme_constant_override("separation", 8)
 	vbox.add_child(header)
 
+	# Custom TextureRect for crisis/riot category (use riot crowd asset instead of pure unicode for high-value events)
+	var used_custom_icon := false
+	if (cat == "crisis" or "riot" in cat or "riot" in str(entry.get("title","")).to_lower() or "riot" in str(entry.get("body","")).to_lower()) and _riot_crowd_icon != null:
+		var tr := TextureRect.new()
+		tr.texture = _riot_crowd_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(18, 18)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		header.add_child(tr)
+		used_custom_icon = true
+	elif ("space" in cat or "technology" in cat or "moon" in str(entry.get("title","")).to_lower() or "mars" in str(entry.get("title","")).to_lower() or "secret" in str(entry.get("title","")).to_lower() or "space" in str(entry.get("body","")).to_lower()) and (_space_icon != null or _secret_space_icon != null):
+		var tr := TextureRect.new()
+		tr.texture = _secret_space_icon if ("secret" in str(entry.get("title","")).to_lower() or "covert" in str(entry.get("body","")).to_lower()) else _space_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(18, 18)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		header.add_child(tr)
+		used_custom_icon = true
+	elif ("mech" in str(entry.get("title","")).to_lower() or "mech" in str(entry.get("body","")).to_lower() or "diesel" in str(entry.get("title","")).to_lower()) and _mech_icon != null:
+		var tr := TextureRect.new()
+		tr.texture = _mech_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(18, 18)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		header.add_child(tr)
+		used_custom_icon = true
+	elif ("human" in str(entry.get("title","")).to_lower() or "genetic" in str(entry.get("body","")).to_lower() or "enhancement" in str(entry.get("title","")).to_lower()) and _human_enh_icon != null:
+		var tr := TextureRect.new()
+		tr.texture = _human_enh_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(18, 18)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		header.add_child(tr)
+		used_custom_icon = true
+	elif ("sonic" in str(entry.get("title","")).to_lower() or "sonic" in str(entry.get("body","")).to_lower()) and _sonic_icon != null:
+		var tr := TextureRect.new()
+		tr.texture = _sonic_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(18, 18)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		header.add_child(tr)
+		used_custom_icon = true
+	elif ("versailles" in str(entry.get("title","")).to_lower() or "1919" in str(entry.get("title","")).to_lower() or "peace" in str(entry.get("title","")).to_lower() or "1918" in str(entry.get("title","")).to_lower()) and _versailles_icon != null:
+		var tr := TextureRect.new()
+		tr.texture = _versailles_icon
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.custom_minimum_size = Vector2(18, 18)
+		tr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		header.add_child(tr)
+		used_custom_icon = true
+	if not used_custom_icon:
+		var icon_label := Label.new()
+		icon_label.text = icon + " "
+		icon_label.add_theme_font_size_override("font_size", 14)
+		header.add_child(icon_label)
+
 	var title_label := Label.new()
 	title_label.text = str(entry.get("title", "News"))
 	title_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	RetrowaveTheme.style_column_header(title_label)
+	title_label.add_theme_color_override("font_color", cat_color)
 	header.add_child(title_label)
 
 	var dismiss_button := Button.new()

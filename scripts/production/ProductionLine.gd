@@ -32,6 +32,7 @@ var production_progress: float = 0.0
 var active_refinement: RefinementProject = null
 ## Overrides template module_loadout for weapon/cargo slots (empty string clears a slot).
 var custom_module_loadout: Dictionary = {}
+var current_production_layer: String = "mass"  # "mass", "automated", "additive", "nano" — per-line paradigm for layered production trades (wired from tech rule_flags)
 
 var _design_data: DesignDataLoader = null
 var _rules: Dictionary = {}
@@ -56,15 +57,25 @@ func add_progress(amount: float) -> void:
 
 
 func refresh_design_production_cost() -> void:
-	var template := get_current_template()
+	var template: UnitTemplate = get_current_template()
 	if template == null:
-		design_production_cost = 100.0
-		daily_resource_cost = {}
+		if design_id.begins_with("civilian_"):
+			# Fixed low cost for civilian consumer goods demo (happiness loop).
+			design_production_cost = 60.0
+			daily_resource_cost = {"steel": 2, "energy": 1}  # light inputs for goods
+		else:
+			design_production_cost = 100.0
+			daily_resource_cost = {}
 	else:
 		design_production_cost = ProductionCostCalculator.resolve_cost(
 			template, _design_data, get_effective_loadout()
 		)
 		daily_resource_cost = template.get_daily_resource_cost_dict()
+		# Apply per-line layer cost trade (higher burn for mass/nano, etc) to base PP cost and daily res
+		var lcm := get_layer_cost_multiplier()
+		design_production_cost *= lcm
+		for res in daily_resource_cost:
+			daily_resource_cost[res] = float(daily_resource_cost[res]) * lcm
 	required_progress = design_production_cost
 
 
@@ -99,10 +110,15 @@ func set_template(template_id: String) -> Dictionary:
 		push_warning("ProductionLine has no DesignDataLoader")
 		return result
 
-	var new_template := _design_data.get_template(template_id)
+	var new_template : UnitTemplate = _design_data.get_template(template_id)
 	if new_template == null:
-		push_warning("Unknown unit template: " + template_id)
-		return result
+		if template_id.begins_with("civilian_"):
+			# Civilian goods lines (roadmap): no unit template, fixed consumer output for pop happiness.
+			# Allowed for any factory to demo civilian production.
+			print("ProductionLine: civilian goods mode set for %s (no template, fixed cost/happiness effect)." % template_id)
+		else:
+			push_warning("Unknown unit template: " + template_id)
+			return result
 
 	_persist_current_state()
 
@@ -111,10 +127,13 @@ func set_template(template_id: String) -> Dictionary:
 		old_template = _design_data.get_template(current_template_id)
 
 	if old_template != null and old_template.id != template_id:
-		var similarity := RetoolingCalculator.compute_similarity(old_template, new_template, _rules)
+		var similarity : float = RetoolingCalculator.compute_similarity(old_template, new_template, _rules)
 		result["similarity"] = similarity
 		result["retooling_days"] = RetoolingCalculator.compute_retooling_days(similarity, _rules)
 		retooling_days_remaining = result["retooling_days"]
+		# Apply layer retool/flex trade (additive/nano faster retool for custom/flex)
+		retooling_days_remaining *= get_layer_retool_multiplier()
+		result["retooling_days"] = retooling_days_remaining
 		production_progress = 0.0
 		template_changed.emit(current_template_id, template_id, retooling_days_remaining)
 	elif current_template_id != template_id:
@@ -144,7 +163,7 @@ func get_current_state() -> DesignLineState:
 
 
 func get_tooling_efficiency() -> float:
-	var state := get_current_state()
+	var state : DesignLineState = get_current_state()
 	if state == null:
 		return 0.0
 	var max_eff := float(_rules.get("tooling", {}).get("max_efficiency", 100))
@@ -152,7 +171,7 @@ func get_tooling_efficiency() -> float:
 
 
 func get_output_multiplier() -> float:
-	var multiplier := _base_output_multiplier()
+	var multiplier : float = _base_output_multiplier()
 	return multiplier * _active_modifiers().get_total_output_multiplier()
 
 
@@ -165,16 +184,32 @@ func _base_output_multiplier() -> float:
 	var at_zero := float(tooling_rules.get("output_multiplier_at_zero", 0.82))
 	var at_max := float(tooling_rules.get("output_multiplier_at_max", 1.38))
 	var tooling_ratio := get_tooling_efficiency() / maxf(max_eff, 0.001)
-	var multiplier := lerpf(at_zero, at_max, tooling_ratio)
+	var multiplier : float = lerpf(at_zero, at_max, tooling_ratio)
 
 	if active_refinement != null and not active_refinement.blocks_production:
 		multiplier *= 1.0 - active_refinement.production_penalty
+
+	# Weather full penalties integration (econ polish): cold/mud/snow/blackout drag factory output (province targeted via factory if avail)
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_production_weather_mult"):
+		var wmult : float = 1.0
+		# Resolve pid from factory if tracked on line/factory
+		if typeof(FactoryManager) != TYPE_NIL and "factory_id" in self and self.factory_id != null:
+			var fdata = FactoryManager.get_factory(self.factory_id) if FactoryManager.has_method("get_factory") else null
+			var pidv := -1
+			if fdata:
+				if "province_id" in fdata:
+					pidv = int(fdata.province_id)
+				elif typeof(fdata) == TYPE_DICTIONARY and fdata.has("province_id"):
+					pidv = int(fdata.get("province_id"))
+			if pidv >= 0:
+				wmult = WeatherManager.get_production_weather_mult(pidv)
+		multiplier *= wmult
 
 	return multiplier
 
 
 func get_effective_loadout() -> Dictionary:
-	var template := get_current_template()
+	var template: UnitTemplate = get_current_template()
 	if template == null:
 		return {}
 	return LogisticsCalculator.resolve_loadout(template, custom_module_loadout)
@@ -205,8 +240,8 @@ func clear_custom_loadout() -> void:
 
 
 func get_reliability_profile() -> ReliabilityProfile:
-	var template := get_current_template()
-	var state := get_current_state()
+	var template: UnitTemplate = get_current_template()
+	var state : DesignLineState = get_current_state()
 	if template == null or state == null:
 		return ReliabilityProfile.new()
 	return ReliabilityCalculator.compute_profile(
@@ -222,12 +257,14 @@ func get_reliability_profile() -> ReliabilityProfile:
 
 
 func get_effective_reliability() -> float:
-	return get_reliability_profile().effective_reliability
+	var base := get_reliability_profile().effective_reliability
+	# Layer quality trade (mass lower, nano/additive higher precision/custom)
+	return base * get_layer_quality_multiplier()
 
 
 func list_refinement_options() -> Array[Dictionary]:
 	var options: Array[Dictionary] = []
-	var state := get_current_state()
+	var state : DesignLineState = get_current_state()
 	if state == null or _design_data == null:
 		return options
 
@@ -237,7 +274,7 @@ func list_refinement_options() -> Array[Dictionary]:
 		var project_id := str(def.get("id", ""))
 		if project_id.is_empty():
 			continue
-		var eligibility := _refinement_eligibility(project_id, def, state)
+		var eligibility : Dictionary = _refinement_eligibility(project_id, def, state)
 		options.append({
 			"id": project_id,
 			"name": str(def.get("name", project_id)),
@@ -259,15 +296,15 @@ func list_refinement_options() -> Array[Dictionary]:
 
 
 func can_start_refinement(project_id: String) -> Dictionary:
-	var state := get_current_state()
+	var state : DesignLineState = get_current_state()
 	if state == null:
 		return {"can_start": false, "reason": "no_active_design"}
-	var def := _design_data.get_refinement_def(project_id) if _design_data else {}
+	var def: Dictionary = _design_data.get_refinement_def(project_id) if _design_data else {}
 	return _refinement_eligibility(project_id, def, state)
 
 
 func get_days_per_unit() -> float:
-	var template := get_current_template()
+	var template: UnitTemplate = get_current_template()
 	if template == null:
 		return 9999.0
 	var base_days := template.base_production_days
@@ -275,11 +312,13 @@ func get_days_per_unit() -> float:
 		var mod: EquipmentModule = _design_data.get_module(module_id)
 		if mod != null:
 			base_days += mod.production_time * 0.15
+	# Layer speed trade: mass faster bulk (lower days), nano slower
+	base_days /= get_layer_speed_multiplier()
 	return maxf(base_days, 1.0)
 
 
 func get_production_cost() -> Dictionary:
-	var template := get_current_template()
+	var template: UnitTemplate = get_current_template()
 	if template == null:
 		return {}
 	var total: Dictionary = {}
@@ -288,15 +327,19 @@ func get_production_cost() -> Dictionary:
 		var mod: EquipmentModule = _design_data.get_module(module_id)
 		if mod != null:
 			_merge_cost(total, mod.cost)
+	# Layer cost trade also felt here (for UI previews)
+	var lcm := get_layer_cost_multiplier()
+	for k in total:
+		total[k] = float(total[k]) * lcm
 	return total
 
 
 func start_refinement(project_id: String) -> bool:
-	var eligibility := can_start_refinement(project_id)
+	var eligibility : Dictionary = can_start_refinement(project_id)
 	if not bool(eligibility.get("can_start", false)):
 		return false
 
-	var def := _design_data.get_refinement_def(project_id)
+	var def: Dictionary = _design_data.get_refinement_def(project_id)
 	active_refinement = RefinementProject.from_def(def, current_template_id)
 	refinement_started.emit(project_id, current_template_id)
 	return true
@@ -317,7 +360,7 @@ func advance_days(days: float) -> Dictionary:
 	if days <= 0.0 or current_template_id.is_empty():
 		return report
 
-	var state := get_current_state()
+	var state : DesignLineState = get_current_state()
 	if state != null:
 		state.days_on_design += days
 
@@ -361,6 +404,14 @@ func _complete_unit(state: DesignLineState) -> void:
 	state.tooling_efficiency = clampf(state.tooling_efficiency + (gain + idle_gain) * tooling_mult, 0.0, max_eff)
 
 	var profile := get_reliability_profile()
+	# High-value foreign military / loyalty hook: High national foreign_military_pct or low loyalty reduces effective reliability of completed units (integration strain, lower quality control, "bought" troops/equipment feel less reliable — historical parallel to mercenary or colonial production issues).
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_military_loyalty_multiplier"):
+		var loyalty: float = GameData.get_military_loyalty_multiplier("player")  # or current owner if tracked
+		var foreign_pct := 0.0
+		if "foreign_military_pct" in GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}:
+			foreign_pct = GameData.get_peace_state().get("foreign_military_pct", {}).get("player", 0.0)
+		var foreign_penalty := 1.0 - (foreign_pct * 0.4) * (1.0 - loyalty)  # scales with both
+		profile.effective_reliability = clampf(profile.effective_reliability * foreign_penalty, 0.5, 1.0)
 	unit_completed.emit(current_template_id, profile.effective_reliability, profile)
 
 
@@ -378,7 +429,7 @@ func _advance_refinement(days: float, report: Dictionary) -> void:
 func _persist_current_state() -> void:
 	if current_template_id.is_empty():
 		return
-	var state := get_current_state()
+	var state : DesignLineState = get_current_state()
 	if state != null:
 		design_states[current_template_id] = state
 
@@ -395,7 +446,7 @@ func _ensure_design_state(template_id: String) -> DesignLineState:
 
 
 func _apply_refinement_completion(project: RefinementProject) -> void:
-	var state := get_current_state()
+	var state : DesignLineState = get_current_state()
 	if state == null or project == null:
 		return
 	state.reliability_refinement_bonus += project.reliability_gain
@@ -488,5 +539,57 @@ func _factory_manager() -> Node:
 	return tree.root.get_node_or_null("/root/FactoryManager")
 
 
+
+# === Layered production paradigm state + trades (per-line choice for epochs; smallest change to feel speed/quality/cost/time/flex/retool trades) ===
+const _LAYER_TRADES := {
+	"mass": {"speed": 1.15, "quality": 0.90, "cost": 1.10, "retool": 1.0, "precision": 0.85, "desc": "+speed/bulk output, lower quality/custom, higher res burn"},
+	"automated": {"speed": 1.05, "quality": 1.05, "cost": 1.0, "retool": 0.95, "precision": 1.0, "desc": "balanced speed + flexibility"},
+	"additive": {"speed": 0.85, "quality": 1.20, "cost": 1.15, "retool": 0.75, "precision": 1.25, "desc": "high flex/precision/custom (advanced/low vol), slower bulk, +power/rare"},
+	"nano": {"speed": 0.60, "quality": 1.40, "cost": 1.35, "retool": 0.60, "precision": 1.50, "desc": "ultimate precision/flex but high power/rare/ethics risk, very slow for mass"},
+}
+
+func get_current_layer() -> String:
+	return current_production_layer if current_production_layer in _LAYER_TRADES else "mass"
+
+func set_production_layer(layer: String) -> Dictionary:
+	var result := {"success": false, "old_layer": current_production_layer, "new_layer": layer, "trades": {} }
+	if not _LAYER_TRADES.has(layer):
+		result["error"] = "invalid_layer"
+		return result
+	current_production_layer = layer
+	# Refresh costs (PP + daily res) to reflect layer cost trade; rescale progress % to keep same completion
+	var old_cost := design_production_cost
+	refresh_design_production_cost()
+	if old_cost > 0.001 and design_production_cost > 0.001 and progress > 0.0:
+		progress = clampf(progress * (design_production_cost / old_cost), 0.0, design_production_cost)
+	result["success"] = true
+	result["trades"] = get_layer_trades_preview()
+	return result
+
+func get_layer_trades_preview() -> Dictionary:
+	var l := get_current_layer()
+	var t : Dictionary = _LAYER_TRADES.get(l, {}).duplicate(true)
+	t["layer"] = l
+	t["unlocked"] = true  # refined by PM/UI via rule_flags
+	return t
+
+func get_layer_speed_multiplier() -> float:
+	return float(_LAYER_TRADES.get(get_current_layer(), {}).get("speed", 1.0))
+
+func get_layer_cost_multiplier() -> float:
+	return float(_LAYER_TRADES.get(get_current_layer(), {}).get("cost", 1.0))
+
+func get_layer_quality_multiplier() -> float:
+	return float(_LAYER_TRADES.get(get_current_layer(), {}).get("quality", 1.0))
+
+func get_layer_retool_multiplier() -> float:
+	return float(_LAYER_TRADES.get(get_current_layer(), {}).get("retool", 1.0))
+
+
 func get_daily_resource_cost() -> Dictionary:
-	return daily_resource_cost.duplicate(true)
+	var d := daily_resource_cost.duplicate(true)
+	# Ensure layer cost trade reflected (e.g. mass/nano higher burn)
+	var lcm := get_layer_cost_multiplier()
+	for k in d:
+		d[k] = float(d[k]) * lcm
+	return d

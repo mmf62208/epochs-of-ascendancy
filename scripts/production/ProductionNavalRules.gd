@@ -41,7 +41,7 @@ const NAVAL_VISUAL_ARCHETYPES: Array[String] = [
 
 
 static func is_naval_category(category: String) -> bool:
-	var c := category.strip_edges().to_lower()
+	var c: String = category.strip_edges().to_lower()
 	if c.is_empty():
 		return false
 	if c in NAVAL_CATEGORIES:
@@ -52,10 +52,10 @@ static func is_naval_category(category: String) -> bool:
 static func is_naval_template(template: UnitTemplate) -> bool:
 	if template == null:
 		return false
-	var bt := template.base_type.strip_edges().to_lower()
+	var bt: String = template.base_type.strip_edges().to_lower()
 	if bt in ["naval", "submarine"]:
 		return true
-	var arch := template.visual_archetype.strip_edges().to_lower()
+	var arch: String = template.visual_archetype.strip_edges().to_lower()
 	if not arch.is_empty():
 		for token in NAVAL_VISUAL_ARCHETYPES:
 			if arch == token or arch.contains(token):
@@ -82,7 +82,7 @@ static func is_naval_template(template: UnitTemplate) -> bool:
 static func is_naval_design(design_id: String) -> bool:
 	if design_id.is_empty() or GameData.design_data == null:
 		return false
-	var template := GameData.design_data.get_template(design_id)
+	var template: UnitTemplate = GameData.design_data.get_template(design_id)
 	return is_naval_template(template)
 
 

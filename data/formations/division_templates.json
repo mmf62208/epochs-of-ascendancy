@@ -92,6 +92,51 @@
         {"template_id": "m4_sherman_medium", "count": 40},
         {"template_id": "gmc_6x6_cargo_truck", "count": 60}
       ]
+    },
+    {
+      "id": "mech_division_proto",
+      "name": "Dieselpunk Mech Division (Prototype)",
+      "manpower": 8000,
+      "support_supply_per_day": 120,
+      "infantry_equipment_template": "infantry_m1_garand",
+      "equipment": [
+        {"template_id": "churchill_mk7_heavy", "count": 36},
+        {"template_id": "m4_sherman_medium", "count": 24},
+        {"type": "truck", "count": 200}
+      ],
+      "subunits": [
+        {"type": "mech", "count": 12, "equipment_override": null}
+      ]
+    },
+    {
+      "id": "orbital_recon_asset",
+      "name": "Orbital Recon Asset Support",
+      "manpower": 200,
+      "support_supply_per_day": 50,
+      "equipment": [
+        {"template_id": "gps_satellite", "count": 4},
+        {"template_id": "r7_sputnik", "count": 2}
+      ]
+    },
+    {
+      "id": "drone_swarm_div",
+      "name": "Drone Swarm Division (Future)",
+      "manpower": 2500,
+      "support_supply_per_day": 40,
+      "equipment": [
+        {"template_id": "drone_swarm_recon", "count": 180}
+      ]
+    },
+    {
+      "id": "power_armor_brigade",
+      "name": "Power Armor Brigade (Cyber/Biotech Enhanced)",
+      "manpower": 4200,
+      "support_supply_per_day": 95,
+      "infantry_equipment_template": "cyber_enhanced_infantry",
+      "equipment": [
+        {"template_id": "power_battle_armor", "count": 48},
+        {"template_id": "cyber_enhanced_infantry", "count": 1200}
+      ]
     }
   ]
 }

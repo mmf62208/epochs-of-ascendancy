@@ -1,0 +1,34 @@
+{
+  "id": "cyber_enhanced_infantry",
+  "name": "Cyber-Enhanced Infantry",
+  "base_type": "Infantry",
+  "size_category": "Light",
+  "visual_archetype": "cyber_infantry",
+  "crew_required": 1,
+  "base_training_level": 30,
+  "max_experience_level": 110,
+  "base_stats": {
+    "speed": 32,
+    "reliability": 70,
+    "fuel_consumption": 2,
+    "supply_need": 12,
+    "armor": 22,
+    "top_armor": 12,
+    "hardness": 25,
+    "soft_attack": 22,
+    "hard_attack": 8
+  },
+  "slots": {
+    "MainWeapon": { "max": 1 },
+    "Augment": { "max": 2 }
+  },
+  "unlock_tech": [ "cybernetics_prosthetics_1975" ],
+  "is_vehicle": false,
+  "is_cyber": true,
+  "description": "Cybernetic prosthetics and neural augments for infantry. Fast, precise, but psych/ethics/hand risks.",
+  "production_category": "cyber_infantry",
+  "era": "future",
+  "modules": [],
+  "production_cost": 68.0,
+  "daily_resource_cost": { "steel": 0.4, "electronics": 1.8, "rare_earth": 0.25 }
+}

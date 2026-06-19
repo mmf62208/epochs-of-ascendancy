@@ -330,6 +330,25 @@ func _apply_national_supply_modifiers(formation_id: String, base_consumption: fl
 	if typeof(NationalSpiritManager) != TYPE_NIL:
 		supply_mod += NationalSpiritManager.get_total_supply_consumption_modifier(owner_tag)
 
+	# NMM supply + space tech wiring: deflector shields power hungry cost; tele rapid gives small supply efficiency
+	if typeof(NationalModifierManager) != TYPE_NIL:
+		var smods := NationalModifierManager.get_supply_modifiers(owner_tag)
+		supply_mod += float(smods.get("supply_consumption", 0.0))
+		# Shields 1995: power hungry (positive = worse consumption)
+		if typeof(TechnologyManager) != TYPE_NIL and (TechnologyManager.has_rule_flag(owner_tag, "energy_shields") or TechnologyManager.is_tech_completed(owner_tag, "deflector_shields_1995")):
+			supply_mod += 0.12  # +12% supply for shields energy draw (tradeoff)
+			if OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1":
+				print("[SPACE WIRING] deflector_shields power cost +supply for %s" % owner_tag)
+		# Tele rapid deploy: small supply bonus (efficiency from instant)
+		var rapid := float(smods.get("rapid_deployment", 0.0))  # note: may be in combat, fallback
+		if rapid == 0.0 and typeof(NationalModifierManager) != TYPE_NIL:
+			var cmods := NationalModifierManager.get_combat_modifiers(owner_tag)
+			rapid = float(cmods.get("rapid_deployment", 0.0))
+		if rapid > 0.0 or (typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(owner_tag, "teleportation")):
+			supply_mod -= minf(0.15, rapid * 0.4)  # reduce consumption
+			if OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1":
+				print("[SPACE WIRING] teleporters rapid deploy supply bonus for %s rapid=%.2f" % [owner_tag, rapid])
+
 	if supply_mod == 0.0:
 		return base_consumption
 
@@ -676,6 +695,12 @@ func get_land_divisions_at_province(
 	var tag := country_tag.strip_edges().to_upper()
 	if tag.is_empty():
 		tag = player_tag
+	# Teleporters rapid deploy wiring (minor Supply/Leader tie per task)
+	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(tag, "teleportation"):
+		print("[SPACE WIRING] tele rapid formation deploy for %s (first Mars alt + movement/combat reinforce)" % tag)
+	# Teleporters rapid deploy wiring (minor Supply/Leader tie per task)
+	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(tag, "teleportation"):
+		print("[SPACE WIRING] tele rapid formation deploy for %s (first Mars alt + movement/combat reinforce)" % tag)
 	var out: Array[Dictionary] = []
 	if tag.is_empty():
 		return out

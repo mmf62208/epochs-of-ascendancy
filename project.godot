@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Epochs-of-Ascendancy"
-run/main_scene="uid://e7nwre744kui"
+run/main_scene="res://scenes/TestScenario.tscn"
 config/features=PackedStringArray("4.6", "Forward Plus")
 config/icon="res://icon.svg"
 
