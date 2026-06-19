@@ -5545,7 +5545,7 @@
     },
     {
       "id": 9270,
-      "name": "New Settlement",
+      "name": "Liverpool",
       "terrain": "urban",
       "core_for_tags": [
         "ENG"
@@ -5563,7 +5563,7 @@
     },
     {
       "id": 9271,
-      "name": "New Settlement",
+      "name": "Leeds",
       "terrain": "urban",
       "core_for_tags": [
         "ENG"
@@ -5581,7 +5581,7 @@
     },
     {
       "id": 9272,
-      "name": "New Settlement",
+      "name": "Newcastle",
       "terrain": "urban",
       "core_for_tags": [
         "ENG"
@@ -5599,7 +5599,7 @@
     },
     {
       "id": 9273,
-      "name": "New Settlement",
+      "name": "Southampton",
       "terrain": "urban",
       "core_for_tags": [
         "ENG"
@@ -5617,7 +5617,7 @@
     },
     {
       "id": 9274,
-      "name": "New Settlement",
+      "name": "Birmingham",
       "terrain": "urban",
       "core_for_tags": [
         "ENG"

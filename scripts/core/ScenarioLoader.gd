@@ -955,6 +955,7 @@ func _duplicate_province_from_base(base_p: Province) -> Province:
 	p.owner_tag = base_p.owner_tag
 	p.controller_tag = base_p.controller_tag
 	p.core_for = base_p.core_for.duplicate()
+	p.strategic_region_id = base_p.strategic_region_id
 	p.development_level = base_p.development_level
 	p.infrastructure = base_p.infrastructure
 	p.factories = base_p.factories
@@ -1446,3 +1447,6 @@ func _apply_layer_data_to_province(p: Province):
 		p.development_level = int(round(float(economy_data.get("development_level", p.development_level))))
 		if economy_data.has("resources"):
 			p.resources = economy_data["resources"].duplicate(true)
+
+	if province_region_by_id.has(p.id):
+		p.strategic_region_id = int(province_region_by_id[p.id])

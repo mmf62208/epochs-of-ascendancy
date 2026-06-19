@@ -20,6 +20,8 @@ extends Resource
 @export var owner_tag: String = ""
 @export var controller_tag: String = ""
 @export var core_for: Array[String] = []
+## Cached strategic region id (from strategic_regions.json at scenario load; 0 = unassigned).
+@export var strategic_region_id: int = 0
 #endregion
 
 #region Economy & stats

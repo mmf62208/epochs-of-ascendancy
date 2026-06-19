@@ -1757,8 +1757,9 @@ func _run_headless_policy_settle_cycles() -> void:
 				mapr.call("debug_preview_combat_vs_adjacent")
 				print("  [ACTION] Preview combat vs adjacent (real Province + ProvinceInsight.get_battle_preview + BattleManager.can_assault). Settlement def bonus / getters / welfare drag / loyalty in logs.")
 				# Demo AAR panel for full details
-				if typeof(DebugOverlay) != TYPE_NIL and DebugOverlay.has_method("show_battle_aar"):
-					DebugOverlay.call_deferred("show_battle_aar", {"attacker_tag":"GER", "defender_tag":"FRA", "odds_attacker_win":58.0, "winner":"GER", "key_factors":["overwhelming_air_superiority","air_superiority","leader_impact","fort_mod"], "air_dominance_level":"full","air_power_ratio":4.5, "units_att":["Inf x3","Tank x1","CAS heavy"], "units_def":["Fort Inf x2"], "outcome":"Breakthrough, key factors visible in AAR. Overwhelming air superiority achieved - enemy grounded at high cost.", "date":"1940-05", "attacker_casualties":120, "defender_casualties":80, "space_strike_bonus":0.1, "combat_logs":{"attacker":[{"date":"1940-05","province_id":101,"result":"win","key_factors":["overwhelming_air_superiority","leader_impact"],"leader":"Rommel","outcome":"Casualties:120 vs 80"}]}, "attacker_power_detail":{"leader_name":"Rommel","leader_attack_bonus":0.15}})
+				var debug_aar: Node = get_tree().get_first_node_in_group("debug_overlay") if get_tree() else null
+				if debug_aar != null and debug_aar.has_method("show_battle_aar"):
+					debug_aar.call_deferred("show_battle_aar", {"attacker_tag":"GER", "defender_tag":"FRA", "odds_attacker_win":58.0, "winner":"GER", "key_factors":["overwhelming_air_superiority","air_superiority","leader_impact","fort_mod"], "air_dominance_level":"full","air_power_ratio":4.5, "units_att":["Inf x3","Tank x1","CAS heavy"], "units_def":["Fort Inf x2"], "outcome":"Breakthrough, key factors visible in AAR. Overwhelming air superiority achieved - enemy grounded at high cost.", "date":"1940-05", "attacker_casualties":120, "defender_casualties":80, "space_strike_bonus":0.1, "combat_logs":{"attacker":[{"date":"1940-05","province_id":101,"result":"win","key_factors":["overwhelming_air_superiority","leader_impact"],"leader":"Rommel","outcome":"Casualties:120 vs 80"}]}, "attacker_power_detail":{"leader_name":"Rommel","leader_attack_bonus":0.15}})
 			# NEW actions
 			if mapr.has_method("debug_invest_infra_selected_province"):
 				mapr.call("debug_invest_infra_selected_province")
@@ -3280,9 +3281,9 @@ func _force_space_race_evidence_prints() -> void:
 	print("[HISTORICAL COMBAT TEST] Starting WWI/WWII sims - force OOB, run resolver, log AAR/tips/unit logs for gaps.")
 	# Stub: force Marne-like (inf/art vs inf, trench terrain, gas if tech)
 	if typeof(CombatResolver) != TYPE_NIL:
-		r = CombatResolver.new()
+		var r: CombatResolver = CombatResolver.new()
 		# Assume forces set in harness or 50T
-		p_marne = r.get_effective_combat_power("german_infantry_division_1943_mixed", "trench", "", "plains")  # proxy
+		var p_marne: Dictionary = r.get_effective_combat_power("german_infantry_division_1943_mixed", "trench", "", "plains")  # proxy
 		print("  [MARNE 1914 proxy] GER inf vs trench: power ~%.1f (attrition grind expected; gap: no persistent supply drain for prolonged battle)" % float(p_marne.get("soft_attack",0)))
 		r.free()
 	print("[HISTORICAL TEST] Gaps/recs logged. See full in /tmp/combat-history-testing-summary.md from agent. Add to BM: logistics endurance, chem, battle sabo, initiative flank, weather persist.")

@@ -53,7 +53,7 @@ static func build_compact_hover_tooltip(province: Province) -> String:
 	if not owner.is_empty():
 		lines.append("Owner: %s" % owner)
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
-		var rid: int = MapManager.get_province_region_id(province.id)
+		var rid: int = province.strategic_region_id if province.strategic_region_id > 0 else MapManager.get_province_region_id(province.id)
 		if rid > 0:
 			var rname: String = MapManager.get_strategic_region_name(rid)
 			if not rname.is_empty():
@@ -75,7 +75,7 @@ static func build_strategic_hover_tooltip(province: Province) -> String:
 			nation = str(country["name"])
 	var region := ""
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
-		var rid: int = MapManager.get_province_region_id(province.id)
+		var rid: int = province.strategic_region_id if province.strategic_region_id > 0 else MapManager.get_province_region_id(province.id)
 		if rid > 0:
 			region = MapManager.get_strategic_region_name(rid)
 	if not region.is_empty():
@@ -3954,12 +3954,20 @@ static func build_control_glance_bbcode(province: Province) -> String:
 	if province == null:
 		return ""
 	var owner := province.owner_tag if not province.owner_tag.is_empty() else "—"
+	var region_line := ""
+	var rid: int = province.strategic_region_id
+	if rid <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
+		rid = MapManager.get_province_region_id(province.id)
+	if rid > 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_strategic_region_name"):
+		var rname: String = MapManager.get_strategic_region_name(rid)
+		if not rname.is_empty():
+			region_line = "  ·  Region: %s" % rname
 	if is_province_contested(province):
 		return (
-			"%sOwner %s  ·  %s⚑ Held by %s[/color]"
-			% [COLOR_MUTED, owner, COLOR_WARN, province.controller_tag]
+			"%sOwner %s%s  ·  %s⚑ Held by %s[/color]"
+			% [COLOR_MUTED, owner, region_line, COLOR_WARN, province.controller_tag]
 		)
-	return "%sOwner: %s[/color]" % [COLOR_MUTED, owner]
+	return "%sOwner: %s%s[/color]" % [COLOR_MUTED, owner, region_line]
 
 
 static func build_province_glance_bbcode(

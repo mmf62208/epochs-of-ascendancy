@@ -621,6 +621,9 @@ func get_demo_geometry_override(pid: int) -> Array:
 
 ## Fast lookup: which strategic region contains this province (0 if none).
 func get_province_region_id(province_id: int) -> int:
+	var prov: Province = get_province(province_id)
+	if prov != null and prov.strategic_region_id > 0:
+		return prov.strategic_region_id
 	# Prefer ScenarioLoader for live data, fallback to our cached regions (reverse map could be built for speed)
 	var loader := get_node_or_null("/root/ScenarioLoader") as ScenarioLoader
 	if loader != null and loader.province_region_by_id.has(province_id):

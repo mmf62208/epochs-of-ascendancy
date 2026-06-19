@@ -219,8 +219,10 @@ func execute_province_assault(
 	result["combat_logs"] = logs_snap
 
 	# Auto AAR for player if involved (accessible panel) - now after logs
-	if typeof(DebugOverlay) != TYPE_NIL and (str(result.get("attacker_tag","")) == "player" or str(result.get("defender_tag","")) == "player"):
-		DebugOverlay.call_deferred("show_battle_aar", result)
+	if str(result.get("attacker_tag","")) == "player" or str(result.get("defender_tag","")) == "player":
+		var debug_aar: Node = get_tree().get_first_node_in_group("debug_overlay") if get_tree() else null
+		if debug_aar != null and debug_aar.has_method("show_battle_aar"):
+			debug_aar.call_deferred("show_battle_aar", result)
 
 	return {"success": true, "result": result}
 
@@ -342,20 +344,20 @@ func apply_combat_outcome(
 			var is_win := (w == "attacker")
 			var org_loss := 0.09 if is_win else 0.27
 			var rdy_loss := 0.07 if is_win else 0.22
-			att_f.organization = clampf(float(att_f.get("organization", 1.0)) * (1.0 - org_loss + randf() * 0.04), 0.22, 1.0)
-			att_f.readiness = clampf(float(att_f.get("readiness", 1.0)) * (1.0 - rdy_loss + randf() * 0.04), 0.28, 1.0)
+			att_f.organization = clampf(att_f.organization * (1.0 - org_loss + randf() * 0.04), 0.22, 1.0)
+			att_f.readiness = clampf(att_f.readiness * (1.0 - rdy_loss + randf() * 0.04), 0.28, 1.0)
 			if not is_win:
-				att_f.strength = clampf(float(att_f.get("strength", 1.0)) * (0.72 + randf() * 0.12), 0.35, 1.0)
+				att_f.strength = clampf(att_f.strength * (0.72 + randf() * 0.12), 0.35, 1.0)
 			att_f.is_in_combat = true
 			dmg_line += "ATT %s: org=%.2f rdy=%.2f str=%.2f ; " % [attacker_formation_id, att_f.organization, att_f.readiness, att_f.strength]
 		if def_f != null:
 			var is_win_def := (w == "defender")
 			var org_loss_d := 0.26 if not is_win_def else 0.10
 			var rdy_loss_d := 0.21 if not is_win_def else 0.08
-			def_f.organization = clampf(float(def_f.get("organization", 1.0)) * (1.0 - org_loss_d + randf() * 0.04), 0.22, 1.0)
-			def_f.readiness = clampf(float(def_f.get("readiness", 1.0)) * (1.0 - rdy_loss_d + randf() * 0.04), 0.28, 1.0)
+			def_f.organization = clampf(def_f.organization * (1.0 - org_loss_d + randf() * 0.04), 0.22, 1.0)
+			def_f.readiness = clampf(def_f.readiness * (1.0 - rdy_loss_d + randf() * 0.04), 0.28, 1.0)
 			if not is_win_def:
-				def_f.strength = clampf(float(def_f.get("strength", 1.0)) * (0.62 + randf() * 0.12), 0.30, 1.0)
+				def_f.strength = clampf(def_f.strength * (0.62 + randf() * 0.12), 0.30, 1.0)
 			def_f.is_in_combat = true
 			dmg_line += "DEF %s: org=%.2f rdy=%.2f str=%.2f" % [def_fid, def_f.organization, def_f.readiness, def_f.strength]
 		if att_f != null or def_f != null:

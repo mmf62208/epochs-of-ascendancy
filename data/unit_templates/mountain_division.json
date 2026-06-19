@@ -1,0 +1,46 @@
+{
+  "id": "cyber_enhanced_infantry",
+  "name": "Mountain Division",
+  "base_type": "Infantry",
+  "size_category": "Light",
+  "visual_archetype": "mountain_infantry",
+  "crew_required": 1,
+  "base_training_level": 30,
+  "max_experience_level": 110,
+  "base_stats": {
+    "speed": 32,
+    "reliability": 70,
+    "fuel_consumption": 2,
+    "supply_need": 12,
+    "armor": 22,
+    "top_armor": 12,
+    "hardness": 25,
+    "soft_attack": 22,
+    "hard_attack": 8
+  },
+  "slots": {
+    "MainWeapon": {
+      "max": 1
+    },
+    "Augment": {
+      "max": 2
+    }
+  },
+  "unlock_tech": "mountain_warfare",
+  "is_vehicle": false,
+  "is_cyber": true,
+  "description": "Specialized alpine troops with superior mobility in rough terrain. Unlocks with appropriate doctrine/tech.",
+  "production_category": "mountain",
+  "era": "future",
+  "modules": [],
+  "production_cost": 68.0,
+  "daily_resource_cost": {
+    "steel": 0.4,
+    "electronics": 1.8,
+    "rare_earth": 0.25
+  },
+  "template_id": "mountain_division",
+  "hard_attack": 5,
+  "soft_attack": 9,
+  "supply_consumption": 0.9
+}
