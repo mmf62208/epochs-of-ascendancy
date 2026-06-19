@@ -5307,6 +5307,23 @@ static func _battle_preview_block(
 		tips.append("Orbital strike support active — guided munitions have much greater impacts on troops")
 	if preview.get("guided_munitions_bonus", 0.0) > 0.1:
 		tips.append("Guided munitions bonus for advanced units (space comms/tech)")
+	# Unit specialty factors (from resolver power in live calls or passed; HoI4-style % visible)
+	var umf := preview.get("unit_mod_factors", {})
+	if umf:
+		if umf.has("marine_amphib_coastal"):
+			tips.append("Marine amphibious specialists active (+28% soft in coastal)")
+		if umf.has("paratroop_org_risk"):
+			tips.append("Paratroop drop in progress — high organizational risk (-18% org)")
+		if umf.has("sf_flanking_sabotage"):
+			tips.append("Special forces flanking/sabotage bonus (+22% flank, pre-battle defender hit)")
+		if umf.has("mountain_terrain_bonus"):
+			tips.append("Mountain specialists in favorable terrain (+32% soft)")
+		if umf.has("ski_winter_terrain"):
+			tips.append("Ski/winter troops dominant in snow (+35% soft)")
+		if umf.has("space_orbital_support"):
+			tips.append("Space-capable/orbital recon support (+20% + guided precision)")
+		if umf.has("guided_munitions_soft"):
+			tips.append("Guided munitions active — devastating precision on soft troops (+50% soft impact)")
 	tips.append("See full AAR (F10) for unit combat logs (Formation.combat_log: date/province/result/key factors/leader), leader impacts, modifiers with % values, space/air effects")
 	if tips.size() > 0:
 		block += "\n  %sKey situation: %s[/color]" % [COLOR_MUTED, " · ".join(tips)]

@@ -21,8 +21,7 @@
         "political_general": 1
       },
       "birth_year": 1968,
-      "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2025
     },
     {
       "leader_id": "usa_army_chief_2026",
@@ -42,8 +41,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1972,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2024
     },
     {
       "leader_id": "usa_navy_chief_2026",
@@ -104,8 +102,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1978,
-      "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2025
     },
     {
       "leader_id": "usa_richardson_2026",
@@ -125,8 +122,7 @@
         "methodical": 1
       },
       "birth_year": 1972,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "usa_mendez_2026",
@@ -167,8 +163,7 @@
         "aggressive": 3
       },
       "birth_year": 1975,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "usa_whitmore_2026",
@@ -188,8 +183,7 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2023
     },
     {
       "leader_id": "usa_monroe_2026",
@@ -209,8 +203,7 @@
         "methodical": 2
       },
       "birth_year": 1970,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2024
     },
     {
       "leader_id": "usa_chen_2026",
@@ -252,7 +245,7 @@
       },
       "birth_year": 1971,
       "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
+      "portrait": "res://assets/graphics/portraits/leaders/weber.png"
     },
     {
       "leader_id": "ger_schmidt_2026",
@@ -273,7 +266,7 @@
       },
       "birth_year": 1975,
       "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/ger_fuehrer.png"
+      "portrait": "res://assets/graphics/portraits/leaders/schmidt.png"
     },
     {
       "leader_id": "ger_hoffmann_2026",
@@ -294,7 +287,7 @@
       },
       "birth_year": 1979,
       "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/ger_fuehrer.png"
+      "portrait": "res://assets/graphics/portraits/leaders/hoffmann.png"
     },
     {
       "leader_id": "rus_volkov_2026",
@@ -314,8 +307,7 @@
         "methodical": 1
       },
       "birth_year": 1969,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/sov_marshal.png"
+      "start_year": 2020
     },
     {
       "leader_id": "rus_orlova_2026",
@@ -335,8 +327,7 @@
         "cautious": 2
       },
       "birth_year": 1973,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/sov_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "chn_liu_2026",
@@ -356,8 +347,7 @@
         "logistics_wizard": 2
       },
       "birth_year": 1973,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "chn_wang_2026",
@@ -377,8 +367,7 @@
         "cautious": 1
       },
       "birth_year": 1975,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "eng_taylor_2026",
@@ -399,7 +388,7 @@
       },
       "birth_year": 1970,
       "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/uk_marshal.png"
+      "portrait": "res://assets/graphics/portraits/leaders/taylor.png"
     },
     {
       "leader_id": "eng_frost_2026",
@@ -420,7 +409,7 @@
       },
       "birth_year": 1972,
       "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/uk_marshal.png"
+      "portrait": "res://assets/graphics/portraits/leaders/frost.png"
     },
     {
       "leader_id": "fra_dupont_2026",
@@ -441,7 +430,7 @@
       },
       "birth_year": 1971,
       "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
+      "portrait": "res://assets/graphics/portraits/leaders/dupont.png"
     },
     {
       "leader_id": "fra_martin_2026",
@@ -462,7 +451,7 @@
       },
       "birth_year": 1976,
       "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
+      "portrait": "res://assets/graphics/portraits/leaders/martin.png"
     },
     {
       "leader_id": "jap_sato_2026",
@@ -482,8 +471,7 @@
         "cautious": 2
       },
       "birth_year": 1977,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/jap_admiral.png"
+      "start_year": 2023
     },
     {
       "leader_id": "jap_tanaka_2026",
@@ -503,8 +491,7 @@
         "bold": 1
       },
       "birth_year": 1974,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/jap_admiral.png"
+      "start_year": 2022
     },
     {
       "leader_id": "ind_sharma_2026",
@@ -524,8 +511,7 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "isr_cohen_2026",
@@ -545,8 +531,7 @@
         "aggressive": 1
       },
       "birth_year": 1970,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2019
     },
     {
       "leader_id": "irn_rezaei_2026",
@@ -566,8 +551,7 @@
         "cautious": 1
       },
       "birth_year": 1974,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "kor_park_2026",
@@ -587,8 +571,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1973,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "pol_kowalski_2026",
@@ -608,8 +591,7 @@
         "methodical": 2
       },
       "birth_year": 1975,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/pol_general.png"
+      "start_year": 2023
     },
     {
       "leader_id": "ukr_shevchenko_2026",
@@ -629,8 +611,7 @@
         "morale_builder": 1
       },
       "birth_year": 1971,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "tur_yilmaz_2026",
@@ -649,8 +630,7 @@
         "mountain_specialist": 2
       },
       "birth_year": 1972,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
+      "start_year": 2021
     },
     {
       "leader_id": "sau_al_rashid_2026",
@@ -669,8 +649,7 @@
         "logistics_wizard": 2
       },
       "birth_year": 1976,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "ita_rossi_2026",
@@ -691,7 +670,7 @@
       },
       "birth_year": 1973,
       "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
+      "portrait": "res://assets/graphics/portraits/leaders/rossi.png"
     },
     {
       "leader_id": "spa_garcia_2026",
@@ -710,8 +689,7 @@
         "cautious": 2
       },
       "birth_year": 1974,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "bra_silva_2026",
@@ -731,8 +709,7 @@
         "logistics_wizard": 1
       },
       "birth_year": 1975,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "mex_herrera_2026",
@@ -752,8 +729,7 @@
         "bold": 1
       },
       "birth_year": 1977,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2024
     },
     {
       "leader_id": "can_fraser_2026",
@@ -773,8 +749,7 @@
         "arctic_bear": 1
       },
       "birth_year": 1971,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "nor_hansen_2026",
@@ -794,8 +769,7 @@
         "arctic_bear": 2
       },
       "birth_year": 1973,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "aus_mitchell_2026",
@@ -814,8 +788,7 @@
         "jungle_panther": 2
       },
       "birth_year": 1972,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "rus_air_cmd_2026",
@@ -835,8 +808,7 @@
         "methodical": 1
       },
       "birth_year": 1969,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "chn_air_cmd_2026",
@@ -856,8 +828,7 @@
         "methodical": 1
       },
       "birth_year": 1972,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "eng_air_cmd_2026",
@@ -878,7 +849,7 @@
       },
       "birth_year": 1972,
       "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "portrait": "res://assets/graphics/portraits/leaders/air_cmd.png"
     },
     {
       "leader_id": "fra_nav_cmd_2026",
@@ -899,7 +870,7 @@
       },
       "birth_year": 1969,
       "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
+      "portrait": "res://assets/graphics/portraits/leaders/nav_cmd.png"
     },
     {
       "leader_id": "jap_air_cmd_2026",
@@ -920,7 +891,7 @@
       },
       "birth_year": 1973,
       "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "portrait": "res://assets/graphics/portraits/leaders/air_cmd_1.png"
     },
     {
       "leader_id": "ind_nav_cmd_2026",
@@ -940,8 +911,7 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2023
     },
     {
       "leader_id": "ind_air_cmd_2026",
@@ -961,8 +931,7 @@
         "methodical": 1
       },
       "birth_year": 1972,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2019
     },
     {
       "leader_id": "isr_nav_cmd_2026",
@@ -982,8 +951,7 @@
         "cautious": 1
       },
       "birth_year": 1975,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "isr_air_cmd_2026",
@@ -1003,8 +971,7 @@
         "methodical": 1
       },
       "birth_year": 1975,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2020
     },
     {
       "leader_id": "irn_nav_cmd_2026",
@@ -1024,8 +991,7 @@
         "cautious": 1
       },
       "birth_year": 1968,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "irn_air_cmd_2026",
@@ -1045,8 +1011,7 @@
         "methodical": 1
       },
       "birth_year": 1968,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2021
     },
     {
       "leader_id": "kor_nav_cmd_2026",
@@ -1066,8 +1031,7 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "kor_air_cmd_2026",
@@ -1087,8 +1051,7 @@
         "methodical": 1
       },
       "birth_year": 1972,
-      "start_year": 2018,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2018
     },
     {
       "leader_id": "mex_nav_cmd_2026",
@@ -1108,8 +1071,7 @@
         "cautious": 1
       },
       "birth_year": 1975,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2019
     },
     {
       "leader_id": "mex_air_cmd_2026",
@@ -1129,8 +1091,7 @@
         "methodical": 1
       },
       "birth_year": 1975,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "bra_nav_cmd_2026",
@@ -1150,8 +1111,7 @@
         "cautious": 1
       },
       "birth_year": 1973,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "bra_air_cmd_2026",
@@ -1171,8 +1131,7 @@
         "methodical": 1
       },
       "birth_year": 1973,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "ita_nav_cmd_2026",
@@ -1193,7 +1152,7 @@
       },
       "birth_year": 1976,
       "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
+      "portrait": "res://assets/graphics/portraits/leaders/nav_cmd_7.png"
     },
     {
       "leader_id": "ita_air_cmd_2026",
@@ -1214,7 +1173,7 @@
       },
       "birth_year": 1976,
       "start_year": 2018,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "portrait": "res://assets/graphics/portraits/leaders/air_cmd_8.png"
     },
     {
       "leader_id": "spa_nav_cmd_2026",
@@ -1276,8 +1235,7 @@
         "cautious": 1
       },
       "birth_year": 1969,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
+      "start_year": 2021
     },
     {
       "leader_id": "tur_air_cmd_2026",
@@ -1297,8 +1255,7 @@
         "methodical": 1
       },
       "birth_year": 1969,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2021
     },
     {
       "leader_id": "sau_nav_cmd_2026",
@@ -1318,8 +1275,7 @@
         "cautious": 1
       },
       "birth_year": 1979,
-      "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2025
     },
     {
       "leader_id": "sau_air_cmd_2026",
@@ -1339,8 +1295,7 @@
         "methodical": 1
       },
       "birth_year": 1979,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2024
     },
     {
       "leader_id": "pol_nav_cmd_2026",
@@ -1360,8 +1315,7 @@
         "cautious": 1
       },
       "birth_year": 1977,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/pol_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "pol_air_cmd_2026",
@@ -1381,8 +1335,7 @@
         "methodical": 1
       },
       "birth_year": 1977,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "ukr_nav_cmd_2026",
@@ -1402,8 +1355,7 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2024
     },
     {
       "leader_id": "ukr_air_cmd_2026",
@@ -1423,8 +1375,7 @@
         "methodical": 1
       },
       "birth_year": 1972,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2020
     },
     {
       "leader_id": "can_nav_cmd_2026",
@@ -1444,8 +1395,7 @@
         "cautious": 1
       },
       "birth_year": 1977,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2023
     },
     {
       "leader_id": "can_air_cmd_2026",
@@ -1465,8 +1415,7 @@
         "methodical": 1
       },
       "birth_year": 1977,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "nor_gen_cmd_2026",
@@ -1486,8 +1435,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1971,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "nor_air_cmd_2026",
@@ -1507,8 +1455,7 @@
         "methodical": 1
       },
       "birth_year": 1971,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2021
     },
     {
       "leader_id": "aus_nav_cmd_2026",
@@ -1528,8 +1475,7 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "aus_air_cmd_2026",
@@ -1549,8 +1495,7 @@
         "methodical": 1
       },
       "birth_year": 1972,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "aze_gen_cmd_2026",
@@ -1570,8 +1515,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1970,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "aze_nav_cmd_2026",
@@ -1591,8 +1535,7 @@
         "cautious": 1
       },
       "birth_year": 1970,
-      "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2025
     },
     {
       "leader_id": "aze_air_cmd_2026",
@@ -1612,8 +1555,7 @@
         "methodical": 1
       },
       "birth_year": 1970,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2019
     },
     {
       "leader_id": "irq_gen_cmd_2026",
@@ -1633,8 +1575,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1974,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "irq_nav_cmd_2026",
@@ -1654,8 +1595,7 @@
         "cautious": 1
       },
       "birth_year": 1974,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2023
     },
     {
       "leader_id": "irq_air_cmd_2026",
@@ -1675,8 +1615,7 @@
         "methodical": 1
       },
       "birth_year": 1974,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "syr_gen_cmd_2026",
@@ -1696,8 +1635,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1978,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2019
     },
     {
       "leader_id": "syr_nav_cmd_2026",
@@ -1717,8 +1655,7 @@
         "cautious": 1
       },
       "birth_year": 1978,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "syr_air_cmd_2026",
@@ -1738,8 +1675,7 @@
         "methodical": 1
       },
       "birth_year": 1978,
-      "start_year": 2018,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2018
     },
     {
       "leader_id": "nga_gen_cmd_2026",
@@ -1759,8 +1695,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1977,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2023
     },
     {
       "leader_id": "nga_nav_cmd_2026",
@@ -1780,8 +1715,7 @@
         "cautious": 1
       },
       "birth_year": 1977,
-      "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2025
     },
     {
       "leader_id": "nga_air_cmd_2026",
@@ -1801,8 +1735,7 @@
         "methodical": 1
       },
       "birth_year": 1977,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "col_gen_cmd_2026",
@@ -1822,8 +1755,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1969,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "col_nav_cmd_2026",
@@ -1843,8 +1775,7 @@
         "cautious": 1
       },
       "birth_year": 1969,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "col_air_cmd_2026",
@@ -1864,8 +1795,7 @@
         "methodical": 1
       },
       "birth_year": 1969,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2024
     },
     {
       "leader_id": "sgp_gen_cmd_2026",
@@ -1885,8 +1815,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1976,
-      "start_year": 2018,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2018
     },
     {
       "leader_id": "sgp_nav_cmd_2026",
@@ -1906,8 +1835,7 @@
         "cautious": 1
       },
       "birth_year": 1976,
-      "start_year": 2018,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2018
     },
     {
       "leader_id": "sgp_air_cmd_2026",
@@ -1927,8 +1855,7 @@
         "methodical": 1
       },
       "birth_year": 1976,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2019
     },
     {
       "leader_id": "mys_gen_cmd_2026",
@@ -1948,8 +1875,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1969,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2024
     },
     {
       "leader_id": "mys_nav_cmd_2026",
@@ -1969,8 +1895,7 @@
         "cautious": 1
       },
       "birth_year": 1969,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2019
     },
     {
       "leader_id": "mys_air_cmd_2026",
@@ -1990,8 +1915,7 @@
         "methodical": 1
       },
       "birth_year": 1969,
-      "start_year": 2018,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2018
     },
     {
       "leader_id": "tha_gen_cmd_2026",
@@ -2011,8 +1935,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1968,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "tha_nav_cmd_2026",
@@ -2032,8 +1955,7 @@
         "cautious": 1
       },
       "birth_year": 1968,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2024
     },
     {
       "leader_id": "tha_air_cmd_2026",
@@ -2053,8 +1975,7 @@
         "methodical": 1
       },
       "birth_year": 1968,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2024
     },
     {
       "leader_id": "nzl_gen_cmd_2026",
@@ -2074,8 +1995,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1968,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2024
     },
     {
       "leader_id": "nzl_nav_cmd_2026",
@@ -2095,8 +2015,7 @@
         "cautious": 1
       },
       "birth_year": 1968,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2019
     },
     {
       "leader_id": "nzl_air_cmd_2026",
@@ -2116,8 +2035,7 @@
         "methodical": 1
       },
       "birth_year": 1968,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "isl_gen_cmd_2026",
@@ -2137,8 +2055,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1970,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "isl_nav_cmd_2026",
@@ -2158,8 +2075,7 @@
         "cautious": 1
       },
       "birth_year": 1970,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "isl_air_cmd_2026",
@@ -2179,8 +2095,7 @@
         "methodical": 1
       },
       "birth_year": 1970,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "pan_gen_cmd_2026",
@@ -2200,8 +2115,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1970,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2024
     },
     {
       "leader_id": "pan_nav_cmd_2026",
@@ -2221,8 +2135,7 @@
         "cautious": 1
       },
       "birth_year": 1970,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2019
     },
     {
       "leader_id": "pan_air_cmd_2026",
@@ -2242,8 +2155,7 @@
         "methodical": 1
       },
       "birth_year": 1970,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2021
     },
     {
       "leader_id": "grl_gen_cmd_2026",
@@ -2263,8 +2175,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1976,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "grl_nav_cmd_2026",
@@ -2284,8 +2195,7 @@
         "cautious": 1
       },
       "birth_year": 1976,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "grl_air_cmd_2026",
@@ -2305,8 +2215,7 @@
         "methodical": 1
       },
       "birth_year": 1976,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2020
     },
     {
       "leader_id": "fin_gen_cmd_2026",
@@ -2326,8 +2235,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1975,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2024
     },
     {
       "leader_id": "fin_nav_cmd_2026",
@@ -2347,8 +2255,7 @@
         "cautious": 1
       },
       "birth_year": 1975,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "fin_air_cmd_2026",
@@ -2368,8 +2275,7 @@
         "methodical": 1
       },
       "birth_year": 1975,
-      "start_year": 2018,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2018
     },
     {
       "leader_id": "dnk_gen_cmd_2026",
@@ -2389,8 +2295,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1978,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2023
     },
     {
       "leader_id": "dnk_nav_cmd_2026",
@@ -2410,8 +2315,7 @@
         "cautious": 1
       },
       "birth_year": 1978,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2019
     },
     {
       "leader_id": "dnk_air_cmd_2026",
@@ -2431,8 +2335,7 @@
         "methodical": 1
       },
       "birth_year": 1978,
-      "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2025
     },
     {
       "leader_id": "swe_gen_cmd_2026",
@@ -2452,8 +2355,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1971,
-      "start_year": 2018,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2018
     },
     {
       "leader_id": "swe_nav_cmd_2026",
@@ -2473,8 +2375,7 @@
         "cautious": 1
       },
       "birth_year": 1971,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2024
     },
     {
       "leader_id": "swe_air_cmd_2026",
@@ -2494,8 +2395,7 @@
         "methodical": 1
       },
       "birth_year": 1971,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2019
     },
     {
       "leader_id": "idn_gen_cmd_2026",
@@ -2515,8 +2415,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1972,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2019
     },
     {
       "leader_id": "idn_nav_cmd_2026",
@@ -2536,8 +2435,7 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2019
     },
     {
       "leader_id": "idn_air_cmd_2026",
@@ -2557,8 +2455,7 @@
         "methodical": 1
       },
       "birth_year": 1972,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2020
     },
     {
       "leader_id": "usa_gen2_2026",
@@ -2578,8 +2475,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1971,
-      "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2025
     },
     {
       "leader_id": "usa_nav2_2026",
@@ -2599,8 +2495,7 @@
         "cautious": 1
       },
       "birth_year": 1974,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2024
     },
     {
       "leader_id": "usa_air2_2026",
@@ -2620,8 +2515,7 @@
         "methodical": 1
       },
       "birth_year": 1979,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "ger_gen2_2026",
@@ -2642,7 +2536,7 @@
       },
       "birth_year": 1974,
       "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/ger_general1.png"
+      "portrait": "res://assets/graphics/portraits/leaders/gen2_1.png"
     },
     {
       "leader_id": "ger_nav2_2026",
@@ -2663,7 +2557,7 @@
       },
       "birth_year": 1977,
       "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/ger_fuehrer.png"
+      "portrait": "res://assets/graphics/portraits/leaders/nav2_1.png"
     },
     {
       "leader_id": "ger_air2_2026",
@@ -2684,7 +2578,7 @@
       },
       "birth_year": 1975,
       "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_marshal_german_1950s.png"
+      "portrait": "res://assets/graphics/portraits/leaders/air2_1.png"
     },
     {
       "leader_id": "rus_gen2_2026",
@@ -2704,8 +2598,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1971,
-      "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/sov_marshal.png"
+      "start_year": 2025
     },
     {
       "leader_id": "rus_nav2_2026",
@@ -2725,8 +2618,7 @@
         "cautious": 1
       },
       "birth_year": 1977,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/sov_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "rus_air2_2026",
@@ -2746,8 +2638,7 @@
         "methodical": 1
       },
       "birth_year": 1979,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "chn_gen2_2026",
@@ -2767,8 +2658,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1974,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "chn_nav2_2026",
@@ -2788,8 +2678,7 @@
         "cautious": 1
       },
       "birth_year": 1979,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "chn_air2_2026",
@@ -2809,8 +2698,7 @@
         "methodical": 1
       },
       "birth_year": 1972,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "eng_gen2_2026",
@@ -2831,7 +2719,7 @@
       },
       "birth_year": 1974,
       "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/uk_marshal.png"
+      "portrait": "res://assets/graphics/portraits/leaders/gen2_2.png"
     },
     {
       "leader_id": "eng_nav2_2026",
@@ -2852,7 +2740,7 @@
       },
       "birth_year": 1972,
       "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/uk_marshal.png"
+      "portrait": "res://assets/graphics/portraits/leaders/nav2_2.png"
     },
     {
       "leader_id": "eng_air2_2026",
@@ -2873,7 +2761,7 @@
       },
       "birth_year": 1978,
       "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "portrait": "res://assets/graphics/portraits/leaders/air2_2.png"
     },
     {
       "leader_id": "fra_gen2_2026",
@@ -2894,7 +2782,7 @@
       },
       "birth_year": 1979,
       "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
+      "portrait": "res://assets/graphics/portraits/leaders/gen2_3.png"
     },
     {
       "leader_id": "fra_nav2_2026",
@@ -2915,7 +2803,7 @@
       },
       "birth_year": 1979,
       "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/fra_general.png"
+      "portrait": "res://assets/graphics/portraits/leaders/nav2_3.png"
     },
     {
       "leader_id": "fra_air2_2026",
@@ -2936,7 +2824,7 @@
       },
       "birth_year": 1975,
       "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "portrait": "res://assets/graphics/portraits/leaders/air2_3.png"
     },
     {
       "leader_id": "jap_gen2_2026",
@@ -2957,7 +2845,7 @@
       },
       "birth_year": 1974,
       "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/jap_admiral.png"
+      "portrait": "res://assets/graphics/portraits/leaders/gen2_4.png"
     },
     {
       "leader_id": "jap_nav2_2026",
@@ -2977,8 +2865,7 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/jap_admiral.png"
+      "start_year": 2020
     },
     {
       "leader_id": "jap_air2_2026",
@@ -2999,7 +2886,7 @@
       },
       "birth_year": 1977,
       "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "portrait": "res://assets/graphics/portraits/leaders/air2_4.png"
     },
     {
       "leader_id": "usa_space_2026",
@@ -3039,8 +2926,7 @@
         "blockade_runner": 1
       },
       "birth_year": 1974,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2020
     },
     {
       "leader_id": "ind_air_2026",
@@ -3059,8 +2945,7 @@
         "combined_arms_master": 1
       },
       "birth_year": 1976,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "kor_navy_2026",
@@ -3079,8 +2964,7 @@
         "carrier_admiral": 1
       },
       "birth_year": 1975,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2021
     },
     {
       "leader_id": "kor_air_2026",
@@ -3099,8 +2983,7 @@
         "methodical": 1
       },
       "birth_year": 1978,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "chn_air_2026",
@@ -3119,8 +3002,7 @@
         "methodical": 2
       },
       "birth_year": 1972,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2020
     },
     {
       "leader_id": "fra_navy_2026",
@@ -3140,7 +3022,7 @@
       },
       "birth_year": 1971,
       "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "portrait": "res://assets/graphics/portraits/leaders/navy_13.png"
     },
     {
       "leader_id": "jap_air_2026",
@@ -3160,7 +3042,7 @@
       },
       "birth_year": 1976,
       "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "portrait": "res://assets/graphics/portraits/leaders/jap_air_2026.png"
     },
     {
       "leader_id": "pol_air_2026",
@@ -3179,8 +3061,7 @@
         "iron_will": 1
       },
       "birth_year": 1977,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "pol_navy_2026",
@@ -3199,8 +3080,7 @@
         "sea_wolf": 1
       },
       "birth_year": 1974,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2021
     },
     {
       "leader_id": "ukr_navy_2026",
@@ -3219,8 +3099,7 @@
         "iron_will": 1
       },
       "birth_year": 1973,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2020
     },
     {
       "leader_id": "ukr_air_2026",
@@ -3239,8 +3118,7 @@
         "morale_builder": 1
       },
       "birth_year": 1975,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "tur_air_2026",
@@ -3259,8 +3137,7 @@
         "mountain_specialist": 1
       },
       "birth_year": 1978,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "tur_navy_2026",
@@ -3279,8 +3156,7 @@
         "cautious": 1
       },
       "birth_year": 1976,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2021
     },
     {
       "leader_id": "sau_air_2026",
@@ -3299,8 +3175,7 @@
         "logistics_wizard": 1
       },
       "birth_year": 1977,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "sau_navy_2026",
@@ -3319,8 +3194,7 @@
         "blockade_runner": 1
       },
       "birth_year": 1979,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "spa_navy_2026",
@@ -3359,8 +3233,7 @@
         "methodical": 1
       },
       "birth_year": 1975,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "bra_navy_2026",
@@ -3379,8 +3252,7 @@
         "jungle_panther": 1
       },
       "birth_year": 1974,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2021
     },
     {
       "leader_id": "bra_air_2026",
@@ -3399,8 +3271,7 @@
         "bold": 1
       },
       "birth_year": 1977,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "mex_air_2026",
@@ -3419,8 +3290,7 @@
         "aggressive": 1
       },
       "birth_year": 1980,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2024
     },
     {
       "leader_id": "mex_navy_2026",
@@ -3439,8 +3309,7 @@
         "cautious": 1
       },
       "birth_year": 1978,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "can_air_2026",
@@ -3459,8 +3328,7 @@
         "arctic_bear": 1
       },
       "birth_year": 1976,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2021
     },
     {
       "leader_id": "can_navy_2026",
@@ -3479,8 +3347,7 @@
         "cautious": 2
       },
       "birth_year": 1972,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2020
     },
     {
       "leader_id": "aus_navy_2026",
@@ -3499,8 +3366,7 @@
         "sea_wolf": 1
       },
       "birth_year": 1973,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2021
     },
     {
       "leader_id": "aus_air_2026",
@@ -3519,8 +3385,7 @@
         "jungle_panther": 1
       },
       "birth_year": 1975,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "nor_air_2026",
@@ -3539,8 +3404,7 @@
         "arctic_bear": 1
       },
       "birth_year": 1977,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "isr_navy_2026",
@@ -3559,8 +3423,7 @@
         "cautious": 1
       },
       "birth_year": 1971,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2020
     },
     {
       "leader_id": "isr_air_2026",
@@ -3579,8 +3442,7 @@
         "bold": 1
       },
       "birth_year": 1973,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "irn_air_2026",
@@ -3599,8 +3461,7 @@
         "mountain_specialist": 1
       },
       "birth_year": 1976,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2021
     },
     {
       "leader_id": "irn_navy_2026",
@@ -3619,8 +3480,7 @@
         "cautious": 1
       },
       "birth_year": 1978,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/navy_admiral_japanese_1960s.png"
+      "start_year": 2022
     },
     {
       "leader_id": "aze_gen_2026",
@@ -3639,8 +3499,7 @@
         "mountain_specialist": 1
       },
       "birth_year": 1974,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "aze_nav_2026",
@@ -3659,8 +3518,7 @@
         "cautious": 1
       },
       "birth_year": 1976,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "aze_air_2026",
@@ -3679,8 +3537,7 @@
         "bold": 1
       },
       "birth_year": 1980,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2024
     },
     {
       "leader_id": "irq_gen_2026",
@@ -3699,8 +3556,7 @@
         "desert_fox": 1
       },
       "birth_year": 1972,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "irq_nav_2026",
@@ -3719,8 +3575,7 @@
         "cautious": 1
       },
       "birth_year": 1977,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "irq_air_2026",
@@ -3739,8 +3594,7 @@
         "aggressive": 1
       },
       "birth_year": 1979,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "syr_gen_2026",
@@ -3759,8 +3613,7 @@
         "ruthless": 1
       },
       "birth_year": 1973,
-      "start_year": 2019,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2019
     },
     {
       "leader_id": "syr_nav_2026",
@@ -3779,8 +3632,7 @@
         "cautious": 1
       },
       "birth_year": 1978,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "syr_air_2026",
@@ -3799,8 +3651,7 @@
         "bold": 1
       },
       "birth_year": 1981,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2024
     },
     {
       "leader_id": "nga_gen_2026",
@@ -3819,8 +3670,7 @@
         "jungle_panther": 1
       },
       "birth_year": 1975,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "nga_nav_2026",
@@ -3839,8 +3689,7 @@
         "blockade_runner": 1
       },
       "birth_year": 1977,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "nga_air_2026",
@@ -3859,8 +3708,7 @@
         "aggressive": 1
       },
       "birth_year": 1980,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2024
     },
     {
       "leader_id": "col_gen_2026",
@@ -3879,8 +3727,7 @@
         "jungle_panther": 2
       },
       "birth_year": 1974,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "col_nav_2026",
@@ -3899,8 +3746,7 @@
         "cautious": 1
       },
       "birth_year": 1976,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "col_air_2026",
@@ -3919,8 +3765,7 @@
         "bold": 1
       },
       "birth_year": 1978,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "sgp_gen_2026",
@@ -3939,8 +3784,7 @@
         "logistics_wizard": 1
       },
       "birth_year": 1973,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "sgp_nav_2026",
@@ -3959,8 +3803,7 @@
         "blockade_runner": 1
       },
       "birth_year": 1975,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "sgp_air_2026",
@@ -3979,8 +3822,7 @@
         "methodical": 1
       },
       "birth_year": 1977,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "mys_gen_2026",
@@ -3999,8 +3841,7 @@
         "jungle_panther": 1
       },
       "birth_year": 1974,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "mys_nav_2026",
@@ -4019,8 +3860,7 @@
         "sea_wolf": 1
       },
       "birth_year": 1976,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "mys_air_2026",
@@ -4039,8 +3879,7 @@
         "cautious": 1
       },
       "birth_year": 1979,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "tha_gen_2026",
@@ -4059,8 +3898,7 @@
         "cautious": 1
       },
       "birth_year": 1973,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "tha_nav_2026",
@@ -4079,8 +3917,7 @@
         "blockade_runner": 1
       },
       "birth_year": 1976,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "tha_air_2026",
@@ -4099,8 +3936,7 @@
         "bold": 1
       },
       "birth_year": 1978,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "nzl_gen_2026",
@@ -4119,8 +3955,7 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "nzl_nav_2026",
@@ -4139,8 +3974,7 @@
         "sea_wolf": 1
       },
       "birth_year": 1975,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "nzl_air_2026",
@@ -4159,8 +3993,7 @@
         "methodical": 1
       },
       "birth_year": 1977,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "fin_gen_2026",
@@ -4179,8 +4012,7 @@
         "arctic_bear": 2
       },
       "birth_year": 1971,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "fin_nav_2026",
@@ -4199,8 +4031,7 @@
         "arctic_bear": 1
       },
       "birth_year": 1974,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "fin_air_2026",
@@ -4219,8 +4050,7 @@
         "cautious": 1
       },
       "birth_year": 1977,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "dnk_gen_2026",
@@ -4239,8 +4069,7 @@
         "methodical": 1
       },
       "birth_year": 1972,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "dnk_nav_2026",
@@ -4259,8 +4088,7 @@
         "blockade_runner": 1
       },
       "birth_year": 1975,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "dnk_air_2026",
@@ -4279,8 +4107,7 @@
         "cautious": 1
       },
       "birth_year": 1978,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "swe_gen_2026",
@@ -4299,8 +4126,7 @@
         "cautious": 2
       },
       "birth_year": 1970,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "swe_nav_2026",
@@ -4319,8 +4145,7 @@
         "sea_wolf": 1
       },
       "birth_year": 1974,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "swe_air_2026",
@@ -4339,8 +4164,7 @@
         "methodical": 1
       },
       "birth_year": 1977,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "idn_gen_2026",
@@ -4359,8 +4183,7 @@
         "jungle_panther": 2
       },
       "birth_year": 1973,
-      "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2020
     },
     {
       "leader_id": "idn_nav_2026",
@@ -4379,8 +4202,7 @@
         "blockade_runner": 1
       },
       "birth_year": 1976,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "idn_air_2026",
@@ -4399,8 +4221,7 @@
         "cautious": 1
       },
       "birth_year": 1979,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2023
     },
     {
       "leader_id": "isl_gen_2026",
@@ -4419,8 +4240,7 @@
         "arctic_bear": 2
       },
       "birth_year": 1975,
-      "start_year": 2021,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2021
     },
     {
       "leader_id": "isl_nav_2026",
@@ -4439,8 +4259,7 @@
         "cautious": 1
       },
       "birth_year": 1978,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2023
     },
     {
       "leader_id": "isl_air_2026",
@@ -4459,8 +4278,7 @@
         "bold": 1
       },
       "birth_year": 1980,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2024
     },
     {
       "leader_id": "pan_gen_2026",
@@ -4479,8 +4297,7 @@
         "jungle_panther": 1
       },
       "birth_year": 1976,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "pan_nav_2026",
@@ -4499,8 +4316,7 @@
         "blockade_runner": 1
       },
       "birth_year": 1978,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2023
     },
     {
       "leader_id": "pan_air_2026",
@@ -4519,8 +4335,7 @@
         "aggressive": 1
       },
       "birth_year": 1981,
-      "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2024
     },
     {
       "leader_id": "grl_gen_2026",
@@ -4539,8 +4354,7 @@
         "arctic_bear": 2
       },
       "birth_year": 1977,
-      "start_year": 2022,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2022
     },
     {
       "leader_id": "grl_nav_2026",
@@ -4559,8 +4373,7 @@
         "arctic_bear": 1
       },
       "birth_year": 1979,
-      "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/usa_general.png"
+      "start_year": 2023
     },
     {
       "leader_id": "grl_air_2026",
@@ -4579,8 +4392,7 @@
         "cautious": 1
       },
       "birth_year": 1982,
-      "start_year": 2025,
-      "portrait": "res://assets/graphics/portraits/leaders/air_vice_marshal_british_1950s.png"
+      "start_year": 2025
     }
   ]
 }

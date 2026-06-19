@@ -48,6 +48,85 @@ func get_effective_combat_power(
 		terrain_bonus = leader.get_terrain_modifier(terrain)
 		final_soft += terrain_bonus * 8.0
 
+	# ============================================================
+	# UNIT TYPE SPECIALTY MODIFIERS (HoI4-style detailed % terrain/unit factors, visible in previews/tests/logs)
+	# Marines (amphib + vs coast), Paratroop (airdrop bonus, high org loss risk), SF (flanking/sabotage pre-battle), Mountain/Ski (terrain specific), space variants (orbital support).
+	# Guided munitions multiplier for advanced units (high impact on soft troops *1.5, less vs armor ~*1.22). Stacks with orbital.
+	# ============================================================
+	var unit_type := _detect_unit_type(division_template_id)
+	var unit_mod_factors: Dictionary = {}
+	var guided_mult_soft := 1.0
+	var guided_mult_hard := 1.0
+
+	# Detect guided eligibility (space designer + precision rule or special templates)
+	var owner_for_tech := (leader.country_tag if leader != null else "player")
+	var is_guided_eligible := false
+	if typeof(TechnologyManager) != TYPE_NIL:
+		if TechnologyManager.has_rule_flag(owner_for_tech, "space_designer_unlocked") or TechnologyManager.has_rule_flag(owner_for_tech, "precision_guided") or TechnologyManager.has_rule_flag(owner_for_tech, "guided_munitions"):
+			is_guided_eligible = true
+	if unit_type in ["space", "sf"] or "cyber" in division_template_id.to_lower() or "advanced" in division_template_id.to_lower():
+		is_guided_eligible = true
+
+	if unit_type == "marine":
+		var tlow := terrain.to_lower()
+		var is_coastal := tlow in ["coast", "coastal", "beach", "river", "marsh", "island", "delta"]
+		if province_for_effects != null:
+			var pt := str(province_for_effects.get("terrain", "")).to_lower() if typeof(province_for_effects) == TYPE_DICTIONARY else (province_for_effects.terrain.to_lower() if province_for_effects != null and "terrain" in province_for_effects else "")
+			if "coast" in pt or "river" in pt or "beach" in pt:
+				is_coastal = true
+		if is_coastal:
+			final_soft *= 1.28
+			final_readiness *= 1.12
+			final_org *= 1.06
+			unit_mod_factors["marine_amphib_coastal"] = 28
+			unit_mod_factors["marine_readiness_coast"] = 12
+		else:
+			final_soft *= 1.05
+			unit_mod_factors["marine_general"] = 5
+	elif unit_type == "paratroop":
+		final_soft *= 1.18
+		final_org *= 0.82
+		final_readiness *= 0.90
+		unit_mod_factors["paratroop_airdrop_bonus"] = 18
+		unit_mod_factors["paratroop_org_risk"] = -18
+	elif unit_type == "sf":
+		final_soft *= 1.22
+		final_hard *= 1.15
+		final_readiness *= 1.10
+		unit_mod_factors["sf_flanking_sabotage"] = 22
+		unit_mod_factors["sf_sabotage_def_org_hit"] = -0.15  # applied in resolve
+	elif unit_type == "mountain":
+		var tlow := terrain.to_lower()
+		if tlow in ["mountains", "hills", "snow_capped", "alpine"]:
+			final_soft *= 1.32
+			final_readiness *= 1.18
+			final_org *= 1.10
+			unit_mod_factors["mountain_terrain_bonus"] = 32
+		else:
+			final_soft *= 0.95
+			unit_mod_factors["mountain_off_terrain"] = -5
+	elif unit_type == "ski":
+		var tlow := terrain.to_lower()
+		if tlow in ["snow_capped", "snow", "frozen", "tundra"]:
+			final_soft *= 1.35
+			final_readiness *= 1.25
+			final_org *= 1.08
+			unit_mod_factors["ski_winter_terrain"] = 35
+	elif unit_type == "space":
+		final_soft *= 1.20
+		final_hard *= 1.20
+		unit_mod_factors["space_orbital_support"] = 20
+
+	# Guided munitions (precision on advanced/space/sf/cyber)
+	if is_guided_eligible:
+		guided_mult_soft = 1.5
+		guided_mult_hard = 1.22
+		final_soft *= guided_mult_soft
+		final_hard *= guided_mult_hard
+		unit_mod_factors["guided_munitions_soft"] = 50
+		unit_mod_factors["guided_munitions_hard"] = 22
+		has_guided = true  # for downstream
+
 	# Space combat to ground: orbital strikes and guided munitions (from space designer assets).
 	# Greater impacts on troops (precision strikes, morale/ org hits for infantry). Costly to maintain.
 	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(leader.country_tag if leader else "player", "space_designer_unlocked"):
@@ -208,6 +287,10 @@ func get_effective_combat_power(
 		"leader_id": leader_id,
 		"leader_attack_bonus": leader.get_attack_modifier() if leader != null else 0.0,
 		"training_path_soft_bonus": training_path_bonus,
+		"unit_type": unit_type,
+		"unit_mod_factors": unit_mod_factors,
+		"guided_munitions_applied": is_guided_eligible,
+		"guided_soft_mult": guided_mult_soft,
 		"training_path_modifiers": combat_stats.get("training_path_modifiers", {}),
 		"terrain": terrain,
 		"terrain_bonus_applied": terrain_bonus,
@@ -753,6 +836,15 @@ func resolve_combat(
 
 	combat_phase_advanced.emit(PHASE_POSITIONING, _phase_positioning(battle_province, side_state))
 
+	# SF pre-battle sabotage (from unit_mod_factors in power calc; applies org/readiness hit to defender)
+	if def_power.get("unit_mod_factors", {}).has("sf_sabotage_def_org_hit"):
+		var sabo := float(def_power["unit_mod_factors"]["sf_sabotage_def_org_hit"])
+		if "org" in side_state["defender"]:
+			side_state["defender"]["org"] *= max(0.6, 1.0 + sabo)
+		if "readiness" in side_state["defender"]:
+			side_state["defender"]["readiness"] *= max(0.7, 1.0 + sabo * 0.5)
+		print("[SF SABOTAGE] Pre-battle special forces hit defender org/readiness by ", sabo)
+
 	combat_phase_advanced.emit(PHASE_POSITIONING, _phase_positioning(battle_province, side_state))
 
 	# === AIR SUPERIORITY (continuous scale) ===
@@ -964,3 +1056,20 @@ func _phase_resolution(
 
 func _side_strength(side: Dictionary) -> float:
 	return float(side.get("soft", 0.0)) + float(side.get("hard", 0.0)) * 1.6
+
+
+func _detect_unit_type(division_template_id: String) -> String:
+	var t := division_template_id.to_lower()
+	if "marine" in t or "amphib" in t:
+		return "marine"
+	if "paratroop" in t or "airborne" in t:
+		return "paratroop"
+	if "sf_" in t or "special_forces" in t or ("special" in t and "force" in t):
+		return "sf"
+	if "mountain" in t:
+		return "mountain"
+	if "ski" in t or ("winter" in t and "troop" in t):
+		return "ski"
+	if "space" in t or "orbital" in t or "recon_asset" in t:
+		return "space"
+	return "standard"

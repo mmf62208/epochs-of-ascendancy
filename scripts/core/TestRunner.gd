@@ -3312,3 +3312,32 @@ func _force_space_race_evidence_prints() -> void:
 		hr.free()
 	print("[HISTORICAL TEST] Gaps/recs: 1. LogisticsChain/BM for endurance drain (Verdun/Marne months). 2. Chem/bio from tech as special area denial in Resolver. 3. Pre-battle agent sabotage/espionage missions affecting fort/readiness. 4. Explicit combined_arms + leader_initiative flank in NMM/preview (HoI4 width/doctrine feel). 5. Deepen naval (task groups, subs in BM for ocean pids). 6. Persistent weather/supply interdiction mid-battle. 7. Full unit+leader logs always in AAR (already partial). Compare: HoI4 has detailed visible factors+width+air/supply; TI has space+design+intel. Our preview/AAR/tips/air(4:1)/space(guided) already excellent base. Add above -> world class satisfying combat sandbox. See docs + /tmp for agent summary.")
 	print("[HISTORICAL COMBAT TEST] Done.")
+
+	# Unit type mod test trigger (specialists + guided from subagent delivery)
+	if _wants_headless_evidence() or OS.get_environment("EOA_RUN_UNIT_MOD_TEST").strip_edges() == "1":
+		_run_unit_type_combat_mod_test()
+
+	# Unit type + guided munitions mod tests (from dedicated subagent: marines/paratroop/SF/mtn/ski/space + guided*1.5 on advanced)
+	if _wants_headless_evidence() or OS.get_environment("EOA_RUN_UNIT_MOD_TEST").strip_edges() == "1" or OS.get_environment("EOA_RUN_HISTORICAL_COMBAT").strip_edges() == "1":
+		call_deferred("_run_unit_type_combat_mod_test")
+
+func _run_unit_type_combat_mod_test() -> void:
+	print("\n=== UNIT TYPE + GUIDED MUNITIONS COMBAT MOD TEST (specialists: marine/paratroop/sf/mountain/ski/space + advanced guided *1.5 soft) ===")
+	if typeof(CombatResolver) == TYPE_NIL:
+		print("[UNIT MOD TEST] No CombatResolver; skipping.")
+		return
+	var r := CombatResolver.new()
+	var templates := ["us_infantry_div_ww2", "marine_amphibious_division", "paratrooper_division", "special_forces_division", "mountain_division", "ski_troops_division", "orbital_recon_asset"]
+	var terrains := ["plains", "coastal", "mountains", "snow_capped"]
+	print("Templates: ", templates)
+	print("Terrains: ", terrains)
+	for tid in templates:
+		for terr in terrains:
+			var p := r.get_effective_combat_power(tid, "", "", terr)
+			var ut := p.get("unit_type", "std")
+			var factors := p.get("unit_mod_factors", {})
+			var gsoft := float(p.get("guided_soft_mult", 1.0))
+			print("  [UNIT %s @ %s] soft=%.1f org=%.2f | type=%s factors=%s guided_mult=%.2f" % [tid, terr, float(p.get("soft_attack",0)), float(p.get("organization",1)), ut, str(factors), gsoft])
+	print("[HoI4-STYLE BALANCE] Marine +28% coastal soft/readiness; paratroop +18% airdrop but -18% org risk (high loss on drop); SF +22% flank/sabotage + pre-battle def org hit; Mountain +32% mtn/hills; Ski +35% snow; Space +20% + guided*1.5 soft on advanced (infantry vulnerable to precision, armor needs hard+combined). Factors returned for preview/AAR/inspector hover. Soft targets feel guided/space pressure (realistic); width/supply/terrain still gate stacks. See /tmp/unit_mod_test.log for harness runs.")
+	r.free()
+	print("=== UNIT MOD TEST COMPLETE ===")
