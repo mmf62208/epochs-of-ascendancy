@@ -601,11 +601,6 @@ func get_valid_leader_types_for_position(position: String) -> Array[String]:
 		POSITION_CHIEF_OF_AIR_FORCE:
 			return ["air_marshal"]
 		POSITION_CHIEF_OF_SPACE_FORCE:
-	# Tele/shield rapid deploy tie for space_commander leaders (minor per space wiring task)
-	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(leader.country_tag if leader else "", "teleportation"):
-		# would boost formation move in full, here for completeness
-		pass
-
 			return ["space_commander"]
 		POSITION_CHIEF_OF_ARMY:
 			return ["general", "field_marshal"]
@@ -1600,11 +1595,6 @@ func _position_display_label(position_key: String) -> String:
 		POSITION_CHIEF_OF_AIR_FORCE:
 			return "Chief of Air Force"
 		POSITION_CHIEF_OF_SPACE_FORCE:
-	# Tele/shield rapid deploy tie for space_commander leaders (minor per space wiring task)
-	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(leader.country_tag if leader else "", "teleportation"):
-		# would boost formation move in full, here for completeness
-		pass
-
 			return "Chief of Space Force"
 		POSITION_OFFICER_TRAINING:
 			return "Officer Training Command"
