@@ -5375,17 +5375,13 @@ static func _battle_preview_block(
 		tips.append("Guided munitions bonus for advanced units (space comms/tech)")
 	if tips.size() > 0:
 		block += "\n  %sKey situation: %s[/color]" % [COLOR_MUTED, " · ".join(tips)]
+	# Update tips to reference AAR for full specificity (unit logs from Formation, leader, modifiers %, space/air)
+	tips.append("See full AAR (F10) for unit combat logs (Formation.combat_log: date/province/result/key factors/leader), leader impacts, modifiers with % values, space/air effects")
+	# Accessibility for full AAR (not in hover to avoid overwhelm; click/F10 for deep)
+	block += "\n  %s[Press F10 for full AAR] — unit combat logs, leader impacts, full modifiers %% list, space/air effects, tips. Balance: air dominance 4:1+ full suppress; space high precision impact but maintenance costly, not instant win.[/color]" % COLOR_MUTED
 	# Most important: odds, key units/leaders if standout, major modifiers.
 	if preview.has("odds_attacker_win"):
-		block += "\n  %sOdds: %.0f%% attacker win — %s[/color]" % [COLOR_EFFECTIVE, float(preview["odds_attacker_win"]), preview.get("odds_note", "")]
-	if preview.has("engaged_units_att"):
-		block += "\n  %sUnits Att: %s | Def: %s[/color]" % [COLOR_MUTED, ", ".join(preview.get("engaged_units_att", [])), ", ".join(preview.get("engaged_units_def", []))]
-	if preview.has("leaders_att"):
-		block += "\n  %sLeaders: Att %s | Def %s[/color]" % [COLOR_MUTED, ", ".join(preview.get("leaders_att", [])), ", ".join(preview.get("leaders_def", []))]
-	if preview.has("air_factors") and str(preview.get("air_factors", "")) != "":
-		block += "\n  %sAir/Planes: %s[/color]" % [COLOR_MUTED, preview["air_factors"]]
-	if preview.has("modifiers") and preview["modifiers"].size() > 0:
-		block += "\n  %sModifiers: %s[/color]" % [COLOR_MUTED, " · ".join(preview.get("modifiers", []))]
+		block += "\n  %sEstimated success odds: %.0f%% (click for full breakdown) [Press F10 for full AAR][/color]" % [COLOR_EFFECTIVE, float(preview["odds_attacker_win"])]
 	return block
 
 

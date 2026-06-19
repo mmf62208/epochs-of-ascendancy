@@ -178,18 +178,26 @@ func execute_province_assault(
 		target_province_id,
 	)
 
+	# Balance + AAR data: numeric casualties estimates (margin based) + power details for modifiers/leader display
+	var att_sc := float(result.get("attacker_score", 100.0))
+	var def_sc := float(result.get("defender_score", 100.0))
+	var margin_c := absf(att_sc - def_sc) / maxf(maxf(att_sc, def_sc), 1.0)
+	var base_cas := int(25 + margin_c * 140 + randf() * 25)
+	result["attacker_casualties"] = int(base_cas * (0.6 + randf()*0.5)) if str(result.get("winner","")) == "defender" else int(base_cas * (0.35 + randf()*0.25))
+	result["defender_casualties"] = int(base_cas * (0.65 + randf()*0.5)) if str(result.get("winner","")) == "attacker" else int(base_cas * (0.3 + randf()*0.25))
+	# Attach fresh power details (leader/space/nat/terrain bonuses) for full AAR modifiers list
+	if _resolver != null:
+		var t_terr := target.terrain if target != null and not target.terrain.is_empty() else "plains"
+		var t_id := target.id if target != null else -1
+		var t_dev := target.development_level if target != null else 0
+		var t_inf := target.infrastructure if target != null else 0
+		result["attacker_power_detail"] = _resolver.get_effective_combat_power(str(attacker.formation_id if attacker else ""), "", fid, t_terr, t_id, t_dev, t_inf)
+		result["defender_power_detail"] = _resolver.get_effective_combat_power(str(defender.formation_id if defender else ""), "", str(result.get("defender_formation_id","")), t_terr, t_id, t_dev, t_inf)
+
 	apply_combat_outcome(result, fid, from_pid)
 	battle_resolved.emit(result)
 
-	# Auto AAR for player if involved (accessible panel)
-	if str(result.get("attacker_tag", "")) == "player" or str(result.get("defender_tag", "")) == "player":
-		var tree := Engine.get_main_loop() as SceneTree
-		if tree != null:
-			for node in tree.get_nodes_in_group("debug_overlay"):
-				if node.has_method("show_battle_aar"):
-					node.call_deferred("show_battle_aar", result)
-					break
-
+	# Unit combat log BEFORE AAR (so logs populated when panel pulls from Formation); space note
 	# Space ground integration note for AAR/tips
 	if result.get("space_strike_bonus", 0.0) > 0.05:
 		print("[BATTLEMANAGER SPACE] Orbital strike active in assault: guided munitions edge applied (costly to maintain, not instant win)")
@@ -197,6 +205,22 @@ func execute_province_assault(
 	_log_unit_combat(fid, from_pid, target_province_id, result, "attacker")
 	if result.has("defender_formation_id"):
 		_log_unit_combat(str(result.get("defender_formation_id", "")), target_province_id, from_pid, result, "defender")
+
+	# Snapshot logs into result for AAR (even if deferred timing)
+	var logs_snap := {}
+	if typeof(LeaderManager) != TYPE_NIL:
+		var fa := LeaderManager.get_formation(fid) if not fid.is_empty() else null
+		if fa != null and "combat_log" in fa:
+			logs_snap["attacker"] = fa.combat_log.duplicate()
+		var fdid := str(result.get("defender_formation_id", ""))
+		var fd := LeaderManager.get_formation(fdid) if not fdid.is_empty() else null
+		if fd != null and "combat_log" in fd:
+			logs_snap["defender"] = fd.combat_log.duplicate()
+	result["combat_logs"] = logs_snap
+
+	# Auto AAR for player if involved (accessible panel) - now after logs
+	if typeof(DebugOverlay) != TYPE_NIL and (str(result.get("attacker_tag","")) == "player" or str(result.get("defender_tag","")) == "player"):
+		DebugOverlay.call_deferred("show_battle_aar", result)
 
 	return {"success": true, "result": result}
 
@@ -304,6 +328,38 @@ func apply_combat_outcome(
 	var winner := str(result.get("winner", ""))
 	# Apply persistent org/readiness damage to the actual live formations (main loop combat now has lasting effects).
 	_apply_combat_damage_to_formations(result, attacker_formation_id)
+
+	# === Balance integration: apply persistent org/readiness/strength damage here (from BM as per design)
+	# Loser heavier losses (strength hit), winner lighter org/rdy hit. Recovery via Supply daily (infra/supply mod).
+	# This makes combat "have teeth", feeds AAR logs + inspector stationed units state.
+	if typeof(LeaderManager) != TYPE_NIL:
+		var att_f: Formation = LeaderManager.get_formation(attacker_formation_id) if not attacker_formation_id.is_empty() else null
+		var def_fid := str(result.get("defender_formation_id", ""))
+		var def_f: Formation = LeaderManager.get_formation(def_fid) if not def_fid.is_empty() else null
+		var w := winner
+		var dmg_line := "[COMBAT DAMAGE] "
+		if att_f != null:
+			var is_win := (w == "attacker")
+			var org_loss := 0.09 if is_win else 0.27
+			var rdy_loss := 0.07 if is_win else 0.22
+			att_f.organization = clampf(float(att_f.get("organization", 1.0)) * (1.0 - org_loss + randf() * 0.04), 0.22, 1.0)
+			att_f.readiness = clampf(float(att_f.get("readiness", 1.0)) * (1.0 - rdy_loss + randf() * 0.04), 0.28, 1.0)
+			if not is_win:
+				att_f.strength = clampf(float(att_f.get("strength", 1.0)) * (0.72 + randf() * 0.12), 0.35, 1.0)
+			att_f.is_in_combat = true
+			dmg_line += "ATT %s: org=%.2f rdy=%.2f str=%.2f ; " % [attacker_formation_id, att_f.organization, att_f.readiness, att_f.strength]
+		if def_f != null:
+			var is_win_def := (w == "defender")
+			var org_loss_d := 0.26 if not is_win_def else 0.10
+			var rdy_loss_d := 0.21 if not is_win_def else 0.08
+			def_f.organization = clampf(float(def_f.get("organization", 1.0)) * (1.0 - org_loss_d + randf() * 0.04), 0.22, 1.0)
+			def_f.readiness = clampf(float(def_f.get("readiness", 1.0)) * (1.0 - rdy_loss_d + randf() * 0.04), 0.28, 1.0)
+			if not is_win_def:
+				def_f.strength = clampf(float(def_f.get("strength", 1.0)) * (0.62 + randf() * 0.12), 0.30, 1.0)
+			def_f.is_in_combat = true
+			dmg_line += "DEF %s: org=%.2f rdy=%.2f str=%.2f" % [def_fid, def_f.organization, def_f.readiness, def_f.strength]
+		if att_f != null or def_f != null:
+			print(dmg_line)
 
 	if captured and target_pid >= 0 and typeof(MapManager) != TYPE_NIL:
 		MapManager.update_province_owner(target_pid, attacker_tag, attacker_tag, false)
