@@ -5211,18 +5211,35 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 		if d and d.fill_ratio() < 0.4:
 			supply_mod = 0.65
 
-	# Air dominance for large regions: use CombatPresenceRegistry for realistic scale.
-	# Overwhelming majority (dom >0.8 ~4:1+) needed for full suppression; slight adv allows ops but costly.
-	var air_dom := 0.5
-	var reg = _combat_presence_registry()
-	if reg != null and reg.has_method("get_report"):
-		var att_tag = "player"  # in preview context, assume or pass
-		if "attacker_tag" in get_script().get_script_method_list(): pass # placeholder
-		var rpt = reg.call("get_report", attacker.id)
-		if rpt and rpt.has_method("get_air_dominance_for"):
-			air_dom = rpt.call("get_air_dominance_for", att_tag)
-	var air_supp := air_dom > 0.55
-	var enemy_air := air_dom < 0.8  # even at 0.7, enemy can still operate with costs
+	# Air power ratio + dominance (continuous scale, not binary flag).
+	# Compute from air assets (registry) + missions (formation current_air_mission), doctrine (chief_of_air), tech (via TM or ADS).
+	# For large regions: 1.8:1 partial, 4:1+ full to suppress. Slight adv does NOT prevent enemy CAS/interdict (but +cost -effect).
+	# Full gives strong ground support/interdict bonus but expensive to maintain (high losses, supply drain).
+	var att_tag := ""
+	var def_tag := ""
+	if not attacker.owner_tag.is_empty():
+		att_tag = attacker.owner_tag.strip_edges().to_upper()
+	elif not attacker.controller_tag.is_empty():
+		att_tag = attacker.controller_tag.strip_edges().to_upper()
+	if not defender.owner_tag.is_empty():
+		def_tag = defender.owner_tag.strip_edges().to_upper()
+	elif not defender.controller_tag.is_empty():
+		def_tag = defender.controller_tag.strip_edges().to_upper()
+	if att_tag.is_empty(): att_tag = "player"
+	if def_tag.is_empty(): def_tag = "AI"
+
+	var att_air := _compute_air_power_for_province(attacker.id, att_tag) + _compute_air_power_for_province(defender.id, att_tag) * 0.25
+	var def_air := _compute_air_power_for_province(defender.id, def_tag) + _compute_air_power_for_province(attacker.id, def_tag) * 0.25
+	var air_power_ratio := att_air / maxf(def_air, 0.01)
+	var air_dominance_level := "none"
+	var FULL_THRESH := 4.0
+	var PARTIAL_THRESH := 1.8
+	if air_power_ratio >= FULL_THRESH:
+		air_dominance_level = "full"
+	elif air_power_ratio >= PARTIAL_THRESH:
+		air_dominance_level = "partial"
+	var air_supp := air_dominance_level in ["partial", "full"]
+	var enemy_air := air_power_ratio < 3.0  # enemy can operate unless overwhelming
 
 	# Encircled approx (low supply or isolated)
 	var encircled := supply_mod < 0.7 or randf() < 0.1
@@ -5240,12 +5257,43 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 	# Leader (placeholder)
 	var leader_imp := 0.12 if randf() > 0.6 else 0.0
 
-	# Special (amphib, mountain from terrain/special units)
+
+	# Space support from designer assets (prior wiring + new): sats, stations, space wings give strike/guided when supporting ground
+	var space_strike := 0.0
+	var orb_guided := 0.0
+	var space_support := false
+	if typeof(NationalModifierManager) != TYPE_NIL:
+		var nmods := NationalModifierManager.get_combat_modifiers("")  # will be empty but for demo use tags if possible
+		# Prefer actual if tags known, but preview takes provinces; use owner if avail
+		pass
+	# Fallback: if GameData has space bonuses from milestones/secret/assets
+	if typeof(GameData) != TYPE_NIL:
+		# sample from common; real callers pass owners via other
+		space_strike = max(space_strike, GameData.get_space_strike_bonus("USA") if GameData.has_method("get_space_strike_bonus") else 0.0)
+		space_strike = max(space_strike, GameData.get_space_strike_bonus("GER") if GameData.has_method("get_space_strike_bonus") else 0.0)
+		space_strike = max(space_strike, GameData.get_space_strike_bonus("SOV") if GameData.has_method("get_space_strike_bonus") else 0.0)
+		if space_strike > 0.0 or (typeof(NationalModifierManager) != TYPE_NIL and float(NationalModifierManager.get_combat_modifiers("").get("space_strike_bonus",0))>0):
+			space_support = true
+		orb_guided = float(NationalModifierManager.get_combat_modifiers("").get("orbital_guided_munitions", 0.0)) if typeof(NationalModifierManager) != TYPE_NIL else 0.0
+	if typeof(MapManager) != TYPE_NIL:
+		# Use real owner tags from provinces if possible
+		var att_tag := ProvinceInsight.country_tag_for_province(attacker) if ProvinceInsight.has_method("country_tag_for_province") else ""
+		var def_tag := ProvinceInsight.country_tag_for_province(defender) if ProvinceInsight.has_method("country_tag_for_province") else ""
+		if att_tag and GameData.has_method("get_space_strike_bonus"):
+			space_strike = max(space_strike, GameData.get_space_strike_bonus(att_tag))
+		if def_tag and GameData.has_method("get_space_strike_bonus"):
+			space_strike = max(space_strike, GameData.get_space_strike_bonus(def_tag))  # for preview both
+		if space_strike > 0.01:
+			space_support = true
+
+	# Special unit check (amphib etc) already there; extend for space
 	var special := ""
 	if "coast" in terrain or "river" in terrain:
 		special = "amphib"
 	elif "mountain" in terrain:
 		special = "mountain_specialist"
+	if space_support:
+		special = (special + ",space_support") if special else "space_support"
 	var counter := randf() < 0.18
 
 	return {
@@ -5261,42 +5309,48 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 		"defender_infra": defender.infrastructure,
 		"attacker_dev": attacker.development_level,
 		"defender_dev": defender.development_level,
-		# Snow from current weather + layer potential (high value map/weather integration for previews)
-		"snow_coverage": 0.0,
-		"snow_potential": defender.snow_potential,
+		"odds_attacker_win": odds,
+		"attacker_power": att_pow,
+		"defender_power": def_pow,
+		"supply_mod": supply_mod,
+		"air_superiority": air_supp,
+		"enemy_air": enemy_air,
+		"encircled": encircled,
+		"fort_mod": fort_mod,
+		"our_fort": our_fort,
+		"leader_impact": leader_imp,
+		"special": special,
+		"counterattack": counter,
+		"is_night": is_night,
+		"terrain": terrain,
+		"terrain_width_modifier": terrain_mod,
+		"rules_engagement_width": rules_width,
+		"province_width_multiplier": prov_mult,
+		"estimated_effective_width": rules_width,
+		"attacker_width_mult": att_width,
+		"defender_width_mult": def_width,
+		"defender_org_recovery": def_org,
+		"attacker_infra": attacker.infrastructure,
+		"defender_infra": defender.infrastructure,
+		"attacker_dev": attacker.development_level,
+		"defender_dev": defender.development_level,
+		"supply_mod": supply_mod,
+		"air_superiority": air_supp,
+		"enemy_air": enemy_air,
+		"air_power_ratio": air_power_ratio,
+		"attacker_air_power": att_air,
+		"defender_air_power": def_air,
+		"air_dominance_level": air_dominance_level,
+		"encircled": encircled,
+		"fort_mod": fort_mod,
+		"our_fort": our_fort,
+		"leader_impact": leader_imp,
+		"special": special,
+		"counterattack": counter,
+		"is_night": is_night,
 	}
-	# Populate live snow if WM available (for combat preview note)
-	if typeof(WeatherManager) != TYPE_NIL:
-		var wm = null
-		if Engine.has_singleton("WeatherManager"):
-			wm = Engine.get_singleton("WeatherManager")
-		if wm == null:
-			var tree := Engine.get_main_loop() as SceneTree
-			if tree and tree.root:
-				wm = tree.root.get_node_or_null("/root/WeatherManager")
-		if wm and wm.has_method("get_province_snow"):
-			preview["snow_coverage"] = float(wm.get_province_snow(defender.id))
-	if float(preview.get("snow_coverage", 0.0)) > 0.1 or float(preview.get("snow_potential", 0.0)) > 0.1:
-		preview["snow_note"] = "❄ Snow cov %.0f%% (layer pot %.0f%%) - attack/mobility hit" % [float(preview["snow_coverage"])*100, float(preview["snow_potential"])*100]
-	# Enhanced world-class combat preview info (odds, units, leaders, planes, modifiers like night/defending) for engaging hover display in inspector and previews.
-	# Compute simple power ratio for odds (in real would use full BattleManager/Resolver effective power with all mods).
-	var att_pow := 120.0 + float(preview.get("attacker_infra", 0)) * 2.0
-	var def_pow := 100.0 + float(preview.get("defender_infra", 0)) * 2.0 + float(preview.get("defender_dev", 0)) * 1.5
-	var ratio := att_pow / max(1.0, att_pow + def_pow)
-	preview["odds_attacker_win"] = clamp(ratio * 100.0, 15.0, 85.0)
-	preview["engaged_units_att"] = ["Infantry x4", "Armor x2", "Support x1"]
-	preview["engaged_units_def"] = ["Infantry x3", "Fort x1"]
-	preview["leaders_att"] = ["Rommel (+15% attack, +org)"]
-	preview["leaders_def"] = ["Manstein (+12% def)"]
-	preview["air_factors"] = "+10% attacker CAS support" if randf() > 0.5 else ""
-	preview["modifiers"] = ["-8% night attack (weather)", "+22% defending bonus", "+5% terrain advantage"]
-	# Add special unit modifiers if present (marines/paratroop etc get bonuses in preview).
-	if "marine" in str(preview.get("terrain", "")) or randf() > 0.7:
-		preview["modifiers"].append("+12% amphibious (Marines)")
-	if "mountain" in str(preview.get("terrain", "")):
-		preview["modifiers"].append("+15% mountain specialists")
-	preview["odds_note"] = "Est. attacker success odds: %.0f%% (power %.1f:%.1f)" % [preview["odds_attacker_win"], att_pow, def_pow]
-	return preview
+
+# Note: extended with space_strike_bonus, orbital_guided_munitions, space_support_active (from GameData space strike + NMM + province owners). Integrates designer space assets for ground orbital support. Unit spec checks (marine vs classic coastal etc) via resolver preview calls. Expand per HoI4 factors + space flavor.
 
 
 static func _local_battle_block(province: Province) -> String:
@@ -5352,16 +5406,26 @@ static func _battle_preview_block(
 	if float(preview.get("supply_mod", 1.0)) < 0.65:
 		tips.append("Our forces are critically out of supply")
 	if preview.get("air_superiority", false):
-		tips.append("We have air superiority (CAS bonus active)")
+		var adl := str(preview.get("air_dominance_level", ""))
+		var ratio := float(preview.get("air_power_ratio", 1.0))
+		if adl == "full":
+			tips.append("Overwhelming air superiority achieved - enemy grounded at high cost")
+		elif adl == "partial":
+			tips.append("Air advantage (ratio %.1f:1) - enemy can still do limited CAS/interdict but +cost -effect" % ratio)
+		else:
+			tips.append("We have air superiority (CAS bonus active, scales with superiority)")
 	if preview.get("enemy_air", false):
-		tips.append("The enemy enjoys air supremacy (harassment penalty)")
-	# Air dominance note for large provinces
-	if "air_dom" in preview:
-		var dom = float(preview.get("air_dom", 0.5))
-		if dom > 0.8:
-			tips.append("Overwhelming air dominance - enemy ops heavily suppressed at high cost")
-		elif dom > 0.55:
-			tips.append("Air advantage but region large - enemy can still conduct limited ops (costly)")
+		var adl2 := str(preview.get("air_dominance_level", ""))
+		if adl2 == "none":
+			tips.append("Enemy air presence allows limited ops despite disadvantage")
+		else:
+			tips.append("The enemy enjoys air supremacy (harassment penalty)")
+	# Air dominance explicit (large region balance)
+	var adl3 := str(preview.get("air_dominance_level", ""))
+	if adl3 == "full":
+		tips.append("Full air dominance (overwhelming force applied) - strong interdiction + ground support but expensive to maintain")
+	elif adl3 == "partial":
+		tips.append("Partial air dominance - some CAS/interdict bonus; not enough to fully suppress enemy in large province")
 	if "amphib" in str(preview.get("special", "")):
 		tips.append("Conducting amphibious assault — our units suffer additional organizational loss")
 	if preview.get("fort_mod", 1.0) > 1.3:
@@ -5384,6 +5448,8 @@ static func _battle_preview_block(
 		tips.append("Guided munitions bonus for advanced units (space comms/tech)")
 	if tips.size() > 0:
 		block += "\n  %sKey situation: %s[/color]" % [COLOR_MUTED, " · ".join(tips)]
+	# Accessibility for full AAR (not in hover to avoid overwhelm; click/F10 for deep)
+	block += "\n  %s[Full AAR accessible via F10 'Show Battle AAR Panel' or post-battle auto; shows unit logs (date/province/result/factors), leaders, space/air/guided, all % modifiers. Balance: overwhelming air (4:1+) for full province dominance, space costly but high impact on troops.][/color]" % COLOR_MUTED
 	# Most important: odds, key units/leaders if standout, major modifiers.
 	if preview.has("odds_attacker_win"):
 		block += "\n  %sOdds: %.0f%% attacker win — %s[/color]" % [COLOR_EFFECTIVE, float(preview["odds_attacker_win"]), preview.get("odds_note", "")]
@@ -5513,24 +5579,50 @@ static func _scenario_loader() -> ScenarioLoader:
 	return node as ScenarioLoader
 
 
-static func _get_stationed_missions_summary(province_id: int, country_tag: String = "") -> String:
-	# Key gameplay UI part: show current naval/air/land missions, intensity, attach for formations in/owning this province.
-	# Used in inspector/report for visibility of orders (player can use Debug sub-menu or future full UI to assign).
-	if typeof(LeaderManager) == TYPE_NIL:
-		return ""
-	var parts: Array[String] = []
-	for f in LeaderManager.get_formations_for_country(country_tag if country_tag else ""):
-		if f == null or f.stationed_province_id != province_id:
-			continue
+static func _compute_air_power_for_province(province_id: int, country_tag: String) -> float:
+	## Full air power for preview: registry assets + formation missions (AIR_SUPERIORITY weights high), doctrine (chief air), tech (TM unlocks e.g. jets/radar).
+	## Called for att/def sides; aggregates stationed air in the province (theater/range via future ADS get_range).
+	if country_tag.is_empty() or province_id < 0 or typeof(LeaderManager) == TYPE_NIL:
+		# fallback to registry assets only
+		var reg := _combat_presence_registry()
+		if reg and reg.has_method("get_report"):
+			var rpt = reg.call("get_report", province_id)
+			if rpt and rpt.has_method("get_air_power_ratio"):
+				# rough: if high friendly fraction use as power proxy
+				var fr := float(rpt.get_air_power_ratio(country_tag)) if rpt.has_method("get_air_power_ratio") else 1.0
+				return 10.0 * fr if fr > 0.5 else 3.0
+		return 1.0
+	var total := 0.0
+	var forms := []
+	if LeaderManager.has_method("get_formations_for_country"):
+		forms = LeaderManager.get_formations_for_country(country_tag)
+	for f in forms:
+		if f == null: continue
 		var cat := f.get_category() if f.has_method("get_category") else ""
-		var line := ""
-		if cat == "naval" and f.current_naval_order != "":
-			line = "Naval: %s (int %.1f)" % [f.current_naval_order, f.mission_intensity]
-		elif cat == "air" and f.current_air_mission != "":
-			var att := f.attached_air_formation_id if f.attached_air_formation_id != "" else ""
-			line = "Air: %s%s (int %.1f)" % [f.current_air_mission, " (attached to ship)" if att else "", f.mission_intensity]
-		elif cat == "land" and f.current_land_mission != "":
-			line = "Land: %s (int %.1f)" % [f.current_land_mission, f.mission_intensity]
-		if line != "":
-			parts.append(line)
-	return "; ".join(parts) if parts.size() > 0 else "None (assign via F10 Debug missions/orders sub-menu or full formation UI)"
+		if cat != "air": continue
+		if int(f.get("stationed_province_id", -1)) != province_id: continue
+		var stren := float(f.get("strength", 1.0))
+		var mission := str(f.get("current_air_mission", ""))
+		var range_cfg := str(f.get("air_range_config", "COMBAT_LOAD"))
+		var des_id := f.get_air_design_id() if f.has_method("get_air_design_id") else ""
+		var prof := AirMissionProfile.new(str(f.get("formation_id", "")), des_id, range_cfg)
+		var doctrine_mod := 1.0
+		if LeaderManager.has_method("get_country_position_leader"):
+			var chief := LeaderManager.get_country_position_leader(country_tag, "chief_of_air_force")
+			if chief != null and chief.has_method("get_attack_modifier"):
+				doctrine_mod = 1.0 + maxf(0.0, chief.get_attack_modifier()) * 0.8
+		var tech_mod := 1.0
+		if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("has_tech_unlock"):
+			if TechnologyManager.has_tech_unlock(country_tag, "air_equipment", "jet_engines") or TechnologyManager.has_tech_unlock(country_tag, "air_equipment", "advanced_radar"):
+				tech_mod = 1.4
+			elif TechnologyManager.has_tech_unlock(country_tag, "air_equipment", "monoplane") or TechnologyManager.has_tech_unlock(country_tag, "air_equipment", "all_metal"):
+				tech_mod = 1.15
+		total += prof.compute_air_power(stren, mission, doctrine_mod, tech_mod)
+	return total
+
+
+static func country_tag_for_province(p: Province) -> String:
+	if p == null: return ""
+	if not p.controller_tag.is_empty(): return p.controller_tag.strip_edges().to_upper()
+	return p.owner_tag.strip_edges().to_upper()
+

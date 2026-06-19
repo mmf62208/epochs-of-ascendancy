@@ -38,12 +38,23 @@
     "enemy_controlled_hop": 0.12,
     "adjacent_enemy_province": 0.045,
     "enemy_air_superiority_per_level": 0.06,
+    "enemy_air_superiority_per_air_power_ratio": 0.04,
     "enemy_naval_at_port": 0.14,
     "enemy_land_forces_per_brigade_equiv": 0.025,
     "max_interdiction_chance": 0.92
   },
   "intel": {
     "air_threat_from_superiority_ratio": 10.0
+  },
+  "air": {
+    "full_dominance_threshold": 4.0,
+    "partial_dominance_threshold": 1.8,
+    "cas_full_bonus": 0.35,
+    "cas_partial_bonus": 0.15,
+    "disadv_cas_penalty": 0.3,
+    "contested_air_maintain_cost_mult": 1.65,
+    "disadv_air_cost_mult": 2.8,
+    "comment": "Large provinces/regions require overwhelming (3:1-5:1) air power ratio for full suppression. Slight advantage does not prevent enemy air ops (CAS/interdict still possible but +cost -effect). Even full dominance is expensive to maintain (high losses, supply/fuel drain for attacker). Matches HoI4 zones where ground ops possible with cost/penalty."
   },
   "throughput": {
     "capacity_fraction_per_day": 0.15,

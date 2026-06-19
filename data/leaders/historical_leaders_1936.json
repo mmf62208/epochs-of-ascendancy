@@ -203,7 +203,7 @@
       },
       "birth_year": 1896,
       "start_year": 1935,
-      "portrait": "res://assets/graphics/portraits/leaders/sov_marshal.png"
+      "portrait": "res://assets/graphics/portraits/leaders/zhukov.png"
     },
     {
       "leader_id": "sov_timoshenko",

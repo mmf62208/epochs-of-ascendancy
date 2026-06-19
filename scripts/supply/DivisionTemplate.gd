@@ -220,6 +220,10 @@ func get_specialized_sustainment_demand() -> float:
 	var division_sustainment := sustainment_equipment_template.to_lower()
 	if division_sustainment.contains("marine") or division_sustainment.contains("amphibious"):
 		extra += 180.0
+	elif division_sustainment.contains("space") or division_sustainment.contains("orbital"):
+		extra += 110.0
+	elif division_sustainment.contains("para") or division_sustainment.contains("airborne"):
+		extra += 140.0
 	elif division_sustainment.contains("engineer"):
 		extra += 120.0
 
@@ -233,6 +237,16 @@ func get_specialized_sustainment_demand() -> float:
 				extra += 120.0 * weight
 			"marine", "amphibious":
 				extra += 180.0 * weight
+			"paratrooper", "airborne":
+				extra += 140.0 * weight  # airdrop gear
+			"special_forces":
+				extra += 90.0 * weight  # sabotage/flank kits
+			"mountain":
+				extra += 70.0 * weight
+			"ski_winter":
+				extra += 65.0 * weight
+			"space_capable", "orbital":
+				extra += 110.0 * weight  # comms, recon, orbital support modules
 			"recon", "reconnaissance":
 				extra += 60.0 * weight
 			"medical", "field_hospital":
@@ -294,6 +308,81 @@ func get_final_combat_stats(
 		"has_sustainment_shortage": _shortages_affect_sustainment(current_shortages, design_data),
 	}
 
+## Returns bonuses for special unit types (marines amphib, paratroop airdrop/deep, SF sabotage/flank, mountain/terrain, ski/winter/snow, space_capable with orbital support).
+## Called from CombatResolver phases and effective power; integrates with NMM national space/orbital bonuses and terrain.
+## space_support: whether orbital strike/guided/recon from space assets/designer is active for this side.
+func get_specialization_modifiers(terrain: String = "", has_space_support: bool = false, national_space_strike: float = 0.0) -> Dictionary:
+	var spec := ""
+	var division_id := template_id if not template_id.is_empty() else id
+	var ds := sustainment_equipment_template.to_lower()
+	var subs: Array = subunit_defs
+	for sdef in subs:
+		if typeof(sdef) == TYPE_DICTIONARY:
+			var t := _subunit_type_key(sdef as Dictionary)
+			if t in ["marine","paratrooper","special_forces","mountain","ski_winter","space_capable"]:
+				spec = t
+				break
+	if spec.is_empty():
+		if "marine" in division_id or "amphib" in ds:
+			spec = "marine"
+		elif "para" in division_id or "airborne" in ds:
+			spec = "paratrooper"
+		elif "special" in division_id or "sf" in division_id or "commando" in division_id:
+			spec = "special_forces"
+		elif "mountain" in division_id:
+			spec = "mountain"
+		elif "ski" in division_id or "winter" in division_id:
+			spec = "ski_winter"
+		elif "space" in division_id or "orbital" in division_id or "cyber_enhanced" in division_id:
+			spec = "space_capable"
+	var mods := {
+		"soft_attack_mod": 0.0,
+		"hard_attack_mod": 0.0,
+		"org_mod": 0.0,
+		"readiness_mod": 0.0,
+		"terrain_defense": 0.0,
+		"flank_bonus": 0.0,
+		"deep_strike": 0.0,
+		"morale_hit_resist": 0.0,
+		"special": spec,
+	}
+	match spec:
+		"marine":
+			mods["soft_attack_mod"] = 0.12
+			mods["readiness_mod"] = 0.08
+			if "coast" in terrain or "river" in terrain or terrain == "marsh":
+				mods["soft_attack_mod"] += 0.18  # amphib bonus
+				mods["org_mod"] = 0.10
+		"paratrooper":
+			mods["soft_attack_mod"] = 0.08
+			mods["deep_strike"] = 0.25
+			mods["readiness_mod"] = 0.05
+			mods["org_mod"] = -0.05
+		"special_forces":
+			mods["flank_bonus"] = 0.20
+			mods["soft_attack_mod"] = 0.10
+			mods["hard_attack_mod"] = 0.05
+			mods["morale_hit_resist"] = 0.15
+		"mountain":
+			mods["terrain_defense"] = 0.22
+			if "mountain" in terrain:
+				mods["soft_attack_mod"] = 0.15
+				mods["hard_attack_mod"] = 0.10
+		"ski_winter":
+			mods["terrain_defense"] = 0.12
+			if "snow" in terrain or "winter" in terrain or "tundra" in terrain:
+				mods["soft_attack_mod"] = 0.18
+				mods["readiness_mod"] = 0.10
+		"space_capable":
+			mods["soft_attack_mod"] = 0.05
+			mods["hard_attack_mod"] = 0.08
+			mods["readiness_mod"] = 0.06
+			if has_space_support:
+				mods["soft_attack_mod"] += 0.12 + national_space_strike * 0.5
+				mods["hard_attack_mod"] += 0.15 + national_space_strike * 0.8
+				mods["org_mod"] = 0.05
+				mods["morale_hit_resist"] = 0.10
+	return mods
 
 func _shortages_affect_infantry(current_shortages: Dictionary, design_data: DesignDataLoader) -> bool:
 	if current_shortages.is_empty():
@@ -401,6 +490,16 @@ func _subunit_type_key(subunit: Dictionary) -> String:
 		return "combat_engineer"
 	if template_id.contains("marine") or template_id.contains("amphibious"):
 		return "marine"
+	if template_id.contains("paratroop") or template_id.contains("airborne") or template_id.contains("para"):
+		return "paratrooper"
+	if template_id.contains("special") or template_id.contains("sf_") or template_id.contains("commando"):
+		return "special_forces"
+	if template_id.contains("mountain"):
+		return "mountain"
+	if template_id.contains("ski") or template_id.contains("winter"):
+		return "ski_winter"
+	if template_id.contains("space") or template_id.contains("orbital") or template_id.contains("cyber_enhanced"):
+		return "space_capable"
 	if template_id.contains("recon"):
 		return "recon"
 	if template_id.contains("medical") or template_id.contains("hospital"):

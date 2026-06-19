@@ -12,7 +12,7 @@
     "era_max": 1935,
     "epoch": "pre_war",
     "prerequisites": [
-      "tank_prototypes_1916"
+      "basic_machine_tools"
     ],
     "research": {
       "base_cost_days": 70,
@@ -24,14 +24,8 @@
       {
         "type": "unit_design",
         "template_ids": [
-          "usa_armor_1918",
-          "ger_armor_1918",
-          "fra_armor_1918"
+          "usa_armor_1918"
         ]
-      },
-      {
-        "type": "equipment_module",
-        "module_id": "m1916_37mm_tank_gun"
       }
     ],
     "ui": {

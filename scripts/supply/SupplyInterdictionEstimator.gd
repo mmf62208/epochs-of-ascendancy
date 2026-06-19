@@ -2,7 +2,9 @@ class_name SupplyInterdictionEstimator
 extends RefCounted
 
 ## Estimates convoy / column loss risk from control, adjacent enemies, and stub force presence.
-
+## Enhanced for continuous air superiority: uses air_power_ratio for interdiction.
+## High enemy air adv (e.g. 3:1+) increases chance/cost significantly.
+## If we (route owner) have high air adv, we can reduce enemy air's interdict effect (but this estimator is per-side).
 
 static func estimate(
 	path: Array[int],
@@ -22,6 +24,10 @@ static func estimate(
 		"enemy_naval": 0.0,
 		"enemy_land": 0.0,
 	}
+
+	var air_rules := {}
+	if rules.has_method("get_block"):
+		air_rules = rules.get_block("air")
 
 	for i in path.size():
 		var pid := int(path[i])
@@ -60,11 +66,38 @@ static func estimate(
 					breakdown["adjacent_enemy"] += float(inter_rules.get("adjacent_enemy_province", 0.045))
 					break
 
-		var air_lvl := float(presence.get("enemy_air_superiority", 0))
-		if air_lvl > 0.0:
-			var air_bump := air_lvl * float(inter_rules.get("enemy_air_superiority_per_level", 0.06))
+		# Continuous air: use air_power_ratio if present (enemy view of ratio = their enemy ratio for us? )
+		# presence here is "enemy presence" relative to owner; so enemy_air_power high means bad for owner.
+		var air_p_ratio := float(presence.get("air_power_ratio", 1.0))  # for the route owner vs enemies
+		var enemy_air_p := float(presence.get("enemy_air_power", 0.0))
+		var our_air_p := float(presence.get("our_air_power", 0.0))  # owner's view
+
+		# For this estimator, enemy_air_superiority (legacy) or direct: if enemies have adv over owner, high interdict
+		var enemy_adv_ratio := enemy_air_p / maxf(our_air_p, 0.01) if our_air_p + enemy_air_p > 0 else float(presence.get("enemy_air_superiority", 0))
+		if enemy_adv_ratio > 0.1 or float(presence.get("enemy_air_superiority", 0)) > 0.0:
+			var air_bump := 0.0
+			var per_ratio := float(inter_rules.get("enemy_air_superiority_per_air_power_ratio", 0.04))
+			if per_ratio <= 0.0:
+				per_ratio = 0.04
+			air_bump = clampf(enemy_adv_ratio * per_ratio, 0.0, 0.35)
+			# Overwhelming enemy air ( >3:1 ) does more damage to our supply
+			if enemy_adv_ratio >= 3.0:
+				air_bump *= 1.6
+				# Even if not full in estimator, scale up
+			elif enemy_adv_ratio >= 1.5:
+				air_bump *= 1.2
+			# If owner has high adv, reduce the bump (we contest their air)
+			if air_p_ratio >= 2.5:
+				air_bump *= 0.5
 			total += air_bump
 			breakdown["enemy_air"] += air_bump
+		else:
+			# fallback legacy
+			var air_lvl := float(presence.get("enemy_air_superiority", 0))
+			if air_lvl > 0.0:
+				var air_bump := air_lvl * float(inter_rules.get("enemy_air_superiority_per_level", 0.06))
+				total += air_bump
+				breakdown["enemy_air"] += air_bump
 
 		if bool(presence.get("enemy_naval_at_port", false)):
 			var naval_bump := float(inter_rules.get("enemy_naval_at_port", 0.14))

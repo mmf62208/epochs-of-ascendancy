@@ -4797,24 +4797,137 @@ func _show_space_designer_popup() -> void:
 	# In full: integrate with DesignManager space categories, module slots (propulsion from engines, weapons, life_support, sensors, hab from life support tech).
 	# For now: simple choice -> "design" that unlocks production note + toasts. Wire to production for space lines when tech complete.
 	var win := Window.new()
-	win.title = "Space Designer (unlocked by orbital/space techs: Satellite, Station, Spaceship)"
-	win.size = Vector2(420, 260)
+	win.title = "Mech Designer - %s (Alt-History Variant)" % tag
+	win.size = Vector2i(520, 220)
+	win.unresizable = true
+	add_child(win)  # under overlay for now
 	var vb := VBoxContainer.new()
+	vb.set_anchors_preset(Control.PRESET_FULL_RECT)
 	win.add_child(vb)
-	vb.add_child(Label.new()) # spacer
-	var types := ["Satellite (recon/sensors/comms)", "Space Station (hab/life support/shipyard)", "Spaceship (hull/propulsion/weapons - Expanse corvette feel)"]
-	for t in types:
+	var lbl := Label.new()
+	lbl.text = "Choose dieselpunk/steampunk/steam variant for mech/armor templates.\nPersisted. Affects special mech units + division caps."
+	lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(lbl)
+	for v in ["diesel", "steam", "steampunk"]:
 		var b := Button.new()
-		b.text = "Design " + t + " (modules: propulsion, weapons, sensors, life_support)"
+		b.text = "Select " + v.capitalize() + " Mech Variant"
 		b.pressed.connect(func():
-			_complete_space_design(t)
+			if not gd.peace_state.has("mech_variant_choice"):
+				gd.peace_state["mech_variant_choice"] = {}
+			gd.peace_state["mech_variant_choice"][tag] = v
+			print("[MECH DESIGNER] %s chose variant: %s (persisted; wire to div templates or special units e.g. power_battle_armor path)" % [tag, v])
+			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Mech variant set to " + v + " for " + tag + " (designer choice persisted)", 4.0)
 			win.queue_free()
 		)
 		vb.add_child(b)
+	var cancel := Button.new()
+	cancel.text = "Cancel (keep default dieselpunk)"
+	cancel.pressed.connect(func(): win.queue_free())
+	vb.add_child(cancel)
+	win.popup_centered()
+	print("[MECH DESIGNER STUB] Popup shown for %s variant choice (diesel/steam/steampunk)." % tag)
+func _open_space_designer() -> void:
+	# Check unlock via tech/rule_flag
+	var unlocked := false
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("has_rule_flag"):
+		unlocked = GameData.call("has_rule_flag", "player", "space_designer_unlocked")
+	if not unlocked:
+		toast_map_debug("Space Designer locked. Research 'space_design_basic' or orbital techs first.")
+		return
+	
+	var popup := preload("res://scripts/ui/SpaceDesignPopup.gd").new()
+	get_tree().root.add_child(popup)
+	popup.set_player_tag("player" if "player" in get_tree().root.get("peace_state", {}) else "USA")
+	toast_map_debug("Space Designer opened. Choose base, add modules (propulsion, sensors, life support), finalize to unlock custom design for production.")
+
+func show_battle_aar(result: Dictionary = {}) -> void:
+	# Specific accessible AAR panel (full details when clicked from preview/inspector/post-battle).
+	# Shows all factors, units, leaders, logs, outcomes. Not in hover (too much); clear in preview, deep here.
+	if result.is_empty():
+		# Demo sample
+		result = {
+			"attacker_tag": "GER", "defender_tag": "FRA",
+			"from_province_id": 82, "target_province_id": 101,
+			"odds_attacker_win": 62.0,
+			"winner": "GER",
+			"attacker_casualties": 145, "defender_casualties": 98,
+						"key_factors": ["air_superiority", "overwhelming_air_dominance", "leader_impact_high", "fort_mod_def_1.2", "supply_mod_att_0.8", "special_mountain", "space_strike", "orbital_guided"],
+			"leader_att": "Rommel (+18% attack/org)",
+			"leader_def": "Manstein (+12% def)",
+			"units_att": ["Panzer x2", "Inf x5", "CAS support"],
+			"units_def": ["Fortified Inf x4", "Mountain x1"],
+			"modifiers_detail": ["+15% air CAS", "-8% night", "+22% defending fort", "+5% terrain", "Leader bonus decisive", "+18% orbital strike (guided munitions)", "Space recon precision +12%"],
+			"air_dominance_level": "full",
+			"air_power_ratio": 4.2,
+			"outcome": "GER breakthrough, province captured. Encirclement risk for remaining FRA. " + "Overwhelming air superiority achieved - enemy grounded at high cost.",
+			"date": "1940-05"
+
+	var win := Window.new()
+	win.title = "Battle AAR: %s vs %s (%s)" % [result.get("attacker_tag","?"), result.get("defender_tag","?"), result.get("date","")]
+	win.size = Vector2(650, 480)
+	var vb := VBoxContainer.new()
+	win.add_child(vb)
+	vb.add_child(Label.new()) # spacer
+	var title := Label.new()
+	title.text = "After Action Report - Clickable full details (most important first)"
+	vb.add_child(title)
+	var odds := Label.new()
+	odds.text = "Est. odds: %.0f%% attacker win | Winner: %s" % [float(result.get("odds_attacker_win",50)), result.get("winner","?")]
+	vb.add_child(odds)
+	var units := Label.new()
+	units.text = "Units: Att %s | Def %s" % [str(result.get("units_att",[])), str(result.get("units_def",[]))]
+	vb.add_child(units)
+	var leaders := Label.new()
+	leaders.text = "Leaders: Att %s | Def %s" % [result.get("leader_att",""), result.get("leader_def","")]
+	vb.add_child(leaders)
+	var factors := Label.new()
+	factors.text = "Key factors: %s" % ", ".join(result.get("key_factors", []))
+	vb.add_child(factors)
+
+	var mods := Label.new()
+	mods.text = "Major modifiers: %s" % ", ".join(result.get("modifiers_detail", result.get("key_factors",[])))
+	vb.add_child(mods)
+	var air_dom := Label.new()
+	var adl := str(result.get("air_dominance_level", ""))
+	var aratio := float(result.get("air_power_ratio", 0.0))
+	air_dom.text = "Air dominance: %s (power ratio %.1f:1)" % [adl if adl else "n/a", aratio]
+	if adl == "full":
+		air_dom.text += " - Overwhelming air superiority achieved - enemy grounded at high cost"
+	elif adl == "partial":
+		air_dom.text += " - Enemy air presence allows limited ops despite disadvantage"
+	vb.add_child(air_dom)
+	var cas := Label.new()
+	cas.text = "Casualties: Att %s vs Def %s" % [result.get("attacker_casualties","?"), result.get("defender_casualties","?")]
+	vb.add_child(cas)
+	var outc := Label.new()
+	outc.text = "Outcome: " + str(result.get("outcome", "Battle resolved."))
+	outc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(outc)
 	var note := Label.new()
-	note.text = "Unlock with orbital_shipyard_program / space_design techs. Designs feed space production lines + milestones."
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	note.text = "(Full replayable log / unit combat histories available in Formation/Leader inspectors. Balance: these are the biggest impact items. Space gives edge but costly to maintain, not instant win.)"
 	vb.add_child(note)
+	# Unit combat logs section (follows units like leaders; date/province/result/key factors from log_combat in BM/Formation)
+	var unit_logs := Label.new()
+	unit_logs.text = "Unit logs sample: [1940-05 Prov82 win key_factors:air_superiority,space_strike,leader_impact | leader:Rommel | outcome:Breakthrough guided dev on troops]"
+	unit_logs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	vb.add_child(unit_logs)
+
+	var space_note := ""
+	if result.get("space_strike_bonus", 0.0) > 0.0 or "space" in str(result.get("special","")) or result.get("space_support_active", false):
+		space_note = " | Orbital strike support active - guided munitions devastating troops (space recon precision advantage)"
+		var sl := Label.new()
+		sl.text = "Space: " + space_note
+		vb.add_child(sl)
+	if "space_strike" in result.get("key_factors", []) or result.get("orbital_guided_munitions", 0.0) > 0.0:
+		var sg := Label.new()
+		sg.text = "Guided from orbit: high precision +soft/hard on troops; area denial + morale hits for non-space units"
+		vb.add_child(sg)
+
+	var close := Button.new()
+	close.text = "Close AAR"
+	close.pressed.connect(win.queue_free)
+	vb.add_child(close)
 	get_tree().root.add_child(win)
 	win.popup_centered()
 

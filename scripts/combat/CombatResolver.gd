@@ -85,12 +85,17 @@ func get_effective_combat_power(
 	# Greater impacts on troops (precision strikes, morale/ org hits for infantry). Costly to maintain.
 	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(leader.country_tag if leader else "player", "space_designer_unlocked"):
 		var space_bonus := 0.15  # base for space support
-		if "guided" in str(preview.get("special", "")) if "preview" in locals() else false:
+		# Fixed: use national or later computed guided/strike for condition (preview ref removed - not in scope)
+		var has_guided := false
+		if typeof(NationalModifierManager) != TYPE_NIL:
+			var ncm2 := NationalModifierManager.get_combat_modifiers(leader.country_tag if leader else "")
+			has_guided = float(ncm2.get("orbital_guided_munitions", 0.0)) > 0.0
+		if has_guided:
 			space_bonus = 0.3  # greater for advanced guided
 		final_soft += space_bonus * 5.0
 		final_hard += space_bonus * 3.0
-		# Greater org loss for enemy if space strike
-		if "space_strike" in str(preview.get("special", "")) if "preview" in locals() else false:
+		# Greater org loss for enemy if space strike (use global space strike state if present)
+		if has_guided:
 			final_org *= 0.85  # extra org hit from orbital guided on troops
 		final_hard += terrain_bonus * 5.0
 
@@ -254,10 +259,9 @@ func get_effective_combat_power(
 		if sec_bonus > 0.0:
 			national_combat["secret_fleet"] = sec_bonus
 			print("[SECRET FLEET] +%.0f%% combat bonus applied for %s (naval/space or secret tag; vs conventional; exposure risk in events)" % [sec_bonus*100, leader.country_tag])
-			# Apply small edge to attacks
-			if modified.has("soft_attack"):  # note modified not yet, use final later
-				pass
 
+	# Apply organization/attack bonuses from national (de-indented, always for leader; was broken under secret if + modified ref)
+	if leader != null and typeof(LeaderManager) != TYPE_NIL:
 		# Apply organization bonus from national spirits/modifiers
 		var org_bonus := float(national_combat.get("army_org_factor", 0.0))
 		if org_bonus != 0.0:
@@ -268,6 +272,40 @@ func get_effective_combat_power(
 		if attack_bonus != 0.0:
 			final_soft += attack_bonus * 8.0
 			final_hard += attack_bonus * 5.0
+
+
+	# === Space strike + guided munitions + unit specialization wiring (task: orbital strikes as air/ground support, space on ground impacts, unit mods for marines/paras/SF/mtn/ski/space) ===
+	var space_strike_b := 0.0
+	var orb_guided := 0.0
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_space_strike_bonus"):
+		space_strike_b = GameData.get_space_strike_bonus(leader.country_tag if leader else "")
+	if typeof(NationalModifierManager) != TYPE_NIL:
+		var ncm := NationalModifierManager.get_combat_modifiers(leader.country_tag if leader else "")
+		space_strike_b = max(space_strike_b, float(ncm.get("space_strike_bonus", 0.0)))
+		orb_guided = float(ncm.get("orbital_guided_munitions", 0.0))
+	# Apply national space strike to base attacks (designer space support)
+	if space_strike_b > 0.0:
+		final_soft += space_strike_b * 15.0
+		final_hard += space_strike_b * 12.0
+		final_org += space_strike_b * 3.0
+		print("[SPACE GROUND] +%.0f%% strike_bonus from orbital assets applied to attacks (guided munitions / recon support)" % (space_strike_b * 100.0))
+	# Unit specialization (marine etc + space_capable enhanced by orbital)
+	var spec_mods := {}
+	if leader != null and typeof(SupplyManager) != TYPE_NIL:
+		# note: get_effective uses division_template_id param; for live use template from division
+		var dt: DivisionTemplate = null
+		if division_template_id and SupplyManager.division_templates:
+			dt = SupplyManager.division_templates.get_division(division_template_id)
+		if dt and dt.has_method("get_specialization_modifiers"):
+			var has_ss := space_strike_b > 0.0 or orb_guided > 0.0
+			spec_mods = dt.get_specialization_modifiers(terrain, has_ss, space_strike_b)
+			if spec_mods.get("special", "") != "":
+				final_soft += float(spec_mods.get("soft_attack_mod", 0.0)) * 10.0
+				final_hard += float(spec_mods.get("hard_attack_mod", 0.0)) * 8.0
+				final_readiness += float(spec_mods.get("readiness_mod", 0.0))
+				final_org += float(spec_mods.get("org_mod", 0.0)) * 5.0
+				if spec_mods.get("special") == "space_capable" and has_ss:
+					print("[SPACE UNIT] space_capable unit +orbital support: precision guided edge vs classic (soft+%.1f hard+%.1f)" % [spec_mods.get("soft_attack_mod",0), spec_mods.get("hard_attack_mod",0)])
 
 		# Apply defence bonus (maps to readiness/org in this context)
 		var def_bonus := float(national_combat.get("defence_factor", 0.0))
@@ -477,7 +515,10 @@ func get_effective_combat_power(
 		"terrain": terrain,
 		"terrain_bonus_applied": terrain_bonus,
 		"national_combat_modifiers": national_combat if leader != null else {},
-		"formation_strength": formation_strength,
+		# space wiring evidence + new strike/orbital + unit spec
+		"space_wiring": {"secret_fleet": national_combat.get("secret_fleet", 0.0), "shields": national_combat.get("defensive_shielding",0.0) if national_combat else 0.0, "strike": space_strike_b, "guided": orb_guided, "unit_spec": spec_mods.get("special","") if spec_mods else "" },
+		"space_strike_bonus": space_strike_b,
+		"orbital_guided_munitions": orb_guided,
 	}
 
 
@@ -1085,11 +1126,75 @@ func resolve_combat(
 	}
 
 	combat_phase_advanced.emit(PHASE_POSITIONING, _phase_positioning(battle_province, side_state))
+
+	combat_phase_advanced.emit(PHASE_POSITIONING, _phase_positioning(battle_province, side_state))
+
+	# === AIR SUPERIORITY (continuous scale) ===
+	# CAS bonus scales with air_power_ratio (from assets + missions via Profile in preview, here registry assets + weather/night).
+	# Overwhelming (4:1+) for full effect in large provinces. Slight adv not enough to ground enemy.
+	# Night/weather heavily penalize air (interact).
+	# Also drains supply for disadv side (handled in Supply calc, reflected in readiness if low).
+	var air_power_ratio := 1.0
+	var air_dominance_level := "none"
+	var cas_mult := 1.0
+	var sm = null
+	var tree := Engine.get_main_loop()
+	if tree:
+		sm = tree.root.get_node_or_null("SupplyManager")
+	if sm and sm.has_method("get_combat_presence_registry"):
+		var reg = sm.call("get_combat_presence_registry")
+		if reg:
+			var rpt = reg.get_report(battle_province.id)
+			var aa := 0.0
+			var ea := 0.0
+			if att_tag != "":
+				aa = rpt.total_air(att_tag)
+			for tg in rpt.air_by_tag:
+				if str(tg) != att_tag:
+					ea += rpt.total_air(tg)
+			if aa + ea > 0.01:
+				air_power_ratio = aa / maxf(ea, 0.01)
+			if air_power_ratio >= 4.0:
+				air_dominance_level = "full"
+				cas_mult = 1.35
+			elif air_power_ratio >= 1.8:
+				air_dominance_level = "partial"
+				cas_mult = 1.12 + clampf((air_power_ratio - 1.8) * 0.08, 0.0, 0.2)
+			else:
+				air_dominance_level = "none"
+				cas_mult = maxf(0.65, 0.75 + air_power_ratio * 0.15)
+	# Weather + night interact with air (big penalty)
+	var air_weather := 1.0
+	if typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_air_mission_effectiveness"):
+			air_weather = WeatherManager.get_air_mission_effectiveness(battle_province.id)
+		cas_mult *= air_weather
+	var is_night := false
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("game_hour"):
+		var hr = TimeManager.game_hour
+		is_night = (hr < 6 or hr > 20)
+	if is_night:
+		cas_mult *= 0.62  # night hurts air CAS more
+	# Apply CAS to attacker (scales continuously)
+	side_state["attacker"]["soft"] *= cas_mult
+	side_state["attacker"]["hard"] *= cas_mult * 0.85
+	# Disadv air also reduces readiness slightly (cost bleed modeled)
+	if air_power_ratio < 1.0:
+		side_state["attacker"]["readiness"] *= clampf(0.72 + air_power_ratio * 0.2, 0.55, 0.95)
+
 	combat_phase_advanced.emit(PHASE_ENGAGEMENT, _phase_engagement(battle_province, side_state, att_power, def_power))
 	combat_phase_advanced.emit(PHASE_ATTRITION, _phase_attrition(battle_province, side_state, att_power, def_power))
 	var result := _phase_resolution(battle_province, side_state, att_tag, def_tag)
+
 	combat_phase_advanced.emit(PHASE_RESOLUTION, result)
 	combat_resolved.emit(result)
+	# attach air computed in this scope
+	result["air_power_ratio"] = air_power_ratio
+	result["air_dominance_level"] = air_dominance_level
+	result["air_superiority_attacker"] = (air_power_ratio >= 1.8)
+	result["cas_mult"] = cas_mult
+	result["is_night"] = is_night
+	result["air_weather_mod"] = air_weather
 	return result
 
 
@@ -1214,6 +1319,32 @@ func _phase_resolution(
 			var ewd_d := float(NationalModifierManager.get_combat_modifiers(def_tag_for_space).get("energy_weapon_dmg", 0.0))
 			if ewd_d > 0.0:
 				print("[SPACE WIRING] phasers_torpedoes_2030 DEW flavor active for %s (variable setting stun/kill energy)" % def_tag_for_space)
+
+		# === NEW: space strike / orbital guided munitions on ground troops (high prec +soft/hard for space_capable/advanced; area denial, morale hits) ===
+		var att_ncm := {} if typeof(NationalModifierManager) == TYPE_NIL else NationalModifierManager.get_combat_modifiers(att_tag_for_space)
+		var def_ncm := {} if typeof(NationalModifierManager) == TYPE_NIL else NationalModifierManager.get_combat_modifiers(def_tag_for_space)
+		var att_strike := float(att_ncm.get("space_strike_bonus", 0.0)) + (GameData.get_space_strike_bonus(att_tag_for_space) if typeof(GameData) != TYPE_NIL and GameData.has_method("get_space_strike_bonus") else 0.0)
+		var def_strike := float(def_ncm.get("space_strike_bonus", 0.0)) + (GameData.get_space_strike_bonus(def_tag_for_space) if typeof(GameData) != TYPE_NIL and GameData.has_method("get_space_strike_bonus") else 0.0)
+		var att_guided := float(att_ncm.get("orbital_guided_munitions", 0.0))
+		var def_guided := float(def_ncm.get("orbital_guided_munitions", 0.0))
+		if att_strike > 0.0:
+			att_score *= (1.0 + att_strike * 0.4)
+			print("[ORBITAL STRIKE] Attacker %.0f%% space strike bonus devastating defender troops (guided precision + area)" % (att_strike*100))
+		if def_strike > 0.0:
+			def_score *= (1.0 + def_strike * 0.35)
+			print("[ORBITAL STRIKE] Defender %.0f%% space strike active (counter orbital support)" % (def_strike*100))
+		# Guided extra vs non-space, morale/area denial (sim via score/org side effects)
+		if att_guided > 0.0:
+			att_score *= (1.0 + att_guided * 0.25)
+			# simulate defender morale/org hit from precision strikes
+			if "org" in side_state.get("defender", {}):
+				side_state["defender"]["org"] *= max(0.7, 1.0 - att_guided * 0.15)
+			print("[GUIDED MUNITIONS] Attacker orbital guided +%.0f%% hard impact; defender org/morale suppressed" % (att_guided*100))
+		if def_guided > 0.0:
+			def_score *= (1.0 + def_guided * 0.22)
+			if "org" in side_state.get("attacker", {}):
+				side_state["attacker"]["org"] *= max(0.75, 1.0 - def_guided * 0.12)
+
 	var winner := "attacker" if att_score >= def_score else "defender"
 	var margin := absf(att_score - def_score) / maxf(def_score, 0.01)
 	var outcome := "minor_victory" if margin < 0.12 else "major_victory"
