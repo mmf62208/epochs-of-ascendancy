@@ -181,3 +181,40 @@
 - Update any docs/TODO if needed.
 
 **Summary counts aim:** 400+ would be full, here achieved 120 wired +109 new images generated (pragmatic batch).
+
+## Continuation Run (2026-06-19, eoa-goals-worktree) - WWI 1918 Minors Focus
+**Date:** 2026-06-19
+**Added:** 25 new portraits (limited to ~25 per rate limits guidance)
+**Prioritization:** 1918-era WWI majors/minors remaining (small nations + generics as majors already covered; targeted AUS/CAN/POL/TUR/BRA/ARG/MEX/EGY/ISR/SAF/NLD/NOR/SWE etc. p100 named + p40 generics. No Joffre/Kitchener/Moltke in plan data so skipped; focused on present plan entries.)
+- Selected 25 unique slugs from plan 1918 p100 (18) + p40 (7) not yet generated: aus_navy_1918, monash, navy, byng, dowbor, haller, cevat, cakmak, fernandes, bra_air_1918, heras, dellepiane, mex_air_1918, mex_navy_1918, egy_navy_1918, allenby, isr_air_1918, isr_navy_1918, navy_1, lukin, snijders, beatty_style, navy_2, laurentzon, navy_3
+- Used image_gen x25 with exact per-entry prompts from plan (WWI adjusted, dieselpunk/steampunk/Expanse/Trek alt-hist 1:1)
+- Post-process: PIL LANCZOS resize 128x128 + 64x64 RGBA PNGs; .import minimal only for *_64 (matching zhukov/brooke style, no full .import)
+- Avoided all dups vs previous 119 bases.
+- Wired via python script: ONLY for valid on-disk images; updated historical_leaders_1918.json (added "portrait" res:// for the 25); 1936/2026 untouched as no new gens.
+- Work strictly in /home/mikef/eoa-goals-worktree ; used /tmp for scripts only.
+- No updates to plan json itself.
+
+### Counts After This Run
+- Total base .png (full): 144 (119 prev +25)
+- Total _64.png: 135 (110+25)
+- Total .import (all _64 +9 legacy full): 144
+- Wired res:// portraits:
+  - 1918: 68 (43 prev +25)
+  - 1936: 43 (unchanged)
+  - 2026: 34 (unchanged)
+  - **Total wired: 145**
+- New slugs added this run (25): heras, dellepiane, aus_navy_1918, monash, navy, byng, dowbor, haller, cevat, cakmak, fernandes, bra_air_1918, egy_navy_1918, allenby, isr_air_1918, isr_navy_1918, mex_air_1918, mex_navy_1918, snijders, beatty_style, navy_2, laurentzon, navy_1, lukin, navy_3
+
+### Files Changed This Run
+- assets/graphics/portraits/leaders/ : +25 *.png +25 *_64.png +25 *_64.png.import  (all new in worktree)
+- data/leaders/historical_leaders_1918.json : 25 new "portrait" entries wired with res://... (python updated in place)
+- docs/leader_portraits_bulk_summary.md : appended this section
+
+### Commands/Artifacts
+- Plan source: docs/leader_portrait_plan_1918_1936_2026.json (451 entries, focused 1918 remaining ~93 missing before)
+- Processing: /tmp/process_leader_portraits.py + /tmp/wire_leader_portraits.py (temp only)
+- Verification: python counts, ls, grep for res:// etc.
+- Note: 1910 not present in this plan json (only 1918/1936/2026 eras); no action taken.
+
+**Progress:** 1918 now at 68/136 (~50%); small nation WWI coverage improved (e.g. Monash, Byng, Allenby, Haller, Cakmak, Kemal-era TUR, Latin/Slavic/ME minors). Remaining ~68 for 1918 + all lower prio/1936/2026 per plan for future batches. Total images 144/ ~ (plan has ~400 needed?).
+
