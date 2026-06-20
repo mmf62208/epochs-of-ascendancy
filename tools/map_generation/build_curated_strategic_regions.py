@@ -60,7 +60,7 @@ TAG_TO_REGION: dict[str, int] = {
     "ITA": 14, "CHE": 14, "AUT": 14,
     "NOR": 9, "SWE": 9, "DNK": 9, "FIN": 9,
     "POL": 11, "CZE": 8, "HUN": 17, "ROM": 17, "BUL": 17, "YUG": 17,
-    "GRC": 18, "TUR": 19,
+    "GRC": 18, "CRE": 18, "SIC": 15, "MLT": 16, "COR": 16, "SAR": 16, "BAL": 16, "CYP": 24, "TUR": 19,
     "EGY": 20, "LBA": 20, "ALG": 20, "TUN": 20, "MAR": 20,
     "UKR": 21, "BLR": 21,
     "RUS": 22, "SOV": 22,
@@ -127,10 +127,20 @@ def classify_by_geography(info: dict) -> int:
         return 10
     if 2280 <= cx <= 2525 and 485 <= cy <= 625:
         return 11
+    if 1620 <= cx <= 2420 and 930 <= cy <= 1340:
+        return 12
     if 2035 <= cx <= 2125 and 455 <= cy <= 585:
         return 12
+    if 2280 <= cx <= 2720 and 1170 <= cy <= 1320:
+        return 14
+    if 2550 <= cx <= 3040 and 1280 <= cy <= 1450:
+        return 15
+    if 1100 <= cx <= 2100 and 1320 <= cy <= 1620:
+        return 13
     if 1900 <= cx <= 2105 and 580 <= cy <= 785:
         return 13
+    if 4080 <= cx <= 4220 and 1630 <= cy <= 1730:
+        return 24
     if 2100 <= cx <= 2285 and 520 <= cy <= 685:
         return 14
     if 2180 <= cx <= 2425 and 640 <= cy <= 825:
@@ -198,8 +208,10 @@ def classify(info: dict) -> int:
             rid = TAG_TO_REGION[t]
             if t == "GER" and info["cx"] >= 2190:
                 return 8
-            if t == "ITA" and info["cy"] >= 640:
-                return 15
+            if t == "ITA":
+                if info["cy"] >= 1280:
+                    return 15
+                return 14
             if t == "RUS" and info["cy"] >= 400:
                 return 21 if info["cx"] < 2800 else 22
             return rid

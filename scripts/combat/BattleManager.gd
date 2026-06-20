@@ -329,7 +329,6 @@ func apply_combat_outcome(
 	var captured := bool(result.get("province_control_change", false))
 	var winner := str(result.get("winner", ""))
 	# Apply persistent org/readiness damage to the actual live formations (main loop combat now has lasting effects).
-	_apply_combat_damage_to_formations(result, attacker_formation_id)
 
 	# === Balance integration: apply persistent org/readiness/strength damage here (from BM as per design)
 	# Loser heavier losses (strength hit), winner lighter org/rdy hit. Recovery via Supply daily (infra/supply mod).
@@ -388,6 +387,12 @@ func apply_combat_outcome(
 ## Uses existing can_assault + execute logic; limited to 1-2 actions per major per day to avoid spam.
 ## AI targets based on simple adjacent non-owned (later: supply/infra/org scoring + ascend geo).
 func simulate_daily_ai_combat() -> void:
+	# Prefer DebugOverlay for full scored logic (weather/geo aware); fallback to inline AI below.
+	var dbg := get_node_or_null("/root/DebugOverlay")
+	if dbg != null and dbg.has_method("_simulate_ai_combat_turn"):
+		dbg.call("_simulate_ai_combat_turn")
+		print("[BM DAILY AI] delegated to DebugOverlay _simulate (full scoring + chain + weather).")
+		return
 	# World-class main-loop AI battle initiation (promoted from F10 harness _simulate_ai_combat_turn base).
 	# Called daily by TimeManager for 50+ turn integrated playtesting (auto wars for AI nations, not debug-only).
 	# Uses real BattleManager paths (can/execute + chain/flank) + supply/infra/org + weather-aware target choice.
@@ -733,86 +738,6 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 ## Pragmatic additions to support direct OOB setup for WWI/WWII battles and referenced calls in harness/docs.
 ## These enable recreating Marne/Verdun (attrition), Stalingrad (urban winter supply), Midway (naval air), D-Day (amphib).
 
-func simulate_daily_ai_combat() -> void:
-	"""Main-loop autonomous AI combat for 50+ turn integrated playtests (promoted from harness; scored on supply/infra/low-org + weather + chain)."""
-	# Prefer DebugOverlay for full scored logic (weather/geo aware); fallback simple.
-	var dbg := get_node_or_null("/root/DebugOverlay")
-	if dbg != null and dbg.has_method("_simulate_ai_combat_turn"):
-		dbg.call("_simulate_ai_combat_turn")
-		print("[BM DAILY AI] delegated to DebugOverlay _simulate (full scoring + chain + weather).")
-		return
-	# Fallback direct (for pure BM headless without UI)
-	print("[BM DAILY AI] fallback simple AI assaults (limited). Extend via TestRunner historical harness for full OOB realism.")
-	var mm := get_node_or_null("/root/MapManager")
-	if mm == null or not mm.has_method("get_provinces_by_owner"):
-		return
-	var ai_tags := ["GER", "SOV", "JAP", "ITA"]
-	for tag in ai_tags:
-		var owned: Array = mm.call("get_provinces_by_owner", tag)
-		if owned.size() < 1: continue
-		var fromp := int(owned[0])
-		var adjs := mm.call("get_adjacent_provinces", fromp)
-		for aidv in adjs:
-			var aid := int(aidv)
-			var p: Province = mm.call("get_province", aid) if mm.has_method("get_province") else null
-			if p == null or p.owner_tag == tag or p.owner_tag == "": continue
-			var can: Dictionary = can_assault_province(tag, aid, fromp)
-			if bool(can.get("ok", false)):
-				var cres := execute_chain_assault_or_flank(tag, aid, fromp, 1)
-				print("[BM DAILY AI FALLBACK] %s chain assault on %d -> %d results" % [tag, aid, cres.size()])
-				break
-
-func execute_naval_engagement(attacker_tag: String, defender_tag: String, sea_province_id: int, intensity: float = 0.5, has_submarines: bool = false, bad_weather: bool = false) -> Dictionary:
-	"""Deeper naval integration stub for Midway 1942 etc. Uses registry air/ship presence, weather, subs for carrier/sub battles. Logs factors for AAR."""
-	var sm := get_node_or_null("/root/SupplyManager")
-	var att_air := 5.0
-	var def_air := 3.0
-	var att_naval := 12.0
-	var def_naval := 9.0
-	if sm != null and sm.has_method("get_combat_presence_registry"):
-		var reg := sm.call("get_combat_presence_registry")
-		if reg != null:
-			var rpt := reg.get_report(sea_province_id)
-			if rpt != null:
-				att_air = float(rpt.total_air(attacker_tag) if rpt.has_method("total_air") else att_air)
-				def_air = 0.0
-				if "air_by_tag" in rpt:
-					for tg in rpt.air_by_tag.keys():
-						if str(tg) != attacker_tag:
-							def_air += float(rpt.air_by_tag[tg])
-				att_naval = float(rpt.navy_total if "navy_total" in rpt else att_naval) * (1.4 if "JAP" in attacker_tag or "USA" in attacker_tag else 1.0)  # carrier weight
-				if "naval_strength" in rpt:
-					for tg in rpt.naval_strength.keys():
-						if str(tg) != attacker_tag:
-							def_naval += float(rpt.naval_strength[tg])
-	var w_mult := 0.65 if bad_weather else 1.0
-	var sub_mult := 1.25 if has_submarines else 1.0
-	var att_score := (att_air * 1.8 + att_naval * 0.9) * intensity * w_mult * sub_mult
-	var def_score := (def_air * 1.8 + def_naval * 0.9) * intensity * w_mult
-	var winner_tag := attacker_tag if att_score >= def_score else defender_tag
-	var margin := absf(att_score - def_score) / maxf(max(att_score, def_score), 1.0)
-	var result := {
-		"winner": winner_tag,
-		"attacker_tag": attacker_tag,
-		"defender_tag": defender_tag,
-		"sea_province_id": sea_province_id,
-		"attacker_score": att_score,
-		"defender_score": def_score,
-		"air_ratio": att_air / maxf(def_air, 0.01),
-		"has_submarines": has_submarines,
-		"bad_weather": bad_weather,
-		"intensity": intensity,
-		"outcome": "major_victory" if margin > 0.25 else "minor_victory",
-		"key_factors": ["carrier_air_dominance" if att_air > def_air * 1.5 else "surface_gunnery", "submarine_ambush" if has_submarines else "no_sub_factor", "storm_degrades_air" if bad_weather else "clear_skies"],
-		"casualties": { "attacker": int(120 + randf() * 180), "defender": int(90 + randf() * 220) },  # planes + ships abstract
-		"notes": "Proxy naval/air for historical (Midway: US dive bombers + intel key vs IJN). Expand with full ship templates + task groups."
-	}
-	print("[BM NAVAL ENGAGEMENT] %s vs %s @sea%d | winner=%s att_score=%.1f def=%.1f airR=%.1f subs=%s storm=%s" % [
-		attacker_tag, defender_tag, sea_province_id, winner_tag, att_score, def_score, result["air_ratio"], has_submarines, bad_weather
-	])
-	# Attach to combat logs if formations involved (future)
-	return result
-
 func force_historical_oob_for_battle(battle_key: String, year: int = 1942, custom_pids: Dictionary = {}) -> Dictionary:
 	"""Force realistic OOB at representative provinces for history testing (called by TestRunner sims). Updates owners, deploys formations from templates, assigns historical leaders, seeds air/naval presence, sets weather proxy."""
 	print("[BM HIST OOB] Forcing OOB for battle=%s year=%d" % [battle_key, year])
@@ -900,14 +825,14 @@ func force_historical_oob_for_battle(battle_key: String, year: int = 1942, custo
 
 	# Historical leader assign (use available historical; match era loosely)
 	if lm.has_method("get_leaders_for_country"):
-		var att_leaders := lm.call("get_leaders_for_country", att_tag)
+		var att_leaders: Array = lm.call("get_leaders_for_country", att_tag) as Array
 		if att_leaders.size() > 0 and att_divs.size() > 0:
-			var lid := att_leaders[0].leader_id if "leader_id" in att_leaders[0] else ""
+			var lid: String = str(att_leaders[0].leader_id) if att_leaders[0] is Leader else ""
 			if lid != "" and lm.has_method("assign_leader_to_formation"):
 				lm.call("assign_leader_to_formation", lid, att_divs[0])
-		var def_leaders := lm.call("get_leaders_for_country", def_tag)
+		var def_leaders: Array = lm.call("get_leaders_for_country", def_tag) as Array
 		if def_leaders.size() > 0 and def_divs.size() > 0:
-			var dlid := def_leaders[0].leader_id if "leader_id" in def_leaders[0] else ""
+			var dlid: String = str(def_leaders[0].leader_id) if def_leaders[0] is Leader else ""
 			if dlid != "" and lm.has_method("assign_leader_to_formation"):
 				lm.call("assign_leader_to_formation", dlid, def_divs[0])
 

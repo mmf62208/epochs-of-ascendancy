@@ -10761,6 +10761,252 @@
       "infrastructure": 1,
       "development_level": 1,
       "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9520": {
+      "population": 465499,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9521": {
+      "population": 598500,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9522": {
+      "population": 598500,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9523": {
+      "population": 598500,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9524": {
+      "population": 598500,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9525": {
+      "population": 598500,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9526": {
+      "population": 598500,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9527": {
+      "population": 598500,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9528": {
+      "population": 598500,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9529": {
+      "population": 598500,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9530": {
+      "population": 598500,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9531": {
+      "population": 598500,
+      "factories": 2,
+      "infrastructure": 1,
+      "development_level": 2,
+      "resources": {
+        "steel": 30
+      }
+    },
+    "9532": {
+      "population": 680000,
+      "factories": 3,
+      "infrastructure": 1,
+      "development_level": 3,
+      "resources": {
+        "iron": 45
+      }
+    },
+    "9533": {
+      "population": 680000,
+      "factories": 3,
+      "infrastructure": 1,
+      "development_level": 3,
+      "resources": {
+        "iron": 45
+      }
+    },
+    "9534": {
+      "population": 680000,
+      "factories": 3,
+      "infrastructure": 1,
+      "development_level": 3,
+      "resources": {
+        "iron": 45
+      }
+    },
+    "9535": {
+      "population": 680000,
+      "factories": 3,
+      "infrastructure": 1,
+      "development_level": 3,
+      "resources": {
+        "iron": 45
+      }
+    },
+    "9536": {
+      "population": 612000,
+      "factories": 3,
+      "infrastructure": 1,
+      "development_level": 3,
+      "resources": {
+        "iron": 45
+      }
+    },
+    "9537": {
+      "population": 612000,
+      "factories": 3,
+      "infrastructure": 1,
+      "development_level": 3,
+      "resources": {
+        "iron": 45
+      }
+    },
+    "9538": {
+      "population": 234000,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9539": {
+      "population": 234000,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9540": {
+      "population": 234000,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9541": {
+      "population": 234000,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9542": {
+      "population": 234000,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9544": {
+      "population": 210600,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9545": {
+      "population": 210600,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9546": {
+      "population": 234000,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9547": {
+      "population": 234000,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9548": {
+      "population": 234000,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9549": {
+      "population": 210600,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
+    },
+    "9550": {
+      "population": 210600,
+      "factories": 1,
+      "infrastructure": 1,
+      "development_level": 1,
+      "notes": "Phase 1 generated child (pop scaled from base catalog)"
     }
   }
 }

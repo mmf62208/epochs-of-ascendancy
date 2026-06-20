@@ -206,7 +206,10 @@
       },
       "population_base": 1330000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "victory_points": 15
     },
     {
       "id": 22,
@@ -224,7 +227,10 @@
       },
       "population_base": 1360000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "SPA",
+      "controller_tag": "SPA",
+      "victory_points": 15
     },
     {
       "id": 25,
@@ -5101,7 +5107,7 @@
     },
     {
       "id": 9246,
-      "name": "New Settlement",
+      "name": "Turin",
       "terrain": "urban",
       "core_for_tags": [
         "ITA"
@@ -5115,11 +5121,14 @@
       },
       "population_base": 1053000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "victory_points": 5
     },
     {
       "id": 9247,
-      "name": "New Settlement",
+      "name": "Venice",
       "terrain": "urban",
       "core_for_tags": [
         "ITA"
@@ -5133,11 +5142,14 @@
       },
       "population_base": 1053000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "victory_points": 5
     },
     {
       "id": 9248,
-      "name": "New Settlement",
+      "name": "Bologna",
       "terrain": "urban",
       "core_for_tags": [
         "ITA"
@@ -5151,11 +5163,14 @@
       },
       "population_base": 1053000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "victory_points": 4
     },
     {
       "id": 9249,
-      "name": "New Settlement",
+      "name": "Florence",
       "terrain": "urban",
       "core_for_tags": [
         "ITA"
@@ -5169,11 +5184,14 @@
       },
       "population_base": 1053000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "victory_points": 4
     },
     {
       "id": 9250,
-      "name": "New Settlement",
+      "name": "Naples",
       "terrain": "urban",
       "core_for_tags": [
         "ITA"
@@ -5187,7 +5205,10 @@
       },
       "population_base": 1053000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "victory_points": 8
     },
     {
       "id": 9251,
@@ -5205,7 +5226,10 @@
       },
       "population_base": 1053000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "victory_points": 12
     },
     {
       "id": 9252,
@@ -5671,7 +5695,7 @@
     },
     {
       "id": 9276,
-      "name": "New Settlement",
+      "name": "Lille",
       "terrain": "urban",
       "core_for_tags": [
         "FRA"
@@ -5686,11 +5710,14 @@
       },
       "population_base": 468000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "victory_points": 4
     },
     {
       "id": 9277,
-      "name": "New Settlement",
+      "name": "Strasbourg",
       "terrain": "urban",
       "core_for_tags": [
         "FRA"
@@ -5705,11 +5732,14 @@
       },
       "population_base": 468000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "victory_points": 3
     },
     {
       "id": 9278,
-      "name": "New Settlement",
+      "name": "Nantes",
       "terrain": "urban",
       "core_for_tags": [
         "FRA"
@@ -5724,11 +5754,14 @@
       },
       "population_base": 468000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "victory_points": 3
     },
     {
       "id": 9279,
-      "name": "New Settlement",
+      "name": "Bordeaux",
       "terrain": "urban",
       "core_for_tags": [
         "FRA"
@@ -5743,11 +5776,14 @@
       },
       "population_base": 468000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "victory_points": 4
     },
     {
       "id": 9280,
-      "name": "New Settlement",
+      "name": "Toulouse",
       "terrain": "urban",
       "core_for_tags": [
         "FRA"
@@ -5762,7 +5798,10 @@
       },
       "population_base": 468000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "victory_points": 3
     },
     {
       "id": 9281,
@@ -5781,7 +5820,10 @@
       },
       "population_base": 468000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "victory_points": 25
     },
     {
       "id": 9282,
@@ -8951,6 +8993,655 @@
         "primary_resource": "coal"
       },
       "population_base": 216450,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9520,
+      "name": "Malta",
+      "terrain": "urban",
+      "core_for_tags": [
+        "MLT"
+      ],
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 465499,
+      "victory_points": 3,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9521,
+      "name": "Palermo",
+      "terrain": "urban",
+      "core_for_tags": [
+        "SIC",
+        "ITA"
+      ],
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 665000,
+      "victory_points": 5,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9522,
+      "name": "Catania",
+      "terrain": "urban",
+      "core_for_tags": [
+        "SIC",
+        "ITA"
+      ],
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 665000,
+      "victory_points": 4,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9523,
+      "name": "Messina",
+      "terrain": "plains",
+      "core_for_tags": [
+        "SIC",
+        "ITA"
+      ],
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 665000,
+      "victory_points": 3,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9524,
+      "name": "Heraklion",
+      "terrain": "urban",
+      "core_for_tags": [
+        "CRE",
+        "GRC"
+      ],
+      "owner_tag": "GRC",
+      "controller_tag": "GRC",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 665000,
+      "victory_points": 4,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9525,
+      "name": "Chania",
+      "terrain": "plains",
+      "core_for_tags": [
+        "CRE",
+        "GRC"
+      ],
+      "owner_tag": "GRC",
+      "controller_tag": "GRC",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 665000,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9526,
+      "name": "Ajaccio",
+      "terrain": "plains",
+      "core_for_tags": [
+        "COR",
+        "FRA"
+      ],
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 665000,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9527,
+      "name": "Cagliari",
+      "terrain": "plains",
+      "core_for_tags": [
+        "SAR",
+        "ITA"
+      ],
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 665000,
+      "victory_points": 3,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9528,
+      "name": "Sassari",
+      "terrain": "plains",
+      "core_for_tags": [
+        "SAR",
+        "ITA"
+      ],
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 665000,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9529,
+      "name": "Palma",
+      "terrain": "plains",
+      "core_for_tags": [
+        "BAL",
+        "SPA"
+      ],
+      "owner_tag": "SPA",
+      "controller_tag": "SPA",
+      "natural_resources": {
+        "resources": {
+          "iron": 45
+        },
+        "resource_score": 45.0,
+        "primary_resource": "iron"
+      },
+      "population_base": 680000,
+      "victory_points": 4,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9530,
+      "name": "Ibiza",
+      "terrain": "plains",
+      "core_for_tags": [
+        "BAL",
+        "SPA"
+      ],
+      "owner_tag": "SPA",
+      "controller_tag": "SPA",
+      "natural_resources": {
+        "resources": {
+          "iron": 45
+        },
+        "resource_score": 45.0,
+        "primary_resource": "iron"
+      },
+      "population_base": 680000,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9531,
+      "name": "Menorca",
+      "terrain": "plains",
+      "core_for_tags": [
+        "BAL",
+        "SPA"
+      ],
+      "owner_tag": "SPA",
+      "controller_tag": "SPA",
+      "natural_resources": {
+        "resources": {
+          "iron": 45
+        },
+        "resource_score": 45.0,
+        "primary_resource": "iron"
+      },
+      "population_base": 680000,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9532,
+      "name": "Barcelona",
+      "terrain": "urban",
+      "core_for_tags": [
+        "SPA"
+      ],
+      "owner_tag": "SPA",
+      "controller_tag": "SPA",
+      "natural_resources": {
+        "resources": {
+          "iron": 45
+        },
+        "resource_score": 45.0,
+        "primary_resource": "iron"
+      },
+      "population_base": 748000,
+      "victory_points": 8,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9533,
+      "name": "Valencia",
+      "terrain": "plains",
+      "core_for_tags": [
+        "SPA"
+      ],
+      "owner_tag": "SPA",
+      "controller_tag": "SPA",
+      "natural_resources": {
+        "resources": {
+          "iron": 45
+        },
+        "resource_score": 45.0,
+        "primary_resource": "iron"
+      },
+      "population_base": 544000,
+      "victory_points": 5,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9534,
+      "name": "Seville",
+      "terrain": "plains",
+      "core_for_tags": [
+        "SPA"
+      ],
+      "owner_tag": "SPA",
+      "controller_tag": "SPA",
+      "natural_resources": {
+        "resources": {
+          "iron": 45
+        },
+        "resource_score": 45.0,
+        "primary_resource": "iron"
+      },
+      "population_base": 544000,
+      "victory_points": 4,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9535,
+      "name": "Lisbon",
+      "terrain": "urban",
+      "core_for_tags": [
+        "POR"
+      ],
+      "owner_tag": "POR",
+      "controller_tag": "POR",
+      "natural_resources": {
+        "resources": {
+          "iron": 45
+        },
+        "resource_score": 45.0,
+        "primary_resource": "iron"
+      },
+      "population_base": 748000,
+      "victory_points": 6,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9536,
+      "name": "Nicosia",
+      "terrain": "urban",
+      "core_for_tags": [
+        "CYP"
+      ],
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 192400,
+      "victory_points": 3,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9537,
+      "name": "Limassol",
+      "terrain": "plains",
+      "core_for_tags": [
+        "CYP"
+      ],
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 192400,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9538,
+      "name": "Lyon",
+      "terrain": "urban",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 327600,
+      "victory_points": 8,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9539,
+      "name": "Marseille",
+      "terrain": "urban",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 327600,
+      "victory_points": 6,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9540,
+      "name": "Nice",
+      "terrain": "plains",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 210600,
+      "victory_points": 3,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9541,
+      "name": "Dijon",
+      "terrain": "plains",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 210600,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9542,
+      "name": "Rennes",
+      "terrain": "plains",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 210600,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9544,
+      "name": "Genoa",
+      "terrain": "plains",
+      "core_for_tags": [
+        "ITA"
+      ],
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 598500,
+      "victory_points": 3,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9545,
+      "name": "Bari",
+      "terrain": "plains",
+      "core_for_tags": [
+        "ITA"
+      ],
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 598500,
+      "victory_points": 3,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9546,
+      "name": "Reims",
+      "terrain": "plains",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 210600,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9547,
+      "name": "Grenoble",
+      "terrain": "plains",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 210600,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9548,
+      "name": "Montpellier",
+      "terrain": "plains",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "owner_tag": "FRA",
+      "controller_tag": "FRA",
+      "natural_resources": {
+        "resources": {
+          "iron": 30,
+          "steel": 16
+        },
+        "resource_score": 46,
+        "primary_resource": "iron"
+      },
+      "population_base": 210600,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9549,
+      "name": "Verona",
+      "terrain": "plains",
+      "core_for_tags": [
+        "ITA"
+      ],
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 598500,
+      "victory_points": 3,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9550,
+      "name": "Ancona",
+      "terrain": "plains",
+      "core_for_tags": [
+        "ITA"
+      ],
+      "owner_tag": "ITA",
+      "controller_tag": "ITA",
+      "natural_resources": {
+        "resources": {
+          "steel": 30
+        },
+        "resource_score": 30.0,
+        "primary_resource": "steel"
+      },
+      "population_base": 598500,
       "victory_points": 2,
       "special_features": [],
       "special_levels": {}

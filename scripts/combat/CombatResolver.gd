@@ -118,6 +118,7 @@ func get_effective_combat_power(
 	var unit_mod_factors: Dictionary = {}
 	var guided_mult_soft := 1.0
 	var guided_mult_hard := 1.0
+	var has_guided := false
 
 	# Detect guided eligibility (space designer + precision rule or special templates)
 	var owner_for_tech := (leader.country_tag if leader != null else "player")
@@ -131,10 +132,6 @@ func get_effective_combat_power(
 	if unit_type == "marine":
 		var tlow := terrain.to_lower()
 		var is_coastal := tlow in ["coast", "coastal", "beach", "river", "marsh", "island", "delta"]
-		if province_for_effects != null:
-			var pt := str(province_for_effects.get("terrain", "")).to_lower() if typeof(province_for_effects) == TYPE_DICTIONARY else (province_for_effects.terrain.to_lower() if province_for_effects != null and "terrain" in province_for_effects else "")
-			if "coast" in pt or "river" in pt or "beach" in pt:
-				is_coastal = true
 		if is_coastal:
 			final_soft *= 1.28
 			final_readiness *= 1.12
@@ -481,8 +478,11 @@ func get_effective_combat_power(
 		if formation_for_effects.current_land_mission in [Formation.LAND_MISSION_DEFEND, Formation.LAND_MISSION_ARTILLERY_PREP]:
 			final_readiness *= 1.05  # preplanned fire planning.
 	# Air fully integrated (expanded stub): CAS/interdiction + intensity + effectiveness + AA.
-	# Uses AirMissionProfile/formation air_mission + WM air effectiveness + mission_intensity for CAS bonus to attacker/soft, interdiction drag on defender org/readiness (models supply interdiction in battle).
 	if formation_for_effects != null:
+		var air_power_ratio := 1.0
+		var cas_mult := 1.0
+		var preview_def_power: Dictionary = {}
+		var preview_att_power: Dictionary = {"hard_attack": final_hard, "soft_attack": final_soft}
 		var air_bonus := 0.0
 		var interdict_drag := 0.0
 		if formation_for_effects.has_method("get_mission_mods"):
@@ -490,8 +490,8 @@ func get_effective_combat_power(
 			air_bonus = float(air_mods.get("combat_bonus", 0.0))
 			# AA vs enemy air (defenders damage aircraft, reduce air effect, attrition to enemy air presence)
 			var aa_vs := float(air_mods.get("aa_vs_air", 0.0))
-			if aa_vs > 0.0 or (def_power and float(def_power.get("aa_factor", 0.0)) > 0.0):
-				aa_vs = max(aa_vs, float(def_power.get("aa_factor", 0.15)) if def_power else 0.15)
+			if aa_vs > 0.0 or float(preview_def_power.get("aa_factor", 0.0)) > 0.0:
+				aa_vs = max(aa_vs, float(preview_def_power.get("aa_factor", 0.15)))
 				# Reduce enemy air effectiveness / cas if defender AA
 				if air_power_ratio < 1.0:  # enemy air
 					air_power_ratio *= max(0.5, 1.0 - aa_vs * 0.3)
@@ -532,8 +532,6 @@ func get_effective_combat_power(
 	var ecm_drag := 0.0
 	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(owner_for_tech, "ecm_jamming"):
 		ecm_drag = 0.15
-	if def_power and float(def_power.get("ecm_factor", 0.0)) > 0.0:
-		ecm_drag = max(ecm_drag, float(def_power.get("ecm_factor", 0.1)))
 	if ecm_drag > 0.01:
 		final_soft *= (1.0 - ecm_drag * 0.4)
 		if has_guided:
@@ -543,11 +541,9 @@ func get_effective_combat_power(
 
 	# Anti-drone tech (like anti-air for drones; contemporary, reduces air/drone effect).
 	var anti_drone := 0.0
-	if unit_type == "anti_drone" or (def_power and "drone" in str(def_power.get("special", ""))):
+	if unit_type == "anti_drone":
 		anti_drone = 0.2
 	if anti_drone > 0:
-		if air_power_ratio > 0.5:  # if enemy air/drone
-			air_power_ratio *= (1.0 - anti_drone)
 		print("[ANTI_DRONE] Reduced enemy air/drone effect")
 
 	# Anti-tank for infantry (tools help infantry hold vs armor, like Javelin in Ukraine; infantry vs hard attack bonus).
@@ -555,7 +551,7 @@ func get_effective_combat_power(
 		var at_bonus := 0.0
 		if "at_support" in str(division_template_id).to_lower() or (formation_for_effects and "anti_tank" in str(formation_for_effects)):
 			at_bonus = 0.15
-		if at_bonus > 0 and float(att_power.get("hard_attack", 0)) > float(final_soft) * 0.5:  # vs armor heavy
+		if at_bonus > 0 and float(final_hard) > float(final_soft) * 0.5:  # vs armor heavy
 			final_soft *= (1.0 + at_bonus)
 			print("[ANTI_TANK] Infantry AT bonus vs armor")
 
@@ -1311,8 +1307,11 @@ func resolve_combat(
 		side_state["attacker"]["readiness"] *= clampf(0.72 + air_power_ratio * 0.2, 0.55, 0.95)
 
 	combat_phase_advanced.emit(PHASE_ENGAGEMENT, _phase_engagement(battle_province, side_state, att_power, def_power))
-	combat_phase_advanced.emit(PHASE_ATTRITION, _phase_attrition(battle_province, side_state, att_power, def_power))
-	var result := _phase_resolution(battle_province, side_state, att_tag, def_tag)
+	combat_phase_advanced.emit(PHASE_ATTRITION, _phase_attrition(battle_province, side_state, att_power, def_power, air_dominance_level))
+	var att_leader: Leader = null
+	if typeof(LeaderManager) != TYPE_NIL and not attacker_army_id.is_empty():
+		att_leader = LeaderManager.get_leader_for_army(attacker_army_id)
+	var result := _phase_resolution(battle_province, side_state, att_tag, def_tag, att_power, def_power, att_leader)
 	combat_phase_advanced.emit(PHASE_RESOLUTION, result)
 	combat_resolved.emit(result)
 	return result
@@ -1372,6 +1371,7 @@ func _phase_attrition(
 	side_state: Dictionary,
 	att_power: Dictionary,
 	def_power: Dictionary,
+	air_dominance_level: String = "none",
 ) -> Dictionary:
 	var att_supply := 1.0
 	var def_supply := 1.0
@@ -1425,7 +1425,7 @@ func _phase_attrition(
 		if sm.has_method("get_combat_presence_registry"):
 			var reg = sm.call("get_combat_presence_registry")
 			if reg and reg.has_method("get_report"):
-				var rpt = reg.get_report(battle_province.id) if battle_province else null
+				var rpt = reg.get_report(_battle_province.id) if _battle_province else null
 				if rpt:
 					inter_chance = clampf(float(rpt.get("interdict_chance", 0.0)) + float(rpt.get("enemy_control", 0.0)) * 0.15 + float(rpt.get("enemy_air", 0.0)) * 0.08, 0.0, 0.6)
 		if inter_chance > 0.01:
@@ -1443,6 +1443,9 @@ func _phase_resolution(
 	side_state: Dictionary,
 	attacker_tag: String,
 	defender_tag: String,
+	att_power: Dictionary = {},
+	def_power: Dictionary = {},
+	attacker_leader: Leader = null,
 ) -> Dictionary:
 	var att_score: float = (
 		_side_strength(side_state["attacker"])
@@ -1496,7 +1499,7 @@ func _phase_resolution(
 	# Urban/difficult terrain/fortifications help defenders last longer (stacks with org/supply bias)
 	var def_org := float(side_state["defender"].get("org", 1.0))
 	var def_rdy := float(side_state["defender"].get("readiness", 1.0))
-	var def_supply := float(def_power.get("supply_mod", 1.0)) if def_power else 1.0
+	var def_supply := float(def_power.get("supply_mod", 1.0))
 	var org_def_bias := clampf( (def_org - 0.4) * 0.8, 0.0, 0.55)
 	if def_supply > 0.75:
 		org_def_bias *= 1.25  # supplied defenders hold much longer
@@ -1504,7 +1507,7 @@ func _phase_resolution(
 	var terr := battle_province.terrain if battle_province else "plains"
 	var fort_mod := 1.0
 	if battle_province:
-		fort_mod = float(battle_province.get("fortification_level", battle_province.development_level * 0.08 + (1.0 if "fort" in str(battle_province.special_features) else 0.0)))
+		fort_mod = float(battle_province.development_level) * 0.08 + (1.0 if "fort" in str(battle_province.special_features) else 0.0)
 	if terr in ["urban", "mountains", "jungle", "hills", "marsh", "snow_capped"] or fort_mod > 1.15:
 		def_score *= 1.12 + clampf(fort_mod - 1.0, 0.0, 0.35)
 		if def_org > 0.65:
@@ -1523,10 +1526,10 @@ func _phase_resolution(
 	# Chance breakthroughs (based on leader initiative/breakthrough trait, margin, org diff, terrain).
 	# Heroic defense already boosts def.
 	var leader_break := 0.0
-	if leader and "breakthrough" in str(leader.trait_levels if hasattr(leader, "trait_levels") else ""):
+	if attacker_leader != null and "breakthrough" in str(attacker_leader.trait_levels):
 		leader_break = 0.1
-	if leader and hasattr(leader, "initiative_skill"):
-		leader_break += leader.initiative_skill / 30.0
+	if attacker_leader != null and "initiative_skill" in attacker_leader:
+		leader_break += float(attacker_leader.initiative_skill) / 30.0
 	if leader_break > 0 and randf() < leader_break and margin > 0.1:
 		att_score *= 1.15
 		print("[BREAKTHROUGH CHANCE] Leader trait/initiative caused breakthrough (extra score)")

@@ -9137,6 +9137,228 @@
       },
       "resource_score": 60,
       "primary_resource": "coal"
+    },
+    "9520": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9521": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9522": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9523": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9524": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9525": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9526": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9527": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9528": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9529": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9530": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9531": {
+      "resources": {
+        "steel": 30
+      },
+      "resource_score": 30.0,
+      "primary_resource": "steel"
+    },
+    "9532": {
+      "resources": {
+        "iron": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "iron"
+    },
+    "9533": {
+      "resources": {
+        "iron": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "iron"
+    },
+    "9534": {
+      "resources": {
+        "iron": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "iron"
+    },
+    "9535": {
+      "resources": {
+        "iron": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "iron"
+    },
+    "9536": {
+      "resources": {
+        "iron": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "iron"
+    },
+    "9537": {
+      "resources": {
+        "iron": 45
+      },
+      "resource_score": 45.0,
+      "primary_resource": "iron"
+    },
+    "9538": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9539": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9540": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9541": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9542": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9544": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9545": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9546": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9547": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9548": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9549": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
+    },
+    "9550": {
+      "resources": {
+        "iron": 30,
+        "steel": 16
+      },
+      "resource_score": 46,
+      "primary_resource": "iron"
     }
   }
 }

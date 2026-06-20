@@ -300,27 +300,6 @@ func refresh_intel_from_forces() -> void:
 	_apply_agent_intelligence_modifiers()
 
 
-func _process_air_missions(days: float = 1.0) -> void:
-	## Called from debug harness / daily for air formations on missions (CAS/INTERDICTION/AIR_SUPERIORITY etc).
-	## Updates presence or applies direct effects (e.g. INTERDICTION mission boosts enemy route interdict).
-	## For full: would factor range from AirMissionProfile + ADS, weather, basing.
-	if days <= 0.0 or typeof(LeaderManager) == TYPE_NIL:
-		return
-	# Simple: air on INTERDICTION mission in a province adds to effective "air interdiction threat" for enemies (via presence proxy)
-	for f in LeaderManager.get_formations_for_country(player_tag):
-		if f == null or f.get_category() != "air": continue
-		var mid := f.current_air_mission if "current_air_mission" in f else ""
-		if mid != "INTERDICTION": continue
-		var pid := int(f.get("stationed_province_id", -1))
-		if pid < 0: continue
-		var stren := float(f.get("strength", 1.0)) * 0.8  # mission effect
-		# boost enemy view if we add "virtual" threat; for now just log + slight registry if wanted
-		if OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1":
-			print("[AIR MISSION] %s INTERDICTION str%.1f at %d (would raise enemy supply cost in area)" % [f.formation_id, stren, pid])
-	# Also process for other countries if sim
-	print("[AIR] _process_air_missions tick (missions factor into power via Profile in combat/preview; supply costs always via calc)")
-
-
 func set_enemy_presence(province_id: int, presence: Dictionary) -> void:
 	var store: Dictionary = get_meta("enemy_presence") if has_meta("enemy_presence") else {}
 	store[province_id] = presence
@@ -409,7 +388,7 @@ func calculate_daily_supply_consumption(formation_id: String) -> float:
 	var formation := get_formation(formation_id)
 	var prov_id := -1
 	if formation != null:
-		prov_id = int(formation.get("stationed_province_id", -1))
+		prov_id = formation.stationed_province_id
 		if prov_id < 0 and division_deployments.has(formation_id):
 			prov_id = int((division_deployments[formation_id] as Dictionary).get("province_id", -1))
 	if prov_id >= 0:
@@ -425,17 +404,6 @@ func calculate_daily_supply_consumption(formation_id: String) -> float:
 		return maxf(base_consumption, 0.1)
 
 	var leader_id := ""
-	if formation != null and formation.has_leader():
-		leader_id = formation.leader_id
-	elif not formation_id.is_empty():
-		leader_id = LeaderManager.resolve_leader_id_for_formation(formation_id)
-
-	if not leader_id.is_empty():
-		return LeaderManager.apply_supply_consumption_for_leader(base_consumption, leader_id)
-	return maxf(base_consumption, 0.1)
-
-	var leader_id := ""
-	var formation := get_formation(formation_id)
 	if formation != null and formation.has_leader():
 		leader_id = formation.leader_id
 	elif not formation_id.is_empty():

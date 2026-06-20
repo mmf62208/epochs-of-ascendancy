@@ -992,7 +992,7 @@ func _try_assign_supply_route_to_flow(flow: TradeFlow) -> void:
 
 	# Estimate cargo size from the flow (very rough for now)
 	var estimated_tons := flow.quantity_per_turn * 10.0  # heuristic
-	var plan := SupplyManager.find_route_for_trade(flow.from_tag, flow.to_tag, estimated_tons)
+	var plan: SupplyRoutePlan = SupplyManager.find_route_for_trade(flow.from_tag, flow.to_tag, estimated_tons)
 	if plan and plan.path_length() >= 2:
 		flow.route_plan_id = plan.route_id
 		flow.preferred_mode = plan.routing_mode
@@ -1054,7 +1054,7 @@ func advance_trade_flows(current_turn: int) -> void:
 
 			# Basic route attrition simulation for cargo loss (future full sim): small loss based on route risk, mitigated by protection
 			if not flow.route_plan_id.is_empty() and typeof(SupplyManager) != TYPE_NIL:
-				var plan := SupplyManager.get_route(flow.route_plan_id)
+				var plan: SupplyRoutePlan = SupplyManager.get_route(flow.route_plan_id)
 				if plan:
 					var risk := float(plan.interdiction_chance)
 					var prot := float(flow.metadata.get("regional_convoy_protection", 0.0))
@@ -1141,7 +1141,7 @@ func interdict_trade_flow(flow_id: String, interdictor_type: String, loss_fracti
 	# If the flow has a real SupplyRoutePlan, we can incorporate its interdiction data for more grounded loss.
 	var effective_loss := loss_fraction
 	if not flow.route_plan_id.is_empty() and typeof(SupplyManager) != TYPE_NIL:
-		var plan := SupplyManager.get_route(flow.route_plan_id)
+		var plan: SupplyRoutePlan = SupplyManager.get_route(flow.route_plan_id)
 		if plan:
 			var route_risk := float(plan.interdiction_chance)
 			# Blend caller-provided loss with route risk (lightweight)
@@ -1218,7 +1218,7 @@ func interdict_trade_flow(flow_id: String, interdictor_type: String, loss_fracti
 	if not flow.route_plan_id.is_empty():
 		history_entry["route_id"] = flow.route_plan_id
 		if typeof(SupplyManager) != TYPE_NIL:
-			var plan := SupplyManager.get_route(flow.route_plan_id)
+			var plan: SupplyRoutePlan = SupplyManager.get_route(flow.route_plan_id)
 			if plan:
 				history_entry["route_risk"] = plan.interdiction_chance
 				history_entry["route_modes"] = plan.segment_modes

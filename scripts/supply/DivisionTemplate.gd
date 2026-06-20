@@ -313,7 +313,7 @@ func get_final_combat_stats(
 ## space_support: whether orbital strike/guided/recon from space assets/designer is active for this side.
 func get_specialization_modifiers(terrain: String = "", has_space_support: bool = false, national_space_strike: float = 0.0) -> Dictionary:
 	var spec := ""
-	var division_id := template_id if not template_id.is_empty() else id
+	var division_id: String = id if not id.is_empty() else ""
 	var ds := sustainment_equipment_template.to_lower()
 	var subs: Array = subunit_defs
 	for sdef in subs:

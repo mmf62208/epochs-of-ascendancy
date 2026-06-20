@@ -5504,13 +5504,13 @@ static func _supply_manager() -> Node:
 		return null
 	return tree.root.get_node_or_null("SupplyManager")
 
-static func _combat_presence_registry() -> Node:
+static func _combat_presence_registry() -> CombatPresenceRegistry:
 	var tree := Engine.get_main_loop()
 	if tree == null:
 		return null
-	var sm = tree.root.get_node_or_null("SupplyManager")
-	if sm and sm.has_method("get_combat_presence_registry"):
-		return sm.call("get_combat_presence_registry")
+	var sm: Node = tree.root.get_node_or_null("SupplyManager")
+	if sm != null and sm.has_method("get_combat_presence_registry"):
+		return sm.get_combat_presence_registry() as CombatPresenceRegistry
 	return null
 
 
