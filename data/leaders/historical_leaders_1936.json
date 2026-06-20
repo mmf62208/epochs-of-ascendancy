@@ -891,7 +891,8 @@
         "logistics_wizard": 1
       },
       "birth_year": 1884,
-      "start_year": 1939
+      "start_year": 1939,
+      "portrait": "res://assets/graphics/portraits/leaders/blamey.png"
     },
     {
       "leader_id": "nld_winkelman_1936",
@@ -1478,7 +1479,8 @@
         "bold": 1
       },
       "birth_year": 1895,
-      "start_year": 1936
+      "start_year": 1936,
+      "portrait": "res://assets/graphics/portraits/leaders/bra_air_1936.png"
     },
     {
       "leader_id": "mex_cardenas_1936",
@@ -1652,7 +1654,8 @@
         "bold": 1
       },
       "birth_year": 1881,
-      "start_year": 1935
+      "start_year": 1935,
+      "portrait": "res://assets/graphics/portraits/leaders/aus_air_1936.png"
     },
     {
       "leader_id": "bra_nav_1936",
@@ -1672,7 +1675,8 @@
         "cautious": 1
       },
       "birth_year": 1902,
-      "start_year": 1934
+      "start_year": 1934,
+      "portrait": "res://assets/graphics/portraits/leaders/bra_navy_1936.png"
     },
     {
       "leader_id": "can_nav_1936",
@@ -1711,7 +1715,8 @@
         "bold": 1
       },
       "birth_year": 1885,
-      "start_year": 1935
+      "start_year": 1935,
+      "portrait": "res://assets/graphics/portraits/leaders/can_air_1936.png"
     },
     {
       "leader_id": "chl_gen_1936",

@@ -218,3 +218,137 @@
 
 **Progress:** 1918 now at 68/136 (~50%); small nation WWI coverage improved (e.g. Monash, Byng, Allenby, Haller, Cakmak, Kemal-era TUR, Latin/Slavic/ME minors). Remaining ~68 for 1918 + all lower prio/1936/2026 per plan for future batches. Total images 144/ ~ (plan has ~400 needed?).
 
+## Continuation Run (2026-06-19) - Remaining 1918 WWI High-Pri + Some 1936 Interwar
+**Date:** 2026-06-19
+**Added:** 25 new portraits (23 for 1918 WWI-era + 2 for 1936 interwar)
+**Prioritization:** targeted remaining 1918 from plan (pri=100: 18 entries for key WWI leaders like kemal, sanders, pilsudski, sikorski, birdwood variants, obregon, gonzalez, aus_air_1918, goes, recep, tur_air, pol_navy etc.; + pri=40 notables: mannerheim, reza, godley, smuts, petliura) and some 1936 (pri=105: cardenas, rydz_smigly). Avoided all dups vs current 144 existing slugs. Used exact plan prompts for consistency.
+- Used image_gen (25 calls) with the exact "prompt" strings from docs/leader_portrait_plan_1918_1936_2026.json (alt-history dieselpunk/steampunk/Exspanse/Trek blend, 1:1 square, game asset style)
+- Post-process with PIL: load jpg->RGBA, LANCZOS resize to 128x128.png + 64x64.png ; wrote to assets/graphics/portraits/leaders/ of eoa-goals-worktree
+- Created .import stubs ONLY for the 25 *_64.png (exact format matching e.g. zhukov_64.png.import : remap texture, source_file res://..._64.png , compress/mode=0)
+- Wired valid ONLY: updated historical_leaders_1918.json (23 new portrait fields) + historical_leaders_1936.json (2); paths like "res://assets/graphics/portraits/leaders/kemal.png" . No wiring for non-existing.
+- No changes to plan json, 2026, or other files.
+- Strictly worked only inside /home/mikef/eoa-goals-worktree (temps in /tmp)
+
+### New Slugs Generated/Wired This Batch (25)
+  - aus_air_1918
+  - birdwood
+  - birdwood_1
+  - goes
+  - egy_air_1918
+  - watson
+  - trumpeldor
+  - jabotinsky
+  - gonzalez
+  - obregon
+  - pilsudski
+  - pilsudski_air
+  - pol_navy_1918
+  - sikorski
+  - kemal
+  - sanders
+  - recep
+  - tur_air_1918
+  - mannerheim
+  - reza
+  - godley
+  - smuts
+  - petliura
+  - cardenas
+  - rydz_smigly
+
+### Counts After This Run
+- Total base .png (full): 169 (144 prev +25)
+- Total _64.png: 160 (135 prev +25)
+- Total .import (for _64s): 169
+- Wired res:// portraits (valid on-disk only):
+  - 1918: 91 (68 prev +23)
+  - 1936: 45 (43 prev +2)
+  - 2026: 34 (unchanged)
+  - **Total wired: 170**
+- 1918 now 91/136 (exceeded "to 80+" example)
+
+### Verification Performed
+- ls + python: confirmed 25 new full png + _64 + .import in assets/graphics/portraits/leaders/ ; all slugs unique vs prior
+- python count scripts: 1918 91 valid wired (no portrait ref to missing file); 1936 +2; cross-checked leader_id matches in plan vs json
+- Sample new files: kemal.png, pilsudski.png, mannerheim.png, cardenas.png, aus_air_1918_64.png.import exist with correct sizes/formats
+- No dups/overwrites; previous portraits (e.g. hindenburg, brooke, existing 144) untouched
+- JSONs have valid portrait only for generated this+prior; updated in place
+- All per task: ~25 new (exactly 25), 1918 WWI focus + some 1936, consistent prompts, PIL, .import, wire only valid, append summary, work only in goals-worktree
+
+### Files Changed This Run
+- assets/graphics/portraits/leaders/ : +25 *.png +25 *_64.png +25 *_64.png.import
+- data/leaders/historical_leaders_1918.json : +23 "portrait" fields wired
+- data/leaders/historical_leaders_1936.json : +2 "portrait" fields wired
+- docs/leader_portraits_bulk_summary.md : appended this continuation section
+
+**Progress:** 1918 now at 91/136 (~67%); significantly improved WWI-era coverage for alternate-history leaders (e.g. Mustafa Kemal, Józef Piłsudski, Władysław Sikorski, Carl Gustaf Mannerheim, Jan Smuts, Symon Petliura, Otto Liman von Sanders, Recep Peker, Polish/ Turkish/ AUS/ ISR/ MEX/ BRA/ EGY/ FIN/ UKR/ NZL/ SAF/ IRN minors + air/navy generics). 2 interwar added (Lazaro Cardenas, Edward Rydz-Śmigły). Remaining ~45 1918 needing per plan + most 1936/2026 for future batches within limits.
+
+
+## Continuation Run (2026-06-19) - Remaining 1918 WWI Pri40 Minors + High-Pri 1936
+**Date:** 2026-06-19
+**Added:** 25 new portraits 
+**Prioritization:** Since no high-pri (>=100) 1918 remain (all done in prior runs), targeted most remaining 1918 WWI (~45 left, all pri=40) from plan: 20 selected (altamirano, chl_air_1918, de_castelnau, dnk_air_1918, engberg, fin_air_1918, firuz, gouraud, grebenko, grl_air_1918, grl_navy_1918, horn, host, hvidsten, irn_air_1918, isl_air_1918, isl_navy_1918, jonsson, knud, lagos) -- CHL/SYR/DNK/FIN/IRN/GRL/SWE/NOR/UKR/ISL minors + named like Altamirano, de Castelnau, Firuz, Gouraud(SYR), Grebenko, Horn, Host, Hvidsten, Jonsson, Knud, Lagos. Then 5 bulk high-pri 1936 (pri=105): aus_air_1936, blamey, bra_air_1936, bra_navy_1936, can_air_1936 (AUS/BRA/CAN air/navy + Blamey). Avoided all dups vs current 169 existing slugs. Used EXACT prompts from docs/leader_portrait_plan_1918_1936_2026.json (no edits to plan). 1:1 alt-history diesel/steampunk/Expanse/Trek blend military portraits.
+
+- Used image_gen (25 sequential calls) with the exact "prompt" strings from plan.
+- Post-process with PIL (LANCZOS): jpg->RGBA, resize 128x128.png + 64x64.png to assets/graphics/portraits/leaders/ (worktree only).
+- Created _64.png.import stubs (25) exactly matching precedent minimal format (e.g. brooke_64.png.import : [remap] importer texture, [deps] source_file res://..._64.png, [params] compress/mode=0 ). No full-size .import created (per precedent for named gens).
+- Wired ONLY valid: updated historical_leaders_1918.json (+20 "portrait" fields for matching leader_id), historical_leaders_1936.json (+5). Paths "res://assets/graphics/portraits/leaders/slug.png". 2026 untouched.
+- No changes to plan json, no other files.
+- Strictly in /home/mikef/eoa-goals-worktree ; temps/scripts in /tmp only. Relative paths used.
+
+### New Slugs Generated/Wired This Batch (25)
+  - altamirano
+  - chl_air_1918
+  - de_castelnau
+  - dnk_air_1918
+  - engberg
+  - fin_air_1918
+  - firuz
+  - gouraud
+  - grebenko
+  - grl_air_1918
+  - grl_navy_1918
+  - horn
+  - host
+  - hvidsten
+  - irn_air_1918
+  - isl_air_1918
+  - isl_navy_1918
+  - jonsson
+  - knud
+  - lagos
+  - aus_air_1936
+  - blamey
+  - bra_air_1936
+  - bra_navy_1936
+  - can_air_1936
+
+### Counts After This Run
+- Total base .png (full): 194 (169 prev +25)
+- Total _64.png: 185 (160 prev +25)
+- Total .import (for _64s + legacy full): 185 _64.imports (+9 legacy full .import for generics)
+- Wired res:// portraits (valid on-disk only):
+  - 1918: 111 (91 prev +20)
+  - 1936: 50 (45 prev +5)
+  - 2026: 34 (unchanged)
+  - **Total wired: 195**
+- 1918 now 111/136 (met aim 110+); 1936 50/93 (progress to 60+ target)
+
+### Verification Performed
+- ls assets/graphics/portraits/leaders/ : +25 png +25 _64.png +25 _64.png.import confirmed (no full imports for new)
+- python: 25 new slugs unique vs prior 169 (no dups/overwrites of e.g. hindenburg, kemal, smuts, existing generics)
+- PIL sizes: all 128x128 and 64x64 verified via code (LANCZOS); sample sizes e.g. altamirano.png ~ similar bytes to precedent
+- JSON counts: 1918=111 valid (no ref to missing png); 1936=50; cross match leader_id from plan selected to json + png on disk
+- No portrait set unless file existed; only new valid ones.
+- All 25 have matching .png . _64.png and _64.import in leaders/
+- Plan source not edited; used docs/leader_portrait_plan_1918_1936_2026.json for exact prompts/selection.
+- Work isolated to worktree for all assets/json/docs changes; git add -f to be run for new files.
+
+### Files Changed This Run
+- assets/graphics/portraits/leaders/ : +25 *.png +25 *_64.png +25 *_64.png.import
+- data/leaders/historical_leaders_1918.json : +20 "portrait" fields wired
+- data/leaders/historical_leaders_1936.json : +5 "portrait" fields wired
+- docs/leader_portraits_bulk_summary.md : appended this continuation section
+
+**Progress:** 1918 now at 111/136 (~82%); good coverage for remaining WWI minor nations (Chile, Denmark, Finland, Iran, Greenland, Sweden, Norway, Ukraine, Iceland, Syria, Brazil? no 1918 here, etc + air/navy cmdrs). 1936 interwar improved to 50/93 with AUS/BRA/CAN high-pri. Remaining ~25 1918 per plan + ~43 1936 + most 2026. Total images 194/451 targeted. Next batches can continue 1918 last 25 + 1936 bulk within image_gen limits.
+

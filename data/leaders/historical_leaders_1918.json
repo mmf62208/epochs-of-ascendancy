@@ -771,7 +771,8 @@
       },
       "birth_year": 1885,
       "start_year": 1918,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/grebenko.png"
     },
     {
       "leader_id": "fin_mannerheim",
@@ -835,7 +836,8 @@
       },
       "birth_year": 1871,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/hvidsten.png"
     },
     {
       "leader_id": "nor_laurentzon",
@@ -878,7 +880,8 @@
       },
       "birth_year": 1855,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/horn.png"
     },
     {
       "leader_id": "swe_prince",
@@ -920,7 +923,8 @@
       },
       "birth_year": 1871,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/host.png"
     },
     {
       "leader_id": "dnk_werther",
@@ -1315,7 +1319,8 @@
       },
       "birth_year": 1875,
       "start_year": 1914,
-      "end_year": 1925
+      "end_year": 1925,
+      "portrait": "res://assets/graphics/portraits/leaders/altamirano.png"
     },
     {
       "leader_id": "chl_lagos",
@@ -1335,7 +1340,8 @@
       },
       "birth_year": 1873,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/lagos.png"
     },
     {
       "leader_id": "egy_allenby",
@@ -1423,7 +1429,8 @@
       },
       "birth_year": 1878,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/firuz.png"
     },
     {
       "leader_id": "isr_jabotinsky",
@@ -1555,7 +1562,8 @@
       },
       "birth_year": 1867,
       "start_year": 1914,
-      "end_year": 1925
+      "end_year": 1925,
+      "portrait": "res://assets/graphics/portraits/leaders/gouraud.png"
     },
     {
       "leader_id": "syr_de_castelnau",
@@ -1576,7 +1584,8 @@
       },
       "birth_year": 1851,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/de_castelnau.png"
     },
     {
       "leader_id": "isl_jonsson",
@@ -1597,7 +1606,8 @@
       },
       "birth_year": 1885,
       "start_year": 1918,
-      "end_year": 1930
+      "end_year": 1930,
+      "portrait": "res://assets/graphics/portraits/leaders/jonsson.png"
     },
     {
       "leader_id": "grl_knud",
@@ -1618,7 +1628,8 @@
       },
       "birth_year": 1879,
       "start_year": 1918,
-      "end_year": 1930
+      "end_year": 1930,
+      "portrait": "res://assets/graphics/portraits/leaders/knud.png"
     },
     {
       "leader_id": "sov_kolchak_1918",
@@ -1935,7 +1946,8 @@
         "cautious": 1
       },
       "birth_year": 1875,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/engberg.png"
     },
     {
       "leader_id": "tur_cakmak_1918",
@@ -2337,7 +2349,8 @@
         "bold": 1
       },
       "birth_year": 1869,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/chl_air_1918.png"
     },
     {
       "leader_id": "dnk_air_1918",
@@ -2356,7 +2369,8 @@
         "bold": 1
       },
       "birth_year": 1883,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/dnk_air_1918.png"
     },
     {
       "leader_id": "egy_nav_1918",
@@ -2396,7 +2410,8 @@
         "bold": 1
       },
       "birth_year": 1878,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/fin_air_1918.png"
     },
     {
       "leader_id": "fra_air_1918",
@@ -2436,7 +2451,8 @@
         "cautious": 1
       },
       "birth_year": 1874,
-      "start_year": 1917
+      "start_year": 1917,
+      "portrait": "res://assets/graphics/portraits/leaders/grl_navy_1918.png"
     },
     {
       "leader_id": "grl_air_1918",
@@ -2455,7 +2471,8 @@
         "bold": 1
       },
       "birth_year": 1860,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/grl_air_1918.png"
     },
     {
       "leader_id": "irn_air_1918",
@@ -2474,7 +2491,8 @@
         "bold": 1
       },
       "birth_year": 1875,
-      "start_year": 1917
+      "start_year": 1917,
+      "portrait": "res://assets/graphics/portraits/leaders/irn_air_1918.png"
     },
     {
       "leader_id": "isl_nav_1918",
@@ -2494,7 +2512,8 @@
         "cautious": 1
       },
       "birth_year": 1872,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/isl_navy_1918.png"
     },
     {
       "leader_id": "isl_air_1918",
@@ -2513,7 +2532,8 @@
         "bold": 1
       },
       "birth_year": 1865,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/isl_air_1918.png"
     },
     {
       "leader_id": "isr_nav_1918",
