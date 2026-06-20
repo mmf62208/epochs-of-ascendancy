@@ -23,7 +23,14 @@
 	{"id": 69, "owner_tag": "BRA", "controller_tag": "BRA", "factories": 20, "development_level": 3.8, "infrastructure": 5, "special_features": ["port"], "special_levels": {"port": 4}},
 	{"id": 85, "owner_tag": "FRA", "controller_tag": "FRA", "factories": 10, "development_level": 3.5, "infrastructure": 4, "special_features": [], "special_levels": {}},
 	{"id": 86, "owner_tag": "ENG", "controller_tag": "ENG", "factories": 12, "development_level": 3.2, "infrastructure": 4, "special_features": [], "special_levels": {}},
-	{"id": 88, "owner_tag": "ENG", "controller_tag": "ENG", "factories": 15, "development_level": 4.0, "infrastructure": 5, "special_features": ["port"], "special_levels": {"port": 5}}
+	{"id": 88, "owner_tag": "ENG", "controller_tag": "ENG", "factories": 15, "development_level": 4.0, "infrastructure": 5, "special_features": ["port"], "special_levels": {"port": 5}},
+	{"id": 20, "owner_tag": "SER", "controller_tag": "SER", "factories": 8, "development_level": 3.5, "infrastructure": 4, "special_features": ["capital"], "special_levels": {}},
+	{"id": 24, "owner_tag": "BUL", "controller_tag": "BUL", "factories": 10, "development_level": 3.8, "infrastructure": 4, "special_features": [], "special_levels": {}},
+	{"id": 25, "owner_tag": "GRE", "controller_tag": "GRE", "factories": 7, "development_level": 3.6, "infrastructure": 3, "special_features": ["port"], "special_levels": {"port": 3}},
+	{"id": 26, "owner_tag": "ROM", "controller_tag": "ROM", "factories": 9, "development_level": 3.7, "infrastructure": 4, "special_features": [], "special_levels": {}},
+	{"id": 27, "owner_tag": "BEL", "controller_tag": "BEL", "factories": 12, "development_level": 5.0, "infrastructure": 6, "special_features": ["capital", "port"], "special_levels": {"port": 4}},
+	{"id": 29, "owner_tag": "AUH", "controller_tag": "AUH", "factories": 15, "development_level": 5.2, "infrastructure": 5, "special_features": [], "special_levels": {}},
+	{"id": 30, "owner_tag": "RUS", "controller_tag": "RUS", "factories": 12, "development_level": 3.9, "infrastructure": 4, "special_features": ["port"], "special_levels": {"port": 3}}
   ],
   "countries": [
 	{"tag": "GER", "name": "German Empire", "color": "#8B0000", "capital_province_id": 2, "major_power": true, "industrial_weight": 2, "key_provinces": [2, 3], "ideology": "monarchy", "current_tech_level": 5, "focus_tree_path": "res://data/focus_trees/germany_1910.json", "stability": 75.0, "war_support": 40.0},
@@ -38,6 +45,10 @@
 	{"tag": "SER", "name": "Kingdom of Serbia", "color": "#DC143C", "capital_province_id": 20, "ideology": "monarchy", "current_tech_level": 3, "focus_tree_path": "res://data/focus_trees/serbia_1910.json", "stability": 45.0, "war_support": 65.0},
 	{"tag": "NLD", "name": "Netherlands", "color": "#FF0000", "capital_province_id": 48, "ideology": "democracy", "current_tech_level": 6, "focus_tree_path": "res://data/focus_trees/netherlands_1910.json", "stability": 75.0, "war_support": 25.0},
 	{"tag": "ARG", "name": "Argentina", "color": "#75AADB", "capital_province_id": 28, "ideology": "democracy", "current_tech_level": 4, "focus_tree_path": "res://data/focus_trees/argentina_1910.json", "stability": 65.0, "war_support": 30.0},
-	{"tag": "BRA", "name": "Brazil", "color": "#00A859", "capital_province_id": 69, "ideology": "democracy", "current_tech_level": 4, "focus_tree_path": "res://data/focus_trees/brazil_1910.json", "stability": 60.0, "war_support": 35.0}
+	{"tag": "BRA", "name": "Brazil", "color": "#00A859", "capital_province_id": 69, "ideology": "democracy", "current_tech_level": 4, "focus_tree_path": "res://data/focus_trees/brazil_1910.json", "stability": 60.0, "war_support": 35.0},
+	{"tag": "BUL", "name": "Kingdom of Bulgaria", "color": "#006400", "capital_province_id": 24, "ideology": "monarchy", "current_tech_level": 3, "focus_tree_path": "res://data/focus_trees/bulgaria_1910.json", "stability": 50.0, "war_support": 55.0},
+	{"tag": "GRE", "name": "Kingdom of Greece", "color": "#000080", "capital_province_id": 25, "ideology": "monarchy", "current_tech_level": 3, "focus_tree_path": "res://data/focus_trees/greece_1910.json", "stability": 55.0, "war_support": 50.0},
+	{"tag": "ROM", "name": "Kingdom of Romania", "color": "#8B4513", "capital_province_id": 26, "ideology": "monarchy", "current_tech_level": 3, "focus_tree_path": "res://data/focus_trees/romania_1910.json", "stability": 52.0, "war_support": 48.0},
+	{"tag": "BEL", "name": "Kingdom of Belgium", "color": "#FFD700", "capital_province_id": 27, "ideology": "democracy", "current_tech_level": 5, "focus_tree_path": "res://data/focus_trees/belgium_1910.json", "stability": 70.0, "war_support": 30.0}
   ]
 }
