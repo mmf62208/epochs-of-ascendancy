@@ -6,10 +6,6 @@ var land_by_tag: Dictionary = {}
 var air_by_tag: Dictionary = {}
 var naval_by_tag: Dictionary = {}
 var naval_at_port_by_tag: Dictionary = {}
-var sub_strength_by_tag: Dictionary = {}  # submarines harder to spot
-var surface_strength_by_tag: Dictionary = {}  # surface ships, carriers etc easier
-## For spotting sim: aggregate recon value (planes + radar ships + etc)
-var naval_recon_by_tag: Dictionary = {}
 ## Engineer / combat-engineer brigade equivalents (friendly repair crews).
 var engineers_by_tag: Dictionary = {}
 
@@ -30,33 +26,6 @@ func add_naval(tag: String, amount: float, at_port: bool) -> void:
 	naval_by_tag[tag] = float(naval_by_tag.get(tag, 0.0)) + amount
 	if at_port:
 		naval_at_port_by_tag[tag] = float(naval_at_port_by_tag.get(tag, 0.0)) + amount
-	# For demo, assume mix; in real would classify template
-	# Here, we'll use separate calls or heuristic later. Default surface for now.
-	surface_strength_by_tag[tag] = float(surface_strength_by_tag.get(tag, 0.0)) + amount * 0.8
-	sub_strength_by_tag[tag] = float(sub_strength_by_tag.get(tag, 0.0)) + amount * 0.2
-
-func add_sub_presence(tag: String, amount: float) -> void:
-	sub_strength_by_tag[tag] = float(sub_strength_by_tag.get(tag, 0.0)) + amount
-	naval_by_tag[tag] = float(naval_by_tag.get(tag, 0.0)) + amount
-
-func add_surface_presence(tag: String, amount: float) -> void:
-	surface_strength_by_tag[tag] = float(surface_strength_by_tag.get(tag, 0.0)) + amount
-	naval_by_tag[tag] = float(naval_by_tag.get(tag, 0.0)) + amount
-
-func add_naval_recon(tag: String, amount: float) -> void:
-	naval_recon_by_tag[tag] = float(naval_recon_by_tag.get(tag, 0.0)) + amount
-
-func total_naval(tag: String) -> float:
-	return float(naval_by_tag.get(tag, 0.0))
-
-func total_subs(tag: String) -> float:
-	return float(sub_strength_by_tag.get(tag, 0.0))
-
-func total_surface(tag: String) -> float:
-	return float(surface_strength_by_tag.get(tag, 0.0))
-
-func total_naval_recon(tag: String) -> float:
-	return float(naval_recon_by_tag.get(tag, 0.0))
 
 
 func total_land(tag: String) -> float:
@@ -128,17 +97,28 @@ func set_engineers(tag: String, amount: float) -> void:
 	else:
 		engineers_by_tag[t] = amount
 
-func get_navy_total() -> float:
-	var t := 0.0
-	for v in naval_by_tag.values():
-		t += float(v)
-	return t
+## === AIR RECON / INTEL EXPANSION ===
+## Recon from air missions (RECON profile) gives persistent bonus to spotting/intel in province.
+## Feeds naval recon, land preview accuracy, reduces "fog" in battle odds, Supply interdict estimates.
+var air_recon_by_tag: Dictionary = {}  # tag -> recon_points (decays daily or persists short)
 
-var navy_total: float :
-	get = get_navy_total
+func add_air_recon(tag: String, points: float) -> void:
+	air_recon_by_tag[tag] = float(air_recon_by_tag.get(tag, 0.0)) + points
 
-func get_naval_strength() -> Dictionary:
-	return naval_by_tag
+func total_air_recon(tag: String) -> float:
+	return float(air_recon_by_tag.get(tag, 0.0))
 
-var naval_strength: Dictionary :
-	get = get_naval_strength
+func get_air_recon_bonus(friendly_tag: String) -> float:
+	var own := total_air_recon(friendly_tag)
+	var enemy := 0.0
+	for t in air_recon_by_tag:
+		if str(t) != friendly_tag:
+			enemy += float(air_recon_by_tag[t])
+	# Net advantage (our recon - enemy counter-recon)
+	return clampf( (own - enemy * 0.6) * 0.12 , -0.4, 1.2)  # scales to meaningful % bonus
+
+func decay_air_recon(days: float = 1.0) -> void:
+	for t in air_recon_by_tag.keys():
+		air_recon_by_tag[t] = maxf(0.0, float(air_recon_by_tag[t]) * (1.0 - 0.25 * days))
+		if air_recon_by_tag[t] < 0.05:
+			air_recon_by_tag.erase(t)

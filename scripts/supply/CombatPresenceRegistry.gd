@@ -35,6 +35,17 @@ func add_engineer_presence(province_id: int, owner_tag: String, brigade_equiv: f
 	var r := get_report(province_id)
 	r.add_engineers(owner_tag.strip_edges().to_upper(), brigade_equiv)
 
+## Air recon presence (from dedicated RECON missions; boosts intel/spotting for region).
+func add_air_recon_presence(province_id: int, owner_tag: String, recon_points: float) -> void:
+	var r := get_report(province_id)
+	r.add_air_recon(owner_tag, recon_points)
+
+func decay_all_recon(days: float = 1.0) -> void:
+	for pid in _by_province:
+		var r: ProvinceForceReport = _by_province[pid]
+		if r and r.has_method("decay_air_recon"):
+			r.decay_air_recon(days)
+
 
 func register_division_presence(
 	province_id: int,

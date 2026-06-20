@@ -100,22 +100,6 @@ func get_effective_combat_power(
 		final_readiness = min(1.95, final_readiness * 1.12)
 		final_org = min(1.95, final_org * 1.08)
 
-	# Unit experience / veteran level (from combat XP, training, battles): meaningful impact on staying power and effectiveness.
-	# Formation tracks experience; passed via combat_stats or context (0-100 or normalized level).
-	var unit_xp := float(combat_stats.get("unit_experience", combat_stats.get("veteran_level", 0.0)))
-	if unit_xp > 0.0:
-		var xp_mult := clampf(1.0 + (unit_xp / 400.0), 1.0, 1.25)  # up to 25% bonus for elite veterans
-		final_soft *= xp_mult
-		final_hard *= xp_mult * 0.95
-		final_org = min(2.0, final_org * (1.0 + unit_xp / 300.0))
-		final_readiness = min(2.0, final_readiness * (1.0 + unit_xp / 350.0))
-		# XP also reduces casualties a bit (better tactics)
-		if combat_stats.has("casualties"):
-			combat_stats["casualties"] = float(combat_stats["casualties"]) * (1.0 - unit_xp / 500.0)
-
-	# Detect unit_type early for doctrine/air/naval branch logic (fix scope for later use)
-	var unit_type_early := _detect_unit_type(division_template_id)
-
 	if leader != null and not leader.is_injured and not leader.is_captured:
 		final_soft += leader.get_attack_modifier() * 10.0
 		final_hard += leader.get_attack_modifier() * 6.0
@@ -124,30 +108,6 @@ func get_effective_combat_power(
 
 		terrain_bonus = leader.get_terrain_modifier(terrain)
 		final_soft += terrain_bonus * 8.0
-
-	# Service doctrine branch bonuses (wired from LeaderManager service_doctrines + DESIGN_DOCTRINES tradeoffs)
-	# Army: blitzkrieg mobility/breakthrough, attrition_warfare manpower/art but high cost.
-	# Navy/Air/Space similar. Era appropriate via doctrine unlock/research.
-	if leader != null and typeof(LeaderManager) != TYPE_NIL:
-		var doc := LeaderManager.get_service_doctrine(leader.country_tag, "army" if unit_type_early in ["infantry","armor","artillery"] else ("navy" if unit_type_early in ["naval","sub"] else ("air_force" if unit_type_early in ["air","fighter","bomber"] else "space_force")))
-		if doc != "":
-			if doc == "blitzkrieg" or doc == "mobile_warfare":
-				final_soft *= 1.08
-				final_readiness *= 1.05
-				# high supply cost handled in supply
-			elif doc == "attrition_warfare":
-				final_org *= 1.10
-				final_readiness *= 0.95
-			elif doc == "carrier_task_force" or doc == "naval_aviation":
-				final_soft *= 1.06
-				# air_support already from leader
-			elif doc == "strategic_bombing":
-				# for air units
-				if unit_type_early in ["air", "bomber"]:
-					final_soft *= 1.12
-			elif "space" in doc or doc == "orbital_strike":
-				final_soft *= 1.05
-				final_hard *= 1.08
 
 	# ============================================================
 	# UNIT TYPE SPECIALTY MODIFIERS (HoI4-style detailed % terrain/unit factors, visible in previews/tests/logs)
@@ -158,7 +118,6 @@ func get_effective_combat_power(
 	var unit_mod_factors: Dictionary = {}
 	var guided_mult_soft := 1.0
 	var guided_mult_hard := 1.0
-	var has_guided := false
 
 	# Detect guided eligibility (space designer + precision rule or special templates)
 	var owner_for_tech := (leader.country_tag if leader != null else "player")
@@ -172,6 +131,10 @@ func get_effective_combat_power(
 	if unit_type == "marine":
 		var tlow := terrain.to_lower()
 		var is_coastal := tlow in ["coast", "coastal", "beach", "river", "marsh", "island", "delta"]
+		if province_for_effects != null:
+			var pt := str(province_for_effects.get("terrain", "")).to_lower() if typeof(province_for_effects) == TYPE_DICTIONARY else (province_for_effects.terrain.to_lower() if province_for_effects != null and "terrain" in province_for_effects else "")
+			if "coast" in pt or "river" in pt or "beach" in pt:
+				is_coastal = true
 		if is_coastal:
 			final_soft *= 1.28
 			final_readiness *= 1.12
@@ -361,11 +324,8 @@ func get_effective_combat_power(
 	# Uses formation air_mission data if present (set by AirMission system); simple for now, scales with intensity.
 	if formation_for_effects != null:
 		var air_int := 0.0
-		var air_fuel := 1.0
-		var air_org := final_org
 		if typeof(formation_for_effects) == TYPE_DICTIONARY:
 			air_int = float(formation_for_effects.get("air_mission_intensity", 0.0)) if formation_for_effects.has("air_mission_intensity") else 0.0
-			air_fuel = float(formation_for_effects.get("air_fuel_state", 1.0))
 			if formation_for_effects.has("air_mission_type") and str(formation_for_effects.get("air_mission_type","")).to_upper() in ["CAS", "CLOSE_AIR_SUPPORT"]:
 				final_soft *= (1.0 + clampf(air_int * 0.12, 0.0, 0.25))
 				final_hard *= (1.0 + clampf(air_int * 0.08, 0.0, 0.18))
@@ -374,20 +334,7 @@ func get_effective_combat_power(
 				final_org *= (1.0 - clampf(air_int * 0.07, 0.0, 0.15))
 		elif formation_for_effects is Object and formation_for_effects.has_method("get"):
 			air_int = float(formation_for_effects.call("get", "air_mission_intensity") if formation_for_effects.has("air_mission_intensity") else 0.0)
-			air_fuel = float(formation_for_effects.call("get", "air_fuel_state") if formation_for_effects.has("air_fuel_state") else 1.0)
-
-		# Air loiter / sortie generation (unique to air war): limited by fuel/org/range/era.
-		# Early wars: 1 sortie; with jets/tankers/AWACS: more runs/day if high org/fuel/supply.
-		# Not infinite loiter until late tech (user req).
-		var sortie_rate := clampf(0.6 + air_fuel * 0.4 + (air_org - 1.0) * 0.3, 0.4, 1.8)
-		# Tech boost late (jets, tankers, drones)
-		if typeof(TechnologyManager) != TYPE_NIL and (TechnologyManager.has_rule_flag(owner_for_tech, "jet_fighters") or TechnologyManager.has_rule_flag(owner_for_tech, "aerial_refueling") or TechnologyManager.has_rule_flag(owner_for_tech, "drone_warfare")):
-			sortie_rate = min(2.5, sortie_rate * 1.2)
-		final_soft *= sortie_rate
-		final_hard *= sortie_rate * 0.9
-		# Fuel burn note for supply (caller can deduct)
-		if air_fuel < 0.5:
-			final_readiness *= 0.85
+			# similar for type...
 
 	if prov_dev < 0:
 		prov_dev = 0
@@ -534,11 +481,8 @@ func get_effective_combat_power(
 		if formation_for_effects.current_land_mission in [Formation.LAND_MISSION_DEFEND, Formation.LAND_MISSION_ARTILLERY_PREP]:
 			final_readiness *= 1.05  # preplanned fire planning.
 	# Air fully integrated (expanded stub): CAS/interdiction + intensity + effectiveness + AA.
+	# Uses AirMissionProfile/formation air_mission + WM air effectiveness + mission_intensity for CAS bonus to attacker/soft, interdiction drag on defender org/readiness (models supply interdiction in battle).
 	if formation_for_effects != null:
-		var air_power_ratio := 1.0
-		var cas_mult := 1.0
-		var preview_def_power: Dictionary = {}
-		var preview_att_power: Dictionary = {"hard_attack": final_hard, "soft_attack": final_soft}
 		var air_bonus := 0.0
 		var interdict_drag := 0.0
 		if formation_for_effects.has_method("get_mission_mods"):
@@ -546,8 +490,8 @@ func get_effective_combat_power(
 			air_bonus = float(air_mods.get("combat_bonus", 0.0))
 			# AA vs enemy air (defenders damage aircraft, reduce air effect, attrition to enemy air presence)
 			var aa_vs := float(air_mods.get("aa_vs_air", 0.0))
-			if aa_vs > 0.0 or float(preview_def_power.get("aa_factor", 0.0)) > 0.0:
-				aa_vs = max(aa_vs, float(preview_def_power.get("aa_factor", 0.15)))
+			if aa_vs > 0.0 or (def_power and float(def_power.get("aa_factor", 0.0)) > 0.0):
+				aa_vs = max(aa_vs, float(def_power.get("aa_factor", 0.15)) if def_power else 0.15)
 				# Reduce enemy air effectiveness / cas if defender AA
 				if air_power_ratio < 1.0:  # enemy air
 					air_power_ratio *= max(0.5, 1.0 - aa_vs * 0.3)
@@ -588,6 +532,8 @@ func get_effective_combat_power(
 	var ecm_drag := 0.0
 	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(owner_for_tech, "ecm_jamming"):
 		ecm_drag = 0.15
+	if def_power and float(def_power.get("ecm_factor", 0.0)) > 0.0:
+		ecm_drag = max(ecm_drag, float(def_power.get("ecm_factor", 0.1)))
 	if ecm_drag > 0.01:
 		final_soft *= (1.0 - ecm_drag * 0.4)
 		if has_guided:
@@ -597,9 +543,11 @@ func get_effective_combat_power(
 
 	# Anti-drone tech (like anti-air for drones; contemporary, reduces air/drone effect).
 	var anti_drone := 0.0
-	if unit_type == "anti_drone":
+	if unit_type == "anti_drone" or (def_power and "drone" in str(def_power.get("special", ""))):
 		anti_drone = 0.2
 	if anti_drone > 0:
+		if air_power_ratio > 0.5:  # if enemy air/drone
+			air_power_ratio *= (1.0 - anti_drone)
 		print("[ANTI_DRONE] Reduced enemy air/drone effect")
 
 	# Anti-tank for infantry (tools help infantry hold vs armor, like Javelin in Ukraine; infantry vs hard attack bonus).
@@ -607,7 +555,7 @@ func get_effective_combat_power(
 		var at_bonus := 0.0
 		if "at_support" in str(division_template_id).to_lower() or (formation_for_effects and "anti_tank" in str(formation_for_effects)):
 			at_bonus = 0.15
-		if at_bonus > 0 and float(final_hard) > float(final_soft) * 0.5:  # vs armor heavy
+		if at_bonus > 0 and float(att_power.get("hard_attack", 0)) > float(final_soft) * 0.5:  # vs armor heavy
 			final_soft *= (1.0 + at_bonus)
 			print("[ANTI_TANK] Infantry AT bonus vs armor")
 
@@ -686,64 +634,270 @@ func get_effective_combat_power(
 	}
 
 
-## Stub for naval strategic engagement resolution (called from BattleManager naval path).
-## In full sim would use ship class templates, weapon ranges (torp/gun/missile), air cover, etc.
-## For now, applies range/ vis / sub / choke mods to outcome. (Moved out of get_effective for proper class scope.)
+## Full phased naval engagement resolver (WWI 1916 Jutland gunline/haze -> 1942 Midway carrier/intel -> 1982 Falklands Exocet/ASW -> 2026 CSG sat/jam/missile).
+## Inspired by history (spotting failures, ECM/jam reduce guided, weather/night favor stealth/ambush/subs, screening, fuel/endurance limits not total annihilation, disengage common, leader doctrine matter) + HoI4 patterns (spot task vs strike, org, repair separate, not doomstack binary).
+## Phases: search (dynamic recon/spot from assets + weather/jam/tech), detect, (ASW subphase), engage (screen/guided/air/gun), disengage (leader init/org/damage/intel based).
+## Era/tech gating: pre-1938 visual/poor radar -> radar/sonar boost -> ECM/missile counter -> sat recon/unlimited nuke endurance.
+## Spotting: air (NAVAL_STRIKE/RECON attached), surface detection_contrib + order, sub stealth, chokepoint, later sat. Jamming from context/ECM modules reduces enemy spot + guided eff.
+## Fuel/endurance: caller/Supply passes low_fuel_mult; affects power. Low org + damage -> higher disengage.
+## Not annihilation: disengage rolls allow withdraw with reduced further cas. Screening (escort order) protects vs torp/sub/air.
+## Leader: naval_combat + carrier_admiral (strike), sea_wolf (sub/ambush), initiative (disengage/ambush). National chief bonus via context.
+## Returns rich AAR: phases, spotting values, key_factors, retreat_chances, est cas, engagement_type for logs/ProvinceInsight/TestRunner summary.
+## Callers (BM) enrich context with orders, weather, sub_heavy, choke, leader_bonuses, jamming, fuel_state, tech_year, formations proxy.
 func resolve_naval_engagement(context: Dictionary, atk_power: float, def_power: float) -> Dictionary:
-	var res := {"ok": true, "type": "naval"}
-	var vis = float(context.get("weather_vis", 1.0))
-	var choke = bool(context.get("chokepoint", false))
-	var subh = bool(context.get("sub_heavy", false))
-	var range_mod = float(context.get("range_mod", 1.0))
-	var closer = bool(context.get("closer_engagement", false))  # from order/storm
-	var a_order = str(context.get("attacker_order", ""))
-	var d_order = str(context.get("defender_order", ""))
-	# Mods (orders amplify: S&D/AMBUSH closer in low vis)
-	if subh and (range_mod < 0.6 or closer or a_order in ["AMBUSH", "SEARCH_AND_DESTROY"] or d_order in ["AMBUSH", "SEARCH_AND_DESTROY"]):
-		def_power *= 1.3
+	var res := {"ok": true, "type": "naval", "phases": [], "spotting": {}, "asw": {}, "engagement": {}, "disengage": {}, "key_factors": [], "winner": "", "naval_casualties_est": 0.0, "attacker_casualties": 0.0, "defender_casualties": 0.0, "context": context}
+	var vis : float = float(context.get("weather_vis", 1.0))
+	var choke : bool = bool(context.get("chokepoint", false))
+	var subh : bool = bool(context.get("sub_heavy", false))
+	var range_mod : float = float(context.get("range_mod", 1.0))
+	var closer : bool = bool(context.get("closer_engagement", false))
+	var a_order : String = str(context.get("attacker_order", "")).to_upper()
+	var d_order : String = str(context.get("defender_order", "")).to_upper()
+	var atk_tag : String = str(context.get("attacker", "ATK"))
+	var def_tag : String = str(context.get("defender", "DEF"))
+	var sea_pid : int = int(context.get("sea_pid", -1))
+
+	# Era / tech gating (from Time or context; defaults allow full sim across 1918-2026)
+	var year := 1942
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year"):
+		year = int(TimeManager.get_current_year())
+	elif context.has("year"):
+		year = int(context["year"])
+	var has_radar : bool = year >= 1938
+	var has_sonar : bool = year >= 1938
+	var has_ecm : bool = year >= 1965 or "ecm" in str(context.get("jamming_tech", "")).to_lower()
+	var has_sat : bool = year >= 1975 or "sat" in str(context.get("recon_tech", "")).to_lower()
+	var has_jet_carrier : bool = year >= 1955
+	var has_missile : bool = year >= 1960
+	var has_nuke_prop : bool = year >= 1958  # unlimited endurance proxy for subs/carriers
+
+	res["phases"].append("search")
+
+	# === DYNAMIC SPOTTING PHASE (realistic recon stack: air/surface/sub/sat + mods; history Jutland haze missed, Midway JP recon fail + weather; modern sat/P8) ===
+	# Base from formations (get_naval_detection_contrib + visibility inverse for enemy stealth) + orders
+	var base_spot_atk : float = float(context.get("atk_detection", 1.0))
+	var base_spot_def : float = float(context.get("def_detection", 1.0))
+	# Enhance with order (Formation methods already good)
+	if a_order in ["SEARCH_PATROL", "SEARCH_AND_DESTROY", "STRIKE"]:
+		base_spot_atk *= 1.35
+	if d_order in ["SEARCH_PATROL", "SEARCH_AND_DESTROY", "STRIKE"]:
+		base_spot_def *= 1.35
+	if a_order == "AMBUSH":
+		base_spot_atk *= 0.75  # stealthy search
+	if d_order == "ASW":
+		base_spot_def *= 1.2
+	# Air recon contrib (NAVAL_STRIKE/RECON attached or presence; carrier heavy early)
+	var air_recon_atk := float(context.get("air_recon_atk", 0.0)) + (0.8 if "carrier" in str(context.get("atk_assets","")).to_lower() else 0.0)
+	var air_recon_def := float(context.get("air_recon_def", 0.0))
+	if has_jet_carrier:
+		air_recon_atk *= 1.3
+		air_recon_def *= 1.3
+	base_spot_atk += air_recon_atk * 0.6
+	base_spot_def += air_recon_def * 0.6
+	# Sub contrib (stealthy detect but low profile)
+	if subh:
+		base_spot_def += 0.4  # subs help own side spot? or for ambusher
+	# Sat / advanced recon (post 1975 or tech)
+	if has_sat:
+		base_spot_atk += 0.7
+		base_spot_def += 0.7
+	# Weather + choke (choke = straits hard to hide; low vis = sub favor per history)
+	var weather_spot_mult : float = clamp(vis * (1.0 if has_radar else 0.7), 0.15, 1.15)
 	if choke:
-		atk_power *= 0.85
-	# Order specific full resolution (inspired by games: torp surprise for AMBUSH close subs, guns for STRIKE stand-off, air for carriers, ASW counters subs)
-	if a_order == "AMBUSH" and (range_mod < 0.6 or closer):
-		def_power *= 0.85  # surprise torp/sub bonus for attacker in ambush/closer
-	if a_order == "STRIKE" and range_mod > 1.0:
-		atk_power *= 1.2  # carrier air/gun at stand off
+		weather_spot_mult *= 1.4  # harder hide
+	if vis < 0.5 and not has_radar:
+		weather_spot_mult *= 0.6  # visual era haze/smoke penalty (Jutland)
+	base_spot_atk *= weather_spot_mult
+	base_spot_def *= weather_spot_mult
+	# Jamming / ECM: reduces enemy spotting + guided later (EA-6B, Growler, modern; post WWII)
+	var jam_atk : float = float(context.get("jam_atk", 0.0))  # jamming applied by defender vs attacker spot
+	var jam_def : float = float(context.get("jam_def", 0.0))
+	if has_ecm:
+		jam_atk = max(jam_atk, float(context.get("ecm_level", 0.3)))
+		jam_def = max(jam_def, float(context.get("ecm_level", 0.3)))
+	base_spot_atk *= clamp(1.0 - jam_def * 0.65, 0.3, 1.0)
+	base_spot_def *= clamp(1.0 - jam_atk * 0.65, 0.3, 1.0)
+	# Sub stealth bonus in conditions (AMBUSH order + low vis + no sonar early)
+	var sub_stealth_mult : float = 1.0
+	if subh and (vis < 0.55 or a_order == "AMBUSH" or d_order == "AMBUSH"):
+		sub_stealth_mult = 0.55 if has_sonar else 0.35
+		base_spot_atk *= sub_stealth_mult if subh else 1.0  # harder for non-sub side to spot subs
+	# Final spot values
+	var spot_atk : float = clamp(base_spot_atk, 0.1, 3.5)
+	var spot_def : float = clamp(base_spot_def, 0.1, 3.5)
+	res["spotting"] = {
+		"attacker_spot": spot_atk, "defender_spot": spot_def,
+		"vis": vis, "choke": choke, "weather_mult": weather_spot_mult,
+		"jam_applied": [jam_atk, jam_def], "has_radar": has_radar, "has_sat": has_sat, "sub_stealth": sub_stealth_mult
+	}
+	# Detect if either spots well or sub ambush forces
+	var detect_threshold : float = 0.65
+	var detected : bool = (spot_atk > detect_threshold or spot_def > detect_threshold) or (subh and (a_order == "AMBUSH" or d_order == "AMBUSH" or vis < 0.5))
+	if not detected:
+		res["winner"] = "none"
+		res["outcome"] = "no_contact_spotting_failed"
+		res["key_factors"].append("missed_searches_weather_or_recon_fail")
+		res["naval_casualties_est"] = 0.0
+		print("  [NAVAL RESOLVER] search phase: no detection (spot_atk=%.2f def=%.2f vis=%.2f jam=%.2f subh=%s year=%d) -> no engagement" % [spot_atk, spot_def, vis, jam_atk, subh, year])
+		return res
+	res["phases"].append("detect")
+
+	# === ASW / SUB PHASE (if subs; sonar/depth/helos vs stealth; history Falklands RN ASW effort vs San Luis, Midway sub pickets missed) ===
+	var asw_mod : float = 1.0
+	if subh:
+		res["phases"].append("asw")
+		if (d_order == "ASW" or a_order == "ASW") and has_sonar:
+			asw_mod = 1.25
+			res["asw"] = {"sonar_active": true, "mod": asw_mod}
+		# Sub advantage in stealth conditions already applied to spot; now combat power
+		if vis < 0.5 or closer or choke:
+			if a_order in ["AMBUSH", "SEARCH_AND_DESTROY"] or subh:
+				def_power *= 1.2  # sub side power if ambushing (or swap logic)
+		# ASW counters sub power
+		if d_order == "ASW":
+			def_power *= asw_mod
+			atk_power *= 0.9 if subh else 1.0  # assume atk sub heavy for simplicity in call
+		res["asw"]["final_mod"] = asw_mod
+
+	# === ENGAGE PHASE (screening, guided/ECM, air strike, gunnery range, order/leader, carrier) ===
+	res["phases"].append("engage")
+	# Order mods (full use of Formation logic + extras)
+	if a_order == "AMBUSH" and (range_mod < 0.6 or closer or vis < 0.5):
+		def_power *= 0.82  # surprise
+	if a_order == "STRIKE" and (range_mod > 0.9 or has_jet_carrier):
+		atk_power *= 1.22 if has_radar else 1.12
 	if d_order == "ASW" and subh:
-		def_power *= 1.15  # ASW counters subs
+		def_power *= 1.18
+	if choke:
+		atk_power *= 0.88  # narrow favors defender or brawl
+		def_power *= 1.1
+	# Screening: escort/CONVOY orders protect capitals from sub/torp/air strikes (DDs/CLs screen)
+	if d_order in ["ESCORT", "CONVOY_DUTY"]:
+		def_power *= 1.12  # reduced effective loss to strike
+	# Guided weapons (missiles/torps wire/guided) vulnerable to ECM/jam; post missile era
+	if has_missile:
+		var guided_mult := 1.15
+		if has_ecm or jam_atk > 0.1:
+			guided_mult *= clamp(1.0 - jam_atk * 0.55, 0.5, 1.1)
+		atk_power *= guided_mult if "missile" in str(context.get("atk_assets","")).to_lower() or year > 1955 else 1.0
+	# Air / carrier strike (Midway decisive; Leyte air kills BBs without air cover)
+	var carrier_bonus := 0.0
+	if a_order == "STRIKE" or "carrier" in str(context.get("atk_assets","")).to_lower():
+		carrier_bonus = 0.35 if has_jet_carrier else 0.22
+		if has_ecm:
+			carrier_bonus *= 0.85  # CAP/jam defense
+	atk_power += carrier_bonus * def_power * 0.4  # relative
 
-	# Expanded world-class factors (recon/spotting, jamming, fuel/endurance, satellites late era, leader)
-	# Spotting from recon (air/sub/surface/sat in context), reduced by jamming, weather.
-	var spotting := float(context.get("spotting", 1.0))
-	var jamming := float(context.get("jamming", 0.0))  # 0-0.5 from ECM/tech
-	var fuel_state := float(context.get("fuel_state", 1.0))  # from supply
-	var sat_bonus := float(context.get("satellite_bonus", 0.0))
-	if jamming > 0.0:
-		spotting *= (1.0 - jamming * 0.6)
-		atk_power *= (1.0 - jamming * 0.4)
-		def_power *= (1.0 - jamming * 0.3)
-	if fuel_state < 0.6:
-		atk_power *= (0.6 + fuel_state * 0.5)
-		def_power *= (0.6 + fuel_state * 0.5)
-	if sat_bonus > 0.0:
-		spotting *= (1.0 + sat_bonus * 0.5)
-		atk_power *= (1.0 + sat_bonus * 0.3)
-	# Recon advantage boosts attacker if high spotting
-	if spotting > 1.2:
-		atk_power *= 1.1
-	# Leader in context for naval traits
-	var naval_leader_bonus := float(context.get("naval_leader_bonus", 0.0))
-	atk_power += naval_leader_bonus
-	def_power += float(context.get("defender_naval_leader_bonus", 0.0))
+	# Leader / doctrine (sea_wolf, carrier_admiral, initiative from traits + chief navy)
+	var leader_atk := float(context.get("leader_atk_bonus", 0.0))
+	var leader_def := float(context.get("leader_def_bonus", 0.0))
+	# Extra specific: carrier_admiral boosts strike, sea_wolf sub/ambush
+	if "carrier_admiral" in str(context.get("atk_traits", "")) and a_order == "STRIKE":
+		leader_atk += 0.15
+	if "sea_wolf" in str(context.get("atk_traits", "")) and (subh or a_order == "AMBUSH"):
+		leader_atk += 0.18
+	if "carrier_admiral" in str(context.get("def_traits", "")) and d_order == "STRIKE":
+		leader_def += 0.15
+	if "sea_wolf" in str(context.get("def_traits", "")) and (subh or d_order == "AMBUSH"):
+		leader_def += 0.18
+	atk_power += leader_atk
+	def_power += leader_def
 
-	# Simple roll
-	var total = atk_power + def_power + 0.01
-	var atk_win_chance = atk_power / total
-	res["winner"] = "attacker" if randf() < atk_win_chance else "defender"
-	res["naval_casualties_est"] = randf() * 0.3 + 0.1
-	res["engagement_type"] = "close_ambush" if (range_mod < 0.6 or closer) else ("chokepoint_brawl" if choke else "stand_off")
-	res["context"] = context
-	print("  [NAVAL RESOLVER] %s engagement: vis=%.2f choke=%s sub=%s range_mod=%.2f closer=%s orders(%s/%s) spot=%.2f jam=%.2f fuel=%.2f sat=%.2f -> %s" % [res["engagement_type"], vis, choke, subh, range_mod, closer, a_order, d_order, spotting, jamming, fuel_state, sat_bonus, res["winner"]])
+	# Fuel/endurance state (from Supply; low = reduced power/speed, vuln; nuke late unlimited)
+	var fuel_mult_atk : float = clamp(float(context.get("fuel_atk", 1.0)), 0.4, 1.1)
+	var fuel_mult_def : float = clamp(float(context.get("fuel_def", 1.0)), 0.4, 1.1)
+	if has_nuke_prop:
+		fuel_mult_atk = 1.0
+		fuel_mult_def = 1.0
+	atk_power *= fuel_mult_atk
+	def_power *= fuel_mult_def
+
+	# Final power roll (margin for outcome)
+	var total : float = atk_power + def_power + 0.01
+	var atk_win_chance : float = atk_power / total
+	var atk_wins : bool = randf() < atk_win_chance
+	var winner_tag : String = atk_tag if atk_wins else def_tag
+	res["winner"] = winner_tag
+	res["attacker_wins"] = atk_wins
+	var margin : float = absf(atk_power - def_power) / maxf(total, 1.0)
+	res["engagement"] = {
+		"atk_power_final": atk_power, "def_power_final": def_power,
+		"margin": margin, "range_mod": range_mod, "fuel_mults": [fuel_mult_atk, fuel_mult_def],
+		"leader_bonuses": [leader_atk, leader_def], "carrier_bonus": carrier_bonus,
+		"screening": d_order in ["ESCORT", "CONVOY_DUTY"]
+	}
+
+	# Casualties (abstract est % + detailed; not total kill; damage to org/readiness/strength fed back by caller)
+	var base_cas : float = 0.08 + margin * 0.22 + (0.05 if closer or choke else 0.0)
+	res["naval_casualties_est"] = clamp(base_cas, 0.05, 0.45)
+	res["attacker_casualties"] = res["naval_casualties_est"] * (0.7 if atk_wins else 1.3)
+	res["defender_casualties"] = res["naval_casualties_est"] * (1.3 if atk_wins else 0.7)
+
+	# === DISENGAGE / WITHDRAW PHASE (history: Jutland Germans smoke/turn away, not fight to last; Midway JP withdraw after carrier loss; modern task forces RTB if outspotted; not annihilation) ===
+	res["phases"].append("disengage")
+	var init_atk : float = float(context.get("initiative_atk", 0.5)) + (0.1 if "initiative" in str(context.get("atk_traits","")) else 0.0)
+	var init_def : float = float(context.get("initiative_def", 0.5)) + (0.1 if "initiative" in str(context.get("def_traits","")) else 0.0)
+	var org_atk : float = clamp(float(context.get("org_atk", 0.9)), 0.3, 1.2)
+	var org_def : float = clamp(float(context.get("org_def", 0.9)), 0.3, 1.2)
+	# Disengage higher if took heavy damage, low org, outspotted, good leader init; lower if winning decisively or orders aggressive
+	var dis_base_atk : float = 0.25 + (1.0 - org_atk) * 0.4 + init_atk * 0.3
+	if spot_def > spot_atk * 1.3: dis_base_atk += 0.3
+	if atk_wins: dis_base_atk -= margin * 0.2
+	else: dis_base_atk += 0.1
+	var dis_chance_atk : float = clamp(dis_base_atk, 0.1, 0.85)
+	var dis_base_def : float = 0.25 + (1.0 - org_def) * 0.4 + init_def * 0.3
+	if spot_atk > spot_def * 1.3: dis_base_def += 0.3
+	if not atk_wins: dis_base_def -= margin * 0.2
+	else: dis_base_def += 0.1
+	var dis_chance_def : float = clamp(dis_base_def, 0.1, 0.85)
+	var dis_atk := randf() < dis_chance_atk
+	var dis_def := randf() < dis_chance_def
+	res["disengage"] = {
+		"attacker_disengaged": dis_atk, "defender_disengaged": dis_def,
+		"chances": [dis_chance_atk, dis_chance_def],
+		"initiative": [init_atk, init_def], "orgs": [org_atk, org_def]
+	}
+	if dis_atk or dis_def:
+		res["naval_casualties_est"] *= 0.55  # broke contact, less slaughter (key for fun/historical not binary)
+		res["key_factors"].append("disengage_successful_leaders_org_intel")
+	# Outcome flavor
+	if margin > 0.25:
+		res["outcome"] = "major_victory" if (atk_wins and not dis_atk) else "minor_with_withdraw"
+	else:
+		res["outcome"] = "indecisive_withdraw"
+
+	# Key factors for AAR / logs / summary.md (history accurate)
+	var kf : Array = _collect_naval_key_factors(context, vis, choke, subh, range_mod, year, has_radar, has_sonar, has_ecm, has_sat, spot_atk, spot_def, jam_atk, a_order, d_order, dis_atk or dis_def, margin)
+	res["key_factors"] = kf  # explicit typed Array to satisfy godot strict inference in project settings
+	res["engagement_type"] = "close_ambush_sub" if (subh and (range_mod < 0.6 or closer or vis<0.5)) else ("chokepoint_brawl" if choke else ("stand_off_carrier" if (a_order=="STRIKE" or has_jet_carrier) else "surface_gunnery"))
+
+	# Rich print for evidence harness
+	print("  [NAVAL RESOLVER] %s | phases=%s winner=%s (atk_win=%.2f) cas=%.2f margin=%.2f vis=%.2f spot(%.2f/%.2f) jam(%.2f/%.2f) fuel(%.2f/%.2f) dis(a=%s d=%s) orders(%s/%s) year=%d radar=%s ecm=%s sub=%s" % [
+		res["engagement_type"], str(res["phases"]), res["winner"], atk_win_chance, res["naval_casualties_est"], margin, vis, spot_atk, spot_def, jam_atk, jam_def, fuel_mult_atk, fuel_mult_def, dis_atk, dis_def, a_order, d_order, year, has_radar, has_ecm, subh
+	])
 	return res
+
+# Helper: collect rich factors for AAR (used in TestRunner naval summary vs history)
+func _collect_naval_key_factors(ctx: Dictionary, vis: float, choke: bool, subh: bool, rmod: float, yr: int, radar: bool, sonar: bool, ecm: bool, sat: bool, spat: float, spdf: float, jam: float, ao: String, do: String, disengaged: bool, marg: float) -> Array:
+	var factors: Array[String] = []
+	if vis < 0.5: factors.append("poor_visibility_favors_stealth_ambush_subs")
+	if choke: factors.append("chokepoint_strait_forces_closer_brawl")
+	if subh: factors.append("submarine_factor_stealth_wolfpack_or_ambush")
+	if radar: factors.append("radar_era_enhanced_detection")
+	if not radar and yr < 1938: factors.append("visual_spotting_era_haze_smoke_limits")
+	if sat: factors.append("satellite_recon_global_spotting")
+	if ecm or jam > 0.15: factors.append("ecm_jamming_degrades_enemy_spot_guided_missiles")
+	if ao == "STRIKE" or "carrier" in str(ctx.get("atk_assets","")).to_lower(): factors.append("carrier_air_strike_decisive")
+	if do in ["ESCORT", "CONVOY_DUTY"]: factors.append("screening_protects_capitals")
+	if disengaged: factors.append("disengage_withdraw_common_historical_not_annihilation")
+	if marg > 0.3: factors.append("decisive_margin_one_sided")
+	if ctx.get("fuel_atk",1.0) < 0.6 or ctx.get("fuel_def",1.0) < 0.6: factors.append("fuel_endurance_critical_long_deployment")
+	if ao in ["AMBUSH", "SEARCH_AND_DESTROY"] and subh: factors.append("sea_wolf_doctrine_sub_advantage")
+	if ao == "STRIKE": factors.append("carrier_admiral_air_power")
+	factors.append("intel_recon_weather_jam_leader_key_per_Jutland_Midway_Falklands")
+	return factors
+
+# (Internal helper stub for spot calc if needed; logic in main for simplicity)
 
 
 # ============================================
@@ -1380,6 +1534,28 @@ func resolve_combat(
 		is_night = (hr < 6 or hr > 20)
 	if is_night:
 		cas_mult *= 0.62  # night hurts air CAS more
+
+	# === DYNAMIC RECON / SORTIE INTEGRATION ===
+	# Air recon bonus from registry (RECON missions) improves intel -> slight CAS/odds edge or defender penalty reduction.
+	# (sorties already reflected in air_power_ratio via dynamic registry presence updates in Supply)
+	var recon_b := 0.0
+	var sm_recon = null
+	var tree_r := Engine.get_main_loop()
+	if tree_r:
+		sm_recon = tree_r.root.get_node_or_null("SupplyManager")
+	if sm_recon and sm_recon.has_method("get_combat_presence_registry"):
+		var reg_r = sm_recon.call("get_combat_presence_registry")
+		if reg_r:
+			var rpt_r = reg_r.get_report(battle_province.id)
+			if rpt_r and rpt_r.has_method("get_air_recon_bonus"):
+				recon_b = float(rpt_r.get_air_recon_bonus(att_tag))  # attacker view
+	if recon_b > 0.05:
+		cas_mult *= (1.0 + recon_b * 0.35)  # recon lets air find better targets, coordinate
+		print("[AIR RECON] +%.2f bonus to CAS from dedicated recon sorties (intel/spotting)" % recon_b)
+	elif recon_b < -0.05:
+		cas_mult *= (1.0 + recon_b * 0.2)  # enemy recon hurts
+		print("[AIR RECON] enemy recon penalty to CAS")
+
 	# Apply CAS to attacker (scales continuously)
 	side_state["attacker"]["soft"] *= cas_mult
 	side_state["attacker"]["hard"] *= cas_mult * 0.85
@@ -1388,11 +1564,8 @@ func resolve_combat(
 		side_state["attacker"]["readiness"] *= clampf(0.72 + air_power_ratio * 0.2, 0.55, 0.95)
 
 	combat_phase_advanced.emit(PHASE_ENGAGEMENT, _phase_engagement(battle_province, side_state, att_power, def_power))
-	combat_phase_advanced.emit(PHASE_ATTRITION, _phase_attrition(battle_province, side_state, att_power, def_power, air_dominance_level))
-	var att_leader: Leader = null
-	if typeof(LeaderManager) != TYPE_NIL and not attacker_army_id.is_empty():
-		att_leader = LeaderManager.get_leader_for_army(attacker_army_id)
-	var result := _phase_resolution(battle_province, side_state, att_tag, def_tag, att_power, def_power, att_leader)
+	combat_phase_advanced.emit(PHASE_ATTRITION, _phase_attrition(battle_province, side_state, att_power, def_power))
+	var result := _phase_resolution(battle_province, side_state, att_tag, def_tag)
 	combat_phase_advanced.emit(PHASE_RESOLUTION, result)
 	combat_resolved.emit(result)
 	return result
@@ -1452,7 +1625,6 @@ func _phase_attrition(
 	side_state: Dictionary,
 	att_power: Dictionary,
 	def_power: Dictionary,
-	air_dominance_level: String = "none",
 ) -> Dictionary:
 	var att_supply := 1.0
 	var def_supply := 1.0
@@ -1506,7 +1678,7 @@ func _phase_attrition(
 		if sm.has_method("get_combat_presence_registry"):
 			var reg = sm.call("get_combat_presence_registry")
 			if reg and reg.has_method("get_report"):
-				var rpt = reg.get_report(_battle_province.id) if _battle_province else null
+				var rpt = reg.get_report(battle_province.id) if battle_province else null
 				if rpt:
 					inter_chance = clampf(float(rpt.get("interdict_chance", 0.0)) + float(rpt.get("enemy_control", 0.0)) * 0.15 + float(rpt.get("enemy_air", 0.0)) * 0.08, 0.0, 0.6)
 		if inter_chance > 0.01:
@@ -1524,9 +1696,6 @@ func _phase_resolution(
 	side_state: Dictionary,
 	attacker_tag: String,
 	defender_tag: String,
-	att_power: Dictionary = {},
-	def_power: Dictionary = {},
-	attacker_leader: Leader = null,
 ) -> Dictionary:
 	var att_score: float = (
 		_side_strength(side_state["attacker"])
@@ -1580,7 +1749,7 @@ func _phase_resolution(
 	# Urban/difficult terrain/fortifications help defenders last longer (stacks with org/supply bias)
 	var def_org := float(side_state["defender"].get("org", 1.0))
 	var def_rdy := float(side_state["defender"].get("readiness", 1.0))
-	var def_supply := float(def_power.get("supply_mod", 1.0))
+	var def_supply := float(def_power.get("supply_mod", 1.0)) if def_power else 1.0
 	var org_def_bias := clampf( (def_org - 0.4) * 0.8, 0.0, 0.55)
 	if def_supply > 0.75:
 		org_def_bias *= 1.25  # supplied defenders hold much longer
@@ -1588,7 +1757,7 @@ func _phase_resolution(
 	var terr := battle_province.terrain if battle_province else "plains"
 	var fort_mod := 1.0
 	if battle_province:
-		fort_mod = float(battle_province.development_level) * 0.08 + (1.0 if "fort" in str(battle_province.special_features) else 0.0)
+		fort_mod = float(battle_province.get("fortification_level", battle_province.development_level * 0.08 + (1.0 if "fort" in str(battle_province.special_features) else 0.0)))
 	if terr in ["urban", "mountains", "jungle", "hills", "marsh", "snow_capped"] or fort_mod > 1.15:
 		def_score *= 1.12 + clampf(fort_mod - 1.0, 0.0, 0.35)
 		if def_org > 0.65:
@@ -1607,10 +1776,10 @@ func _phase_resolution(
 	# Chance breakthroughs (based on leader initiative/breakthrough trait, margin, org diff, terrain).
 	# Heroic defense already boosts def.
 	var leader_break := 0.0
-	if attacker_leader != null and "breakthrough" in str(attacker_leader.trait_levels):
+	if leader and "breakthrough" in str(leader.trait_levels if hasattr(leader, "trait_levels") else ""):
 		leader_break = 0.1
-	if attacker_leader != null and "initiative_skill" in attacker_leader:
-		leader_break += float(attacker_leader.initiative_skill) / 30.0
+	if leader and hasattr(leader, "initiative_skill"):
+		leader_break += leader.initiative_skill / 30.0
 	if leader_break > 0 and randf() < leader_break and margin > 0.1:
 		att_score *= 1.15
 		print("[BREAKTHROUGH CHANCE] Leader trait/initiative caused breakthrough (extra score)")

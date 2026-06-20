@@ -62,6 +62,9 @@ static func _presence_for_province(
 
 	presence["our_air_power"] = friendly_air
 	presence["enemy_air_power"] = enemy_air
+	presence["our_air_recon"] = 0.0
+	presence["enemy_air_recon"] = 0.0
+	presence["air_recon_bonus"] = 0.0
 
 	if friendly_air + enemy_air > 0.01:
 		var air_p_ratio := friendly_air / maxf(enemy_air, 0.01)
@@ -91,6 +94,18 @@ static func _presence_for_province(
 						presence["enemy_air_superiority"] *= mod  # immature enemy air less threatening
 					elif mod > 1.0:
 						presence["enemy_air_superiority"] *= min(mod, 1.3)
+
+	# Recon from air (RECON missions add persistent points -> net bonus to intel/spotting)
+	# Always compute (even no air power, recon birds still fly). Placed after air block for scope.
+	var our_recon := float(report.total_air_recon(friendly_tag) if report.has_method("total_air_recon") else 0.0)
+	var en_recon := 0.0
+	if "air_recon_by_tag" in report:
+		for tg in report.air_recon_by_tag:
+			if str(tg) != friendly_tag:
+				en_recon += float(report.air_recon_by_tag[tg])
+	presence["our_air_recon"] = our_recon
+	presence["enemy_air_recon"] = en_recon
+	presence["air_recon_bonus"] = float(report.get_air_recon_bonus(friendly_tag) if report.has_method("get_air_recon_bonus") else (our_recon - en_recon * 0.5) * 0.1 )
 
 	for tag in report.land_by_tag:
 		if str(tag) != friendly_tag:

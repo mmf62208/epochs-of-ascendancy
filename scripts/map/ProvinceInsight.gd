@@ -5303,6 +5303,18 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 	preview["leaders_att"] = ["Rommel (+15% attack, +org)"]
 	preview["leaders_def"] = ["Manstein (+12% def)"]
 	preview["air_factors"] = "+10% attacker CAS support" if randf() > 0.5 else ""
+	# Air recon from sorties (RECON missions) for intel bonus in preview
+	var air_recon_b := 0.0
+	var sm_pi := _supply_manager()
+	if sm_pi and sm_pi.has_method("get_combat_presence_registry"):
+		var reg_pi := sm_pi.call("get_combat_presence_registry")
+		if reg_pi:
+			var rpt_pi := reg_pi.get_report(attacker.id) if attacker else null
+			if rpt_pi and rpt_pi.has_method("get_air_recon_bonus"):
+				air_recon_b = float(rpt_pi.get_air_recon_bonus("player"))
+	if air_recon_b > 0.05:
+		preview["air_recon_bonus"] = air_recon_b
+		preview["air_factors"] += " +recon intel"
 	preview["modifiers"] = ["-8% night attack (weather)", "+22% defending bonus", "+5% terrain advantage"]
 	if "marine" in str(preview.get("terrain", "")) or randf() > 0.7:
 		preview["modifiers"].append("+12% amphibious (Marines)")

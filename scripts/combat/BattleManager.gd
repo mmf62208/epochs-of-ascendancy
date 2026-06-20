@@ -329,6 +329,7 @@ func apply_combat_outcome(
 	var captured := bool(result.get("province_control_change", false))
 	var winner := str(result.get("winner", ""))
 	# Apply persistent org/readiness damage to the actual live formations (main loop combat now has lasting effects).
+	_apply_combat_damage_to_formations(result, attacker_formation_id)
 
 	# === Balance integration: apply persistent org/readiness/strength damage here (from BM as per design)
 	# Loser heavier losses (strength hit), winner lighter org/rdy hit. Recovery via Supply daily (infra/supply mod).
@@ -387,12 +388,6 @@ func apply_combat_outcome(
 ## Uses existing can_assault + execute logic; limited to 1-2 actions per major per day to avoid spam.
 ## AI targets based on simple adjacent non-owned (later: supply/infra/org scoring + ascend geo).
 func simulate_daily_ai_combat() -> void:
-	# Prefer DebugOverlay for full scored logic (weather/geo aware); fallback to inline AI below.
-	var dbg := get_node_or_null("/root/DebugOverlay")
-	if dbg != null and dbg.has_method("_simulate_ai_combat_turn"):
-		dbg.call("_simulate_ai_combat_turn")
-		print("[BM DAILY AI] delegated to DebugOverlay _simulate (full scoring + chain + weather).")
-		return
 	# World-class main-loop AI battle initiation (promoted from F10 harness _simulate_ai_combat_turn base).
 	# Called daily by TimeManager for 50+ turn integrated playtesting (auto wars for AI nations, not debug-only).
 	# Uses real BattleManager paths (can/execute + chain/flank) + supply/infra/org + weather-aware target choice.
@@ -474,11 +469,8 @@ func simulate_daily_ai_combat() -> void:
 	if actions > 0:
 		print("[AI DAILY COMBAT] Total AI assaults this daily tick: %d (promoted/polished for integrated playtest; non-debug main loop)" % actions)
 
-## Strategic naval engagement simulator entry (called after spotting in sea zones).
-## range_mod from weather/vis/storms/night (low = closer range engagements, favors subs/ambush or torps; high = stand off gunnery/carrier strikes).
-## sub_heavy: subs present, harder initial spot but deadly close.
-## Straits: already boosted in caller.
-func execute_naval_engagement(
+## Internal strategic impl (rich context + full resolver phases). Public wrappers delegate.
+func _do_naval_engagement(
 	attacker_tag: String,
 	defender_tag: String,
 	sea_province_id: int,
@@ -491,15 +483,67 @@ func execute_naval_engagement(
 	var sea_p: Province = MapManager.get_province(sea_province_id)
 	if sea_p == null or not sea_p.is_sea:
 		return {"success": false, "reason": "not sea province"}
-	# For demo, find any naval formations of the tags in/near the sea (simplified: use strength or pick test)
-	# In full: query LeaderManager or formations for fleets in that sea or adjacent. Lookup order for mod.
+	# Query real formations for orders, assets, leaders (full integration)
 	var attacker_order := Formation.NAVAL_ORDER_NONE
 	var defender_order := Formation.NAVAL_ORDER_NONE
+	var atk_leader_bonus := 0.0
+	var def_leader_bonus := 0.0
+	var atk_traits := ""
+	var def_traits := ""
+	var atk_fuel := 0.85  # proxy; Supply will pass real
+	var def_fuel := 0.85
+	var atk_org := 0.9
+	var def_org := 0.9
+	var init_atk := 0.5
+	var init_def := 0.5
+	var atk_assets := ""
+	var def_assets := ""
+	var air_recon_atk := 0.0
+	var air_recon_def := 0.0
+	var jam_atk := 0.0  # defender jamming vs atk
+	var jam_def := 0.0
 	if typeof(LeaderManager) != TYPE_NIL:
 		for f in LeaderManager.get_formations_for_country(attacker_tag):
-			if f and f.get_category() == "naval": attacker_order = f.current_naval_order; break
+			if f and f.get_category() == "naval":
+				attacker_order = f.current_naval_order
+				atk_assets = str(f.name) + " " + str(f.naval_design_id)
+				if f.has_leader() and typeof(LeaderManager) != TYPE_NIL:
+					var lid := f.leader_id
+					var l := LeaderManager.get_leader(lid)
+					if l:
+						atk_leader_bonus = l.get_attack_modifier() * 0.8 + l.get_terrain_modifier("sea")
+						atk_traits = str(l.traits if "traits" in l else "")
+						init_atk = l.get_initiative_modifier() * 5.0 + 0.5
+				if "fuel" in f or f.has_method("get"):
+					atk_fuel = clamp(float(f.get("fuel_level") if f.has("fuel_level") else 0.85), 0.3, 1.1)
+				atk_org = float(f.organization) if "organization" in f else 0.9
+				# Air attached for recon/strike
+				if f.attached_air_formation_id != "":
+					air_recon_atk += 0.9
+				break
 		for f in LeaderManager.get_formations_for_country(defender_tag):
-			if f and f.get_category() == "naval": defender_order = f.current_naval_order; break
+			if f and f.get_category() == "naval":
+				defender_order = f.current_naval_order
+				def_assets = str(f.name) + " " + str(f.naval_design_id)
+				if f.has_leader() and typeof(LeaderManager) != TYPE_NIL:
+					var lid := f.leader_id
+					var l := LeaderManager.get_leader(lid)
+					if l:
+						def_leader_bonus = l.get_attack_modifier() * 0.8 + l.get_terrain_modifier("sea")
+						def_traits = str(l.traits if "traits" in l else "")
+						init_def = l.get_initiative_modifier() * 5.0 + 0.5
+				if "fuel" in f or f.has_method("get"):
+					def_fuel = clamp(float(f.get("fuel_level") if f.has("fuel_level") else 0.85), 0.3, 1.1)
+				def_org = float(f.organization) if "organization" in f else 0.9
+				if f.attached_air_formation_id != "":
+					air_recon_def += 0.9
+				break
+	# National chief navy bonus (from LeaderManager)
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_national_bonuses"):
+		var nb := LeaderManager.get_national_bonuses(attacker_tag)
+		atk_leader_bonus += float(nb.get("naval_combat", 0.0))
+		nb = LeaderManager.get_national_bonuses(defender_tag)
+		def_leader_bonus += float(nb.get("naval_combat", 0.0))
 	var context := {
 		"attacker": attacker_tag,
 		"defender": defender_tag,
@@ -510,28 +554,65 @@ func execute_naval_engagement(
 		"chokepoint": false,
 		"attacker_order": attacker_order,
 		"defender_order": defender_order,
+		"leader_atk_bonus": atk_leader_bonus,
+		"leader_def_bonus": def_leader_bonus,
+		"atk_traits": atk_traits,
+		"def_traits": def_traits,
+		"fuel_atk": atk_fuel,
+		"fuel_def": def_fuel,
+		"org_atk": atk_org,
+		"org_def": def_org,
+		"initiative_atk": init_atk,
+		"initiative_def": init_def,
+		"atk_assets": atk_assets,
+		"def_assets": def_assets,
+		"air_recon_atk": air_recon_atk,
+		"air_recon_def": air_recon_def,
+		"jam_atk": jam_atk,
+		"jam_def": jam_def,
+		"year": (TimeManager.get_current_year() if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year") else 1942),
 	}
 	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_naval_spotting_visibility"):
 		context["weather_vis"] = WeatherManager.get_naval_spotting_visibility(sea_province_id)
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint"):
 		context["chokepoint"] = MapManager.has_strategic_chokepoint(sea_province_id)
-	# Adjust powers based on range: low range_mod + sub_heavy + closer (storm/night/order like AMBUSH/S&D) -> sub/torp advantage, close fight; high -> air/gun long range.
-	var atk_power := 1.0 + (0.5 if not sub_heavy else 0.2)
-	var def_power := 1.0 + (0.3 if sub_heavy else 0.1)
-	# Range mod: <0.6 or closer favors subs/ambush (higher def for sub side); use orders from context
-	if range_mod < 0.6 or closer_engagement or context.get("attacker_order", "") in [Formation.NAVAL_ORDER_AMBUSH, Formation.NAVAL_ORDER_SEARCH_AND_DESTROY]:
+	# Adjust base powers (orders + sub/range will be re-applied richer in resolver)
+	var atk_power := 1.0 + (0.4 if not sub_heavy else 0.15)
+	var def_power := 1.0 + (0.25 if sub_heavy else 0.08)
+	# Range/order proxy pre-mod (resolver does full)
+	if range_mod < 0.6 or closer_engagement or attacker_order in [Formation.NAVAL_ORDER_AMBUSH, Formation.NAVAL_ORDER_SEARCH_AND_DESTROY]:
 		if sub_heavy:
-			def_power *= 1.25  # sub advantage in poor vis/close
+			def_power *= 1.22
 		else:
-			atk_power *= 0.9
+			atk_power *= 0.92
 	else:
 		atk_power *= range_mod
-	# Use resolver for common combat math if possible
+	# Enrich from Supply combat presence if avail (air/naval totals for recon/strike power)
+	var sm := get_node_or_null("/root/SupplyManager")
+	if sm != null and sm.has_method("get_combat_presence_registry"):
+		var reg := sm.call("get_combat_presence_registry")
+		if reg != null:
+			var rpt := reg.get_report(sea_province_id)
+			if rpt != null:
+				# Add air for recon/strike
+				var att_air := float(rpt.air_by_tag.get(attacker_tag, 0.0)) if "air_by_tag" in rpt else 0.0
+				var def_air := 0.0
+				if "air_by_tag" in rpt:
+					for tg in rpt.air_by_tag.keys():
+						if str(tg) != attacker_tag: def_air += float(rpt.air_by_tag[tg])
+				context["air_recon_atk"] = max(float(context.get("air_recon_atk",0)), att_air * 0.08)
+				context["air_recon_def"] = max(float(context.get("air_recon_def",0)), def_air * 0.08)
+				# Naval strength proxy
+				var n_atk := float(rpt.naval_strength.get(attacker_tag, 0.0)) if "naval_strength" in rpt else 0.0
+				var n_def := float(rpt.naval_strength.get(defender_tag, 0.0)) if "naval_strength" in rpt else 0.0
+				atk_power += n_atk * 0.06
+				def_power += n_def * 0.06
+	# Use resolver (now full phased)
 	var result := {"success": true, "type": "naval_engagement", "context": context}
 	if _resolver and _resolver.has_method("resolve_naval_engagement"):
 		result = _resolver.resolve_naval_engagement(context, atk_power, def_power)
 	else:
-		# Simple strategic outcome
+		# Fallback simple
 		var total = atk_power + def_power
 		var atk_win = randf() < (atk_power / total)
 		result["winner"] = attacker_tag if atk_win else defender_tag
@@ -540,6 +621,17 @@ func execute_naval_engagement(
 		print("Naval engagement resolved (demo): %s vs %s at %s range (vis %.2f, choke %s, sub %s, closer_order=%s, orders %s/%s) -> winner %s" % [attacker_tag, defender_tag, result["range_engagement"], context["weather_vis"], context["chokepoint"], sub_heavy, closer_engagement, context.get("attacker_order",""), context.get("defender_order",""), result["winner"]])
 	battle_resolved.emit(result)
 	return result
+
+## Public 6-param strategic entry (for code calling with range/sub/closer). Delegates to rich internal.
+func execute_naval_engagement(
+	attacker_tag: String,
+	defender_tag: String,
+	sea_province_id: int,
+	range_mod: float = 1.0,
+	sub_heavy: bool = false,
+	closer_engagement: bool = false,
+) -> Dictionary:
+	return _do_naval_engagement(attacker_tag, defender_tag, sea_province_id, range_mod, sub_heavy, closer_engagement)
 
 
 func get_divisions_at_province(province_id: int, country_tag: String) -> Array[Dictionary]:
@@ -738,6 +830,58 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 ## Pragmatic additions to support direct OOB setup for WWI/WWII battles and referenced calls in harness/docs.
 ## These enable recreating Marne/Verdun (attrition), Stalingrad (urban winter supply), Midway (naval air), D-Day (amphib).
 
+# (duplicate chain func removed for parse)
+
+func simulate_daily_ai_combat() -> void:
+	"""Main-loop autonomous AI combat for 50+ turn integrated playtests (promoted from harness; scored on supply/infra/low-org + weather + chain)."""
+	# Prefer DebugOverlay for full scored logic (weather/geo aware); fallback simple.
+	var dbg := get_node_or_null("/root/DebugOverlay")
+	if dbg != null and dbg.has_method("_simulate_ai_combat_turn"):
+		dbg.call("_simulate_ai_combat_turn")
+		print("[BM DAILY AI] delegated to DebugOverlay _simulate (full scoring + chain + weather).")
+		return
+	# Fallback direct (for pure BM headless without UI)
+	print("[BM DAILY AI] fallback simple AI assaults (limited). Extend via TestRunner historical harness for full OOB realism.")
+	var mm := get_node_or_null("/root/MapManager")
+	if mm == null or not mm.has_method("get_provinces_by_owner"):
+		return
+	var ai_tags := ["GER", "SOV", "JAP", "ITA"]
+	for tag in ai_tags:
+		var owned: Array = mm.call("get_provinces_by_owner", tag)
+		if owned.size() < 1: continue
+		var fromp := int(owned[0])
+		var adjs := mm.call("get_adjacent_provinces", fromp)
+		for aidv in adjs:
+			var aid := int(aidv)
+			var p: Province = mm.call("get_province", aid) if mm.has_method("get_province") else null
+			if p == null or p.owner_tag == tag or p.owner_tag == "": continue
+			var can: Dictionary = can_assault_province(tag, aid, fromp)
+			if bool(can.get("ok", false)):
+				var cres := execute_chain_assault_or_flank(tag, aid, fromp, 1)
+				print("[BM DAILY AI FALLBACK] %s chain assault on %d -> %d results" % [tag, aid, cres.size()])
+				break
+
+func execute_naval_engagement(attacker_tag: String, defender_tag: String, sea_province_id: int, intensity: float = 0.5, has_submarines: bool = false, bad_weather: bool = false) -> Dictionary:
+	"""Historical/Midway proxy entry (5-arg call from harness). Delegates to primary 6-arg strategic execute (now rich phased) after mapping params. Preserves registry air/naval for context. Use for OOB historical tests."""
+	var range_m := 0.6 if bad_weather else 1.1  # bad weather -> closer
+	var closer := bad_weather or intensity > 0.7
+	# Call internal strategic (avoids recursion on overload name)
+	var primary_res := _do_naval_engagement(attacker_tag, defender_tag, sea_province_id, range_m, has_submarines, closer)
+	# Enrich result with historical proxy fields for compatibility with old harness prints/AAR
+	primary_res["intensity"] = intensity
+	primary_res["bad_weather"] = bad_weather
+	primary_res["has_submarines"] = has_submarines
+	if "key_factors" not in primary_res or not primary_res["key_factors"] is Array:
+		primary_res["key_factors"] = []
+	primary_res["key_factors"].append_array(["historical_proxy_midway_leyte_falklands", "registry_air_nav_presence_used"])
+	# Legacy score fields if missing
+	if not primary_res.has("attacker_score"):
+		primary_res["attacker_score"] = float(primary_res.get("attacker_casualties", 0.2)) * 10.0 + 5.0
+	if not primary_res.has("defender_score"):
+		primary_res["defender_score"] = float(primary_res.get("defender_casualties", 0.2)) * 10.0 + 4.0
+	print("[BM NAVAL HIST PROXY] delegated to phased -> %s vs %s @%d winner=%s subs=%s storm=%s" % [attacker_tag, defender_tag, sea_province_id, primary_res.get("winner", "?"), has_submarines, bad_weather])
+	return primary_res
+
 func force_historical_oob_for_battle(battle_key: String, year: int = 1942, custom_pids: Dictionary = {}) -> Dictionary:
 	"""Force realistic OOB at representative provinces for history testing (called by TestRunner sims). Updates owners, deploys formations from templates, assigns historical leaders, seeds air/naval presence, sets weather proxy."""
 	print("[BM HIST OOB] Forcing OOB for battle=%s year=%d" % [battle_key, year])
@@ -825,14 +969,14 @@ func force_historical_oob_for_battle(battle_key: String, year: int = 1942, custo
 
 	# Historical leader assign (use available historical; match era loosely)
 	if lm.has_method("get_leaders_for_country"):
-		var att_leaders: Array = lm.call("get_leaders_for_country", att_tag) as Array
+		var att_leaders := lm.call("get_leaders_for_country", att_tag)
 		if att_leaders.size() > 0 and att_divs.size() > 0:
-			var lid: String = str(att_leaders[0].leader_id) if att_leaders[0] is Leader else ""
+			var lid := att_leaders[0].leader_id if "leader_id" in att_leaders[0] else ""
 			if lid != "" and lm.has_method("assign_leader_to_formation"):
 				lm.call("assign_leader_to_formation", lid, att_divs[0])
-		var def_leaders: Array = lm.call("get_leaders_for_country", def_tag) as Array
+		var def_leaders := lm.call("get_leaders_for_country", def_tag)
 		if def_leaders.size() > 0 and def_divs.size() > 0:
-			var dlid: String = str(def_leaders[0].leader_id) if def_leaders[0] is Leader else ""
+			var dlid := def_leaders[0].leader_id if "leader_id" in def_leaders[0] else ""
 			if dlid != "" and lm.has_method("assign_leader_to_formation"):
 				lm.call("assign_leader_to_formation", dlid, def_divs[0])
 
