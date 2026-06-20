@@ -32,6 +32,7 @@ func get_effective_combat_power(
 
 	# Rule flag wiring for new weapon techs (sonic/CB/bio from land_equipment; phaser from strategic_future)
 	# Balance: high dmg but tradeoffs (indiscriminate for sonic, uncontrollable/ethics for CB, power/heat for energy; prior engines reuse mod/flag checks like radio)
+	# Enhanced chem/bio by tech level (early low area, mid terror, advanced persistent high impact + morale), support equipment/gear (sustainment/support in templates) reduces effect (masks, suits, protective gear represented by support equipment).
 	var owner_tag := ""
 	if leader != null:
 		owner_tag = leader.country_tag
@@ -41,9 +42,28 @@ func get_effective_combat_power(
 		if TechnologyManager.has_rule_flag(owner_tag, "sonic_weapons"):
 			att_mod += 0.12  # area soft control bonus
 			own_risk += 0.05  # indiscriminate hearing/own troop affect
+		# Chem/bio by tech level (high-leverage for prolonged attrit like Verdun/Marne historical)
+		var chem_level := 0
+		var chem_mod := 0.0
+		var chem_risk := 0.0
+		if TechnologyManager.has_rule_flag(owner_tag, "chemical_weapons_early") or TechnologyManager.has_rule_flag(owner_tag, "gas_weapons_1915"):
+			chem_level = 1
+			chem_mod = 0.15
+			chem_risk = 0.08
 		if TechnologyManager.has_rule_flag(owner_tag, "cb_weapons"):
-			att_mod += 0.22  # chem/bio area denial terror
-			own_risk += 0.12  # blowback, mutation, ethics (Hand amp, isolation)
+			chem_level = 2
+			chem_mod = 0.22
+			chem_risk = 0.12
+		if TechnologyManager.has_rule_flag(owner_tag, "advanced_cb_weapons") or TechnologyManager.has_rule_flag(owner_tag, "chemical_biological_weapons_1960"):
+			chem_level = 3
+			chem_mod = 0.30
+			chem_risk = 0.18
+		if chem_mod > 0.0:
+			att_mod += chem_mod
+			own_risk += chem_risk
+			# Area denial terror on defender soft/org too if using (prolonged effect)
+			if base_stats.has("soft_attack"):
+				base_stats["soft_attack"] = float(base_stats["soft_attack"]) * (1.0 + chem_mod * 0.5)
 		if TechnologyManager.has_rule_flag(owner_tag, "phaser_torpedo"):
 			att_mod += 0.18  # scalable energy precise
 			own_risk += 0.08  # power hog, overkill ethics
@@ -54,6 +74,14 @@ func get_effective_combat_power(
 				base_stats["hard_attack"] = float(base_stats["hard_attack"]) * (1.0 + att_mod * 0.7)
 		if own_risk > 0.0 and base_stats.has("readiness"):
 			base_stats["readiness"] = float(base_stats["readiness"]) * (1.0 - own_risk * 0.5)  # self risk trade-off
+		# Support equipment / gear reduction for chem (represented in sustainment/support equipment in div templates or formation)
+		if chem_level > 0 and (base_stats.has("support_equipment") or (division_template_id and ("support" in division_template_id.to_lower() or "sustainment" in division_template_id.to_lower()))):
+			var gear_reduction := 0.4  # 40% reduction if gear present (masks, suits, protective equip)
+			own_risk *= (1.0 - gear_reduction)
+			# Less penalty to readiness
+			if own_risk > 0.0 and base_stats.has("readiness"):
+				base_stats["readiness"] = float(base_stats["readiness"]) * (1.0 + own_risk * 0.3)
+			print("[CHEM WARFARE] Tech level %d impact (mod %.2f risk %.2f) - support gear reduced effect" % [chem_level, chem_mod, chem_risk])
 		# Also feed to ethics risk system indirectly via higher terror if used (caller can check)
 		if (TechnologyManager.has_rule_flag(owner_tag, "cb_weapons") or TechnologyManager.has_rule_flag(owner_tag, "sonic_weapons")) and typeof(GameData) != TYPE_NIL and GameData.has_method("apply_agent_pillar_influence"):
 			# Light ongoing ethics pressure when fielded (balance for bio/sonic backlash)
@@ -460,8 +488,18 @@ func get_effective_combat_power(
 		if formation_for_effects.has_method("get_mission_mods"):
 			var air_mods: Dictionary = formation_for_effects.get_mission_mods()
 			air_bonus = float(air_mods.get("combat_bonus", 0.0))
-			# AA vs enemy air
-			final_readiness *= (1.0 + float(air_mods.get("aa_vs_air", 0.0)) * 0.12)
+			# AA vs enemy air (defenders damage aircraft, reduce air effect, attrition to enemy air presence)
+			var aa_vs := float(air_mods.get("aa_vs_air", 0.0))
+			if aa_vs > 0.0 or (def_power and float(def_power.get("aa_factor", 0.0)) > 0.0):
+				aa_vs = max(aa_vs, float(def_power.get("aa_factor", 0.15)) if def_power else 0.15)
+				# Reduce enemy air effectiveness / cas if defender AA
+				if air_power_ratio < 1.0:  # enemy air
+					air_power_ratio *= max(0.5, 1.0 - aa_vs * 0.3)
+				final_readiness *= (1.0 + aa_vs * 0.15)
+				# Simulate defender AA damaging aircraft (reduce future air or log attrition)
+				if air_power_ratio < 0.9:
+					cas_mult *= 0.88  # AA disrupts CAS
+				print("[AA] Defender AA (%.2f) damaged/reduced enemy air effect, ratio now %.2f" % [aa_vs, air_power_ratio])
 		var am := ""
 		if formation_for_effects.has_method("get_air_mission"):
 			am = str(formation_for_effects.call("get_air_mission"))
@@ -1206,6 +1244,13 @@ func resolve_combat(
 			else:
 				air_dominance_level = "none"
 				cas_mult = maxf(0.65, 0.75 + air_power_ratio * 0.15)
+			# Defenders AA damage aircraft / disrupt air (in battle context)
+			var def_aa := float(def_power.get("aa_factor", 0.0)) if def_power else 0.0
+			if def_aa > 0.05:
+				air_power_ratio *= max(0.5, 1.0 - def_aa * 0.25)
+				if air_power_ratio < 1.0:
+					cas_mult *= 0.9
+				print("[AA IN BATTLE] Defender AA %.2f reduced air ratio to %.2f, disrupted CAS")
 	# Weather + night interact with air (big penalty)
 	var air_weather := 1.0
 	if typeof(WeatherManager) != TYPE_NIL:
@@ -1240,6 +1285,10 @@ func _phase_positioning(battle_province: Province, side_state: Dictionary) -> Di
 	if terr in ["mountains", "jungle", "urban", "marsh", "snow_capped"]:
 		side_state["defender"]["soft"] *= 1.09
 		side_state["defender"]["readiness"] *= 1.04  # terrain defender edge
+	# Urban centers and difficult terrain help defenders last longer (HoI4-like, stacks with fort)
+	if terr in ["urban", "mountains", "jungle", "hills", "marsh", "snow_capped"]:
+		side_state["defender"]["org"] *= 1.08
+		side_state["defender"]["readiness"] *= 1.06
 	# Weather terrain synergy in positioning (mud/snow amplifies bad terrain penalty for attacker)
 	var pid := battle_province.id if battle_province != null else -1
 	if pid >= 0 and typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_movement_multiplier"):
@@ -1305,6 +1354,27 @@ func _phase_attrition(
 	if float(att_power.get("air_interdict", 0.0)) > 0.05:
 		side_state["defender"]["readiness"] *= 0.9
 		side_state["defender"]["org"] *= 0.92
+
+	# Explicit SUPPLY INTERDICT MOD in resolver phase (high-leverage from combat history recs for endurance).
+	# Uses SupplyInterdictionEstimator or presence registry to apply battle-level org/readiness drain based on enemy control/air/land around province.
+	# Makes prolonged fights (similar strength) and weaker attacks last longer/attrit more if interdicted.
+	# Defender less affected (local supply), attacker more (extended lines).
+	if typeof(SupplyManager) != TYPE_NIL:
+		var sm = SupplyManager
+		var inter_chance := 0.0
+		if sm.has_method("get_combat_presence_registry"):
+			var reg = sm.call("get_combat_presence_registry")
+			if reg and reg.has_method("get_report"):
+				var rpt = reg.get_report(battle_province.id) if battle_province else null
+				if rpt:
+					inter_chance = clampf(float(rpt.get("interdict_chance", 0.0)) + float(rpt.get("enemy_control", 0.0)) * 0.15 + float(rpt.get("enemy_air", 0.0)) * 0.08, 0.0, 0.6)
+		if inter_chance > 0.01:
+			var inter_mod := 1.0 - clampf(inter_chance * 0.35, 0.0, 0.45)
+			side_state["attacker"]["org"] *= inter_mod
+			side_state["attacker"]["readiness"] *= max(0.55, inter_mod)
+			side_state["defender"]["org"] *= max(0.65, inter_mod * 0.85)
+			print("[SUPPLY INTERDICT MOD] Applied in resolver phase: chance=%.2f mod=%.2f (endurance for prolonged/weaker attacks)" % [inter_chance, inter_mod])
+
 	return {"attacker_supply": att_supply, "defender_supply": def_supply, "weather_mod": 1.0}
 
 
@@ -1361,8 +1431,36 @@ func _phase_resolution(
 		outcome = "heroic_defense"
 	elif winner == "defender":
 		outcome = "delay_success"
+
+	# High org + position defending with supplies = far less likely to fold quickly (HoI4-like staying power, puts up fight)
+	# Urban/difficult terrain/fortifications help defenders last longer (stacks with org/supply bias)
+	var def_org := float(side_state["defender"].get("org", 1.0))
+	var def_rdy := float(side_state["defender"].get("readiness", 1.0))
+	var def_supply := float(def_power.get("supply_mod", 1.0)) if def_power else 1.0
+	var org_def_bias := clampf( (def_org - 0.4) * 0.8, 0.0, 0.55)
+	if def_supply > 0.75:
+		org_def_bias *= 1.25  # supplied defenders hold much longer
+	def_score *= (1.0 + org_def_bias)
+	var terr := battle_province.terrain if battle_province else "plains"
+	var fort_mod := 1.0
+	if battle_province:
+		fort_mod = float(battle_province.get("fortification_level", battle_province.development_level * 0.08 + (1.0 if "fort" in str(battle_province.special_features) else 0.0)))
+	if terr in ["urban", "mountains", "jungle", "hills", "marsh", "snow_capped"] or fort_mod > 1.15:
+		def_score *= 1.12 + clampf(fort_mod - 1.0, 0.0, 0.35)
+		if def_org > 0.65:
+			def_score *= 1.1  # entrenched high org in urban/fort/terrain holds longer (prolonged fight)
+	# Similar strength fights last longer (close scores + high org -> prolonged_attrition, less quick fold)
+	if abs(att_score - def_score) / max(def_score, 1.0) < 0.18 and min(def_org, float(side_state["attacker"].get("org", 1.0))) > 0.55:
+		outcome = "prolonged_attrition"
+		margin *= 0.6  # smaller margin for less decisive immediate outcome
+		print("[BATTLE DURATION] Similar strength + high org -> prolonged fight (lasts 'days' via repeated assaults, attrit)")
+	# Weaker force attacking stronger: calculate longer time / higher attrition if defender high org/supply/fort
+	if att_score < def_score * 0.65 and def_org > 0.6 and def_supply > 0.7:
+		outcome = "prolonged_stalemate" if margin < 0.25 else outcome
+		margin *= 0.7
+		print("[BATTLE DURATION] Weaker attack vs strong org/supplied defender -> prolonged (time to break higher, more attrit)")
 	var captured := winner == "attacker" and attacker_tag != defender_tag and not attacker_tag.is_empty()
-	return {
+	var result_dict := {
 		"winner": winner,
 		"outcome": outcome,
 		"attacker_score": att_score,
@@ -1372,6 +1470,15 @@ func _phase_resolution(
 		"defender_tag": defender_tag,
 		"province_id": battle_province.id,
 	}
+	# Add duration estimate for preview/AAR (how long battle "takes" based on org/power diff, terrain)
+	var org_diff := def_org - float(side_state["attacker"].get("org", 1.0))
+	var duration_est := 1 + clampf( (1.0 - margin) * 4.0 + org_diff * 2.5 + (fort_mod - 1.0) * 2.0 , 0.0, 12.0)
+	if terr in ["urban", "mountains"]:
+		duration_est += 2.0
+	result_dict["estimated_prolongation_days"] = int(duration_est)
+	if duration_est > 3:
+		print("[BATTLE DURATION] Estimated %d days of attrit (org/supply/terrain/fort bias applied; similar or weaker attacks last longer)" % int(duration_est))
+	return result_dict
 
 
 func _side_strength(side: Dictionary) -> float:

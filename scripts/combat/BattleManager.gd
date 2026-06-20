@@ -339,11 +339,15 @@ func apply_combat_outcome(
 		var def_fid := str(result.get("defender_formation_id", ""))
 		var def_f: Formation = LeaderManager.get_formation(def_fid) if not def_fid.is_empty() else null
 		var w := winner
+		var prolonged := "prolonged" in str(result.get("outcome", "")).to_lower() or str(result.get("outcome", "")) in ["prolonged_attrition", "prolonged_stalemate"]
 		var dmg_line := "[COMBAT DAMAGE] "
 		if att_f != null:
 			var is_win := (w == "attacker")
 			var org_loss := 0.09 if is_win else 0.27
 			var rdy_loss := 0.07 if is_win else 0.22
+			if prolonged:
+				org_loss *= 0.55  # prolonged fights (high org def, similar strength, urban/fort) last longer, less quick decisive damage
+				rdy_loss *= 0.55
 			att_f.organization = clampf(att_f.organization * (1.0 - org_loss + randf() * 0.04), 0.22, 1.0)
 			att_f.readiness = clampf(att_f.readiness * (1.0 - rdy_loss + randf() * 0.04), 0.28, 1.0)
 			if not is_win:
@@ -354,6 +358,9 @@ func apply_combat_outcome(
 			var is_win_def := (w == "defender")
 			var org_loss_d := 0.26 if not is_win_def else 0.10
 			var rdy_loss_d := 0.21 if not is_win_def else 0.08
+			if prolonged:
+				org_loss_d *= 0.5
+				rdy_loss_d *= 0.5
 			def_f.organization = clampf(def_f.organization * (1.0 - org_loss_d + randf() * 0.04), 0.22, 1.0)
 			def_f.readiness = clampf(def_f.readiness * (1.0 - rdy_loss_d + randf() * 0.04), 0.28, 1.0)
 			if not is_win_def:
@@ -361,7 +368,7 @@ func apply_combat_outcome(
 			def_f.is_in_combat = true
 			dmg_line += "DEF %s: org=%.2f rdy=%.2f str=%.2f" % [def_fid, def_f.organization, def_f.readiness, def_f.strength]
 		if att_f != null or def_f != null:
-			print(dmg_line)
+			print(dmg_line + (" (prolonged - reduced losses, lasts longer)" if prolonged else ""))
 
 	if captured and target_pid >= 0 and typeof(MapManager) != TYPE_NIL:
 		MapManager.update_province_owner(target_pid, attacker_tag, attacker_tag, false)

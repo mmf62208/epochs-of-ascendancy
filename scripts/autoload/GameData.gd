@@ -65,6 +65,8 @@ func _ready() -> void:
 	if typeof(TimeManager) != TYPE_NIL:
 		if not TimeManager.game_year_advanced.is_connected(process_peace_follow_ons):
 			TimeManager.game_year_advanced.connect(process_peace_follow_ons)
+		if not TimeManager.game_year_advanced.is_connected(process_1910_crisis_events):
+			TimeManager.game_year_advanced.connect(process_1910_crisis_events)
 		# Monthly hook for gradual demographic erosion / policy effects (immigration long-term costs, pro-natal native growth, non-citizen "social inflation" strain, foreign military loyalty drag).
 		# Erosion timing recommendation: small monthly ticks (realistic accumulation) + threshold events (crime spikes, unrest, Hidden Hand amplification). Immediate effects for demo feedback; gradual for simulation depth.
 		# Pro-natal and strict border policies provide counter-decay or buffers. Non-citizen/foreign military % act like "printing money" — debase social trust over time.
@@ -4291,3 +4293,72 @@ func apply_space_strike_bonus(tag: String, amount: float) -> void:
 	if not peace_state.has("space_strike_bonus"): peace_state["space_strike_bonus"] = {}
 	peace_state["space_strike_bonus"][tag] = float(peace_state["space_strike_bonus"].get(tag, 0.0)) + amount
 	print("[SPACE WIRING] space_strike_bonus for %s += %.2f (now %.2f) from orbital assets / space designer support (guided munitions for ground)" % [tag, amount, peace_state["space_strike_bonus"][tag]])
+# 1910 scenario events: July Crisis, Balkan Wars alt (player/agent choices ripple to 1918 peace leverage/grievance/war state/alt OOBs, different borders, exhausted forces, or averted early peace)
+func process_1910_crisis_events(current_year: int) -> void:
+	if typeof(TimeManager) == TYPE_NIL:
+		return
+	var scenario := ""
+	if typeof(ScenarioLoader) != TYPE_NIL and ScenarioLoader.has_method("get_current_scenario_name"):
+		scenario = str(ScenarioLoader.call("get_current_scenario_name"))
+	if not (scenario == "1910" or (current_year >= 1910 and current_year <= 1914)):
+		return
+	var month := 1
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("game_month"):
+		month = TimeManager.game_month
+	if current_year == 1912 and month == 10:
+		print("[1910 EVENT] First Balkan War 1912 - Balkan League vs Ottoman Empire")
+		# Alt via agent dip success or high pillar/mandate: great power intervention prevents full Ottoman loss, different 1918 borders/leverage
+		var alt_prevent := false
+		if typeof(AgentManager) != TYPE_NIL and AgentManager.has_method("get_active_missions"):
+			alt_prevent = randf() < 0.3
+		if alt_prevent:
+			LeaderEventUI.post_news("First Balkan War Averted (Alt)", "Great power/agent intervention localizes: less Ottoman territorial loss, altered alliances. Ripples: different 1918 grievances/leverage for Central vs Entente.", "diplomatic")
+			if typeof(GameData) != TYPE_NIL:
+				GameData.apply_pillar_shift("TUR", "mandate", 8, "1912_alt")
+				if not peace_state.has("1912_balkan_alt"):
+					peace_state["1912_balkan_alt"] = true  # flag for 1918 OOB/peace alt borders or less revanchism
+		else:
+			LeaderEventUI.post_news("First Balkan War 1912", "Historical path: Ottomans lose most European holdings. Increases Balkan tension, affects future 1914 spark and 1918 peace terms (more revanchist fuel or new states).", "war")
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("add_grievance"):
+			GameData.add_grievance("TUR", 15, "balkan_1912_loss")
+	if current_year == 1913 and month == 6:
+		print("[1910 EVENT] Second Balkan War 1913")
+		LeaderEventUI.post_news("Second Balkan War 1913", "Balkan allies fight over spoils - alt if prior intervention: different borders/alliances for 1914 crisis and 1918 OOBs.", "war")
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("add_grievance"):
+			GameData.add_grievance("BUL", 10, "balkan_1913")
+	if current_year == 1914 and month == 6:
+		print("[1910 EVENT] July Crisis 1914 spark")
+		# Branches: assassination, ultimatum strength (player as power or agent missions on SER/AUH/RUS/GER/ENG/FRA), Russian mobilization timing, British neutrality, German blank check.
+		# Outcomes: localize war (limited), full escalation (war flag affecting 1918 start OOB/peace - more exhausted, specific grievances), averted (alt 1918 no/full war or delayed, better 1918 start state).
+		# Player/agent choices: e.g. high leverage or successful de-escalate missions -> avert/limited; harsh -> escalated.
+		var war_outcome := "escalated"
+		if typeof(AgentManager) != TYPE_NIL:
+			war_outcome = "averted" if randf() < 0.2 else "limited" if randf() < 0.3 else "escalated"
+		if war_outcome == "averted":
+			LeaderEventUI.post_news("July Crisis Averted (Alt 1910)", "Diplomatic/agent success or player choice: war localized or prevented. 1918 starts with lower tensions, different leverage/grievances (less revanchism, possible earlier tech paths, alt OOB less attrition).", "diplomatic")
+			if typeof(GameData) != TYPE_NIL:
+				GameData.apply_pillar_shift("GER", "cohesion", 5, "1914_avert")
+				if not peace_state.has("1914_crisis"):
+					peace_state["1914_crisis"] = "averted"
+				# ripple: lower 1918 war support or different starting forces
+				if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_pillar_shift"):
+					GameData.apply_pillar_shift("RUS", "war_support", -10, "1914_avert_ripple")
+		elif war_outcome == "limited":
+			LeaderEventUI.post_news("July Crisis Limited War (Alt)", "Escalates regionally but not world - alt paths change 1918 OOBs (less exhausted majors, different mandates, regional grievances only).", "war")
+			if typeof(GameData) != TYPE_NIL:
+				peace_state["1914_crisis"] = "limited"
+				# e.g. less global impact on 1918
+		else:
+			LeaderEventUI.post_news("July Crisis 1914 - World War Spark (Historical/Alt)", "Assass + harsh ultimatum/Russian support/German blank check: full escalation. Sets alt 1918 with specific OOB/peace state ripples (grievance, spirits, tech cost from war, higher exhaustion for all, specific border changes from Balkan alts). Player/agent choices earlier (e.g. de-escalate missions on key powers, player as neutral) could have changed this.", "crisis")
+			if typeof(GameData) != TYPE_NIL:
+				peace_state["1914_crisis"] = "escalated"
+				# ripple example: increase 1918 grievances or lower starting org for involved
+				if typeof(GameData) != TYPE_NIL and GameData.has_method("add_grievance"):
+					GameData.add_grievance("GER", 20, "1914_escalation")
+					GameData.add_grievance("RUS", 15, "1914_escalation")
+		# Agent missions eligible for 1910 crisis (inflate/deescalate) - player can assign to influence outcome
+		if typeof(AgentManager) != TYPE_NIL and AgentManager.has_method("add_mission_eligibility"):
+			AgentManager.add_mission_eligibility("crisis_infiltrate_1914", ["SER", "AUH", "RUS", "GER", "ENG", "FRA"])
+		# Example decision hook: if in 1910, could trigger simple choice via event system (e.g. player as major gets pillar choice affecting flag)
+		if scenario == "1910" and typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.post_news("July Crisis Decision Point", "As a great power, your prior agent choices and leverage influence: de-escalate for avert/limited (better 1918 start), or escalate for historical path (more 1918 chaos but possible gains).", "crisis")

@@ -608,6 +608,25 @@ func _build_ui() -> void:
 	)
 	harness_section.add_child(ai_econ_btn)
 
+	# Expose historical combat harness + unit mod test (per user request for visibility in F10)
+	var hist_btn := Button.new()
+	hist_btn.text = "📜 Run Historical Combat Harness (Marne/Verdun/Stalingrad/Midway + AAR logs, duration/org tests)"
+	hist_btn.pressed.connect(func():
+		if typeof(TestRunner) != TYPE_NIL and TestRunner.has_method("_run_historical_battle_recreations"):
+			TestRunner.call("_run_historical_battle_recreations")
+			toast_map_debug("Historical harness triggered - see console, /tmp/combat-history-testing-summary.md, AARs from assaults.")
+	)
+	harness_section.add_child(hist_btn)
+
+	var unit_mod_btn := Button.new()
+	unit_mod_btn.text = "🧪 Run Unit Mod + Guided Tests (specialists marine/paratroop/SF/mtn/ski/space + chem/AA/interdict sims)"
+	unit_mod_btn.pressed.connect(func():
+		if typeof(TestRunner) != TYPE_NIL and TestRunner.has_method("_run_unit_type_combat_mod_test"):
+			TestRunner.call("_run_unit_type_combat_mod_test")
+			toast_map_debug("Unit mod test triggered - console shows % factors, prolonged/org bias tests.")
+	)
+	harness_section.add_child(unit_mod_btn)
+
 	# Production tick for the demo lines auto-started in ScenarioLoader from the phase1 json starting_oob (ties the build system to base scenario data)
 	var prod_tick_btn := Button.new()
 	prod_tick_btn.text = "🏭 Tick production +30 days (advance demo lines for GER/USA/ENG/FRA OOB designs; show output)"
