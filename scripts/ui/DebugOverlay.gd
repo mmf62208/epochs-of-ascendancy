@@ -5151,7 +5151,9 @@ func show_battle_aar(result: Dictionary = {}) -> void:
 		mlab.text = "  • " + m
 		vb.add_child(mlab)
 	if mods_list.size() == 0:
-		vb.add_child(Label.new("  (No detailed modifiers; using key_factors)"))
+		var no_mods_lbl := Label.new()
+		no_mods_lbl.text = "  (No detailed modifiers; using key_factors)"
+		vb.add_child(no_mods_lbl)
 	vb.add_child(HSeparator.new())
 
 	# === Space / Air effects (dedicated, with balance notes)
@@ -5199,76 +5201,3 @@ func show_battle_aar(result: Dictionary = {}) -> void:
 	get_tree().root.add_child(win)
 	win.popup_centered()
 	print("[AAR PANEL] Enhanced full battle AAR shown for %s (pulled logs=%s, mods=%d)" % [result.get("target_province_id", -1), shown_logs, mods_list.size()])
-	return  # legacy basic AAR body excised (Scroll + logs + leaders + % modifiers + space/air + tips above is the full accessible panel)
-
-
-
-
-	var win := Window.new()
-	win.title = "Battle AAR: %s vs %s (%s)" % [result.get("attacker_tag","?"), result.get("defender_tag","?"), result.get("date","")]
-	win.size = Vector2(650, 480)
-	var vb := VBoxContainer.new()
-	win.add_child(vb)
-	vb.add_child(Label.new()) # spacer
-	var title := Label.new()
-	title.text = "After Action Report - Clickable full details (most important first)"
-	vb.add_child(title)
-	var odds := Label.new()
-	odds.text = "Est. odds: %.0f%% attacker win | Winner: %s" % [float(result.get("odds_attacker_win",50)), result.get("winner","?")]
-	vb.add_child(odds)
-	var units := Label.new()
-	units.text = "Units: Att %s | Def %s" % [str(result.get("units_att",[])), str(result.get("units_def",[]))]
-	vb.add_child(units)
-	var leaders := Label.new()
-	leaders.text = "Leaders: Att %s | Def %s" % [result.get("leader_att",""), result.get("leader_def","")]
-	vb.add_child(leaders)
-	var factors := Label.new()
-	factors.text = "Key factors: %s" % ", ".join(result.get("key_factors", []))
-	vb.add_child(factors)
-
-	var mods := Label.new()
-	mods.text = "Major modifiers: %s" % ", ".join(result.get("modifiers_detail", result.get("key_factors",[])))
-	vb.add_child(mods)
-	var air_dom := Label.new()
-	var adl := str(result.get("air_dominance_level", ""))
-	var aratio := float(result.get("air_power_ratio", 0.0))
-	air_dom.text = "Air dominance: %s (power ratio %.1f:1)" % [adl if adl else "n/a", aratio]
-	if adl == "full":
-		air_dom.text += " - Overwhelming air superiority achieved - enemy grounded at high cost"
-	elif adl == "partial":
-		air_dom.text += " - Enemy air presence allows limited ops despite disadvantage"
-	vb.add_child(air_dom)
-	var cas := Label.new()
-	cas.text = "Casualties: Att %s vs Def %s" % [result.get("attacker_casualties","?"), result.get("defender_casualties","?")]
-	vb.add_child(cas)
-	var outc := Label.new()
-	outc.text = "Outcome: " + str(result.get("outcome", "Battle resolved."))
-	outc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	vb.add_child(outc)
-	var note := Label.new()
-	note.text = "(Full replayable log / unit combat histories available in Formation/Leader inspectors. Balance: these are the biggest impact items. Space gives edge but costly to maintain, not instant win.)"
-	vb.add_child(note)
-	# Unit combat logs section (follows units like leaders; date/province/result/key factors from log_combat in BM/Formation)
-	var unit_logs := Label.new()
-	unit_logs.text = "Unit logs sample: [1940-05 Prov82 win key_factors:air_superiority,space_strike,leader_impact | leader:Rommel | outcome:Breakthrough guided dev on troops]"
-	unit_logs.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	vb.add_child(unit_logs)
-
-	var space_note := ""
-	if result.get("space_strike_bonus", 0.0) > 0.0 or "space" in str(result.get("special","")) or result.get("space_support_active", false):
-		space_note = " | Orbital strike support active - guided munitions devastating troops (space recon precision advantage)"
-		var sl := Label.new()
-		sl.text = "Space: " + space_note
-		vb.add_child(sl)
-	if "space_strike" in result.get("key_factors", []) or result.get("orbital_guided_munitions", 0.0) > 0.0:
-		var sg := Label.new()
-		sg.text = "Guided from orbit: high precision +soft/hard on troops; area denial + morale hits for non-space units"
-		vb.add_child(sg)
-
-	var close := Button.new()
-	close.text = "Close AAR"
-	close.pressed.connect(win.queue_free)
-	vb.add_child(close)
-	get_tree().root.add_child(win)
-	win.popup_centered()
-	print("[AAR PANEL] Full battle AAR shown for %s" % result.get("target_province_id", -1))

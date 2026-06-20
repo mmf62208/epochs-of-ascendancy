@@ -733,39 +733,6 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 ## Pragmatic additions to support direct OOB setup for WWI/WWII battles and referenced calls in harness/docs.
 ## These enable recreating Marne/Verdun (attrition), Stalingrad (urban winter supply), Midway (naval air), D-Day (amphib).
 
-func execute_chain_assault_or_flank(attacker_tag: String, initial_target: int, staging_from: int = -1, max_depth: int = 2) -> Array:
-	"""Chain/flank support for multi-province ops and AI (historical flanking like Manstein or D-Day lodgement expansion)."""
-	var results: Array = []
-	var current_from := staging_from
-	var target := initial_target
-	for d in range(max(1, max_depth)):
-		var can := can_assault_province(attacker_tag, target, current_from)
-		if not bool(can.get("ok", false)):
-			break
-		var res := execute_province_assault(attacker_tag, target, current_from)
-		results.append(res)
-		if not bool(res.get("success", false)):
-			break
-		var rdict := res.get("result", {}) if res.has("result") and typeof(res.get("result",{})) == TYPE_DICTIONARY else res
-		if bool(rdict.get("province_control_change", false)):
-			current_from = target
-			# Flank/chain: pick next adjacent enemy if possible (for historical deep battle or exploitation)
-			if typeof(MapManager) != TYPE_NIL:
-				var adjs := MapManager.get_adjacent_provinces(target)
-				var found_next := false
-				for aidv in adjs:
-					var aid := int(aidv)
-					var ap: Province = MapManager.get_province(aid)
-					if ap != null and not ap.is_sea and ap.owner_tag != "" and ap.owner_tag != attacker_tag:
-						target = aid
-						found_next = true
-						break
-				if not found_next:
-					break  # no easy flank
-		else:
-			break
-	return results
-
 func simulate_daily_ai_combat() -> void:
 	"""Main-loop autonomous AI combat for 50+ turn integrated playtests (promoted from harness; scored on supply/infra/low-org + weather + chain)."""
 	# Prefer DebugOverlay for full scored logic (weather/geo aware); fallback simple.

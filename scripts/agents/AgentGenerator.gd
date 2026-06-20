@@ -54,7 +54,7 @@ static func generate_agent(country_tag: String, year: int = 1936) -> Agent:
 	agent.mission_progress = 0.0
 
 	# Wire new art-batch agent portraits
-	agent_portraits = [
+	var agent_portraits: Array[String] = [
 		"res://assets/graphics/portraits/agents/double_agent.png",
 		"res://assets/graphics/portraits/agents/elite_spy.png",
 		"res://assets/graphics/portraits/agents/visionary_scientist.png",

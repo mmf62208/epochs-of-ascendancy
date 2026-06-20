@@ -4298,8 +4298,11 @@ func process_1910_crisis_events(current_year: int) -> void:
 	if typeof(TimeManager) == TYPE_NIL:
 		return
 	var scenario := ""
-	if typeof(ScenarioLoader) != TYPE_NIL and ScenarioLoader.has_method("get_current_scenario_name"):
-		scenario = str(ScenarioLoader.call("get_current_scenario_name"))
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree != null:
+		var scenario_loader: ScenarioLoader = tree.root.find_child("ScenarioLoader", true, false) as ScenarioLoader
+		if scenario_loader != null and scenario_loader.has_method("get_current_scenario_name"):
+			scenario = scenario_loader.get_current_scenario_name()
 	if not (scenario == "1910" or (current_year >= 1910 and current_year <= 1914)):
 		return
 	var month := 1

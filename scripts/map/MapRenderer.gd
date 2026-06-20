@@ -5839,12 +5839,12 @@ func debug_stage_and_execute_sample_assault() -> void:
 	var before_def := {}
 	if typeof(LeaderManager) != TYPE_NIL:
 		# Try to resolve likely attacker formation via BattleManager helpers or preview
-		var pre_divs := BattleManager.get_divisions_at_province(staging_pid, p_tag) if BattleManager and BattleManager.has_method("get_divisions_at_province") else []
+		var pre_divs: Array = BattleManager.get_divisions_at_province(staging_pid, p_tag) if BattleManager and BattleManager.has_method("get_divisions_at_province") else []
 		if pre_divs.size() > 0:
 			att_fid_pre = str(pre_divs[0].get("formation_id", ""))
 		if att_fid_pre.is_empty() and preview.has("formation_id"):
 			att_fid_pre = str(preview.get("formation_id", ""))
-		var def_divs := BattleManager.get_divisions_at_province(target_pid, target_p.owner_tag if target_p else "") if BattleManager and BattleManager.has_method("get_divisions_at_province") else []
+		var def_divs: Array = BattleManager.get_divisions_at_province(target_pid, target_p.owner_tag if target_p else "") if BattleManager and BattleManager.has_method("get_divisions_at_province") else []
 		if def_divs.size() > 0:
 			def_fid_pre = str(def_divs[0].get("formation_id", ""))
 		if not att_fid_pre.is_empty():
