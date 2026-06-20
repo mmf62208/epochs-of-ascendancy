@@ -419,3 +419,71 @@
 
 **Progress:** 1918 now at 136/136 (complete for era!); added last WWI minor nation/air/navy/generals coverage (e.g. Danish Navy/Gen, Finnish Osterman, Iranian Navy, Nigerian Lugard/Air/Nav, Dutch Air/Winkelman, Norwegian Air, NZ Russell/Air/Nav, Palestinian Wavell/Shea/Air/Nav, SAF Smuts/Air, Swedish Prince Gustaf/Air, Syrian Air/Nav, Ukrainian Air/Nav). 1936 still 50/93 + most 2026 remain per plan (pri=105+ for AUS/BRA/CAN etc and others). Total images 219. Next can target remaining ~43 1936 high-pri + 2026.
 
+
+## Continuation Run (2026-06-19) - 1936 High-Priority Pri=105 + AUS/BRA/CAN Air/Navy/Generals + Interwar Named Leaders
+**Date:** 2026-06-19
+**Added:** Exactly 25 new portraits, all for 1936 (1918 complete at 136/136 from prior; no 2026 touched per focus)
+**Prioritization:** Highest priority remaining 1936 entries from plan: all pri=105 without portrait (13: arg_justo_1936, arg_navy_1936, aus_navy_1936, bra_goes_1936, can_mcnaughton, can_nav_1936, egy_messer_1936, egy_air_1936, egy_navy_1936, mex_navy_1936, mex_air_1936, pol_pomor_1936, pol_kalkus_1936 -- covering AUS/BRA/CAN/ARG/MEX/EGY/POL air/navy/generals interwar named), plus 12 high interwar named leaders (pri=45) from other air/navy/generals: fin_mannerheim, irn_reza_1936, nld_winkelman_1936, nld_furstner_1936, nor_dahl_1936, nor_treven_1936, nzl_freyberg_1936, saf_pienaar_1936, swe_thornell_1936, swe_dyrssen_1936, ukr_vatutin_1936, dnk_rechnitzer_1936. Used exact slugs/prompts from docs/leader_portrait_plan_1918_1936_2026.json (no plan edits ever). All work strictly in /home/mikef/eoa-goals-worktree.
+
+- Used image_gen tool (exactly 25 sequential calls, aspect_ratio 1:1) with the *exact* "prompt" field strings from the plan for each (alt-history dieselpunk steampunk Expanse Trek blend, 1:1 square, clean UI game asset no text/bg etc).
+- Post-process: PIL (Pillow 12.2) load jpg convert RGBA, resize LANCZOS to exactly 128x128.png + 64x64.png saved to assets/graphics/portraits/leaders/<slug>.png and <slug>_64.png inside worktree.
+- Created exact _64.png.import stubs (25) matching precedent: [remap] importer="texture" type=CompressedTexture2D ; [deps] source_file="res://assets/graphics/portraits/leaders/<slug>_64.png" ; [params] compress/mode=0 . No full-size .import created.
+- Wired *only* valid new ones: python updated data/leaders/historical_leaders_1936.json setting "portrait": "res://assets/graphics/portraits/leaders/<slug>.png" for the matching leader_id only where file on disk existed. No wiring to 1918 (complete) or 2026. No erroneous refs.
+- Exactly 25 new, no dups, used sequential to ensure correct slug-to-image mapping (prior parallel batch images left unprocessed outside).
+- git add -f relative at end; isolated to worktree; no plan edits; temps only in /tmp.
+
+### New Slugs Generated/Wired This Batch (exactly 25)
+  - mcnaughton
+  - pomor
+  - kalkus
+  - justo
+  - navy_8
+  - goes_1
+  - navy_9
+  - messer
+  - navy_10
+  - can_navy_1936
+  - egy_navy_1936
+  - egy_air_1936
+  - mex_air_1936
+  - mannerheim_1
+  - reza_1
+  - winkelman_1
+  - furstner
+  - dahl
+  - treven
+  - freyberg
+  - pienaar
+  - thornell
+  - dyrssen
+  - vatutin
+  - rechnitzer
+
+### Counts After This Run
+- Total base .png (full, not _64): 244 (219 prev +25)
+- Total _64.png: 235 (210 prev +25)
+- Total .import (for _64s): 235 (210 prev +25)
+- Wired res:// portraits (valid on-disk images only):
+  - 1918: 136 (unchanged, complete)
+  - 1936: 75 (50 prev +25)
+  - 2026: 34 (unchanged)
+  - **Total wired: 245**
+- 1936 now 75/93 (exceeded "70+" aim; from original ~8 to 75)
+
+### Verification Performed
+- ls (relative paths inside worktree): assets/graphics/portraits/leaders/ confirmed exactly 25 new <slug>.png + <slug>_64.png + <slug>_64.png.import ; e.g. mcnaughton.png, navy_10_64.png, mannerheim_1_64.png.import etc. No overwrites of prior 219.
+- PIL verification in process + post: all 25 full 128x128 RGBA, _64 64x64 RGBA; file sizes reasonable (~20-30k / ~6-8k).
+- JSON valid wires only: reloaded historical_leaders_1936.json valid; exactly 75 have non-empty portrait; 0 portrait refs point to non-existing .png (python glob check on all res:// ); only these 25 + priors wired, no plan touched.
+- leader_id / slug match: used plan to map leader_id<->slug, all 25 matched existing entries in 1936 json that previously lacked portrait; files existed before wire step.
+- Before/after: 1936 50->75 ; images full 219->244 ; cross checked no leftover 1918 needs.
+- No plan edits: confirmed via git diff or read (timestamps).
+- Commands: all cd /home/mikef/eoa-goals-worktree ; python using /tmp/process...py ; image_gen calls; relative git at end.
+- 1918 complete verified (136/136), 2026 untouched.
+
+### Files Changed This Run
+- assets/graphics/portraits/leaders/ : +25 *.png +25 *_64.png +25 *_64.png.import (all new files in worktree)
+- data/leaders/historical_leaders_1936.json : +25 "portrait" fields wired (in place edit, only valid)
+- docs/leader_portraits_bulk_summary.md : appended this full new Continuation Run section
+
+**Progress:** 1936 now at 75/93 (~81%); major boost to interwar 1936 coverage for key AUS (navy_10), BRA (goes_1), CAN (mcnaughton + can_navy), ARG, MEX, EGY, POL (pomor/kalkus) + named interwar like Mannerheim, Reza Shah, Winkelman, Furstner, Freyberg, Pienaar, Thornell, Dyrssen, Vatutin, Rechnitzer etc. 1918 100% complete. Remaining ~18 1936 (lower pri 45 like many small nation air/navy generics e.g. chl_gen etc) + 188 2026 per plan for future. Total images now 244 full +235 64. Consistent alt-history style maintained.
+
