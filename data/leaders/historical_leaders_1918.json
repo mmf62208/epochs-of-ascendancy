@@ -119,7 +119,7 @@
     },
     {
       "leader_id": "fra_petain",
-      "name": "Philippe Pétain",
+      "name": "Philippe P\u00e9tain",
       "country_tag": "FRA",
       "leader_type": "general",
       "attack_skill": 5,
@@ -551,7 +551,7 @@
     },
     {
       "leader_id": "jap_kato",
-      "name": "Katō Tomosaburō",
+      "name": "Kat\u014d Tomosabur\u014d",
       "country_tag": "JAP",
       "leader_type": "admiral",
       "attack_skill": 7,
@@ -613,11 +613,12 @@
         "mountain_specialist": 2
       },
       "birth_year": 1881,
-      "start_year": 1915
+      "start_year": 1915,
+      "portrait": "res://assets/graphics/portraits/leaders/kemal.png"
     },
     {
       "leader_id": "tur_cevat",
-      "name": "Cevat Çobanlı",
+      "name": "Cevat \u00c7obanl\u0131",
       "country_tag": "TUR",
       "leader_type": "general",
       "attack_skill": 6,
@@ -658,11 +659,12 @@
       },
       "birth_year": 1855,
       "start_year": 1915,
-      "end_year": 1919
+      "end_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/sanders.png"
     },
     {
       "leader_id": "pol_pilsudski",
-      "name": "Józef Piłsudski",
+      "name": "J\u00f3zef Pi\u0142sudski",
       "country_tag": "POL",
       "leader_type": "general",
       "attack_skill": 8,
@@ -679,11 +681,12 @@
         "aggressive": 2
       },
       "birth_year": 1867,
-      "start_year": 1914
+      "start_year": 1914,
+      "portrait": "res://assets/graphics/portraits/leaders/pilsudski.png"
     },
     {
       "leader_id": "pol_haller",
-      "name": "Józef Haller",
+      "name": "J\u00f3zef Haller",
       "country_tag": "POL",
       "leader_type": "general",
       "attack_skill": 6,
@@ -706,7 +709,7 @@
     },
     {
       "leader_id": "pol_sikorski",
-      "name": "Władysław Sikorski",
+      "name": "W\u0142adys\u0142aw Sikorski",
       "country_tag": "POL",
       "leader_type": "general",
       "attack_skill": 6,
@@ -723,7 +726,8 @@
       },
       "birth_year": 1881,
       "start_year": 1918,
-      "end_year": 1943
+      "end_year": 1943,
+      "portrait": "res://assets/graphics/portraits/leaders/sikorski.png"
     },
     {
       "leader_id": "ukr_petliura",
@@ -745,7 +749,8 @@
       },
       "birth_year": 1879,
       "start_year": 1918,
-      "end_year": 1926
+      "end_year": 1926,
+      "portrait": "res://assets/graphics/portraits/leaders/petliura.png"
     },
     {
       "leader_id": "ukr_grebenko",
@@ -787,11 +792,12 @@
         "iron_will": 1
       },
       "birth_year": 1867,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/mannerheim.png"
     },
     {
       "leader_id": "fin_osterman",
-      "name": "Karl Oskar Österman",
+      "name": "Karl Oskar \u00d6sterman",
       "country_tag": "FIN",
       "leader_type": "general",
       "attack_skill": 5,
@@ -897,7 +903,7 @@
     },
     {
       "leader_id": "dnk_host",
-      "name": "Georg Høst",
+      "name": "Georg H\u00f8st",
       "country_tag": "DNK",
       "leader_type": "admiral",
       "attack_skill": 5,
@@ -998,7 +1004,8 @@
         "charismatic": 1
       },
       "birth_year": 1870,
-      "start_year": 1914
+      "start_year": 1914,
+      "portrait": "res://assets/graphics/portraits/leaders/smuts.png"
     },
     {
       "leader_id": "saf_lukin",
@@ -1064,7 +1071,8 @@
       },
       "birth_year": 1865,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/birdwood.png"
     },
     {
       "leader_id": "nzl_russell",
@@ -1106,7 +1114,8 @@
       },
       "birth_year": 1867,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/godley.png"
     },
     {
       "leader_id": "can_currie",
@@ -1217,11 +1226,12 @@
       },
       "birth_year": 1871,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/goes.png"
     },
     {
       "leader_id": "bra_fernandes",
-      "name": "Antônio Fernandes",
+      "name": "Ant\u00f4nio Fernandes",
       "country_tag": "BRA",
       "leader_type": "admiral",
       "attack_skill": 4,
@@ -1243,7 +1253,7 @@
     },
     {
       "leader_id": "mex_obregon",
-      "name": "Álvaro Obregón",
+      "name": "\u00c1lvaro Obreg\u00f3n",
       "country_tag": "MEX",
       "leader_type": "general",
       "attack_skill": 7,
@@ -1261,11 +1271,12 @@
       },
       "birth_year": 1880,
       "start_year": 1914,
-      "end_year": 1928
+      "end_year": 1928,
+      "portrait": "res://assets/graphics/portraits/leaders/obregon.png"
     },
     {
       "leader_id": "mex_gonzalez",
-      "name": "Pablo González",
+      "name": "Pablo Gonz\u00e1lez",
       "country_tag": "MEX",
       "leader_type": "general",
       "attack_skill": 5,
@@ -1282,7 +1293,8 @@
       },
       "birth_year": 1873,
       "start_year": 1914,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/gonzalez.png"
     },
     {
       "leader_id": "chl_altamirano",
@@ -1367,7 +1379,8 @@
       },
       "birth_year": 1870,
       "start_year": 1917,
-      "end_year": 1920
+      "end_year": 1920,
+      "portrait": "res://assets/graphics/portraits/leaders/watson.png"
     },
     {
       "leader_id": "irn_reza",
@@ -1388,7 +1401,8 @@
         "political_general": 1
       },
       "birth_year": 1878,
-      "start_year": 1921
+      "start_year": 1921,
+      "portrait": "res://assets/graphics/portraits/leaders/reza.png"
     },
     {
       "leader_id": "irn_firuz",
@@ -1431,7 +1445,8 @@
       },
       "birth_year": 1880,
       "start_year": 1918,
-      "end_year": 1940
+      "end_year": 1940,
+      "portrait": "res://assets/graphics/portraits/leaders/jabotinsky.png"
     },
     {
       "leader_id": "isr_trumpeldor",
@@ -1453,7 +1468,8 @@
       },
       "birth_year": 1880,
       "start_year": 1917,
-      "end_year": 1918
+      "end_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/trumpeldor.png"
     },
     {
       "leader_id": "pal_wavell",
@@ -1543,7 +1559,7 @@
     },
     {
       "leader_id": "syr_de_castelnau",
-      "name": "Noël de Castelnau",
+      "name": "No\u00ebl de Castelnau",
       "country_tag": "SYR",
       "leader_type": "general",
       "attack_skill": 6,
@@ -1564,7 +1580,7 @@
     },
     {
       "leader_id": "isl_jonsson",
-      "name": "Jón Jónsson",
+      "name": "J\u00f3n J\u00f3nsson",
       "country_tag": "ISL",
       "leader_type": "general",
       "attack_skill": 4,
@@ -1757,7 +1773,7 @@
     },
     {
       "leader_id": "fra_guillaumat_1918",
-      "name": "Louis Franchet d'Espèrey",
+      "name": "Louis Franchet d'Esp\u00e8rey",
       "country_tag": "FRA",
       "leader_type": "general",
       "attack_skill": 7,
@@ -1898,11 +1914,12 @@
         "bold": 1
       },
       "birth_year": 1890,
-      "start_year": 1919
+      "start_year": 1919,
+      "portrait": "res://assets/graphics/portraits/leaders/pilsudski_air.png"
     },
     {
       "leader_id": "fin_engberg_1918",
-      "name": "Carl von Engeström",
+      "name": "Carl von Engestr\u00f6m",
       "country_tag": "FIN",
       "leader_type": "admiral",
       "attack_skill": 5,
@@ -1958,7 +1975,8 @@
         "cautious": 2
       },
       "birth_year": 1889,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/recep.png"
     },
     {
       "leader_id": "nld_beatty_style_1918",
@@ -2057,7 +2075,8 @@
         "cautious": 1
       },
       "birth_year": 1865,
-      "start_year": 1916
+      "start_year": 1916,
+      "portrait": "res://assets/graphics/portraits/leaders/birdwood_1.png"
     },
     {
       "leader_id": "aus_air_1918",
@@ -2077,7 +2096,8 @@
         "aggressive": 1
       },
       "birth_year": 1890,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/aus_air_1918.png"
     },
     {
       "leader_id": "saf_smuts_1918",
@@ -2215,7 +2235,8 @@
         "bold": 1
       },
       "birth_year": 1890,
-      "start_year": 1918
+      "start_year": 1918,
+      "portrait": "res://assets/graphics/portraits/leaders/egy_air_1918.png"
     },
     {
       "leader_id": "arg_nav_1918",
@@ -2730,7 +2751,8 @@
         "cautious": 1
       },
       "birth_year": 1863,
-      "start_year": 1916
+      "start_year": 1916,
+      "portrait": "res://assets/graphics/portraits/leaders/pol_navy_1918.png"
     },
     {
       "leader_id": "saf_air_1918",
@@ -2826,7 +2848,8 @@
         "bold": 1
       },
       "birth_year": 1866,
-      "start_year": 1917
+      "start_year": 1917,
+      "portrait": "res://assets/graphics/portraits/leaders/tur_air_1918.png"
     },
     {
       "leader_id": "ukr_nav_1918",

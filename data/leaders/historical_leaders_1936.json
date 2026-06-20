@@ -829,7 +829,8 @@
       },
       "birth_year": 1886,
       "start_year": 1935,
-      "end_year": 1939
+      "end_year": 1939,
+      "portrait": "res://assets/graphics/portraits/leaders/rydz_smigly.png"
     },
     {
       "leader_id": "fin_mannerheim",
@@ -1496,7 +1497,8 @@
         "charismatic": 2
       },
       "birth_year": 1895,
-      "start_year": 1934
+      "start_year": 1934,
+      "portrait": "res://assets/graphics/portraits/leaders/cardenas.png"
     },
     {
       "leader_id": "mex_navy_1936",
