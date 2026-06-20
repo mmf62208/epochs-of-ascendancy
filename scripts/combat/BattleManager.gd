@@ -89,7 +89,7 @@ func execute_province_assault(
 	from_province_id: int = -1,
 	attacker_formation_id: String = "",
 ) -> Dictionary:
-	var preview := can_assault_province(attacker_tag, target_province_id, from_province_id)
+	var preview: Dictionary = can_assault_province(attacker_tag, target_province_id, from_province_id)
 	if not bool(preview.get("ok", false)):
 		return {"success": false, "reason": preview.get("reason", "Cannot assault")}
 
@@ -108,6 +108,45 @@ func execute_province_assault(
 	var attacker := _build_attacker_formation(fid, tag, from_pid)
 	var defender := _build_defender_formation(target, str(preview.get("defender_tag", "")))
 
+	# Deeper combat integration for playtest (loyalty/foreign + settlement from relocation/policies).
+	# Settlement in target province gives defender bonus (org/readiness/attrition resistance — "our people defend their land").
+	# Mixed armies: loyalty_factor scales attacker power; also passed to resolver for org/readiness.
+	# Province settlement_level (from demographic engineering) now explicitly factors here and in Resolver.
+	var loyalty_factor := 1.0
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_military_loyalty_multiplier"):
+		loyalty_factor = GameData.get_military_loyalty_multiplier(tag)
+	if "attack_power" in preview:
+		preview["attack_power"] = float(preview.get("attack_power", 0)) * loyalty_factor
+
+	# Settlement defender bonus – refined for world-class balance (inspired by HOI4 terrain/fort defensive favors ~15-50% situational total, Vic3 gradual state dev giving 5-15% throughput/defense, EU4/CK3 holding bonuses stacking to ~20-40% optimized but counterable).
+	# Flavorful "Homeland Resolve / Repopulation Resilience": Our settled/repopulated lands give defender edge (motivation, local knowledge, supply from our people).
+	# Smart level: ~2.5% per settlement_level (user feedback: 5%+ felt powerful). Max ~25% uplift at high investment. Conditional: +extra if high public cohesion or primary culture match (flavorful cultural fit); reduced if foreign troops or low cohesion (integration friction).
+	# Fun & flavorful: Player investment in relocation/pro-natal pays off in "our land is worth more to defend", but not invincible – agents, tech, or poor cohesion can negate. Opposites: Cheap foreign settlement gives less bonus.
+	var settlement_def_bonus: float = 1.0
+	if target and target.settlement_level > 0.05:
+		var base_bonus: float = target.settlement_level * 0.025  # 2.5% per level – balanced, not OP
+		var coh: int = 50
+		if typeof(GameData) != TYPE_NIL:
+			coh = GameData.get_pillar(tag, "cohesion")  # proxy for public will
+		var culture_match: float = 1.0
+		# Simple flavor: if primary culture matches settlement vibe (high settled_areas for "our people")
+		var ps: Dictionary = GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
+		if ps.has("settled_areas") and ps["settled_areas"].size() > 0:
+			culture_match = 1.1  # slight extra for cultural cohesion
+		var conditional: float = 1.0 + (max(0, coh - 50) * 0.001) * culture_match  # cohesion/culture amplifier
+		settlement_def_bonus = clampf(1.0 + (base_bonus * conditional), 1.0, 1.25)  # max 25% flavorful uplift
+		if "defense_power" in preview:
+			preview["defense_power"] = float(preview.get("defense_power", 0)) * settlement_def_bonus
+
+	# River natural border defense (from real layers inference / demo sample apply river_aware children for 82 etc.)
+	# High value: map data (rivers as borders) drives combat (defensive positions, crossing penalty for attacker).
+	# Stacks with settlement/terrain/snow. Demo apply makes it live for testing without full 471 swap.
+	var river_def_bonus: float = 1.0
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_river_border") and MapManager.has_river_border(target_province_id):
+		river_def_bonus = 1.05  # 5% defender edge for river lines (historical e.g. Rhine defenses)
+		if "defense_power" in preview:
+			preview["defense_power"] = float(preview.get("defense_power", 0)) * river_def_bonus
+
 	var context := {
 		"attacker_tag": tag,
 		"defender_tag": preview.get("defender_tag", ""),
@@ -115,6 +154,10 @@ func execute_province_assault(
 		"from_province_id": from_pid,
 		"attacker_formation_id": fid,
 		"defender_formation_id": defender.formation_id,
+		"loyalty_factor": loyalty_factor,
+		"settlement_def_bonus": settlement_def_bonus,
+		"target_settlement_level": target.settlement_level if target else 0.0,
+		"river_def_bonus": river_def_bonus,
 	}
 	battle_started.emit(context)
 
@@ -176,8 +219,10 @@ func execute_province_assault(
 	result["combat_logs"] = logs_snap
 
 	# Auto AAR for player if involved (accessible panel) - now after logs
-	if typeof(DebugOverlay) != TYPE_NIL and (str(result.get("attacker_tag","")) == "player" or str(result.get("defender_tag","")) == "player"):
-		DebugOverlay.call_deferred("show_battle_aar", result)
+	if str(result.get("attacker_tag","")) == "player" or str(result.get("defender_tag","")) == "player":
+		var debug_aar: Node = get_tree().get_first_node_in_group("debug_overlay") if get_tree() else null
+		if debug_aar != null and debug_aar.has_method("show_battle_aar"):
+			debug_aar.call_deferred("show_battle_aar", result)
 
 	return {"success": true, "result": result}
 
@@ -234,6 +279,46 @@ func _log_unit_combat(formation_id: String, province: int, other_province: int, 
 	print("[UNIT COMBAT LOG] %s logged combat at %d: %s factors=%s" % [formation_id, province, res_str, factors])
 
 
+## World-class enhancement: chain/flanking assault helper for multi-province operations.
+## After a successful capture, attempts follow-on assault on an adjacent enemy province from the new position (flanking via adjacent).
+## Used by AI demo / harness for better multi-province feel. Returns list of executed results.
+func execute_chain_assault_or_flank(
+	attacker_tag: String,
+	initial_target_pid: int,
+	from_pid: int = -1,
+	max_chain: int = 2
+) -> Array[Dictionary]:
+	var results: Array[Dictionary] = []
+	var current_from := initial_target_pid if initial_target_pid >= 0 else from_pid
+	var bm_res := execute_province_assault(attacker_tag, initial_target_pid, from_pid)
+	if not bm_res.get("success", false):
+		return results
+	results.append(bm_res)
+	# If captured, try 1- max_chain adjacent weak targets for chain/flank.
+	var captured := false
+	if "result" in bm_res and typeof(bm_res.result) == TYPE_DICTIONARY:
+		captured = bool(bm_res.result.get("province_control_change", false))
+	if captured and typeof(MapManager) != TYPE_NIL and max_chain > 0:
+		var adjs: Array = []
+		if MapManager.has_method("get_adjacent_provinces"):
+			adjs = MapManager.get_adjacent_provinces(initial_target_pid)
+		var chained := 0
+		for aidv in adjs:
+			if chained >= max_chain: break
+			var aid := int(aidv)
+			var p: Province = MapManager.get_province(aid) if MapManager.has_method("get_province") else null
+			if p == null or p.is_sea or p.owner_tag == "" or p.owner_tag == attacker_tag: continue
+			var can2 := can_assault_province(attacker_tag, aid, current_from)
+			if bool(can2.get("ok", false)):
+				var follow := execute_province_assault(attacker_tag, aid, current_from)
+				if follow.get("success", false):
+					results.append(follow)
+					chained += 1
+					current_from = aid
+					print("[CHAIN/FLANK] Follow-on assault to %d from new pos; multi-province campaign step." % aid)
+	return results
+
+
 func apply_combat_outcome(
 	result: Dictionary,
 	attacker_formation_id: String,
@@ -243,6 +328,8 @@ func apply_combat_outcome(
 	var attacker_tag := str(result.get("attacker_tag", "")).strip_edges().to_upper()
 	var captured := bool(result.get("province_control_change", false))
 	var winner := str(result.get("winner", ""))
+	# Apply persistent org/readiness damage to the actual live formations (main loop combat now has lasting effects).
+	_apply_combat_damage_to_formations(result, attacker_formation_id)
 
 	# === Balance integration: apply persistent org/readiness/strength damage here (from BM as per design)
 	# Loser heavier losses (strength hit), winner lighter org/rdy hit. Recovery via Supply daily (infra/supply mod).
@@ -257,20 +344,20 @@ func apply_combat_outcome(
 			var is_win := (w == "attacker")
 			var org_loss := 0.09 if is_win else 0.27
 			var rdy_loss := 0.07 if is_win else 0.22
-			att_f.organization = clampf(float(att_f.get("organization", 1.0)) * (1.0 - org_loss + randf() * 0.04), 0.22, 1.0)
-			att_f.readiness = clampf(float(att_f.get("readiness", 1.0)) * (1.0 - rdy_loss + randf() * 0.04), 0.28, 1.0)
+			att_f.organization = clampf(att_f.organization * (1.0 - org_loss + randf() * 0.04), 0.22, 1.0)
+			att_f.readiness = clampf(att_f.readiness * (1.0 - rdy_loss + randf() * 0.04), 0.28, 1.0)
 			if not is_win:
-				att_f.strength = clampf(float(att_f.get("strength", 1.0)) * (0.72 + randf() * 0.12), 0.35, 1.0)
+				att_f.strength = clampf(att_f.strength * (0.72 + randf() * 0.12), 0.35, 1.0)
 			att_f.is_in_combat = true
 			dmg_line += "ATT %s: org=%.2f rdy=%.2f str=%.2f ; " % [attacker_formation_id, att_f.organization, att_f.readiness, att_f.strength]
 		if def_f != null:
 			var is_win_def := (w == "defender")
 			var org_loss_d := 0.26 if not is_win_def else 0.10
 			var rdy_loss_d := 0.21 if not is_win_def else 0.08
-			def_f.organization = clampf(float(def_f.get("organization", 1.0)) * (1.0 - org_loss_d + randf() * 0.04), 0.22, 1.0)
-			def_f.readiness = clampf(float(def_f.get("readiness", 1.0)) * (1.0 - rdy_loss_d + randf() * 0.04), 0.28, 1.0)
+			def_f.organization = clampf(def_f.organization * (1.0 - org_loss_d + randf() * 0.04), 0.22, 1.0)
+			def_f.readiness = clampf(def_f.readiness * (1.0 - rdy_loss_d + randf() * 0.04), 0.28, 1.0)
 			if not is_win_def:
-				def_f.strength = clampf(float(def_f.get("strength", 1.0)) * (0.62 + randf() * 0.12), 0.30, 1.0)
+				def_f.strength = clampf(def_f.strength * (0.62 + randf() * 0.12), 0.30, 1.0)
 			def_f.is_in_combat = true
 			dmg_line += "DEF %s: org=%.2f rdy=%.2f str=%.2f" % [def_fid, def_f.organization, def_f.readiness, def_f.strength]
 		if att_f != null or def_f != null:
@@ -288,8 +375,159 @@ func apply_combat_outcome(
 		_post_battle_news(result, false)
 	elif winner == "defender":
 		_post_battle_news(result, false)
+
+## Main-loop AI battle initiation helper (for 50+ turn playtest integration).
+## Called from TimeManager daily for non-player major powers to keep world alive with wars.
+## Uses existing can_assault + execute logic; limited to 1-2 actions per major per day to avoid spam.
+## AI targets based on simple adjacent non-owned (later: supply/infra/org scoring + ascend geo).
+func simulate_daily_ai_combat() -> void:
+	# World-class main-loop AI battle initiation (promoted from F10 harness _simulate_ai_combat_turn base).
+	# Called daily by TimeManager for 50+ turn integrated playtesting (auto wars for AI nations, not debug-only).
+	# Uses real BattleManager paths (can/execute + chain/flank) + supply/infra/org + weather-aware target choice.
+	# Limited actions to keep balanced (no spam); respects player; logs for harness evidence.
+	if typeof(MapManager) == TYPE_NIL or typeof(LeaderManager) == TYPE_NIL:
+		return
+	var majors := ["GER", "SOV", "USA", "ENG", "FRA", "ITA", "JAP", "POL"]
+	var player_tag := "USA"
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		var pt := str(LeaderManager.call("get_player_country_tag"))
+		if not pt.is_empty():
+			player_tag = pt
+	var actions := 0
+	var max_actions := 3  # polish cap for 50+ turn stability
+	for tag in majors:
+		if tag == player_tag or actions >= max_actions:
+			continue
+		var owned: Array = MapManager.call("get_provinces_by_owner", tag) if MapManager.has_method("get_provinces_by_owner") else []
+		if owned.is_empty():
+			continue
+		var did_one := false
+		for pidv in owned:
+			if did_one or actions >= max_actions: break
+			var pid := int(pidv)
+			var adjs: Array = MapManager.call("get_adjacent_provinces", pid) if MapManager.has_method("get_adjacent_provinces") else []
+			# World-class AI target choice: score based on supply/infra/org (low = attractive/weak) + weather (avoid mud/snow for attacker) + ascend geo stub.
+			var scored_targets: Array = []
+			for aidv in adjs:
+				var aid := int(aidv)
+				var p: Province = MapManager.get_province(aid) if MapManager.has_method("get_province") else null
+				if p == null or p.is_sea or p.owner_tag == tag or p.owner_tag == "": continue
+				var score := 1.0
+				# Infra/supply/dev low = easier target or valuable weak hold
+				if p.infrastructure < 3: score += 0.8
+				if p.development_level < 2: score += 0.6
+				if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("get_depot_state"):
+					var dep = SupplyManager.call("get_depot_state", aid)
+					if dep and "current_stock" in dep and "throughput_capacity" in dep and dep.throughput_capacity > 0:
+						if float(dep.current_stock) / dep.throughput_capacity < 0.3: score += 0.7
+				# Low org/strength defender formations
+				if typeof(LeaderManager) != TYPE_NIL:
+					var defs := LeaderManager.get_formations_for_country(p.owner_tag)
+					for df in defs:
+						if df and ("stationed_province_id" in df) and int(df.stationed_province_id if "stationed_province_id" in df else (df.get("stationed_province_id") if df.has_method("get") else -1)) == aid:
+							var o := float(df.organization if "organization" in df else (df.get("organization") if df.has_method("get") else 1.0))
+							var s := float(df.strength if "strength" in df else (df.get("strength") if df.has_method("get") else 1.0))
+							if o < 0.6: score += 1.2
+							if s < 0.7: score += 0.9
+							break
+				# Weather-aware: penalize if mud/snow heavy for attacker mobility (full tie)
+				if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_movement_multiplier"):
+					var move_mult := float(WeatherManager.call("get_movement_multiplier", aid))
+					if move_mult < 0.7: score -= 0.8  # avoid bad weather for this assault decision
+				# Ascendancy geo stub tie (from DESIGN/MAP): slight score for high geo value (river/choke/full region) if method
+				if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_geo_ascendancy_mod"):
+					var geo_b := float(MapManager.call("get_geo_ascendancy_mod", aid, tag))
+					if geo_b > 1.0: score += (geo_b - 1.0) * 0.5
+				scored_targets.append({"pid": aid, "from": pid, "score": score})
+			scored_targets.sort_custom(func(a, b): return a.score > b.score)
+			for st in scored_targets:
+				if did_one or actions >= max_actions: break
+				var aid := int(st.pid)
+				var fromp := int(st.from)
+				var can: Dictionary = can_assault_province(tag, aid, fromp)
+				if bool(can.get("ok", false)):
+					var chain_results: Array = []
+					if has_method("execute_chain_assault_or_flank"):
+						chain_results = execute_chain_assault_or_flank(tag, aid, fromp, 1)
+					else:
+						var res: Dictionary = execute_province_assault(tag, aid, fromp)
+						chain_results = [res] if res.get("success", false) else []
+					for r in chain_results:
+						print("[AI DAILY COMBAT] %s assaulted (chain/flank, score=%.1f) pid %d from %d -> success=%s capture=%s (weather/infra/org aware; main-loop auto for 50+ turns)" % [
+							tag, st.score, aid, fromp, r.get("success", false), (r.get("result", {}) if typeof(r.get("result",{}))==TYPE_DICTIONARY else {}).get("province_control_change", false)
+						])
+						actions += 1
+					did_one = true
+					break
+	if actions > 0:
+		print("[AI DAILY COMBAT] Total AI assaults this daily tick: %d (promoted/polished for integrated playtest; non-debug main loop)" % actions)
+
+## Strategic naval engagement simulator entry (called after spotting in sea zones).
+## range_mod from weather/vis/storms/night (low = closer range engagements, favors subs/ambush or torps; high = stand off gunnery/carrier strikes).
+## sub_heavy: subs present, harder initial spot but deadly close.
+## Straits: already boosted in caller.
+func execute_naval_engagement(
+	attacker_tag: String,
+	defender_tag: String,
+	sea_province_id: int,
+	range_mod: float = 1.0,
+	sub_heavy: bool = false,
+	closer_engagement: bool = false,
+) -> Dictionary:
+	if typeof(MapManager) == TYPE_NIL:
+		return {"success": false, "reason": "no map"}
+	var sea_p: Province = MapManager.get_province(sea_province_id)
+	if sea_p == null or not sea_p.is_sea:
+		return {"success": false, "reason": "not sea province"}
+	# For demo, find any naval formations of the tags in/near the sea (simplified: use strength or pick test)
+	# In full: query LeaderManager or formations for fleets in that sea or adjacent. Lookup order for mod.
+	var attacker_order := Formation.NAVAL_ORDER_NONE
+	var defender_order := Formation.NAVAL_ORDER_NONE
+	if typeof(LeaderManager) != TYPE_NIL:
+		for f in LeaderManager.get_formations_for_country(attacker_tag):
+			if f and f.get_category() == "naval": attacker_order = f.current_naval_order; break
+		for f in LeaderManager.get_formations_for_country(defender_tag):
+			if f and f.get_category() == "naval": defender_order = f.current_naval_order; break
+	var context := {
+		"attacker": attacker_tag,
+		"defender": defender_tag,
+		"sea_pid": sea_province_id,
+		"range_mod": range_mod,
+		"sub_heavy": sub_heavy,
+		"weather_vis": 1.0,
+		"chokepoint": false,
+		"attacker_order": attacker_order,
+		"defender_order": defender_order,
+	}
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_naval_spotting_visibility"):
+		context["weather_vis"] = WeatherManager.get_naval_spotting_visibility(sea_province_id)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint"):
+		context["chokepoint"] = MapManager.has_strategic_chokepoint(sea_province_id)
+	# Adjust powers based on range: low range_mod + sub_heavy + closer (storm/night/order like AMBUSH/S&D) -> sub/torp advantage, close fight; high -> air/gun long range.
+	var atk_power := 1.0 + (0.5 if not sub_heavy else 0.2)
+	var def_power := 1.0 + (0.3 if sub_heavy else 0.1)
+	# Range mod: <0.6 or closer favors subs/ambush (higher def for sub side); use orders from context
+	if range_mod < 0.6 or closer_engagement or context.get("attacker_order", "") in [Formation.NAVAL_ORDER_AMBUSH, Formation.NAVAL_ORDER_SEARCH_AND_DESTROY]:
+		if sub_heavy:
+			def_power *= 1.25  # sub advantage in poor vis/close
+		else:
+			atk_power *= 0.9
 	else:
-		_post_battle_news(result, false)
+		atk_power *= range_mod
+	# Use resolver for common combat math if possible
+	var result := {"success": true, "type": "naval_engagement", "context": context}
+	if _resolver and _resolver.has_method("resolve_naval_engagement"):
+		result = _resolver.resolve_naval_engagement(context, atk_power, def_power)
+	else:
+		# Simple strategic outcome
+		var total = atk_power + def_power
+		var atk_win = randf() < (atk_power / total)
+		result["winner"] = attacker_tag if atk_win else defender_tag
+		result["naval_casualties"] = randf() * 0.3
+		result["range_engagement"] = "close" if (range_mod < 0.6 or closer_engagement) else "stand_off"
+		print("Naval engagement resolved (demo): %s vs %s at %s range (vis %.2f, choke %s, sub %s, closer_order=%s, orders %s/%s) -> winner %s" % [attacker_tag, defender_tag, result["range_engagement"], context["weather_vis"], context["chokepoint"], sub_heavy, closer_engagement, context.get("attacker_order",""), context.get("defender_order",""), result["winner"]])
+	battle_resolved.emit(result)
+	return result
 
 
 func get_divisions_at_province(province_id: int, country_tag: String) -> Array[Dictionary]:
@@ -355,8 +593,13 @@ func _pick_strongest_division(
 func _estimate_attack_power(formation_id: String, province: Province, country_tag: String) -> float:
 	if _resolver == null:
 		return 0.0
-	var terrain := province.terrain if province != null and province.terrain != "" else "plains"
+	var terrain: String = province.terrain if province != null and province.terrain != "" else "plains"
 	var pid := province.id if province != null else -1
+	# Demo: use effective child terrain if sample subdiv applied
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_effective_terrain_for_demo"):
+		var eff := MapManager.get_effective_terrain_for_demo(pid)
+		if eff != terrain:
+			terrain = eff
 	var dev := province.development_level if province != null else -1
 	var infra := province.infrastructure if province != null else -1
 	var stats: Dictionary = _resolver.get_effective_combat_power(
@@ -393,6 +636,9 @@ func _build_defender_formation(target: Province, defender_tag: String) -> Format
 	garrison.formation_type = Formation.TYPE_GARRISON
 	garrison.name = "%s Garrison" % tag
 	garrison.stationed_province_id = target.id
+	garrison.organization = 1.0
+	garrison.readiness = 1.0
+	garrison.strength = 1.0
 	return garrison
 
 
@@ -406,6 +652,9 @@ func _formation_from_id(formation_id: String, country_tag: String) -> Formation:
 	created.country_tag = country_tag
 	created.formation_type = Formation.TYPE_DIVISION
 	created.name = formation_id
+	created.organization = 1.0
+	created.readiness = 1.0
+	created.strength = 1.0
 	return created
 
 
