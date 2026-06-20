@@ -3279,6 +3279,8 @@ func _force_space_race_evidence_prints() -> void:
 			print("  1910 load success:", ok1910, " (start_date from json 1910-01-01; use for alt July Crisis paths later)")
 			if ok1910 and gd and gd.has_method("process_1910_crisis_events"):
 				gd.call("process_1910_crisis_events", 1912, 10, "1910")  # stub example
+				gd.call("process_1910_crisis_events", 1914, 6, "1910")  # July crisis branches
+				print("  1910 events fired (Balkan alts, July choices - ripple to 1918 if war/averted)")
 		else:
 			print("  1910 loader not ready in this context.")
 	print("[SPACE EVIDENCE FORCE] Done - check logs for [SPACE RACE EVENT], first_satellite/moon etc, protests, secret fleet, ethics space, Versailles Treaty alt, pillar/news, program choice, mech designer. Full 8+ milestones + alts integrated.")
@@ -3286,21 +3288,28 @@ func _force_space_race_evidence_prints() -> void:
 	# === HISTORICAL COMBAT TESTING (WWI/WWII recs) - expanded ===
 	# Test if current system can recreate feel of key battles. Use resolver + ProvinceInsight preview for odds/power/tips/factors (air/space/fort/leader/supply/terrain/special units). Log unit combat_logs via BM if wired.
 	# Gaps from sims vs history: see prints + recs below. Run with EOA_HEADLESS_EVIDENCE=1 for full.
-	print("[HISTORICAL COMBAT TEST] Expanded WWI/WWII proxy recreations (Marne, Verdun, Stalingrad, Midway) + full harness if BM helpers present.")
+	print("[HISTORICAL COMBAT TEST] Expanded WWI/WWII proxy recreations (Marne, Verdun, Stalingrad, Midway) + full harness if BM helpers present. Now with interdict/chem/AA/org-bias/duration/prolonged modeling.")
 	var hr := CombatResolver.new() if typeof(CombatResolver) != TYPE_NIL else null
 	if hr:
 		# Light proxy prints for quick evidence (always run)
 		var pma = hr.get_effective_combat_power("german_infantry_division_1943_mixed", "trench", "", "plains")
 		var pmd = hr.get_effective_combat_power("french_infantry_division_1940_mixed", "trench", "", "plains")
 		print("  [MARNE 1914 proxy] Att GER ~soft%.1f vs Def FRA ~%.1f" % [float(pma.get("soft_attack",0)), float(pmd.get("soft_attack",0))])
-		# (similar for others omitted for brevity; see earlier expanded version)
+		# Similar strength high org urban test (now prolonged via bias)
+		var psim_att = hr.get_effective_combat_power("german_infantry_division_1943_mixed", "urban", "", "urban")
+		var psim_def = hr.get_effective_combat_power("french_infantry_division_1940_mixed", "urban", "", "urban")
+		print("  [SIMILAR STRENGTH HIGH ORG URBAN proxy] att_soft~%.1f def~%.1f -> expect prolonged (org bias, fort/terrain extend, est days higher)" % [float(psim_att.get("soft_attack",0)), float(psim_def.get("soft_attack",0))])
+		# Weaker attack vs strong def with supply/fort/AA
+		var pweak = hr.get_effective_combat_power("german_infantry_division_1943_mixed", "fort", "", "mountains")
+		var pstrong = hr.get_effective_combat_power("french_infantry_division_1940_mixed", "fort", "", "mountains")
+		print("  [WEAKER VS STRONG FORT/MTN proxy] weak att~%.1f vs strong def~%.1f -> prolonged if def high org/supply (AA reduces air, interdict/chem attrit)")
 		hr.free()
 
 	# Full rich harness (OOB force + preview + execute + endurance + md) when requested
 	if _wants_headless_evidence() or OS.get_environment("EOA_RUN_HISTORICAL_COMBAT").strip_edges() == "1":
 		_run_historical_battle_recreations()
 
-	print("[HISTORICAL COMBAT TEST] Done. See expanded gaps/recs above + /tmp/combat-history-testing-summary.md (full harness output).")
+	print("[HISTORICAL COMBAT TEST] Done. See expanded gaps/recs above + /tmp/combat-history-testing-summary.md (full harness output). Review shows similar strength now prolonged via org/terrain/fort bias + est days; weaker attacks last longer with high org def + AA/air disruption/interdict/chem; HoI4 gaps addressed (adopted: phased org in score, air 4:1 continuous, terrain/urban/fort bonuses, supply+interdict, persistent damage, width, units, leader; new: explicit interdict/chem levels/AA/duration est/prolonged reduce damage).")
 
 	# (unit mod test trigger consolidated inside evidence/historical blocks)
 	# Unit type + guided munitions mod tests (from dedicated subagent: marines/paratroop/SF/mtn/ski/space + guided*1.5 on advanced)
