@@ -96,3 +96,29 @@ func set_engineers(tag: String, amount: float) -> void:
 		engineers_by_tag.erase(t)
 	else:
 		engineers_by_tag[t] = amount
+
+## === AIR RECON / INTEL EXPANSION ===
+## Recon from air missions (RECON profile) gives persistent bonus to spotting/intel in province.
+## Feeds naval recon, land preview accuracy, reduces "fog" in battle odds, Supply interdict estimates.
+var air_recon_by_tag: Dictionary = {}  # tag -> recon_points (decays daily or persists short)
+
+func add_air_recon(tag: String, points: float) -> void:
+	air_recon_by_tag[tag] = float(air_recon_by_tag.get(tag, 0.0)) + points
+
+func total_air_recon(tag: String) -> float:
+	return float(air_recon_by_tag.get(tag, 0.0))
+
+func get_air_recon_bonus(friendly_tag: String) -> float:
+	var own := total_air_recon(friendly_tag)
+	var enemy := 0.0
+	for t in air_recon_by_tag:
+		if str(t) != friendly_tag:
+			enemy += float(air_recon_by_tag[t])
+	# Net advantage (our recon - enemy counter-recon)
+	return clampf( (own - enemy * 0.6) * 0.12 , -0.4, 1.2)  # scales to meaningful % bonus
+
+func decay_air_recon(days: float = 1.0) -> void:
+	for t in air_recon_by_tag.keys():
+		air_recon_by_tag[t] = maxf(0.0, float(air_recon_by_tag[t]) * (1.0 - 0.25 * days))
+		if air_recon_by_tag[t] < 0.05:
+			air_recon_by_tag.erase(t)

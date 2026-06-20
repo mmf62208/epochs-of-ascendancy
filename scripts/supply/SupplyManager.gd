@@ -222,6 +222,12 @@ func get_air_power_ratio(province_id: int, friendly_tag: String = "") -> float:
 	var report := force_registry.get_report(province_id)
 	return report.get_air_power_ratio(friendly_tag) if report.has_method("get_air_power_ratio") else 1.0
 
+func get_air_recon_bonus(province_id: int, friendly_tag: String = "") -> float:
+	if friendly_tag.is_empty():
+		friendly_tag = player_tag
+	var report := force_registry.get_report(province_id)
+	return report.get_air_recon_bonus(friendly_tag) if report.has_method("get_air_recon_bonus") else 0.0
+
 
 func refresh_intel_from_forces() -> void:
 	SupplyIntelBridge.refresh_manager(self, player_tag, force_registry, provinces, hubs, rules)
@@ -229,24 +235,124 @@ func refresh_intel_from_forces() -> void:
 
 
 func _process_air_missions(days: float = 1.0) -> void:
-	## Called from debug harness / daily for air formations on missions (CAS/INTERDICTION/AIR_SUPERIORITY etc).
-	## Updates presence or applies direct effects (e.g. INTERDICTION mission boosts enemy route interdict).
-	## For full: would factor range from AirMissionProfile + ADS, weather, basing.
+	## DYNAMIC SORTIE / ENDURANCE / RECON / FUEL MODEL
+	## Uses Formation.get_effective_air_sorties() + AirMissionProfile.compute + ADS.
+	## - Computes realistic sorties based on org/supply/range/infra/leader/doctrine/weather/tech/era/AA.
+	## - Burns fuel (affects future readiness), applies AA attrition to air strength (not elim).
+	## - Updates registry with *sorties* dynamic air presence (so ratios/CAS reflect actual ops tempo, not static).
+	## - RECON missions seed recon_points -> intel bonus (decays).
+	## - Costly even in dominance (fuel, fatigue, AA losses). Early low tempo; late high with support.
+	## Integrates with existing contested cost, weather, profile power.
+	## Called daily + from debug menu. Evidence prints on EOA_HEADLESS_EVIDENCE=1.
 	if days <= 0.0 or typeof(LeaderManager) == TYPE_NIL:
 		return
-	# Simple: air on INTERDICTION mission in a province adds to effective "air interdiction threat" for enemies (via presence proxy)
+	var wm_eff := 1.0
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_air_mission_effectiveness"):
+		# Will query per pid below
+		pass
+	var year_now := 1942
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year"):
+		year_now = int(TimeManager.get_current_year())
+	elif typeof(GameData) != TYPE_NIL:
+		year_now = GameData.get_current_year() if GameData.has_method("get_current_year") else 1942
+
+	# Process player + proxy other countries (for sims)
+	var countries_to_proc := [player_tag]
+	# In full sim would enumerate all active; for now player + seeded enemies
 	for f in LeaderManager.get_formations_for_country(player_tag):
 		if f == null or f.get_category() != "air": continue
-		var mid := f.current_air_mission if "current_air_mission" in f else ""
-		if mid != "INTERDICTION": continue
-		var pid := int(f.get("stationed_province_id", -1))
-		if pid < 0: continue
-		var stren := float(f.get("strength", 1.0)) * 0.8  # mission effect
-		# boost enemy view if we add "virtual" threat; for now just log + slight registry if wanted
+		_process_single_air_formation(f, days, year_now, wm_eff)
+	# Also any air in registry from other (demo/enemy air wings if registered via LeaderManager elsewhere)
+	# For tests, force OOB + manual may populate; this covers when formations exist.
+	print("[AIR] _process_air_missions tick (dynamic sorties, fuel, recon, attrition now active)")
+
+func _process_single_air_formation(f: Formation, days: float, year: int, base_wm: float) -> void:
+	if f == null or f.get_category() != "air": return
+	var mid := str(f.current_air_mission) if "current_air_mission" in f else ""
+	if mid == "" or mid == "NONE": return
+	var pid := int(f.get("stationed_province_id", -1)) if f.has_method("get") or "stationed_province_id" in f else -1
+	if pid < 0 and division_deployments.has(f.formation_id):
+		pid = int(division_deployments[f.formation_id].get("province_id", -1))
+	if pid < 0: return
+
+	# Weather per province
+	var w_eff := base_wm
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_air_mission_effectiveness"):
+		w_eff = float(WeatherManager.call("get_air_mission_effectiveness", pid))
+	# Enemy AA from registry report (defenders in pid)
+	var en_aa := 0.1
+	var reg_report = force_registry.get_report(pid) if force_registry else null
+	if reg_report and reg_report.has_method("total_air"):
+		# Rough: enemy air implies AA threat proxy; real AA from land/aa templates later
+		en_aa = clampf(0.05 + (reg_report.total_air("player" if f.country_tag != "player" else "GER") * 0.08), 0.0, 0.8)
+
+	# Jamming / stealth proxy from tech (late game)
+	var jam := 1.0
+	var stl := 1.0
+	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("has_rule_flag"):
+		var tag := f.country_tag if "country_tag" in f else player_tag
+		if TechnologyManager.has_rule_flag(tag if f.country_tag == player_tag else "enemy", "ecm_jamming"):
+			jam = 0.7  # enemy jamming hurts our
+		if TechnologyManager.has_rule_flag(tag, "stealth_aircraft") or year >= 1985:
+			stl = 1.35
+
+	# Get dynamic sorties using new model (distance proxy 400km avg; infra from province if avail)
+	var base_inf := 5
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var p: Province = MapManager.get_province(pid)
+		if p: base_inf = int(p.infrastructure)
+	var sdata: Dictionary = f.get_effective_air_sorties(450.0, base_inf, en_aa, w_eff, jam, stl, year)
+	var sorties := float(sdata.get("sorties", 1.0))
+	var fuel_b := float(sdata.get("fuel_burn", sorties * 1.2))
+	var rec_pts := float(sdata.get("recon_points", 0.0))
+	var rdy_imp := float(sdata.get("readiness_impact", -0.1))
+	var ab_ch := float(sdata.get("abort_chance", 0.1))
+
+	# Apply to formation readiness/org/strength (fatigue + fuel state)
+	if "organization" in f:
+		f.organization = clampf(float(f.organization) + rdy_imp * 0.7, 0.3, 1.8)
+	if "readiness" in f or f.has_method("set"):
+		var cur_r := float(f.get("readiness", 1.0)) if "readiness" in f else 1.0
+		cur_r = clampf(cur_r + rdy_imp, 0.25, 1.6)
+		if "readiness" in f: f.readiness = cur_r
+	# Strength attrition (AA + mech)
+	var attr := AirMissionProfile.new().apply_air_mission_attrition( float(f.strength if "strength" in f else 1.0), en_aa, sorties, w_eff, stl )
+	if "strength" in f:
+		f.strength = float(attr.get("new_strength", f.strength))
+	# Log for evidence
+	if OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1" or (sorties > 1.5 and randf() > 0.6):
+		print("[AIR SORTIE] %s @%d mission=%s sorties=%.2f loiter=%.1f fuel=%.1f abort=%.0f%% rdy_imp=%.2f AA=%.2f recon=%.1f | %s" % [
+			f.formation_id, pid, mid, sorties, float(sdata.get("loiter",1.0)), fuel_b, ab_ch*100, rdy_imp, en_aa, rec_pts, str(sdata.get("notes",""))
+		])
+
+	# Dynamic presence update: presence reflects actual flown (sorties * strength factor). Makes CAS/interdict vary with ops tempo.
+	var pres_str := float(f.strength if "strength" in f else 1.0) * sorties * 0.7
+	force_registry.add_air_presence(pid, f.country_tag if "country_tag" in f else player_tag, pres_str)
+
+	# Recon bonus if RECON mission (persistent short term for intel feed)
+	if mid == Formation.AIR_MISSION_RECON and rec_pts > 0.1:
+		force_registry.add_air_recon_presence(pid, f.country_tag if "country_tag" in f else player_tag, rec_pts * 0.8)
+		# Also to adjacent for area effect (simplified; real would use region)
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_adjacent_provinces"):
+			for adj in MapManager.get_adjacent_provinces(pid).slice(0, 3):
+				force_registry.add_air_recon_presence(int(adj), f.country_tag if "country_tag" in f else player_tag, rec_pts * 0.3)
+
+	# Fuel burn impact (reduce local depot or global fuel if avail; simple readiness hit if can't)
+	# For now, extra readiness/org hit proportional fuel if low infra
+	if fuel_b > 3.0 and base_inf < 4:
+		if "organization" in f: f.organization = maxf(0.3, float(f.organization) * 0.92)
 		if OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1":
-			print("[AIR MISSION] %s INTERDICTION str%.1f at %d (would raise enemy supply cost in area)" % [f.formation_id, stren, pid])
-	# Also process for other countries if sim
-	print("[AIR] _process_air_missions tick (missions factor into power via Profile in combat/preview; supply costs always via calc)")
+			print("[AIR FUEL] High burn %.1f with low infra %d at %d -> extra org drain" % [fuel_b, base_inf, pid])
+
+	# Interdict boost for INTERDICTION mission (existing + scaled by sorties)
+	if mid == "INTERDICTION" and sorties > 0.5:
+		# Slight boost to enemy interdict chance via registry (SupplyInterdictionEstimator uses presence)
+		# Already presence higher -> interdict estimators pick up air
+		if OS.get_environment("EOA_HEADLESS_EVIDENCE") == "1":
+			print("[AIR INTERDICT] %s flew %.1f sorties -> supply pressure on enemies at %d" % [f.formation_id, sorties, pid])
+
+	# Note: full fuel drawn from Supply depots/cargo happens in calculate/consume paths using extra from sdata if wired.
+	# CAS/ other effects via updated registry ratios + resolver using sorties in future calls.
 
 
 func set_enemy_presence(province_id: int, presence: Dictionary) -> void:
@@ -362,17 +468,6 @@ func calculate_daily_supply_consumption(formation_id: String) -> float:
 		return LeaderManager.apply_supply_consumption_for_leader(base_consumption, leader_id)
 	return maxf(base_consumption, 0.1)
 
-	var leader_id := ""
-	var formation := get_formation(formation_id)
-	if formation != null and formation.has_leader():
-		leader_id = formation.leader_id
-	elif not formation_id.is_empty():
-		leader_id = LeaderManager.resolve_leader_id_for_formation(formation_id)
-
-	if not leader_id.is_empty():
-		return LeaderManager.apply_supply_consumption_for_leader(base_consumption, leader_id)
-	return maxf(base_consumption, 0.1)
-
 
 func _apply_national_supply_modifiers(formation_id: String, base_consumption: float) -> float:
 	# Try to determine the owning country of the formation
@@ -444,7 +539,12 @@ func advance_supply_day(days: float = 1.0) -> void:
 	# Naval recon from fleets in sea zones (1 chance per day per seazone presence)
 	_process_naval_recon(days)
 
+	# Naval fuel consumption + endurance for fleets at sea (long deployments burn fuel/supply; low = vuln/return forced; resupply at ports)
+	_process_naval_fuel_endurance_and_repair(days)
+
 	_process_air_missions(days)
+	if force_registry and force_registry.has_method("decay_all_recon"):
+		force_registry.decay_all_recon(days)  # air recon intel decays (persistent but not permanent)
 	var attrition := get_attrition_cargo_summary()
 	var attrition_tons := float(attrition.get("total_tons", 0.0)) * days
 	for key in _routes:
@@ -703,6 +803,97 @@ func _report_enemy_naval_detection(sea_pid: int, spotter: String, spotted: Strin
 func _are_hostile(a: String, b: String) -> bool:
 	# Simple placeholder; real version would check diplomacy/war state
 	return a != b  # Assume different tags are potentially hostile for recon purposes
+
+
+## Naval fuel/endurance consumption, vulnerability, resupply at ports, and repair hooks.
+## Formations with naval category in sea provinces consume based on template fuel + order intensity + days.
+## Low fuel: power/speed penalty (caller passes to BM), higher detect vuln.
+## Resupply: if in/adjacent port province with fuel_stockpile or depot, refuel.
+## Repair: slow org/readiness/strength recovery at port (dockyards/tech later).
+## Also: chance to trigger full BM naval engagement on strong detection (beyond log).
+func _process_naval_fuel_endurance_and_repair(days: float = 1.0) -> void:
+	if days <= 0.0 or typeof(LeaderManager) == TYPE_NIL or typeof(MapManager) == TYPE_NIL:
+		return
+	var sea_pids: Array = []
+	if MapManager.has_method("get_provinces_by_terrain"):
+		sea_pids = MapManager.get_provinces_by_terrain("sea")
+	for pidv in sea_pids:
+		var pid := int(pidv)
+		var report := force_registry.get_report(pid)
+		if report.navy_total <= 0.0:
+			continue
+		for owner in report.naval_strength.keys():
+			if float(report.naval_strength[owner]) <= 0.0:
+				continue
+			# Find naval formations for this owner (use LeaderManager)
+			for f in LeaderManager.get_formations_for_country(owner):
+				if f == null or f.get_category() != "naval" or int(f.stationed_province_id if "stationed_province_id" in f else -1) != pid:
+					continue
+				# Consume fuel/supply for at-sea ops (use template if linked, else proxy from name/size)
+				var base_fuel := 12.0  # abstract daily for fleet proxy
+				var nname := str(f.name).to_lower() + " " + str(f.naval_design_id).to_lower()
+				if "sub" in nname: base_fuel = 6.0
+				elif "carrier" in nname or "battleship" in nname: base_fuel = 22.0
+				elif "destroyer" in nname or "frigate" in nname: base_fuel = 9.0
+				var order_mult := 1.0
+				match f.current_naval_order:
+					Formation.NAVAL_ORDER_SEARCH_PATROL, Formation.NAVAL_ORDER_SEARCH_AND_DESTROY, Formation.NAVAL_ORDER_STRIKE:
+						order_mult = 1.25
+					Formation.NAVAL_ORDER_AMBUSH:
+						order_mult = 0.9
+					Formation.NAVAL_ORDER_ASW, Formation.NAVAL_ORDER_ESCORT:
+						order_mult = 1.1
+				var consume := base_fuel * order_mult * days * (f.mission_intensity if "mission_intensity" in f else 1.0) * 0.15
+				# Apply to a fuel proxy on formation (add export if needed; use meta or readiness decay for now)
+				var cur_fuel := float(f.get("fuel_level") if f.has("fuel_level") else 0.9)
+				cur_fuel = clamp(cur_fuel - consume * 0.01, 0.1, 1.2)
+				if f.has_method("set"):
+					f.set("fuel_level", cur_fuel)  # may not persist perfectly but for sim
+				# If low fuel, increase vuln (meta for BM context)
+				if cur_fuel < 0.4:
+					# Tag for next engagement
+					if not has_meta("low_fuel_navies"): set_meta("low_fuel_navies", {})
+					var lf := get_meta("low_fuel_navies") as Dictionary
+					lf[str(pid) + "_" + owner] = cur_fuel
+					set_meta("low_fuel_navies", lf)
+				# Resupply at port or adj port (check presence or special)
+				var at_port := bool(report.naval_at_port_by_tag.get(owner, 0.0) > 0.0)
+				if not at_port and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_adjacent_provinces"):
+					for ap in MapManager.get_adjacent_provinces(pid):
+						var apv: Province = MapManager.get_province(int(ap))
+						if apv != null and (apv.has_feature("port") or apv.has_feature("naval_base") or apv.is_sea == false):
+							at_port = true; break
+				if at_port and cur_fuel < 0.95:
+					cur_fuel = min(1.05, cur_fuel + 0.25 * days)  # refuel
+					if f.has_method("set"): f.set("fuel_level", cur_fuel)
+				# Repair hook: recover org/readiness/strength slowly at port (real dock time later via infra/tech)
+				if at_port:
+					f.organization = clamp(float(f.organization) + 0.04 * days, 0.3, 1.0)
+					f.readiness = clamp(float(f.readiness) + 0.03 * days, 0.3, 1.0)
+					if float(f.strength) < 0.95:
+						f.strength = clamp(float(f.strength) + 0.02 * days, 0.4, 1.0)
+				# Possible engagement trigger on good mutual detect (beyond log in recon)
+				if randf() < 0.12 * days :  # hostiles exist proxy (simplified; in full check war/diplo)
+					var has_hostile := false
+					for o2 in report.naval_strength.keys():
+						if str(o2) != owner and _are_hostile(owner, str(o2)):
+							has_hostile = true; break
+					if has_hostile:
+					# Find possible enemy
+					for o2 in report.naval_strength.keys():
+						if o2 == owner or float(report.naval_strength[o2]) < 1.0: continue
+						if _are_hostile(owner, str(o2)) and randf() < 0.4:
+							if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("execute_naval_engagement"):
+								var intens := clamp(0.4 + (1.0 - cur_fuel) * 0.3, 0.3, 0.9)
+								BattleManager.execute_naval_engagement(owner, str(o2), pid, intens, "sub" in nname, cur_fuel < 0.5)
+							break
+	# Decay low fuel meta occasionally
+	if has_meta("low_fuel_navies") and randf() < 0.3:
+		var lf2 := get_meta("low_fuel_navies") as Dictionary
+		for k in lf2.keys():
+			lf2[k] = float(lf2[k]) + 0.05
+			if float(lf2[k]) > 0.9: lf2.erase(k)
+		set_meta("low_fuel_navies", lf2)
 
 
 func ensure_division_formations_for_country(country_tag: String) -> void:
