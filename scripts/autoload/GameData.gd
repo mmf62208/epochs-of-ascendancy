@@ -4364,7 +4364,9 @@ func process_1910_crisis_events(current_year: int) -> void:
 					GameData.add_grievance("RUS", 15, "1914_escalation")
 		# Agent missions eligible for 1910 crisis (inflate/deescalate) - player can assign to influence outcome
 		if typeof(AgentManager) != TYPE_NIL and AgentManager.has_method("add_mission_eligibility"):
-			AgentManager.add_mission_eligibility("crisis_infiltrate_1914", ["SER", "AUH", "RUS", "GER", "ENG", "FRA"])
+			AgentManager.add_mission_eligibility("july_crisis_infiltrate", ["SER", "AUH", "RUS", "GER", "ENG", "FRA"])
+			AgentManager.add_mission_eligibility("balkan_league_intel", ["SER", "BUL", "GRE", "ROM", "TUR", "RUS"])
+			AgentManager.add_mission_eligibility("pre_battle_sabotage", ["GER", "FRA", "RUS", "AUH", "ITA", "ENG"])  # usable pre-offensive in 1910-14 window too
 		# Example decision hook: if in 1910, could trigger simple choice via event system (e.g. player as major gets pillar choice affecting flag)
 		if scenario == "1910" and typeof(LeaderEventUI) != TYPE_NIL:
 			LeaderEventUI.post_news("July Crisis Decision Point", "As a great power, your prior agent choices and leverage influence: de-escalate for avert/limited (better 1918 start), or escalate for historical path (more 1918 chaos but possible gains).", "crisis")

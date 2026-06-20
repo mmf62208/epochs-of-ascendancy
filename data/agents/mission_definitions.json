@@ -690,5 +690,89 @@
         "description": "Space intel op failed or backfired."
       }
     }
+  },
+  "pre_battle_sabotage": {
+    "id": "pre_battle_sabotage",
+    "name": "Pre-Battle Sabotage & Intel",
+    "category": "intelligence",
+    "description": "Infiltrate enemy depots, rails, and command pre-offensive to degrade readiness, fort effectiveness, and org (directly feeds battle preview and combat power).",
+    "base_success_chance": 0.55,
+    "duration_months": 2,
+    "detection_risk": 0.30,
+    "skill_requirement": "intelligence",
+    "min_skill_level": 4,
+    "outcomes": {
+      "success": {
+        "effect": "sabotage_level",
+        "magnitude": 0.35,
+        "prestige_gain": 3,
+        "description": "Significant pre-battle disruption: defender fort/readiness reduced in preview and opening combat."
+      },
+      "partial": {
+        "effect": "sabotage_level",
+        "magnitude": 0.18,
+        "prestige_gain": 1,
+        "description": "Partial sabotage achieved; modest impact on enemy combat staying power."
+      },
+      "failure": {
+        "description": "Sabotage network compromised or ineffective."
+      }
+    }
+  },
+  "july_crisis_infiltrate": {
+    "id": "july_crisis_infiltrate",
+    "name": "Infiltrate July Crisis (1914)",
+    "category": "diplomatic",
+    "description": "1910-era special: manipulate SER/AUH/RUS/GER/ENG/FRA decision-makers or leak intel during the July Crisis to tilt avert/limited/escalated outcome (ripples to 1918 peace_state and OOB mods).",
+    "base_success_chance": 0.40,
+    "duration_months": 1,
+    "detection_risk": 0.35,
+    "skill_requirement": "diplomatic",
+    "min_skill_level": 3,
+    "outcomes": {
+      "success": {
+        "effect": "1914_crisis_shift",
+        "magnitude": -0.25,
+        "prestige_gain": 5,
+        "description": "De-escalation or favorable intel leak: raises chance of averted/limited path (better 1918 start for player side)."
+      },
+      "partial": {
+        "effect": "1914_crisis_shift",
+        "magnitude": -0.10,
+        "prestige_gain": 2,
+        "description": "Some influence applied to crisis participants."
+      },
+      "failure": {
+        "description": "Crisis manipulation exposed; may worsen escalation for your side."
+      }
+    }
+  },
+  "balkan_league_intel": {
+    "id": "balkan_league_intel",
+    "name": "Balkan League Intelligence",
+    "category": "intelligence",
+    "description": "1910-era: penetrate Balkan League vs Ottoman networks (1912-13) to shape intervention odds and alt border outcomes (affects 1918 grievances/leverage via 1912_balkan_alt flag).",
+    "base_success_chance": 0.60,
+    "duration_months": 3,
+    "detection_risk": 0.22,
+    "skill_requirement": "intelligence",
+    "min_skill_level": 3,
+    "outcomes": {
+      "success": {
+        "effect": "balkan_alt",
+        "magnitude": 0.30,
+        "prestige_gain": 3,
+        "description": "Key intel or agent pressure alters Balkan War path (flag set for 1918 ripple)."
+      },
+      "partial": {
+        "effect": "balkan_alt",
+        "magnitude": 0.12,
+        "prestige_gain": 1,
+        "description": "Partial insight into league plans."
+      },
+      "failure": {
+        "description": "Balkan networks remain opaque."
+      }
+    }
   }
 }
