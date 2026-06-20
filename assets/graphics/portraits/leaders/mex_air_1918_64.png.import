@@ -1,0 +1,9 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+
+[deps]
+source_file="res://assets/graphics/portraits/leaders/mex_air_1918_64.png"
+
+[params]
+compress/mode=0
