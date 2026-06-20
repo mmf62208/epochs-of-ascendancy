@@ -3313,13 +3313,10 @@ func _force_space_race_evidence_prints() -> void:
 	print("[HISTORICAL TEST] Gaps/recs: 1. LogisticsChain/BM for endurance drain (Verdun/Marne months). 2. Chem/bio from tech as special area denial in Resolver. 3. Pre-battle agent sabotage/espionage missions affecting fort/readiness. 4. Explicit combined_arms + leader_initiative flank in NMM/preview (HoI4 width/doctrine feel). 5. Deepen naval (task groups, subs in BM for ocean pids). 6. Persistent weather/supply interdiction mid-battle. 7. Full unit+leader logs always in AAR (already partial). Compare: HoI4 has detailed visible factors+width+air/supply; TI has space+design+intel. Our preview/AAR/tips/air(4:1)/space(guided) already excellent base. Add above -> world class satisfying combat sandbox. See docs + /tmp for agent summary.")
 	print("[HISTORICAL COMBAT TEST] Done.")
 
-	# Unit type mod test trigger (specialists + guided from subagent delivery)
-	if _wants_headless_evidence() or OS.get_environment("EOA_RUN_UNIT_MOD_TEST").strip_edges() == "1":
-		_run_unit_type_combat_mod_test()
-
+	# (unit mod test trigger consolidated inside evidence/historical blocks)
 	# Unit type + guided munitions mod tests (from dedicated subagent: marines/paratroop/SF/mtn/ski/space + guided*1.5 on advanced)
 	if _wants_headless_evidence() or OS.get_environment("EOA_RUN_UNIT_MOD_TEST").strip_edges() == "1" or OS.get_environment("EOA_RUN_HISTORICAL_COMBAT").strip_edges() == "1":
-		call_deferred("_run_unit_type_combat_mod_test")
+		_run_unit_type_combat_mod_test()  # direct for evidence (call_deferred may be too late)
 
 func _run_unit_type_combat_mod_test() -> void:
 	print("\n=== UNIT TYPE + GUIDED MUNITIONS COMBAT MOD TEST (specialists: marine/paratroop/sf/mountain/ski/space + advanced guided *1.5 soft) ===")

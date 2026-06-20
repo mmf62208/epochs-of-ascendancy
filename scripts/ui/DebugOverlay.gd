@@ -5180,6 +5180,7 @@ func show_battle_aar(result: Dictionary = {}) -> void:
 	get_tree().root.add_child(win)
 	win.popup_centered()
 	print("[AAR PANEL] Enhanced full battle AAR shown for %s (pulled logs=%s, mods=%d)" % [result.get("target_province_id", -1), shown_logs, mods_list.size()])
+	return  # legacy basic AAR body excised (Scroll + logs + leaders + % modifiers + space/air + tips above is the full accessible panel)
 
 
 
