@@ -5237,6 +5237,20 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 	var fort_mod := 1.0 + (defender.settlement_level * 0.25)
 	var our_fort := attacker.settlement_level > 0.2
 
+	# Pre-battle espionage/sabotage (high-leverage per combat recs: intel prep, agent sabo on defender readiness/fort/odds; ties to AgentManager depot or province network)
+	var sabo_level := 0.0
+	if typeof(AgentManager) != TYPE_NIL and AgentManager.has_method("get_depot_state"):
+		var ds: Variant = AgentManager.call("get_depot_state", defender.id)
+		if ds and "sabotage_level" in ds:
+			sabo_level = clampf(float(ds.sabotage_level), 0.0, 0.6)
+	elif typeof(AgentManager) != TYPE_NIL and AgentManager.has_method("get_active_missions"):
+		# Fallback: light presence if network active (real impl tracks pre-battle missions)
+		sabo_level = 0.15 if randf() < 0.25 else 0.0
+	if sabo_level > 0.08:
+		fort_mod *= (1.0 - sabo_level * 0.4)
+		# Also bias power slightly for preview
+		def_pow *= (1.0 - sabo_level * 0.2)
+
 	# Night
 	var is_night := false
 	if typeof(TimeManager) != TYPE_NIL:
@@ -5294,6 +5308,9 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 		preview["modifiers"].append("+12% amphibious (Marines)")
 	if "mountain" in str(preview.get("terrain", "")):
 		preview["modifiers"].append("+15% mountain specialists")
+	if sabo_level > 0.08:
+		preview["sabotage_level"] = sabo_level
+		preview["modifiers"].append("-%.0f%% defender fort/readiness (pre-battle agent sabotage/intel)" % (sabo_level * 40))
 	preview["odds_note"] = "Est. attacker success odds: %.0f%% (power %.1f:%.1f)" % [odds, att_pow, def_pow]
 	return preview
 
@@ -5369,6 +5386,8 @@ static func _battle_preview_block(
 		tips.append("The enemy is fortified / dug in")
 	if preview.get("our_fort", false):
 		tips.append("We are fortified / dug in (defensive bonus)")
+	if float(preview.get("sabotage_level", 0.0)) > 0.08:
+		tips.append("Pre-battle agent sabotage/intel reduced enemy readiness/fort (~%.0f%% effect)" % (float(preview.get("sabotage_level",0.0))*40.0))
 	if preview.get("counterattack", false):
 		tips.append("The enemy is counterattacking")
 	if preview.get("is_night", false):
