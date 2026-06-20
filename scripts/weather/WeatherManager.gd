@@ -110,6 +110,19 @@ func get_naval_mission_effectiveness(pid: int) -> float:
 	base *= get_power_availability(pid)
 	return base
 
+## Naval spotting / detection visibility for engagement context (used by BM naval, resolver, recon).
+## High vis good for surface/gun/carrier spot; low vis (storm/night/haze) favors subs/ambush/torps (history: Jutland haze/smoke, Midway searches hampered).
+## Factors weather + power + future sat/light.
+func get_naval_spotting_visibility(pid: int) -> float:
+	var base := get_naval_mission_effectiveness(pid)
+	# Spotting slightly different: penalize less for wind (surface waves), more for low vis/precip for visual/radar early.
+	var w = _province_weather.get(pid, {})
+	var vis = w.get("visibility", 1.0)
+	var storm = w.get("precip_intensity", 0.0)
+	var spot = clamp(vis * (1.0 - storm * 0.5), 0.1, 1.0) * base * 0.9 + 0.1  # weighted
+	# Tech era later could boost via radar/sat but here base weather; caller applies tech/asset.
+	return clamp(spot, 0.05, 1.2)
+
 func get_carrier_air_effectiveness(pid: int) -> float:
 	# Carrier launched aircraft more vulnerable to weather than land-based
 	var air = get_air_mission_effectiveness(pid)

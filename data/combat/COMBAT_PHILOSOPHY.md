@@ -61,6 +61,7 @@
 - Fortification levels and engineer construction.
 - Weather and day/night cycles.
 - Leader traits and doctrine effects.
+- **Naval (implemented 2026)**: Phased resolver (search/detect/ASW/engage/disengage) with dynamic multi-source spotting (air recon/NAVAL_STRIKE, subs, surface, sat), ECM/jamming reducing detect/guided, fuel/endurance consumption in Supply for sea deployments (low fuel = vuln/forced RTB), ASW sensor+helo+depth subphases, leader traits (sea_wolf/carrier_admiral) + initiative for disengage (high retreat% prevents annihilation per history Jutland/Midway/Falklands), screening orders, era/tech gating (visual->radar->ecm->sat/nuke). HoI4 task-force mission pattern + historical realism without micro. See BM/Resolver/Supply/Formation + /tmp/naval-combat-testing-summary.md . Fuel/repair at ports/hooks, combined carrier support to land.
 
 ## Combat Width & Infrastructure
 
