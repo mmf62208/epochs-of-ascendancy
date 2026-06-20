@@ -98,6 +98,9 @@ func _ready() -> void:
 	if "1918" in str(_cur_year):  # Rough; in real use scenario tag
 		# Auto phases demo open (if not already) + separatism checks for failed state pressure (low public Cohesion from riots/food/rights -> openness to high Ascendancy systems or separatism).
 		pass  # Called from ScenarioLoader or demo _ready for now; see phases demo for auto victory dialogue.
+		# If coming from 1910 alt-history campaign, apply pre-war crisis ripples to starting state
+		if has_method("_apply_1910_ripples_to_1918"):
+			call("_apply_1910_ripples_to_1918")
 
 	# Dedicated quick save/load + events test (riots Paris/conditional + research ethics delayed + persist roundtrip). Triggered by EOA_TEST_SAVE_LOAD=1 for fast non-50t validation.
 	if OS.get_environment("EOA_TEST_SAVE_LOAD").strip_edges() == "1":
@@ -4365,3 +4368,47 @@ func process_1910_crisis_events(current_year: int) -> void:
 		# Example decision hook: if in 1910, could trigger simple choice via event system (e.g. player as major gets pillar choice affecting flag)
 		if scenario == "1910" and typeof(LeaderEventUI) != TYPE_NIL:
 			LeaderEventUI.post_news("July Crisis Decision Point", "As a great power, your prior agent choices and leverage influence: de-escalate for avert/limited (better 1918 start), or escalate for historical path (more 1918 chaos but possible gains).", "crisis")
+
+	# Additional 1910-11 pre-crisis flavor + arms race hints (deeper alt history buildup)
+	if current_year == 1911 and month == 3:
+		print("[1910 EVENT] Pre-war arms race / Agadir analog 1911")
+		LeaderEventUI.post_news("1911 Crisis (Agadir/Morocco analog)", "Colonial tension spikes. Agent dip or player choice can de-escalate for later 1914 bonus or allow buildup (higher war_support but cohesion cost).", "diplomatic")
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("add_grievance"):
+			if randf() < 0.4:
+				GameData.add_grievance("GER", 8, "1911_tension")
+	if current_year == 1910 and month == 7:
+		print("[1910 EVENT] 1910 start: Balkan tinderbox and great power alignments forming")
+		LeaderEventUI.post_news("1910: The Gathering Storm Begins", "Balkan League forming vs Ottomans; naval arms race ENG-GER. Early agent missions or player policy can tilt future crises (Balkan alt outcomes, July leverage). Use 1910-1914 window for alt-history prevention or acceleration.", "crisis")
+
+# Helper: apply 1910 crisis ripples into 1918 start state (called from 1918 load or Test/Scenario post 1910 campaign)
+# If prior 1910 campaign run, peace_state carries "1914_crisis", "1912_balkan_alt" etc to adjust OOB, grievances, starting org/rdy, tech, peace leverage.
+func _apply_1910_ripples_to_1918() -> void:
+	if not peace_state.has("1914_crisis") and not peace_state.has("1912_balkan_alt"):
+		return
+	var crisis := str(peace_state.get("1914_crisis", ""))
+	print("[1910->1918 RIPPLE] Applying pre-1914 alt outcomes to 1918 start: crisis=", crisis)
+	if crisis == "averted":
+		# Better 1918: less exhaustion, lower grievances on some, possible earlier doctrines or bonus org
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("add_grievance"):
+			GameData.add_grievance("GER", -10, "1914_averted_ripple")  # less revanchism
+		# lower starting war exhaustion hint (used by Supply/Resolver or OOB force)
+		if not peace_state.has("1918_start_mods"):
+			peace_state["1918_start_mods"] = {}
+		peace_state["1918_start_mods"]["org_bonus"] = 0.15
+		peace_state["1918_start_mods"]["exhaustion_mult"] = 0.7
+		print("  Averted: 1918 majors start with +org, less war attrition modeled in OOB.")
+	elif crisis == "limited":
+		peace_state["1918_start_mods"] = peace_state.get("1918_start_mods", {})
+		peace_state["1918_start_mods"]["regional_only"] = true
+		print("  Limited 1914: 1918 has regional focus, different minor OOBs/borders from Balkans.")
+	elif crisis == "escalated":
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("add_grievance"):
+			GameData.add_grievance("AUH", 12, "prolonged_balkan_1914")
+		peace_state["1918_start_mods"] = peace_state.get("1918_start_mods", {})
+		peace_state["1918_start_mods"]["exhaustion_mult"] = 1.25  # more tired armies at start
+		print("  Escalated full: 1918 starts with higher exhaustion/grievance (alt OOB possible via force_historical or player choices).")
+	if peace_state.get("1912_balkan_alt", false):
+		# alt Ottoman survival or border affects 1918 TUR or new states leverage
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_pillar_shift"):
+			GameData.apply_pillar_shift("TUR", "mandate", 5, "balkan_alt_1918")
+		print("  1912 Balkan alt: 1918 peace terms or TUR position shifted (less loss, different successor claims).")

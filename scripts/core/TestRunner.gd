@@ -170,8 +170,9 @@ func _print_grand_theater_qc_evidence(mapr: Node) -> void:
 				print("[GRAND THEATER QC] FAIL Data-driven naval chokepoints")
 			notes.append("chokepoints=%d" % chokes.size())
 
+		var regions: Dictionary = {}
 		if MapManager.has_method("get_all_strategic_regions"):
-			var regions: Dictionary = MapManager.get_all_strategic_regions()
+			regions = MapManager.get_all_strategic_regions()
 			total += 1
 			var region_ok: bool = regions.size() >= 20
 			if region_ok:
@@ -214,7 +215,62 @@ func _print_grand_theater_qc_evidence(mapr: Node) -> void:
 				else:
 					print("[GRAND THEATER QC] FAIL %s region (sample #%d rid=%d expected %d, provs=%d)" % [label, sample_pid, got_rid, exp_rid, pids.size()])
 
-	if mapr != null:
+			# Mediterranean islands (Malta solo, Sicily multi, Crete multi)
+			var island_checks: Array = [
+				[9520, 16, "Malta"],
+				[9521, 15, "Palermo"],
+				[9524, 18, "Heraklion"],
+				[9526, 16, "Ajaccio"],
+				[9527, 16, "Cagliari"],
+				[9529, 16, "Palma"],
+			]
+			for ichk in island_checks:
+				var ipid: int = int(ichk[0])
+				var irid_exp: int = int(ichk[1])
+				var iname: String = str(ichk[2])
+				total += 1
+				var irid_got: int = MapManager.get_province_region_id(ipid)
+				if irid_got == irid_exp and MapManager.get_province(ipid) != null:
+					passed += 1
+					print("[GRAND THEATER QC] PASS Island %s (#%d → region %d)" % [iname, ipid, irid_got])
+				else:
+					print("[GRAND THEATER QC] FAIL Island %s (#%d rid=%d expected %d)" % [iname, ipid, irid_got, irid_exp])
+			# Iberia mainland + Cyprus
+			var iberia_checks: Array = [
+				[22, 13, "Madrid"],
+				[9532, 13, "Barcelona"],
+				[9536, 24, "Nicosia"],
+			]
+			for ibchk in iberia_checks:
+				var ibpid: int = int(ibchk[0])
+				var ibrid_exp: int = int(ibchk[1])
+				var ibname: String = str(ibchk[2])
+				total += 1
+				var ibrid_got: int = MapManager.get_province_region_id(ibpid)
+				if ibrid_got == ibrid_exp and MapManager.get_province(ibpid) != null:
+					passed += 1
+					print("[GRAND THEATER QC] PASS Iberia/Cyprus %s (#%d → region %d)" % [ibname, ibpid, ibrid_got])
+				else:
+					print("[GRAND THEATER QC] FAIL Iberia/Cyprus %s (#%d rid=%d expected %d)" % [ibname, ibpid, ibrid_got, ibrid_exp])
+
+			var france_italy_checks: Array = [
+				[9281, 12, "Paris"],
+				[9538, 12, "Lyon"],
+				[9251, 14, "Milan"],
+				[21, 15, "Rome"],
+				[9250, 15, "Naples"],
+			]
+			for fchk in france_italy_checks:
+				var fpid: int = int(fchk[0])
+				var frid_exp: int = int(fchk[1])
+				var fname: String = str(fchk[2])
+				total += 1
+				var frid_got: int = MapManager.get_province_region_id(fpid)
+				if frid_got == frid_exp and MapManager.get_province(fpid) != null:
+					passed += 1
+					print("[GRAND THEATER QC] PASS France/Italy %s (#%d → region %d)" % [fname, fpid, frid_got])
+				else:
+					print("[GRAND THEATER QC] FAIL France/Italy %s (#%d rid=%d expected %d)" % [fname, fpid, frid_got, frid_exp])
 		total += 1
 		var lod_ok: bool = mapr.get("_region_highlight_layer") != null or mapr.get("_political_labels_layer") != null
 		if lod_ok:
@@ -3298,9 +3354,15 @@ func _force_space_race_evidence_prints() -> void:
 			var ok1910 = await loader.load_scenario("1910")
 			print("  1910 load success:", ok1910, " (start_date from json 1910-01-01; use for alt July Crisis paths later)")
 			if ok1910 and gd and gd.has_method("process_1910_crisis_events"):
-				gd.call("process_1910_crisis_events", 1912, 10, "1910")  # stub example
-				gd.call("process_1910_crisis_events", 1914, 6, "1910")  # July crisis branches
+				# Call with year; func reads month from TimeManager (or defaults). Advance time sim if needed for month triggers.
+				gd.call("process_1910_crisis_events", 1912)
+				gd.call("process_1910_crisis_events", 1913)
+				gd.call("process_1910_crisis_events", 1914)
 				print("  1910 events fired (Balkan alts, July choices - ripple to 1918 if war/averted)")
+				# Demo 1910->1918 ripple (in real: run 1910 campaign, save peace_state, load 1918)
+				if gd.has_method("_apply_1910_ripples_to_1918"):
+					gd.call("_apply_1910_ripples_to_1918")
+					print("  1910 ripples applied to 1918 state (org/exhaustion/grievance/border alts from crisis flags)")
 		else:
 			print("  1910 loader not ready in this context.")
 	print("[SPACE EVIDENCE FORCE] Done - check logs for [SPACE RACE EVENT], first_satellite/moon etc, protests, secret fleet, ethics space, Versailles Treaty alt, pillar/news, program choice, mech designer. Full 8+ milestones + alts integrated.")
@@ -3359,8 +3421,8 @@ func _run_unit_type_combat_mod_test() -> void:
 	for tid in templates:
 		for terr in terrains:
 			var p := r.get_effective_combat_power(tid, "", "", terr)
-			var ut := p.get("unit_type", "std")
-			var factors := p.get("unit_mod_factors", {})
+			var ut: String = str(p.get("unit_type", "std"))
+			var factors: Dictionary = p.get("unit_mod_factors", {}) as Dictionary
 			var gsoft := float(p.get("guided_soft_mult", 1.0))
 			print("  [UNIT %s @ %s] soft=%.1f org=%.2f | type=%s factors=%s guided_mult=%.2f" % [tid, terr, float(p.get("soft_attack",0)), float(p.get("organization",1)), ut, str(factors), gsoft])
 	print("[HoI4-STYLE BALANCE] Marine +28% coastal soft/readiness; paratroop +18% airdrop but -18% org risk (high loss on drop); SF +22% flank/sabotage + pre-battle def org hit; Mountain +32% mtn/hills; Ski +35% snow; Space +20% + guided*1.5 soft on advanced (infantry vulnerable to precision, armor needs hard+combined). Factors returned for preview/AAR/inspector hover. Soft targets feel guided/space pressure (realistic); width/supply/terrain still gate stacks. See /tmp/unit_mod_test.log for harness runs.")

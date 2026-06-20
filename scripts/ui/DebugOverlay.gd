@@ -612,8 +612,9 @@ func _build_ui() -> void:
 	var hist_btn := Button.new()
 	hist_btn.text = "📜 Run Historical Combat Harness (Marne/Verdun/Stalingrad/Midway + AAR logs, duration/org tests)"
 	hist_btn.pressed.connect(func():
-		if typeof(TestRunner) != TYPE_NIL and TestRunner.has_method("_run_historical_battle_recreations"):
-			TestRunner.call("_run_historical_battle_recreations")
+		var test_runner: Node = get_tree().root.find_child("TestRunner", true, false)
+		if test_runner != null and test_runner.has_method("_run_historical_battle_recreations"):
+			test_runner.call("_run_historical_battle_recreations")
 			toast_map_debug("Historical harness triggered - see console, /tmp/combat-history-testing-summary.md, AARs from assaults.")
 	)
 	harness_section.add_child(hist_btn)
@@ -621,11 +622,30 @@ func _build_ui() -> void:
 	var unit_mod_btn := Button.new()
 	unit_mod_btn.text = "🧪 Run Unit Mod + Guided Tests (specialists marine/paratroop/SF/mtn/ski/space + chem/AA/interdict sims)"
 	unit_mod_btn.pressed.connect(func():
-		if typeof(TestRunner) != TYPE_NIL and TestRunner.has_method("_run_unit_type_combat_mod_test"):
-			TestRunner.call("_run_unit_type_combat_mod_test")
+		var test_runner: Node = get_tree().root.find_child("TestRunner", true, false)
+		if test_runner != null and test_runner.has_method("_run_unit_type_combat_mod_test"):
+			test_runner.call("_run_unit_type_combat_mod_test")
 			toast_map_debug("Unit mod test triggered - console shows % factors, prolonged/org bias tests.")
 	)
 	harness_section.add_child(unit_mod_btn)
+
+	var btn_1910 := Button.new()
+	btn_1910.text = "🌍 Load 1910 Scenario + Fire Crisis Events (Balkans/July alts; ripples to 1918; more provs 43 + 22 tags)"
+	btn_1910.pressed.connect(func():
+		var loader: Node = get_tree().root.find_child("ScenarioLoader", true, false)
+		var gd: Node = get_tree().root.find_child("GameData", true, false) if get_tree() else null
+		if loader and loader.has_method("load_scenario"):
+			# Note: may need full restart or map reload for full visual; test harness prints events + state
+			var ok = loader.call("load_scenario", "1910")
+			toast_map_debug("1910 load attempted (see console for Balkan 1912/13, July branches, flags). Use EOA_1910_TEST=1 for full headless.")
+			if gd and gd.has_method("process_1910_crisis_events"):
+				gd.call("process_1910_crisis_events", 1912)
+				gd.call("process_1910_crisis_events", 1914)
+				if gd.has_method("_apply_1910_ripples_to_1918"):
+					gd.call("_apply_1910_ripples_to_1918")
+				toast_map_debug("1910 crisis events + 1918 ripple demo fired. Check peace_state for 1914_crisis, 1912_balkan_alt, 1918_start_mods.")
+	)
+	harness_section.add_child(btn_1910)
 
 	# Production tick for the demo lines auto-started in ScenarioLoader from the phase1 json starting_oob (ties the build system to base scenario data)
 	var prod_tick_btn := Button.new()
@@ -2313,7 +2333,7 @@ func _build_ui() -> void:
 				toast_map_debug("Chain/flank executed: %d steps. See logs for flanking multi-prov." % ch.size())
 		elif typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("execute_chain_assault_or_flank"):
 			# Fallback direct
-			var ch2 := BattleManager.execute_chain_assault_or_flank(_debug_player_country_tag(), 2, 1, 1)
+			var ch2: Array = BattleManager.execute_chain_assault_or_flank(_debug_player_country_tag(), 2, 1, 1)
 			toast_map_debug("Direct chain demo steps: %d (use selected + Ctrl for full)." % ch2.size())
 		else:
 			toast_map_debug("Chain assault not available yet.")
@@ -4905,7 +4925,7 @@ func _print_tech_observe(ptag: String) -> void:
 	if typeof(GameData) != TYPE_NIL:
 		var gd := get_node_or_null("/root/GameData")
 		if gd and gd.has_method("get_peace_state"):
-			var ps := gd.call("get_peace_state")
+			var ps: Dictionary = gd.call("get_peace_state") as Dictionary
 			print("[MP POOL approx] from pop update if run; peace pop GER/USA sample:", (ps.get("population", {}) as Dictionary).get(ptag, "?"))
 			print("[SPACE MILESTONES] ", ps.get("space_milestones", {}))
 			print("[MECH/SECRET] unlocked=", ps.get("mech_designer_unlocked", {}).get(ptag), " variant_choice=", ps.get("mech_variant_choice", {}).get(ptag), " secret_fleet=", ps.get("secret_fleet_combat_bonus", {}).get(ptag))
@@ -4965,7 +4985,7 @@ func _open_space_designer() -> void:
 	
 	var popup := preload("res://scripts/ui/SpaceDesignPopup.gd").new()
 	get_tree().root.add_child(popup)
-	popup.set_player_tag("player" if "player" in get_tree().root.get("peace_state", {}) else "USA")
+	popup.set_player_tag("USA")
 	toast_map_debug("Space Designer opened. Choose base, add modules (propulsion, sensors, life support), finalize to unlock custom design for production.")
 
 func show_battle_aar(result: Dictionary = {}) -> void:
@@ -5052,8 +5072,8 @@ func show_battle_aar(result: Dictionary = {}) -> void:
 	lsec.text = "LEADER IMPACTS"
 	lsec.add_theme_color_override("font_color", Color(0.9, 0.8, 0.2))
 	vb.add_child(lsec)
-	var att_pd := result.get("attacker_power_detail", {}) if typeof(result.get("attacker_power_detail", {})) == TYPE_DICTIONARY else {}
-	var def_pd := result.get("defender_power_detail", {}) if typeof(result.get("defender_power_detail", {})) == TYPE_DICTIONARY else {}
+	var att_pd: Dictionary = result.get("attacker_power_detail", {}) as Dictionary if typeof(result.get("attacker_power_detail", {})) == TYPE_DICTIONARY else {}
+	var def_pd: Dictionary = result.get("defender_power_detail", {}) as Dictionary if typeof(result.get("defender_power_detail", {})) == TYPE_DICTIONARY else {}
 	var lead_att := Label.new()
 	var att_ldr := str(result.get("leader_name", att_pd.get("leader_name", result.get("leader_att", "—"))))
 	var att_ldr_b := float(att_pd.get("leader_attack_bonus", result.get("leader_attack_bonus", 0.0)))
@@ -5075,7 +5095,7 @@ func show_battle_aar(result: Dictionary = {}) -> void:
 	logsec.text = "UNIT COMBAT LOGS (from Formation.combat_log — follows unit)"
 	logsec.add_theme_color_override("font_color", Color(0.7, 0.9, 0.7))
 	vb.add_child(logsec)
-	var logs_src := result.get("combat_logs", {})
+	var logs_src: Dictionary = result.get("combat_logs", {}) as Dictionary
 	var shown_logs := false
 	for role in ["attacker", "defender"]:
 		var role_logs = logs_src.get(role, []) if typeof(logs_src) == TYPE_DICTIONARY else []
