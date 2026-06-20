@@ -309,6 +309,45 @@ func _print_grand_theater_qc_evidence(mapr: Node) -> void:
 					print("[GRAND THEATER QC] PASS Poland/Scandinavia %s (#%d → region %d)" % [pname, ppid, prid_got])
 				else:
 					print("[GRAND THEATER QC] FAIL Poland/Scandinavia %s (#%d rid=%d expected %d)" % [pname, ppid, prid_got, prid_exp])
+
+			var scand_extra_checks: Array = [
+				[9401, 9, "Uppsala"],
+				[9078, 9, "Narvik"],
+				[9079, 9, "Tromso"],
+				[9229, 9, "Turku"],
+			]
+			for schk in scand_extra_checks:
+				var spid: int = int(schk[0])
+				var srid_exp: int = int(schk[1])
+				var sname: String = str(schk[2])
+				total += 1
+				var srid_got: int = MapManager.get_province_region_id(spid)
+				if srid_got == srid_exp and MapManager.get_province(spid) != null:
+					passed += 1
+					print("[GRAND THEATER QC] PASS Scandinavia extras %s (#%d → region %d)" % [sname, spid, srid_got])
+				else:
+					print("[GRAND THEATER QC] FAIL Scandinavia extras %s (#%d rid=%d expected %d)" % [sname, spid, srid_got, srid_exp])
+
+			var east_balk_checks: Array = [
+				[9089, 21, "Kyiv"],
+				[9563, 17, "Budapest"],
+				[9565, 17, "Belgrade"],
+				[9568, 8, "Prague"],
+				[9571, 18, "Athens"],
+				[9191, 22, "St Petersburg"],
+				[9269, 22, "Moscow"],
+			]
+			for echk in east_balk_checks:
+				var epid: int = int(echk[0])
+				var erid_exp: int = int(echk[1])
+				var ename: String = str(echk[2])
+				total += 1
+				var erid_got: int = MapManager.get_province_region_id(epid)
+				if erid_got == erid_exp and MapManager.get_province(epid) != null:
+					passed += 1
+					print("[GRAND THEATER QC] PASS Eastern Europe/Balkans %s (#%d → region %d)" % [ename, epid, erid_got])
+				else:
+					print("[GRAND THEATER QC] FAIL Eastern Europe/Balkans %s (#%d rid=%d expected %d)" % [ename, epid, erid_got, erid_exp])
 		total += 1
 		var lod_ok: bool = mapr.get("_region_highlight_layer") != null or mapr.get("_political_labels_layer") != null
 		if lod_ok:

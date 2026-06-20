@@ -113,6 +113,9 @@ func get_effective_combat_power(
 		if combat_stats.has("casualties"):
 			combat_stats["casualties"] = float(combat_stats["casualties"]) * (1.0 - unit_xp / 500.0)
 
+	# Detect unit_type early for doctrine/air/naval branch logic (fix scope for later use)
+	var unit_type_early := _detect_unit_type(division_template_id)
+
 	if leader != null and not leader.is_injured and not leader.is_captured:
 		final_soft += leader.get_attack_modifier() * 10.0
 		final_hard += leader.get_attack_modifier() * 6.0
@@ -126,7 +129,7 @@ func get_effective_combat_power(
 	# Army: blitzkrieg mobility/breakthrough, attrition_warfare manpower/art but high cost.
 	# Navy/Air/Space similar. Era appropriate via doctrine unlock/research.
 	if leader != null and typeof(LeaderManager) != TYPE_NIL:
-		var doc := LeaderManager.get_service_doctrine(leader.country_tag, "army" if unit_type in ["infantry","armor","artillery"] else ("navy" if unit_type in ["naval","sub"] else ("air_force" if unit_type in ["air","fighter","bomber"] else "space_force")))
+		var doc := LeaderManager.get_service_doctrine(leader.country_tag, "army" if unit_type_early in ["infantry","armor","artillery"] else ("navy" if unit_type_early in ["naval","sub"] else ("air_force" if unit_type_early in ["air","fighter","bomber"] else "space_force")))
 		if doc != "":
 			if doc == "blitzkrieg" or doc == "mobile_warfare":
 				final_soft *= 1.08
@@ -140,7 +143,7 @@ func get_effective_combat_power(
 				# air_support already from leader
 			elif doc == "strategic_bombing":
 				# for air units
-				if unit_type in ["air", "bomber"]:
+				if unit_type_early in ["air", "bomber"]:
 					final_soft *= 1.12
 			elif "space" in doc or doc == "orbital_strike":
 				final_soft *= 1.05
