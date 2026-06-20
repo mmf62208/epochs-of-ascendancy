@@ -5382,7 +5382,7 @@ static func _battle_preview_block(
 	if preview.get("guided_munitions_bonus", 0.0) > 0.1:
 		tips.append("Guided munitions bonus for advanced units (space comms/tech)")
 	# Unit specialty factors (from resolver power in live calls or passed; HoI4-style % visible)
-	var umf := preview.get("unit_mod_factors", {})
+	var umf: Dictionary = preview.get("unit_mod_factors", {}) as Dictionary
 	if umf:
 		if umf.has("marine_amphib_coastal"):
 			tips.append("Marine amphibious specialists active (+28% soft in coastal)")

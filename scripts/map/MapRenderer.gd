@@ -4468,7 +4468,7 @@ func _get_infra_manager() -> Object:
 func _next_engineer_deploy_label(country_tag: String) -> String:
 	if typeof(SupplyManager) == TYPE_NIL:
 		return "engineers"
-	var formations := SupplyManager.get_engineer_capable_formations(country_tag)
+	var formations: Array = SupplyManager.get_engineer_capable_formations(country_tag)
 	if formations.is_empty():
 		return ""
 	_engineer_deploy_pick_index = _engineer_deploy_pick_index % formations.size()
@@ -4483,7 +4483,7 @@ func _formation_id_for_deploy(country_tag: String, province: Province, use_cycle
 	if typeof(SupplyManager) == TYPE_NIL:
 		return ""
 	if use_cycle:
-		var formations := SupplyManager.get_engineer_capable_formations(country_tag)
+		var formations: Array = SupplyManager.get_engineer_capable_formations(country_tag)
 		if formations.is_empty():
 			return ""
 		_engineer_deploy_pick_index = _engineer_deploy_pick_index % formations.size()

@@ -3319,9 +3319,9 @@ func _run_unit_type_combat_mod_test() -> void:
 	print("Terrains: ", terrains)
 	for tid in templates:
 		for terr in terrains:
-			var p := r.get_effective_combat_power(tid, "", "", terr)
-			var ut := p.get("unit_type", "std")
-			var factors := p.get("unit_mod_factors", {})
+			var p: Dictionary = r.get_effective_combat_power(tid, "", "", terr)
+			var ut: String = str(p.get("unit_type", "std"))
+			var factors: Dictionary = p.get("unit_mod_factors", {}) as Dictionary
 			var gsoft := float(p.get("guided_soft_mult", 1.0))
 			print("  [UNIT %s @ %s] soft=%.1f org=%.2f | type=%s factors=%s guided_mult=%.2f" % [tid, terr, float(p.get("soft_attack",0)), float(p.get("organization",1)), ut, str(factors), gsoft])
 	print("[HoI4-STYLE BALANCE] Marine +28% coastal soft/readiness; paratroop +18% airdrop but -18% org risk (high loss on drop); SF +22% flank/sabotage + pre-battle def org hit; Mountain +32% mtn/hills; Ski +35% snow; Space +20% + guided*1.5 soft on advanced (infantry vulnerable to precision, armor needs hard+combined). Factors returned for preview/AAR/inspector hover. Soft targets feel guided/space pressure (realistic); width/supply/terrain still gate stacks. See /tmp/unit_mod_test.log for harness runs.")
