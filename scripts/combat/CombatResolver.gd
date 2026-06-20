@@ -100,6 +100,19 @@ func get_effective_combat_power(
 		final_readiness = min(1.95, final_readiness * 1.12)
 		final_org = min(1.95, final_org * 1.08)
 
+	# Unit experience / veteran level (from combat XP, training, battles): meaningful impact on staying power and effectiveness.
+	# Formation tracks experience; passed via combat_stats or context (0-100 or normalized level).
+	var unit_xp := float(combat_stats.get("unit_experience", combat_stats.get("veteran_level", 0.0)))
+	if unit_xp > 0.0:
+		var xp_mult := clampf(1.0 + (unit_xp / 400.0), 1.0, 1.25)  # up to 25% bonus for elite veterans
+		final_soft *= xp_mult
+		final_hard *= xp_mult * 0.95
+		final_org = min(2.0, final_org * (1.0 + unit_xp / 300.0))
+		final_readiness = min(2.0, final_readiness * (1.0 + unit_xp / 350.0))
+		# XP also reduces casualties a bit (better tactics)
+		if combat_stats.has("casualties"):
+			combat_stats["casualties"] = float(combat_stats["casualties"]) * (1.0 - unit_xp / 500.0)
+
 	if leader != null and not leader.is_injured and not leader.is_captured:
 		final_soft += leader.get_attack_modifier() * 10.0
 		final_hard += leader.get_attack_modifier() * 6.0
@@ -108,6 +121,30 @@ func get_effective_combat_power(
 
 		terrain_bonus = leader.get_terrain_modifier(terrain)
 		final_soft += terrain_bonus * 8.0
+
+	# Service doctrine branch bonuses (wired from LeaderManager service_doctrines + DESIGN_DOCTRINES tradeoffs)
+	# Army: blitzkrieg mobility/breakthrough, attrition_warfare manpower/art but high cost.
+	# Navy/Air/Space similar. Era appropriate via doctrine unlock/research.
+	if leader != null and typeof(LeaderManager) != TYPE_NIL:
+		var doc := LeaderManager.get_service_doctrine(leader.country_tag, "army" if unit_type in ["infantry","armor","artillery"] else ("navy" if unit_type in ["naval","sub"] else ("air_force" if unit_type in ["air","fighter","bomber"] else "space_force")))
+		if doc != "":
+			if doc == "blitzkrieg" or doc == "mobile_warfare":
+				final_soft *= 1.08
+				final_readiness *= 1.05
+				# high supply cost handled in supply
+			elif doc == "attrition_warfare":
+				final_org *= 1.10
+				final_readiness *= 0.95
+			elif doc == "carrier_task_force" or doc == "naval_aviation":
+				final_soft *= 1.06
+				# air_support already from leader
+			elif doc == "strategic_bombing":
+				# for air units
+				if unit_type in ["air", "bomber"]:
+					final_soft *= 1.12
+			elif "space" in doc or doc == "orbital_strike":
+				final_soft *= 1.05
+				final_hard *= 1.08
 
 	# ============================================================
 	# UNIT TYPE SPECIALTY MODIFIERS (HoI4-style detailed % terrain/unit factors, visible in previews/tests/logs)
@@ -321,8 +358,11 @@ func get_effective_combat_power(
 	# Uses formation air_mission data if present (set by AirMission system); simple for now, scales with intensity.
 	if formation_for_effects != null:
 		var air_int := 0.0
+		var air_fuel := 1.0
+		var air_org := final_org
 		if typeof(formation_for_effects) == TYPE_DICTIONARY:
 			air_int = float(formation_for_effects.get("air_mission_intensity", 0.0)) if formation_for_effects.has("air_mission_intensity") else 0.0
+			air_fuel = float(formation_for_effects.get("air_fuel_state", 1.0))
 			if formation_for_effects.has("air_mission_type") and str(formation_for_effects.get("air_mission_type","")).to_upper() in ["CAS", "CLOSE_AIR_SUPPORT"]:
 				final_soft *= (1.0 + clampf(air_int * 0.12, 0.0, 0.25))
 				final_hard *= (1.0 + clampf(air_int * 0.08, 0.0, 0.18))
@@ -331,7 +371,20 @@ func get_effective_combat_power(
 				final_org *= (1.0 - clampf(air_int * 0.07, 0.0, 0.15))
 		elif formation_for_effects is Object and formation_for_effects.has_method("get"):
 			air_int = float(formation_for_effects.call("get", "air_mission_intensity") if formation_for_effects.has("air_mission_intensity") else 0.0)
-			# similar for type...
+			air_fuel = float(formation_for_effects.call("get", "air_fuel_state") if formation_for_effects.has("air_fuel_state") else 1.0)
+
+		# Air loiter / sortie generation (unique to air war): limited by fuel/org/range/era.
+		# Early wars: 1 sortie; with jets/tankers/AWACS: more runs/day if high org/fuel/supply.
+		# Not infinite loiter until late tech (user req).
+		var sortie_rate := clampf(0.6 + air_fuel * 0.4 + (air_org - 1.0) * 0.3, 0.4, 1.8)
+		# Tech boost late (jets, tankers, drones)
+		if typeof(TechnologyManager) != TYPE_NIL and (TechnologyManager.has_rule_flag(owner_for_tech, "jet_fighters") or TechnologyManager.has_rule_flag(owner_for_tech, "aerial_refueling") or TechnologyManager.has_rule_flag(owner_for_tech, "drone_warfare")):
+			sortie_rate = min(2.5, sortie_rate * 1.2)
+		final_soft *= sortie_rate
+		final_hard *= sortie_rate * 0.9
+		# Fuel burn note for supply (caller can deduct)
+		if air_fuel < 0.5:
+			final_readiness *= 0.85
 
 	if prov_dev < 0:
 		prov_dev = 0
@@ -654,6 +707,31 @@ func resolve_naval_engagement(context: Dictionary, atk_power: float, def_power: 
 		atk_power *= 1.2  # carrier air/gun at stand off
 	if d_order == "ASW" and subh:
 		def_power *= 1.15  # ASW counters subs
+
+	# Expanded world-class factors (recon/spotting, jamming, fuel/endurance, satellites late era, leader)
+	# Spotting from recon (air/sub/surface/sat in context), reduced by jamming, weather.
+	var spotting := float(context.get("spotting", 1.0))
+	var jamming := float(context.get("jamming", 0.0))  # 0-0.5 from ECM/tech
+	var fuel_state := float(context.get("fuel_state", 1.0))  # from supply
+	var sat_bonus := float(context.get("satellite_bonus", 0.0))
+	if jamming > 0.0:
+		spotting *= (1.0 - jamming * 0.6)
+		atk_power *= (1.0 - jamming * 0.4)
+		def_power *= (1.0 - jamming * 0.3)
+	if fuel_state < 0.6:
+		atk_power *= (0.6 + fuel_state * 0.5)
+		def_power *= (0.6 + fuel_state * 0.5)
+	if sat_bonus > 0.0:
+		spotting *= (1.0 + sat_bonus * 0.5)
+		atk_power *= (1.0 + sat_bonus * 0.3)
+	# Recon advantage boosts attacker if high spotting
+	if spotting > 1.2:
+		atk_power *= 1.1
+	# Leader in context for naval traits
+	var naval_leader_bonus := float(context.get("naval_leader_bonus", 0.0))
+	atk_power += naval_leader_bonus
+	def_power += float(context.get("defender_naval_leader_bonus", 0.0))
+
 	# Simple roll
 	var total = atk_power + def_power + 0.01
 	var atk_win_chance = atk_power / total
@@ -661,7 +739,7 @@ func resolve_naval_engagement(context: Dictionary, atk_power: float, def_power: 
 	res["naval_casualties_est"] = randf() * 0.3 + 0.1
 	res["engagement_type"] = "close_ambush" if (range_mod < 0.6 or closer) else ("chokepoint_brawl" if choke else "stand_off")
 	res["context"] = context
-	print("  [NAVAL RESOLVER] %s engagement: vis=%.2f choke=%s sub=%s range_mod=%.2f closer=%s orders(%s/%s) -> %s" % [res["engagement_type"], vis, choke, subh, range_mod, closer, a_order, d_order, res["winner"]])
+	print("  [NAVAL RESOLVER] %s engagement: vis=%.2f choke=%s sub=%s range_mod=%.2f closer=%s orders(%s/%s) spot=%.2f jam=%.2f fuel=%.2f sat=%.2f -> %s" % [res["engagement_type"], vis, choke, subh, range_mod, closer, a_order, d_order, spotting, jamming, fuel_state, sat_bonus, res["winner"]])
 	return res
 
 

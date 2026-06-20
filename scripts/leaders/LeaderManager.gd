@@ -3693,7 +3693,8 @@ func traits_conflict(leader: Leader, trait_id: String) -> bool:
 func can_add_trait(leader: Leader, trait_id: String, level: int = 1) -> bool:
 	if leader == null or trait_id.is_empty():
 		return false
-	if get_trait_definition(trait_id).is_empty():
+	var def := get_trait_definition(trait_id)
+	if def.is_empty():
 		push_warning("LeaderManager: unknown trait '%s'" % trait_id)
 		return false
 	if traits_conflict(leader, trait_id):
@@ -3708,6 +3709,20 @@ func can_add_trait(leader: Leader, trait_id: String, level: int = 1) -> bool:
 	if get_trait_rarity(trait_id) == RARITY_LEGENDARY:
 		if count_traits_by_rarity(leader, RARITY_LEGENDARY) >= MAX_LEGENDARY_TRAITS:
 			return false
+	# Era / tech gating (per user: traits not available ahead of time unless tech unlocked or rare "ahead of his time" leader)
+	var era_min := int(def.get("era_min", 0))
+	var cur_year := 1936
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("game_year"):
+		cur_year = TimeManager.game_year
+	if era_min > 0 and cur_year < era_min:
+		# Allow only if legendary rarity or special "ahead of time" flag on leader (rare historical or player choice sci-fi leader)
+		if get_trait_rarity(trait_id) != RARITY_LEGENDARY and not leader.has_trait("ahead_of_time_visionary"):
+			return false
+	var req_tech := str(def.get("requires_tech", ""))
+	if req_tech != "" and typeof(TechnologyManager) != TYPE_NIL:
+		if not TechnologyManager.has_rule_flag(leader.country_tag if leader.country_tag else "player", req_tech):
+			if get_trait_rarity(trait_id) != RARITY_LEGENDARY:
+				return false  # rare legendary can bypass for "genius ahead of time"
 	return true
 
 

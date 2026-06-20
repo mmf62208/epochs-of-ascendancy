@@ -5,12 +5,25 @@
     "category": "specialist",
     "max_level": 3,
     "rarity": "notable",
-    "acquisition": ["earned", "doctrine"],
+    "acquisition": [
+      "earned",
+      "doctrine"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "armor_attack": 0.08, "breakthrough": 0.05 },
-      "2": { "armor_attack": 0.15, "breakthrough": 0.10 },
-      "3": { "armor_attack": 0.22, "breakthrough": 0.15, "combined_arms_sync": 0.08 }
+      "1": {
+        "armor_attack": 0.08,
+        "breakthrough": 0.05
+      },
+      "2": {
+        "armor_attack": 0.15,
+        "breakthrough": 0.1
+      },
+      "3": {
+        "armor_attack": 0.22,
+        "breakthrough": 0.15,
+        "combined_arms_sync": 0.08
+      }
     }
   },
   "desert_fox": {
@@ -19,12 +32,29 @@
     "category": "terrain",
     "max_level": 3,
     "rarity": "rare",
-    "acquisition": ["earned"],
-    "exclusive_with": ["arctic_bear", "jungle_panther"],
+    "acquisition": [
+      "earned"
+    ],
+    "exclusive_with": [
+      "arctic_bear",
+      "jungle_panther"
+    ],
     "effects_by_level": {
-      "1": { "desert_attack": 0.12, "desert_defense": 0.06 },
-      "2": { "desert_attack": 0.20, "desert_defense": 0.12, "supply_consumption": -0.08 },
-      "3": { "desert_attack": 0.28, "desert_defense": 0.18, "supply_consumption": -0.12, "initiative": 1 }
+      "1": {
+        "desert_attack": 0.12,
+        "desert_defense": 0.06
+      },
+      "2": {
+        "desert_attack": 0.2,
+        "desert_defense": 0.12,
+        "supply_consumption": -0.08
+      },
+      "3": {
+        "desert_attack": 0.28,
+        "desert_defense": 0.18,
+        "supply_consumption": -0.12,
+        "initiative": 1
+      }
     }
   },
   "arctic_bear": {
@@ -33,12 +63,29 @@
     "category": "terrain",
     "max_level": 3,
     "rarity": "rare",
-    "acquisition": ["earned"],
-    "exclusive_with": ["desert_fox", "jungle_panther"],
+    "acquisition": [
+      "earned"
+    ],
+    "exclusive_with": [
+      "desert_fox",
+      "jungle_panther"
+    ],
     "effects_by_level": {
-      "1": { "arctic_attack": 0.12, "arctic_defense": 0.08 },
-      "2": { "arctic_attack": 0.20, "arctic_defense": 0.14, "attrition_reduction": 0.08 },
-      "3": { "arctic_attack": 0.28, "arctic_defense": 0.20, "attrition_reduction": 0.15, "defense": 1 }
+      "1": {
+        "arctic_attack": 0.12,
+        "arctic_defense": 0.08
+      },
+      "2": {
+        "arctic_attack": 0.2,
+        "arctic_defense": 0.14,
+        "attrition_reduction": 0.08
+      },
+      "3": {
+        "arctic_attack": 0.28,
+        "arctic_defense": 0.2,
+        "attrition_reduction": 0.15,
+        "defense": 1
+      }
     }
   },
   "jungle_panther": {
@@ -47,12 +94,29 @@
     "category": "terrain",
     "max_level": 3,
     "rarity": "rare",
-    "acquisition": ["earned"],
-    "exclusive_with": ["desert_fox", "arctic_bear"],
+    "acquisition": [
+      "earned"
+    ],
+    "exclusive_with": [
+      "desert_fox",
+      "arctic_bear"
+    ],
     "effects_by_level": {
-      "1": { "jungle_attack": 0.10, "jungle_defense": 0.08 },
-      "2": { "jungle_attack": 0.18, "jungle_defense": 0.14, "attrition_reduction": 0.06 },
-      "3": { "jungle_attack": 0.26, "jungle_defense": 0.20, "attrition_reduction": 0.12, "initiative": 1 }
+      "1": {
+        "jungle_attack": 0.1,
+        "jungle_defense": 0.08
+      },
+      "2": {
+        "jungle_attack": 0.18,
+        "jungle_defense": 0.14,
+        "attrition_reduction": 0.06
+      },
+      "3": {
+        "jungle_attack": 0.26,
+        "jungle_defense": 0.2,
+        "attrition_reduction": 0.12,
+        "initiative": 1
+      }
     }
   },
   "mountain_specialist": {
@@ -61,12 +125,26 @@
     "category": "terrain",
     "max_level": 3,
     "rarity": "notable",
-    "acquisition": ["earned"],
+    "acquisition": [
+      "earned"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "mountain_attack": 0.10, "mountain_defense": 0.10 },
-      "2": { "mountain_attack": 0.16, "mountain_defense": 0.16, "defense": 1 },
-      "3": { "mountain_attack": 0.24, "mountain_defense": 0.22, "defense": 1, "organization_recovery": 0.08 }
+      "1": {
+        "mountain_attack": 0.1,
+        "mountain_defense": 0.1
+      },
+      "2": {
+        "mountain_attack": 0.16,
+        "mountain_defense": 0.16,
+        "defense": 1
+      },
+      "3": {
+        "mountain_attack": 0.24,
+        "mountain_defense": 0.22,
+        "defense": 1,
+        "organization_recovery": 0.08
+      }
     }
   },
   "night_operator": {
@@ -75,11 +153,20 @@
     "category": "terrain",
     "max_level": 2,
     "rarity": "notable",
-    "acquisition": ["earned"],
+    "acquisition": [
+      "earned"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "attack": 1, "initiative": 1 },
-      "2": { "attack": 1, "initiative": 2, "breakthrough": 0.08 }
+      "1": {
+        "attack": 1,
+        "initiative": 1
+      },
+      "2": {
+        "attack": 1,
+        "initiative": 2,
+        "breakthrough": 0.08
+      }
     }
   },
   "logistics_wizard": {
@@ -88,12 +175,24 @@
     "category": "specialist",
     "max_level": 3,
     "rarity": "notable",
-    "acquisition": ["earned", "doctrine"],
+    "acquisition": [
+      "earned",
+      "doctrine"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "supply_consumption": -0.10 },
-      "2": { "supply_consumption": -0.18, "reinforcement_speed": 0.10 },
-      "3": { "supply_consumption": -0.25, "reinforcement_speed": 0.18, "attrition_reduction": 0.15 }
+      "1": {
+        "supply_consumption": -0.1
+      },
+      "2": {
+        "supply_consumption": -0.18,
+        "reinforcement_speed": 0.1
+      },
+      "3": {
+        "supply_consumption": -0.25,
+        "reinforcement_speed": 0.18,
+        "attrition_reduction": 0.15
+      }
     }
   },
   "artillery_expert": {
@@ -102,12 +201,26 @@
     "category": "specialist",
     "max_level": 3,
     "rarity": "notable",
-    "acquisition": ["earned", "doctrine"],
+    "acquisition": [
+      "earned",
+      "doctrine"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "attack": 1, "breakthrough": 0.04 },
-      "2": { "attack": 1, "breakthrough": 0.08, "planning": 1 },
-      "3": { "attack": 2, "breakthrough": 0.12, "planning": 1 }
+      "1": {
+        "attack": 1,
+        "breakthrough": 0.04
+      },
+      "2": {
+        "attack": 1,
+        "breakthrough": 0.08,
+        "planning": 1
+      },
+      "3": {
+        "attack": 2,
+        "breakthrough": 0.12,
+        "planning": 1
+      }
     }
   },
   "combined_arms_master": {
@@ -116,12 +229,27 @@
     "category": "specialist",
     "max_level": 3,
     "rarity": "rare",
-    "acquisition": ["earned", "doctrine"],
+    "acquisition": [
+      "earned",
+      "doctrine"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "combined_arms_sync": 0.06, "planning": 1 },
-      "2": { "combined_arms_sync": 0.12, "planning": 1, "breakthrough": 0.06 },
-      "3": { "combined_arms_sync": 0.18, "planning": 2, "breakthrough": 0.10, "attack": 1 }
+      "1": {
+        "combined_arms_sync": 0.06,
+        "planning": 1
+      },
+      "2": {
+        "combined_arms_sync": 0.12,
+        "planning": 1,
+        "breakthrough": 0.06
+      },
+      "3": {
+        "combined_arms_sync": 0.18,
+        "planning": 2,
+        "breakthrough": 0.1,
+        "attack": 1
+      }
     }
   },
   "aggressive": {
@@ -130,12 +258,26 @@
     "category": "combat_style",
     "max_level": 3,
     "rarity": "common",
-    "acquisition": ["earned"],
-    "exclusive_with": ["cautious"],
+    "acquisition": [
+      "earned"
+    ],
+    "exclusive_with": [
+      "cautious"
+    ],
     "effects_by_level": {
-      "1": { "attack": 1, "defense": -1 },
-      "2": { "attack": 2, "defense": -1 },
-      "3": { "attack": 3, "defense": -2, "breakthrough": 0.10 }
+      "1": {
+        "attack": 1,
+        "defense": -1
+      },
+      "2": {
+        "attack": 2,
+        "defense": -1
+      },
+      "3": {
+        "attack": 3,
+        "defense": -2,
+        "breakthrough": 0.1
+      }
     }
   },
   "cautious": {
@@ -144,12 +286,27 @@
     "category": "combat_style",
     "max_level": 3,
     "rarity": "common",
-    "acquisition": ["earned"],
-    "exclusive_with": ["aggressive", "reckless"],
+    "acquisition": [
+      "earned"
+    ],
+    "exclusive_with": [
+      "aggressive",
+      "reckless"
+    ],
     "effects_by_level": {
-      "1": { "defense": 1, "attack": -1 },
-      "2": { "defense": 2, "attack": -1 },
-      "3": { "defense": 3, "attack": -2, "organization_recovery": 0.10 }
+      "1": {
+        "defense": 1,
+        "attack": -1
+      },
+      "2": {
+        "defense": 2,
+        "attack": -1
+      },
+      "3": {
+        "defense": 3,
+        "attack": -2,
+        "organization_recovery": 0.1
+      }
     }
   },
   "bold": {
@@ -158,12 +315,27 @@
     "category": "combat_style",
     "max_level": 3,
     "rarity": "notable",
-    "acquisition": ["earned"],
-    "exclusive_with": ["methodical"],
+    "acquisition": [
+      "earned"
+    ],
+    "exclusive_with": [
+      "methodical"
+    ],
     "effects_by_level": {
-      "1": { "attack": 1, "initiative": 1 },
-      "2": { "attack": 2, "initiative": 1, "breakthrough": 0.06 },
-      "3": { "attack": 2, "initiative": 2, "breakthrough": 0.12 }
+      "1": {
+        "attack": 1,
+        "initiative": 1
+      },
+      "2": {
+        "attack": 2,
+        "initiative": 1,
+        "breakthrough": 0.06
+      },
+      "3": {
+        "attack": 2,
+        "initiative": 2,
+        "breakthrough": 0.12
+      }
     }
   },
   "methodical": {
@@ -172,12 +344,27 @@
     "category": "combat_style",
     "max_level": 3,
     "rarity": "notable",
-    "acquisition": ["earned"],
-    "exclusive_with": ["bold"],
+    "acquisition": [
+      "earned"
+    ],
+    "exclusive_with": [
+      "bold"
+    ],
     "effects_by_level": {
-      "1": { "planning": 1, "defense": 1 },
-      "2": { "planning": 2, "defense": 1, "organization_recovery": 0.06 },
-      "3": { "planning": 3, "defense": 2, "organization_recovery": 0.10 }
+      "1": {
+        "planning": 1,
+        "defense": 1
+      },
+      "2": {
+        "planning": 2,
+        "defense": 1,
+        "organization_recovery": 0.06
+      },
+      "3": {
+        "planning": 3,
+        "defense": 2,
+        "organization_recovery": 0.1
+      }
     }
   },
   "reckless": {
@@ -186,11 +373,24 @@
     "category": "personality",
     "max_level": 2,
     "rarity": "common",
-    "acquisition": ["earned", "personality"],
-    "exclusive_with": ["cautious"],
+    "acquisition": [
+      "earned",
+      "personality"
+    ],
+    "exclusive_with": [
+      "cautious"
+    ],
     "effects_by_level": {
-      "1": { "attack": 1, "casualties": 0.15, "organization_recovery": -0.08 },
-      "2": { "attack": 2, "casualties": 0.25, "organization_recovery": -0.12 }
+      "1": {
+        "attack": 1,
+        "casualties": 0.15,
+        "organization_recovery": -0.08
+      },
+      "2": {
+        "attack": 2,
+        "casualties": 0.25,
+        "organization_recovery": -0.12
+      }
     }
   },
   "ruthless": {
@@ -199,11 +399,22 @@
     "category": "combat_style",
     "max_level": 2,
     "rarity": "notable",
-    "acquisition": ["earned"],
-    "exclusive_with": ["morale_builder"],
+    "acquisition": [
+      "earned"
+    ],
+    "exclusive_with": [
+      "morale_builder"
+    ],
     "effects_by_level": {
-      "1": { "attack": 2, "casualties": 0.12 },
-      "2": { "attack": 3, "breakthrough": 0.08, "casualties": 0.20 }
+      "1": {
+        "attack": 2,
+        "casualties": 0.12
+      },
+      "2": {
+        "attack": 3,
+        "breakthrough": 0.08,
+        "casualties": 0.2
+      }
     }
   },
   "morale_builder": {
@@ -212,12 +423,29 @@
     "category": "specialist",
     "max_level": 3,
     "rarity": "notable",
-    "acquisition": ["earned"],
-    "exclusive_with": ["butcher", "ruthless"],
+    "acquisition": [
+      "earned"
+    ],
+    "exclusive_with": [
+      "butcher",
+      "ruthless"
+    ],
     "effects_by_level": {
-      "1": { "organization_recovery": 0.08, "casualties": -0.08 },
-      "2": { "organization_recovery": 0.14, "casualties": -0.12, "defense": 1 },
-      "3": { "organization_recovery": 0.20, "casualties": -0.18, "defense": 1, "logistics": 1 }
+      "1": {
+        "organization_recovery": 0.08,
+        "casualties": -0.08
+      },
+      "2": {
+        "organization_recovery": 0.14,
+        "casualties": -0.12,
+        "defense": 1
+      },
+      "3": {
+        "organization_recovery": 0.2,
+        "casualties": -0.18,
+        "defense": 1,
+        "logistics": 1
+      }
     }
   },
   "butcher": {
@@ -226,11 +454,22 @@
     "category": "legendary",
     "max_level": 2,
     "rarity": "legendary",
-    "acquisition": ["earned"],
-    "exclusive_with": ["morale_builder"],
+    "acquisition": [
+      "earned"
+    ],
+    "exclusive_with": [
+      "morale_builder"
+    ],
     "effects_by_level": {
-      "1": { "attack": 2, "casualties": 0.25 },
-      "2": { "attack": 4, "breakthrough": 0.15, "casualties": 0.40 }
+      "1": {
+        "attack": 2,
+        "casualties": 0.25
+      },
+      "2": {
+        "attack": 4,
+        "breakthrough": 0.15,
+        "casualties": 0.4
+      }
     }
   },
   "reformer": {
@@ -239,11 +478,18 @@
     "category": "legendary",
     "max_level": 2,
     "rarity": "legendary",
-    "acquisition": ["earned"],
+    "acquisition": [
+      "earned"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "unit_reliability_gain": 0.02 },
-      "2": { "unit_reliability_gain": 0.04, "division_experience_gain": 0.03 }
+      "1": {
+        "unit_reliability_gain": 0.02
+      },
+      "2": {
+        "unit_reliability_gain": 0.04,
+        "division_experience_gain": 0.03
+      }
     }
   },
   "mentor": {
@@ -252,11 +498,19 @@
     "category": "personality",
     "max_level": 2,
     "rarity": "rare",
-    "acquisition": ["earned", "event"],
+    "acquisition": [
+      "earned",
+      "event"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "officer_training_suitability": 25 },
-      "2": { "officer_training_suitability": 40, "training_quality_growth": 0.8 }
+      "1": {
+        "officer_training_suitability": 25
+      },
+      "2": {
+        "officer_training_suitability": 40,
+        "training_quality_growth": 0.8
+      }
     }
   },
   "iron_will": {
@@ -265,11 +519,21 @@
     "category": "legendary",
     "max_level": 2,
     "rarity": "legendary",
-    "acquisition": ["earned", "event"],
+    "acquisition": [
+      "earned",
+      "event"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "defense": 2, "organization_recovery": 0.10 },
-      "2": { "defense": 3, "organization_recovery": 0.18, "attrition_reduction": 0.10 }
+      "1": {
+        "defense": 2,
+        "organization_recovery": 0.1
+      },
+      "2": {
+        "defense": 3,
+        "organization_recovery": 0.18,
+        "attrition_reduction": 0.1
+      }
     }
   },
   "greater_combat_width": {
@@ -278,11 +542,19 @@
     "category": "command_scope",
     "max_level": 2,
     "rarity": "rare",
-    "acquisition": ["earned", "doctrine"],
+    "acquisition": [
+      "earned",
+      "doctrine"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "combat_width": 0.08 },
-      "2": { "combat_width": 0.15, "planning": 1 }
+      "1": {
+        "combat_width": 0.08
+      },
+      "2": {
+        "combat_width": 0.15,
+        "planning": 1
+      }
     }
   },
   "sea_wolf": {
@@ -291,12 +563,23 @@
     "category": "naval",
     "max_level": 3,
     "rarity": "rare",
-    "acquisition": ["earned"],
+    "acquisition": [
+      "earned"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "naval_combat": 0.10 },
-      "2": { "naval_combat": 0.18, "attack": 1 },
-      "3": { "naval_combat": 0.26, "attack": 1, "initiative": 1 }
+      "1": {
+        "naval_combat": 0.1
+      },
+      "2": {
+        "naval_combat": 0.18,
+        "attack": 1
+      },
+      "3": {
+        "naval_combat": 0.26,
+        "attack": 1,
+        "initiative": 1
+      }
     }
   },
   "blockade_runner": {
@@ -305,11 +588,21 @@
     "category": "naval",
     "max_level": 2,
     "rarity": "notable",
-    "acquisition": ["earned", "doctrine"],
+    "acquisition": [
+      "earned",
+      "doctrine"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "naval_combat": 0.06, "supply_consumption": -0.06 },
-      "2": { "naval_combat": 0.12, "supply_consumption": -0.12, "logistics": 1 }
+      "1": {
+        "naval_combat": 0.06,
+        "supply_consumption": -0.06
+      },
+      "2": {
+        "naval_combat": 0.12,
+        "supply_consumption": -0.12,
+        "logistics": 1
+      }
     }
   },
   "carrier_admiral": {
@@ -318,11 +611,21 @@
     "category": "naval",
     "max_level": 2,
     "rarity": "rare",
-    "acquisition": ["doctrine", "focus"],
+    "acquisition": [
+      "doctrine",
+      "focus"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "naval_combat": 0.12, "planning": 1 },
-      "2": { "naval_combat": 0.20, "planning": 2, "air_support": 0.08 }
+      "1": {
+        "naval_combat": 0.12,
+        "planning": 1
+      },
+      "2": {
+        "naval_combat": 0.2,
+        "planning": 2,
+        "air_support": 0.08
+      }
     }
   },
   "blitzkrieg_advocate": {
@@ -331,10 +634,17 @@
     "category": "doctrine",
     "max_level": 1,
     "rarity": "notable",
-    "acquisition": ["doctrine", "focus"],
+    "acquisition": [
+      "doctrine",
+      "focus"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "armor_attack": 0.10, "breakthrough": 0.12, "initiative": 1 }
+      "1": {
+        "armor_attack": 0.1,
+        "breakthrough": 0.12,
+        "initiative": 1
+      }
     }
   },
   "deep_battle_theorist": {
@@ -343,10 +653,17 @@
     "category": "doctrine",
     "max_level": 1,
     "rarity": "notable",
-    "acquisition": ["doctrine", "focus"],
+    "acquisition": [
+      "doctrine",
+      "focus"
+    ],
     "exclusive_with": [],
     "effects_by_level": {
-      "1": { "planning": 2, "breakthrough": 0.10, "combined_arms_sync": 0.06 }
+      "1": {
+        "planning": 2,
+        "breakthrough": 0.1,
+        "combined_arms_sync": 0.06
+      }
     }
   },
   "political_general": {
@@ -355,10 +672,19 @@
     "category": "doctrine",
     "max_level": 1,
     "rarity": "notable",
-    "acquisition": ["focus", "event"],
-    "exclusive_with": ["political_liability"],
+    "acquisition": [
+      "focus",
+      "event"
+    ],
+    "exclusive_with": [
+      "political_liability"
+    ],
     "effects_by_level": {
-      "1": { "defense": 1, "logistics": 1, "stability_bonus": 0.02 }
+      "1": {
+        "defense": 1,
+        "logistics": 1,
+        "stability_bonus": 0.02
+      }
     }
   },
   "political_liability": {
@@ -367,10 +693,20 @@
     "category": "personality",
     "max_level": 1,
     "rarity": "common",
-    "acquisition": ["personality", "event"],
-    "exclusive_with": ["political_general", "charismatic"],
+    "acquisition": [
+      "personality",
+      "event"
+    ],
+    "exclusive_with": [
+      "political_general",
+      "charismatic"
+    ],
     "effects_by_level": {
-      "1": { "attack": 1, "stability_penalty": 0.03, "planning": -1 }
+      "1": {
+        "attack": 1,
+        "stability_penalty": 0.03,
+        "planning": -1
+      }
     }
   },
   "charismatic": {
@@ -379,10 +715,18 @@
     "category": "personality",
     "max_level": 1,
     "rarity": "notable",
-    "acquisition": ["personality"],
-    "exclusive_with": ["arrogant", "political_liability"],
+    "acquisition": [
+      "personality"
+    ],
+    "exclusive_with": [
+      "arrogant",
+      "political_liability"
+    ],
     "effects_by_level": {
-      "1": { "organization_recovery": 0.08, "morale": 0.05 }
+      "1": {
+        "organization_recovery": 0.08,
+        "morale": 0.05
+      }
     }
   },
   "arrogant": {
@@ -391,10 +735,163 @@
     "category": "personality",
     "max_level": 1,
     "rarity": "common",
-    "acquisition": ["personality", "earned"],
-    "exclusive_with": ["charismatic"],
+    "acquisition": [
+      "personality",
+      "earned"
+    ],
+    "exclusive_with": [
+      "charismatic"
+    ],
     "effects_by_level": {
-      "1": { "attack": 1, "combined_arms_sync": -0.10, "planning": -1 }
+      "1": {
+        "attack": 1,
+        "combined_arms_sync": -0.1,
+        "planning": -1
+      }
+    }
+  },
+  "air_superiority_ace": {
+    "name": "Air Superiority Ace",
+    "description": "Elite fighter leader, controls the skies for CAS and protects own bombers.",
+    "category": "air",
+    "max_level": 3,
+    "rarity": "notable",
+    "acquisition": [
+      "earned",
+      "doctrine"
+    ],
+    "era_min": 1916,
+    "effects_by_level": {
+      "1": {
+        "air_support": 0.1
+      },
+      "2": {
+        "air_support": 0.18,
+        "casualties": -0.08
+      },
+      "3": {
+        "air_support": 0.25,
+        "casualties": -0.15,
+        "initiative": 1
+      }
+    }
+  },
+  "strategic_bomber_commander": {
+    "name": "Strategic Bomber Commander",
+    "description": "Coordinates long range bombing, area denial and industrial targeting.",
+    "category": "air",
+    "max_level": 3,
+    "rarity": "rare",
+    "acquisition": [
+      "earned",
+      "doctrine"
+    ],
+    "era_min": 1935,
+    "requires_tech": "strategic_bombing",
+    "effects_by_level": {
+      "1": {
+        "strategic_bombing": 0.12
+      },
+      "2": {
+        "strategic_bombing": 0.2,
+        "supply_drain": 0.08
+      },
+      "3": {
+        "strategic_bombing": 0.28,
+        "supply_drain": 0.12,
+        "organization": 1
+      }
+    }
+  },
+  "space_tactician": {
+    "name": "Space Tactician",
+    "description": "Ahead-of-time or future leader who integrates orbital strikes, satellites and space assets into ground/naval/air ops.",
+    "category": "space",
+    "max_level": 3,
+    "rarity": "legendary",
+    "acquisition": [
+      "earned"
+    ],
+    "era_min": 2020,
+    "requires_tech": "space_designer_unlocked",
+    "effects_by_level": {
+      "1": {
+        "space_strike_bonus": 0.1,
+        "recon": 0.1
+      },
+      "2": {
+        "space_strike_bonus": 0.18,
+        "recon": 0.18,
+        "jamming_resist": 0.1
+      },
+      "3": {
+        "space_strike_bonus": 0.25,
+        "recon": 0.25,
+        "jamming_resist": 0.18,
+        "initiative": 2
+      }
+    }
+  },
+  "panzer_pioneer": {
+    "name": "Panzer Pioneer",
+    "description": "Rare ahead-of-his-time armored warfare visionary (Guderian-like or sci-fi equivalent). Unlocks mobile breakthrough even in early eras if tech allows or legendary leader.",
+    "category": "specialist",
+    "max_level": 3,
+    "rarity": "legendary",
+    "acquisition": [
+      "earned"
+    ],
+    "era_min": 1918,
+    "effects_by_level": {
+      "1": {
+        "armor_attack": 0.15,
+        "breakthrough": 0.1,
+        "mobility": 0.1
+      },
+      "2": {
+        "armor_attack": 0.25,
+        "breakthrough": 0.18,
+        "mobility": 0.15,
+        "combined_arms_sync": 0.1
+      },
+      "3": {
+        "armor_attack": 0.35,
+        "breakthrough": 0.25,
+        "mobility": 0.2,
+        "combined_arms_sync": 0.15,
+        "initiative": 1
+      }
+    }
+  },
+  "drone_swarm_coordinator": {
+    "name": "Drone Swarm Coordinator",
+    "description": "Future-era specialist for autonomous drone swarms in recon, strike, SEAD. High loiter, low pilot risk.",
+    "category": "air",
+    "max_level": 3,
+    "rarity": "rare",
+    "acquisition": [
+      "earned",
+      "doctrine"
+    ],
+    "era_min": 1980,
+    "requires_tech": "drone_warfare",
+    "effects_by_level": {
+      "1": {
+        "air_support": 0.08,
+        "recon": 0.15,
+        "loiter_bonus": 0.1
+      },
+      "2": {
+        "air_support": 0.15,
+        "recon": 0.22,
+        "loiter_bonus": 0.18
+      },
+      "3": {
+        "air_support": 0.22,
+        "recon": 0.3,
+        "loiter_bonus": 0.25,
+        "jamming_resist": 0.1
+      }
     }
   }
 }
