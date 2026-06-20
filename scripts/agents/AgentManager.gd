@@ -355,6 +355,34 @@ func _apply_mission_outcome(agent: Agent, mission: Dictionary, outcome: String, 
 		"minister_compromised":
 			_apply_minister_compromised(agent, magnitude)
 		"narrative_shift":
+		# === 1910-era crisis / pre-battle espionage effects (keep going) ===
+		"sabotage_level":
+			# Accumulates on target depot (if mission had target); preview already reads it for fort/power bias.
+			if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_depot_sabotage"):
+				GameData.apply_depot_sabotage(agent.target_province_id if "target_province_id" in agent else 0, magnitude)
+			else:
+				# Fallback: direct on Supply if depot registry exists
+				if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("get_depot_state"):
+					var dep = SupplyManager.get_depot_state(agent.target_province_id if hasattr(agent,"target_province_id") else 0)
+					if dep and "sabotage_level" in dep:
+						dep.sabotage_level = clampf(float(getattr(dep,"sabotage_level",0.0)) + magnitude, 0.0, 0.9)
+		"1914_crisis_shift":
+			if typeof(GameData) != TYPE_NIL:
+				var ps = GameData.get("peace_state", {})
+				cur = str(ps.get("1914_crisis", "escalated"))
+				# magnitude negative favors de-escalate
+				if magnitude < -0.15:
+					ps["1914_crisis"] = "averted" if randf() < 0.6 else "limited"
+				elif magnitude < 0:
+					ps["1914_crisis"] = "limited" if cur != "averted" else cur
+				GameData.set("peace_state", ps)
+				print("[AGENT 1910] July crisis shift applied via mission, new state:", ps.get("1914_crisis"))
+		"balkan_alt":
+			if typeof(GameData) != TYPE_NIL:
+				var ps2 = GameData.get("peace_state", {})
+				ps2["1912_balkan_alt"] = true if magnitude > 0.2 or randf() < 0.5 else ps2.get("1912_balkan_alt", false)
+				GameData.set("peace_state", ps2)
+				print("[AGENT 1910] Balkan alt flag set via mission:", ps2.get("1912_balkan_alt"))
 			_apply_narrative_shift(country, magnitude)
 		"bargaining_leverage":
 			_apply_bargaining_leverage(agent, magnitude)
