@@ -194,6 +194,26 @@ func _print_grand_theater_qc_evidence(mapr: Node) -> void:
 			else:
 				print("[GRAND THEATER QC] FAIL UK split (London rid=%d, expected 1)" % london_rid)
 
+			# UK 5-way macro regions: Scotland, Wales, Ireland must have provinces on map
+			var uk_macro_checks: Array = [
+				[3, "Scotland", 9510],
+				[4, "Wales", 9512],
+				[5, "Ireland", 9513],
+			]
+			for chk in uk_macro_checks:
+				var exp_rid: int = int(chk[0])
+				var label: String = str(chk[1])
+				var sample_pid: int = int(chk[2])
+				total += 1
+				var got_rid: int = MapManager.get_province_region_id(sample_pid)
+				var reg: Dictionary = regions.get(exp_rid, {}) as Dictionary
+				var pids: Array = reg.get("province_ids", [])
+				if got_rid == exp_rid and pids.size() >= 1:
+					passed += 1
+					print("[GRAND THEATER QC] PASS %s region (rid=%d, %d provs, sample #%d)" % [label, exp_rid, pids.size(), sample_pid])
+				else:
+					print("[GRAND THEATER QC] FAIL %s region (sample #%d rid=%d expected %d, provs=%d)" % [label, sample_pid, got_rid, exp_rid, pids.size()])
+
 	if mapr != null:
 		total += 1
 		var lod_ok: bool = mapr.get("_region_highlight_layer") != null or mapr.get("_political_labels_layer") != null

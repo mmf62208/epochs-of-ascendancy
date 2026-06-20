@@ -5559,7 +5559,10 @@
       },
       "population_base": 481000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "victory_points": 4
     },
     {
       "id": 9271,
@@ -5577,7 +5580,10 @@
       },
       "population_base": 481000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "victory_points": 4
     },
     {
       "id": 9272,
@@ -5595,7 +5601,10 @@
       },
       "population_base": 481000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "victory_points": 3
     },
     {
       "id": 9273,
@@ -5613,7 +5622,10 @@
       },
       "population_base": 481000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "victory_points": 2
     },
     {
       "id": 9274,
@@ -5631,7 +5643,10 @@
       },
       "population_base": 481000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "victory_points": 8
     },
     {
       "id": 9275,
@@ -5649,7 +5664,10 @@
       },
       "population_base": 481000,
       "special_features": [],
-      "special_levels": {}
+      "special_levels": {},
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "victory_points": 25
     },
     {
       "id": 9276,
@@ -8831,6 +8849,111 @@
       "special_features": [],
       "special_levels": {},
       "is_sea": true
+    },
+    {
+      "id": 9510,
+      "name": "Edinburgh",
+      "terrain": "urban",
+      "core_for_tags": [
+        "SCO"
+      ],
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 264550,
+      "victory_points": 5,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9511,
+      "name": "Aberdeen",
+      "terrain": "plains",
+      "core_for_tags": [
+        "SCO"
+      ],
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 264550,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9512,
+      "name": "Cardiff",
+      "terrain": "plains",
+      "core_for_tags": [
+        "WLS"
+      ],
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 216450,
+      "victory_points": 3,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9513,
+      "name": "Dublin",
+      "terrain": "urban",
+      "core_for_tags": [
+        "IRL"
+      ],
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 216450,
+      "victory_points": 8,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9514,
+      "name": "Cork",
+      "terrain": "plains",
+      "core_for_tags": [
+        "IRL"
+      ],
+      "owner_tag": "ENG",
+      "controller_tag": "ENG",
+      "natural_resources": {
+        "resources": {
+          "coal": 60
+        },
+        "resource_score": 60,
+        "primary_resource": "coal"
+      },
+      "population_base": 216450,
+      "victory_points": 2,
+      "special_features": [],
+      "special_levels": {}
     }
   ]
 }

@@ -9102,6 +9102,41 @@
       },
       "resource_score": 374,
       "primary_resource": "oil"
+    },
+    "9510": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9511": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9512": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9513": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
+    },
+    "9514": {
+      "resources": {
+        "coal": 60
+      },
+      "resource_score": 60,
+      "primary_resource": "coal"
     }
   }
 }

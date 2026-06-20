@@ -7026,6 +7026,36 @@
       "movement_cost": 1.0,
       "combat_modifier": -0.5,
       "is_sea": true
+    },
+    "9510": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9511": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9512": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9513": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
+    },
+    "9514": {
+      "terrain": "urban",
+      "movement_cost": 1.0,
+      "combat_modifier": 0.0,
+      "notes": "Generated child \u2014 Phase 1"
     }
   }
 }

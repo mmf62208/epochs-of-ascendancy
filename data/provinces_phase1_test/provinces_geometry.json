@@ -5,7 +5,8 @@
     "source": "apply_phase1_merge.py + generate_europe_phase1.py",
     "original_province_count": 100,
     "added_children": 449,
-    "total": 471
+    "total": 471,
+    "british_isles_carve": "v1_geo_aligned"
   },
   "provinces": [
     {
@@ -8299,27 +8300,27 @@
       "parent_id": 5,
       "points": [
         [
-          2019.295,
-          431.01750000000004
+          2007,
+          412
         ],
         [
-          2016.81,
-          423.99
+          2037,
+          412
         ],
         [
-          2024.5433333333333,
-          421.25666666666666
+          2037,
+          432
         ],
         [
-          2045.4130555555555,
-          436.30305555555566
+          2007,
+          432
         ]
       ],
       "label_anchor": [
-        2026.5153472222223,
-        428.1418055555556
+        2022,
+        422
       ],
-      "notes": "Densify + radial/bisect. Area 1750.3\u2192171.9. (naval-aware densify)",
+      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
       "river_aware": false
     },
     {
@@ -8327,27 +8328,27 @@
       "parent_id": 5,
       "points": [
         [
-          2032.2766666666666,
-          418.52333333333337
+          2031,
+          410
         ],
         [
-          2040.01,
-          415.79
+          2059,
+          410
         ],
         [
-          2049.95,
-          418.91333333333336
+          2059,
+          430
         ],
         [
-          2045.4130555555555,
-          436.30305555555566
+          2031,
+          430
         ]
       ],
       "label_anchor": [
-        2041.9124305555556,
-        422.3824305555556
+        2045,
+        420
       ],
-      "notes": "Densify + radial/bisect. Area 1750.3\u2192180.2. (naval-aware densify)",
+      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
       "river_aware": false
     },
     {
@@ -8355,27 +8356,27 @@
       "parent_id": 5,
       "points": [
         [
-          2059.89,
-          422.0366666666667
+          2054,
+          408
         ],
         [
-          2069.83,
-          425.16
+          2082,
+          408
         ],
         [
-          2073.9700000000003,
-          433.94500000000005
+          2082,
+          428
         ],
         [
-          2045.4130555555555,
-          436.30305555555566
+          2054,
+          428
         ]
       ],
       "label_anchor": [
-        2062.275763888889,
-        429.3611805555556
+        2068,
+        418
       ],
-      "notes": "Densify + radial/bisect. Area 1750.3\u2192223.8. (naval-aware densify)",
+      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
       "river_aware": false
     },
     {
@@ -8383,27 +8384,27 @@
       "parent_id": 5,
       "points": [
         [
-          2078.11,
-          442.73
+          2054,
+          448
         ],
         [
-          2072.7250000000004,
-          446.535
+          2082,
+          448
         ],
         [
-          2067.34,
-          450.34000000000003
+          2082,
+          468
         ],
         [
-          2045.4130555555555,
-          436.30305555555566
+          2054,
+          468
         ]
       ],
       "label_anchor": [
-        2065.897013888889,
-        443.9770138888889
+        2068,
+        458
       ],
-      "notes": "Densify + radial/bisect. Area 1750.3\u2192159.0. (naval-aware densify)",
+      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
       "river_aware": false
     },
     {
@@ -8411,27 +8412,27 @@
       "parent_id": 5,
       "points": [
         [
-          2056.57,
-          457.95
+          2025,
+          427
         ],
         [
-          2046.63,
-          456.0
+          2055,
+          427
         ],
         [
-          2036.69,
-          454.05
+          2055,
+          447
         ],
         [
-          2045.4130555555555,
-          436.30305555555566
+          2025,
+          447
         ]
       ],
       "label_anchor": [
-        2046.3257638888892,
-        451.0757638888889
+        2040,
+        437
       ],
-      "notes": "Densify + radial/bisect. Area 1750.3\u2192193.4. (naval-aware densify)",
+      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
       "river_aware": false
     },
     {
@@ -8439,27 +8440,27 @@
       "parent_id": 5,
       "points": [
         [
-          2026.75,
-          452.1
+          2039,
+          435
         ],
         [
-          2024.2649999999999,
-          445.0725
+          2071,
+          435
         ],
         [
-          2021.78,
-          438.045
+          2071,
+          457
         ],
         [
-          2045.4130555555555,
-          436.30305555555566
+          2039,
+          457
         ]
       ],
       "label_anchor": [
-        2029.552013888889,
-        442.8801388888889
+        2055,
+        446
       ],
-      "notes": "Densify + radial/bisect. Area 1750.3\u2192170.4. (naval-aware densify)",
+      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
       "river_aware": false
     },
     {
@@ -13080,6 +13081,146 @@
       ],
       "is_sea": true,
       "name": "North Sea Zone (prototype)"
+    },
+    {
+      "id": 9510,
+      "parent_id": 5,
+      "points": [
+        [
+          2029,
+          395
+        ],
+        [
+          2061,
+          395
+        ],
+        [
+          2061,
+          415
+        ],
+        [
+          2029,
+          415
+        ]
+      ],
+      "label_anchor": [
+        2045,
+        405
+      ],
+      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "river_aware": false
+    },
+    {
+      "id": 9511,
+      "parent_id": 5,
+      "points": [
+        [
+          2061,
+          388
+        ],
+        [
+          2089,
+          388
+        ],
+        [
+          2089,
+          408
+        ],
+        [
+          2061,
+          408
+        ]
+      ],
+      "label_anchor": [
+        2075,
+        398
+      ],
+      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "river_aware": false
+    },
+    {
+      "id": 9512,
+      "parent_id": 5,
+      "points": [
+        [
+          1984,
+          420
+        ],
+        [
+          2012,
+          420
+        ],
+        [
+          2012,
+          444
+        ],
+        [
+          1984,
+          444
+        ]
+      ],
+      "label_anchor": [
+        1998,
+        432
+      ],
+      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "river_aware": false
+    },
+    {
+      "id": 9513,
+      "parent_id": 5,
+      "points": [
+        [
+          1954,
+          437
+        ],
+        [
+          1982,
+          437
+        ],
+        [
+          1982,
+          459
+        ],
+        [
+          1954,
+          459
+        ]
+      ],
+      "label_anchor": [
+        1968,
+        448
+      ],
+      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "river_aware": false
+    },
+    {
+      "id": 9514,
+      "parent_id": 5,
+      "points": [
+        [
+          1947,
+          452
+        ],
+        [
+          1973,
+          452
+        ],
+        [
+          1973,
+          472
+        ],
+        [
+          1947,
+          472
+        ]
+      ],
+      "label_anchor": [
+        1960,
+        462
+      ],
+      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "river_aware": false
     }
   ]
 }

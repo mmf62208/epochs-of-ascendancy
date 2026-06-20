@@ -26,19 +26,27 @@
       "id": 3,
       "name": "Scotland",
       "notes": "Highlands, Central Belt, northern Britain.",
-      "province_ids": []
+      "province_ids": [
+        9510,
+        9511
+      ]
     },
     {
       "id": 4,
       "name": "Wales",
       "notes": "Western Britain, Welsh valleys.",
-      "province_ids": []
+      "province_ids": [
+        9512
+      ]
     },
     {
       "id": 5,
       "name": "Ireland",
       "notes": "Republic + Northern Ireland (provinces stay separate).",
-      "province_ids": []
+      "province_ids": [
+        9513,
+        9514
+      ]
     },
     {
       "id": 6,
