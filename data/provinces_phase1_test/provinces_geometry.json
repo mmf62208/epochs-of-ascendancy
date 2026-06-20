@@ -6,7 +6,17 @@
     "original_province_count": 100,
     "added_children": 449,
     "total": 471,
-    "british_isles_carve": "v1_geo_aligned"
+    "british_isles_carve": "v2_lonlat_anchored",
+    "british_isles_bbox": [
+      -25.0,
+      28.0,
+      45.0,
+      72.0
+    ],
+    "british_isles_canvas": [
+      5000,
+      2000
+    ]
   },
   "provinces": [
     {
@@ -8300,27 +8310,27 @@
       "parent_id": 5,
       "points": [
         [
-          2007,
-          412
+          1557.0,
+          834.0
         ],
         [
-          2037,
-          412
+          1587.0,
+          834.0
         ],
         [
-          2037,
-          432
+          1587.0,
+          854.0
         ],
         [
-          2007,
-          432
+          1557.0,
+          854.0
         ]
       ],
       "label_anchor": [
-        2022,
-        422
+        1572.0,
+        844.0
       ],
-      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "notes": "British Isles carve v2 \u2014 lon/lat anchor (53.41N, -2.98E)",
       "river_aware": false
     },
     {
@@ -8328,27 +8338,27 @@
       "parent_id": 5,
       "points": [
         [
-          2031,
-          410
+          1660.0,
+          816.0
         ],
         [
-          2059,
-          410
+          1688.0,
+          816.0
         ],
         [
-          2059,
-          430
+          1688.0,
+          836.0
         ],
         [
-          2031,
-          430
+          1660.0,
+          836.0
         ]
       ],
       "label_anchor": [
-        2045,
-        420
+        1674.0,
+        826.0
       ],
-      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "notes": "British Isles carve v2 \u2014 lon/lat anchor (53.80N, -1.55E)",
       "river_aware": false
     },
     {
@@ -8356,27 +8366,27 @@
       "parent_id": 5,
       "points": [
         [
-          2054,
-          408
+          1656.0,
+          763.0
         ],
         [
-          2082,
-          408
+          1684.0,
+          763.0
         ],
         [
-          2082,
-          428
+          1684.0,
+          783.0
         ],
         [
-          2054,
-          428
+          1656.0,
+          783.0
         ]
       ],
       "label_anchor": [
-        2068,
-        418
+        1670.0,
+        773.0
       ],
-      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "notes": "British Isles carve v2 \u2014 lon/lat anchor (54.98N, -1.61E)",
       "river_aware": false
     },
     {
@@ -8384,27 +8394,27 @@
       "parent_id": 5,
       "points": [
         [
-          2054,
-          448
+          1671.0,
+          948.0
         ],
         [
-          2082,
-          448
+          1699.0,
+          948.0
         ],
         [
-          2082,
-          468
+          1699.0,
+          968.0
         ],
         [
-          2054,
-          468
+          1671.0,
+          968.0
         ]
       ],
       "label_anchor": [
-        2068,
-        458
+        1685.0,
+        958.0
       ],
-      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "notes": "British Isles carve v2 \u2014 lon/lat anchor (50.91N, -1.40E)",
       "river_aware": false
     },
     {
@@ -8412,27 +8422,27 @@
       "parent_id": 5,
       "points": [
         [
-          2025,
-          427
+          1634.0,
+          876.0
         ],
         [
-          2055,
-          427
+          1664.0,
+          876.0
         ],
         [
-          2055,
-          447
+          1664.0,
+          896.0
         ],
         [
-          2025,
-          447
+          1634.0,
+          896.0
         ]
       ],
       "label_anchor": [
-        2040,
-        437
+        1649.0,
+        886.0
       ],
-      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "notes": "British Isles carve v2 \u2014 lon/lat anchor (52.48N, -1.90E)",
       "river_aware": false
     },
     {
@@ -8440,27 +8450,27 @@
       "parent_id": 5,
       "points": [
         [
-          2039,
-          435
+          1760.0,
+          919.0
         ],
         [
-          2071,
-          435
+          1792.0,
+          919.0
         ],
         [
-          2071,
-          457
+          1792.0,
+          941.0
         ],
         [
-          2039,
-          457
+          1760.0,
+          941.0
         ]
       ],
       "label_anchor": [
-        2055,
-        446
+        1776.0,
+        930.0
       ],
-      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "notes": "British Isles carve v2 \u2014 lon/lat anchor (51.51N, -0.13E)",
       "river_aware": false
     },
     {
@@ -13087,27 +13097,27 @@
       "parent_id": 5,
       "points": [
         [
-          2029,
-          395
+          1541.0,
+          719.0
         ],
         [
-          2061,
-          395
+          1573.0,
+          719.0
         ],
         [
-          2061,
-          415
+          1573.0,
+          739.0
         ],
         [
-          2029,
-          415
+          1541.0,
+          739.0
         ]
       ],
       "label_anchor": [
-        2045,
-        405
+        1557.0,
+        729.0
       ],
-      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "notes": "British Isles carve v2 \u2014 lon/lat anchor (55.95N, -3.19E)",
       "river_aware": false
     },
     {
@@ -13115,27 +13125,27 @@
       "parent_id": 5,
       "points": [
         [
-          2061,
-          388
+          1622.0,
+          664.0
         ],
         [
-          2089,
-          388
+          1650.0,
+          664.0
         ],
         [
-          2089,
-          408
+          1650.0,
+          684.0
         ],
         [
-          2061,
-          408
+          1622.0,
+          684.0
         ]
       ],
       "label_anchor": [
-        2075,
-        398
+        1636.0,
+        674.0
       ],
-      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "notes": "British Isles carve v2 \u2014 lon/lat anchor (57.15N, -2.09E)",
       "river_aware": false
     },
     {
@@ -13143,27 +13153,27 @@
       "parent_id": 5,
       "points": [
         [
-          1984,
-          420
+          1544.0,
+          920.0
         ],
         [
-          2012,
-          420
+          1572.0,
+          920.0
         ],
         [
-          2012,
-          444
+          1572.0,
+          944.0
         ],
         [
-          1984,
-          444
+          1544.0,
+          944.0
         ]
       ],
       "label_anchor": [
-        1998,
-        432
+        1558.0,
+        932.0
       ],
-      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "notes": "British Isles carve v2 \u2014 lon/lat anchor (51.48N, -3.18E)",
       "river_aware": false
     },
     {
@@ -13171,27 +13181,27 @@
       "parent_id": 5,
       "points": [
         [
-          1954,
-          437
+          1324.0,
+          836.0
         ],
         [
-          1982,
-          437
+          1352.0,
+          836.0
         ],
         [
-          1982,
-          459
+          1352.0,
+          858.0
         ],
         [
-          1954,
-          459
+          1324.0,
+          858.0
         ]
       ],
       "label_anchor": [
-        1968,
-        448
+        1338.0,
+        847.0
       ],
-      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "notes": "British Isles carve v2 \u2014 lon/lat anchor (53.35N, -6.26E)",
       "river_aware": false
     },
     {
@@ -13199,27 +13209,27 @@
       "parent_id": 5,
       "points": [
         [
-          1947,
-          452
+          1167.0,
+          903.0
         ],
         [
-          1973,
-          452
+          1193.0,
+          903.0
         ],
         [
-          1973,
-          472
+          1193.0,
+          923.0
         ],
         [
-          1947,
-          472
+          1167.0,
+          923.0
         ]
       ],
       "label_anchor": [
-        1960,
-        462
+        1180.0,
+        913.0
       ],
-      "notes": "British Isles carve v1 \u2014 geo-aligned placement",
+      "notes": "British Isles carve v2 \u2014 lon/lat anchor (51.90N, -8.47E)",
       "river_aware": false
     }
   ]

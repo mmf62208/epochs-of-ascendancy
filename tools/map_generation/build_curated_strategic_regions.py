@@ -102,13 +102,10 @@ def prov_info(p: dict, geo_by_id: dict) -> dict | None:
 
 def classify_eng_split(info: dict) -> int:
     cx, cy = info["cx"], info["cy"]
-    if cy < 410:
+    # Thresholds aligned with lon/lat-anchored British Isles (bbox -25..45, 28..72, 5000×2000).
+    if cy < 760:
         return 3
-    if cx < 2008 and 418 <= cy <= 472:
-        return 4
-    if cx < 1995 and cy >= 400:
-        return 5
-    if cy >= 436:
+    if cy >= 905:
         return 1
     return 2
 
@@ -116,7 +113,7 @@ def classify_eng_split(info: dict) -> int:
 def classify_by_geography(info: dict) -> int:
     cx, cy = info["cx"], info["cy"]
 
-    if 1950 <= cx <= 2095 and 395 <= cy <= 478:
+    if 1150 <= cx <= 1790 and 660 <= cy <= 975:
         return classify_eng_split(info)
     if 2088 <= cx <= 2168 and 400 <= cy <= 468:
         return 6
