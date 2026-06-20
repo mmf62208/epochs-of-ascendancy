@@ -526,6 +526,46 @@ func get_effective_combat_power(
 		if interdict_drag > 0.01:
 			final_readiness *= (1.0 - interdict_drag * 0.6)  # defender supply/org hit from interdiction
 			final_org *= (1.0 - interdict_drag * 0.4)
+
+	# ECM/jamming and electronic countermeasures (field jamming impact on combat/defense, per Ukraine/contemporary).
+	# Reduces guided/air/space effectiveness unless countered.
+	var ecm_drag := 0.0
+	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(owner_for_tech, "ecm_jamming"):
+		ecm_drag = 0.15
+	if def_power and float(def_power.get("ecm_factor", 0.0)) > 0.0:
+		ecm_drag = max(ecm_drag, float(def_power.get("ecm_factor", 0.1)))
+	if ecm_drag > 0.01:
+		final_soft *= (1.0 - ecm_drag * 0.4)
+		if has_guided:
+			final_soft *= (1.0 - ecm_drag * 0.3)  # jamming hurts guided more
+		final_org *= (1.0 - ecm_drag * 0.1)
+		print("[ECM/JAMMING] Reduced soft/guided/org by jamming factor")
+
+	# Anti-drone tech (like anti-air for drones; contemporary, reduces air/drone effect).
+	var anti_drone := 0.0
+	if unit_type == "anti_drone" or (def_power and "drone" in str(def_power.get("special", ""))):
+		anti_drone = 0.2
+	if anti_drone > 0:
+		if air_power_ratio > 0.5:  # if enemy air/drone
+			air_power_ratio *= (1.0 - anti_drone)
+		print("[ANTI_DRONE] Reduced enemy air/drone effect")
+
+	# Anti-tank for infantry (tools help infantry hold vs armor, like Javelin in Ukraine; infantry vs hard attack bonus).
+	if unit_type == "infantry" or "inf" in division_template_id.to_lower():
+		var at_bonus := 0.0
+		if "at_support" in str(division_template_id).to_lower() or (formation_for_effects and "anti_tank" in str(formation_for_effects)):
+			at_bonus = 0.15
+		if at_bonus > 0 and float(att_power.get("hard_attack", 0)) > float(final_soft) * 0.5:  # vs armor heavy
+			final_soft *= (1.0 + at_bonus)
+			print("[ANTI_TANK] Infantry AT bonus vs armor")
+
+	# Wire-guided munitions: overcome jamming (ignore ecm_drag), but higher production costs (modeled as supply/ readiness cost or note for prod).
+	if has_guided and typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(owner_for_tech, "wire_guided_munitions"):
+		ecm_drag = 0.0  # counters jamming
+		final_soft *= 1.1  # slightly better vs jammed
+		final_org *= 0.95  # higher cost -> slight org/readiness penalty (slower sustain)
+		print("[WIRE_GUIDED] Overcomes jamming but higher cost (readiness penalty)")
+
 	# Radio/tech for org in high intensity missions (move/attack/defend).
 	if formation_for_effects != null:
 		var mi := 1.0
@@ -1355,6 +1395,26 @@ func _phase_attrition(
 		side_state["defender"]["readiness"] *= 0.9
 		side_state["defender"]["org"] *= 0.92
 
+	# Attrition during active combat increased by enemy air superiority (full/partial), shore bombardment, orbital bombardment.
+	# Attrition losses/disruption from enemy air support/interceptors (scales with dominance).
+	if air_dominance_level == "full":
+		side_state["defender"]["org"] *= 0.85
+		side_state["defender"]["readiness"] *= 0.88
+		print("[AIR SUP ATTRITION] Full air sup increased defender attrition")
+	elif air_dominance_level == "partial":
+		side_state["defender"]["org"] *= 0.92
+		side_state["defender"]["readiness"] *= 0.95
+	# Shore bombardment (from naval/attacker special)
+	if float(att_power.get("shore_bombard", 0.0)) > 0.05 or "shore" in str(att_power.get("special", "")):
+		side_state["defender"]["org"] *= 0.9
+		side_state["defender"]["readiness"] *= 0.92
+		print("[SHORE BOMBARD ATTRITION] Naval shore support increased defender attrition")
+	# Orbital bombardment (space strike)
+	if float(att_power.get("space_strike", 0.0)) > 0.05 or "orbital" in str(att_power.get("special", "")):
+		side_state["defender"]["org"] *= 0.88
+		side_state["defender"]["readiness"] *= 0.9
+		print("[ORBITAL ATTRITION] Space/orbital increased defender attrition")
+
 	# Explicit SUPPLY INTERDICT MOD in resolver phase (high-leverage from combat history recs for endurance).
 	# Uses SupplyInterdictionEstimator or presence registry to apply battle-level org/readiness drain based on enemy control/air/land around province.
 	# Makes prolonged fights (similar strength) and weaker attacks last longer/attrit more if interdicted.
@@ -1459,6 +1519,18 @@ func _phase_resolution(
 		outcome = "prolonged_stalemate" if margin < 0.25 else outcome
 		margin *= 0.7
 		print("[BATTLE DURATION] Weaker attack vs strong org/supplied defender -> prolonged (time to break higher, more attrit)")
+
+	# Chance breakthroughs (based on leader initiative/breakthrough trait, margin, org diff, terrain).
+	# Heroic defense already boosts def.
+	var leader_break := 0.0
+	if leader and "breakthrough" in str(leader.trait_levels if hasattr(leader, "trait_levels") else ""):
+		leader_break = 0.1
+	if leader and hasattr(leader, "initiative_skill"):
+		leader_break += leader.initiative_skill / 30.0
+	if leader_break > 0 and randf() < leader_break and margin > 0.1:
+		att_score *= 1.15
+		print("[BREAKTHROUGH CHANCE] Leader trait/initiative caused breakthrough (extra score)")
+	# Similar for defender heroic if high org.
 	var captured := winner == "attacker" and attacker_tag != defender_tag and not attacker_tag.is_empty()
 	var result_dict := {
 		"winner": winner,

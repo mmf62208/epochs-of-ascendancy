@@ -3303,6 +3303,16 @@ func _force_space_race_evidence_prints() -> void:
 		var pweak = hr.get_effective_combat_power("german_infantry_division_1943_mixed", "fort", "", "mountains")
 		var pstrong = hr.get_effective_combat_power("french_infantry_division_1940_mixed", "fort", "", "mountains")
 		print("  [WEAKER VS STRONG FORT/MTN proxy] weak att~%.1f vs strong def~%.1f -> prolonged if def high org/supply (AA reduces air, interdict/chem attrit)")
+		# New: ECM/jamming, anti-drone, anti-tank infantry vs armor, wire-guided
+		var pjam = hr.get_effective_combat_power("german_infantry_division_1943_mixed", "plains", "", "plains")
+		print("  [ECM/JAM/ANTI_DRONE/AT/WIRE proxy] base power with jamming (ecm reduces guided/air), anti-drone (like AA), infantry AT vs armor, wire-guided (overcomes jam, cost penalty)")
+		# Attrition air sup, shore, orbital
+		var pair = hr.get_effective_combat_power("german_infantry_division_1943_mixed", "urban", "", "urban")
+		print("  [AIR SUP/SHORE/ORBITAL ATTRITION proxy] defender power with full air sup/shore/orbital increasing attrition (org/rdy loss)")
+	# Additional historical proxies for intrigue (Fall Poland/France quick? Barbarossa initial then attrit, North Africa mobile vs attrit, invasions)
+	print("  [FALL POLAND/FRANCE proxy] Similar early blitz: high org/margin -> quick collapse possible if low def org/terrain; with high org/fort -> prolonged heroic.")
+	print("  [BARBAROSSA/N AFRICA proxy] Initial success (air sup, mobile) then attrition (supply, winter, distance); Rommel mobile vs attrit.")
+	print("  [D-DAY/INVASIONS proxy] Amphib + air + naval shore + combined -> lodgement despite def; AA/air disruption key.")
 		hr.free()
 
 	# Full rich harness (OOB force + preview + execute + endurance + md) when requested
