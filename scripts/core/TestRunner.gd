@@ -215,7 +215,10 @@ func _ready() -> void:
 						MapManager.update_province_owner(demo_pid, demo_tag, demo_tag, true)
 					else:
 						demo_tag = dp.owner_tag
-			var proj = idm.start_infrastructure_project(demo_pid, 2, demo_tag)
+			if idm.has_method("ensure_political_power_seed"):
+				idm.ensure_political_power_seed(demo_tag)
+			# Demo project skips PP spend so harness always shows an active investment.
+			var proj = idm.start_infrastructure_project(demo_pid, 2, demo_tag, false)
 			if proj:
 				print("TestRunner: Demo investment project started on pid ", demo_pid, " for ", demo_tag)
 

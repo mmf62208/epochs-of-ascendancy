@@ -6,10 +6,10 @@
 
 ## Now (highest leverage)
 
-1. **Main-loop combat** — ✅ Province assault (`BattleManager`); still need AI orders + multi-province campaigns
-2. **Active infrastructure investment** — finish player/AI project loop per [DESIGN_InfrastructureDevelopmentSystem.md](docs/DESIGN_InfrastructureDevelopmentSystem.md) (InfoPanel invest UI exists; polish + save/load).
-3. **Save/load completeness** — long sessions including active projects, formations, and scenario metadata.
-4. **Headless CI** — stable `--quit-after 15` smoke; optional `EOA_RUN_FULL_LEADER_TESTS=1` for full roster reload.
+1. **Main-loop combat** — ✅ Province assault (`BattleManager`) + ✅ AI assaults (`AIBattleDirector`); still need multi-province campaigns / AI movement
+2. **Active infrastructure investment** — ✅ Phase B loop (PP, Invest Infra/Dev, cancel, save/load, AI invest, passive factory→dev); polish toasts/news + tech construction bonuses next
+3. **Save/load completeness** — long sessions including active projects, PP ledger, formations, and scenario metadata
+4. **Headless CI** — stable `--quit-after 15` smoke; optional `EOA_RUN_FULL_LEADER_TESTS=1` for full roster reload
 
 ---
 
@@ -28,9 +28,9 @@
 
 | Area | Next step |
 |------|-----------|
-| Combat | Terrain/weather/air in resolver; battle initiation from map |
+| Combat | Multi-day campaigns; terrain/weather/air in resolver; AI movement to fronts |
 | Leaders | Training bonuses in live battles; news feed panel |
-| Technology | Expand beyond Support/Radio slice |
+| Technology | Expand beyond Support/Radio; wire `construction_speed` into projects |
 | Agents | Persistent province rings + detection pressure |
 | Diplomacy | Flesh out `DiplomacyView` beyond stub |
 | Production | Screen data caching; assignment UI polish |
@@ -38,8 +38,9 @@
 
 ---
 
-## Recently completed (June 2026)
+## Recently completed
 
+- **Aug 9:** Infra Phase B (PP ledger, Invest Dev, cancel/refund, passive dev growth, hostile capture cancel, AI investment); `AIBattleDirector` autoload + F10 AI Assault Pass.
 - **Jun 6:** Debug overlay layout (full-width buttons, vertical scroll only, draggable + **⤡ resize**); WorldMap InfoPanel scroll; TopInfoBar/MainMenu HUD sync; phased combat headless test; `SpecialSiteManager` autoload + site ID fixes.
 - **Jun 5:** Grand theater auto-load, terrain toggle, map editor export/load, weather on high-res bg.
 - **Jun 4–5:** BorderLayer, F10 combat capture demo, TestRunner map-first bootstrap, leader roster fallback for `phase1_europe_test`.
@@ -60,7 +61,7 @@ Long-form status, leader/combat/agent notes, and historical session bullets were
 
 ## Suggested implementation order
 
-1. Combat battle loop on map (formations → resolver → owner change → borders)
-2. Infrastructure investment Phase A completion + save/load
-3. Save/load hardening + autosave UX
-4. Rich agent networks OR expanded tech trees (pick based on playtest feedback)
+1. AI formation movement + multi-province campaign loop
+2. Save/load hardening + autosave UX (projects, PP, deployments)
+3. Tech construction bonuses + Industry Foundations slice
+4. Rich agent networks OR unit icons on map (pick based on playtest feedback)

@@ -144,6 +144,9 @@ func apply_combat_outcome(
 
 	if captured and target_pid >= 0 and typeof(MapManager) != TYPE_NIL:
 		MapManager.update_province_owner(target_pid, attacker_tag, attacker_tag, false)
+		if typeof(InfrastructureDevelopmentManager) != TYPE_NIL \
+			and InfrastructureDevelopmentManager.has_method("on_province_captured"):
+			InfrastructureDevelopmentManager.on_province_captured(target_pid, attacker_tag)
 		if typeof(FormationMovement) != TYPE_NIL and not attacker_formation_id.is_empty():
 			FormationMovement.move_formation_to_province(
 				attacker_formation_id, target_pid, attacker_tag,

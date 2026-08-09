@@ -1,6 +1,6 @@
 # Current State of Epochs of Ascendancy
 
-**Last updated:** June 6, 2026  
+**Last updated:** August 9, 2026  
 **Playtest entry:** `scenes/TestScenario.tscn` (F5) → `phase1_europe_test` via `TestRunner.gd`  
 **Doc index:** [README.md](README.md)
 
@@ -8,7 +8,11 @@
 
 ## Executive summary
 
-Strong **map/visual foundation** and **deep simulation backend**. Phase 1 Europe (~180 provinces), grand theater underlay, dynamic borders, F10 debug tools, scrollable province inspector, and a resizable debug overlay are playable. Core autoloads (Time, Supply, Production, Leaders, Agents, Technology, Special Sites) are largely implemented. Main gaps for a 50+ turn playtest: **main-loop combat**, **active infra investment completion**, and **save/load for long sessions**.
+Strong **map/visual foundation** and **deep simulation backend**. Phase 1 Europe (~180 provinces), grand theater underlay, dynamic borders, F10 debug tools, scrollable province inspector, and a resizable debug overlay are playable. Core autoloads (Time, Supply, Production, Leaders, Agents, Technology, Special Sites, Battle, Infra Development, AI Battle Director) are largely implemented.
+
+**Recently completed (this pass):** Infrastructure investment Phase B loop (Political Power spend, development invest, cancel + refund, passive factory→dev growth, hostile capture cancel, light AI investment) and basic AI province assault orders (`AIBattleDirector`).
+
+Main remaining gaps for a 50+ turn playtest: **multi-province campaigns / AI movement**, **save/load hardening for long sessions**, and **tech/agent depth**.
 
 ---
 
@@ -20,7 +24,7 @@ Strong **map/visual foundation** and **deep simulation backend**. Phase 1 Europe
 | Terrain toggle | ✅ Political vs detailed raster |
 | Map visual editor | ✅ Debug placement, list/delete, JSON export/load |
 | Dynamic borders | ✅ `BorderLayer`; refreshes on owner change |
-| F10 tools | ✅ Border demo, test combat, owner cycle, collapsible sections |
+| F10 tools | ✅ Border demo, test combat, AI assault pass, owner cycle |
 | Debug overlay UX | ✅ Full-width layout, vertical scroll, drag + resize (⤡) |
 | Province inspector | ✅ Scrollable `InfoPanel` on province click |
 | Phase 1 scenario | ✅ `data/provinces_phase1_test/` |
@@ -28,7 +32,7 @@ Strong **map/visual foundation** and **deep simulation backend**. Phase 1 Europe
 
 ---
 
-## UI shell — **Good (June 6)**
+## UI shell — **Good**
 
 | Area | Status |
 |------|--------|
@@ -36,6 +40,7 @@ Strong **map/visual foundation** and **deep simulation backend**. Phase 1 Europe
 | MainMenu | ✅ Save manager, fade, help dialog, scenario restart |
 | LeaderEventUI | ✅ Toasts; headless-safe replacement popups |
 | DebugOverlay | ✅ Resizable panel, readable section layout |
+| Invest / Dev / Cancel | ✅ InfoPanel buttons with PP cost + project status |
 
 ---
 
@@ -49,11 +54,11 @@ Strong **map/visual foundation** and **deep simulation backend**. Phase 1 Europe
 | Leaders | ✅ 1918/1936/2026 rosters, training, replacements |
 | Agents | ✅ Daily sabotage/disruption; network foundation |
 | Technology | ⚠️ Support/Radio functional; expand trees |
-| Infrastructure | ⚠️ Passive repair/sabotage strong; **Invest** UI started, loop incomplete |
-| Combat | ⚠️ Province assault loop wired (`BattleManager`); AI/multi-day campaigns still pending |
+| Infrastructure | ✅ Invest + Development projects, PP ledger, daily tick, sabotage duel, save/load, AI invest, passive factory growth |
+| Combat | ✅ Province assault (`BattleManager`); ✅ AI assaults (`AIBattleDirector`); multi-day campaigns still pending |
 | Special sites | ✅ Manager + tier IDs; build from InfoPanel |
 | Weather | ⚠️ Overlay stub on grand theater |
-| Save/load | ⚠️ Broad persistence exists; long-session gaps remain |
+| Save/load | ⚠️ Projects + PP persist; long-session gaps remain |
 
 ---
 
@@ -71,9 +76,9 @@ Details: [TESTING_PLAN.md](TESTING_PLAN.md)
 
 ## Top priorities
 
-1. Main-loop combat — **province assault wired** (Ctrl+click, Attack button, capture + borders); AI battle initiation still pending
-2. Finish infrastructure investment loop + persist active projects
-3. Save/load hardening for multi-hour sessions
+1. Multi-province campaigns / AI formation movement (assaults exist; operational war still thin)
+2. Save/load hardening for multi-hour sessions (formations, scenario metadata, PP mid-run)
+3. Technology expansion beyond Support/Radio
 4. Replace placeholder map master art when ready
 
 Backlog: [TODO.md](../TODO.md)
@@ -83,11 +88,12 @@ Backlog: [TODO.md](../TODO.md)
 ## Quick playtest
 
 1. **F5** on `TestScenario.tscn`
-2. Click provinces → scrollable inspector; **Close** or Esc
-3. **F10** → debug tools; drag title bar; resize with **⤡** corner
+2. Click provinces → scrollable inspector; **Invest Infra / Invest Dev / Cancel Project**; **Close** or Esc
+3. **F10** → debug tools; drag title bar; resize with **⤡** corner; **AI Assault Pass**
 4. **Menu** → save/load; **Return to Title** reloads scenario
 5. **L / R / T / C / Y** — map overlays
 6. **Combat:** click friendly province with a division → **Ctrl+click** adjacent enemy (or **Attack** in InfoPanel). Try GER on province 1 vs FRA neighbors after setting TopInfoBar country to **GER**.
+7. Unpause time — AI countries with adjacent deployments may launch assaults every few days.
 
 ---
 
@@ -98,5 +104,6 @@ Backlog: [TODO.md](../TODO.md)
 | [README.md](README.md) | Documentation index |
 | [TESTING_PLAN.md](TESTING_PLAN.md) | Regression checklist |
 | [TEST_MAP_GRAND_THEATER_FOUNDATION.md](TEST_MAP_GRAND_THEATER_FOUNDATION.md) | Map QC |
-| [SESSION_NOTES/2026-06-05.md](SESSION_NOTES/2026-06-05.md) | Recent review |
+| [DESIGN_InfrastructureDevelopmentSystem.md](DESIGN_InfrastructureDevelopmentSystem.md) | Infra investment design |
+| [SESSION_NOTES/2026-06-05.md](SESSION_NOTES/2026-06-05.md) | June review |
 | [../README.md](../README.md) | Project vision + install |

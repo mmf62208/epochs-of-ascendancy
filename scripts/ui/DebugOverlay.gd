@@ -505,6 +505,11 @@ func _build_ui() -> void:
 		combat_test_btn.pressed.connect(_on_test_combat_capture)
 		test_section.add_child(combat_test_btn)
 
+		var ai_assault_btn := Button.new()
+		ai_assault_btn.text = "AI Assault Pass (non-player divisions → adjacent enemies)"
+		ai_assault_btn.pressed.connect(_on_run_ai_assault_pass)
+		test_section.add_child(ai_assault_btn)
+
 		var debug_map_hint := Label.new()
 		debug_map_hint.text = "Debug map: Shift+click adjacent = attacker staging; right-click cycles owner (F10 open)"
 		debug_map_hint.add_theme_font_size_override("font_size", 9)
@@ -2540,6 +2545,21 @@ func _on_test_combat_capture() -> void:
 			"Combat %s — winner=%s capture=%s (no border change)" % [outcome, winner, str(captured)]
 		)
 	print("DebugOverlay test combat pid=%d result=%s" % [battle_pid, result])
+
+
+func _on_run_ai_assault_pass() -> void:
+	if typeof(AIBattleDirector) == TYPE_NIL:
+		_toast("AIBattleDirector unavailable")
+		return
+	if not AIBattleDirector.has_method("run_ai_assault_pass"):
+		_toast("AIBattleDirector missing run_ai_assault_pass")
+		return
+	var n: int = int(AIBattleDirector.run_ai_assault_pass())
+	if n <= 0:
+		_toast("AI assault pass: no valid attacks (need enemy divisions adjacent to foes)")
+	else:
+		_toast("AI assault pass launched %d attack(s)" % n)
+		_force_border_refresh()
 
 
 func _pick_attacker_tag_for_combat(mr: MapRenderer, battle_pid: int, defender_tag: String) -> String:

@@ -9,7 +9,7 @@ This folder holds the data-driven tables for the Province Infrastructure & Devel
 
 ## Usage
 
-`InfrastructureDevelopmentManager` (skeleton at `scripts/map/InfrastructureDevelopmentManager.gd`) loads these on `_ready`. Province getters and `ProvinceEffects` will be updated in Phase B/C to optionally read from these tables instead of (or in addition to) the current hardcoded formulas in `Province.gd`.
+`InfrastructureDevelopmentManager` (`scripts/map/InfrastructureDevelopmentManager.gd`) loads these on `_ready` and runs the Phase B investment loop (PP, daily projects, AI invest). Province getters and `ProvinceEffects` will be updated in Phase C to optionally read from these tables instead of (or in addition to) the current hardcoded formulas in `Province.gd`.
 
 ## Editing
 
