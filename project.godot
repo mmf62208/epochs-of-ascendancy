@@ -35,6 +35,7 @@ SpecialSiteManager="*res://scripts/map/SpecialSiteManager.gd"
 TechnologyManager="*res://scripts/technology/TechnologyManager.gd"
 SaveLoadManager="*res://scripts/autoload/SaveLoadManager.gd"
 BattleManager="*res://scripts/combat/BattleManager.gd"
+AIBattleDirector="*res://scripts/combat/AIBattleDirector.gd"
 
 [display]
 

@@ -90,6 +90,10 @@ EOA_RUN_FULL_LEADER_TESTS=1 godot --headless --path . res://scenes/TestScenario.
 - Province click → scrollable InfoPanel; Close works
 - **F10** debug overlay: full-width buttons, no horizontal scroll; drag title; resize **⤡**
 - Menu open/close restores pause + speed on TopInfoBar
+- Owned province → **Invest Infra / Invest Dev** shows PP cost; project progress + **Cancel Project**
+- Save mid-project → quickload restores active project + PP
+- **F10 → AI Assault Pass** with enemy divisions adjacent to foes launches attacks
+- Unpaused time: AI countries may assault every few days; AI may start infra projects weekly
 
 **Grand theater load:** console should show high-res map line + `Loaded 141 leaders` for `phase1_europe_test`.
 

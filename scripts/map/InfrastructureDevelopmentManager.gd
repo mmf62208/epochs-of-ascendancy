@@ -8,7 +8,8 @@
 ##
 ## Register as autoload "InfrastructureDevelopmentManager" after MapManager and before heavy UI.
 ##
-## Status: Skeleton + Phase A foundation. Not yet wired into TimeManager or UI.
+## Status: Phase A + Phase B core loop — daily ticks, Invest UI, PP spend, cancel, development,
+## save/load, passive factory→dev growth, hostile capture cancel, light AI investment.
 
 extends Node
 
@@ -17,6 +18,7 @@ signal project_progress_updated(province_id: int, project: ProvincialProject, wo
 signal project_completed(province_id: int, new_level: int, axis: String, project: ProvincialProject)
 signal project_cancelled(province_id: int, reason: String)
 signal project_sabotaged(province_id: int, work_lost: float, severity: String)
+signal political_power_changed(country_tag: String, new_amount: float)
 
 # --- Inner data model (can be promoted to its own Resource later) ---
 class ProvincialProject:
@@ -94,7 +96,18 @@ var active_projects: Dictionary = {}          # province_id (int) -> ProvincialP
 var _level_defs: Dictionary = {}              # lazy loaded from data/infrastructure/*.json
 var _dev_level_defs: Dictionary = {}
 
+## Lightweight Political Power ledger (MVP national resource for investment).
+## Keys: country tag (upper) → float PP balance.
+var political_power: Dictionary = {}
+const PP_STARTING_BALANCE := 120.0
+const PP_DAILY_REGEN := 2.5
+const PP_REFUND_ON_CANCEL := 0.45
+const PASSIVE_DEV_DAILY := 0.035
+const AI_INVEST_INTERVAL_DAYS := 7
+const AI_MAX_PROJECTS_PER_COUNTRY := 2
+
 var _is_initialized: bool = false
+var _ai_day_counter: int = 0
 
 
 func _ready() -> void:
@@ -139,7 +152,12 @@ func initialize_with_time() -> void:
 
 
 func _on_game_day_advanced(year: int, month: int, day: int) -> void:
+	_regen_political_power_daily()
 	advance_daily_projects(year, month, day)
+	advance_passive_development_growth()
+	_ai_day_counter += 1
+	if _ai_day_counter % AI_INVEST_INTERVAL_DAYS == 0:
+		advance_ai_investments()
 
 
 func _current_game_day_index() -> int:
@@ -167,7 +185,12 @@ func get_all_projects_for_country(country_tag: String) -> Array[ProvincialProjec
 	return result
 
 
-func can_start_project(province_id: int, axis: String, investor_tag: String) -> Dictionary:
+func can_start_project(
+	province_id: int,
+	axis: String,
+	investor_tag: String,
+	require_pp: bool = true,
+) -> Dictionary:
 	"""Returns { ok: bool, reason: String, cost_pp: int, eta_days: int, work_per_day: float }"""
 	var result := {"ok": false, "reason": "", "cost_pp": 0, "eta_days": 0, "work_per_day": 0.0}
 
@@ -205,17 +228,27 @@ func can_start_project(province_id: int, axis: String, investor_tag: String) -> 
 	result.work_per_day = preview_work
 	result.eta_days = int(ceil(100.0 / maxf(0.1, preview_work))) if preview_work > 0 else 60
 
-	# TODO: Check actual Political Power / national construction capacity here
-	# For now we assume the caller (UI) will validate PP.
+	var pp_have := get_political_power(tag)
+	result["pp_available"] = pp_have
+	if require_pp and pp_have + 0.01 < float(cost):
+		result.reason = "Need %d Political Power (have %.0f)." % [cost, pp_have]
+		return result
 
 	result.ok = true
 	result.reason = "Ready to start %s investment toward level %d." % [axis, current_level + gap]
 	return result
 
 
-func start_infrastructure_project(province_id: int, target_level: int, investor_tag: String) -> ProvincialProject:
+func start_infrastructure_project(
+	province_id: int,
+	target_level: int,
+	investor_tag: String,
+	spend_pp: bool = true,
+) -> ProvincialProject:
 	"""Main entry point from UI / AI. Returns the project or null on failure."""
-	var preview := can_start_project(province_id, "infrastructure", investor_tag)
+	var tag := investor_tag.strip_edges().to_upper()
+	ensure_political_power_seed(tag)
+	var preview := can_start_project(province_id, "infrastructure", tag, spend_pp)
 	if not preview.get("ok", false):
 		push_warning("InfrastructureDevelopmentManager: cannot start project — %s" % preview.get("reason", "unknown"))
 		return null
@@ -224,14 +257,19 @@ func start_infrastructure_project(province_id: int, target_level: int, investor_
 	if p == null:
 		return null
 
+	var cost := int(preview.get("cost_pp", 45))
+	if spend_pp and not spend_political_power(tag, float(cost)):
+		push_warning("InfrastructureDevelopmentManager: insufficient PP for infra project")
+		return null
+
 	var proj := ProvincialProject.new()
 	proj.province_id = province_id
 	proj.axis = "infrastructure"
-	proj.owner_tag = investor_tag.strip_edges().to_upper()
+	proj.owner_tag = tag
 	proj.starting_level = p.infrastructure
-	proj.target_level = target_level
+	proj.target_level = maxi(target_level, p.infrastructure + 1)
 	proj.work_per_day_base = _calculate_base_work_rate(p, "infrastructure", proj.owner_tag)
-	proj.political_power_cost = int(preview.get("cost_pp", 45))
+	proj.political_power_cost = cost if spend_pp else 0
 	proj.start_day = _current_game_day_index()
 	proj.status = "active"
 
@@ -245,7 +283,51 @@ func start_infrastructure_project(province_id: int, target_level: int, investor_
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
 		MapManager.notify_province_changed(province_id, "infrastructure_project")
 
-	print("InfrastructureDevelopmentManager: started infra project on province %d (target %d) for %s" % [province_id, target_level, proj.owner_tag])
+	print("InfrastructureDevelopmentManager: started infra project on province %d (target %d) for %s" % [province_id, proj.target_level, proj.owner_tag])
+	return proj
+
+
+func start_development_project(
+	province_id: int,
+	target_level: int,
+	investor_tag: String,
+	spend_pp: bool = true,
+) -> ProvincialProject:
+	"""Start a development (+1 economic maturity) project."""
+	var tag := investor_tag.strip_edges().to_upper()
+	ensure_political_power_seed(tag)
+	var preview := can_start_project(province_id, "development", tag, spend_pp)
+	if not preview.get("ok", false):
+		push_warning("InfrastructureDevelopmentManager: cannot start development — %s" % preview.get("reason", "unknown"))
+		return null
+
+	var p: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	if p == null:
+		return null
+
+	var cost := int(preview.get("cost_pp", 35))
+	if spend_pp and not spend_political_power(tag, float(cost)):
+		push_warning("InfrastructureDevelopmentManager: insufficient PP for development project")
+		return null
+
+	var proj := ProvincialProject.new()
+	proj.province_id = province_id
+	proj.axis = "development"
+	proj.owner_tag = tag
+	proj.starting_level = p.development_level
+	proj.target_level = maxi(target_level, p.development_level + 1)
+	proj.work_per_day_base = _calculate_base_work_rate(p, "development", proj.owner_tag)
+	proj.political_power_cost = cost if spend_pp else 0
+	proj.start_day = _current_game_day_index()
+	proj.status = "active"
+	_refresh_project_modifiers(proj, p)
+
+	active_projects[province_id] = proj
+	project_started.emit(proj)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
+		MapManager.notify_province_changed(province_id, "infrastructure_project")
+
+	print("InfrastructureDevelopmentManager: started development project on province %d → Lv.%d for %s" % [province_id, proj.target_level, tag])
 	return proj
 
 
@@ -254,9 +336,28 @@ func cancel_project(province_id: int, reason: String = "player_cancelled") -> bo
 		return false
 	var proj: ProvincialProject = active_projects[province_id]
 	proj.status = "cancelled"
+	# Partial PP refund for voluntary cancel; none for hostile capture.
+	if reason == "player_cancelled" or reason == "ai_cancelled":
+		var refund := float(proj.political_power_cost) * PP_REFUND_ON_CANCEL * (1.0 - proj.progress / 100.0)
+		if refund > 0.5:
+			add_political_power(proj.owner_tag, refund)
 	active_projects.erase(province_id)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
+		MapManager.notify_province_changed(province_id, "infrastructure_project")
 	project_cancelled.emit(province_id, reason)
 	return true
+
+
+## Called when a province changes controller mid-project (hostile capture cancels with no refund).
+func on_province_captured(province_id: int, new_controller_tag: String) -> void:
+	if not active_projects.has(province_id):
+		return
+	var proj: ProvincialProject = active_projects[province_id]
+	var new_tag := new_controller_tag.strip_edges().to_upper()
+	if proj.owner_tag.to_upper() == new_tag:
+		return
+	cancel_project(province_id, "hostile_capture")
+	print("InfrastructureDevelopmentManager: project on %d cancelled — hostile capture by %s" % [province_id, new_tag])
 
 
 ## Called daily by the time signal (or manually from tests).
@@ -416,17 +517,26 @@ func _get_era_max(country_tag: String, axis: String) -> int:
 
 func get_save_data() -> Dictionary:
 	var data := {
-		"version": 1,
-		"active_projects": {}
+		"version": 2,
+		"active_projects": {},
+		"political_power": {},
 	}
 	for pid in active_projects.keys():
 		var proj: ProvincialProject = active_projects[pid]
 		data["active_projects"][str(pid)] = proj.to_save_dict()
+	for tag in political_power.keys():
+		data["political_power"][str(tag)] = float(political_power[tag])
 	return data
 
 
 func apply_loaded_data(data: Dictionary) -> void:
 	active_projects.clear()
+	political_power.clear()
+
+	if data.has("political_power") and typeof(data["political_power"]) == TYPE_DICTIONARY:
+		for tag in data["political_power"].keys():
+			political_power[str(tag).to_upper()] = float(data["political_power"][tag])
+
 	if not data.has("active_projects"):
 		_notify_all_projects_for_visuals()
 		return
@@ -439,6 +549,156 @@ func apply_loaded_data(data: Dictionary) -> void:
 
 	print("InfrastructureDevelopmentManager: restored %d active projects from save." % active_projects.size())
 	_notify_all_projects_for_visuals()
+
+
+## === Political Power (MVP national ledger) ===
+
+func ensure_political_power_seed(country_tag: String) -> void:
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		return
+	if not political_power.has(tag):
+		political_power[tag] = PP_STARTING_BALANCE
+		political_power_changed.emit(tag, PP_STARTING_BALANCE)
+
+
+func get_political_power(country_tag: String) -> float:
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		return 0.0
+	ensure_political_power_seed(tag)
+	return float(political_power.get(tag, 0.0))
+
+
+func add_political_power(country_tag: String, amount: float) -> void:
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty() or amount == 0.0:
+		return
+	ensure_political_power_seed(tag)
+	political_power[tag] = float(political_power[tag]) + amount
+	political_power_changed.emit(tag, float(political_power[tag]))
+
+
+func spend_political_power(country_tag: String, amount: float) -> bool:
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty() or amount <= 0.0:
+		return true
+	ensure_political_power_seed(tag)
+	if float(political_power[tag]) + 0.01 < amount:
+		return false
+	political_power[tag] = float(political_power[tag]) - amount
+	political_power_changed.emit(tag, float(political_power[tag]))
+	return true
+
+
+func _regen_political_power_daily() -> void:
+	# Regen for every tag that already has a ledger entry, plus any active project owners.
+	var tags: Dictionary = {}
+	for t in political_power.keys():
+		tags[str(t).to_upper()] = true
+	for proj in active_projects.values():
+		tags[str(proj.owner_tag).to_upper()] = true
+	for tag in tags.keys():
+		add_political_power(str(tag), PP_DAILY_REGEN)
+
+
+## Factories running in a connected province slowly raise development (makes UI strings true).
+func advance_passive_development_growth() -> void:
+	if typeof(MapManager) == TYPE_NIL:
+		return
+	for pid in MapManager.get_all_provinces().keys():
+		if has_active_project(int(pid)):
+			continue
+		var p: Province = MapManager.get_province(int(pid))
+		if p == null:
+			continue
+		var factory_count := int(p.factories)
+		if factory_count <= 0:
+			continue
+		# Skip heavily sabotaged provinces
+		if typeof(AgentManager) != TYPE_NIL and "networks" in AgentManager:
+			var net = AgentManager.networks.get(int(pid))
+			if net != null and net.has_method("is_active") and net.is_active() and str(net.focus) == "infrastructure_sabotage":
+				continue
+		var gain := PASSIVE_DEV_DAILY * (1.0 + float(clampi(p.infrastructure, 0, 12)) * 0.04)
+		gain *= clampf(0.5 + float(factory_count) * 0.25, 0.5, 2.0)
+		var accum_key := "_passive_dev_progress"
+		var accum := float(p.get_meta(accum_key, 0.0)) if p.has_meta(accum_key) else 0.0
+		accum += gain
+		if accum >= 1.0:
+			var steps := int(floor(accum))
+			accum -= float(steps)
+			MapManager.update_province_development(int(pid), p.development_level + steps)
+			p = MapManager.get_province(int(pid))
+		if p != null:
+			p.set_meta(accum_key, accum)
+
+
+## AI: invest PP into owned high-value provinces lacking projects.
+func advance_ai_investments() -> void:
+	if typeof(MapManager) == TYPE_NIL:
+		return
+	var player := _player_country_tag()
+	var by_country: Dictionary = {}  # tag -> Array[int] province ids
+	for pid in MapManager.get_all_provinces().keys():
+		var p: Province = MapManager.get_province(int(pid))
+		if p == null:
+			continue
+		var tag := p.controller_tag.strip_edges().to_upper()
+		if tag.is_empty():
+			tag = p.owner_tag.strip_edges().to_upper()
+		if tag.is_empty() or tag == player:
+			continue
+		if not by_country.has(tag):
+			by_country[tag] = []
+		by_country[tag].append(int(pid))
+
+	for tag in by_country.keys():
+		var owned: Array = by_country[tag]
+		var active_count := get_all_projects_for_country(str(tag)).size()
+		if active_count >= AI_MAX_PROJECTS_PER_COUNTRY:
+			continue
+		ensure_political_power_seed(str(tag))
+		# Prefer higher VP / infra cores
+		owned.sort_custom(func(a, b): return _ai_province_score(int(a)) > _ai_province_score(int(b)))
+		for pid_var in owned:
+			if active_count >= AI_MAX_PROJECTS_PER_COUNTRY:
+				break
+			var pid := int(pid_var)
+			if has_active_project(pid):
+				continue
+			var p: Province = MapManager.get_province(pid)
+			if p == null:
+				continue
+			# Prefer infra until mid levels, then development
+			var axis := "infrastructure" if p.infrastructure < 8 else "development"
+			var preview := can_start_project(pid, axis, str(tag))
+			if not preview.get("ok", false):
+				continue
+			var started: ProvincialProject = null
+			if axis == "infrastructure":
+				started = start_infrastructure_project(pid, p.infrastructure + 1, str(tag), true)
+			else:
+				started = start_development_project(pid, p.development_level + 1, str(tag), true)
+			if started != null:
+				active_count += 1
+
+
+func _ai_province_score(province_id: int) -> float:
+	var p: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	if p == null:
+		return 0.0
+	return float(p.victory_points) * 3.0 + float(p.infrastructure) + float(p.development_level) * 1.5
+
+
+func _player_country_tag() -> String:
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		var t := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		if not t.is_empty():
+			return t
+	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.get("player_tag"):
+		return str(SupplyManager.player_tag).strip_edges().to_upper()
+	return "USA"
 
 
 ## After restoring projects (especially on load), tell the map + UI to refresh construction visuals.
@@ -762,22 +1022,20 @@ func get_project_status(province_id: int) -> Dictionary:
 ## Convenience for the most common case (InfoPanel "Invest" button).
 ## Returns { success: bool, reason: String, project: ProvincialProject? }
 func try_start_infrastructure_investment(province_id: int, investor_tag: String) -> Dictionary:
+	ensure_political_power_seed(investor_tag)
 	var preview := can_start_project(province_id, "infrastructure", investor_tag)
 	if not preview.get("ok", false):
 		return {
 			"success": false,
 			"reason": preview.get("reason", "Cannot start project"),
-			"preview": preview
+			"preview": preview,
+			"pp_available": get_political_power(investor_tag),
 		}
 
-	# TODO (Phase B): Real Political Power spend here.
-	# For now we just proceed (the design assumes the UI or a NationalLedger will gate PP later).
-
-	# Compute sensible target (current +1 for MVP)
 	var p_for_target: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
 	var cur := p_for_target.infrastructure if p_for_target else 1
 	var tgt := cur + 1
-	var proj := start_infrastructure_project(province_id, tgt, investor_tag)
+	var proj := start_infrastructure_project(province_id, tgt, investor_tag, true)
 	if proj == null:
 		return {"success": false, "reason": "Failed to create project (internal error)"}
 
@@ -786,7 +1044,51 @@ func try_start_infrastructure_investment(province_id: int, investor_tag: String)
 		"reason": "Investment project started",
 		"project": proj,
 		"eta_days": proj.get_eta_days(),
-		"cost_pp": preview.get("cost_pp", 0)
+		"cost_pp": preview.get("cost_pp", 0),
+		"pp_remaining": get_political_power(investor_tag),
+	}
+
+
+func try_start_development_investment(province_id: int, investor_tag: String) -> Dictionary:
+	ensure_political_power_seed(investor_tag)
+	var preview := can_start_project(province_id, "development", investor_tag)
+	if not preview.get("ok", false):
+		return {
+			"success": false,
+			"reason": preview.get("reason", "Cannot start development"),
+			"preview": preview,
+			"pp_available": get_political_power(investor_tag),
+		}
+
+	var p_for_target: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	var cur := p_for_target.development_level if p_for_target else 1
+	var tgt := cur + 1
+	var proj := start_development_project(province_id, tgt, investor_tag, true)
+	if proj == null:
+		return {"success": false, "reason": "Failed to create development project"}
+
+	return {
+		"success": true,
+		"reason": "Development project started",
+		"project": proj,
+		"eta_days": proj.get_eta_days(),
+		"cost_pp": preview.get("cost_pp", 0),
+		"pp_remaining": get_political_power(investor_tag),
+	}
+
+
+func try_cancel_project(province_id: int, requester_tag: String) -> Dictionary:
+	if not active_projects.has(province_id):
+		return {"success": false, "reason": "No active project"}
+	var proj: ProvincialProject = active_projects[province_id]
+	var tag := requester_tag.strip_edges().to_upper()
+	if proj.owner_tag.to_upper() != tag:
+		return {"success": false, "reason": "Only the investing country can cancel"}
+	var ok := cancel_project(province_id, "player_cancelled")
+	return {
+		"success": ok,
+		"reason": "Project cancelled" if ok else "Cancel failed",
+		"pp_remaining": get_political_power(tag),
 	}
 
 

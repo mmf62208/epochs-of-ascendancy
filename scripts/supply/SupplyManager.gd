@@ -32,6 +32,13 @@ var active_cargo: SupplyCargoProfile = null
 # ProvinceEffects + MapManager: All province + national modifier queries should go through
 # MapManager.get_province_effects(...) when possible (centralized after Map System start).
 
+func _find_scenario_loader() -> ScenarioLoader:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	return tree.root.find_child("ScenarioLoader", true, false) as ScenarioLoader
+
+
 func _get_effects_safe(pid: int, tag: String) -> ProvinceEffects:
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_effects"):
 		var fx: ProvinceEffects = MapManager.get_province_effects(pid, tag)
@@ -41,9 +48,9 @@ func _get_effects_safe(pid: int, tag: String) -> ProvinceEffects:
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
 		p = MapManager.get_province(pid) as Province
 	if p == null:
-		var loader := get_node_or_null("/root/ScenarioLoader")
+		var loader := _find_scenario_loader()
 		if loader != null and loader.has_method("get_province"):
-			p = loader.call("get_province", pid)
+			p = loader.call("get_province", pid) as Province
 	if p == null:
 		return null
 	return ProvinceEffects.for_country_province(p, tag) if typeof(ProvinceEffects) != TYPE_NIL else null
@@ -494,9 +501,9 @@ func _generate_local_supply_from_development(days: float) -> void:
 		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
 			province = MapManager.get_province(int(pid)) as Province
 		if province == null:
-			var loader := get_node_or_null("/root/ScenarioLoader")
+			var loader := _find_scenario_loader()
 			if loader != null and loader.has_method("get_province"):
-				province = loader.call("get_province", pid)
+				province = loader.call("get_province", pid) as Province
 		if province == null:
 			continue
 

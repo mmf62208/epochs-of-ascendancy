@@ -23,6 +23,8 @@ extends Node2D
 
 # Dynamically created infrastructure investment UI (MVP — matches engineers button pattern)
 var _btn_invest_infra: Button = null
+var _btn_invest_dev: Button = null
+var _btn_cancel_project: Button = null
 var _label_invest_status: Label = null
 
 # Dynamically created Special Sites section in InfoPanel
@@ -1881,12 +1883,32 @@ func _ensure_infrastructure_investment_ui() -> void:
 	_btn_invest_infra = Button.new()
 	_btn_invest_infra.name = "BtnInvestInfrastructure"
 	_btn_invest_infra.text = "Invest in Infrastructure"
-	_btn_invest_infra.tooltip_text = "Start a provincial development project. Raises infrastructure over time, improving supply, combat width, and unlocking advanced factory types. Cost scales with current level."
+	_btn_invest_infra.tooltip_text = "Spend Political Power to raise infrastructure over time (supply, combat width, factory unlocks)."
 	_btn_invest_infra.custom_minimum_size = Vector2(200, 28)
 	_btn_invest_infra.visible = false
 	if not _btn_invest_infra.pressed.is_connected(_on_invest_infrastructure_pressed):
 		_btn_invest_infra.pressed.connect(_on_invest_infrastructure_pressed)
 	content.add_child(_btn_invest_infra)
+
+	_btn_invest_dev = Button.new()
+	_btn_invest_dev.name = "BtnInvestDevelopment"
+	_btn_invest_dev.text = "Invest in Development"
+	_btn_invest_dev.tooltip_text = "Spend Political Power to raise development (factory eligibility, local supply generation)."
+	_btn_invest_dev.custom_minimum_size = Vector2(200, 28)
+	_btn_invest_dev.visible = false
+	if not _btn_invest_dev.pressed.is_connected(_on_invest_development_pressed):
+		_btn_invest_dev.pressed.connect(_on_invest_development_pressed)
+	content.add_child(_btn_invest_dev)
+
+	_btn_cancel_project = Button.new()
+	_btn_cancel_project.name = "BtnCancelProject"
+	_btn_cancel_project.text = "Cancel Project"
+	_btn_cancel_project.tooltip_text = "Cancel the active project and reclaim a partial Political Power refund."
+	_btn_cancel_project.custom_minimum_size = Vector2(200, 28)
+	_btn_cancel_project.visible = false
+	if not _btn_cancel_project.pressed.is_connected(_on_cancel_project_pressed):
+		_btn_cancel_project.pressed.connect(_on_cancel_project_pressed)
+	content.add_child(_btn_cancel_project)
 
 
 func _update_infrastructure_investment_ui(province: Province) -> void:
@@ -1895,12 +1917,20 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 		return
 	if province == null:
 		_btn_invest_infra.visible = false
+		if _btn_invest_dev:
+			_btn_invest_dev.visible = false
+		if _btn_cancel_project:
+			_btn_cancel_project.visible = false
 		_label_invest_status.visible = false
 		return
 
 	var mgr = _get_infra_manager()
 	if mgr == null:
 		_btn_invest_infra.visible = false
+		if _btn_invest_dev:
+			_btn_invest_dev.visible = false
+		if _btn_cancel_project:
+			_btn_cancel_project.visible = false
 		_label_invest_status.visible = false
 		return
 
@@ -1912,11 +1942,21 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 	)
 	if not show_ui:
 		_btn_invest_infra.visible = false
+		if _btn_invest_dev:
+			_btn_invest_dev.visible = false
+		if _btn_cancel_project:
+			_btn_cancel_project.visible = false
 		_label_invest_status.visible = false
 		return
 
 	_label_invest_status.visible = true
 	_btn_invest_infra.visible = true
+	if _btn_invest_dev:
+		_btn_invest_dev.visible = true
+
+	var pp := 0.0
+	if mgr.has_method("get_political_power"):
+		pp = float(mgr.get_political_power(player_tag))
 
 	var status: Dictionary = (
 		mgr.get_project_status(province.id) if mgr.has_method("get_project_status") else {}
@@ -1927,20 +1967,46 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 		var pct := int(round(float(status.get("progress", 0.0))))
 		var eta := int(status.get("eta_days", 0))
 		var sabotaged := bool(status.get("is_sabotaged", false))
-		var sab_note := " ⚠ Sabotage slowing progress" if sabotaged else ""
-		_label_invest_status.text = "Infra Project: %d%% → Lv.%d (ETA %d days)%s" % [
-			pct, int(status.get("target_level", province.infrastructure + 1)), eta, sab_note
+		var axis := str(status.get("axis", "infrastructure"))
+		var sab_note := " — sabotage slowing" if sabotaged else ""
+		_label_invest_status.text = "%s Project: %d%% → Lv.%d (ETA %dd)%s · PP %.0f" % [
+			axis.capitalize(),
+			pct,
+			int(status.get("target_level", province.infrastructure + 1)),
+			eta,
+			sab_note,
+			pp,
 		]
 		_label_invest_status.modulate = Color(1.0, 0.85, 0.4) if sabotaged else Color(0.6, 0.95, 0.85)
 		_btn_invest_infra.text = "Project Active"
 		_btn_invest_infra.disabled = true
+		if _btn_invest_dev:
+			_btn_invest_dev.text = "Project Active"
+			_btn_invest_dev.disabled = true
+		if _btn_cancel_project:
+			_btn_cancel_project.visible = true
+			_btn_cancel_project.disabled = false
 	else:
-		_label_invest_status.text = "Infra: %d  ·  Dev: %d  (Invest to raise)" % [
-			province.infrastructure, province.development_level
+		var infra_preview: Dictionary = {}
+		var dev_preview: Dictionary = {}
+		if mgr.has_method("can_start_project"):
+			infra_preview = mgr.can_start_project(province.id, "infrastructure", player_tag)
+			dev_preview = mgr.can_start_project(province.id, "development", player_tag)
+		_label_invest_status.text = "Infra: %d  ·  Dev: %d  ·  PP: %.0f" % [
+			province.infrastructure, province.development_level, pp
 		]
 		_label_invest_status.modulate = Color(0.85, 0.9, 0.95)
-		_btn_invest_infra.text = "Invest in Infrastructure"
-		_btn_invest_infra.disabled = false
+		var infra_cost := int(infra_preview.get("cost_pp", 45))
+		var dev_cost := int(dev_preview.get("cost_pp", 35))
+		_btn_invest_infra.text = "Invest Infra (%d PP)" % infra_cost
+		_btn_invest_infra.disabled = not bool(infra_preview.get("ok", true))
+		_btn_invest_infra.tooltip_text = str(infra_preview.get("reason", "Raise infrastructure"))
+		if _btn_invest_dev:
+			_btn_invest_dev.text = "Invest Dev (%d PP)" % dev_cost
+			_btn_invest_dev.disabled = not bool(dev_preview.get("ok", true))
+			_btn_invest_dev.tooltip_text = str(dev_preview.get("reason", "Raise development"))
+		if _btn_cancel_project:
+			_btn_cancel_project.visible = false
 
 
 func _on_invest_infrastructure_pressed() -> void:
@@ -1956,7 +2022,6 @@ func _on_invest_infrastructure_pressed() -> void:
 	if mgr.has_method("try_start_infrastructure_investment"):
 		result = mgr.try_start_infrastructure_investment(selected_province_id, player)
 	else:
-		# Fallback to older API — target current + 1
 		var target := 0
 		if provinces.has(selected_province_id):
 			target = provinces[selected_province_id].infrastructure + 1
@@ -1973,9 +2038,10 @@ func _on_invest_infrastructure_pressed() -> void:
 		if provinces.has(selected_province_id):
 			pname = provinces[selected_province_id].name
 		_show_inspector_toast(
-			"Infrastructure project started%s — ETA ~%d days" % [
+			"Infrastructure project started%s — ETA ~%d days (PP left %.0f)" % [
 				(" in " + pname) if not pname.is_empty() else "",
 				eta,
+				float(result.get("pp_remaining", 0.0)),
 			],
 			3.0,
 		)
@@ -1987,6 +2053,43 @@ func _on_invest_infrastructure_pressed() -> void:
 			3.5,
 			true,
 		)
+
+
+func _on_invest_development_pressed() -> void:
+	if selected_province_id < 0:
+		return
+	var mgr = _get_infra_manager()
+	if mgr == null or not mgr.has_method("try_start_development_investment"):
+		_show_inspector_toast("Development investment unavailable", 2.5, true)
+		return
+	var result: Dictionary = mgr.try_start_development_investment(selected_province_id, _player_tag())
+	if result.get("success", false):
+		_show_inspector_toast(
+			"Development project started — ETA ~%d days" % int(result.get("eta_days", 20)),
+			3.0,
+		)
+		if provinces.has(selected_province_id):
+			show_info_panel(provinces[selected_province_id])
+	else:
+		_show_inspector_toast(str(result.get("reason", "Cannot start development")), 3.5, true)
+
+
+func _on_cancel_project_pressed() -> void:
+	if selected_province_id < 0:
+		return
+	var mgr = _get_infra_manager()
+	if mgr == null or not mgr.has_method("try_cancel_project"):
+		return
+	var result: Dictionary = mgr.try_cancel_project(selected_province_id, _player_tag())
+	if result.get("success", false):
+		_show_inspector_toast(
+			"Project cancelled — PP now %.0f" % float(result.get("pp_remaining", 0.0)),
+			2.8,
+		)
+		if provinces.has(selected_province_id):
+			show_info_panel(provinces[selected_province_id])
+	else:
+		_show_inspector_toast(str(result.get("reason", "Cancel failed")), 3.0, true)
 
 
 func _show_inspector_toast(message: String, duration: float = 2.5, is_error: bool = false) -> void:
@@ -2866,6 +2969,15 @@ func _ensure_supply_overlay_panel() -> void:
 
 
 func _player_tag() -> String:
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		var lm_tag := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		if not lm_tag.is_empty():
+			return lm_tag
+	var bar := get_tree().get_first_node_in_group("top_info_bar") if get_tree() else null
+	if bar != null and bar.get("player_country_tag"):
+		var bar_tag := str(bar.player_country_tag).strip_edges().to_upper()
+		if not bar_tag.is_empty():
+			return bar_tag
 	var sm := _supply_manager()
 	if sm != null and sm.get("player_tag"):
 		return str(sm.player_tag).strip_edges().to_upper()
@@ -4196,7 +4308,7 @@ func apply_phase1_europe_background() -> void:
 func spawn_data_driven_objects_from_layers() -> void:
 	if typeof(ScenarioLoader) == TYPE_NIL:
 		return
-	var loader = get_node_or_null("/root/ScenarioLoader")
+	var loader := get_tree().root.find_child("ScenarioLoader", true, false) as ScenarioLoader
 	if loader == null:
 		return
 	var city_data: Dictionary = {}
