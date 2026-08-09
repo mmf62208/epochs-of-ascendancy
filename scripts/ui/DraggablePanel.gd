@@ -29,4 +29,19 @@ func _on_drag_input(event: InputEvent) -> void:
 			else:
 				_dragging = false
 	elif event is InputEventMouseMotion and _dragging:
-		global_position = get_global_mouse_position() - _drag_offset
+		global_position = _clamp_to_viewport(get_global_mouse_position() - _drag_offset)
+
+
+func _clamp_to_viewport(pos: Vector2) -> Vector2:
+	var viewport := get_viewport()
+	if viewport == null:
+		return pos
+	var visible_rect := viewport.get_visible_rect()
+	var panel_size := size
+	if panel_size == Vector2.ZERO:
+		panel_size = custom_minimum_size
+	var max_pos := visible_rect.size - Vector2(64, 48)
+	return Vector2(
+		clampf(pos.x, -panel_size.x + 64.0, max_pos.x),
+		clampf(pos.y, 0.0, max_pos.y)
+	)

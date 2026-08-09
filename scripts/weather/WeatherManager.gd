@@ -29,16 +29,18 @@ var _global_weather_mod: Dictionary = {
 
 func _ready() -> void:
 	if typeof(TimeManager) != TYPE_NIL:
-		# Connect to daily tick when available
-		if TimeManager.has_signal("day_tick"):
-			TimeManager.day_tick.connect(_on_day_tick)
+		if TimeManager.has_signal("game_day_advanced") and not TimeManager.game_day_advanced.is_connected(_on_day_tick):
+			TimeManager.game_day_advanced.connect(_on_day_tick)
 	print("WeatherManager ready (lightweight season + event stub)")
 
-func _on_day_tick(_year: int, _month: int, _day: int, _total_days: int) -> void:
+func _on_day_tick(_year: int, _month: int, _day: int) -> void:
+	var total_days := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		total_days = TimeManager.get_total_days_elapsed()
 	# Throttle: only full sim every N days or on interesting changes
-	if _total_days - _last_tick_day < 1:
+	if total_days - _last_tick_day < 1:
 		return
-	_last_tick_day = _total_days
+	_last_tick_day = total_days
 	_simulate_day_impl(_year, _month, _day)
 
 func _get_season_progress(month: int, day: int) -> float:
