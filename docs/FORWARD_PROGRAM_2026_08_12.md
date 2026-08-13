@@ -11,6 +11,8 @@
 | **Local snapshot** | `505d91d` on `main` — “snapshot: world_accurate ~3520 + full-test machine state” |
 | **GitHub** | `git push` **blocked on this machine** (no `~/.ssh`, no `gh`) — ops note, not a code PR |
 
+**Archive (do not re-open PR 1–3):** this DAG landed 2026-08-12 (PR 1 `2b19597` · PR 2 `30910c2` greps green · PR 3 `7035837` · PR 4 `0b13284`). Live truth is [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md) §0. Body below is the approved design as written, not a to-do list.
+
 **Truth sources (read first):** [`docs/GAME_STATUS_SNAPSHOT.md`](docs/GAME_STATUS_SNAPSHOT.md) · [`docs/HOI4_EOA_GAP_REVIEW.md`](docs/HOI4_EOA_GAP_REVIEW.md) · [`docs/EOA_RESIDUAL_PRIORITY_BOARD.md`](docs/EOA_RESIDUAL_PRIORITY_BOARD.md) · [`docs/PLAYTEST_AND_DECISION_GUIDE.md`](docs/PLAYTEST_AND_DECISION_GUIDE.md) §0b · [`docs/SESSION_NOTES/2026-08-05_m6_smoke.md`](docs/SESSION_NOTES/2026-08-05_m6_smoke.md) · [`docs/GAME_DIRECTOR_PLAN.md`](docs/GAME_DIRECTOR_PLAN.md) · [`.grok/skills/eoa-full-test/SKILL.md`](.grok/skills/eoa-full-test/SKILL.md) · [`AGENTS.md`](AGENTS.md)
 
 ---
