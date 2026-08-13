@@ -1,4 +1,6 @@
-> **Status (2026-08-12):** Live truth → [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md) (**~3520** board, machine full-test green, M6 human-only). Director → [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md). Dual markers → root `TODO.md`. Play → [`PLAYTEST_AND_DECISION_GUIDE.md`](PLAYTEST_AND_DECISION_GUIDE.md) §0b. This file remains append-only session log.
+> **Status (2026-08-13):** Live truth → [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md). **GitHub `main` @ `51b52e1` is the working tip** (board ~3520 · keep-going PR 1–4 landed · M6 human-only). Branch off `main`; do not merge draft `origin/cursor/*`. Director → [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md). Dual markers → root `TODO.md`. Play → [`PLAYTEST_AND_DECISION_GUIDE.md`](PLAYTEST_AND_DECISION_GUIDE.md) §0b. This file remains append-only session log.
+
+> **2026-08-13 GitHub main tip:** Submitted stack is on `origin/main` (`51b52e1`). SNAPSHOT / residual / forward program / director plan updated: work from GitHub `main` going forward; snapshot base remains `505d91d`. Draft PRs `cursor/fix-void-return-2453` and `cursor/continue-infra-ai-combat-6057` stay unmerged.
 
 # Current State of Epochs of Ascendancy
 

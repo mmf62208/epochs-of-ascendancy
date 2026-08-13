@@ -1,8 +1,8 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-12 (keep-going board · `505d91d` + cad45c93 PR 1–4 · board still ~3520 · machine full-test green · M6 human-only open)  
+**Date:** 2026-08-13 (GitHub `main` tip · `51b52e1` · keep-going PR 1–4 under `505d91d` · board ~3520 · M6 human-only open)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
-**How to keep going:** 5-step protocol in §0. Next human: F5 §0b items 3–15. Next machine: playtest-driven shipped-path fix only. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
+**How to keep going:** 5-step protocol in §0. **Work from GitHub `main` only.** Next human: F5 §0b items 3–15. Next machine: playtest-driven shipped-path fix only. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
 **Audience:** Human playtester, game director, implementer agents  
 **Source of truth for “what is true now”:** this file + [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md)  
@@ -28,9 +28,9 @@ Every Cursor / Grok / human session on this tree:
 |------|--------|
 | **Human** | `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · play §0b items **3–15** · append session notes. M6 20d/60d still open after that. |
 | **Machine** | Playtest-driven bug on a **shipped** path only. No new dual. No GameData split. No `ceb60fdd-*` merge. |
-| **GitHub** | **Ops** — no SSH/`gh` on the director machine. Local snapshot `505d91d` + this stack. Do not force-push over June Cursor history. |
+| **GitHub** | **`origin/main` is the working tip** (`51b52e1` — keep-going board on top of snapshot `505d91d`). Branch off `main`; open PRs into `main`. Do not force-push over June Cursor history. |
 
-**This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
+**This DAG (landed on `main`; PR 1–4 under snapshot `505d91d` → tip `51b52e1`):**
 
 - §0b first-session surfaces are **machine-composited** (`first_session_play_surface_product` + gates `--quick`). That is **not** M6.
 - Assault hang-class **closed** at `30910c2` (greps green: fill-pids, no full icon rebuild, BM notify `target_pid`, success-path busy clears in `_assault_post_ui_light`; failure still clears synchronously).
@@ -38,7 +38,7 @@ Every Cursor / Grok / human session on this tree:
 
 **Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3.
 
-**Do not merge:** `origin/cursor/*` (this clone has `origin/cursor/fix-void-return-2453`) · `feature/goals-forward-2026-06-18` · any `execute-plan/ceb60fdd-*` / `ceb60fdd-stack-assembly`. Work this tree (`505d91d`+). Dual board only via `EOA_SCENARIO=world_full`. Godot only via `tools/run_godot.sh`. Never renumber `world_full` IDs.
+**Do not merge:** `origin/cursor/*` (this clone has `origin/cursor/fix-void-return-2453`) · `feature/goals-forward-2026-06-18` · any `execute-plan/ceb60fdd-*` / `ceb60fdd-stack-assembly`. **Work from GitHub `main` (`51b52e1`+).** Dual board only via `EOA_SCENARIO=world_full`. Godot only via `tools/run_godot.sh`. Never renumber `world_full` IDs.
 
 ---
 
