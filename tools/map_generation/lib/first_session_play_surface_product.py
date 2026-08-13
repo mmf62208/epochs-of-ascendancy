@@ -40,7 +40,7 @@ def _child(ok: bool, summary: Any) -> Dict[str, Any]:
 
 
 def build_first_session_play_surface_product() -> Dict[str, Any]:
-    capital = build_world_accurate_capital_pick_product()
+    capital_pick = build_world_accurate_capital_pick_product()
     fronts = build_map_live_border_fronts_surface_product(country_tag="GER")
     war_path = build_map_war_path_surface_product(country_tag="GER")
     corridor = build_supply_corridor_product()
@@ -52,7 +52,7 @@ def build_first_session_play_surface_product() -> Dict[str, Any]:
     play_strip = build_order_panel_play_strip_product(province_id=1)
 
     bits = {
-        "capital": bool(capital.get("ok")),
+        "capital_pick": bool(capital_pick.get("ok")),
         "fronts": bool(fronts.get("ok")),
         "war_path": bool(war_path.get("ok")),
         "corridor": bool(corridor.get("ok")),
@@ -62,7 +62,7 @@ def build_first_session_play_surface_product() -> Dict[str, Any]:
         "play_strip": bool(play_strip.get("ok")),
     }
     products: Dict[str, Mapping[str, Any]] = {
-        "capital": capital,
+        "capital_pick": capital_pick,
         "fronts": fronts,
         "war_path": war_path,
         "corridor": corridor,

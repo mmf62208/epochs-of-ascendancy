@@ -18,7 +18,7 @@ from save_resume_primary_command_product import (  # noqa: E402
 )
 
 CHILD_NAMES = (
-    "capital",
+    "capital_pick",
     "fronts",
     "war_path",
     "corridor",
