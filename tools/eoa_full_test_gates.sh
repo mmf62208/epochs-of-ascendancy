@@ -81,6 +81,10 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_map_supply_corridor_product \
     tools.map_generation.tests.test_map_supply_hub_brief_product \
     tools.map_generation.tests.test_hoi_full_test_gap_matrix_product \
+    tools.map_generation.tests.test_first_session_play_surface_product \
+    tools.map_generation.tests.test_first_session_hotkeys_product \
+    tools.map_generation.tests.test_first_session_assault_surface_product \
+    tools.map_generation.tests.test_order_panel_play_strip_product \
     -v || fail
 
 run_step unit_save_path \
