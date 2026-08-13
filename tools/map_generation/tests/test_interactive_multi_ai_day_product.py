@@ -16,6 +16,7 @@ from interactive_multi_ai_day_product import (  # noqa: E402
     HARD_MAX_PRODUCTION,
     build_interactive_multi_ai_day_product,
     build_interactive_multi_ai_day_queue,
+    extract_gd_func_body,
     interactive_multi_ai_day_integrity,
     non_player_majors,
     personality_aggression,
@@ -119,9 +120,8 @@ class TestInteractiveMultiAiDayProduct(unittest.TestCase):
             msg="GameData interactive multi-AI must reference personality/aggression",
         )
         # Live multi-AI must call tag-scoped apply, not player apply_production
-        live_idx = gd.find("func apply_interactive_multi_ai_day_live")
-        self.assertGreaterEqual(live_idx, 0)
-        live_body = gd[live_idx : live_idx + 4500]
+        live_body = extract_gd_func_body(gd, "apply_interactive_multi_ai_day_live")
+        self.assertTrue(live_body, msg="apply_interactive_multi_ai_day_live missing")
         self.assertIn("apply_production_for_tag", live_body)
         import re
 
@@ -132,6 +132,12 @@ class TestInteractiveMultiAiDayProduct(unittest.TestCase):
             ),
             msg="interactive multi-AI must not call player-scoped apply_production",
         )
+        # Soft theater tick stays — apply_supply is not a leak.
+        self.assertIn("apply_supply", live_body)
+        # Flush-site: call must live inside _flush_sim_events, not merely in the file.
+        flush_body = extract_gd_func_body(tm, "_flush_sim_events")
+        self.assertTrue(flush_body, msg="_flush_sim_events missing")
+        self.assertIn("_maybe_run_interactive_multi_ai", flush_body)
 
     def test_prod_tags_drive_tag_scoped_stock_sim(self) -> None:
         """Honest path: planned prod_tags → apply_ops → stock deltas on those tags only."""
@@ -190,6 +196,52 @@ class TestInteractiveMultiAiDayProduct(unittest.TestCase):
         first = (q.get("queue") or [{}])[0]
         self.assertIn("aggression", first)
         self.assertGreaterEqual(float(first.get("aggression") or 0), 0.8)
+
+    def test_ger_as_player_excluded_from_prod_tags(self) -> None:
+        """F5 default player is GER — must not sit in the production budget."""
+        p = build_interactive_multi_ai_day_product(player_tag="GER")
+        self.assertTrue(p.get("ok"), msg=p)
+        self.assertEqual(p.get("player_tag"), "GER")
+        prod_tags = list((p.get("plan") or {}).get("prod_tags") or [])
+        self.assertNotIn("GER", prod_tags)
+        sim = (p.get("plan") or {}).get("stockpile_sim") or {}
+        self.assertEqual(int(sim.get("player_delta") or 0), 0)
+        self.assertIn("ger_player_excluded_from_prod", p.get("pass") or [])
+        self.assertIn("ger_player_delta_zero", p.get("pass") or [])
+
+    def test_flush_site_slice_not_file_presence(self) -> None:
+        p = build_interactive_multi_ai_day_product()
+        self.assertIn("flush_calls_interactive_multi_ai", p.get("pass") or [])
+        tm = TM.read_text(encoding="utf-8")
+        flush_body = extract_gd_func_body(tm, "_flush_sim_events")
+        self.assertIn("_maybe_run_interactive_multi_ai", flush_body)
+        # Sibling func exists but must not be the only hit the product accepts.
+        self.assertIn("func _maybe_run_interactive_multi_ai", tm)
+        self.assertNotIn("func _maybe_run_interactive_multi_ai", flush_body)
+
+    def test_live_remaining_leak_needles(self) -> None:
+        """Only these three needles are leaks. apply_supply stays."""
+        p = build_interactive_multi_ai_day_product()
+        self.assertTrue(p.get("ok"), msg=p)
+        self.assertIn("live_no_daily_production_tick", p.get("pass") or [])
+        self.assertIn("live_no_bare_apply_production", p.get("pass") or [])
+        self.assertIn("live_no_player_apply_production", p.get("pass") or [])
+        gd = GD.read_text(encoding="utf-8")
+        live_body = extract_gd_func_body(gd, "apply_interactive_multi_ai_day_live")
+        import re
+
+        self.assertNotIn("daily_production_tick", live_body)
+        self.assertIsNone(re.search(r"(?<![\w])apply_production\s*\(", live_body))
+        self.assertIsNone(
+            re.search(
+                r'apply_order_panel_action\s*\(\s*["\']apply_production["\']',
+                live_body,
+            )
+        )
+        self.assertRegex(
+            live_body,
+            r'apply_order_panel_action\s*\(\s*["\']apply_supply["\']',
+        )
 
 
 if __name__ == "__main__":

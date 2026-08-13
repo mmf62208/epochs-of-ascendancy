@@ -15,6 +15,7 @@ Killswitch (runtime): EOA_INTERACTIVE_MULTI_AI=0
 """
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence
 
@@ -39,6 +40,21 @@ PERSONALITY_AGGRESSION: Dict[str, float] = {
     "JAP": 0.75,
     "POL": 0.52,
 }
+
+
+def extract_gd_func_body(src: str, func_name: str) -> str:
+    """One GDScript func only — file-level presence is not enough."""
+    needle = "func %s" % func_name
+    i = src.find(needle)
+    if i < 0:
+        return ""
+    lines = src[i:].splitlines()
+    out = [lines[0]]
+    for line in lines[1:]:
+        if line.startswith("func "):
+            break
+        out.append(line)
+    return "\n".join(out)
 
 
 def _norm_tag(tag: Any) -> str:
@@ -410,6 +426,29 @@ def build_interactive_multi_ai_day_product(
         if plan.get("prod_tags"):
             passes.append("prod_tags_drive_stock_deltas")
 
+    # F5 default player is GER; planner DEFAULT stays USA.
+    ger_plan = build_interactive_multi_ai_day_queue(
+        major_tags,
+        "GER",
+        day_index=day_index,
+        max_production=max_production,
+        max_soft_ticks=max_soft_ticks,
+        day_budget=day_budget,
+        use_personality=use_personality,
+    )
+    ger_ops = resolve_tag_scoped_apply_ops(ger_plan.get("queue") or [])
+    ger_sim = simulate_tag_stockpile_applies(ger_ops, player_tag="GER")
+    plan["ger_player_sim"] = ger_sim
+    plan["ger_prod_tags"] = list(ger_plan.get("prod_tags") or [])
+    if "GER" not in (ger_plan.get("prod_tags") or []):
+        passes.append("ger_player_excluded_from_prod")
+    else:
+        fails.append("ger_player_in_prod_tags")
+    if ger_sim.get("ok") and int(ger_sim.get("player_delta") or 0) == 0:
+        passes.append("ger_player_delta_zero")
+    else:
+        fails.append("ger_player_stock_mutated")
+
     # Wiring: GameData live API + TimeManager gate + killswitch string
     gd_path = ROOT / "scripts" / "autoload" / "GameData.gd"
     tm_path = ROOT / "scripts" / "autoload" / "TimeManager.gd"
@@ -429,24 +468,32 @@ def build_interactive_multi_ai_day_product(
         else:
             fails.append("missing_apply_production_for_tag")
         # Live multi-AI body must call apply_production_for_tag, not bare apply_production
-        live_idx = gd.find("func apply_interactive_multi_ai_day_live")
-        if live_idx >= 0:
-            live_body = gd[live_idx : live_idx + 4500]
+        live_body = extract_gd_func_body(gd, "apply_interactive_multi_ai_day_live")
+        if live_body:
             if "apply_production_for_tag" in live_body:
                 passes.append("live_calls_tag_scoped_apply")
             else:
                 fails.append("live_missing_tag_scoped_apply")
             # Forbidden: player-scoped order-panel production inside multi-AI loop body.
             # Match real calls only (not comments): apply_order_panel_action( then apply_production
-            import re as _re
-
-            call_pat = _re.compile(
+            call_pat = re.compile(
                 r'apply_order_panel_action\s*\(\s*["\']apply_production["\']'
             )
             if call_pat.search(live_body):
                 fails.append("live_still_uses_player_apply_production")
             else:
                 passes.append("live_no_player_apply_production")
+            # Remaining leak needles only. apply_supply soft tick is intentional.
+            if "daily_production_tick" in live_body:
+                fails.append("live_uses_daily_production_tick")
+            else:
+                passes.append("live_no_daily_production_tick")
+            if re.search(r"(?<![\w])apply_production\s*\(", live_body):
+                fails.append("live_uses_bare_apply_production")
+            else:
+                passes.append("live_no_bare_apply_production")
+        else:
+            fails.append("live_missing_tag_scoped_apply")
     else:
         fails.append("missing_gamedata")
 
@@ -472,6 +519,12 @@ def build_interactive_multi_ai_day_product(
             passes.append("timemanager_killswitch")
         else:
             fails.append("missing_timemanager_killswitch")
+        # Flush-site: hook must be inside _flush_sim_events, not a dead sibling.
+        flush_body = extract_gd_func_body(tm, "_flush_sim_events")
+        if "_maybe_run_interactive_multi_ai" in flush_body:
+            passes.append("flush_calls_interactive_multi_ai")
+        else:
+            fails.append("flush_missing_interactive_multi_ai")
         # Interactive must not re-enable full daily AI combat (OOM history).
         if "_should_run_daily_ai_combat" in tm and "not is_interactive_light_sim" in tm:
             passes.append("daily_ai_combat_still_gated")
