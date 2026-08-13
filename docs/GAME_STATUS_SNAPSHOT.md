@@ -1,9 +1,8 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-12 (doc/git snapshot · board still ~3520 · machine full-test green · M6 human-only open)  
-**Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md)  
-**How to keep going:** play [`PLAYTEST_AND_DECISION_GUIDE.md`](PLAYTEST_AND_DECISION_GUIDE.md) §0b (incomplete notes in [`SESSION_NOTES/2026-08-05_m6_smoke.md`](SESSION_NOTES/2026-08-05_m6_smoke.md)); do **not** add new residual dual packages; Cursor/GitHub agents must use this tree, not June `origin` history.  
-
+**Date:** 2026-08-12 (keep-going board · `505d91d` + cad45c93 PR 1–4 · board still ~3520 · machine full-test green · M6 human-only open)  
+**Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
+**How to keep going:** 5-step protocol in §0. Next human: F5 §0b items 3–15. Next machine: playtest-driven shipped-path fix only. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
 **Audience:** Human playtester, game director, implementer agents  
 **Source of truth for “what is true now”:** this file + [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md)  
@@ -11,7 +10,35 @@
 **HOI4 pillar gap review:** [`HOI4_EOA_GAP_REVIEW.md`](HOI4_EOA_GAP_REVIEW.md) · pure `hoi_full_test_gap_matrix_product` (17/17 P0 landed · open P0=0)  
 **Grok partner setup:** [`EOA_GROK_SETUP.md`](EOA_GROK_SETUP.md) · skill `eoa-full-test` · gates `tools/eoa_full_test_gates.sh` · `/eoa-gates`  
 **Year multi-AI campaign:** `tools/eoa_year_multi_ai_test.sh` · **71 factions all AI** · lean 365d **PASS** (majors real production apply · minors soft ticks · calendar 1936-01-01→1937-01-01 · ~7s · evidence `tools/map_generation/output/year_multi_ai_campaign_evidence.json`)  
-**Interactive multi-AI (graphical F5):** budgeted **3** production + **1** soft supply/day · **personality aggression rank** · **tag-scoped** `apply_production_for_tag` (not player stockpile) · pure `interactive_multi_ai_day_product` · killswitch `EOA_INTERACTIVE_MULTI_AI=0`
+**Interactive multi-AI (graphical F5):** budgeted **3** production + **1** soft supply/day · **personality aggression rank** · **tag-scoped** `apply_production_for_tag` (not player stockpile) · pure `interactive_multi_ai_day_product` · **on official `--quick` gate** · killswitch `EOA_INTERACTIVE_MULTI_AI=0`
+
+---
+
+## 0. How to keep going (session protocol)
+
+Every Cursor / Grok / human session on this tree:
+
+1. **Read SNAPSHOT** (this file, one screen). If MASTER or TODO disagrees, **this file wins**.
+2. **Load `/eoa-full-test`** (`.grok/skills/eoa-full-test/SKILL.md`).
+3. **Run `tools/eoa_full_test_gates.sh --quick`** while iterating; full script before merge.
+4. **One play-loop slice** — fix the shipped API; extend the existing product/test. No new dual package. No GameData split.
+5. **Human §0b notes** — play [`PLAYTEST_AND_DECISION_GUIDE.md`](PLAYTEST_AND_DECISION_GUIDE.md) §0b and **append** [`SESSION_NOTES/2026-08-05_m6_smoke.md`](SESSION_NOTES/2026-08-05_m6_smoke.md). Do not invent M6 complete.
+
+| Next | Action |
+|------|--------|
+| **Human** | `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · play §0b items **3–15** · append session notes. M6 20d/60d still open after that. |
+| **Machine** | Playtest-driven bug on a **shipped** path only. No new dual. No GameData split. No `ceb60fdd-*` merge. |
+| **GitHub** | **Ops** — no SSH/`gh` on the director machine. Local snapshot `505d91d` + this stack. Do not force-push over June Cursor history. |
+
+**This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
+
+- §0b first-session surfaces are **machine-composited** (`first_session_play_surface_product` + gates `--quick`). That is **not** M6.
+- Assault hang-class **closed** at `30910c2` (greps green: fill-pids, no full icon rebuild, BM notify `target_pid`, success-path busy clears in `_assault_post_ui_light`; failure still clears synchronously).
+- Interactive multi-AI tag-scope is on the **official gate** (`test_interactive_multi_ai_day_product` in `eoa_full_test_gates.sh`).
+
+**Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3.
+
+**Do not merge:** `origin/cursor/*` (this clone has `origin/cursor/fix-void-return-2453`) · `feature/goals-forward-2026-06-18` · any `execute-plan/ceb60fdd-*` / `ceb60fdd-stack-assembly`. Work this tree (`505d91d`+). Dual board only via `EOA_SCENARIO=world_full`. Godot only via `tools/run_godot.sh`. Never renumber `world_full` IDs.
 
 ---
 
@@ -43,6 +70,8 @@
 | **Stream 2 state labels** | **DONE** — states mapmode (**Shift+F9**) @ operational · **Europe NUTS budget quota** + geo-grid (not pure province_n) so Maginot theater stays labeled · pure `select_state_labels_for_budget` |
 | **WarLoop first-session** | **DONE** — toolbar **WarLoop** · **Shift+I** · `show_first_session_war_path` (EquipmentFlow ON + Fronts + assault brief) · pure `map_war_path_surface_product` |
 | **Human playtest kit** | **DONE** — `PLAYTEST_AND_DECISION_GUIDE.md` §0b post-merge checklist · **M6 20d/60d narrative still open** |
+| **§0b machine composer** | **DONE (PR 1)** — `first_session_play_surface_product` ANDs eight shipped builders · on `eoa_full_test_gates.sh --quick` · **not M6** |
+| **Assault hang-class** | **CLOSED (PR 2 · `30910c2` greps green)** — no inspector on execute success · pid-only fill/icons · BM notify `target_pid` · success busy in `_assault_post_ui_light` |
 | **Adjacency** | `shared_edge_near_vertex_plus_knn` · land shared coverage **~0.974** · 0 land orphans · GER↔FRA kept |
 | **Geometry** | GIS hybrid + **us_merge_v1** + **row_sparse_merge_v1** · NE land hit **0.986** |
 | **Map finished (machine)** | **YES** — dual IDs intact · sparse densify closed · pick/multi-front/assault headless green · **M6 human notes not a gate** |
@@ -91,8 +120,10 @@
 
 From [`WORLD_CLASS_MAP_REVIEW.md`](WORLD_CLASS_MAP_REVIEW.md) §4 + forward plan:
 
-1. **M6** Human 20d + 60d playtest notes (**still open — not automated, not a machine gate**) — use §0b checklist first  
-2. Optional residual (post full-test, not P0): SE Asia micro-merge if noisy · graphical `renderer_frame` · deeper fuel networks · designer UX polish · persistent OOB Attack chip  
+1. **Human §0b items 3–15** — `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · append [`SESSION_NOTES/2026-08-05_m6_smoke.md`](SESSION_NOTES/2026-08-05_m6_smoke.md)  
+2. **M6** Human 20d + 60d playtest notes (**still open — not automated, not a machine gate**)  
+3. Next machine: playtest-driven shipped-path fix only (no dual, no GameData split, no `ceb60fdd-*`)  
+4. Optional residual (post full-test, not P0): SE Asia micro-merge if noisy · graphical `renderer_frame` · deeper fuel networks · designer UX polish · persistent OOB Attack chip · DESIGN_LADDER_A corridor/transit (parked)
 
 
 
@@ -163,8 +194,10 @@ tools/run_godot.sh --path . res://scenes/TestScenario.tscn
 
 **Map machine gate status:** closed. **Full-test play path re-verified 2026-08-01** (unit + QC + headless pick/assault + save + year multi-AI 365d; SCRIPT ERROR 0).  
 
+**§0b composer + hang-class + multi-AI gate (2026-08-12 DAG):** `test_first_session_play_surface_product` · `test_first_session_assault_surface_product` (hang-class greps green at `30910c2`) · `test_interactive_multi_ai_day_product` — all in `tools/eoa_full_test_gates.sh --quick`.
+
 **Year multi-AI (lean) latest:** 71 nations · 365 days · major_apply_sum ≥ majors×days/2 · no OOM · shell fail-closed on SCRIPT ERROR / Killed.  
 
-Remaining map-star open item is **human-only M6**.
+Remaining map-star open item is **human-only M6**. This keep-going board is **PR 4 of 4**, not the only PR.
 
 Next orchestration: **[`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md)**.

@@ -1,10 +1,11 @@
 # EOA — Game Director Plan (phases + agents → full-test world-class)
 
-**Date:** 2026-08-12 (reconciled to live SNAPSHOT · board ~3520)  
+**Date:** 2026-08-12 (keep-going board · reconciled to live SNAPSHOT · board ~3520)  
 **Role of this doc:** Single **orchestration** board for implementer agents and human director sessions.  
 **Status truth:** [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md) · **always win** if this file disagrees  
+**Keep-going (this DAG):** SNAPSHOT §0 · [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md) · residual [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md)  
 **Map as living star (HOI4/V3 structure review):** [`WORLD_CLASS_MAP_REVIEW.md`](WORLD_CLASS_MAP_REVIEW.md)  
-**Long program (no permanent deferrals):** [`MASTER_COMPLETION_PLAN.md`](MASTER_COMPLETION_PLAN.md)  
+**Long program (no permanent deferrals):** [`MASTER_COMPLETION_PLAN.md`](MASTER_COMPLETION_PLAN.md) — catalogue only; SNAPSHOT wins  
 **Human play:** [`PLAYTEST_AND_DECISION_GUIDE.md`](PLAYTEST_AND_DECISION_GUIDE.md)
 
 ---
@@ -117,7 +118,9 @@ Priorities from WORLD_CLASS_MAP_REVIEW §4 (do **not** renumber boards):
 | M3 Terrain mapmode polish | UIUX | **DONE** — Ctrl+F9 + toolbar; `terrain_mapmode_color_from_key` |
 | M4 Supply corridor highlight | Production + UIUX | **DONE** — G + supply preview polyline; `find_land_path` / `highlight_supply_corridor` |
 | M5 Measured FPS @ live board | PerfCI | **DONE (post-sparse re-sample 2026-07-31)** — n=60 · mean 34.01ms · p50 33.62 · p95 35.61 · ~29.4 fps · soft 30 **FAIL** honest · `map_tick_proxy_headless` |
-| M6 Human 20d + 60d notes | Human + Director | PLAYTEST notes filed |
+| M6 Human 20d + 60d notes | Human + Director | PLAYTEST notes filed — **still open** (not a machine gate) |
+
+**Next session (after 2026-08-12 loop-honesty DAG):** PR 1 §0b composer · PR 2 assault hang-class (**closed** at `30910c2`, greps green) · PR 3 multi-AI on official gates · PR 4 keep-going board (this file + SNAPSHOT §0). Then **human §0b items 3–15** via `tools/run_godot.sh --path . res://scenes/TestScenario.tscn`; append [`SESSION_NOTES/2026-08-05_m6_smoke.md`](SESSION_NOTES/2026-08-05_m6_smoke.md). Next machine work is only a playtest-driven shipped-path fix. M6 remains human-only. Do **not** merge `origin/cursor/*` (this clone has `fix-void-return-2453`), `feature/goals-forward-2026-06-18`, or `execute-plan/ceb60fdd-*`. GitHub push is ops (`505d91d` + this stack). Deferred: FPS, GameData split, densify, DESIGN_LADDER_A corridor/transit, museum/MP/V3.
 
 ### Phase D6+ — Long program (MASTER)
 
