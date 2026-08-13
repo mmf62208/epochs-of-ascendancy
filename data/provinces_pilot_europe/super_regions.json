@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "super_regions": [
+    {
+      "id": 1,
+      "name": "Europe",
+      "region_ids": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10
+      ],
+      "theater": "europe_core"
+    }
+  ]
+}

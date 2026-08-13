@@ -370,3 +370,11 @@ func get_virtual_children_for_parent(parent_id: int) -> Array[int]:
 
 func has_virtual_demo() -> bool:
 	return _virtual_polys.size() > 0
+
+
+## Returns parent province id if [param vid] is a registered demo virtual child, else -1.
+## Never infer parent as vid/1000 — world_full real ids live in that numeric range.
+func resolve_virtual_parent(vid: int) -> int:
+	if _virtual_to_parent.has(vid):
+		return int(_virtual_to_parent[vid])
+	return -1

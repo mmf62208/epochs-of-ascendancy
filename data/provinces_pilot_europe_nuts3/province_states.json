@@ -1,0 +1,3412 @@
+{
+  "states": [
+    {
+      "id": 1,
+      "name": "Thrace",
+      "owner_hint": "ALB",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710000,
+        710001,
+        710002,
+        710003,
+        710004,
+        710005,
+        710006,
+        710007
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 2,
+      "name": "Macedonia",
+      "owner_hint": "ALB",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710008,
+        710009,
+        710010,
+        710011
+      ],
+      "province_n": 4
+    },
+    {
+      "id": 3,
+      "name": "Bohemia",
+      "owner_hint": "AUS",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710012,
+        710013,
+        710014,
+        710015,
+        710016,
+        710017,
+        710018,
+        710019
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 4,
+      "name": "Moravia",
+      "owner_hint": "AUS",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710020,
+        710021,
+        710022,
+        710023,
+        710024,
+        710025,
+        710026,
+        710027
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 5,
+      "name": "Austria Proper",
+      "owner_hint": "AUS",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710028,
+        710029,
+        710030,
+        710031,
+        710032,
+        710033,
+        710034,
+        710035
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 6,
+      "name": "Tyrol",
+      "owner_hint": "AUS",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710036,
+        710037,
+        710038,
+        710039,
+        710040,
+        710041,
+        710042,
+        710043
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 7,
+      "name": "Styria",
+      "owner_hint": "AUS",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710044,
+        710045,
+        710046
+      ],
+      "province_n": 3
+    },
+    {
+      "id": 8,
+      "name": "Flanders",
+      "owner_hint": "BEL",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        710047,
+        710048,
+        710049,
+        710050,
+        710051,
+        710052,
+        710053,
+        710054
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 9,
+      "name": "Wallonia",
+      "owner_hint": "BEL",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        710055,
+        710056,
+        710057,
+        710058,
+        710059,
+        710060,
+        710061,
+        710062
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 10,
+      "name": "Brabant",
+      "owner_hint": "BEL",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        710063,
+        710064,
+        710065,
+        710066,
+        710067,
+        710068,
+        710069,
+        710070
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 11,
+      "name": "Holland",
+      "owner_hint": "BEL",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        710071,
+        710072,
+        710073,
+        710074,
+        710075,
+        710076,
+        710077,
+        710078
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 12,
+      "name": "Zeeland",
+      "owner_hint": "BEL",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        710079,
+        710080,
+        710081,
+        710082,
+        710083,
+        710084,
+        710085,
+        710086
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 13,
+      "name": "Limburg",
+      "owner_hint": "BEL",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        710087,
+        710088,
+        710089,
+        710090
+      ],
+      "province_n": 4
+    },
+    {
+      "id": 14,
+      "name": "Epirus",
+      "owner_hint": "BUL",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710091,
+        710092,
+        710093,
+        710094,
+        710095,
+        710096,
+        710097,
+        710098
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 15,
+      "name": "Thessaly",
+      "owner_hint": "BUL",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710099,
+        710100,
+        710101,
+        710102,
+        710103,
+        710104,
+        710105,
+        710106
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 16,
+      "name": "Peloponnese",
+      "owner_hint": "BUL",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710107,
+        710108,
+        710109,
+        710110,
+        710111,
+        710112,
+        710113,
+        710114
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 17,
+      "name": "Bosnia",
+      "owner_hint": "BUL",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710115,
+        710116,
+        710117,
+        710118
+      ],
+      "province_n": 4
+    },
+    {
+      "id": 18,
+      "name": "Serbia",
+      "owner_hint": "CRO",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710808,
+        710809,
+        710810,
+        710811,
+        710812,
+        710813,
+        710814,
+        710815
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 19,
+      "name": "Croatia",
+      "owner_hint": "CRO",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710816,
+        710817,
+        710818,
+        710819,
+        710820,
+        710821,
+        710822,
+        710823
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 20,
+      "name": "Slovenia",
+      "owner_hint": "CRO",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710824,
+        710825,
+        710826,
+        710827,
+        710828
+      ],
+      "province_n": 5
+    },
+    {
+      "id": 21,
+      "name": "Warsaw",
+      "owner_hint": "CYP",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        710145
+      ],
+      "province_n": 1
+    },
+    {
+      "id": 22,
+      "name": "Carinthia",
+      "owner_hint": "CZE",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710146,
+        710147,
+        710148,
+        710149,
+        710150,
+        710151,
+        710152,
+        710153
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 23,
+      "name": "Slovakia",
+      "owner_hint": "CZE",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710154,
+        710155,
+        710156,
+        710157,
+        710158,
+        710159
+      ],
+      "province_n": 6
+    },
+    {
+      "id": 24,
+      "name": "Zealand",
+      "owner_hint": "DNK",
+      "region_hint": "Nordic",
+      "province_ids": [
+        710561,
+        710562,
+        710563,
+        710564,
+        710565,
+        710566,
+        710567,
+        710568
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 25,
+      "name": "Jutland",
+      "owner_hint": "DNK",
+      "region_hint": "Nordic",
+      "province_ids": [
+        710569,
+        710570,
+        710571
+      ],
+      "province_n": 3
+    },
+    {
+      "id": 26,
+      "name": "Southeast England",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711335,
+        711336,
+        711337,
+        711338,
+        711339,
+        711340,
+        711341,
+        711342
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 27,
+      "name": "Midlands",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711343,
+        711344,
+        711345,
+        711346,
+        711347,
+        711348,
+        711349,
+        711350
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 28,
+      "name": "Yorkshire",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711351,
+        711352,
+        711353,
+        711354,
+        711355,
+        711356,
+        711357,
+        711358
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 29,
+      "name": "Northumbria",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711359,
+        711360,
+        711361,
+        711362,
+        711363,
+        711364,
+        711365,
+        711366
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 30,
+      "name": "Wales",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711367,
+        711368,
+        711369,
+        711370,
+        711371,
+        711372,
+        711373,
+        711374
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 31,
+      "name": "Scottish Lowlands",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711375,
+        711376,
+        711377,
+        711378,
+        711379,
+        711380,
+        711381,
+        711382
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 32,
+      "name": "Scottish Highlands",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711383,
+        711384,
+        711385,
+        711386,
+        711387,
+        711388,
+        711389,
+        711390
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 33,
+      "name": "Ulster",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711391,
+        711392,
+        711393,
+        711394,
+        711395,
+        711396,
+        711397,
+        711398
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 34,
+      "name": "Leinster",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711399,
+        711400,
+        711401,
+        711402,
+        711403,
+        711404,
+        711405,
+        711406
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 35,
+      "name": "Munster",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711407,
+        711408,
+        711409,
+        711410,
+        711411,
+        711412,
+        711413,
+        711414
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 36,
+      "name": "Connacht",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711415,
+        711416,
+        711417,
+        711418,
+        711419,
+        711420,
+        711421,
+        711422
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 37,
+      "name": "Lancashire",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711423,
+        711424,
+        711425,
+        711426,
+        711427,
+        711428,
+        711429,
+        711430
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 38,
+      "name": "East Anglia",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711431,
+        711432,
+        711433,
+        711434,
+        711435,
+        711436,
+        711437,
+        711438
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 39,
+      "name": "Wessex",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711439,
+        711440,
+        711441,
+        711442,
+        711443,
+        711444,
+        711445,
+        711446
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 40,
+      "name": "Cornwall",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711447,
+        711448,
+        711449,
+        711450,
+        711451,
+        711452,
+        711453,
+        711454
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 41,
+      "name": "Kent",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711455,
+        711456,
+        711457,
+        711458,
+        711459,
+        711460,
+        711461,
+        711462
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 42,
+      "name": "Cumbria",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711463,
+        711464,
+        711465,
+        711466,
+        711467,
+        711468,
+        711469,
+        711470
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 43,
+      "name": "Glasgow Belt",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711471,
+        711472,
+        711473,
+        711474,
+        711475,
+        711476,
+        711477,
+        711478
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 44,
+      "name": "Dublin Pale",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711479,
+        711480,
+        711481,
+        711482,
+        711483,
+        711484,
+        711485,
+        711486
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 45,
+      "name": "Clyde",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711487,
+        711488,
+        711489,
+        711490,
+        711491,
+        711492,
+        711493,
+        711494
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 46,
+      "name": "Northern Southeast England",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711495,
+        711496,
+        711497,
+        711498,
+        711499,
+        711500,
+        711501,
+        711502
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 47,
+      "name": "Northern Midlands",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711503,
+        711504,
+        711505,
+        711506,
+        711507,
+        711508,
+        711509,
+        711510
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 48,
+      "name": "Northern Yorkshire",
+      "owner_hint": "ENG",
+      "region_hint": "British Isles",
+      "province_ids": [
+        711511,
+        711512,
+        711513
+      ],
+      "province_n": 3
+    },
+    {
+      "id": 49,
+      "name": "Pomeranian Coast",
+      "owner_hint": "EST",
+      "region_hint": "Baltic Rim",
+      "province_ids": [
+        710572,
+        710573,
+        710574,
+        710575,
+        710576
+      ],
+      "province_n": 5
+    },
+    {
+      "id": 50,
+      "name": "Scania",
+      "owner_hint": "FIN",
+      "region_hint": "Nordic",
+      "province_ids": [
+        710688,
+        710689,
+        710690,
+        710691,
+        710692,
+        710693,
+        710694,
+        710695
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 51,
+      "name": "Svealand",
+      "owner_hint": "FIN",
+      "region_hint": "Nordic",
+      "province_ids": [
+        710696,
+        710697,
+        710698,
+        710699,
+        710700,
+        710701,
+        710702,
+        710703
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 52,
+      "name": "Götaland",
+      "owner_hint": "FIN",
+      "region_hint": "Nordic",
+      "province_ids": [
+        710704,
+        710705,
+        710706
+      ],
+      "province_n": 3
+    },
+    {
+      "id": 53,
+      "name": "Île-de-France",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710707,
+        710708,
+        710709,
+        710710,
+        710711,
+        710712,
+        710713,
+        710714
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 54,
+      "name": "Normandy",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710715,
+        710716,
+        710717,
+        710718,
+        710719,
+        710720,
+        710721,
+        710722
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 55,
+      "name": "Brittany",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710723,
+        710724,
+        710725,
+        710726,
+        710727,
+        710728,
+        710729,
+        710730
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 56,
+      "name": "Aquitaine",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710731,
+        710732,
+        710733,
+        710734,
+        710735,
+        710736,
+        710737,
+        710738
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 57,
+      "name": "Provence",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710739,
+        710740,
+        710741,
+        710742,
+        710743,
+        710744,
+        710745,
+        710746
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 58,
+      "name": "Alsace",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710747,
+        710748,
+        710749,
+        710750,
+        710751,
+        710752,
+        710753,
+        710754
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 59,
+      "name": "Lorraine",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710755,
+        710756,
+        710757,
+        710758,
+        710759,
+        710760,
+        710761,
+        710762
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 60,
+      "name": "Burgundy",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710763,
+        710764,
+        710765,
+        710766,
+        710767,
+        710768,
+        710769,
+        710770
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 61,
+      "name": "Languedoc",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710771,
+        710772,
+        710773,
+        710774,
+        710775,
+        710776,
+        710777,
+        710778
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 62,
+      "name": "Champagne",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710779,
+        710780,
+        710781,
+        710782,
+        710783,
+        710784,
+        710785,
+        710786
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 63,
+      "name": "Picardy",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710787,
+        710788,
+        710789,
+        710790,
+        710791,
+        710792,
+        710793,
+        710794
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 64,
+      "name": "Auvergne",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710795,
+        710796,
+        710797,
+        710798,
+        710799,
+        710800,
+        710801,
+        710802
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 65,
+      "name": "Poitou",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        710803,
+        710804,
+        710805,
+        710806,
+        710807
+      ],
+      "province_n": 5
+    },
+    {
+      "id": 66,
+      "name": "Brandenburg",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710160,
+        710161,
+        710162,
+        710163,
+        710164,
+        710165,
+        710166,
+        710167
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 67,
+      "name": "Bavaria",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710168,
+        710169,
+        710170,
+        710171,
+        710172,
+        710173,
+        710174,
+        710175
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 68,
+      "name": "Saxony",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710176,
+        710177,
+        710178,
+        710179,
+        710180,
+        710181,
+        710182,
+        710183
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 69,
+      "name": "Rhineland",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710184,
+        710185,
+        710186,
+        710187,
+        710188,
+        710189,
+        710190,
+        710191
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 70,
+      "name": "Westphalia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710192,
+        710193,
+        710194,
+        710195,
+        710196,
+        710197,
+        710198,
+        710199
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 71,
+      "name": "Silesia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710200,
+        710201,
+        710202,
+        710203,
+        710204,
+        710205,
+        710206,
+        710207
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 72,
+      "name": "Hanover",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710208,
+        710209,
+        710210,
+        710211,
+        710212,
+        710213,
+        710214,
+        710215
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 73,
+      "name": "Württemberg",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710216,
+        710217,
+        710218,
+        710219,
+        710220,
+        710221,
+        710222,
+        710223
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 74,
+      "name": "Hesse",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710224,
+        710225,
+        710226,
+        710227,
+        710228,
+        710229,
+        710230,
+        710231
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 75,
+      "name": "Pomerania",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710232,
+        710233,
+        710234,
+        710235,
+        710236,
+        710237,
+        710238,
+        710239
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 76,
+      "name": "Mecklenburg",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710240,
+        710241,
+        710242,
+        710243,
+        710244,
+        710245,
+        710246,
+        710247
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 77,
+      "name": "Thuringia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710248,
+        710249,
+        710250,
+        710251,
+        710252,
+        710253,
+        710254,
+        710255
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 78,
+      "name": "Baden",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710256,
+        710257,
+        710258,
+        710259,
+        710260,
+        710261,
+        710262,
+        710263
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 79,
+      "name": "Schleswig-Holstein",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710264,
+        710265,
+        710266,
+        710267,
+        710268,
+        710269,
+        710270,
+        710271
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 80,
+      "name": "East Prussia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710272,
+        710273,
+        710274,
+        710275,
+        710276,
+        710277,
+        710278,
+        710279
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 81,
+      "name": "Franconia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710280,
+        710281,
+        710282,
+        710283,
+        710284,
+        710285,
+        710286,
+        710287
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 82,
+      "name": "Palatinate",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710288,
+        710289,
+        710290,
+        710291,
+        710292,
+        710293,
+        710294,
+        710295
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 83,
+      "name": "Holstein",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710296,
+        710297,
+        710298,
+        710299,
+        710300,
+        710301,
+        710302,
+        710303
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 84,
+      "name": "Anhalt",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710304,
+        710305,
+        710306,
+        710307,
+        710308,
+        710309,
+        710310,
+        710311
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 85,
+      "name": "Oldenburg",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710312,
+        710313,
+        710314,
+        710315,
+        710316,
+        710317,
+        710318,
+        710319
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 86,
+      "name": "Brunswick",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710320,
+        710321,
+        710322,
+        710323,
+        710324,
+        710325,
+        710326,
+        710327
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 87,
+      "name": "Nassau",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710328,
+        710329,
+        710330,
+        710331,
+        710332,
+        710333,
+        710334,
+        710335
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 88,
+      "name": "West Prussia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710336,
+        710337,
+        710338,
+        710339,
+        710340,
+        710341,
+        710342,
+        710343
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 89,
+      "name": "Upper Silesia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710344,
+        710345,
+        710346,
+        710347,
+        710348,
+        710349,
+        710350,
+        710351
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 90,
+      "name": "Lower Saxony",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710352,
+        710353,
+        710354,
+        710355,
+        710356,
+        710357,
+        710358,
+        710359
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 91,
+      "name": "Swabia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710360,
+        710361,
+        710362,
+        710363,
+        710364,
+        710365,
+        710366,
+        710367
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 92,
+      "name": "Moselle",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710368,
+        710369,
+        710370,
+        710371,
+        710372,
+        710373,
+        710374,
+        710375
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 93,
+      "name": "Saarland",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710376,
+        710377,
+        710378,
+        710379,
+        710380,
+        710381,
+        710382,
+        710383
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 94,
+      "name": "Ruhr",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710384,
+        710385,
+        710386,
+        710387,
+        710388,
+        710389,
+        710390,
+        710391
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 95,
+      "name": "Harz",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710392,
+        710393,
+        710394,
+        710395,
+        710396,
+        710397,
+        710398,
+        710399
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 96,
+      "name": "Lusatia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710400,
+        710401,
+        710402,
+        710403,
+        710404,
+        710405,
+        710406,
+        710407
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 97,
+      "name": "Northern Brandenburg",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710408,
+        710409,
+        710410,
+        710411,
+        710412,
+        710413,
+        710414,
+        710415
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 98,
+      "name": "Northern Bavaria",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710416,
+        710417,
+        710418,
+        710419,
+        710420,
+        710421,
+        710422,
+        710423
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 99,
+      "name": "Northern Saxony",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710424,
+        710425,
+        710426,
+        710427,
+        710428,
+        710429,
+        710430,
+        710431
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 100,
+      "name": "Northern Rhineland",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710432,
+        710433,
+        710434,
+        710435,
+        710436,
+        710437,
+        710438,
+        710439
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 101,
+      "name": "Northern Westphalia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710440,
+        710441,
+        710442,
+        710443,
+        710444,
+        710445,
+        710446,
+        710447
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 102,
+      "name": "Northern Silesia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710448,
+        710449,
+        710450,
+        710451,
+        710452,
+        710453,
+        710454,
+        710455
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 103,
+      "name": "Northern Hanover",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710456,
+        710457,
+        710458,
+        710459,
+        710460,
+        710461,
+        710462,
+        710463
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 104,
+      "name": "Northern Württemberg",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710464,
+        710465,
+        710466,
+        710467,
+        710468,
+        710469,
+        710470,
+        710471
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 105,
+      "name": "Northern Hesse",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710472,
+        710473,
+        710474,
+        710475,
+        710476,
+        710477,
+        710478,
+        710479
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 106,
+      "name": "Northern Pomerania",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710480,
+        710481,
+        710482,
+        710483,
+        710484,
+        710485,
+        710486,
+        710487
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 107,
+      "name": "Northern Mecklenburg",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710488,
+        710489,
+        710490,
+        710491,
+        710492,
+        710493,
+        710494,
+        710495
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 108,
+      "name": "Northern Thuringia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710496,
+        710497,
+        710498,
+        710499,
+        710500,
+        710501,
+        710502,
+        710503
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 109,
+      "name": "Northern Baden",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710504,
+        710505,
+        710506,
+        710507,
+        710508,
+        710509,
+        710510,
+        710511
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 110,
+      "name": "Northern Schleswig-Holstein",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710512,
+        710513,
+        710514,
+        710515,
+        710516,
+        710517,
+        710518,
+        710519
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 111,
+      "name": "Northern East Prussia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710520,
+        710521,
+        710522,
+        710523,
+        710524,
+        710525,
+        710526,
+        710527
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 112,
+      "name": "Northern Franconia",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710528,
+        710529,
+        710530,
+        710531,
+        710532,
+        710533,
+        710534,
+        710535
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 113,
+      "name": "Northern Palatinate",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710536,
+        710537,
+        710538,
+        710539,
+        710540,
+        710541,
+        710542,
+        710543
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 114,
+      "name": "Northern Holstein",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710544,
+        710545,
+        710546,
+        710547,
+        710548,
+        710549,
+        710550,
+        710551
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 115,
+      "name": "Northern Anhalt",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710552,
+        710553,
+        710554,
+        710555,
+        710556,
+        710557,
+        710558,
+        710559
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 116,
+      "name": "Northern Oldenburg",
+      "owner_hint": "GER",
+      "region_hint": "Germany",
+      "province_ids": [
+        710560
+      ],
+      "province_n": 1
+    },
+    {
+      "id": 117,
+      "name": "Albania",
+      "owner_hint": "GRE",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710577,
+        710578,
+        710579,
+        710580,
+        710581,
+        710582,
+        710583,
+        710584
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 118,
+      "name": "Montenegro",
+      "owner_hint": "GRE",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710585,
+        710586,
+        710587,
+        710588,
+        710589,
+        710590,
+        710591,
+        710592
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 119,
+      "name": "Kosovo",
+      "owner_hint": "GRE",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710593,
+        710594,
+        710595,
+        710596,
+        710597,
+        710598,
+        710599,
+        710600
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 120,
+      "name": "Vojvodina",
+      "owner_hint": "GRE",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710601,
+        710602,
+        710603,
+        710604,
+        710605,
+        710606,
+        710607,
+        710608
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 121,
+      "name": "Dobruja",
+      "owner_hint": "GRE",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710609,
+        710610,
+        710611,
+        710612,
+        710613,
+        710614,
+        710615,
+        710616
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 122,
+      "name": "Wallachia",
+      "owner_hint": "GRE",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710617,
+        710618,
+        710619,
+        710620,
+        710621,
+        710622,
+        710623,
+        710624
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 123,
+      "name": "Moldavia",
+      "owner_hint": "GRE",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710625,
+        710626,
+        710627,
+        710628
+      ],
+      "province_n": 4
+    },
+    {
+      "id": 124,
+      "name": "Hungary Plain",
+      "owner_hint": "HUN",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710829,
+        710830,
+        710831,
+        710832,
+        710833,
+        710834,
+        710835,
+        710836
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 125,
+      "name": "Transdanubia",
+      "owner_hint": "HUN",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710837,
+        710838,
+        710839,
+        710840,
+        710841,
+        710842,
+        710843,
+        710844
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 126,
+      "name": "Galicia West",
+      "owner_hint": "HUN",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710845,
+        710846,
+        710847,
+        710848
+      ],
+      "province_n": 4
+    },
+    {
+      "id": 127,
+      "name": "Norrland",
+      "owner_hint": "ICE",
+      "region_hint": "Nordic",
+      "province_ids": [
+        710857,
+        710858
+      ],
+      "province_n": 2
+    },
+    {
+      "id": 128,
+      "name": "Northern Northumbria",
+      "owner_hint": "IRE",
+      "region_hint": "British Isles",
+      "province_ids": [
+        710849,
+        710850,
+        710851,
+        710852,
+        710853,
+        710854,
+        710855,
+        710856
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 129,
+      "name": "Lombardy",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710859,
+        710860,
+        710861,
+        710862,
+        710863,
+        710864,
+        710865,
+        710866
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 130,
+      "name": "Veneto",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710867,
+        710868,
+        710869,
+        710870,
+        710871,
+        710872,
+        710873,
+        710874
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 131,
+      "name": "Piedmont",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710875,
+        710876,
+        710877,
+        710878,
+        710879,
+        710880,
+        710881,
+        710882
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 132,
+      "name": "Tuscany",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710883,
+        710884,
+        710885,
+        710886,
+        710887,
+        710888,
+        710889,
+        710890
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 133,
+      "name": "Latium",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710891,
+        710892,
+        710893,
+        710894,
+        710895,
+        710896,
+        710897,
+        710898
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 134,
+      "name": "Campania",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710899,
+        710900,
+        710901,
+        710902,
+        710903,
+        710904,
+        710905,
+        710906
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 135,
+      "name": "Sicily",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710907,
+        710908,
+        710909,
+        710910,
+        710911,
+        710912,
+        710913,
+        710914
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 136,
+      "name": "Sardinia",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710915,
+        710916,
+        710917,
+        710918,
+        710919,
+        710920,
+        710921,
+        710922
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 137,
+      "name": "Emilia",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710923,
+        710924,
+        710925,
+        710926,
+        710927,
+        710928,
+        710929,
+        710930
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 138,
+      "name": "Romagna",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710931,
+        710932,
+        710933,
+        710934,
+        710935,
+        710936,
+        710937,
+        710938
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 139,
+      "name": "Umbria",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710939,
+        710940,
+        710941,
+        710942,
+        710943,
+        710944,
+        710945,
+        710946
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 140,
+      "name": "Marche",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710947,
+        710948,
+        710949,
+        710950,
+        710951,
+        710952,
+        710953,
+        710954
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 141,
+      "name": "Abruzzo",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710955,
+        710956,
+        710957,
+        710958,
+        710959,
+        710960,
+        710961,
+        710962
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 142,
+      "name": "Calabria",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        710963,
+        710964,
+        710965
+      ],
+      "province_n": 3
+    },
+    {
+      "id": 143,
+      "name": "East Prussian Shore",
+      "owner_hint": "LAT",
+      "region_hint": "Baltic Rim",
+      "province_ids": [
+        710978,
+        710979,
+        710980,
+        710981,
+        710982,
+        710983
+      ],
+      "province_n": 6
+    },
+    {
+      "id": 144,
+      "name": "Kraków",
+      "owner_hint": "LIE",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710966
+      ],
+      "province_n": 1
+    },
+    {
+      "id": 145,
+      "name": "Gdańsk Corridor",
+      "owner_hint": "LIT",
+      "region_hint": "Baltic Rim",
+      "province_ids": [
+        710967,
+        710968,
+        710969,
+        710970,
+        710971,
+        710972,
+        710973,
+        710974
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 146,
+      "name": "Courland Coast",
+      "owner_hint": "LIT",
+      "region_hint": "Baltic Rim",
+      "province_ids": [
+        710975,
+        710976
+      ],
+      "province_n": 2
+    },
+    {
+      "id": 147,
+      "name": "Hainaut",
+      "owner_hint": "LUX",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        710977
+      ],
+      "province_n": 1
+    },
+    {
+      "id": 148,
+      "name": "Transylvania",
+      "owner_hint": "MKD",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710985,
+        710986,
+        710987,
+        710988,
+        710989,
+        710990,
+        710991,
+        710992
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 149,
+      "name": "Languedoc Coast",
+      "owner_hint": "MLT",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        710993,
+        710994
+      ],
+      "province_n": 2
+    },
+    {
+      "id": 150,
+      "name": "Banat",
+      "owner_hint": "MNE",
+      "region_hint": "Balkans",
+      "province_ids": [
+        710984
+      ],
+      "province_n": 1
+    },
+    {
+      "id": 151,
+      "name": "Luxembourg",
+      "owner_hint": "NLD",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        710995,
+        710996,
+        710997,
+        710998,
+        710999,
+        711000,
+        711001,
+        711002
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 152,
+      "name": "Gelderland",
+      "owner_hint": "NLD",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        711003,
+        711004,
+        711005,
+        711006,
+        711007,
+        711008,
+        711009,
+        711010
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 153,
+      "name": "Utrecht",
+      "owner_hint": "NLD",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        711011,
+        711012,
+        711013,
+        711014,
+        711015,
+        711016,
+        711017,
+        711018
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 154,
+      "name": "Antwerp",
+      "owner_hint": "NLD",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        711019,
+        711020,
+        711021,
+        711022,
+        711023,
+        711024,
+        711025,
+        711026
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 155,
+      "name": "Liège",
+      "owner_hint": "NLD",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        711027,
+        711028,
+        711029,
+        711030,
+        711031,
+        711032,
+        711033,
+        711034
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 156,
+      "name": "Finland Proper",
+      "owner_hint": "NOR",
+      "region_hint": "Nordic",
+      "province_ids": [
+        711035,
+        711036,
+        711037,
+        711038,
+        711039,
+        711040,
+        711041,
+        711042
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 157,
+      "name": "Ostrobothnia",
+      "owner_hint": "NOR",
+      "region_hint": "Nordic",
+      "province_ids": [
+        711043,
+        711044,
+        711045,
+        711046,
+        711047
+      ],
+      "province_n": 5
+    },
+    {
+      "id": 158,
+      "name": "Poznań",
+      "owner_hint": "POL",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711048,
+        711049,
+        711050,
+        711051,
+        711052,
+        711053,
+        711054,
+        711055
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 159,
+      "name": "Vilnius",
+      "owner_hint": "POL",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711056,
+        711057,
+        711058,
+        711059,
+        711060,
+        711061,
+        711062,
+        711063
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 160,
+      "name": "Minsk",
+      "owner_hint": "POL",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711064,
+        711065,
+        711066,
+        711067,
+        711068,
+        711069,
+        711070,
+        711071
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 161,
+      "name": "Kiev",
+      "owner_hint": "POL",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711072,
+        711073,
+        711074,
+        711075,
+        711076,
+        711077,
+        711078,
+        711079
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 162,
+      "name": "Odessa",
+      "owner_hint": "POL",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711080,
+        711081,
+        711082,
+        711083,
+        711084,
+        711085,
+        711086,
+        711087
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 163,
+      "name": "Crimea",
+      "owner_hint": "POL",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711088,
+        711089,
+        711090,
+        711091,
+        711092,
+        711093,
+        711094,
+        711095
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 164,
+      "name": "Donbass",
+      "owner_hint": "POL",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711096,
+        711097,
+        711098,
+        711099,
+        711100,
+        711101,
+        711102,
+        711103
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 165,
+      "name": "Smolensk",
+      "owner_hint": "POL",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711104,
+        711105,
+        711106,
+        711107,
+        711108,
+        711109,
+        711110,
+        711111
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 166,
+      "name": "Brest",
+      "owner_hint": "POL",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711112,
+        711113,
+        711114,
+        711115,
+        711116,
+        711117,
+        711118,
+        711119
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 167,
+      "name": "Lublin",
+      "owner_hint": "POL",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711120
+      ],
+      "province_n": 1
+    },
+    {
+      "id": 168,
+      "name": "Castile",
+      "owner_hint": "POR",
+      "region_hint": "Iberia",
+      "province_ids": [
+        711121,
+        711122,
+        711123,
+        711124,
+        711125,
+        711126,
+        711127,
+        711128
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 169,
+      "name": "Aragon",
+      "owner_hint": "POR",
+      "region_hint": "Iberia",
+      "province_ids": [
+        711129,
+        711130,
+        711131,
+        711132,
+        711133,
+        711134,
+        711135,
+        711136
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 170,
+      "name": "Catalonia",
+      "owner_hint": "POR",
+      "region_hint": "Iberia",
+      "province_ids": [
+        711137,
+        711138,
+        711139,
+        711140,
+        711141,
+        711142,
+        711143,
+        711144
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 171,
+      "name": "Andalusia",
+      "owner_hint": "POR",
+      "region_hint": "Iberia",
+      "province_ids": [
+        711145
+      ],
+      "province_n": 1
+    },
+    {
+      "id": 172,
+      "name": "Dalmatia",
+      "owner_hint": "ROM",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711146,
+        711147,
+        711148,
+        711149,
+        711150,
+        711151,
+        711152,
+        711153
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 173,
+      "name": "Herzegovina",
+      "owner_hint": "ROM",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711154,
+        711155,
+        711156,
+        711157,
+        711158,
+        711159,
+        711160,
+        711161
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 174,
+      "name": "Bulgaria North",
+      "owner_hint": "ROM",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711162,
+        711163,
+        711164,
+        711165,
+        711166,
+        711167,
+        711168,
+        711169
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 175,
+      "name": "Bulgaria South",
+      "owner_hint": "ROM",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711170,
+        711171,
+        711172,
+        711173,
+        711174,
+        711175,
+        711176,
+        711177
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 176,
+      "name": "Attica",
+      "owner_hint": "ROM",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711178,
+        711179,
+        711180,
+        711181,
+        711182,
+        711183,
+        711184,
+        711185
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 177,
+      "name": "Crete",
+      "owner_hint": "ROM",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711186,
+        711187
+      ],
+      "province_n": 2
+    },
+    {
+      "id": 178,
+      "name": "Ionian Isles",
+      "owner_hint": "SER",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711188,
+        711189,
+        711190,
+        711191,
+        711192,
+        711193,
+        711194,
+        711195
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 179,
+      "name": "Northern Thrace",
+      "owner_hint": "SER",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711196,
+        711197,
+        711198,
+        711199,
+        711200,
+        711201,
+        711202,
+        711203
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 180,
+      "name": "Northern Macedonia",
+      "owner_hint": "SER",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711204,
+        711205,
+        711206,
+        711207,
+        711208,
+        711209,
+        711210,
+        711211
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 181,
+      "name": "Northern Epirus",
+      "owner_hint": "SER",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711212
+      ],
+      "province_n": 1
+    },
+    {
+      "id": 182,
+      "name": "Galicia",
+      "owner_hint": "SPA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        710629,
+        710630,
+        710631,
+        710632,
+        710633,
+        710634,
+        710635,
+        710636
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 183,
+      "name": "Portugal Norte",
+      "owner_hint": "SPA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        710637,
+        710638,
+        710639,
+        710640,
+        710641,
+        710642,
+        710643,
+        710644
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 184,
+      "name": "Portugal Sul",
+      "owner_hint": "SPA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        710645,
+        710646,
+        710647,
+        710648,
+        710649,
+        710650,
+        710651,
+        710652
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 185,
+      "name": "Valencia",
+      "owner_hint": "SPA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        710653,
+        710654,
+        710655,
+        710656,
+        710657,
+        710658,
+        710659,
+        710660
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 186,
+      "name": "Navarre",
+      "owner_hint": "SPA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        710661,
+        710662,
+        710663,
+        710664,
+        710665,
+        710666,
+        710667,
+        710668
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 187,
+      "name": "Asturias",
+      "owner_hint": "SPA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        710669,
+        710670,
+        710671,
+        710672,
+        710673,
+        710674,
+        710675,
+        710676
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 188,
+      "name": "León",
+      "owner_hint": "SPA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        710677,
+        710678,
+        710679,
+        710680,
+        710681,
+        710682,
+        710683,
+        710684
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 189,
+      "name": "Extremadura",
+      "owner_hint": "SPA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        710685,
+        710686,
+        710687
+      ],
+      "province_n": 3
+    },
+    {
+      "id": 190,
+      "name": "Silesia Polish",
+      "owner_hint": "SVK",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        711246,
+        711247,
+        711248,
+        711249,
+        711250,
+        711251,
+        711252,
+        711253
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 191,
+      "name": "Northern Thessaly",
+      "owner_hint": "SVN",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711234,
+        711235,
+        711236,
+        711237,
+        711238,
+        711239,
+        711240,
+        711241
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 192,
+      "name": "Northern Peloponnese",
+      "owner_hint": "SVN",
+      "region_hint": "Balkans",
+      "province_ids": [
+        711242,
+        711243,
+        711244,
+        711245
+      ],
+      "province_n": 4
+    },
+    {
+      "id": 193,
+      "name": "Karelia",
+      "owner_hint": "SWE",
+      "region_hint": "Nordic",
+      "province_ids": [
+        711213,
+        711214,
+        711215,
+        711216,
+        711217,
+        711218,
+        711219,
+        711220
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 194,
+      "name": "Oslofjord",
+      "owner_hint": "SWE",
+      "region_hint": "Nordic",
+      "province_ids": [
+        711221,
+        711222,
+        711223,
+        711224,
+        711225,
+        711226,
+        711227,
+        711228
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 195,
+      "name": "Trøndelag",
+      "owner_hint": "SWE",
+      "region_hint": "Nordic",
+      "province_ids": [
+        711229,
+        711230,
+        711231,
+        711232,
+        711233
+      ],
+      "province_n": 5
+    },
+    {
+      "id": 196,
+      "name": "Sudeten",
+      "owner_hint": "SWI",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710119,
+        710120,
+        710121,
+        710122,
+        710123,
+        710124,
+        710125,
+        710126
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 197,
+      "name": "Burgenland",
+      "owner_hint": "SWI",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710127,
+        710128,
+        710129,
+        710130,
+        710131,
+        710132,
+        710133,
+        710134
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 198,
+      "name": "Salzburg",
+      "owner_hint": "SWI",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710135,
+        710136,
+        710137,
+        710138,
+        710139,
+        710140,
+        710141,
+        710142
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 199,
+      "name": "Upper Austria",
+      "owner_hint": "SWI",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        710143,
+        710144
+      ],
+      "province_n": 2
+    },
+    {
+      "id": 200,
+      "name": "Lwów",
+      "owner_hint": "TUR",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711254,
+        711255,
+        711256,
+        711257,
+        711258,
+        711259,
+        711260,
+        711261
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 201,
+      "name": "Volhynia",
+      "owner_hint": "TUR",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711262,
+        711263,
+        711264,
+        711265,
+        711266,
+        711267,
+        711268,
+        711269
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 202,
+      "name": "Podolia",
+      "owner_hint": "TUR",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711270,
+        711271,
+        711272,
+        711273,
+        711274,
+        711275,
+        711276,
+        711277
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 203,
+      "name": "Bessarabia",
+      "owner_hint": "TUR",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711278,
+        711279,
+        711280,
+        711281,
+        711282,
+        711283,
+        711284,
+        711285
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 204,
+      "name": "Courland",
+      "owner_hint": "TUR",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711286,
+        711287,
+        711288,
+        711289,
+        711290,
+        711291,
+        711292,
+        711293
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 205,
+      "name": "Livonia",
+      "owner_hint": "TUR",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711294,
+        711295,
+        711296,
+        711297,
+        711298,
+        711299,
+        711300,
+        711301
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 206,
+      "name": "Estonia",
+      "owner_hint": "TUR",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711302,
+        711303,
+        711304,
+        711305,
+        711306,
+        711307,
+        711308,
+        711309
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 207,
+      "name": "Lithuania Proper",
+      "owner_hint": "TUR",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711310,
+        711311,
+        711312,
+        711313,
+        711314,
+        711315,
+        711316,
+        711317
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 208,
+      "name": "Belarus West",
+      "owner_hint": "TUR",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711318,
+        711319,
+        711320,
+        711321,
+        711322,
+        711323,
+        711324,
+        711325
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 209,
+      "name": "Ukraine West",
+      "owner_hint": "TUR",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711326,
+        711327,
+        711328,
+        711329,
+        711330,
+        711331,
+        711332,
+        711333
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 210,
+      "name": "Pripet",
+      "owner_hint": "TUR",
+      "region_hint": "Eastern Frontiers",
+      "province_ids": [
+        711334
+      ],
+      "province_n": 1
+    }
+  ],
+  "meta": {
+    "pilot": true,
+    "nuts3": true
+  }
+}

@@ -3,9 +3,10 @@ extends PanelContainer
 
 ## Floating multiline province tooltip for map hover (BBCode for retrowave accents).
 
-@export var max_width: float = 380.0
-@export var max_height: float = 380.0
-@export var font_size: int = 12
+# Compact hover card (~½ prior size) — short province glance, not full inspector.
+@export var max_width: float = 190.0
+@export var max_height: float = 190.0
+@export var font_size: int = 11
 
 var _rich: RichTextLabel
 var _panel_style: StyleBoxFlat
@@ -28,10 +29,10 @@ func _ready() -> void:
 	visible = false
 	z_index = 200
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 10)
-	margin.add_theme_constant_override("margin_right", 10)
-	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_bottom", 8)
+	margin.add_theme_constant_override("margin_left", 6)
+	margin.add_theme_constant_override("margin_right", 6)
+	margin.add_theme_constant_override("margin_top", 5)
+	margin.add_theme_constant_override("margin_bottom", 5)
 	add_child(margin)
 
 	_rich = RichTextLabel.new()
@@ -39,7 +40,7 @@ func _ready() -> void:
 	_rich.bbcode_enabled = true
 	_rich.fit_content = true
 	_rich.scroll_active = true
-	_rich.custom_minimum_size = Vector2(max_width - 20.0, 0)
+	_rich.custom_minimum_size = Vector2(max_width - 12.0, 0)
 	_rich.add_theme_font_size_override("normal_font_size", font_size)
 	_rich.meta_clicked.connect(_on_meta_clicked)
 	_rich.mouse_filter = Control.MOUSE_FILTER_STOP
@@ -299,8 +300,8 @@ func _apply_panel_style() -> void:
 	elif _selected_accent:
 		border_w = 2
 	_panel_style.set_border_width_all(border_w)
-	_panel_style.set_corner_radius_all(6)
-	_panel_style.shadow_size = 6
+	_panel_style.set_corner_radius_all(4)
+	_panel_style.shadow_size = 4
 
 
 func show_text(
@@ -353,20 +354,23 @@ func show_text(
 	if not visible:
 		return
 
+	var inner_w := maxf(max_width - 12.0, 80.0)
+	_rich.fit_content = true
+	_rich.scroll_active = false
+	_rich.custom_minimum_size = Vector2(inner_w, 0)
 	_rich.reset_size()
 	reset_size()
 	var size := get_minimum_size()
 	if size.y > max_height:
 		_rich.fit_content = false
-		_rich.custom_minimum_size = Vector2(max_width - 20.0, max_height - 16.0)
+		_rich.custom_minimum_size = Vector2(inner_w, max_height - 12.0)
 		_rich.scroll_active = true
 		reset_size()
 		size = get_minimum_size()
-	else:
-		_rich.fit_content = true
-		_rich.custom_minimum_size = Vector2(max_width - 20.0, 0)
-		_rich.scroll_active = false
-	var pos := screen_pos + Vector2(16, 12)
+	# Cap reported size so positioning never assumes a huge card.
+	size.x = minf(size.x, max_width)
+	size.y = minf(size.y, max_height)
+	var pos := screen_pos + Vector2(12, 10)
 	if pos.x + size.x > viewport_size.x - 8.0:
 		pos.x = viewport_size.x - size.x - 8.0
 	if pos.y + size.y > viewport_size.y - 8.0:

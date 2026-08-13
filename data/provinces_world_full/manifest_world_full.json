@@ -1,0 +1,9 @@
+{
+  "phase": "world_full_v1",
+  "stats": {
+    "total": 1600,
+    "added_world": 467,
+    "from_grand_theater": 1133,
+    "sea_strait_lake": 340
+  }
+}

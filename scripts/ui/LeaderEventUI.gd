@@ -93,15 +93,21 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 	panel.custom_minimum_size = Vector2(380, 0)
 	var icon2 := "📢" if not is_error else "⛔"
 	var cat2 := "system" if not is_error else "error"
+	# Flat panels only — ornamented 9-slice frame (panel_frame_512) eats ~48px corners
+	# with unreadable "scroll" chrome; notices must stay legible.
 	if is_error:
 		var err_style := StyleBoxFlat.new()
 		err_style.bg_color = Color("#2a1520")
 		err_style.border_color = RetrowaveTheme.WARNING
 		err_style.set_border_width_all(2)
 		err_style.set_corner_radius_all(4)
+		err_style.content_margin_left = 12
+		err_style.content_margin_right = 12
+		err_style.content_margin_top = 10
+		err_style.content_margin_bottom = 10
 		panel.add_theme_stylebox_override("panel", err_style)
 	else:
-		RetrowaveTheme.style_detail_panel(panel)
+		RetrowaveTheme.style_detail_panel_flat(panel)
 	if entry.get("category") == "hand":
 		var hand_style := StyleBoxFlat.new()
 		hand_style.bg_color = Color(0.1, 0.05, 0.15)
@@ -242,8 +248,8 @@ func get_recent_news(limit: int = 10) -> Array[Dictionary]:
 func _show_toast(entry: Dictionary) -> void:
 	_ensure_toast_layer()
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(380, 0)
-	RetrowaveTheme.style_detail_panel(panel)
+	panel.custom_minimum_size = Vector2(400, 0)
+	# Start flat; category StyleBoxFlat below replaces — never use ornamented frame.
 
 	# Better per-category styling + icons (unicode for event visual polish; tie to portraits later in lists)
 	var cat := str(entry.get("category", "general")).to_lower()
@@ -269,17 +275,21 @@ func _show_toast(entry: Dictionary) -> void:
 	elif cat in ["separatism", "mutiny", "famine"]: cat_color = Color(0.85, 0.55, 0.55)
 	elif cat in ["sabotage", "scandal"]: cat_color = Color(0.75, 0.65, 0.45)
 	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.12, 0.13, 0.18, 0.95)
+	style.bg_color = Color(0.10, 0.11, 0.16, 0.96)
 	style.border_color = cat_color
-	style.set_border_width_all(1)
-	style.set_corner_radius_all(4)
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(6)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	style.content_margin_top = 10
+	style.content_margin_bottom = 10
 	panel.add_theme_stylebox_override("panel", style)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 10)
-	margin.add_theme_constant_override("margin_top", 8)
-	margin.add_theme_constant_override("margin_right", 10)
-	margin.add_theme_constant_override("margin_bottom", 8)
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_bottom", 10)
 	panel.add_child(margin)
 
 	var vbox := VBoxContainer.new()

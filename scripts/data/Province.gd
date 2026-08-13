@@ -8,6 +8,8 @@ extends Resource
 @export var terrain: String = "plains"
 @export var snow_potential: float = 0.0  # from layers inference, for winter snow on high elev (0-1)
 @export var is_sea: bool = false
+## Map domain from data (land / coastal_land / sea / strait / lake). Complements is_sea.
+@export var domain: String = "land"
 ## Coastal / port access — required for shipyards and naval production.
 @export var has_port: bool = false
 ## Map-local position (e.g. label anchor or province centroid in province space).
@@ -77,6 +79,14 @@ func _get_weather_manager() -> Node:
 	return null
 
 
+## Safe MapManager lookup (autoload has no class_name — avoid bare MapManager identifier at parse time).
+func _get_map_manager() -> Node:
+	var tree := Engine.get_main_loop()
+	if tree == null or tree.root == null:
+		return null
+	return tree.root.get_node_or_null("/root/MapManager")
+
+
 func get_movement_cost() -> float:
 	var terrain_mult := _base_terrain_movement_multiplier()
 	var infra := float(clampi(infrastructure, 0, 50))
@@ -92,7 +102,8 @@ func get_movement_cost() -> float:
 		mult = wm.get_movement_multiplier(id)
 		if snow_potential > 0.2 and mult < 1.0:
 			mult *= 0.9  # extra on high snow potential
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_river_border") and MapManager.has_river_border(id):
+	var mm: Node = _get_map_manager()
+	if mm != null and mm.has_method("has_river_border") and bool(mm.call("has_river_border", id)):
 		mult *= 0.97  # river border friction (natural barrier for movement/invasion)
 	return terrain_mult * infra_factor * dev_factor * mult
 

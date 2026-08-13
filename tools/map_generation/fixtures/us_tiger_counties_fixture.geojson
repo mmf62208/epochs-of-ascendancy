@@ -1,0 +1,441 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "New York",
+        "NAMELSAD": "New York County",
+        "STATEFP": "36",
+        "GEOID": "36061"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -74.05,
+              40.68
+            ],
+            [
+              -73.9,
+              40.68
+            ],
+            [
+              -73.9,
+              40.88
+            ],
+            [
+              -74.05,
+              40.88
+            ],
+            [
+              -74.05,
+              40.68
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "Kings",
+        "NAMELSAD": "Kings County",
+        "STATEFP": "36",
+        "GEOID": "36047"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -74.05,
+              40.55
+            ],
+            [
+              -73.85,
+              40.55
+            ],
+            [
+              -73.85,
+              40.74
+            ],
+            [
+              -74.05,
+              40.74
+            ],
+            [
+              -74.05,
+              40.55
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "Queens",
+        "NAMELSAD": "Queens County",
+        "STATEFP": "36",
+        "GEOID": "36081"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -73.96,
+              40.54
+            ],
+            [
+              -73.7,
+              40.54
+            ],
+            [
+              -73.7,
+              40.8
+            ],
+            [
+              -73.96,
+              40.8
+            ],
+            [
+              -73.96,
+              40.54
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "Los Angeles",
+        "NAMELSAD": "Los Angeles County",
+        "STATEFP": "06",
+        "GEOID": "06037"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -118.95,
+              33.7
+            ],
+            [
+              -117.65,
+              33.7
+            ],
+            [
+              -117.65,
+              34.85
+            ],
+            [
+              -118.95,
+              34.85
+            ],
+            [
+              -118.95,
+              33.7
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "Cook",
+        "NAMELSAD": "Cook County",
+        "STATEFP": "17",
+        "GEOID": "17031"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -88.3,
+              41.45
+            ],
+            [
+              -87.5,
+              41.45
+            ],
+            [
+              -87.5,
+              42.2
+            ],
+            [
+              -88.3,
+              42.2
+            ],
+            [
+              -88.3,
+              41.45
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "Harris",
+        "NAMELSAD": "Harris County",
+        "STATEFP": "48",
+        "GEOID": "48201"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -95.95,
+              29.5
+            ],
+            [
+              -94.9,
+              29.5
+            ],
+            [
+              -94.9,
+              30.2
+            ],
+            [
+              -95.95,
+              30.2
+            ],
+            [
+              -95.95,
+              29.5
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "Maricopa",
+        "NAMELSAD": "Maricopa County",
+        "STATEFP": "04",
+        "GEOID": "04013"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -113.35,
+              32.5
+            ],
+            [
+              -111.55,
+              32.5
+            ],
+            [
+              -111.55,
+              34.05
+            ],
+            [
+              -113.35,
+              34.05
+            ],
+            [
+              -113.35,
+              32.5
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "King",
+        "NAMELSAD": "King County",
+        "STATEFP": "53",
+        "GEOID": "53033"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -122.55,
+              47.15
+            ],
+            [
+              -121.05,
+              47.15
+            ],
+            [
+              -121.05,
+              47.8
+            ],
+            [
+              -122.55,
+              47.8
+            ],
+            [
+              -122.55,
+              47.15
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "Miami-Dade",
+        "NAMELSAD": "Miami-Dade County",
+        "STATEFP": "12",
+        "GEOID": "12086"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -80.9,
+              25.2
+            ],
+            [
+              -80.1,
+              25.2
+            ],
+            [
+              -80.1,
+              25.98
+            ],
+            [
+              -80.9,
+              25.98
+            ],
+            [
+              -80.9,
+              25.2
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "Philadelphia",
+        "NAMELSAD": "Philadelphia County",
+        "STATEFP": "42",
+        "GEOID": "42101"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -75.28,
+              39.86
+            ],
+            [
+              -74.95,
+              39.86
+            ],
+            [
+              -74.95,
+              40.15
+            ],
+            [
+              -75.28,
+              40.15
+            ],
+            [
+              -75.28,
+              39.86
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "Suffolk",
+        "NAMELSAD": "Suffolk County",
+        "STATEFP": "25",
+        "GEOID": "25025"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -71.2,
+              42.22
+            ],
+            [
+              -70.95,
+              42.22
+            ],
+            [
+              -70.95,
+              42.4
+            ],
+            [
+              -71.2,
+              42.4
+            ],
+            [
+              -71.2,
+              42.22
+            ]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "NAME": "District of Columbia",
+        "NAMELSAD": "District of Columbia",
+        "STATEFP": "11",
+        "GEOID": "11001"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              -77.12,
+              38.79
+            ],
+            [
+              -76.91,
+              38.79
+            ],
+            [
+              -76.91,
+              38.995
+            ],
+            [
+              -77.12,
+              38.995
+            ],
+            [
+              -77.12,
+              38.79
+            ]
+          ]
+        ]
+      }
+    }
+  ],
+  "meta": {
+    "fixture": true,
+    "note": "synthetic CB-style county rectangles for offline TIGER ingest tests"
+  }
+}

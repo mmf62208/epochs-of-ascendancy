@@ -45,21 +45,43 @@ const NATIONAL_KEY_LABELS: Dictionary = {
 static func build_compact_hover_tooltip(province: Province) -> String:
 	if province == null:
 		return ""
+	var top: Dictionary = build_inspector_topline(province)
 	var lines: PackedStringArray = []
-	lines.append(province.name)
+	lines.append(str(top.get("title", province.name)))
+	lines.append(str(top.get("owner_line", "Owner: Unowned")))
+	var region_line := str(top.get("region_line", ""))
+	if not region_line.is_empty():
+		lines.append(region_line)
+	var sea_line := str(top.get("sea_zone_line", ""))
+	if not sea_line.is_empty():
+		lines.append(sea_line)
+	lines.append(province.terrain.capitalize())
+	return "\n".join(lines)
+
+
+## Top-line inspector identity: name, owner, strategic region, sea zone (when assigned).
+## Resolves live MapManager region/sea zone; pure formatting via MapPolishFormatters.
+static func build_inspector_topline(province: Province) -> Dictionary:
+	if province == null:
+		return _MapPolishFormatters.format_inspector_topline("Province", "", "", "")
 	var owner := province.owner_tag.strip_edges()
 	if owner.is_empty():
 		owner = country_tag_for_province(province)
-	if not owner.is_empty():
-		lines.append("Owner: %s" % owner)
+	var region := ""
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
 		var rid: int = province.strategic_region_id if province.strategic_region_id > 0 else MapManager.get_province_region_id(province.id)
-		if rid > 0:
-			var rname: String = MapManager.get_strategic_region_name(rid)
-			if not rname.is_empty():
-				lines.append("Region: %s" % rname)
-	lines.append(province.terrain.capitalize())
-	return "\n".join(lines)
+		if rid > 0 and MapManager.has_method("get_strategic_region_name"):
+			region = str(MapManager.get_strategic_region_name(rid)).strip_edges()
+	var sea_zone := ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_sea_zone_name"):
+		sea_zone = str(MapManager.get_sea_zone_name(province.id)).strip_edges()
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint"):
+		if MapManager.has_strategic_chokepoint(province.id):
+			if sea_zone.is_empty():
+				sea_zone = "⚓ Naval chokepoint / strait"
+			elif "chokepoint" not in sea_zone.to_lower() and "strait" not in sea_zone.to_lower():
+				sea_zone = "%s · ⚓ chokepoint" % sea_zone
+	return _MapPolishFormatters.format_inspector_topline(province.name, owner, region, sea_zone)
 
 
 static func build_strategic_hover_tooltip(province: Province) -> String:
@@ -78,6 +100,14 @@ static func build_strategic_hover_tooltip(province: Province) -> String:
 		var rid: int = province.strategic_region_id if province.strategic_region_id > 0 else MapManager.get_province_region_id(province.id)
 		if rid > 0:
 			region = MapManager.get_strategic_region_name(rid)
+	var choke := ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint"):
+		if MapManager.has_strategic_chokepoint(province.id):
+			choke = "⚓ Naval chokepoint"
+	if not choke.is_empty() and not region.is_empty():
+		return "%s\n%s · %s\n%s" % [nation, region, province.name, choke]
+	if not choke.is_empty():
+		return "%s\n%s\n%s" % [nation, province.name, choke]
 	if not region.is_empty():
 		return "%s\n%s · %s" % [nation, region, province.name]
 	return "%s\n%s" % [nation, province.name]
@@ -169,6 +199,12 @@ static func build_inspector_full_bbcode(
 		return ""
 	var pe: ProvinceEffects = report["province_effects"]
 	var lines: PackedStringArray = []
+	# Always lead with name / owner / region / sea zone top-line.
+	var topline: Dictionary = build_inspector_topline(province)
+	var top_bb := str(topline.get("bbcode", ""))
+	if not top_bb.is_empty():
+		lines.append(top_bb)
+		lines.append("")
 	var compare_hdr := build_inspector_compare_header(province, selected_province_id)
 	if not compare_hdr.is_empty():
 		lines.append(compare_hdr)
@@ -181,8 +217,23 @@ static func build_inspector_full_bbcode(
 		)
 	if not infra_inspector.is_empty():
 		lines.append(infra_inspector)
-	if not pressure_inspector.is_empty():
+	# Always surface special sites + chokepoint even when sabotage card is empty.
+	var sites_inspector := build_special_sites_effect_bbcode(province, false)
+	if not sites_inspector.is_empty() and (infra_inspector.is_empty() or "Special sites" not in infra_inspector):
 		if not infra_inspector.is_empty():
+			lines.append("")
+		lines.append(sites_inspector)
+	var choke_inspector := build_naval_chokepoint_badge_bbcode(province)
+	if not choke_inspector.is_empty() and (infra_inspector.is_empty() or "Naval chokepoint" not in infra_inspector):
+		lines.append(choke_inspector)
+	var sea_zone_line := build_sea_zone_badge_bbcode(province)
+	if not sea_zone_line.is_empty():
+		lines.append(sea_zone_line)
+	var basing_line := build_naval_basing_badge_bbcode(province)
+	if not basing_line.is_empty():
+		lines.append(basing_line)
+	if not pressure_inspector.is_empty():
+		if not infra_inspector.is_empty() or not sites_inspector.is_empty():
 			lines.append("")
 		lines.append(pressure_inspector)
 	var tag := str(report.get("country_tag", ""))
@@ -207,10 +258,394 @@ static func build_inspector_full_bbcode(
 	if not glance.is_empty():
 		lines.append("%sAt a glance: %s[/color]" % [COLOR_HEADER, glance])
 		lines.append("")
+	# Damage/sabotage map classification + HH monthly signal when this province is targeted.
+	var dmg_cls := classify_province_map_damage(province)
+	if bool(dmg_cls.get("is_damaged", false)):
+		lines.append(
+			"%s%s Map damage: %s[/color]"
+			% [COLOR_WARN, str(dmg_cls.get("marker", "⚠")), str(dmg_cls.get("label", "damaged"))]
+		)
+	var hh_line := build_hh_map_signal_inspector_line()
+	if not hh_line.is_empty():
+		var sig_pid := -1
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
+			var ps_hh: Dictionary = GameData.get_peace_state()
+			sig_pid = int(ps_hh.get("hh_last_map_signal", {}).get("province_id", -1))
+		if sig_pid == province.id or sig_pid < 0:
+			lines.append(hh_line)
+	# Multi-month HH agenda trail (player-readable history from GameData store).
+	var agenda_bb := build_hh_agenda_trail_inspector_bbcode()
+	if not agenda_bb.is_empty():
+		lines.append(agenda_bb)
+	# Agenda panel pilot (expanded multi-entry UI block from same trail store).
+	var agenda_panel := build_hh_agenda_panel_inspector_bbcode()
+	if not agenda_panel.is_empty() and agenda_panel != agenda_bb:
+		lines.append(agenda_panel)
+	# Agenda screen layout pilot (sections) — only when trail non-empty.
+	var agenda_screen := build_hh_agenda_screen_inspector_bbcode()
+	if not agenda_screen.is_empty():
+		lines.append(agenda_screen)
+	# Agent counterplay options from last HH map signal (pilot).
+	var counter_bb := build_agent_counterplay_inspector_bbcode(province)
+	if not counter_bb.is_empty():
+		lines.append(counter_bb)
+	# Agenda action-pick pilot (empty trail → empty string).
+	var agenda_actions := build_hh_agenda_actions_inspector_bbcode()
+	if not agenda_actions.is_empty():
+		lines.append(agenda_actions)
+	# Agent mission priority pilot from last HH signal.
+	var mission_bb := build_agent_mission_priority_inspector_bbcode(province)
+	if not mission_bb.is_empty():
+		lines.append(mission_bb)
+	# Operator data-dir banner (world_full default clarity).
+	var data_banner := build_scenario_data_dir_banner_bbcode()
+	if not data_banner.is_empty():
+		lines.append(data_banner)
+	# Choke + basing synergy chip when naval-relevant.
+	var choke_base := build_choke_basing_synergy_bbcode(province)
+	if not choke_base.is_empty():
+		lines.append(choke_base)
+	# Sealane supply/trade chip for provinces in a sea zone.
+	var sealane_chip := build_sealane_route_chip_bbcode(province)
+	if not sealane_chip.is_empty():
+		lines.append(sealane_chip)
+	# Convoy escort need chip for coastal / sea-zone provinces.
+	var escort_chip := build_convoy_escort_chip_bbcode(province)
+	if not escort_chip.is_empty():
+		lines.append(escort_chip)
+	# Fleet redeploy posture pilot.
+	var posture_chip := build_fleet_posture_chip_bbcode(province)
+	if not posture_chip.is_empty():
+		lines.append(posture_chip)
+	# Weather chip + legend (live WeatherManager path).
+	var weather_chip := build_weather_chip_bbcode(province)
+	if not weather_chip.is_empty():
+		lines.append(weather_chip)
+	# Season daylight + forecast + extreme + legend surface chips.
+	var season_chip := build_season_daylight_chip_bbcode()
+	if not season_chip.is_empty():
+		lines.append(season_chip)
+	var forecast_chip := build_forecast_chip_bbcode(province)
+	var extreme_chip := build_extreme_event_chip_bbcode()
+	if not extreme_chip.is_empty():
+		lines.append(extreme_chip)
+	var weather_legend := build_weather_legend_chip_bbcode()
+	if not weather_legend.is_empty():
+		lines.append(weather_legend)
+	var move_chip := build_move_weather_chip_bbcode(province)
+	if not move_chip.is_empty():
+		lines.append(move_chip)
+	var storm_convoy := build_storm_convoy_chip_bbcode(province)
+	if not storm_convoy.is_empty():
+		lines.append(storm_convoy)
+	var sea_wx := build_sea_weather_supply_chip_bbcode(province)
+	if not sea_wx.is_empty():
+		lines.append(sea_wx)
+	# Fleet theater posture (multi-port summary when coastal).
+	var theater_posture := build_fleet_theater_posture_chip_bbcode(province)
+	if not theater_posture.is_empty():
+		lines.append(theater_posture)
+	# Weather phase ribbon (combat UI pilot).
+	var wx_ribbon := build_weather_phase_ribbon_chip_bbcode(province)
+	if not wx_ribbon.is_empty():
+		lines.append(wx_ribbon)
+	# HH agenda monthly pulse digest (empty trail → empty).
+	var pulse_bb := build_hh_agenda_pulse_inspector_bbcode()
+	if not pulse_bb.is_empty():
+		lines.append(pulse_bb)
+	# HH pulse+actions combined digest.
+	var pulse_acts := build_hh_pulse_actions_inspector_bbcode()
+	if not pulse_acts.is_empty():
+		lines.append(pulse_acts)
+	# Agent network response pilot from HH signal.
+	var net_resp := build_agent_network_response_bbcode(province)
+	if not net_resp.is_empty():
+		lines.append(net_resp)
+	# Agent network deploy plan chip.
+	var deploy_plan := build_agent_network_deploy_bbcode(province)
+	if not deploy_plan.is_empty():
+		lines.append(deploy_plan)
+	# Beyond deepen: redeploy route, combat briefing, monthly brief, coverage, weather ops section.
+	var redeploy_chip := build_fleet_redeploy_route_chip_bbcode(province)
+	if not redeploy_chip.is_empty():
+		lines.append(redeploy_chip)
+	var wx_brief := build_weather_combat_briefing_chip_bbcode(province)
+	if not wx_brief.is_empty():
+		lines.append(wx_brief)
+	var monthly_brief := build_hh_monthly_brief_inspector_bbcode()
+	if not monthly_brief.is_empty():
+		lines.append(monthly_brief)
+	var coverage_chip := build_agent_coverage_chip_bbcode()
+	if not coverage_chip.is_empty():
+		lines.append(coverage_chip)
+	var wx_ops := build_inspector_weather_ops_section_bbcode(province)
+	if not wx_ops.is_empty():
+		lines.append(wx_ops)
+	var pressure_chip := build_weather_pressure_chip_bbcode(province)
+	if not pressure_chip.is_empty():
+		lines.append(pressure_chip)
+	var naval_tip := build_naval_wx_tip_chip_bbcode(province)
+	if not naval_tip.is_empty():
+		lines.append(naval_tip)
+	var air_alert := build_air_grounding_alert_chip_bbcode(province)
+	if not air_alert.is_empty():
+		lines.append(air_alert)
+	var freeze_chip := build_freeze_thaw_chip_bbcode(province)
+	if not freeze_chip.is_empty():
+		lines.append(freeze_chip)
+	var infra_wx := build_infra_weather_wear_chip_bbcode(province)
+	if not infra_wx.is_empty():
+		lines.append(infra_wx)
+	var fog_chip := build_coastal_fog_gate_chip_bbcode(province)
+	if not fog_chip.is_empty():
+		lines.append(fog_chip)
+	var joint_chip := build_joint_focus_agent_chip_bbcode()
+	if not joint_chip.is_empty():
+		lines.append(joint_chip)
+	var route_wx := build_supply_route_weather_rank_chip_bbcode(province)
+	if not route_wx.is_empty():
+		lines.append(route_wx)
+	# Beyond ops-expand: task group, multi-front, quarterly, escalation, theater polish.
+	var task_group := build_fleet_task_group_chip_bbcode(province)
+	if not task_group.is_empty():
+		lines.append(task_group)
+	var multi_front := build_multi_front_assault_chip_bbcode(province)
+	if not multi_front.is_empty():
+		lines.append(multi_front)
+	var quarterly := build_hh_quarterly_rollup_inspector_bbcode()
+	if not quarterly.is_empty():
+		lines.append(quarterly)
+	var escalation := build_agent_escalation_chip_bbcode()
+	if not escalation.is_empty():
+		lines.append(escalation)
+	var day_risk := build_campaign_day_risk_chip_bbcode(province)
+	if not day_risk.is_empty():
+		lines.append(day_risk)
+	var convoy_win := build_convoy_weather_window_chip_bbcode(province)
+	if not convoy_win.is_empty():
+		lines.append(convoy_win)
+	var prod_alert := build_production_weather_alert_chip_bbcode(province)
+	if not prod_alert.is_empty():
+		lines.append(prod_alert)
+	var sea_naval := build_sea_naval_weather_ops_chip_bbcode(province)
+	if not sea_naval.is_empty():
+		lines.append(sea_naval)
+	var morale_wx := build_combat_morale_weather_chip_bbcode(province)
+	if not morale_wx.is_empty():
+		lines.append(morale_wx)
+	var depot_wx := build_depot_weather_capacity_chip_bbcode(province)
+	if not depot_wx.is_empty():
+		lines.append(depot_wx)
+	var daylight := build_daylight_combat_mod_chip_bbcode()
+	if not daylight.is_empty():
+		lines.append(daylight)
+	var choke_wx := build_choke_weather_synergy_chip_bbcode(province)
+	if not choke_wx.is_empty():
+		lines.append(choke_wx)
+	var focus_wx := build_focus_weather_aware_chip_bbcode(province)
+	if not focus_wx.is_empty():
+		lines.append(focus_wx)
+	var ops_dash := build_ops_dashboard_chip_bbcode(province)
+	if not ops_dash.is_empty():
+		lines.append(ops_dash)
+	# Integrated multi-system packages (beyond theater-expand).
+	var fleet_wx := build_fleet_weather_package_chip_bbcode(province)
+	if not fleet_wx.is_empty():
+		lines.append(fleet_wx)
+	var assault_ready := build_assault_readiness_chip_bbcode(province)
+	if not assault_ready.is_empty():
+		lines.append(assault_ready)
+	var counter_ops := build_counter_ops_chip_bbcode()
+	if not counter_ops.is_empty():
+		lines.append(counter_ops)
+	var commits := build_hh_agenda_commits_chip_bbcode()
+	if not commits.is_empty():
+		lines.append(commits)
+	var choke_sea := build_choke_sea_weather_chip_bbcode(province)
+	if not choke_sea.is_empty():
+		lines.append(choke_sea)
+	var trade_chain := build_trade_chain_chip_bbcode(province)
+	if not trade_chain.is_empty():
+		lines.append(trade_chain)
+	var factory_risk := build_factory_risk_chip_bbcode(province)
+	if not factory_risk.is_empty():
+		lines.append(factory_risk)
+	var supply_chain := build_supply_chain_health_chip_bbcode(province)
+	if not supply_chain.is_empty():
+		lines.append(supply_chain)
+	var air_pkg := build_air_ops_package_chip_bbcode(province)
+	if not air_pkg.is_empty():
+		lines.append(air_pkg)
+	# Product-depth day chips: priority-budgeted (cognitive load / Top 5 follow-on).
+	_append_budgeted_product_depth_chips(lines, province)
+	# Always surface resource/damage + sealane contest skims at operational readability.
+	var res_dmg := build_resource_damage_skim_chip_bbcode(province)
+	if not res_dmg.is_empty():
+		lines.append(res_dmg)
+	var sealane_contest := build_sealane_contest_skim_chip_bbcode(province)
+	if not sealane_contest.is_empty():
+		lines.append(sealane_contest)
+	var infra_site := build_infra_site_consistency_chip_bbcode(province)
+	if not infra_site.is_empty():
+		lines.append(infra_site)
+	var hh_screen_day := build_hh_agenda_screen_day_chip_bbcode(province)
+	if not hh_screen_day.is_empty():
+		lines.append(hh_screen_day)
+	var fleet_auto_day := build_fleet_autonomy_day_chip_bbcode(province)
+	if not fleet_auto_day.is_empty():
+		lines.append(fleet_auto_day)
+	var sealane_vis := build_sealane_contest_visual_chip_bbcode(province)
+	if not sealane_vis.is_empty():
+		lines.append(sealane_vis)
+	# Next-10 always-on skims (theater brief · campaign decision · multi-phase)
+	var mp_day := build_multi_phase_combat_day_chip_bbcode(province)
+	if not mp_day.is_empty():
+		lines.append(mp_day)
+	var th_brief := build_theater_brief_day_chip_bbcode(province)
+	if not th_brief.is_empty():
+		lines.append(th_brief)
+	var camp_dec := build_campaign_decision_day_chip_bbcode(province)
+	if not camp_dec.is_empty():
+		lines.append(camp_dec)
+	var fleet_ai_day := build_fleet_ai_ops_day_chip_bbcode(province)
+	if not fleet_ai_day.is_empty():
+		lines.append(fleet_ai_day)
+	var ind_econ := build_industry_economy_day_chip_bbcode(province)
+	if not ind_econ.is_empty():
+		lines.append(ind_econ)
+	var joint_ops := build_joint_ops_loop_day_chip_bbcode(province)
+	if not joint_ops.is_empty():
+		lines.append(joint_ops)
+	var war_cab := build_war_cabinet_day_chip_bbcode(province)
+	if not war_cab.is_empty():
+		lines.append(war_cab)
+	var oq_day := build_order_queue_day_chip_bbcode(province)
+	if not oq_day.is_empty():
+		lines.append(oq_day)
+	var risk_day := build_campaign_risk_day_chip_bbcode(province)
+	if not risk_day.is_empty():
+		lines.append(risk_day)
+	var sealane_h := build_sealane_health_day_chip_bbcode(province)
+	if not sealane_h.is_empty():
+		lines.append(sealane_h)
+	var th_camp := build_theater_campaign_day_chip_bbcode(province)
+	if not th_camp.is_empty():
+		lines.append(th_camp)
+	var th_ord := build_theater_order_day_chip_bbcode(province)
+	if not th_ord.is_empty():
+		lines.append(th_ord)
+	var fac_risk := build_factory_risk_day_chip_bbcode(province)
+	if not fac_risk.is_empty():
+		lines.append(fac_risk)
+	var best_as := build_best_assault_day_chip_bbcode(province)
+	if not best_as.is_empty():
+		lines.append(best_as)
+	var th_mut := build_theater_mutation_day_chip_bbcode(province)
+	if not th_mut.is_empty():
+		lines.append(th_mut)
+	var air_sortie := build_air_ops_sortie_day_chip_bbcode(province)
+	if not air_sortie.is_empty():
+		lines.append(air_sortie)
+	var exec_one := build_execute_one_day_chip_bbcode(province)
+	if not exec_one.is_empty():
+		lines.append(exec_one)
+	var hh_mon := build_hh_monthly_day_chip_bbcode(province)
+	if not hh_mon.is_empty():
+		lines.append(hh_mon)
+
+	# Gameplay loops beyond integration-expand.
+	var basing_log := build_basing_logistics_chip_bbcode(province)
+	if not basing_log.is_empty():
+		lines.append(basing_log)
+	var follow_on := build_assault_follow_on_chip_bbcode(province)
+	if not follow_on.is_empty():
+		lines.append(follow_on)
+	var exec_order := build_counter_ops_execute_chip_bbcode()
+	if not exec_order.is_empty():
+		lines.append(exec_order)
+	var agenda_pick := build_agenda_execute_pick_chip_bbcode()
+	if not agenda_pick.is_empty():
+		lines.append(agenda_pick)
+	var move_path := build_move_path_ops_chip_bbcode(province)
+	if not move_path.is_empty():
+		lines.append(move_path)
+	var basing_repair := build_basing_repair_weather_chip_bbcode(province)
+	if not basing_repair.is_empty():
+		lines.append(basing_repair)
+	var sealane := build_sealane_joint_health_chip_bbcode(province)
+	if not sealane.is_empty():
+		lines.append(sealane)
+	var reinforced := build_reinforced_assault_chip_bbcode(province)
+	if not reinforced.is_empty():
+		lines.append(reinforced)
+	var war_path := build_war_path_urgency_chip_bbcode()
+	if not war_path.is_empty():
+		lines.append(war_path)
+	var oob_fac := build_oob_factory_risk_chip_bbcode(province)
+	if not oob_fac.is_empty():
+		lines.append(oob_fac)
+	var force_sup := build_force_supply_posture_chip_bbcode(province)
+	if not force_sup.is_empty():
+		lines.append(force_sup)
+	var leader_wx := build_leader_weather_assign_chip_bbcode(province)
+	if not leader_wx.is_empty():
+		lines.append(leader_wx)
+	var joint_loop := build_joint_ops_loop_strip_chip_bbcode(province)
+	var fleet_camp := build_fleet_campaign_chip_bbcode(province)
+	var combat_camp := build_combat_campaign_chip_bbcode(province)
+	var camp_decision := build_campaign_decision_strip_chip_bbcode(province)
+	var fleet_order := build_fleet_order_chip_bbcode(province)
+	var combat_order := build_combat_order_chip_bbcode(province)
+	var exec_strip := build_execution_decision_strip_chip_bbcode(province)
+	var station_mut := build_fleet_station_mutation_chip_bbcode(province)
+	var mut_strip := build_mutation_decision_strip_chip_bbcode(province)
+	var theater_cmd := build_theater_command_strip_chip_bbcode(province)
+	var player_orders := build_player_order_surface_chip_bbcode(province)
+	var cmd_log := build_command_result_log_chip_bbcode()
+	var day_report := build_theater_day_report_chip_bbcode(province)
+	var order_panel := build_order_panel_chip_bbcode(province)
+	var war_econ_chip := build_war_economy_day_chip_bbcode(province)
+	var logistics_chip := build_logistics_day_chip_bbcode(province)
+	var day_strip_chip := build_theater_day_command_strip_chip_bbcode(province)
+	if not joint_loop.is_empty():
+		lines.append(joint_loop)
+	if not war_econ_chip.is_empty():
+		lines.append(war_econ_chip)
+	if not logistics_chip.is_empty():
+		lines.append(logistics_chip)
+	if not day_strip_chip.is_empty():
+		lines.append(day_strip_chip)
 	lines.append("%sModifier breakdown[/color]" % COLOR_HEADER)
 	lines.append(_modifier_legend_bbcode())
 	lines.append("")
 	var situation_sec := build_inspector_situation_section(province)
+	if not fleet_camp.is_empty():
+		lines.append(fleet_camp)
+	if not combat_camp.is_empty():
+		lines.append(combat_camp)
+	if not camp_decision.is_empty():
+		lines.append(camp_decision)
+	if not fleet_order.is_empty():
+		lines.append(fleet_order)
+	if not combat_order.is_empty():
+		lines.append(combat_order)
+	if not exec_strip.is_empty():
+		lines.append(exec_strip)
+	if not station_mut.is_empty():
+		lines.append(station_mut)
+	if not mut_strip.is_empty():
+		lines.append(mut_strip)
+	if not theater_cmd.is_empty():
+		lines.append(theater_cmd)
+	if not player_orders.is_empty():
+		lines.append(player_orders)
+	if not cmd_log.is_empty():
+		lines.append(cmd_log)
+	if not day_report.is_empty():
+		lines.append(day_report)
+	if not order_panel.is_empty():
+		lines.append(order_panel)
+
 	if not situation_sec.is_empty():
 		lines.append(situation_sec)
 		lines.append("")
@@ -3314,6 +3749,3592 @@ static func build_infra_repair_breakdown_bbcode(province: Province, detailed: bo
 	return "\n".join(lines)
 
 
+const _MapPolishFormatters := preload("res://scripts/map/MapPolishFormatters.gd")
+const _MapNextListHelpers := preload("res://scripts/map/MapNextListHelpers.gd")
+
+
+## Live damage/sabotage state → pure classifier for map tint/marker (MapNextListHelpers).
+static func build_map_damage_state(province: Province) -> Dictionary:
+	if province == null:
+		return {}
+	var bd := _infra_repair_breakdown(province)
+	var site_dmg := 0
+	for site in province.special_sites:
+		if site != null and site.is_damaged():
+			site_dmg += 1
+	var proj_sabo := false
+	var mgr := _get_infra_mgr_for_insight()
+	if mgr != null and mgr.has_method("is_project_sabotaged"):
+		proj_sabo = mgr.is_project_sabotaged(province.id)
+	return {
+		"under_infra_sabotage": bool(bd.get("under_infra_sabotage", false)),
+		"depot_sabotage_level": float(bd.get("depot_sabotage_level", 0.0)),
+		"site_damaged_count": site_dmg,
+		"project_sabotaged": proj_sabo,
+		"agent_pressure_kind": agent_pressure_focus_kind(province),
+		"infrastructure": int(bd.get("infrastructure", province.infrastructure)),
+	}
+
+
+static func classify_province_map_damage(province: Province) -> Dictionary:
+	return _MapNextListHelpers.classify_map_damage(build_map_damage_state(province))
+
+
+static func build_hh_map_signal_inspector_line() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("get_peace_state"):
+		return ""
+	var ps: Dictionary = GameData.get_peace_state()
+	var sig: Dictionary = ps.get("hh_last_map_signal", {}) if ps is Dictionary else {}
+	if sig.is_empty() or not bool(sig.get("active", false)):
+		return ""
+	return str(sig.get("inspector_line", sig.get("label", "")))
+
+
+## Agenda screen layout pilot BBCode (Recent / By class sections).
+static func build_hh_agenda_screen_inspector_bbcode(max_lines: int = 4) -> String:
+	if typeof(GameData) == TYPE_NIL:
+		return ""
+	var plain := ""
+	if GameData.has_method("format_hh_agenda_screen_plain"):
+		plain = str(GameData.format_hh_agenda_screen_plain(max_lines)).strip_edges()
+	if plain.is_empty():
+		return ""
+	var out: PackedStringArray = []
+	for ln in plain.split("\n"):
+		var t := str(ln).strip_edges()
+		if t.is_empty():
+			continue
+		if t.begins_with("## "):
+			out.append("%s── %s ──[/color]" % [COLOR_HEADER, t.substr(3)])
+		else:
+			out.append("%s%s[/color]" % [COLOR_MUTED, t])
+	return "\n".join(out)
+
+
+## Agenda panel pilot BBCode (title + class count + trail lines).
+static func build_hh_agenda_panel_inspector_bbcode(max_lines: int = 4) -> String:
+	if typeof(GameData) == TYPE_NIL:
+		return ""
+	var plain := ""
+	if GameData.has_method("format_hh_agenda_panel_plain"):
+		plain = str(GameData.format_hh_agenda_panel_plain(max_lines)).strip_edges()
+	elif GameData.has_method("format_hh_agenda_trail_plain"):
+		plain = str(GameData.format_hh_agenda_trail_plain(max_lines)).strip_edges()
+	if plain.is_empty():
+		return ""
+	var out_lines: PackedStringArray = []
+	var first := true
+	for ln in plain.split("\n"):
+		var t := str(ln).strip_edges()
+		if t.is_empty():
+			continue
+		if first:
+			out_lines.append("%s── ◈ %s ──[/color]" % [COLOR_HEADER, t])
+			first = false
+		else:
+			out_lines.append("%s%s[/color]" % [COLOR_MUTED, t])
+	return "\n".join(out_lines)
+
+
+## Agenda action-pick pilot BBCode (from GameData trail; empty → "").
+static func build_hh_agenda_actions_inspector_bbcode(max_actions: int = 3) -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("pick_hh_agenda_actions_plain"):
+		return ""
+	var plain := str(GameData.pick_hh_agenda_actions_plain(max_actions)).strip_edges()
+	if plain.is_empty():
+		return ""
+	var out: PackedStringArray = []
+	out.append("%s── Agenda actions ──[/color]" % COLOR_HEADER)
+	for ln in plain.split("\n"):
+		var t := str(ln).strip_edges()
+		if t.is_empty():
+			continue
+		out.append("%s▶ %s[/color]" % [COLOR_MUTED, t])
+	return "\n".join(out)
+
+
+## Agent mission priority pilot from last HH map signal.
+static func build_agent_mission_priority_inspector_bbcode(province: Province) -> String:
+	if province == null or typeof(GameData) == TYPE_NIL or not GameData.has_method("get_peace_state"):
+		return ""
+	var ps: Dictionary = GameData.get_peace_state()
+	var sig: Dictionary = ps.get("hh_last_map_signal", {}) if ps is Dictionary else {}
+	if sig.is_empty() or not bool(sig.get("active", false)):
+		return ""
+	var sig_pid := int(sig.get("province_id", -1))
+	if sig_pid >= 0 and sig_pid != province.id:
+		return ""
+	var action := str(sig.get("action_class", "")).to_lower()
+	if false:
+		return ""
+	var ranked: Dictionary = MapPolishFormatters.rank_agent_missions(action, 0.6, 0.35, 0.5, 4)
+	if bool(ranked.get("empty", true)):
+		return ""
+	var out: PackedStringArray = []
+	out.append("%s── Agent mission priority ──[/color]" % COLOR_HEADER)
+	out.append("%s%s[/color]" % [COLOR_MUTED, str(ranked.get("summary", ""))])
+	var missions: Array = ranked.get("missions", [])
+	for m in missions:
+		if typeof(m) != TYPE_DICTIONARY:
+			continue
+		out.append(
+			"%s◇ %s (%.0f)[/color]"
+			% [COLOR_MUTED, str(m.get("mission", "")), float(m.get("score", 0.0))]
+		)
+	return "\n".join(out)
+
+
+## Operator data-dir banner (world_full default play board clarity).
+static func build_scenario_data_dir_banner_bbcode() -> String:
+	var scenario := "world_full"
+	if typeof(MapPolishFormatters) == TYPE_NIL:
+		return ""
+	if true:
+		var line := str(MapPolishFormatters.format_scenario_data_dir_banner(scenario, ""))
+		if line.is_empty():
+			return ""
+		return "%s%s[/color]" % [COLOR_MUTED, line]
+	return ""
+
+
+## Choke + basing synergy chip for naval-relevant provinces.
+static func build_choke_basing_synergy_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	var is_choke := false
+	if MapManager.has_method("has_strategic_chokepoint"):
+		is_choke = MapManager.has_strategic_chokepoint(province.id)
+	var basing: Dictionary = {}
+	if MapManager.has_method("get_naval_basing"):
+		basing = MapManager.get_naval_basing(province.id)
+	var level := str(basing.get("level", "none"))
+	if not is_choke and level == "none":
+		return ""
+	if false:
+		return ""
+	var score := float(
+		MapPolishFormatters.choke_basing_synergy_score(
+			is_choke, level, int(basing.get("capacity", 0))
+		)
+	)
+	return (
+		"%s⚓ Choke+basing[/color] %s— score %.0f · %s[/color]"
+		% [COLOR_TECH if COLOR_TECH else "[color=#5ec8ff]", COLOR_MUTED, score, level]
+	)
+
+
+## Sealane supply/trade chip from friendly sea-zone multipliers.
+static func build_sealane_route_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("get_sea_zone_control_for_province"):
+		return ""
+	var ctrl: Dictionary = MapManager.get_sea_zone_control_for_province(province.id)
+	if ctrl.is_empty():
+		return ""
+	var tag := str(province.owner_tag).strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "ENG"
+	if typeof(MapPolishFormatters) == TYPE_NIL:
+		return ""
+	var fr: Dictionary = MapPolishFormatters.friendly_sea_zone_multipliers_from_dict(ctrl, tag)
+	if not bool(fr.get("applies", false)):
+		return ""
+	var s := float(fr.get("supply_multiplier", 1.0))
+	var t := float(fr.get("trade_multiplier", 1.0))
+	var rel := str(fr.get("relation", "neutral"))
+	return (
+		"%s🌊 Sealanes[/color] %s— %s · supply ×%.2f · trade ×%.2f[/color]"
+		% [COLOR_TECH if COLOR_TECH else "[color=#5ec8ff]", COLOR_MUTED, rel, s, t]
+	)
+
+
+## Convoy escort need chip for coastal/sea-zone provinces (uses MapManager pilot).
+static func build_convoy_escort_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("plan_convoy_escort_for_path"):
+		return ""
+	var in_zone := false
+	if MapManager.has_method("get_sea_zone_name"):
+		in_zone = not str(MapManager.get_sea_zone_name(province.id)).strip_edges().is_empty()
+	var coastal := false
+	if MapManager.has_method("get_province_terrain"):
+		var terr: Dictionary = MapManager.get_province_terrain(province.id)
+		var dom := str(terr.get("domain", "")).to_lower()
+		coastal = dom.begins_with("coast") or dom == "strait"
+	if not in_zone and not coastal and not bool(province.is_sea):
+		return ""
+	var path: Array = [province.id]
+	if MapManager.has_method("get_adjacent_provinces"):
+		for ap in MapManager.get_adjacent_provinces(province.id):
+			path.append(int(ap))
+			if path.size() >= 4:
+				break
+	var plan: Dictionary = MapManager.plan_convoy_escort_for_path(
+		path, 40.0, 100.0, str(province.owner_tag)
+	)
+	if plan.is_empty():
+		return ""
+	return (
+		"%s🛡 Convoy escort[/color] %s— %s[/color]"
+		% [COLOR_TECH if COLOR_TECH else "[color=#5ec8ff]", COLOR_MUTED, str(plan.get("summary", ""))]
+	)
+
+
+## Weather chip from WeatherManager (live surface). Pass 9: retrowave ground/storm icon prefix.
+static func build_weather_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	var body := ""
+	if WeatherManager.has_method("format_province_weather_chip_bbcode"):
+		body = str(WeatherManager.format_province_weather_chip_bbcode(province.id)).strip_edges()
+	elif WeatherManager.has_method("get_conditions_summary"):
+		body = "%s🌤 %s[/color]" % [COLOR_MUTED, str(WeatherManager.get_conditions_summary(province.id))]
+	if body.is_empty():
+		return ""
+	var img := _weather_chip_img_prefix(province)
+	if img.is_empty():
+		return body
+	return "%s %s" % [img, body]
+
+
+static func _weather_chip_img_prefix(province: Province) -> String:
+	if province == null:
+		return ""
+	var ground := "dry"
+	var precip := 0.0
+	if typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_province_weather"):
+			var w: Variant = WeatherManager.call("get_province_weather", province.id)
+			if w is Dictionary:
+				ground = str(w.get("ground_state", "dry"))
+				precip = float(w.get("precip_intensity", 0.0))
+		elif WeatherManager.has_method("get_conditions_summary"):
+			var summ := str(WeatherManager.get_conditions_summary(province.id)).to_lower()
+			if "storm" in summ:
+				ground = "storm"
+			elif "snow" in summ or "ice" in summ or "frozen" in summ:
+				ground = "snow"
+			elif "mud" in summ:
+				ground = "mud"
+	var WxLib = load("res://scripts/ui/WeatherIconLibrary.gd")
+	if WxLib == null:
+		return ""
+	var key: String = WxLib.key_from_weather(ground, precip)
+	return str(WxLib.bbcode_img(key, 16))
+
+
+## Fleet redeploy posture chip (MapManager + MapPolishFormatters).
+static func build_fleet_posture_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("rank_fleet_posture_for_province"):
+		return ""
+	var coastal := false
+	if MapManager.has_method("get_province_terrain"):
+		var terr: Dictionary = MapManager.get_province_terrain(province.id)
+		var dom := str(terr.get("domain", "")).to_lower()
+		coastal = dom.begins_with("coast") or dom == "strait" or dom == "sea"
+	if not coastal and not bool(province.is_sea):
+		return ""
+	var ranked: Dictionary = MapManager.rank_fleet_posture_for_province(province.id, 0.85, str(province.owner_tag))
+	if ranked.is_empty() or bool(ranked.get("empty", false)):
+		return ""
+	return (
+		"%s🚢 Fleet posture[/color] %s— %s[/color]"
+		% [COLOR_TECH, COLOR_MUTED, str(ranked.get("summary", ""))]
+	)
+
+
+## HH monthly agenda pulse digest (empty trail → "").
+static func build_hh_agenda_pulse_inspector_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_hh_agenda_pulse_plain"):
+		return ""
+	var plain := str(GameData.format_hh_agenda_pulse_plain()).strip_edges()
+	if plain.is_empty():
+		return ""
+	var out: PackedStringArray = []
+	out.append("%s── Hand pulse ──[/color]" % COLOR_HEADER)
+	for ln in plain.split("\n"):
+		var t := str(ln).strip_edges()
+		if t.is_empty():
+			continue
+		out.append("%s%s[/color]" % [COLOR_MUTED, t])
+	return "\n".join(out)
+
+
+## Agent network response pilot (mission deploy after HH signal).
+static func build_agent_network_response_bbcode(province: Province) -> String:
+	if province == null or typeof(GameData) == TYPE_NIL or not GameData.has_method("get_peace_state"):
+		return ""
+	var ps: Dictionary = GameData.get_peace_state()
+	var sig: Dictionary = ps.get("hh_last_map_signal", {}) if ps is Dictionary else {}
+	if sig.is_empty() or not bool(sig.get("active", false)):
+		return ""
+	if int(sig.get("province_id", -1)) >= 0 and int(sig.get("province_id", -1)) != province.id:
+		return ""
+	if false:
+		return ""
+	var ranked: Dictionary = MapPolishFormatters.rank_agent_missions(
+		str(sig.get("action_class", "")), 0.65, 0.3, 0.5, 3
+	)
+	if bool(ranked.get("empty", true)):
+		return ""
+	return (
+		"%s◎ Network response[/color] %s— %s[/color]"
+		% [COLOR_HEADER, COLOR_MUTED, str(ranked.get("summary", ""))]
+	)
+
+
+## Season daylight chip (WeatherManager / MapPolishFormatters).
+static func build_season_daylight_chip_bbcode() -> String:
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("format_season_daylight_chip_bbcode"):
+		return str(WeatherManager.format_season_daylight_chip_bbcode()).strip_edges()
+	var month := 1
+	if typeof(TimeManager) != TYPE_NIL and "current_month" in TimeManager:
+		month = int(TimeManager.current_month)
+	var chip: Dictionary = MapPolishFormatters.format_season_daylight_chip(month)
+	return str(chip.get("bbcode", "")).strip_edges()
+
+
+## Next-day forecast chip.
+static func build_forecast_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if WeatherManager.has_method("format_province_forecast_chip_bbcode"):
+		return str(WeatherManager.format_province_forecast_chip_bbcode(province.id)).strip_edges()
+	return ""
+
+
+## Extreme event severity chip.
+static func build_extreme_event_chip_bbcode() -> String:
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("format_extreme_event_chip_bbcode"):
+		return str(WeatherManager.format_extreme_event_chip_bbcode()).strip_edges()
+	return ""
+
+
+## Weather legend surface (short header line).
+static func build_weather_legend_chip_bbcode() -> String:
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("format_weather_legend_bbcode"):
+		var full := str(WeatherManager.format_weather_legend_bbcode()).strip_edges()
+		if full.is_empty():
+			return ""
+		# First line only for inspector density.
+		var first := full.split("\n")[0]
+		return first
+	return ""
+
+
+## Move cost with weather chip.
+static func build_move_weather_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("estimate_move_cost_with_weather"):
+		return ""
+	var est: Dictionary = MapManager.estimate_move_cost_with_weather(province.id, 1.0, false)
+	if est.is_empty():
+		return ""
+	return str(est.get("bbcode", "")).strip_edges()
+
+
+## Storm convoy risk chip (coastal / sea).
+static func build_storm_convoy_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if not bool(province.is_sea) and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_terrain"):
+		var terr: Dictionary = MapManager.get_province_terrain(province.id)
+		var dom := str(terr.get("domain", "")).to_lower()
+		if not (dom.begins_with("coast") or dom == "strait" or dom == "sea"):
+			return ""
+	if WeatherManager.has_method("format_storm_convoy_risk_bbcode"):
+		return str(WeatherManager.format_storm_convoy_risk_bbcode(province.id)).strip_edges()
+	return ""
+
+
+## Sea×weather supply combined chip for sea-zone provinces.
+static func build_sea_weather_supply_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("get_sea_zone_control_for_province"):
+		return ""
+	var ctrl: Dictionary = MapManager.get_sea_zone_control_for_province(province.id)
+	if ctrl.is_empty():
+		return ""
+	var tag := str(province.owner_tag)
+	var sea := 1.0
+	var fr: Dictionary = MapPolishFormatters.friendly_sea_zone_multipliers_from_dict(ctrl, tag)
+	sea = float(fr.get("supply_multiplier", 1.0))
+	var wx := 1.0
+	if WeatherManager.has_method("get_supply_weather_multiplier"):
+		wx = float(WeatherManager.get_supply_weather_multiplier(province.id))
+	var comb: Dictionary = MapPolishFormatters.sea_weather_supply_combined(sea, wx)
+	return (
+		"%s⚓ Sea×weather[/color] %s— %s[/color]"
+		% [COLOR_TECH, COLOR_MUTED, str(comb.get("summary", ""))]
+	)
+
+
+## Fleet theater posture chip (samples nearby coastal ids when available).
+static func build_fleet_theater_posture_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("plan_fleet_theater_posture_for_ids"):
+		return ""
+	var coastal := false
+	if MapManager.has_method("get_province_terrain"):
+		var terr: Dictionary = MapManager.get_province_terrain(province.id)
+		var dom := str(terr.get("domain", "")).to_lower()
+		coastal = dom.begins_with("coast") or dom == "strait" or dom == "sea"
+	if not coastal and not bool(province.is_sea):
+		return ""
+	var plan: Dictionary = MapManager.plan_fleet_theater_posture_for_ids(
+		[province.id], 0.85, str(province.owner_tag)
+	)
+	if plan.is_empty() or bool(plan.get("empty", false)):
+		return ""
+	return (
+		"%s🚢 Theater fleet[/color] %s— %s[/color]"
+		% [COLOR_TECH, COLOR_MUTED, str(plan.get("summary", ""))]
+	)
+
+
+## Weather-aware combat phase ribbon chip.
+static func build_weather_phase_ribbon_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("build_weather_phase_ribbon"):
+		return ""
+	var ribbon: Dictionary = BattleManager.build_weather_phase_ribbon(100.0, 80.0, province.id)
+	if ribbon.is_empty() or bool(ribbon.get("empty", false)):
+		return ""
+	return str(ribbon.get("bbcode", ribbon.get("plain", ""))).strip_edges()
+
+
+## HH pulse+actions combined digest (empty trail → "").
+static func build_hh_pulse_actions_inspector_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_hh_pulse_actions_plain"):
+		return ""
+	var plain := str(GameData.format_hh_pulse_actions_plain()).strip_edges()
+	if plain.is_empty():
+		return ""
+	var out: PackedStringArray = []
+	out.append("%s── Hand pulse+actions ──[/color]" % COLOR_HEADER)
+	for ln in plain.split("\n"):
+		var t := str(ln).strip_edges()
+		if t.is_empty():
+			continue
+		out.append("%s%s[/color]" % [COLOR_MUTED, t])
+	return "\n".join(out)
+
+
+## Agent network deploy plan chip (missions → deploy counts).
+static func build_agent_network_deploy_bbcode(province: Province) -> String:
+	if province == null or typeof(GameData) == TYPE_NIL or not GameData.has_method("get_peace_state"):
+		return ""
+	var ps: Dictionary = GameData.get_peace_state()
+	var sig: Dictionary = ps.get("hh_last_map_signal", {}) if ps is Dictionary else {}
+	if sig.is_empty() or not bool(sig.get("active", false)):
+		return ""
+	if int(sig.get("province_id", -1)) >= 0 and int(sig.get("province_id", -1)) != province.id:
+		return ""
+	var plan: Dictionary = MapPolishFormatters.format_network_deploy_plan(
+		str(sig.get("action_class", "influence")),
+		float(sig.get("influence", 0.55)),
+		0.3,
+		3,
+		0.5,
+	)
+	if bool(plan.get("empty", true)):
+		return ""
+	return str(plan.get("bbcode", "")).strip_edges()
+
+
+static func build_fleet_redeploy_route_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("plan_fleet_redeploy_routes_from"):
+		return ""
+	var coastal := bool(province.is_sea)
+	if not coastal and MapManager.has_method("get_province_terrain"):
+		var terr: Dictionary = MapManager.get_province_terrain(province.id)
+		var dom := str(terr.get("domain", "")).to_lower()
+		coastal = dom.begins_with("coast") or dom == "strait" or dom == "sea"
+	if not coastal:
+		return ""
+	# Single-dest self-route still exercises ranking with origin basing.
+	var plan: Dictionary = MapManager.plan_fleet_redeploy_routes_from(
+		province.id, [province.id], 0.85, str(province.owner_tag)
+	)
+	if plan.is_empty() or bool(plan.get("empty", false)):
+		return ""
+	return (
+		"%s🚢 Redeploy route[/color] %s— %s[/color]"
+		% [COLOR_TECH, COLOR_MUTED, str(plan.get("summary", ""))]
+	)
+
+
+static func build_weather_combat_briefing_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("build_weather_combat_briefing"):
+		return ""
+	var brief: Dictionary = BattleManager.build_weather_combat_briefing(
+		100.0, 80.0, province.id, 1.0, str(province.name)
+	)
+	if brief.is_empty() or bool(brief.get("empty", false)):
+		return ""
+	return str(brief.get("bbcode", brief.get("headline", ""))).strip_edges()
+
+
+static func build_hh_monthly_brief_inspector_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_hh_monthly_brief_plain"):
+		return ""
+	var plain := str(GameData.format_hh_monthly_brief_plain()).strip_edges()
+	if plain.is_empty():
+		return ""
+	var out: PackedStringArray = []
+	out.append("%s── Monthly Hand brief ──[/color]" % COLOR_HEADER)
+	for ln in plain.split("\n"):
+		var t := str(ln).strip_edges()
+		if t.is_empty():
+			continue
+		out.append("%s%s[/color]" % [COLOR_MUTED, t])
+	return "\n".join(out)
+
+
+static func build_agent_coverage_chip_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_agent_coverage_plan_plain"):
+		return ""
+	var plain := str(GameData.format_agent_coverage_plan_plain(5)).strip_edges()
+	if plain.is_empty():
+		return ""
+	return "%s◎ Coverage[/color] %s— %s[/color]" % [COLOR_HEADER, COLOR_MUTED, plain]
+
+
+static func build_inspector_weather_ops_section_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if WeatherManager.has_method("format_inspector_weather_section_bbcode"):
+		return str(WeatherManager.format_inspector_weather_section_bbcode(province.id)).strip_edges()
+	return ""
+
+
+static func build_weather_pressure_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if WeatherManager.has_method("format_weather_pressure_chip_bbcode"):
+		return str(WeatherManager.format_weather_pressure_chip_bbcode(province.id)).strip_edges()
+	return ""
+
+
+static func build_naval_wx_tip_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if not bool(province.is_sea) and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_terrain"):
+		var terr: Dictionary = MapManager.get_province_terrain(province.id)
+		var dom := str(terr.get("domain", "")).to_lower()
+		if not (dom.begins_with("coast") or dom == "strait" or dom == "sea"):
+			return ""
+	if WeatherManager.has_method("format_naval_engagement_weather_tip_bbcode"):
+		return str(WeatherManager.format_naval_engagement_weather_tip_bbcode(province.id)).strip_edges()
+	return ""
+
+
+static func build_air_grounding_alert_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if WeatherManager.has_method("format_air_grounding_alert_bbcode"):
+		return str(WeatherManager.format_air_grounding_alert_bbcode(province.id)).strip_edges()
+	return ""
+
+
+static func build_freeze_thaw_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if WeatherManager.has_method("format_freeze_thaw_chip_bbcode"):
+		return str(WeatherManager.format_freeze_thaw_chip_bbcode(province.id)).strip_edges()
+	return ""
+
+
+static func build_infra_weather_wear_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if WeatherManager.has_method("format_infra_weather_wear_bbcode"):
+		return str(WeatherManager.format_infra_weather_wear_bbcode(province.id)).strip_edges()
+	return ""
+
+
+static func build_coastal_fog_gate_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if not bool(province.is_sea) and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_terrain"):
+		var terr: Dictionary = MapManager.get_province_terrain(province.id)
+		var dom := str(terr.get("domain", "")).to_lower()
+		if not (dom.begins_with("coast") or dom == "strait" or dom == "sea"):
+			return ""
+	if WeatherManager.has_method("format_coastal_fog_gate_bbcode"):
+		return str(WeatherManager.format_coastal_fog_gate_bbcode(province.id)).strip_edges()
+	return ""
+
+
+static func build_joint_focus_agent_chip_bbcode() -> String:
+	var focus: Array = [{"id": "industrial_effort", "score": 70.0}]
+	var missions: Array = [{"mission": "counterintel", "score": 85.0}, {"mission": "propaganda", "score": 40.0}]
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
+		var ps: Dictionary = GameData.get_peace_state()
+		var sig: Dictionary = ps.get("hh_last_map_signal", {}) if ps is Dictionary else {}
+		if not sig.is_empty() and bool(sig.get("active", false)):
+			missions = [{"mission": str(sig.get("action_class", "counterintel")) + "_defense", "score": 90.0}]
+	var board: Dictionary = MapPolishFormatters.joint_focus_agent_priority(focus, missions, 3)
+	if bool(board.get("empty", true)):
+		return ""
+	return str(board.get("bbcode", "")).strip_edges()
+
+
+static func build_supply_route_weather_rank_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	var path_wx: Array = [{
+		"province_id": province.id,
+		"ground_state": "dry",
+		"precip_intensity": 0.0,
+	}]
+	if WeatherManager.has_method("get_supply_weather_multiplier"):
+		var sm := float(WeatherManager.get_supply_weather_multiplier(province.id))
+		path_wx[0]["precip_intensity"] = clampf((1.0 - sm) * 2.0, 0.0, 1.0)
+		if sm < 0.75:
+			path_wx[0]["ground_state"] = "mud"
+	var ranked: Dictionary = MapPolishFormatters.rank_supply_route_weather_risk(path_wx)
+	if bool(ranked.get("empty", true)):
+		return ""
+	return str(ranked.get("bbcode", ranked.get("summary", ""))).strip_edges()
+
+
+static func build_fleet_task_group_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("compose_fleet_task_group_for_province"):
+		return ""
+	var coastal := bool(province.is_sea)
+	if not coastal and MapManager.has_method("get_province_terrain"):
+		var terr: Dictionary = MapManager.get_province_terrain(province.id)
+		var dom := str(terr.get("domain", "")).to_lower()
+		coastal = dom.begins_with("coast") or dom == "strait" or dom == "sea"
+	if not coastal:
+		return ""
+	var tg: Dictionary = MapManager.compose_fleet_task_group_for_province(
+		province.id, 100.0, "patrol", str(province.owner_tag)
+	)
+	if tg.is_empty() or bool(tg.get("empty", false)):
+		return ""
+	return str(tg.get("bbcode", tg.get("summary", ""))).strip_edges()
+
+
+static func build_multi_front_assault_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(BattleManager) == TYPE_NIL:
+		return ""
+	if not BattleManager.has_method("rank_multi_front_assault_targets"):
+		return ""
+	var targets: Array = [
+		{"province_id": province.id, "defender_power": 80.0},
+		{"province_id": province.id + 1, "defender_power": 120.0},
+	]
+	var ranked: Dictionary = BattleManager.rank_multi_front_assault_targets(targets, 100.0, 1.0)
+	if ranked.is_empty() or bool(ranked.get("empty", false)):
+		return ""
+	return str(ranked.get("bbcode", ranked.get("summary", ""))).strip_edges()
+
+
+static func build_hh_quarterly_rollup_inspector_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_hh_quarterly_rollup_plain"):
+		return ""
+	var plain := str(GameData.format_hh_quarterly_rollup_plain()).strip_edges()
+	if plain.is_empty():
+		return ""
+	var out: PackedStringArray = []
+	out.append("%s── Quarterly Hand ──[/color]" % COLOR_HEADER)
+	for ln in plain.split("\n"):
+		var t := str(ln).strip_edges()
+		if t.is_empty():
+			continue
+		out.append("%s%s[/color]" % [COLOR_MUTED, t])
+	return "\n".join(out)
+
+
+static func build_agent_escalation_chip_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_agent_escalation_ladder_plain"):
+		return ""
+	var plain := str(GameData.format_agent_escalation_ladder_plain()).strip_edges()
+	if plain.is_empty():
+		return ""
+	return "%s◎ Escalation[/color] %s— %s[/color]" % [COLOR_HEADER, COLOR_MUTED, plain]
+
+
+static func build_campaign_day_risk_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if WeatherManager.has_method("format_campaign_day_risk_bbcode"):
+		return str(WeatherManager.format_campaign_day_risk_bbcode(province.id)).strip_edges()
+	return ""
+
+
+static func build_convoy_weather_window_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if not bool(province.is_sea) and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_terrain"):
+		var terr: Dictionary = MapManager.get_province_terrain(province.id)
+		var dom := str(terr.get("domain", "")).to_lower()
+		if not (dom.begins_with("coast") or dom == "strait" or dom == "sea"):
+			return ""
+	if WeatherManager.has_method("format_convoy_weather_window_bbcode"):
+		return str(WeatherManager.format_convoy_weather_window_bbcode(province.id)).strip_edges()
+	return ""
+
+
+static func build_production_weather_alert_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if WeatherManager.has_method("format_production_weather_alert_bbcode"):
+		return str(WeatherManager.format_production_weather_alert_bbcode(province.id)).strip_edges()
+	return ""
+
+
+static func build_sea_naval_weather_ops_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("get_sea_zone_control_for_province"):
+		return ""
+	var ctrl: Dictionary = MapManager.get_sea_zone_control_for_province(province.id)
+	if ctrl.is_empty():
+		return ""
+	var sea := 1.0
+	var fr: Dictionary = MapPolishFormatters.friendly_sea_zone_multipliers_from_dict(ctrl, str(province.owner_tag))
+	sea = float(fr.get("supply_multiplier", 1.0))
+	if WeatherManager.has_method("format_sea_naval_weather_ops_bbcode"):
+		return str(WeatherManager.format_sea_naval_weather_ops_bbcode(province.id, sea)).strip_edges()
+	return ""
+
+
+static func build_combat_morale_weather_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if not WeatherManager.has_method("get_combat_morale_weather_mult"):
+		return ""
+	var m := float(WeatherManager.get_combat_morale_weather_mult(province.id))
+	return "%s🛡 Morale wx[/color] %s— ×%.2f[/color]" % [COLOR_HEADER, COLOR_MUTED, m]
+
+
+static func build_depot_weather_capacity_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if not WeatherManager.has_method("get_depot_weather_capacity"):
+		return ""
+	var dep: Dictionary = WeatherManager.get_depot_weather_capacity(province.id, 100.0)
+	return str(dep.get("bbcode", dep.get("summary", ""))).strip_edges()
+
+
+static func build_daylight_combat_mod_chip_bbcode() -> String:
+	if typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	if WeatherManager.has_method("format_daylight_combat_mod_bbcode"):
+		return str(WeatherManager.format_daylight_combat_mod_bbcode()).strip_edges()
+	return ""
+
+
+static func build_choke_weather_synergy_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL or typeof(MapManager) == TYPE_NIL:
+		return ""
+	var is_choke := false
+	if MapManager.has_method("has_strategic_chokepoint"):
+		is_choke = bool(MapManager.has_strategic_chokepoint(province.id))
+	if not is_choke:
+		return ""
+	if WeatherManager.has_method("format_choke_weather_synergy_bbcode"):
+		return str(WeatherManager.format_choke_weather_synergy_bbcode(province.id, true, true)).strip_edges()
+	return ""
+
+
+static func build_focus_weather_aware_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	var wvis := 1.0
+	var wprec := 0.0
+	var g := "dry"
+	# Use pressure via formatter with province weather if available through WM production mult proxy
+	if WeatherManager.has_method("get_combat_weather_multiplier"):
+		wvis = float(WeatherManager.get_combat_weather_multiplier(province.id))
+	var scored: Dictionary = MapPolishFormatters.focus_weather_aware_score(50.0, "industrial_effort", wvis, wprec, g)
+	return str(scored.get("bbcode", "")).strip_edges()
+
+
+static func build_ops_dashboard_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	var summaries: Array = []
+	var day := build_campaign_day_risk_chip_bbcode(province)
+	if not day.is_empty():
+		summaries.append(day)
+	var tg := build_fleet_task_group_chip_bbcode(province)
+	if not tg.is_empty():
+		summaries.append(tg)
+	var front := build_multi_front_assault_chip_bbcode(province)
+	if not front.is_empty():
+		summaries.append(front)
+	var esc := build_agent_escalation_chip_bbcode()
+	if not esc.is_empty():
+		summaries.append(esc)
+	var dash: Dictionary = MapPolishFormatters.format_ops_dashboard(summaries)
+	if bool(dash.get("empty", true)):
+		return ""
+	return str(dash.get("bbcode", "")).strip_edges()
+
+
+static func build_fleet_weather_package_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("fleet_weather_mission_package_for_province"):
+		return ""
+	var coastal := bool(province.is_sea)
+	if not coastal and MapManager.has_method("get_province_terrain"):
+		var terr: Dictionary = MapManager.get_province_terrain(province.id)
+		var dom := str(terr.get("domain", "")).to_lower()
+		coastal = dom.begins_with("coast") or dom == "strait" or dom == "sea"
+	if not coastal:
+		return ""
+	var pkg: Dictionary = MapManager.fleet_weather_mission_package_for_province(
+		province.id, "strike", 100.0, str(province.owner_tag)
+	)
+	if pkg.is_empty() or bool(pkg.get("empty", false)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", ""))).strip_edges()
+
+
+static func build_assault_readiness_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(BattleManager) == TYPE_NIL:
+		return ""
+	if not BattleManager.has_method("build_assault_readiness_compose"):
+		return ""
+	var targets: Array = [{"province_id": province.id, "defender_power": 80.0}]
+	var ready: Dictionary = BattleManager.build_assault_readiness_compose(targets, 100.0, 1.0, province.id)
+	if ready.is_empty() or bool(ready.get("empty", false)):
+		return ""
+	return str(ready.get("bbcode", ready.get("summary", ""))).strip_edges()
+
+
+static func build_counter_ops_chip_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_counter_ops_board_plain"):
+		return ""
+	var plain := str(GameData.format_counter_ops_board_plain()).strip_edges()
+	if plain.is_empty():
+		return ""
+	return "%s◎ Counter-ops[/color] %s— %s[/color]" % [COLOR_HEADER, COLOR_MUTED, plain]
+
+
+static func build_hh_agenda_commits_chip_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_hh_agenda_commitments_plain"):
+		return ""
+	var plain := str(GameData.format_hh_agenda_commitments_plain()).strip_edges()
+	if plain.is_empty():
+		return ""
+	var out: PackedStringArray = []
+	out.append("%s── Agenda commits ──[/color]" % COLOR_HEADER)
+	for ln in plain.split("\n"):
+		var t := str(ln).strip_edges()
+		if t.is_empty():
+			continue
+		out.append("%s%s[/color]" % [COLOR_MUTED, t])
+	return "\n".join(out)
+
+
+static func build_choke_sea_weather_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("choke_sea_weather_package_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.choke_sea_weather_package_for_province(province.id, str(province.owner_tag))
+	if pkg.is_empty() or bool(pkg.get("empty", false)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", ""))).strip_edges()
+
+
+static func build_trade_chain_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	var sea := 1.0
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_sea_zone_control_for_province"):
+		var ctrl: Dictionary = MapManager.get_sea_zone_control_for_province(province.id)
+		if not ctrl.is_empty():
+			var fr: Dictionary = MapPolishFormatters.friendly_sea_zone_multipliers_from_dict(ctrl, str(province.owner_tag))
+			sea = float(fr.get("trade_multiplier", fr.get("supply_multiplier", 1.0)))
+	var precip := 0.0
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_trade_weather_multiplier"):
+		var tw := float(WeatherManager.get_trade_weather_multiplier(province.id))
+		precip = clampf(1.0 - tw, 0.0, 1.0)
+	var chain: Dictionary = MapPolishFormatters.trade_supply_weather_chain(sea, "dry", precip, 0.0)
+	return str(chain.get("bbcode", "")).strip_edges()
+
+
+static func build_factory_risk_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	var temp := 10.0
+	var precip := 0.0
+	var ground := "dry"
+	var vis := 1.0
+	if WeatherManager.has_method("get_production_weather_multiplier"):
+		var pm := float(WeatherManager.get_production_weather_multiplier(province.id))
+		precip = clampf((1.0 - pm) * 2.0, 0.0, 1.0)
+		if pm < 0.85:
+			temp = -18.0
+	if WeatherManager.has_method("get_combat_weather_multiplier"):
+		vis = float(WeatherManager.get_combat_weather_multiplier(province.id))
+	var risk: Dictionary = MapPolishFormatters.factory_risk_compose(temp, precip, ground, vis, 0.2)
+	return str(risk.get("bbcode", "")).strip_edges()
+
+
+static func build_supply_chain_health_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	var sea := 1.0
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_sea_zone_control_for_province"):
+		var ctrl: Dictionary = MapManager.get_sea_zone_control_for_province(province.id)
+		if not ctrl.is_empty():
+			var fr: Dictionary = MapPolishFormatters.friendly_sea_zone_multipliers_from_dict(ctrl, str(province.owner_tag))
+			sea = float(fr.get("supply_multiplier", 1.0))
+	var ground := "dry"
+	var precip := 0.0
+	var vis := 1.0
+	if typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_supply_weather_multiplier"):
+			var sm := float(WeatherManager.get_supply_weather_multiplier(province.id))
+			precip = clampf((1.0 - sm) * 2.0, 0.0, 1.0)
+			if sm < 0.75:
+				ground = "mud"
+		if WeatherManager.has_method("get_naval_spot_weather_multiplier"):
+			vis = float(WeatherManager.get_naval_spot_weather_multiplier(province.id))
+	var chain: Dictionary = MapPolishFormatters.supply_chain_health_compose(100.0, sea, ground, precip, vis, 0.0)
+	return str(chain.get("bbcode", "")).strip_edges()
+
+
+static func build_air_ops_package_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(WeatherManager) == TYPE_NIL:
+		return ""
+	var vis := 1.0
+	var precip := 0.0
+	if WeatherManager.has_method("get_air_sortie_weather_eff"):
+		vis = float(WeatherManager.get_air_sortie_weather_eff(province.id))
+		precip = clampf(1.0 - vis, 0.0, 1.0)
+	var month := 1
+	if typeof(TimeManager) != TYPE_NIL and "current_month" in TimeManager:
+		month = int(TimeManager.current_month)
+	var pkg: Dictionary = MapPolishFormatters.air_ops_package(vis, precip, 0.2, month)
+	return str(pkg.get("bbcode", "")).strip_edges()
+
+
+## Air-ops day package chip (live WeatherManager → MapPolishFormatters.air_ops_day_package).
+static func build_air_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_ops_day_for_province"):
+		var day: Dictionary = MapManager.air_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	var vis := 1.0
+	var precip := 0.0
+	var month := 6
+	if typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_air_sortie_weather_eff"):
+			vis = float(WeatherManager.get_air_sortie_weather_eff(province.id))
+			precip = clampf(1.0 - vis, 0.0, 1.0)
+		elif WeatherManager.has_method("get_combat_weather_multiplier"):
+			vis = float(WeatherManager.get_combat_weather_multiplier(province.id))
+			precip = clampf(1.0 - vis, 0.0, 1.0)
+	if typeof(TimeManager) != TYPE_NIL and "current_month" in TimeManager:
+		month = int(TimeManager.current_month)
+	var pkg: Dictionary = MapPolishFormatters.air_ops_day_package(vis, precip, 0.2, month)
+	return str(pkg.get("bbcode", pkg.get("summary", ""))).strip_edges()
+
+
+## Forecast planning day chip (live weather → MapPolishFormatters.weather_forecast_planning_day).
+static func build_forecast_planning_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_forecast_planning_day_for_province"):
+		var day: Dictionary = MapManager.weather_forecast_planning_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	var vis := 1.0
+	var precip := 0.0
+	if typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_combat_weather_multiplier"):
+			vis = float(WeatherManager.get_combat_weather_multiplier(province.id))
+			precip = clampf(1.0 - vis, 0.0, 1.0)
+		if WeatherManager.has_method("get_supply_weather_multiplier"):
+			var sm := float(WeatherManager.get_supply_weather_multiplier(province.id))
+			precip = maxf(precip, clampf((1.0 - sm) * 2.0, 0.0, 1.0))
+	var pkg: Dictionary = MapPolishFormatters.weather_forecast_planning_day(10.0, precip, vis, 0.2, "dry")
+	return str(pkg.get("bbcode", pkg.get("summary", ""))).strip_edges()
+
+
+## Naval interdiction day chip (live MapManager → MapPolishFormatters.naval_interdiction_day).
+static func build_naval_interdiction_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_interdiction_day_for_province"):
+		var day: Dictionary = MapManager.naval_interdiction_day_for_province(province.id, 80.0)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Joint command day chip (compose naval + intel + air + logistics).
+static func build_joint_command_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("joint_command_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.joint_command_day_for_tag(tag, province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Order execute day chip (queue drain budget).
+static func build_order_execute_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("order_execute_day_for_province"):
+		var day: Dictionary = MapManager.order_execute_day_for_province(province.id, 3)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Strategic continuity day chip (orders + focus + next-day feedback).
+static func build_strategic_continuity_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_continuity_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.strategic_continuity_day_for_tag(tag, province.id, 3)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Force posture day chip.
+static func build_force_posture_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_posture_day_for_province"):
+		var day: Dictionary = MapManager.force_posture_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Force readiness day chip.
+static func build_force_readiness_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_readiness_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.force_readiness_day_for_tag(tag, province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Production surge day chip.
+static func build_production_surge_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_surge_day_for_province"):
+		var day: Dictionary = MapManager.production_surge_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Industry surge day chip.
+static func build_industry_surge_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("industry_surge_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.industry_surge_day_for_tag(tag, province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Naval campaign day chip.
+static func build_naval_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_campaign_day_for_province"):
+		var day: Dictionary = MapManager.naval_campaign_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Joint campaign day chip.
+static func build_joint_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("joint_campaign_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.joint_campaign_day_for_tag(tag, province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Fog/air crisis day chip.
+static func build_fog_air_crisis_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fog_air_crisis_day_for_province"):
+		var day: Dictionary = MapManager.fog_air_crisis_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Weather crisis day chip.
+static func build_weather_crisis_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_crisis_day_for_province"):
+		var day: Dictionary = MapManager.weather_crisis_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Agent response day chip.
+static func build_agent_response_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_response_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.agent_response_day_for_tag(tag, province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Agent campaign day chip.
+static func build_agent_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_campaign_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.agent_campaign_day_for_tag(tag, province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Combat ops day chip.
+static func build_combat_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_ops_day_for_province"):
+		var day: Dictionary = MapManager.combat_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Combat campaign day chip.
+static func build_combat_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_campaign_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.combat_campaign_day_for_tag(tag, province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Fleet redeploy day chip.
+static func build_fleet_redeploy_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_redeploy_day_for_province"):
+		var day: Dictionary = MapManager.fleet_redeploy_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Fleet campaign day chip.
+static func build_fleet_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_campaign_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.fleet_campaign_day_for_tag(tag, province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Naval campaign skim chip (Top 5 #3).
+static func build_naval_campaign_skim_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_campaign_skim_for_province"):
+		var day: Dictionary = MapManager.naval_campaign_skim_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## HH player path chip (Top 5 #4).
+static func build_hh_player_path_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_agenda_player_path_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.hh_agenda_player_path_for_tag(tag, province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Resource/damage operational skim chip.
+static func build_resource_damage_skim_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("resource_damage_skim_for_province"):
+		var day: Dictionary = MapManager.resource_damage_skim_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Sealane contest skim chip.
+static func build_sealane_contest_skim_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("sealane_contest_skim_for_province"):
+		var day: Dictionary = MapManager.sealane_contest_skim_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Infra/special-site consistency chip.
+static func build_infra_site_consistency_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("infra_site_consistency_skim_for_province"):
+		var day: Dictionary = MapManager.infra_site_consistency_skim_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## HH agenda screen day chip.
+static func build_hh_agenda_screen_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_agenda_screen_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.hh_agenda_screen_day_for_tag(tag, province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Fleet autonomy day chip.
+static func build_fleet_autonomy_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_autonomy_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.fleet_autonomy_day_for_tag(tag, 0.65, 3)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Sealane contest visual chip.
+static func build_sealane_contest_visual_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("sealane_contest_visual_for_province"):
+		var day: Dictionary = MapManager.sealane_contest_visual_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Next-10 depth chips.
+static func build_multi_phase_combat_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_phase_combat_day_for_province"):
+		var day: Dictionary = MapManager.multi_phase_combat_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_combat_air_naval_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_air_naval_day_for_province"):
+		var day: Dictionary = MapManager.combat_air_naval_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_agent_auto_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_auto_day_live"):
+		var day: Dictionary = MapManager.agent_auto_day_live(province.id, 3)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_focus_pick_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_pick_day_live"):
+		var day: Dictionary = MapManager.focus_pick_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_production_priority_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_priority_day_for_province"):
+		var day: Dictionary = MapManager.production_priority_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_convoy_escort_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_escort_day_for_province"):
+		var day: Dictionary = MapManager.convoy_escort_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_next_day_feedback_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("next_day_feedback_day_live"):
+		var day: Dictionary = MapManager.next_day_feedback_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_map_effect_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("map_effect_day_for_province"):
+		var day: Dictionary = MapManager.map_effect_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_theater_brief_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_brief_day_for_province"):
+		var day: Dictionary = MapManager.theater_brief_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_campaign_decision_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_decision_day_live"):
+		var day: Dictionary = MapManager.campaign_decision_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Next-20 priority depth chips.
+static func build_order_panel_ux_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("order_panel_ux_day_live"):
+		var day: Dictionary = MapManager.order_panel_ux_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_multi_phase_combat_ui_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_phase_combat_ui_day_for_province"):
+		var day: Dictionary = MapManager.multi_phase_combat_ui_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_fleet_ai_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_ai_ops_day_for_tag"):
+		var tag := str(province.owner_tag)
+		var day: Dictionary = MapManager.fleet_ai_ops_day_for_tag(tag, 0.7)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_hh_agenda_package_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_agenda_package_day_live"):
+		var day: Dictionary = MapManager.hh_agenda_package_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_agent_campaign_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_campaign_depth_day_live"):
+		var day: Dictionary = MapManager.agent_campaign_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_industry_economy_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("industry_economy_day_for_province"):
+		var day: Dictionary = MapManager.industry_economy_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_save_slot_browser_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_slot_browser_day_live"):
+		var day: Dictionary = MapManager.save_slot_browser_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_basing_logistics_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_logistics_day_for_province"):
+		var day: Dictionary = MapManager.basing_logistics_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_assault_follow_on_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_follow_on_day_for_province"):
+		var day: Dictionary = MapManager.assault_follow_on_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_joint_ops_loop_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("joint_ops_loop_day_for_province"):
+		var day: Dictionary = MapManager.joint_ops_loop_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Next-30 theater surface chips.
+static func build_war_cabinet_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_cabinet_day_live"):
+		var day: Dictionary = MapManager.war_cabinet_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_supply_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("supply_campaign_day_for_province"):
+		var day: Dictionary = MapManager.supply_campaign_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_force_supply_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_supply_day_for_province"):
+		var day: Dictionary = MapManager.force_supply_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_counter_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("counter_ops_day_live"):
+		var day: Dictionary = MapManager.counter_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_multi_province_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_province_live_day_for_tag"):
+		var day: Dictionary = MapManager.multi_province_live_day_for_tag(str(province.owner_tag), province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_order_queue_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("order_queue_day_live"):
+		var day: Dictionary = MapManager.order_queue_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_agent_ai_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_ai_board_day_live"):
+		var day: Dictionary = MapManager.agent_ai_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_fleet_order_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_order_day_for_province"):
+		var day: Dictionary = MapManager.fleet_order_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_fleet_theater_posture_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_theater_posture_day_for_tag"):
+		var day: Dictionary = MapManager.fleet_theater_posture_day_for_tag(str(province.owner_tag), 0.7)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_campaign_risk_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_risk_day_for_province"):
+		var day: Dictionary = MapManager.campaign_risk_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Next-40 campaign surface chips.
+static func build_sealane_health_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("sealane_health_day_for_province"):
+		var day: Dictionary = MapManager.sealane_health_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_convoy_package_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_package_day_for_province"):
+		var day: Dictionary = MapManager.convoy_package_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_theater_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_campaign_day_for_province"):
+		var day: Dictionary = MapManager.theater_campaign_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_production_risk_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_risk_day_for_province"):
+		var day: Dictionary = MapManager.production_risk_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_leader_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_campaign_day_for_province"):
+		var day: Dictionary = MapManager.leader_campaign_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_basing_repair_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_repair_day_for_province"):
+		var day: Dictionary = MapManager.basing_repair_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_focus_order_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_order_day_live"):
+		var day: Dictionary = MapManager.focus_order_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_naval_order_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_order_day_for_province"):
+		var day: Dictionary = MapManager.naval_order_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_air_land_order_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_land_order_day_for_province"):
+		var day: Dictionary = MapManager.air_land_order_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_theater_order_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_order_day_for_province"):
+		var day: Dictionary = MapManager.theater_order_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+## Next-50 ops/mutation chips.
+static func build_factory_risk_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("factory_risk_day_for_province"):
+		var day: Dictionary = MapManager.factory_risk_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_trade_chain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("trade_chain_day_for_province"):
+		var day: Dictionary = MapManager.trade_chain_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_war_path_urgency_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_path_urgency_day_live"):
+		var day: Dictionary = MapManager.war_path_urgency_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_combat_morale_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_morale_day_for_province"):
+		var day: Dictionary = MapManager.combat_morale_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_choke_sea_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("choke_sea_day_for_province"):
+		var day: Dictionary = MapManager.choke_sea_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_redeploy_route_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("redeploy_route_day_for_province"):
+		var day: Dictionary = MapManager.redeploy_route_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_theater_report_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_report_day_for_province"):
+		var day: Dictionary = MapManager.theater_report_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_best_station_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("best_station_day_for_province"):
+		var day: Dictionary = MapManager.best_station_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_best_assault_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("best_assault_day_for_province"):
+		var day: Dictionary = MapManager.best_assault_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_theater_mutation_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_mutation_day_for_province"):
+		var day: Dictionary = MapManager.theater_mutation_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+
+## Next-60 command depth chips.
+
+static func build_air_ops_sortie_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_ops_sortie_day_for_province"):
+		var day: Dictionary = MapManager.air_ops_sortie_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_escalation_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_escalation_day_live"):
+		var day: Dictionary = MapManager.agent_escalation_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_coverage_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_coverage_day_live"):
+		var day: Dictionary = MapManager.agent_coverage_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_order_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_order_day_for_province"):
+		var day: Dictionary = MapManager.combat_order_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_production_order_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_order_day_for_province"):
+		var day: Dictionary = MapManager.production_order_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_supply_order_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("supply_order_day_for_province"):
+		var day: Dictionary = MapManager.supply_order_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_phase_strip_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_phase_strip_day_for_province"):
+		var day: Dictionary = MapManager.combat_phase_strip_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_patrol_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_patrol_day_for_province"):
+		var day: Dictionary = MapManager.fleet_patrol_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_execute_one_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("execute_one_day_live"):
+		var day: Dictionary = MapManager.execute_one_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_fleet_plan_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_fleet_plan_day_for_province"):
+		var day: Dictionary = MapManager.daily_fleet_plan_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_combat_plan_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_combat_plan_day_for_province"):
+		var day: Dictionary = MapManager.daily_combat_plan_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_prod_plan_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_prod_plan_day_for_province"):
+		var day: Dictionary = MapManager.daily_prod_plan_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_agent_plan_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_agent_plan_day_live"):
+		var day: Dictionary = MapManager.daily_agent_plan_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_supply_plan_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_supply_plan_day_for_province"):
+		var day: Dictionary = MapManager.daily_supply_plan_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_dispatch_mutation_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_dispatch_mutation_day_live"):
+		var day: Dictionary = MapManager.agent_dispatch_mutation_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_station_mutation_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_station_mutation_day_for_province"):
+		var day: Dictionary = MapManager.fleet_station_mutation_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_stage_mutation_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_stage_mutation_day_for_province"):
+		var day: Dictionary = MapManager.assault_stage_mutation_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_task_mutation_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_task_mutation_day_for_province"):
+		var day: Dictionary = MapManager.naval_task_mutation_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_land_stage_mutation_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_land_stage_mutation_day_for_province"):
+		var day: Dictionary = MapManager.air_land_stage_mutation_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_monthly_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_monthly_day_live"):
+		var day: Dictionary = MapManager.hh_monthly_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+## When false (default), inspector skips hundreds of product-depth day chips.
+## Those chips were eagerly evaluated on every province select and some paths
+## (e.g. apply_queue audit) *mutated* game state — freezing interactive play.
+## Enable only for headless harness / deep debug: set true temporarily.
+static var enable_product_depth_chips_in_inspector: bool = false
+
+
+## Collect product-depth day chips and append only the priority budget.
+static func _append_budgeted_product_depth_chips(lines: PackedStringArray, province: Province) -> void:
+	if province == null:
+		return
+	# Interactive path: skip (see enable_product_depth_chips_in_inspector).
+	if not enable_product_depth_chips_in_inspector:
+		return
+	var candidates: Array = []
+	var pairs: Array = [
+		["air_ops_day", build_air_ops_day_chip_bbcode(province)],
+		["forecast_day", build_forecast_planning_day_chip_bbcode(province)],
+		["naval_interdiction_day", build_naval_interdiction_day_chip_bbcode(province)],
+		["joint_command_day", build_joint_command_day_chip_bbcode(province)],
+		["order_execute_day", build_order_execute_day_chip_bbcode(province)],
+		["strategic_continuity_day", build_strategic_continuity_day_chip_bbcode(province)],
+		["force_posture_day", build_force_posture_day_chip_bbcode(province)],
+		["force_readiness_day", build_force_readiness_day_chip_bbcode(province)],
+		["production_surge_day", build_production_surge_day_chip_bbcode(province)],
+		["industry_surge_day", build_industry_surge_day_chip_bbcode(province)],
+		["naval_campaign_day", build_naval_campaign_day_chip_bbcode(province)],
+		["joint_campaign_day", build_joint_campaign_day_chip_bbcode(province)],
+		["fog_air_crisis_day", build_fog_air_crisis_day_chip_bbcode(province)],
+		["weather_crisis_day", build_weather_crisis_day_chip_bbcode(province)],
+		["agent_response_day", build_agent_response_day_chip_bbcode(province)],
+		["agent_campaign_day", build_agent_campaign_day_chip_bbcode(province)],
+		["combat_ops_day", build_combat_ops_day_chip_bbcode(province)],
+		["combat_campaign_day", build_combat_campaign_day_chip_bbcode(province)],
+		["fleet_redeploy_day", build_fleet_redeploy_day_chip_bbcode(province)],
+		["fleet_campaign_day", build_fleet_campaign_day_chip_bbcode(province)],
+		["naval_skim", build_naval_campaign_skim_chip_bbcode(province)],
+		["hh_player_path", build_hh_player_path_chip_bbcode(province)],
+		["war_cabinet", build_war_cabinet_chip_bbcode()],
+		["campaign_strip", build_campaign_strip_chip_bbcode(province)],
+		["convoy_pkg", build_convoy_package_chip_bbcode(province)],
+		["theater_ready", build_theater_readiness_chip_bbcode(province)],
+		["multi_phase_combat_day", build_multi_phase_combat_day_chip_bbcode(province)],
+		["combat_air_naval_day", build_combat_air_naval_day_chip_bbcode(province)],
+		["agent_auto_day", build_agent_auto_day_chip_bbcode(province)],
+		["focus_pick_day", build_focus_pick_day_chip_bbcode(province)],
+		["production_priority_day", build_production_priority_day_chip_bbcode(province)],
+		["convoy_escort_day", build_convoy_escort_day_chip_bbcode(province)],
+		["next_day_feedback_day", build_next_day_feedback_day_chip_bbcode(province)],
+		["map_effect_day", build_map_effect_day_chip_bbcode(province)],
+		["theater_brief_day", build_theater_brief_day_chip_bbcode(province)],
+		["campaign_decision_day", build_campaign_decision_day_chip_bbcode(province)],
+		["order_panel_ux_day", build_order_panel_ux_day_chip_bbcode(province)],
+		["multi_phase_combat_ui_day", build_multi_phase_combat_ui_day_chip_bbcode(province)],
+		["fleet_ai_ops_day", build_fleet_ai_ops_day_chip_bbcode(province)],
+		["hh_agenda_package_day", build_hh_agenda_package_day_chip_bbcode(province)],
+		["agent_campaign_depth_day", build_agent_campaign_depth_day_chip_bbcode(province)],
+		["industry_economy_day", build_industry_economy_day_chip_bbcode(province)],
+		["save_slot_browser_day", build_save_slot_browser_day_chip_bbcode(province)],
+		["basing_logistics_day", build_basing_logistics_day_chip_bbcode(province)],
+		["assault_follow_on_day", build_assault_follow_on_day_chip_bbcode(province)],
+		["joint_ops_loop_day", build_joint_ops_loop_day_chip_bbcode(province)],
+		["war_cabinet_day", build_war_cabinet_day_chip_bbcode(province)],
+		["supply_campaign_day", build_supply_campaign_day_chip_bbcode(province)],
+		["force_supply_day", build_force_supply_day_chip_bbcode(province)],
+		["counter_ops_day", build_counter_ops_day_chip_bbcode(province)],
+		["multi_province_live_day", build_multi_province_live_day_chip_bbcode(province)],
+		["order_queue_day", build_order_queue_day_chip_bbcode(province)],
+		["agent_ai_board_day", build_agent_ai_board_day_chip_bbcode(province)],
+		["fleet_order_day", build_fleet_order_day_chip_bbcode(province)],
+		["fleet_theater_posture_day", build_fleet_theater_posture_day_chip_bbcode(province)],
+		["campaign_risk_day", build_campaign_risk_day_chip_bbcode(province)],
+		["sealane_health_day", build_sealane_health_day_chip_bbcode(province)],
+		["convoy_package_day", build_convoy_package_day_chip_bbcode(province)],
+		["theater_campaign_day", build_theater_campaign_day_chip_bbcode(province)],
+		["production_risk_day", build_production_risk_day_chip_bbcode(province)],
+		["leader_campaign_day", build_leader_campaign_day_chip_bbcode(province)],
+		["basing_repair_day", build_basing_repair_day_chip_bbcode(province)],
+		["focus_order_day", build_focus_order_day_chip_bbcode(province)],
+		["naval_order_day", build_naval_order_day_chip_bbcode(province)],
+		["air_land_order_day", build_air_land_order_day_chip_bbcode(province)],
+		["theater_order_day", build_theater_order_day_chip_bbcode(province)],
+		["factory_risk_day", build_factory_risk_day_chip_bbcode(province)],
+		["trade_chain_day", build_trade_chain_day_chip_bbcode(province)],
+		["war_path_urgency_day", build_war_path_urgency_day_chip_bbcode(province)],
+		["combat_morale_day", build_combat_morale_day_chip_bbcode(province)],
+		["choke_sea_day", build_choke_sea_day_chip_bbcode(province)],
+		["redeploy_route_day", build_redeploy_route_day_chip_bbcode(province)],
+		["theater_report_day", build_theater_report_day_chip_bbcode(province)],
+		["best_station_day", build_best_station_day_chip_bbcode(province)],
+		["best_assault_day", build_best_assault_day_chip_bbcode(province)],
+		["theater_mutation_day", build_theater_mutation_day_chip_bbcode(province)],
+		["air_ops_sortie_day", build_air_ops_sortie_day_chip_bbcode(province)],
+		["agent_escalation_day", build_agent_escalation_day_chip_bbcode(province)],
+		["agent_coverage_day", build_agent_coverage_day_chip_bbcode(province)],
+		["combat_order_day", build_combat_order_day_chip_bbcode(province)],
+		["production_order_day", build_production_order_day_chip_bbcode(province)],
+		["supply_order_day", build_supply_order_day_chip_bbcode(province)],
+		["combat_phase_strip_day", build_combat_phase_strip_day_chip_bbcode(province)],
+		["fleet_patrol_day", build_fleet_patrol_day_chip_bbcode(province)],
+		["execute_one_day", build_execute_one_day_chip_bbcode(province)],
+		["daily_fleet_plan_day", build_daily_fleet_plan_day_chip_bbcode(province)],
+		["daily_combat_plan_day", build_daily_combat_plan_day_chip_bbcode(province)],
+		["daily_prod_plan_day", build_daily_prod_plan_day_chip_bbcode(province)],
+		["daily_agent_plan_day", build_daily_agent_plan_day_chip_bbcode(province)],
+		["daily_supply_plan_day", build_daily_supply_plan_day_chip_bbcode(province)],
+		["agent_dispatch_mutation_day", build_agent_dispatch_mutation_day_chip_bbcode(province)],
+		["fleet_station_mutation_day", build_fleet_station_mutation_day_chip_bbcode(province)],
+		["assault_stage_mutation_day", build_assault_stage_mutation_day_chip_bbcode(province)],
+		["naval_task_mutation_day", build_naval_task_mutation_day_chip_bbcode(province)],
+		["air_land_stage_mutation_day", build_air_land_stage_mutation_day_chip_bbcode(province)],
+		["hh_monthly_day", build_hh_monthly_day_chip_bbcode(province)],
+		["leader_weather_day", build_leader_weather_day_chip_bbcode(province)],
+		["oob_factory_day", build_oob_factory_day_chip_bbcode(province)],
+		["move_ops_day", build_move_ops_day_chip_bbcode(province)],
+		["fleet_wx_mission_day", build_fleet_wx_mission_day_chip_bbcode(province)],
+		["player_surface_day", build_player_surface_day_chip_bbcode(province)],
+		["multi_province_plan_day", build_multi_province_plan_day_chip_bbcode(province)],
+		["theater_prod_auto_day", build_theater_prod_auto_day_chip_bbcode(province)],
+		["focus_mutation_day", build_focus_mutation_day_chip_bbcode(province)],
+		["mutation_feedback_day", build_mutation_feedback_day_chip_bbcode(province)],
+		["hh_quarterly_day", build_hh_quarterly_day_chip_bbcode(province)],
+		["depot_weather_day", build_depot_weather_day_chip_bbcode(province)],
+		["fleet_patrol_strip_day", build_fleet_patrol_strip_day_chip_bbcode(province)],
+		["close_loop_day", build_close_loop_day_chip_bbcode(province)],
+		["agent_missions_day", build_agent_missions_day_chip_bbcode(province)],
+		["supply_route_mutation_day", build_supply_route_mutation_day_chip_bbcode(province)],
+		["basing_fuel_day", build_basing_fuel_day_chip_bbcode(province)],
+		["ops_dashboard_day", build_ops_dashboard_day_chip_bbcode(province)],
+		["daily_theater_tick_day", build_daily_theater_tick_day_chip_bbcode(province)],
+		["command_log_day", build_command_log_day_chip_bbcode(province)],
+		["integrity_gate_day", build_integrity_gate_day_chip_bbcode(province)],
+		["result_feedback_day", build_result_feedback_day_chip_bbcode(province)],
+		["day_budget_day", build_day_budget_day_chip_bbcode(province)],
+		["hh_auto_plan_day", build_hh_auto_plan_day_chip_bbcode(province)],
+		["append_log_day", build_append_log_day_chip_bbcode(province)],
+		["log_strip_day", build_log_strip_day_chip_bbcode(province)],
+		["assault_readiness_day", build_assault_readiness_day_chip_bbcode(province)],
+		["coherence_delta_day", build_coherence_delta_day_chip_bbcode(province)],
+		["agent_order_day", build_agent_order_day_chip_bbcode(province)],
+		["execution_gate_day", build_execution_gate_day_chip_bbcode(province)],
+		["cohesion_gate_day", build_cohesion_gate_day_chip_bbcode(province)],
+		["command_gate_day", build_command_gate_day_chip_bbcode(province)],
+		["execute_order_day", build_execute_order_day_chip_bbcode(province)],
+		["air_sortie_ready_day", build_air_sortie_ready_day_chip_bbcode(province)],
+		["weather_combat_brief_day", build_weather_combat_brief_day_chip_bbcode(province)],
+		["day_audit_day", build_day_audit_day_chip_bbcode(province)],
+		["map_visible_day", build_map_visible_day_chip_bbcode(province)],
+		["assault_card_day", build_assault_card_day_chip_bbcode(province)],
+		["save_slot_list_day", build_save_slot_list_day_chip_bbcode(province)],
+		["multi_phase_estimate_day", build_multi_phase_estimate_day_chip_bbcode(province)],
+		["campaign_strip_day", build_campaign_strip_day_chip_bbcode(province)],
+		["mutation_result_day", build_mutation_result_day_chip_bbcode(province)],
+		["mutation_strip_day", build_mutation_strip_day_chip_bbcode(province)],
+		["close_mutation_day", build_close_mutation_day_chip_bbcode(province)],
+		["mutation_gate_day", build_mutation_gate_day_chip_bbcode(province)],
+		["agenda_pick_day", build_agenda_pick_day_chip_bbcode(province)],
+		["agenda_actions_day", build_agenda_actions_day_chip_bbcode(province)],
+		["hh_commit_order_day", build_hh_commit_order_day_chip_bbcode(province)],
+		["theater_hh_commit_day", build_theater_hh_commit_day_chip_bbcode(province)],
+		["hh_counterplay_day", build_hh_counterplay_day_chip_bbcode(province)],
+		["task_group_day", build_task_group_day_chip_bbcode(province)],
+		["naval_basing_day", build_naval_basing_day_chip_bbcode(province)],
+		["naval_multi_phase_day", build_naval_multi_phase_day_chip_bbcode(province)],
+		["coastal_fog_gate_day", build_coastal_fog_gate_day_chip_bbcode(province)],
+		["phase_ribbon_day", build_phase_ribbon_day_chip_bbcode(province)],
+		["assault_rank_day", build_assault_rank_day_chip_bbcode(province)],
+		["joint_timeline_day", build_joint_timeline_day_chip_bbcode(province)],
+		["daylight_combat_day", build_daylight_combat_day_chip_bbcode(province)],
+		["production_auto_day", build_production_auto_day_chip_bbcode(province)],
+		["production_risk_alert_day", build_production_risk_alert_day_chip_bbcode(province)],
+		["day_results_flair_day", build_day_results_flair_day_chip_bbcode(province)],
+		["best_assault_live_day", build_best_assault_live_day_chip_bbcode(province)],
+		["best_station_live_day", build_best_station_live_day_chip_bbcode(province)],
+		["execute_one_live_day", build_execute_one_live_day_chip_bbcode(province)],
+		["basing_fuel_loop_day", build_basing_fuel_loop_day_chip_bbcode(province)],
+		["fleet_wx_package_day", build_fleet_wx_package_day_chip_bbcode(province)],
+		["convoy_wx_window_day", build_convoy_wx_window_day_chip_bbcode(province)],
+		["focus_wx_score_day", build_focus_wx_score_day_chip_bbcode(province)],
+		["morale_wx_day", build_morale_wx_day_chip_bbcode(province)],
+		["campaign_risk_live_day", build_campaign_risk_live_day_chip_bbcode(province)],
+		["depot_wx_live_day", build_depot_wx_live_day_chip_bbcode(province)],
+		["daily_fleet_auto_day", build_daily_fleet_auto_day_chip_bbcode(province)],
+		["daily_combat_auto_day", build_daily_combat_auto_day_chip_bbcode(province)],
+		["daily_agent_auto_day", build_daily_agent_auto_day_chip_bbcode(province)],
+		["daily_supply_auto_day", build_daily_supply_auto_day_chip_bbcode(province)],
+		["basing_signals_day", build_basing_signals_day_chip_bbcode(province)],
+		["basing_rates_day", build_basing_rates_day_chip_bbcode(province)],
+		["combat_wx_mult_day", build_combat_wx_mult_day_chip_bbcode(province)],
+		["sea_zone_trade_day", build_sea_zone_trade_day_chip_bbcode(province)],
+		["hh_secondary_trail_day", build_hh_secondary_trail_day_chip_bbcode(province)],
+		["agent_campaign_live_day", build_agent_campaign_live_day_chip_bbcode(province)],
+		["live_mut_board_day", build_live_mut_board_day_chip_bbcode(province)],
+		["feedback_chain_day", build_feedback_chain_day_chip_bbcode(province)],
+		["mut_close_stack_day", build_mut_close_stack_day_chip_bbcode(province)],
+		["dual_domain_mutate_day", build_dual_domain_mutate_day_chip_bbcode(province)],
+		["assault_mut_fb_day", build_assault_mut_fb_day_chip_bbcode(province)],
+		["agent_mut_log_day", build_agent_mut_log_day_chip_bbcode(province)],
+		["supply_mut_fb_day", build_supply_mut_fb_day_chip_bbcode(province)],
+		["combat_surface_stack_day", build_combat_surface_stack_day_chip_bbcode(province)],
+		["phase_timeline_stack_day", build_phase_timeline_stack_day_chip_bbcode(province)],
+		["assault_rank_card_day", build_assault_rank_card_day_chip_bbcode(province)],
+		["joint_naval_land_day", build_joint_naval_land_day_chip_bbcode(province)],
+		["multi_front_surface_day", build_multi_front_surface_day_chip_bbcode(province)],
+		["combat_depth_strip_day", build_combat_depth_strip_day_chip_bbcode(province)],
+		["phase_estimate_ribbon_day", build_phase_estimate_ribbon_day_chip_bbcode(province)],
+		["fleet_path_stack_day", build_fleet_path_stack_day_chip_bbcode(province)],
+		["basing_mission_day", build_basing_mission_day_chip_bbcode(province)],
+		["hh_path_stack_day", build_hh_path_stack_day_chip_bbcode(province)],
+		["hh_trail_counter_day", build_hh_trail_counter_day_chip_bbcode(province)],
+		["agent_mission_path_day", build_agent_mission_path_day_chip_bbcode(province)],
+		["incomplete_loop_close_day", build_incomplete_loop_close_day_chip_bbcode(province)],
+		["prod_mut_apply_day", build_prod_mut_apply_day_chip_bbcode(province)],
+		["supply_mut_apply_day", build_supply_mut_apply_day_chip_bbcode(province)],
+		["execute_prod_live_day", build_execute_prod_live_day_chip_bbcode(province)],
+		["day_budget_apply_day", build_day_budget_apply_day_chip_bbcode(province)],
+		["apply_audit_live_day", build_apply_audit_live_day_chip_bbcode(province)],
+		["live_apply_results_day", build_live_apply_results_day_chip_bbcode(province)],
+		["mutation_gate_apply_day", build_mutation_gate_apply_day_chip_bbcode(province)],
+		["daily_prod_auto_live_day", build_daily_prod_auto_live_day_chip_bbcode(province)],
+		["theater_prod_live_day", build_theater_prod_live_day_chip_bbcode(province)],
+		["prod_campaign_risk_day", build_prod_campaign_risk_day_chip_bbcode(province)],
+		["prod_wx_stack_day", build_prod_wx_stack_day_chip_bbcode(province)],
+		["factory_risk_live_day", build_factory_risk_live_day_chip_bbcode(province)],
+		["depot_prod_stack_day", build_depot_prod_stack_day_chip_bbcode(province)],
+		["industry_close_loop_day", build_industry_close_loop_day_chip_bbcode(province)],
+		["save_slot_surface_day", build_save_slot_surface_day_chip_bbcode(province)],
+		["save_browser_live_day", build_save_browser_live_day_chip_bbcode(province)],
+		["campaign_continuity_day", build_campaign_continuity_day_chip_bbcode(province)],
+		["ops_dash_continuity_day", build_ops_dash_continuity_day_chip_bbcode(province)],
+		["execution_gate_cont_day", build_execution_gate_cont_day_chip_bbcode(province)],
+		["industry_save_close_day", build_industry_save_close_day_chip_bbcode(province)],
+		["fleet_ai_task_day", build_fleet_ai_task_day_chip_bbcode(province)],
+		["fleet_wx_ops_day", build_fleet_wx_ops_day_chip_bbcode(province)],
+		["basing_fuel_ops_day", build_basing_fuel_ops_day_chip_bbcode(province)],
+		["naval_phase_ops_day", build_naval_phase_ops_day_chip_bbcode(province)],
+		["coastal_fog_ops_day", build_coastal_fog_ops_day_chip_bbcode(province)],
+		["fleet_station_mut_day", build_fleet_station_mut_day_chip_bbcode(province)],
+		["naval_task_mut_day", build_naval_task_mut_day_chip_bbcode(province)],
+		["hh_agenda_pick_day", build_hh_agenda_pick_day_chip_bbcode(province)],
+		["hh_agenda_actions_day", build_hh_agenda_actions_day_chip_bbcode(province)],
+		["hh_order_path_day", build_hh_order_path_day_chip_bbcode(province)],
+		["theater_hh_path_day", build_theater_hh_path_day_chip_bbcode(province)],
+		["hh_trail_ops_day", build_hh_trail_ops_day_chip_bbcode(province)],
+		["agent_mission_ops_day", build_agent_mission_ops_day_chip_bbcode(province)],
+		["agent_campaign_ops_day", build_agent_campaign_ops_day_chip_bbcode(province)],
+		["combat_inspect_stack_day", build_combat_inspect_stack_day_chip_bbcode(province)],
+		["phase_ribbon_inspect_day", build_phase_ribbon_inspect_day_chip_bbcode(province)],
+		["joint_timeline_inspect_day", build_joint_timeline_inspect_day_chip_bbcode(province)],
+		["assault_rank_inspect_day", build_assault_rank_inspect_day_chip_bbcode(province)],
+		["combat_campaign_ops_day", build_combat_campaign_ops_day_chip_bbcode(province)],
+		["fleet_hh_combat_close_day", build_fleet_hh_combat_close_day_chip_bbcode(province)],
+		["depot_logistics_day", build_depot_logistics_day_chip_bbcode(province)],
+		["supply_route_ops_day", build_supply_route_ops_day_chip_bbcode(province)],
+		["move_path_ops_day", build_move_path_ops_day_chip_bbcode(province)],
+		["multi_province_ops_day", build_multi_province_ops_day_chip_bbcode(province)],
+		["theater_auto_tick_day", build_theater_auto_tick_day_chip_bbcode(province)],
+		["daily_supply_ops_day", build_daily_supply_ops_day_chip_bbcode(province)],
+		["logistics_theater_close_day", build_logistics_theater_close_day_chip_bbcode(province)],
+		["force_readiness_ops_day", build_force_readiness_ops_day_chip_bbcode(province)],
+		["oob_factory_ops_day", build_oob_factory_ops_day_chip_bbcode(province)],
+		["medium_equip_ops_day", build_medium_equip_ops_day_chip_bbcode(province)],
+		["naval_skim_ops_day", build_naval_skim_ops_day_chip_bbcode(province)],
+		["basing_logistics_ops_day", build_basing_logistics_ops_day_chip_bbcode(province)],
+		["production_force_ops_day", build_production_force_ops_day_chip_bbcode(province)],
+		["force_oob_close_day", build_force_oob_close_day_chip_bbcode(province)],
+		["player_surface_ops_day", build_player_surface_ops_day_chip_bbcode(province)],
+		["order_panel_ops_day", build_order_panel_ops_day_chip_bbcode(province)],
+		["panel_sections_ops_day", build_panel_sections_ops_day_chip_bbcode(province)],
+		["tooltip_flair_ops_day", build_tooltip_flair_ops_day_chip_bbcode(province)],
+		["apply_audit_ops_day", build_apply_audit_ops_day_chip_bbcode(province)],
+		["logistics_force_panel_close_day", build_logistics_force_panel_close_day_chip_bbcode(province)],
+		["combat_wx_ops_day", build_combat_wx_ops_day_chip_bbcode(province)],
+		["prod_wx_ops_day", build_prod_wx_ops_day_chip_bbcode(province)],
+		["air_sortie_wx_day", build_air_sortie_wx_day_chip_bbcode(province)],
+		["morale_wx_ops_day", build_morale_wx_ops_day_chip_bbcode(province)],
+		["convoy_wx_ops_day", build_convoy_wx_ops_day_chip_bbcode(province)],
+		["daylight_wx_ops_day", build_daylight_wx_ops_day_chip_bbcode(province)],
+		["weather_ops_close_day", build_weather_ops_close_day_chip_bbcode(province)],
+		["war_economy_ops_day", build_war_economy_ops_day_chip_bbcode(province)],
+		["prod_campaign_ops_day", build_prod_campaign_ops_day_chip_bbcode(province)],
+		["focus_wx_ops_day", build_focus_wx_ops_day_chip_bbcode(province)],
+		["focus_mut_ops_day", build_focus_mut_ops_day_chip_bbcode(province)],
+		["supply_economy_ops_day", build_supply_economy_ops_day_chip_bbcode(province)],
+		["depot_economy_ops_day", build_depot_economy_ops_day_chip_bbcode(province)],
+		["war_economy_close_day", build_war_economy_close_day_chip_bbcode(province)],
+		["intel_counter_ops_day", build_intel_counter_ops_day_chip_bbcode(province)],
+		["agent_intel_ops_day", build_agent_intel_ops_day_chip_bbcode(province)],
+		["hh_counter_ops_day", build_hh_counter_ops_day_chip_bbcode(province)],
+		["map_effect_ops_day", build_map_effect_ops_day_chip_bbcode(province)],
+		["coherence_intel_day", build_coherence_intel_day_chip_bbcode(province)],
+		["weather_economy_intel_close_day", build_weather_economy_intel_close_day_chip_bbcode(province)],
+		["multi_province_campaign_day", build_multi_province_campaign_day_chip_bbcode(province)],
+		["theater_auto_campaign_day", build_theater_auto_campaign_day_chip_bbcode(province)],
+		["daily_command_ops_day", build_daily_command_ops_day_chip_bbcode(province)],
+		["theater_readiness_ops_day", build_theater_readiness_ops_day_chip_bbcode(province)],
+		["move_path_campaign_day", build_move_path_campaign_day_chip_bbcode(province)],
+		["theater_order_board_day", build_theater_order_board_day_chip_bbcode(province)],
+		["theater_campaign_close_day", build_theater_campaign_close_day_chip_bbcode(province)],
+		["basing_fleet_sustain_day", build_basing_fleet_sustain_day_chip_bbcode(province)],
+		["fleet_wx_sustain_day", build_fleet_wx_sustain_day_chip_bbcode(province)],
+		["convoy_sustain_ops_day", build_convoy_sustain_ops_day_chip_bbcode(province)],
+		["sealane_joint_ops_day", build_sealane_joint_ops_day_chip_bbcode(province)],
+		["naval_order_ops_day", build_naval_order_ops_day_chip_bbcode(province)],
+		["fleet_station_sustain_day", build_fleet_station_sustain_day_chip_bbcode(province)],
+		["naval_sealane_close_day", build_naval_sealane_close_day_chip_bbcode(province)],
+		["player_surface_session_day", build_player_surface_session_day_chip_bbcode(province)],
+		["order_panel_session_day", build_order_panel_session_day_chip_bbcode(province)],
+		["mutation_feedback_ops_day", build_mutation_feedback_ops_day_chip_bbcode(province)],
+		["apply_audit_session_day", build_apply_audit_session_day_chip_bbcode(province)],
+		["decision_strip_ops_day", build_decision_strip_ops_day_chip_bbcode(province)],
+		["theater_naval_session_close_day", build_theater_naval_session_close_day_chip_bbcode(province)],
+		["combat_phase_ops_day", build_combat_phase_ops_day_chip_bbcode(province)],
+		["assault_ready_ops_day", build_assault_ready_ops_day_chip_bbcode(province)],
+		["multi_phase_est_ops_day", build_multi_phase_est_ops_day_chip_bbcode(province)],
+		["combat_order_ops_day", build_combat_order_ops_day_chip_bbcode(province)],
+		["assault_rank_ops_day", build_assault_rank_ops_day_chip_bbcode(province)],
+		["phase_ribbon_ops_day", build_phase_ribbon_ops_day_chip_bbcode(province)],
+		["combat_phase_close_day", build_combat_phase_close_day_chip_bbcode(province)],
+		["agent_mission_campaign_day", build_agent_mission_campaign_day_chip_bbcode(province)],
+		["agent_dispatch_ops_day", build_agent_dispatch_ops_day_chip_bbcode(province)],
+		["hh_commit_campaign_day", build_hh_commit_campaign_day_chip_bbcode(province)],
+		["counterplay_campaign_day", build_counterplay_campaign_day_chip_bbcode(province)],
+		["hh_agenda_ops_day", build_hh_agenda_ops_day_chip_bbcode(province)],
+		["agent_hh_joint_day", build_agent_hh_joint_day_chip_bbcode(province)],
+		["agent_hh_close_day", build_agent_hh_close_day_chip_bbcode(province)],
+		["joint_theater_combat_day", build_joint_theater_combat_day_chip_bbcode(province)],
+		["joint_naval_combat_day", build_joint_naval_combat_day_chip_bbcode(province)],
+		["focus_joint_ops_day", build_focus_joint_ops_day_chip_bbcode(province)],
+		["joint_command_ops_day", build_joint_command_ops_day_chip_bbcode(province)],
+		["multi_domain_strip_day", build_multi_domain_strip_day_chip_bbcode(province)],
+		["combat_agent_joint_close_day", build_combat_agent_joint_close_day_chip_bbcode(province)],
+		["prod_factory_risk_ops_day", build_prod_factory_risk_ops_day_chip_bbcode(province)],
+		["medium_equip_horizon_ops_day", build_medium_equip_horizon_ops_day_chip_bbcode(province)],
+		["production_priority_ops_day", build_production_priority_ops_day_chip_bbcode(province)],
+		["oob_equip_continuity_day", build_oob_equip_continuity_day_chip_bbcode(province)],
+		["factory_line_ops_day", build_factory_line_ops_day_chip_bbcode(province)],
+		["stockpile_growth_ops_day", build_stockpile_growth_ops_day_chip_bbcode(province)],
+		["production_oob_close_day", build_production_oob_close_day_chip_bbcode(province)],
+		["air_sortie_front_ops_day", build_air_sortie_front_ops_day_chip_bbcode(province)],
+		["multi_front_rank_ops_day", build_multi_front_rank_ops_day_chip_bbcode(province)],
+		["air_land_joint_ops_day", build_air_land_joint_ops_day_chip_bbcode(province)],
+		["assault_front_ops_day", build_assault_front_ops_day_chip_bbcode(province)],
+		["air_forecast_ops_day", build_air_forecast_ops_day_chip_bbcode(province)],
+		["multi_front_supply_ops_day", build_multi_front_supply_ops_day_chip_bbcode(province)],
+		["air_front_close_day", build_air_front_close_day_chip_bbcode(province)],
+		["focus_path_ops_day", build_focus_path_ops_day_chip_bbcode(province)],
+		["war_cabinet_ops_day", build_war_cabinet_ops_day_chip_bbcode(province)],
+		["strategic_strip_ops_day", build_strategic_strip_ops_day_chip_bbcode(province)],
+		["focus_priority_ops_day", build_focus_priority_ops_day_chip_bbcode(province)],
+		["strategic_continuity_ops_day", build_strategic_continuity_ops_day_chip_bbcode(province)],
+		["prod_air_focus_close_day", build_prod_air_focus_close_day_chip_bbcode(province)],
+		["save_slot_integrity_ops_day", build_save_slot_integrity_ops_day_chip_bbcode(province)],
+		["autosave_session_ops_day", build_autosave_session_ops_day_chip_bbcode(province)],
+		["campaign_session_ops_day", build_campaign_session_ops_day_chip_bbcode(province)],
+		["save_resume_ops_day", build_save_resume_ops_day_chip_bbcode(province)],
+		["session_checkpoint_ops_day", build_session_checkpoint_ops_day_chip_bbcode(province)],
+		["save_audit_ops_day", build_save_audit_ops_day_chip_bbcode(province)],
+		["save_session_close_day", build_save_session_close_day_chip_bbcode(province)],
+		["leader_assign_ops_day", build_leader_assign_ops_day_chip_bbcode(province)],
+		["formation_ready_ops_day", build_formation_ready_ops_day_chip_bbcode(province)],
+		["oob_assign_ops_day", build_oob_assign_ops_day_chip_bbcode(province)],
+		["leader_command_ops_day", build_leader_command_ops_day_chip_bbcode(province)],
+		["formation_station_ops_day", build_formation_station_ops_day_chip_bbcode(province)],
+		["leader_formation_joint_day", build_leader_formation_joint_day_chip_bbcode(province)],
+		["leader_formation_close_day", build_leader_formation_close_day_chip_bbcode(province)],
+		["trade_chain_ops_day", build_trade_chain_ops_day_chip_bbcode(province)],
+		["convoy_escort_ops_day", build_convoy_escort_ops_day_chip_bbcode(province)],
+		["sealane_economy_ops_day", build_sealane_economy_ops_day_chip_bbcode(province)],
+		["trade_route_ops_day", build_trade_route_ops_day_chip_bbcode(province)],
+		["convoy_trade_joint_day", build_convoy_trade_joint_day_chip_bbcode(province)],
+		["save_leader_trade_close_day", build_save_leader_trade_close_day_chip_bbcode(province)],
+		["panel_surface_ops_day", build_panel_surface_ops_day_chip_bbcode(province)],
+		["tooltip_chip_ops_day", build_tooltip_chip_ops_day_chip_bbcode(province)],
+		["insight_budget_ops_day", build_insight_budget_ops_day_chip_bbcode(province)],
+		["order_surface_ops_day", build_order_surface_ops_day_chip_bbcode(province)],
+		["product_chip_ops_day", build_product_chip_ops_day_chip_bbcode(province)],
+		["surface_refresh_ops_day", build_surface_refresh_ops_day_chip_bbcode(province)],
+		["inspector_surface_close_day", build_inspector_surface_close_day_chip_bbcode(province)],
+		["infra_invest_ops_day", build_infra_invest_ops_day_chip_bbcode(province)],
+		["special_site_ops_day", build_special_site_ops_day_chip_bbcode(province)],
+		["construction_ops_day", build_construction_ops_day_chip_bbcode(province)],
+		["infra_project_ops_day", build_infra_project_ops_day_chip_bbcode(province)],
+		["investment_status_ops_day", build_investment_status_ops_day_chip_bbcode(province)],
+		["infra_site_joint_day", build_infra_site_joint_day_chip_bbcode(province)],
+		["infra_invest_close_day", build_infra_invest_close_day_chip_bbcode(province)],
+		["daily_auto_ops_day", build_daily_auto_ops_day_chip_bbcode(province)],
+		["theater_tick_ops_day", build_theater_tick_ops_day_chip_bbcode(province)],
+		["multi_domain_auto_ops_day", build_multi_domain_auto_ops_day_chip_bbcode(province)],
+		["daily_apply_ops_day", build_daily_apply_ops_day_chip_bbcode(province)],
+		["theater_auto_joint_day", build_theater_auto_joint_day_chip_bbcode(province)],
+		["inspector_infra_auto_close_day", build_inspector_infra_auto_close_day_chip_bbcode(province)],
+		["follow_on_assault_ops_day", build_follow_on_assault_ops_day_chip_bbcode(province)],
+		["reinforced_combat_ops_day", build_reinforced_combat_ops_day_chip_bbcode(province)],
+		["war_path_urgency_ops_day", build_war_path_urgency_ops_day_chip_bbcode(province)],
+		["assault_follow_ops_day", build_assault_follow_ops_day_chip_bbcode(province)],
+		["reinforce_step_ops_day", build_reinforce_step_ops_day_chip_bbcode(province)],
+		["combat_urgency_ops_day", build_combat_urgency_ops_day_chip_bbcode(province)],
+		["follow_reinforce_close_day", build_follow_reinforce_close_day_chip_bbcode(province)],
+		["choke_sea_wx_ops_day", build_choke_sea_wx_ops_day_chip_bbcode(province)],
+		["sea_zone_mod_ops_day", build_sea_zone_mod_ops_day_chip_bbcode(province)],
+		["basing_choke_ops_day", build_basing_choke_ops_day_chip_bbcode(province)],
+		["choke_control_ops_day", build_choke_control_ops_day_chip_bbcode(province)],
+		["sea_zone_control_ops_day", build_sea_zone_control_ops_day_chip_bbcode(province)],
+		["choke_basing_joint_day", build_choke_basing_joint_day_chip_bbcode(province)],
+		["choke_sea_close_day", build_choke_sea_close_day_chip_bbcode(province)],
+		["agent_escalation_ops_day", build_agent_escalation_ops_day_chip_bbcode(province)],
+		["coverage_ops_day", build_coverage_ops_day_chip_bbcode(province)],
+		["counter_ops_board_ops_day", build_counter_ops_board_ops_day_chip_bbcode(province)],
+		["escalation_ladder_ops_day", build_escalation_ladder_ops_day_chip_bbcode(province)],
+		["agent_coverage_joint_day", build_agent_coverage_joint_day_chip_bbcode(province)],
+		["assault_choke_agent_close_day", build_assault_choke_agent_close_day_chip_bbcode(province)],
+		["equip_horizon_depth_day", build_equip_horizon_depth_day_chip_bbcode(province)],
+		["stockpile_line_ops_day", build_stockpile_line_ops_day_chip_bbcode(province)],
+		["oob_line_continuity_day", build_oob_line_continuity_day_chip_bbcode(province)],
+		["factory_oob_depth_day", build_factory_oob_depth_day_chip_bbcode(province)],
+		["medium_horizon_plan_day", build_medium_horizon_plan_day_chip_bbcode(province)],
+		["equip_stockpile_joint_day", build_equip_stockpile_joint_day_chip_bbcode(province)],
+		["equip_oob_close_day", build_equip_oob_close_day_chip_bbcode(province)],
+		["fleet_multi_theater_ops_day", build_fleet_multi_theater_ops_day_chip_bbcode(province)],
+		["fleet_redeploy_ops_day", build_fleet_redeploy_ops_day_chip_bbcode(province)],
+		["task_group_posture_ops_day", build_task_group_posture_ops_day_chip_bbcode(province)],
+		["fleet_posture_ops_day", build_fleet_posture_ops_day_chip_bbcode(province)],
+		["redeploy_route_ops_day", build_redeploy_route_ops_day_chip_bbcode(province)],
+		["fleet_theater_joint_day", build_fleet_theater_joint_day_chip_bbcode(province)],
+		["fleet_redeploy_close_day", build_fleet_redeploy_close_day_chip_bbcode(province)],
+		["hh_monthly_ops_day", build_hh_monthly_ops_day_chip_bbcode(province)],
+		["hh_quarterly_ops_day", build_hh_quarterly_ops_day_chip_bbcode(province)],
+		["agenda_pulse_ops_day", build_agenda_pulse_ops_day_chip_bbcode(province)],
+		["trail_counterplay_ops_day", build_trail_counterplay_ops_day_chip_bbcode(province)],
+		["hh_agenda_depth_joint_day", build_hh_agenda_depth_joint_day_chip_bbcode(province)],
+		["oob_fleet_hh_close_day", build_oob_fleet_hh_close_day_chip_bbcode(province)],
+		["force_readiness_depth_day", build_force_readiness_depth_day_chip_bbcode(province)],
+		["multi_front_supply_depth_day", build_multi_front_supply_depth_day_chip_bbcode(province)],
+		["depot_route_ops_day", build_depot_route_ops_day_chip_bbcode(province)],
+		["force_posture_depth_day", build_force_posture_depth_day_chip_bbcode(province)],
+		["front_supply_rank_day", build_front_supply_rank_day_chip_bbcode(province)],
+		["force_supply_joint_day", build_force_supply_joint_day_chip_bbcode(province)],
+		["force_supply_close_day", build_force_supply_close_day_chip_bbcode(province)],
+		["weather_pressure_ops_day", build_weather_pressure_ops_day_chip_bbcode(province)],
+		["campaign_crisis_ops_day", build_campaign_crisis_ops_day_chip_bbcode(province)],
+		["prod_weather_crisis_day", build_prod_weather_crisis_day_chip_bbcode(province)],
+		["combat_weather_ops_day", build_combat_weather_ops_day_chip_bbcode(province)],
+		["weather_crisis_brief_day", build_weather_crisis_brief_day_chip_bbcode(province)],
+		["weather_campaign_joint_day", build_weather_campaign_joint_day_chip_bbcode(province)],
+		["weather_crisis_close_day", build_weather_crisis_close_day_chip_bbcode(province)],
+		["focus_war_path_ops_day", build_focus_war_path_ops_day_chip_bbcode(province)],
+		["strategic_strip_depth_day", build_strategic_strip_depth_day_chip_bbcode(province)],
+		["strategic_continuity_depth_day", build_strategic_continuity_depth_day_chip_bbcode(province)],
+		["war_cabinet_pulse_ops_day", build_war_cabinet_pulse_ops_day_chip_bbcode(province)],
+		["focus_continuity_joint_day", build_focus_continuity_joint_day_chip_bbcode(province)],
+		["force_weather_focus_close_day", build_force_weather_focus_close_day_chip_bbcode(province)],
+		["air_sortie_depth_day", build_air_sortie_depth_day_chip_bbcode(province)],
+		["air_land_joint_depth_day", build_air_land_joint_depth_day_chip_bbcode(province)],
+		["multi_domain_ops_day", build_multi_domain_ops_day_chip_bbcode(province)],
+		["air_front_readiness_day", build_air_front_readiness_day_chip_bbcode(province)],
+		["domain_joint_ops_day", build_domain_joint_ops_day_chip_bbcode(province)],
+		["air_land_campaign_day", build_air_land_campaign_day_chip_bbcode(province)],
+		["air_domain_close_day", build_air_domain_close_day_chip_bbcode(province)],
+		["convoy_escort_depth_day", build_convoy_escort_depth_day_chip_bbcode(province)],
+		["sealane_health_ops_day", build_sealane_health_ops_day_chip_bbcode(province)],
+		["trade_pressure_ops_day", build_trade_pressure_ops_day_chip_bbcode(province)],
+		["convoy_sealane_joint_day", build_convoy_sealane_joint_day_chip_bbcode(province)],
+		["sealane_logistics_ops_day", build_sealane_logistics_ops_day_chip_bbcode(province)],
+		["wartime_trade_ops_day", build_wartime_trade_ops_day_chip_bbcode(province)],
+		["convoy_sealane_close_day", build_convoy_sealane_close_day_chip_bbcode(province)],
+		["order_execute_depth_day", build_order_execute_depth_day_chip_bbcode(province)],
+		["map_effect_resolve_day", build_map_effect_resolve_day_chip_bbcode(province)],
+		["next_day_feedback_depth_day", build_next_day_feedback_depth_day_chip_bbcode(province)],
+		["order_effect_joint_day", build_order_effect_joint_day_chip_bbcode(province)],
+		["feedback_loop_ops_day", build_feedback_loop_ops_day_chip_bbcode(province)],
+		["air_convoy_order_close_day", build_air_convoy_order_close_day_chip_bbcode(province)],
+		["leader_assign_depth_day", build_leader_assign_depth_day_chip_bbcode(province)],
+		["formation_ready_depth_day", build_formation_ready_depth_day_chip_bbcode(province)],
+		["leader_weather_depth_day", build_leader_weather_depth_day_chip_bbcode(province)],
+		["formation_station_depth_day", build_formation_station_depth_day_chip_bbcode(province)],
+		["leader_formation_joint_depth_day", build_leader_formation_joint_depth_day_chip_bbcode(province)],
+		["oob_leader_ops_day", build_oob_leader_ops_day_chip_bbcode(province)],
+		["leader_formation_close_depth_day", build_leader_formation_close_depth_day_chip_bbcode(province)],
+		["intel_counter_depth_day", build_intel_counter_depth_day_chip_bbcode(province)],
+		["hh_counterplay_depth_day", build_hh_counterplay_depth_day_chip_bbcode(province)],
+		["agent_response_depth_day", build_agent_response_depth_day_chip_bbcode(province)],
+		["trail_intel_ops_day", build_trail_intel_ops_day_chip_bbcode(province)],
+		["counterintel_board_ops_day", build_counterintel_board_ops_day_chip_bbcode(province)],
+		["intel_response_joint_day", build_intel_response_joint_day_chip_bbcode(province)],
+		["intel_counter_close_day", build_intel_counter_close_day_chip_bbcode(province)],
+		["theater_daily_depth_day", build_theater_daily_depth_day_chip_bbcode(province)],
+		["multi_province_rank_depth_day", build_multi_province_rank_depth_day_chip_bbcode(province)],
+		["daily_auto_depth_day", build_daily_auto_depth_day_chip_bbcode(province)],
+		["theater_brief_ops_day", build_theater_brief_ops_day_chip_bbcode(province)],
+		["multi_province_command_day", build_multi_province_command_day_chip_bbcode(province)],
+		["leader_intel_theater_close_day", build_leader_intel_theater_close_day_chip_bbcode(province)],
+		["save_slot_depth_day", build_save_slot_depth_day_chip_bbcode(province)],
+		["autosave_session_depth_day", build_autosave_session_depth_day_chip_bbcode(province)],
+		["campaign_session_depth_day", build_campaign_session_depth_day_chip_bbcode(province)],
+		["save_resume_depth_day", build_save_resume_depth_day_chip_bbcode(province)],
+		["session_checkpoint_depth_day", build_session_checkpoint_depth_day_chip_bbcode(province)],
+		["save_audit_depth_day", build_save_audit_depth_day_chip_bbcode(province)],
+		["save_session_close_depth_day", build_save_session_close_depth_day_chip_bbcode(province)],
+		["factory_risk_surge_day", build_factory_risk_surge_day_chip_bbcode(province)],
+		["production_priority_depth_day", build_production_priority_depth_day_chip_bbcode(province)],
+		["stockpile_surge_ops_day", build_stockpile_surge_ops_day_chip_bbcode(province)],
+		["line_continuity_depth_day", build_line_continuity_depth_day_chip_bbcode(province)],
+		["industry_surge_joint_day", build_industry_surge_joint_day_chip_bbcode(province)],
+		["production_oob_depth_day", build_production_oob_depth_day_chip_bbcode(province)],
+		["production_surge_close_day", build_production_surge_close_day_chip_bbcode(province)],
+		["multi_phase_estimate_depth_day", build_multi_phase_estimate_depth_day_chip_bbcode(province)],
+		["multi_phase_combat_product", build_multi_phase_combat_product_chip_bbcode(province)],
+		["fleet_multi_day_autonomy_product", build_fleet_multi_day_autonomy_product_chip_bbcode(province)],
+		["save_browser_campaign_product", build_save_browser_campaign_product_chip_bbcode(province)],
+		["medium_tank_oob_product", build_medium_tank_oob_product_chip_bbcode(province)],
+		["hh_multi_month_agenda_product", build_hh_multi_month_agenda_product_chip_bbcode(province)],
+		["agent_campaign_product", build_agent_campaign_product_chip_bbcode(province)],
+		["inspector_decision_product", build_inspector_decision_product_chip_bbcode(province)],
+		["theater_command_product", build_theater_command_product_chip_bbcode(province)],
+		["diplomacy_peace_campaign_product", build_diplomacy_peace_campaign_product_chip_bbcode(province)],
+		["tech_research_campaign_product", build_tech_research_campaign_product_chip_bbcode(province)],
+		["diplomacy_board_advanced_day", build_diplomacy_board_advanced_day_chip_bbcode(province)],
+		["diplomacy_leverage_advanced_day", build_diplomacy_leverage_advanced_day_chip_bbcode(province)],
+		["diplomacy_settle_advanced_day", build_diplomacy_settle_advanced_day_chip_bbcode(province)],
+		["diplomacy_trade_pressure_day", build_diplomacy_trade_pressure_day_chip_bbcode(province)],
+		["diplomacy_agent_hh_joint_day", build_diplomacy_agent_hh_joint_day_chip_bbcode(province)],
+		["diplomacy_focus_peace_joint_day", build_diplomacy_focus_peace_joint_day_chip_bbcode(province)],
+		["diplomacy_peace_close_day", build_diplomacy_peace_close_day_chip_bbcode(province)],
+		["tech_catalog_advanced_day", build_tech_catalog_advanced_day_chip_bbcode(province)],
+		["tech_priority_advanced_day", build_tech_priority_advanced_day_chip_bbcode(province)],
+		["tech_field_advanced_day", build_tech_field_advanced_day_chip_bbcode(province)],
+		["tech_designer_joint_day", build_tech_designer_joint_day_chip_bbcode(province)],
+		["tech_oob_fielding_joint_day", build_tech_oob_fielding_joint_day_chip_bbcode(province)],
+		["tech_industry_focus_joint_day", build_tech_industry_focus_joint_day_chip_bbcode(province)],
+		["tech_research_close_day", build_tech_research_close_day_chip_bbcode(province)],
+		["diplomacy_tech_joint_day", build_diplomacy_tech_joint_day_chip_bbcode(province)],
+		["tech_ai_research_joint_day", build_tech_ai_research_joint_day_chip_bbcode(province)],
+		["diplomacy_naval_air_joint_day", build_diplomacy_naval_air_joint_day_chip_bbcode(province)],
+		["session_diplomacy_tech_joint_day", build_session_diplomacy_tech_joint_day_chip_bbcode(province)],
+		["multi_faction_diplo_tech_day", build_multi_faction_diplo_tech_day_chip_bbcode(province)],
+		["diplomacy_tech_campaign_close_day", build_diplomacy_tech_campaign_close_day_chip_bbcode(province)],
+		["logistics_supply_theater_product", build_logistics_supply_theater_product_chip_bbcode(province)],
+		["intelligence_network_product", build_intelligence_network_product_chip_bbcode(province)],
+		["world_class_campaign_command_product", build_world_class_campaign_command_product_chip_bbcode(province)],
+		["logistics_route_advanced_day", build_logistics_route_advanced_day_chip_bbcode(province)],
+		["logistics_sustain_advanced_day", build_logistics_sustain_advanced_day_chip_bbcode(province)],
+		["logistics_readiness_advanced_day", build_logistics_readiness_advanced_day_chip_bbcode(province)],
+		["logistics_naval_joint_day", build_logistics_naval_joint_day_chip_bbcode(province)],
+		["logistics_tech_industry_joint_day", build_logistics_tech_industry_joint_day_chip_bbcode(province)],
+		["logistics_supply_close_day", build_logistics_supply_close_day_chip_bbcode(province)],
+		["intel_coverage_advanced_day", build_intel_coverage_advanced_day_chip_bbcode(province)],
+		["intel_counterintel_advanced_day", build_intel_counterintel_advanced_day_chip_bbcode(province)],
+		["intel_counterplay_advanced_day", build_intel_counterplay_advanced_day_chip_bbcode(province)],
+		["intel_diplomacy_joint_day", build_intel_diplomacy_joint_day_chip_bbcode(province)],
+		["intel_session_joint_day", build_intel_session_joint_day_chip_bbcode(province)],
+		["intelligence_network_close_day", build_intelligence_network_close_day_chip_bbcode(province)],
+		["world_class_scan_advanced_day", build_world_class_scan_advanced_day_chip_bbcode(province)],
+		["world_class_rank_advanced_day", build_world_class_rank_advanced_day_chip_bbcode(province)],
+		["world_class_execute_advanced_day", build_world_class_execute_advanced_day_chip_bbcode(province)],
+		["world_class_logistics_intel_joint_day", build_world_class_logistics_intel_joint_day_chip_bbcode(province)],
+		["world_class_air_naval_joint_day", build_world_class_air_naval_joint_day_chip_bbcode(province)],
+		["world_class_session_ai_joint_day", build_world_class_session_ai_joint_day_chip_bbcode(province)],
+		["world_class_theater_command_joint_day", build_world_class_theater_command_joint_day_chip_bbcode(province)],
+		["world_class_campaign_close_day", build_world_class_campaign_close_day_chip_bbcode(province)],
+		["war_economy_mobilization_product", build_war_economy_mobilization_product_chip_bbcode(province)],
+		["weather_theater_ops_product", build_weather_theater_ops_product_chip_bbcode(province)],
+		["front_continuity_campaign_product", build_front_continuity_campaign_product_chip_bbcode(province)],
+		["war_economy_board_advanced_day", build_war_economy_board_advanced_day_chip_bbcode(province)],
+		["war_economy_allocate_advanced_day", build_war_economy_allocate_advanced_day_chip_bbcode(province)],
+		["war_economy_sustain_advanced_day", build_war_economy_sustain_advanced_day_chip_bbcode(province)],
+		["war_economy_logistics_joint_day", build_war_economy_logistics_joint_day_chip_bbcode(province)],
+		["war_economy_tech_joint_day", build_war_economy_tech_joint_day_chip_bbcode(province)],
+		["war_economy_mobilization_close_day", build_war_economy_mobilization_close_day_chip_bbcode(province)],
+		["weather_pressure_advanced_day", build_weather_pressure_advanced_day_chip_bbcode(province)],
+		["weather_gate_advanced_day", build_weather_gate_advanced_day_chip_bbcode(province)],
+		["weather_crisis_advanced_day", build_weather_crisis_advanced_day_chip_bbcode(province)],
+		["weather_front_joint_day", build_weather_front_joint_day_chip_bbcode(province)],
+		["weather_economy_joint_day", build_weather_economy_joint_day_chip_bbcode(province)],
+		["weather_theater_ops_close_day", build_weather_theater_ops_close_day_chip_bbcode(province)],
+		["front_combat_advanced_day", build_front_combat_advanced_day_chip_bbcode(province)],
+		["front_assault_advanced_day", build_front_assault_advanced_day_chip_bbcode(province)],
+		["front_sustain_advanced_day", build_front_sustain_advanced_day_chip_bbcode(province)],
+		["front_weather_joint_day", build_front_weather_joint_day_chip_bbcode(province)],
+		["front_economy_joint_day", build_front_economy_joint_day_chip_bbcode(province)],
+		["front_logistics_joint_day", build_front_logistics_joint_day_chip_bbcode(province)],
+		["front_theater_command_joint_day", build_front_theater_command_joint_day_chip_bbcode(province)],
+		["front_continuity_campaign_close_day", build_front_continuity_campaign_close_day_chip_bbcode(province)],
+		["occupation_control_product", build_occupation_control_product_chip_bbcode(province)],
+		["manpower_reinforcement_product", build_manpower_reinforcement_product_chip_bbcode(province)],
+		["leader_command_product", build_leader_command_product_chip_bbcode(province)],
+		["occupation_control_advanced_day", build_occupation_control_advanced_day_chip_bbcode(province)],
+		["occupation_garrison_advanced_day", build_occupation_garrison_advanced_day_chip_bbcode(province)],
+		["occupation_integrate_advanced_day", build_occupation_integrate_advanced_day_chip_bbcode(province)],
+		["occupation_front_joint_day", build_occupation_front_joint_day_chip_bbcode(province)],
+		["occupation_economy_joint_day", build_occupation_economy_joint_day_chip_bbcode(province)],
+		["occupation_control_close_day", build_occupation_control_close_day_chip_bbcode(province)],
+		["manpower_draft_advanced_day", build_manpower_draft_advanced_day_chip_bbcode(province)],
+		["manpower_reinforce_advanced_day", build_manpower_reinforce_advanced_day_chip_bbcode(province)],
+		["manpower_field_advanced_day", build_manpower_field_advanced_day_chip_bbcode(province)],
+		["manpower_front_joint_day", build_manpower_front_joint_day_chip_bbcode(province)],
+		["manpower_economy_joint_day", build_manpower_economy_joint_day_chip_bbcode(province)],
+		["manpower_reinforcement_close_day", build_manpower_reinforcement_close_day_chip_bbcode(province)],
+		["leader_assign_advanced_day", build_leader_assign_advanced_day_chip_bbcode(province)],
+		["leader_station_advanced_day", build_leader_station_advanced_day_chip_bbcode(province)],
+		["leader_ops_advanced_day", build_leader_ops_advanced_day_chip_bbcode(province)],
+		["leader_occupation_joint_day", build_leader_occupation_joint_day_chip_bbcode(province)],
+		["leader_manpower_joint_day", build_leader_manpower_joint_day_chip_bbcode(province)],
+		["leader_intel_joint_day", build_leader_intel_joint_day_chip_bbcode(province)],
+		["leader_theater_joint_day", build_leader_theater_joint_day_chip_bbcode(province)],
+		["occupation_manpower_leader_close_day", build_occupation_manpower_leader_close_day_chip_bbcode(province)],
+		["medium_tank_production_honesty_product", build_medium_tank_production_honesty_product_chip_bbcode(province)],
+		["medium_honesty_60d_day", build_medium_honesty_60d_day_chip_bbcode(province)],
+		["medium_honesty_80d_day", build_medium_honesty_80d_day_chip_bbcode(province)],
+		["medium_honesty_100d_day", build_medium_honesty_100d_day_chip_bbcode(province)],
+		["medium_honesty_unit_stats_day", build_medium_honesty_unit_stats_day_chip_bbcode(province)],
+		["medium_honesty_factory_risk_day", build_medium_honesty_factory_risk_day_chip_bbcode(province)],
+		["medium_honesty_stockpile_day", build_medium_honesty_stockpile_day_chip_bbcode(province)],
+		["medium_honesty_readiness_joint_day", build_medium_honesty_readiness_joint_day_chip_bbcode(province)],
+		["medium_honesty_manpower_joint_day", build_medium_honesty_manpower_joint_day_chip_bbcode(province)],
+		["medium_honesty_economy_joint_day", build_medium_honesty_economy_joint_day_chip_bbcode(province)],
+		["medium_tank_production_honesty_close_day", build_medium_tank_production_honesty_close_day_chip_bbcode(province)],
+		["apply_queue_live_managers_product", build_apply_queue_live_managers_product_chip_bbcode(province)],
+		["apply_queue_audit_day", build_apply_queue_audit_day_chip_bbcode(province)],
+		["apply_queue_production_live_day", build_apply_queue_production_live_day_chip_bbcode(province)],
+		["apply_queue_combat_live_day", build_apply_queue_combat_live_day_chip_bbcode(province)],
+		["apply_queue_supply_live_day", build_apply_queue_supply_live_day_chip_bbcode(province)],
+		["apply_queue_focus_live_day", build_apply_queue_focus_live_day_chip_bbcode(province)],
+		["apply_queue_agent_live_day", build_apply_queue_agent_live_day_chip_bbcode(province)],
+		["apply_queue_station_live_day", build_apply_queue_station_live_day_chip_bbcode(province)],
+		["apply_queue_six_leaf_joint_day", build_apply_queue_six_leaf_joint_day_chip_bbcode(province)],
+		["apply_queue_honesty_joint_day", build_apply_queue_honesty_joint_day_chip_bbcode(province)],
+		["apply_queue_live_managers_close_day", build_apply_queue_live_managers_close_day_chip_bbcode(province)],
+		["occupation_resistance_compliance_product", build_occupation_resistance_compliance_product_chip_bbcode(province)],
+		["manpower_laws_training_product", build_manpower_laws_training_product_chip_bbcode(province)],
+		["peace_conference_settlement_product", build_peace_conference_settlement_product_chip_bbcode(province)],
+		["occupation_resistance_board_day", build_occupation_resistance_board_day_chip_bbcode(province)],
+		["occupation_resistance_policy_day", build_occupation_resistance_policy_day_chip_bbcode(province)],
+		["occupation_resistance_tick_day", build_occupation_resistance_tick_day_chip_bbcode(province)],
+		["occupation_resistance_close_day", build_occupation_resistance_close_day_chip_bbcode(province)],
+		["manpower_law_board_day", build_manpower_law_board_day_chip_bbcode(province)],
+		["manpower_train_pipeline_day", build_manpower_train_pipeline_day_chip_bbcode(province)],
+		["manpower_field_trained_day", build_manpower_field_trained_day_chip_bbcode(province)],
+		["manpower_laws_training_close_day", build_manpower_laws_training_close_day_chip_bbcode(province)],
+		["peace_conference_board_day", build_peace_conference_board_day_chip_bbcode(province)],
+		["peace_conference_demands_day", build_peace_conference_demands_day_chip_bbcode(province)],
+		["peace_conference_settle_day", build_peace_conference_settle_day_chip_bbcode(province)],
+		["peace_conference_campaign_close_day", build_peace_conference_campaign_close_day_chip_bbcode(province)],
+		["product_ux_command_polish_product", build_product_ux_command_polish_product_chip_bbcode(province)],
+		["designer_domain_live_product", build_designer_domain_live_product_chip_bbcode(province)],
+		["campaign_ai_multi_month_product", build_campaign_ai_multi_month_product_chip_bbcode(province)],
+		["product_ux_compact_day", build_product_ux_compact_day_chip_bbcode(province)],
+		["product_ux_chips_day", build_product_ux_chips_day_chip_bbcode(province)],
+		["product_ux_hotkeys_day", build_product_ux_hotkeys_day_chip_bbcode(province)],
+		["product_ux_polish_close_day", build_product_ux_polish_close_day_chip_bbcode(province)],
+		["designer_domain_catalog_day", build_designer_domain_catalog_day_chip_bbcode(province)],
+		["designer_domain_pick_day", build_designer_domain_pick_day_chip_bbcode(province)],
+		["designer_domain_seed_day", build_designer_domain_seed_day_chip_bbcode(province)],
+		["designer_domain_live_close_day", build_designer_domain_live_close_day_chip_bbcode(province)],
+		["campaign_ai_month_board_day", build_campaign_ai_month_board_day_chip_bbcode(province)],
+		["campaign_ai_weekly_plan_day", build_campaign_ai_weekly_plan_day_chip_bbcode(province)],
+		["campaign_ai_theater_execute_day", build_campaign_ai_theater_execute_day_chip_bbcode(province)],
+		["campaign_ai_multi_month_close_day", build_campaign_ai_multi_month_close_day_chip_bbcode(province)],
+		["occupation_revolt_garrison_product", build_occupation_revolt_garrison_product_chip_bbcode(province)],
+		["manpower_cohort_reserve_product", build_manpower_cohort_reserve_product_chip_bbcode(province)],
+		["multi_party_peace_conference_product", build_multi_party_peace_conference_product_chip_bbcode(province)],
+		["occupation_revolt_board_day", build_occupation_revolt_board_day_chip_bbcode(province)],
+		["occupation_revolt_garrison_day", build_occupation_revolt_garrison_day_chip_bbcode(province)],
+		["occupation_revolt_suppress_day", build_occupation_revolt_suppress_day_chip_bbcode(province)],
+		["occupation_revolt_garrison_close_day", build_occupation_revolt_garrison_close_day_chip_bbcode(province)],
+		["manpower_cohort_board_day", build_manpower_cohort_board_day_chip_bbcode(province)],
+		["manpower_cohort_reserve_day", build_manpower_cohort_reserve_day_chip_bbcode(province)],
+		["manpower_cohort_mobilize_day", build_manpower_cohort_mobilize_day_chip_bbcode(province)],
+		["manpower_cohort_reserve_close_day", build_manpower_cohort_reserve_close_day_chip_bbcode(province)],
+		["multi_party_peace_board_day", build_multi_party_peace_board_day_chip_bbcode(province)],
+		["multi_party_peace_wargoals_day", build_multi_party_peace_wargoals_day_chip_bbcode(province)],
+		["multi_party_peace_settle_day", build_multi_party_peace_settle_day_chip_bbcode(province)],
+		["multi_party_peace_campaign_close_day", build_multi_party_peace_campaign_close_day_chip_bbcode(province)],
+		["historical_oob_content_product", build_historical_oob_content_product_chip_bbcode(province)],
+		["tech_tree_branching_product", build_tech_tree_branching_product_chip_bbcode(province)],
+		["save_resume_campaign_product", build_save_resume_campaign_product_chip_bbcode(province)],
+		["historical_oob_catalog_day", build_historical_oob_catalog_day_chip_bbcode(province)],
+		["historical_oob_seed_day", build_historical_oob_seed_day_chip_bbcode(province)],
+		["historical_oob_equip_day", build_historical_oob_equip_day_chip_bbcode(province)],
+		["historical_oob_content_close_day", build_historical_oob_content_close_day_chip_bbcode(province)],
+		["tech_tree_branches_day", build_tech_tree_branches_day_chip_bbcode(province)],
+		["tech_tree_path_day", build_tech_tree_path_day_chip_bbcode(province)],
+		["tech_tree_field_day", build_tech_tree_field_day_chip_bbcode(province)],
+		["tech_tree_branching_close_day", build_tech_tree_branching_close_day_chip_bbcode(province)],
+		["save_resume_checkpoint_day", build_save_resume_checkpoint_day_chip_bbcode(province)],
+		["save_resume_save_day", build_save_resume_save_day_chip_bbcode(province)],
+		["save_resume_resume_day", build_save_resume_resume_day_chip_bbcode(province)],
+		["save_resume_campaign_close_day", build_save_resume_campaign_close_day_chip_bbcode(province)],
+		["tutorial_first_session_product", build_tutorial_first_session_product_chip_bbcode(province)],
+		["focus_tree_content_product", build_focus_tree_content_product_chip_bbcode(province)],
+		["balance_combat_supply_product", build_balance_combat_supply_product_chip_bbcode(province)],
+		["tutorial_session_brief_day", build_tutorial_session_brief_day_chip_bbcode(province)],
+		["tutorial_session_guide_day", build_tutorial_session_guide_day_chip_bbcode(province)],
+		["tutorial_session_checkpoint_day", build_tutorial_session_checkpoint_day_chip_bbcode(province)],
+		["tutorial_first_session_close_day", build_tutorial_first_session_close_day_chip_bbcode(province)],
+		["focus_tree_catalog_day", build_focus_tree_catalog_day_chip_bbcode(province)],
+		["focus_tree_path_day", build_focus_tree_path_day_chip_bbcode(province)],
+		["focus_tree_commit_day", build_focus_tree_commit_day_chip_bbcode(province)],
+		["focus_tree_content_close_day", build_focus_tree_content_close_day_chip_bbcode(province)],
+		["balance_estimate_board_day", build_balance_estimate_board_day_chip_bbcode(province)],
+		["balance_live_sample_day", build_balance_live_sample_day_chip_bbcode(province)],
+		["balance_variance_close_day", build_balance_variance_close_day_chip_bbcode(province)],
+		["balance_combat_supply_close_day", build_balance_combat_supply_close_day_chip_bbcode(province)],
+		["air_multi_phase_theater_product", build_air_multi_phase_theater_product_chip_bbcode(province)],
+		["naval_search_strike_product", build_naval_search_strike_product_chip_bbcode(province)],
+		["war_economy_conversion_product", build_war_economy_conversion_product_chip_bbcode(province)],
+		["air_theater_recon_day", build_air_theater_recon_day_chip_bbcode(province)],
+		["air_theater_cas_gate_day", build_air_theater_cas_gate_day_chip_bbcode(province)],
+		["air_theater_interdiction_day", build_air_theater_interdiction_day_chip_bbcode(province)],
+		["air_multi_phase_theater_close_day", build_air_multi_phase_theater_close_day_chip_bbcode(province)],
+		["naval_search_patrol_day", build_naval_search_patrol_day_chip_bbcode(province)],
+		["naval_asw_escort_day", build_naval_asw_escort_day_chip_bbcode(province)],
+		["naval_carrier_strike_day", build_naval_carrier_strike_day_chip_bbcode(province)],
+		["naval_search_strike_close_day", build_naval_search_strike_close_day_chip_bbcode(province)],
+		["economy_civ_board_day", build_economy_civ_board_day_chip_bbcode(province)],
+		["economy_war_convert_day", build_economy_war_convert_day_chip_bbcode(province)],
+		["economy_stockpile_sustain_day", build_economy_stockpile_sustain_day_chip_bbcode(province)],
+		["war_economy_conversion_close_day", build_war_economy_conversion_close_day_chip_bbcode(province)],
+		["designer_module_editor_product", build_designer_module_editor_product_chip_bbcode(province)],
+		["designer_stats_field_product", build_designer_stats_field_product_chip_bbcode(province)],
+		["designer_multi_domain_campaign_product", build_designer_multi_domain_campaign_product_chip_bbcode(province)],
+		["designer_module_board_day", build_designer_module_board_day_chip_bbcode(province)],
+		["designer_module_edit_day", build_designer_module_edit_day_chip_bbcode(province)],
+		["designer_reliability_gate_day", build_designer_reliability_gate_day_chip_bbcode(province)],
+		["designer_module_editor_close_day", build_designer_module_editor_close_day_chip_bbcode(province)],
+		["designer_stats_board_day", build_designer_stats_board_day_chip_bbcode(province)],
+		["designer_freeze_design_day", build_designer_freeze_design_day_chip_bbcode(province)],
+		["designer_field_seed_day", build_designer_field_seed_day_chip_bbcode(province)],
+		["designer_stats_field_close_day", build_designer_stats_field_close_day_chip_bbcode(province)],
+		["designer_catalog_all_domains_day", build_designer_catalog_all_domains_day_chip_bbcode(province)],
+		["designer_seed_multi_domain_day", build_designer_seed_multi_domain_day_chip_bbcode(province)],
+		["designer_equip_campaign_close_day", build_designer_equip_campaign_close_day_chip_bbcode(province)],
+		["designer_multi_domain_campaign_close_day", build_designer_multi_domain_campaign_close_day_chip_bbcode(province)],
+		["weather_crisis_campaign_product", build_weather_crisis_campaign_product_chip_bbcode(province)],
+		["intel_cell_network_product", build_intel_cell_network_product_chip_bbcode(province)],
+		["leader_theater_command_product", build_leader_theater_command_product_chip_bbcode(province)],
+		["weather_crisis_forecast_day", build_weather_crisis_forecast_day_chip_bbcode(province)],
+		["weather_crisis_gate_multi_day", build_weather_crisis_gate_multi_day_chip_bbcode(province)],
+		["weather_crisis_sustain_day", build_weather_crisis_sustain_day_chip_bbcode(province)],
+		["weather_crisis_campaign_close_day", build_weather_crisis_campaign_close_day_chip_bbcode(province)],
+		["intel_cell_coverage_day", build_intel_cell_coverage_day_chip_bbcode(province)],
+		["intel_cell_ops_day", build_intel_cell_ops_day_chip_bbcode(province)],
+		["intel_counter_sweep_day", build_intel_counter_sweep_day_chip_bbcode(province)],
+		["intel_cell_network_close_day", build_intel_cell_network_close_day_chip_bbcode(province)],
+		["leader_hq_board_day", build_leader_hq_board_day_chip_bbcode(province)],
+		["leader_multi_station_day", build_leader_multi_station_day_chip_bbcode(province)],
+		["leader_theater_ops_day", build_leader_theater_ops_day_chip_bbcode(province)],
+		["leader_theater_command_close_day", build_leader_theater_command_close_day_chip_bbcode(province)],
+		["strategic_war_goal_product", build_strategic_war_goal_product_chip_bbcode(province)],
+		["multi_front_campaign_ai_product", build_multi_front_campaign_ai_product_chip_bbcode(province)],
+		["grand_strategy_cycle_product", build_grand_strategy_cycle_product_chip_bbcode(province)],
+		["war_goal_board_day", build_war_goal_board_day_chip_bbcode(province)],
+		["war_goal_justify_day", build_war_goal_justify_day_chip_bbcode(province)],
+		["war_goal_execute_day", build_war_goal_execute_day_chip_bbcode(province)],
+		["strategic_war_goal_close_day", build_strategic_war_goal_close_day_chip_bbcode(province)],
+		["multi_front_plan_day", build_multi_front_plan_day_chip_bbcode(province)],
+		["multi_front_weekly_day", build_multi_front_weekly_day_chip_bbcode(province)],
+		["multi_front_execute_day", build_multi_front_execute_day_chip_bbcode(province)],
+		["multi_front_campaign_ai_close_day", build_multi_front_campaign_ai_close_day_chip_bbcode(province)],
+		["gs_cycle_scan_day", build_gs_cycle_scan_day_chip_bbcode(province)],
+		["gs_cycle_rank_day", build_gs_cycle_rank_day_chip_bbcode(province)],
+		["gs_cycle_execute_day", build_gs_cycle_execute_day_chip_bbcode(province)],
+		["grand_strategy_cycle_close_day", build_grand_strategy_cycle_close_day_chip_bbcode(province)],
+		["alliance_guarantee_network_product", build_alliance_guarantee_network_product_chip_bbcode(province)],
+		["faction_personality_ai_product", build_faction_personality_ai_product_chip_bbcode(province)],
+		["occupation_revolt_network_product", build_occupation_revolt_network_product_chip_bbcode(province)],
+		["occupation_visual_feedback", build_occupation_visual_chip_bbcode(province)],
+		["alliance_board_day", build_alliance_board_day_chip_bbcode(province)],
+		["alliance_guarantee_day", build_alliance_guarantee_day_chip_bbcode(province)],
+		["alliance_coalition_day", build_alliance_coalition_day_chip_bbcode(province)],
+		["alliance_guarantee_network_close_day", build_alliance_guarantee_network_close_day_chip_bbcode(province)],
+		["personality_board_day", build_personality_board_day_chip_bbcode(province)],
+		["personality_event_day", build_personality_event_day_chip_bbcode(province)],
+		["personality_drive_day", build_personality_drive_day_chip_bbcode(province)],
+		["faction_personality_ai_close_day", build_faction_personality_ai_close_day_chip_bbcode(province)],
+		["revolt_network_map_day", build_revolt_network_map_day_chip_bbcode(province)],
+		["revolt_cascade_risk_day", build_revolt_cascade_risk_day_chip_bbcode(province)],
+		["revolt_network_suppress_day", build_revolt_network_suppress_day_chip_bbcode(province)],
+		["occupation_revolt_network_close_day", build_occupation_revolt_network_close_day_chip_bbcode(province)],
+		["campaign_alpha_primary_strip_product", build_campaign_alpha_primary_strip_product_chip_bbcode(province)],
+
+		["focus_war_path_product", build_focus_war_path_product_chip_bbcode(province)],
+		["naval_multi_phase_campaign_product", build_naval_multi_phase_campaign_product_chip_bbcode(province)],
+		["focus_pick_board_advanced_day", build_focus_pick_board_advanced_day_chip_bbcode(province)],
+		["focus_war_path_advanced_day", build_focus_war_path_advanced_day_chip_bbcode(province)],
+		["focus_commit_execute_advanced_day", build_focus_commit_execute_advanced_day_chip_bbcode(province)],
+		["focus_naval_effort_advanced_day", build_focus_naval_effort_advanced_day_chip_bbcode(province)],
+		["focus_industry_army_joint_day", build_focus_industry_army_joint_day_chip_bbcode(province)],
+		["focus_air_effort_joint_day", build_focus_air_effort_joint_day_chip_bbcode(province)],
+		["focus_war_path_close_day", build_focus_war_path_close_day_chip_bbcode(province)],
+		["naval_posture_advanced_day", build_naval_posture_advanced_day_chip_bbcode(province)],
+		["naval_escort_phase_advanced_day", build_naval_escort_phase_advanced_day_chip_bbcode(province)],
+		["naval_strike_phase_advanced_day", build_naval_strike_phase_advanced_day_chip_bbcode(province)],
+		["naval_fleet_fuel_advanced_day", build_naval_fleet_fuel_advanced_day_chip_bbcode(province)],
+		["naval_fleet_autonomy_joint_day", build_naval_fleet_autonomy_joint_day_chip_bbcode(province)],
+		["naval_air_joint_advanced_day", build_naval_air_joint_advanced_day_chip_bbcode(province)],
+		["naval_multi_phase_close_day", build_naval_multi_phase_close_day_chip_bbcode(province)],
+		["designer_domain_advanced_day", build_designer_domain_advanced_day_chip_bbcode(province)],
+		["designer_seed_advanced_day", build_designer_seed_advanced_day_chip_bbcode(province)],
+		["strategic_ai_multi_day_advanced_day", build_strategic_ai_multi_day_advanced_day_chip_bbcode(province)],
+		["designer_ai_industry_joint_day", build_designer_ai_industry_joint_day_chip_bbcode(province)],
+		["play_session_advanced_joint_day", build_play_session_advanced_joint_day_chip_bbcode(province)],
+		["advanced_deferred_campaign_close_day", build_advanced_deferred_campaign_close_day_chip_bbcode(province)],
+		["play_session_campaign_product", build_play_session_campaign_product_chip_bbcode(province)],
+		["air_ops_campaign_product", build_air_ops_campaign_product_chip_bbcode(province)],
+		["strategic_ai_daily_campaign_product", build_strategic_ai_daily_campaign_product_chip_bbcode(province)],
+		["multi_faction_strategic_ai_product", build_multi_faction_strategic_ai_product_chip_bbcode(province)],
+		["designer_suite_product", build_designer_suite_product_chip_bbcode(province)],
+		["assault_ready_surface_day", build_assault_ready_surface_day_chip_bbcode(province)],
+		["combat_order_surface_day", build_combat_order_surface_day_chip_bbcode(province)],
+		["phase_product_ops_day", build_phase_product_ops_day_chip_bbcode(province)],
+		["multi_phase_joint_day", build_multi_phase_joint_day_chip_bbcode(province)],
+		["save_prod_combat_close_day", build_save_prod_combat_close_day_chip_bbcode(province)],
+		["naval_basing_sustain_day", build_naval_basing_sustain_day_chip_bbcode(province)],
+		["port_fuel_depth_day", build_port_fuel_depth_day_chip_bbcode(province)],
+		["basing_repair_depth_day", build_basing_repair_depth_day_chip_bbcode(province)],
+		["fleet_task_sustain_day", build_fleet_task_sustain_day_chip_bbcode(province)],
+		["convoy_basing_joint_day", build_convoy_basing_joint_day_chip_bbcode(province)],
+		["naval_logistics_depth_day", build_naval_logistics_depth_day_chip_bbcode(province)],
+		["naval_basing_close_day", build_naval_basing_close_day_chip_bbcode(province)],
+		["multi_day_theater_depth_day", build_multi_day_theater_depth_day_chip_bbcode(province)],
+		["theater_campaign_continuity_day", build_theater_campaign_continuity_day_chip_bbcode(province)],
+		["campaign_day_chain_day", build_campaign_day_chain_day_chip_bbcode(province)],
+		["theater_session_ops_day", build_theater_session_ops_day_chip_bbcode(province)],
+		["daily_theater_sustain_day", build_daily_theater_sustain_day_chip_bbcode(province)],
+		["theater_continuity_joint_day", build_theater_continuity_joint_day_chip_bbcode(province)],
+		["theater_campaign_depth_close_day", build_theater_campaign_depth_close_day_chip_bbcode(province)],
+		["inspector_decision_depth_day", build_inspector_decision_depth_day_chip_bbcode(province)],
+		["decision_strip_depth_day", build_decision_strip_depth_day_chip_bbcode(province)],
+		["insight_strip_depth_day", build_insight_strip_depth_day_chip_bbcode(province)],
+		["province_decision_joint_day", build_province_decision_joint_day_chip_bbcode(province)],
+		["inspector_campaign_ops_day", build_inspector_campaign_ops_day_chip_bbcode(province)],
+		["theater_naval_inspector_close_day", build_theater_naval_inspector_close_day_chip_bbcode(province)],
+		["weather_pressure_depth_day", build_weather_pressure_depth_day_chip_bbcode(province)],
+		["foul_combat_ops_day", build_foul_combat_ops_day_chip_bbcode(province)],
+		["weather_logistics_depth_day", build_weather_logistics_depth_day_chip_bbcode(province)],
+		["weather_move_depth_day", build_weather_move_depth_day_chip_bbcode(province)],
+		["weather_crisis_depth_day", build_weather_crisis_depth_day_chip_bbcode(province)],
+		["weather_pressure_joint_day", build_weather_pressure_joint_day_chip_bbcode(province)],
+		["weather_ops_close_depth_day", build_weather_ops_close_depth_day_chip_bbcode(province)],
+		["trade_pressure_depth_day", build_trade_pressure_depth_day_chip_bbcode(province)],
+		["sealane_health_depth_day", build_sealane_health_depth_day_chip_bbcode(province)],
+		["war_economy_sustain_day", build_war_economy_sustain_day_chip_bbcode(province)],
+		["stockpile_economy_depth_day", build_stockpile_economy_depth_day_chip_bbcode(province)],
+		["convoy_economy_joint_day", build_convoy_economy_joint_day_chip_bbcode(province)],
+		["trade_sealane_joint_day", build_trade_sealane_joint_day_chip_bbcode(province)],
+		["war_economy_close_depth_day", build_war_economy_close_depth_day_chip_bbcode(province)],
+		["force_ready_surface_day", build_force_ready_surface_day_chip_bbcode(province)],
+		["formation_equip_depth_day", build_formation_equip_depth_day_chip_bbcode(province)],
+		["reinforce_stockpile_depth_day", build_reinforce_stockpile_depth_day_chip_bbcode(province)],
+		["readiness_board_ops_day", build_readiness_board_ops_day_chip_bbcode(province)],
+		["force_reinforce_joint_day", build_force_reinforce_joint_day_chip_bbcode(province)],
+		["weather_economy_force_close_day", build_weather_economy_force_close_day_chip_bbcode(province)],
+		["strategic_ai_doctrine_depth_day", build_strategic_ai_doctrine_depth_day_chip_bbcode(province)],
+		["strategic_ai_urgency_board_day", build_strategic_ai_urgency_board_day_chip_bbcode(province)],
+		["strategic_ai_player_skip_day", build_strategic_ai_player_skip_day_chip_bbcode(province)],
+		["strategic_ai_budget_depth_day", build_strategic_ai_budget_depth_day_chip_bbcode(province)],
+		["strategic_ai_domain_weight_day", build_strategic_ai_domain_weight_day_chip_bbcode(province)],
+		["strategic_ai_daily_joint_day", build_strategic_ai_daily_joint_day_chip_bbcode(province)],
+		["strategic_ai_campaign_close_day", build_strategic_ai_campaign_close_day_chip_bbcode(province)],
+		["designer_catalog_depth_day", build_designer_catalog_depth_day_chip_bbcode(province)],
+		["designer_seed_production_day", build_designer_seed_production_day_chip_bbcode(province)],
+		["designer_domain_balance_day", build_designer_domain_balance_day_chip_bbcode(province)],
+		["oob_horizon_joint_day", build_oob_horizon_joint_day_chip_bbcode(province)],
+		["production_line_bootstrap_day", build_production_line_bootstrap_day_chip_bbcode(province)],
+		["industry_design_joint_day", build_industry_design_joint_day_chip_bbcode(province)],
+		["designer_industry_close_day", build_designer_industry_close_day_chip_bbcode(province)],
+		["theater_ai_command_joint_day", build_theater_ai_command_joint_day_chip_bbcode(province)],
+		["fleet_ai_campaign_depth_day", build_fleet_ai_campaign_depth_day_chip_bbcode(province)],
+		["agent_ai_campaign_depth_day", build_agent_ai_campaign_depth_day_chip_bbcode(province)],
+		["combat_ai_phase_depth_day", build_combat_ai_phase_depth_day_chip_bbcode(province)],
+		["save_session_ai_joint_day", build_save_session_ai_joint_day_chip_bbcode(province)],
+		["full_game_campaign_close_day", build_full_game_campaign_close_day_chip_bbcode(province)],
+		["air_ops_sortie_depth_day", build_air_ops_sortie_depth_day_chip_bbcode(province)],
+		["air_forecast_planning_depth_day", build_air_forecast_planning_depth_day_chip_bbcode(province)],
+		["air_sortie_weather_gate_day", build_air_sortie_weather_gate_day_chip_bbcode(province)],
+		["convoy_escort_campaign_depth_day", build_convoy_escort_campaign_depth_day_chip_bbcode(province)],
+		["air_land_campaign_depth_day", build_air_land_campaign_depth_day_chip_bbcode(province)],
+		["air_front_readiness_depth_day", build_air_front_readiness_depth_day_chip_bbcode(province)],
+		["air_convoy_campaign_close_day", build_air_convoy_campaign_close_day_chip_bbcode(province)],
+		["focus_pick_depth_day", build_focus_pick_depth_day_chip_bbcode(province)],
+		["focus_order_path_day", build_focus_order_path_day_chip_bbcode(province)],
+		["focus_war_path_depth_day", build_focus_war_path_depth_day_chip_bbcode(province)],
+		["war_path_urgency_depth_day", build_war_path_urgency_depth_day_chip_bbcode(province)],
+		["intel_counter_depth_campaign_day", build_intel_counter_depth_campaign_day_chip_bbcode(province)],
+		["leader_campaign_assign_day", build_leader_campaign_assign_day_chip_bbcode(province)],
+		["focus_intel_leader_close_day", build_focus_intel_leader_close_day_chip_bbcode(province)],
+		["order_execute_session_day", build_order_execute_session_day_chip_bbcode(province)],
+		["next_day_feedback_session_day", build_next_day_feedback_session_day_chip_bbcode(province)],
+		["campaign_decision_session_day", build_campaign_decision_session_day_chip_bbcode(province)],
+		["theater_ai_session_joint_day", build_theater_ai_session_joint_day_chip_bbcode(province)],
+		["force_readiness_session_day", build_force_readiness_session_day_chip_bbcode(province)],
+		["play_session_campaign_close_day", build_play_session_campaign_close_day_chip_bbcode(province)],
+	]
+	for pair in pairs:
+		if not (pair is Array) or pair.size() < 2:
+			continue
+		var cid := str(pair[0])
+		var bb := str(pair[1]).strip_edges()
+		if bb.is_empty():
+			continue
+		candidates.append({"id": cid, "bbcode": bb})
+	var budget: Dictionary = MapPolishFormatters.budget_product_depth_chips(candidates, 8, true)
+	if budget.is_empty() or not (budget.get("chips") is Array):
+		# Fallback: take first 8
+		budget = {"chips": candidates.slice(0, mini(8, candidates.size()))}
+	for c in budget.get("chips", []):
+		if c is Dictionary:
+			var text := str(c.get("bbcode", "")).strip_edges()
+			if not text.is_empty():
+				lines.append(text)
+
+
+static func build_war_cabinet_chip_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_war_cabinet_board_plain"):
+		return ""
+	var plain := str(GameData.format_war_cabinet_board_plain()).strip_edges()
+	if plain.is_empty():
+		return ""
+	var out: PackedStringArray = []
+	out.append("%s── War cabinet ──[/color]" % COLOR_HEADER)
+	for ln in plain.split("\n"):
+		var t := str(ln).strip_edges()
+		if t.is_empty():
+			continue
+		out.append("%s%s[/color]" % [COLOR_MUTED, t])
+	return "\n".join(out)
+
+
+static func build_campaign_strip_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	var summaries: Array = []
+	var a := build_fleet_weather_package_chip_bbcode(province)
+	if not a.is_empty():
+		summaries.append(a)
+	var b := build_assault_readiness_chip_bbcode(province)
+	if not b.is_empty():
+		summaries.append(b)
+	var c := build_counter_ops_chip_bbcode()
+	if not c.is_empty():
+		summaries.append(c)
+	var d := build_supply_chain_health_chip_bbcode(province)
+	if not d.is_empty():
+		summaries.append(d)
+	var strip: Dictionary = MapPolishFormatters.format_campaign_strip(summaries, 6)
+	if bool(strip.get("empty", true)):
+		return ""
+	return str(strip.get("bbcode", "")).strip_edges()
+
+
+static func build_convoy_package_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("convoy_package_for_province"):
+		return ""
+	var coastal := bool(province.is_sea)
+	if not coastal and MapManager.has_method("get_province_terrain"):
+		var terr: Dictionary = MapManager.get_province_terrain(province.id)
+		var dom := str(terr.get("domain", "")).to_lower()
+		coastal = dom.begins_with("coast") or dom == "strait" or dom == "sea"
+	if not coastal:
+		return ""
+	var pkg: Dictionary = MapManager.convoy_package_for_province(province.id, 50.0, str(province.owner_tag))
+	if pkg.is_empty() or bool(pkg.get("empty", false)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", ""))).strip_edges()
+
+
+static func build_theater_readiness_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	# Live call site for theater_readiness_board: fleet+wx + assault readiness + day risk.
+	var summaries: Array = []
+	var fleet_s := build_fleet_weather_package_chip_bbcode(province)
+	if not fleet_s.is_empty():
+		summaries.append(fleet_s)
+	var assault_s := build_assault_readiness_chip_bbcode(province)
+	if not assault_s.is_empty():
+		summaries.append(assault_s)
+	var day_s := build_campaign_day_risk_chip_bbcode(province)
+	if not day_s.is_empty():
+		summaries.append(day_s)
+	if summaries.is_empty():
+		return ""
+	var board: Dictionary = MapPolishFormatters.theater_readiness_board(summaries)
+	if bool(board.get("empty", true)):
+		return ""
+	return str(board.get("bbcode", board.get("summary", ""))).strip_edges()
+
+
+static func build_basing_logistics_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("basing_fleet_fuel_logistics_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.basing_fleet_fuel_logistics_for_province(
+		province.id, 0.45, 100.0, "patrol", str(province.owner_tag)
+	)
+	if pkg.is_empty() or bool(pkg.get("empty", false)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", ""))).strip_edges()
+
+
+static func build_assault_follow_on_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(BattleManager) == TYPE_NIL:
+		return ""
+	if not BattleManager.has_method("build_assault_follow_on_loop"):
+		return ""
+	var targets: Array = [{"province_id": province.id, "defender_power": 80.0}]
+	var fo: Dictionary = BattleManager.build_assault_follow_on_loop(targets, 100.0, 1.0, province.id)
+	if fo.is_empty() or bool(fo.get("empty", false)):
+		return ""
+	return str(fo.get("bbcode", fo.get("summary", ""))).strip_edges()
+
+
+static func build_counter_ops_execute_chip_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_counter_ops_execute_order_plain"):
+		return ""
+	var plain := str(GameData.format_counter_ops_execute_order_plain()).strip_edges()
+	if plain.is_empty():
+		return ""
+	return "%s◎ Execute[/color] %s— %s[/color]" % [COLOR_HEADER, COLOR_MUTED, plain]
+
+
+static func build_agenda_execute_pick_chip_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_hh_agenda_execute_pick_plain"):
+		return ""
+	var plain := str(GameData.format_hh_agenda_execute_pick_plain()).strip_edges()
+	if plain.is_empty():
+		return ""
+	var out: PackedStringArray = []
+	out.append("%s── Agenda execute pick ──[/color]" % COLOR_HEADER)
+	for ln in plain.split("\n"):
+		var t := str(ln).strip_edges()
+		if t.is_empty():
+			continue
+		out.append("%s%s[/color]" % [COLOR_MUTED, t])
+	return "\n".join(out)
+
+
+static func build_move_path_ops_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("move_path_ops_for_province"):
+		return ""
+	var supply_h := 1.0
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_supply_weather_multiplier"):
+		supply_h = float(WeatherManager.get_supply_weather_multiplier(province.id))
+	var mp: Dictionary = MapManager.move_path_ops_for_province(province.id, 1.0, false, supply_h)
+	return str(mp.get("bbcode", mp.get("summary", ""))).strip_edges()
+
+
+static func build_basing_repair_weather_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("basing_repair_weather_for_province"):
+		return ""
+	var br: Dictionary = MapManager.basing_repair_weather_for_province(province.id)
+	if bool(br.get("empty", true)):
+		return ""
+	return str(br.get("bbcode", br.get("summary", ""))).strip_edges()
+
+
+static func build_sealane_joint_health_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(MapManager) == TYPE_NIL:
+		return ""
+	if not MapManager.has_method("sealane_joint_health_for_province"):
+		return ""
+	var sh: Dictionary = MapManager.sealane_joint_health_for_province(province.id, str(province.owner_tag))
+	return str(sh.get("bbcode", sh.get("summary", ""))).strip_edges()
+
+
+static func build_reinforced_assault_chip_bbcode(province: Province) -> String:
+	if province == null or typeof(BattleManager) == TYPE_NIL:
+		return ""
+	if not BattleManager.has_method("build_reinforced_assault_loop"):
+		return ""
+	var targets: Array = [{"province_id": province.id, "defender_power": 80.0}]
+	var ra: Dictionary = BattleManager.build_reinforced_assault_loop(targets, 100.0, 1.0, province.id)
+	if ra.is_empty() or bool(ra.get("empty", false)):
+		return ""
+	return str(ra.get("bbcode", ra.get("summary", ""))).strip_edges()
+
+
+static func build_war_path_urgency_chip_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_war_path_urgency_plain"):
+		return ""
+	var plain := str(GameData.format_war_path_urgency_plain()).strip_edges()
+	if plain.is_empty():
+		return ""
+	return "%s◆ War path[/color] %s— %s[/color]" % [COLOR_HEADER, COLOR_MUTED, plain.split("\n")[0]]
+
+
+static func build_oob_factory_risk_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	var temp := 10.0
+	var precip := 0.0
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_production_weather_multiplier"):
+		var pm := float(WeatherManager.get_production_weather_multiplier(province.id))
+		precip = clampf((1.0 - pm) * 2.0, 0.0, 1.0)
+		if pm < 0.85:
+			temp = -18.0
+	var oob: Dictionary = MapPolishFormatters.oob_factory_risk_loop(temp, precip, "dry", 1.0, 0.2, 1.0)
+	return str(oob.get("bbcode", "")).strip_edges()
+
+
+static func build_force_supply_posture_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	var supply_h := 1.0
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_supply_weather_multiplier"):
+		supply_h = float(WeatherManager.get_supply_weather_multiplier(province.id))
+	var vis := 1.0
+	var precip := 0.0
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_combat_weather_multiplier"):
+		vis = float(WeatherManager.get_combat_weather_multiplier(province.id))
+		precip = clampf(1.0 - vis, 0.0, 1.0)
+	var fs: Dictionary = MapPolishFormatters.force_supply_posture(50.0, supply_h, vis, precip, "dry", 0.2)
+	return str(fs.get("bbcode", "")).strip_edges()
+
+
+static func build_leader_weather_assign_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	var ground := "dry"
+	var vis := 1.0
+	if typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_supply_weather_multiplier"):
+			var sm := float(WeatherManager.get_supply_weather_multiplier(province.id))
+			if sm < 0.75:
+				ground = "mud"
+		if WeatherManager.has_method("get_combat_weather_multiplier"):
+			vis = float(WeatherManager.get_combat_weather_multiplier(province.id))
+	var lw: Dictionary = MapPolishFormatters.leader_weather_assign(0.7, ground, vis, false)
+	return str(lw.get("bbcode", "")).strip_edges()
+
+
+static func build_joint_ops_loop_strip_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	var summaries: Array = []
+	var a := build_basing_logistics_chip_bbcode(province)
+	if not a.is_empty():
+		summaries.append(a)
+	var b := build_assault_follow_on_chip_bbcode(province)
+	if not b.is_empty():
+		summaries.append(b)
+	var c := build_agenda_execute_pick_chip_bbcode()
+	if not c.is_empty():
+		summaries.append(c)
+	if summaries.is_empty():
+		return ""
+	var strip: Dictionary = MapPolishFormatters.joint_ops_loop_strip(summaries)
+	if bool(strip.get("empty", true)):
+		return ""
+	return str(strip.get("bbcode", "")).strip_edges()
+
+
+## Agent counterplay options pilot from last HH map signal (province-targeted).
+
+static func build_fleet_campaign_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("fleet_campaign_plan_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.fleet_campaign_plan_for_province(int(province.id), 0.55, 100.0, "")
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_combat_campaign_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	var pkg: Dictionary = MapPolishFormatters.combat_campaign_phase(100.0, 0.85, 1.0, 0.0, 6, false, [])
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_campaign_decision_strip_chip_bbcode(province: Province) -> String:
+	var summaries: Array = []
+	var a := build_fleet_campaign_chip_bbcode(province)
+	if not a.is_empty():
+		summaries.append(a.split("\n")[0])
+	var b := build_combat_campaign_chip_bbcode(province)
+	if not b.is_empty():
+		summaries.append(b.split("\n")[0])
+	var c := build_joint_ops_loop_strip_chip_bbcode(province)
+	if not c.is_empty():
+		summaries.append(c.split("\n")[0])
+	if summaries.is_empty():
+		return ""
+	var strip: Dictionary = MapPolishFormatters.campaign_decision_strip(summaries)
+	if bool(strip.get("empty", true)):
+		return ""
+	return str(strip.get("bbcode", strip.get("summary", "")))
+
+
+
+static func build_fleet_order_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("fleet_order_execute_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.fleet_order_execute_for_province(int(province.id), 0.55, 100.0)
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_combat_order_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("combat_order_execute_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.combat_order_execute_for_province(int(province.id), 100.0, 0.85)
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_execution_decision_strip_chip_bbcode(province: Province) -> String:
+	var summaries: Array = []
+	var a := build_fleet_order_chip_bbcode(province)
+	if not a.is_empty():
+		summaries.append(a.split("\n")[0])
+	var b := build_combat_order_chip_bbcode(province)
+	if not b.is_empty():
+		summaries.append(b.split("\n")[0])
+	var c := build_campaign_decision_strip_chip_bbcode(province)
+	if not c.is_empty():
+		summaries.append(c.split("\n")[0])
+	if summaries.is_empty():
+		return ""
+	var strip: Dictionary = MapPolishFormatters.execution_decision_strip(summaries)
+	if bool(strip.get("empty", true)):
+		return ""
+	return str(strip.get("bbcode", strip.get("summary", "")))
+
+
+static func build_map_effect_order_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("fleet_order_execute_for_province"):
+		return ""
+	var order_pkg: Dictionary = MapManager.fleet_order_execute_for_province(int(province.id), 0.55, 100.0)
+	if bool(order_pkg.get("empty", true)):
+		return ""
+	var effect: Dictionary = MapPolishFormatters.map_effect_resolve(
+		str(order_pkg.get("order", "")), int(province.id), float(order_pkg.get("score", 0.5))
+	)
+	if bool(effect.get("empty", true)):
+		return ""
+	return str(effect.get("bbcode", effect.get("summary", "")))
+
+
+static func build_next_day_feedback_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("fleet_order_execute_for_province"):
+		return ""
+	var a: Dictionary = MapManager.fleet_order_execute_for_province(int(province.id), 0.55, 100.0)
+	var b: Dictionary = MapManager.fleet_order_execute_for_province(int(province.id), 0.35, 80.0)
+	var fb: Dictionary = MapPolishFormatters.next_day_feedback(
+		float(a.get("score", 0.5)), float(b.get("score", 0.4)), str(a.get("order", ""))
+	)
+	return str(fb.get("bbcode", fb.get("summary", "")))
+
+
+static func build_execution_integrity_chip_bbcode() -> String:
+	var gate: Dictionary = MapPolishFormatters.execution_integrity_gate(1.1, 0.8, 0.2, 1.0)
+	return str(gate.get("bbcode", gate.get("summary", "")))
+
+
+
+static func build_fleet_station_mutation_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("fleet_station_mutation_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.fleet_station_mutation_for_province(int(province.id), "", "", 0.55)
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_mutation_decision_strip_chip_bbcode(province: Province) -> String:
+	var summaries: Array = []
+	var a := build_fleet_station_mutation_chip_bbcode(province)
+	if not a.is_empty():
+		summaries.append(a.split("\n")[0])
+	var b := build_fleet_order_chip_bbcode(province)
+	if not b.is_empty():
+		summaries.append(b.split("\n")[0])
+	var c := ""
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("format_mutation_decision_strip_plain"):
+		c = str(GameData.format_mutation_decision_strip_plain())
+	if not c.is_empty():
+		summaries.append(c.split("\n")[0])
+	if summaries.is_empty():
+		return ""
+	var strip: Dictionary = MapPolishFormatters.mutation_decision_strip(summaries)
+	if bool(strip.get("empty", true)):
+		return ""
+	return str(strip.get("bbcode", strip.get("summary", "")))
+
+
+static func build_production_priority_mutation_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("production_priority_mutation_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.production_priority_mutation_for_province(int(province.id), "primary")
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_mutation_integrity_chip_bbcode() -> String:
+	var gate: Dictionary = MapPolishFormatters.mutation_integrity_gate(1.1, 0.8, 0.2, 1.1)
+	return str(gate.get("bbcode", gate.get("summary", "")))
+
+
+
+static func build_theater_command_strip_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("theater_command_surface_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.theater_command_surface_for_province(int(province.id))
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_player_order_surface_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("player_order_surface_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.player_order_surface_for_province(int(province.id))
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_theater_daily_brief_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("theater_daily_brief_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.theater_daily_brief_for_province(int(province.id))
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_order_queue_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("order_queue_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.order_queue_for_province(int(province.id))
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_command_integrity_chip_bbcode() -> String:
+	var gate: Dictionary = MapPolishFormatters.command_integrity_gate(1.1, 0.8, 0.2, 1.1)
+	return str(gate.get("bbcode", gate.get("summary", "")))
+
+
+
+static func build_command_result_log_chip_bbcode() -> String:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("format_command_result_log_plain"):
+		return ""
+	var plain := str(GameData.format_command_result_log_plain(6)).strip_edges()
+	if plain.is_empty():
+		return ""
+	var trail: Array = GameData.get_command_result_log(6) if GameData.has_method("get_command_result_log") else []
+	var surf: Dictionary = MapPolishFormatters.format_command_log_surface(trail, 6)
+	return str(surf.get("bbcode", plain))
+
+
+static func build_theater_day_report_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("theater_day_report_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.theater_day_report_for_province(int(province.id))
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_daily_apply_integrity_chip_bbcode() -> String:
+	var gate: Dictionary = MapPolishFormatters.daily_apply_integrity_gate(1.1, 0.8, 0.2, 1.1)
+	return str(gate.get("bbcode", gate.get("summary", "")))
+
+
+
+static func build_order_panel_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("order_panel_actions_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.order_panel_actions_for_province(int(province.id))
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_war_economy_day_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("war_economy_day_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.war_economy_day_for_province(int(province.id))
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_logistics_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if MapManager.has_method("sealane_choke_logistics_day_for_province"):
+		var pkg: Dictionary = MapManager.sealane_choke_logistics_day_for_province(int(province.id))
+		if not bool(pkg.get("empty", true)):
+			return str(pkg.get("bbcode", pkg.get("summary", "")))
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("format_logistics_day_plain"):
+		var plain := str(GameData.format_logistics_day_plain(int(province.id))).strip_edges()
+		if not plain.is_empty():
+			return "[color=#5ec8ff]Logistics[/color] [color=#8899aa]%s[/color]" % plain.split("\n")[0]
+	return ""
+
+
+static func build_theater_day_command_strip_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("theater_day_command_strip_live"):
+		return ""
+	var pkg: Dictionary = MapManager.theater_day_command_strip_live(int(province.id), "")
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+
+
+static func build_multi_province_live_chip_bbcode() -> String:
+	if not MapManager.has_method("multi_province_live_plan_for_tag"):
+		return ""
+	var pkg: Dictionary = MapManager.multi_province_live_plan_for_tag("", 4)
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_combat_phase_depth_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("combat_phase_depth_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.combat_phase_depth_for_province(int(province.id))
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_fleet_patrol_depth_chip_bbcode() -> String:
+	if not MapManager.has_method("fleet_patrol_depth_for_tag"):
+		return ""
+	var pkg: Dictionary = MapManager.fleet_patrol_depth_for_tag("", 0.7)
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_ops_depth_integrity_chip_bbcode() -> String:
+	var gate: Dictionary = MapPolishFormatters.ops_depth_integrity_gate(1.1, 0.8, 0.2, 1.1)
+	return str(gate.get("bbcode", gate.get("summary", "")))
+
+
+static func build_production_campaign_risk_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	var temp := 10.0
+	var precip := 0.0
+	var ground := "dry"
+	var vis := 1.0
+	var wind := 0.2
+	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_province_weather"):
+		var w: Dictionary = WeatherManager.get_province_weather(int(province.id))
+		if w is Dictionary:
+			temp = float(w.get("temperature_c", w.get("temp", 10.0)))
+			precip = float(w.get("precip_intensity", w.get("precip", 0.0)))
+			ground = str(w.get("ground_state", "dry"))
+			vis = float(w.get("visibility", 1.0))
+			wind = float(w.get("wind", 0.2))
+	var pkg: Dictionary = MapPolishFormatters.production_campaign_risk(temp, precip, ground, vis, wind, 1.0)
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_supply_campaign_spine_chip_bbcode(province: Province) -> String:
+	if province == null or not MapManager.has_method("supply_campaign_spine_for_province"):
+		return ""
+	var pkg: Dictionary = MapManager.supply_campaign_spine_for_province(int(province.id), 1.0)
+	if bool(pkg.get("empty", true)):
+		return ""
+	return str(pkg.get("bbcode", pkg.get("summary", "")))
+
+
+static func build_cohesion_integrity_chip_bbcode() -> String:
+	var gate: Dictionary = MapPolishFormatters.cohesion_integrity_gate(1.1, 0.8, 0.2)
+	return str(gate.get("bbcode", gate.get("summary", "")))
+
+
+static func build_agent_counterplay_inspector_bbcode(province: Province) -> String:
+	if province == null or typeof(GameData) == TYPE_NIL or not GameData.has_method("get_peace_state"):
+		return ""
+	var ps: Dictionary = GameData.get_peace_state()
+	var sig: Dictionary = ps.get("hh_last_map_signal", {}) if ps is Dictionary else {}
+	if sig.is_empty() or not bool(sig.get("active", false)):
+		return ""
+	var sig_pid := int(sig.get("province_id", -1))
+	if sig_pid >= 0 and sig_pid != province.id:
+		return ""
+	var action := str(sig.get("action_class", "influence")).to_lower()
+	var options: PackedStringArray = []
+	match action:
+		"sabotage":
+			options = PackedStringArray([
+				"Deploy counter-intel agents",
+				"Rush infrastructure repair",
+				"Raise province security",
+			])
+		"economic_pressure":
+			options = PackedStringArray([
+				"Divert trade routes",
+				"Release strategic stockpile",
+				"Subsidize local industry",
+			])
+		"infiltration":
+			options = PackedStringArray([
+				"Loyalty security sweep",
+				"Counter-propaganda campaign",
+				"Hunt enemy agents",
+			])
+		_:
+			options = PackedStringArray([
+				"Open intelligence investigation",
+				"Issue policy response",
+			])
+	var out: PackedStringArray = []
+	out.append("%s── Agent counterplay ──[/color]" % COLOR_HEADER)
+	out.append(
+		"%sCounterplay vs %s[/color]" % [COLOR_MUTED, action]
+	)
+	for o in options:
+		out.append("%s◇ %s[/color]" % [COLOR_MUTED, o])
+	return "\n".join(out)
+
+
+## Multi-month HH agenda trail from GameData (source of truth: hh_agenda_trail).
+static func build_hh_agenda_trail_inspector_bbcode(max_lines: int = 4) -> String:
+	if typeof(GameData) == TYPE_NIL:
+		return ""
+	var plain := ""
+	if GameData.has_method("format_hh_agenda_trail_plain"):
+		plain = str(GameData.format_hh_agenda_trail_plain(max_lines)).strip_edges()
+	elif GameData.has_method("get_hh_agenda_trail"):
+		var trail: Array = GameData.get_hh_agenda_trail()
+		var bits: PackedStringArray = []
+		var start := maxi(0, trail.size() - maxi(1, max_lines))
+		for i in range(start, trail.size()):
+			var e: Variant = trail[i]
+			if typeof(e) != TYPE_DICTIONARY:
+				continue
+			var s := str((e as Dictionary).get("summary", "")).strip_edges()
+			if s.is_empty():
+				s = str((e as Dictionary).get("label", ""))
+			if not s.is_empty():
+				bits.append(s)
+		plain = "\n".join(bits)
+	if plain.is_empty():
+		return ""
+	var out_lines: PackedStringArray = []
+	out_lines.append("%s── ◈ Hidden Hand agenda (recent) ──[/color]" % COLOR_HEADER)
+	for ln in plain.split("\n"):
+		var t := str(ln).strip_edges()
+		if t.is_empty():
+			continue
+		out_lines.append("%s%s[/color]" % [COLOR_MUTED, t])
+	return "\n".join(out_lines)
+
+
 static func build_province_infrastructure_card_bbcode(
 	province: Province,
 	compact: bool = true,
@@ -3321,8 +7342,13 @@ static func build_province_infrastructure_card_bbcode(
 	if not province_needs_infrastructure_ui(province):
 		return ""
 	var bd := _infra_repair_breakdown(province)
+	var tag_early := country_tag_for_province(province)
+	# Investment-only path: show project progress/sabo even when repair breakdown is empty.
 	if bd.is_empty():
-		return ""
+		var invest_only := _build_active_investment_project_line(province, tag_early)
+		if invest_only.is_empty():
+			return ""
+		return "%s── 🚧 Infrastructure project ──[/color]\n%s" % [COLOR_HEADER, invest_only]
 	var rate := float(bd.get("total", 0.0))
 	var infra := int(bd.get("infrastructure", province.infrastructure))
 	var status := _pressure_status_label(province, bd)
@@ -3479,6 +7505,10 @@ static func province_needs_infrastructure_ui(province: Province) -> bool:
 		return true
 	if province.infrastructure < 50:
 		return true
+	# Active provincial investment must surface progress/cancel/sabo even at high infra.
+	var mgr := _get_infra_mgr_for_insight()
+	if mgr != null and mgr.has_method("has_active_project") and mgr.has_active_project(province.id):
+		return true
 	if typeof(MapManager) != TYPE_NIL:
 		var bd := MapManager.get_infrastructure_repair_breakdown(province.id)
 		if float(bd.get("depot_sabotage_level", 0.0)) > 0.05:
@@ -3488,22 +7518,178 @@ static func province_needs_infrastructure_ui(province: Province) -> bool:
 
 static func build_province_infrastructure_section_bbcode(province: Province) -> String:
 	var base := build_province_infrastructure_card_bbcode(province, false)
-
-	# Add special sites summary if present
-	if province != null and province.special_sites.size() > 0:
-		var ss_lines: PackedStringArray = []
-		for site in province.special_sites:
-			if site == null:
-				continue
-			var state := "✓" if site.is_completed() else "🚧" if site.is_under_construction() else "⚠"
-			ss_lines.append("%s %s (T%d)" % [state, site.id, site.tier])
-		if ss_lines.size() > 0:
-			base += "\n[color=#a0c0ff]Special Sites:[/color] " + " · ".join(ss_lines)
-
+	var sites_block := build_special_sites_effect_bbcode(province, false)
+	if not sites_block.is_empty():
+		if not base.is_empty():
+			base += "\n"
+		base += sites_block
+	var choke := build_naval_chokepoint_badge_bbcode(province)
+	if not choke.is_empty():
+		if not base.is_empty():
+			base += "\n"
+		base += choke
 	return base
 
 
+## Hover/inspector: special sites with readable names + effect readout (supply/trade/etc.).
+## Delegates pure formatting to MapPolishFormatters (shipped pure helpers).
+static func build_special_sites_effect_bbcode(province: Province, compact: bool = true) -> String:
+	if province == null or province.special_sites.is_empty():
+		return ""
+	var lines: PackedStringArray = []
+	var ssm = null
+	if typeof(SpecialSiteManager) != TYPE_NIL:
+		ssm = SpecialSiteManager
+	for site in province.special_sites:
+		if site == null:
+			continue
+		var display := str(site.id).replace("_", " ")
+		var def: Dictionary = {}
+		if ssm != null and ssm.has_method("get_site_definition"):
+			def = ssm.get_site_definition(site.id)
+			if def.has("name"):
+				display = str(def["name"])
+		var effects: Dictionary = def.get("effects", {}) if not def.is_empty() else {}
+		var state: String = _MapPolishFormatters.site_state_icon(
+			site.is_completed(), site.is_under_construction(), site.is_damaged()
+		)
+		var under_c := site.is_under_construction()
+		var bits: PackedStringArray = _MapPolishFormatters.format_site_effect_bits(
+			float(site.supply_bonus),
+			float(site.trade_capacity),
+			effects,
+			float(site.construction_progress) if under_c else -1.0,
+			int(site.damage_level) if site.is_damaged() else 0,
+		)
+		var desc := str(def.get("description", "")) if not compact else ""
+		lines.append(
+			_MapPolishFormatters.format_special_site_line(
+				str(site.id), display, int(site.tier), state, bits, compact, desc
+			)
+		)
+	return _MapPolishFormatters.format_special_sites_block(lines, compact)
+
+
+## Badge when province is a data-driven naval chokepoint / strait (contest state).
+static func build_naval_chokepoint_badge_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("has_strategic_chokepoint"):
+		return ""
+	if not MapManager.has_strategic_chokepoint(province.id):
+		return ""
+	if MapManager.has_method("get_chokepoint_contest_state"):
+		var contest: Dictionary = MapManager.get_chokepoint_contest_state(province.id)
+		if not contest.is_empty():
+			return _MapPolishFormatters.format_chokepoint_contest_badge(contest)
+	var bonus := 1.0
+	if MapManager.has_method("get_chokepoint_or_river_supply_bonus"):
+		bonus = MapManager.get_chokepoint_or_river_supply_bonus(province.id)
+	var owner_tag := ""
+	var ctrl_tag := ""
+	if "owner_tag" in province:
+		owner_tag = str(province.owner_tag)
+	if "controller_tag" in province:
+		ctrl_tag = str(province.controller_tag)
+	if ctrl_tag.is_empty() and MapManager.has_method("get_province_controller"):
+		ctrl_tag = str(MapManager.get_province_controller(province.id))
+	if owner_tag.is_empty() and MapManager.has_method("get_province_owner"):
+		owner_tag = str(MapManager.get_province_owner(province.id))
+	return _MapPolishFormatters.format_chokepoint_badge(bonus, ctrl_tag, owner_tag)
+
+
+## Naval basing pilot badge (anchorage / port / major_base + capacity).
+static func build_naval_basing_badge_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) == TYPE_NIL:
+		return ""
+	var basing: Dictionary = {}
+	if MapManager.has_method("get_naval_basing"):
+		basing = MapManager.get_naval_basing(province.id)
+	elif MapManager.has_method("get_naval_basing_for_province"):
+		basing = MapManager.get_naval_basing_for_province(province.id)
+	else:
+		# Fallback: derive signals locally and call pure formatter
+		var domain := ""
+		var facility := ""
+		var is_coastal := false
+		var is_sea := bool(province.is_sea)
+		if MapManager.has_method("get_province_terrain"):
+			var terr: Dictionary = MapManager.get_province_terrain(province.id)
+			domain = str(terr.get("domain", ""))
+			facility = str(terr.get("facility_tier", ""))
+			var tdom := domain.to_lower()
+			is_coastal = tdom == "coastal_land" or tdom == "coastal"
+			if tdom == "sea" or tdom == "ocean":
+				is_sea = true
+		var choke := false
+		if MapManager.has_method("has_strategic_chokepoint"):
+			choke = MapManager.has_strategic_chokepoint(province.id)
+		var in_zone := false
+		if MapManager.has_method("get_sea_zone_name"):
+			in_zone = not str(MapManager.get_sea_zone_name(province.id)).strip_edges().is_empty()
+		var has_port := bool(province.has_port)
+		var port_tier := 0
+		var shipyard := false
+		if province.special_sites != null:
+			for site in province.special_sites:
+				if site == null or not site.is_completed():
+					continue
+				if site.site_type == SpecialSite.SiteType.PORT:
+					has_port = true
+					port_tier = maxi(port_tier, int(site.tier))
+				elif site.site_type == SpecialSite.SiteType.NAVAL_SHIPYARD:
+					shipyard = true
+		basing = _MapPolishFormatters.compute_naval_basing(
+			domain,
+			is_sea,
+			is_coastal,
+			has_port,
+			port_tier,
+			shipyard,
+			shipyard,
+			choke,
+			facility,
+			in_zone,
+			province.id,
+		)
+	if basing.is_empty() or not bool(basing.get("is_naval", false)):
+		return ""
+	return _MapPolishFormatters.format_naval_basing_badge(basing)
+
+
+## Sea-zone theater label + control stub (unowned / contested / controlled by TAG).
+static func build_sea_zone_badge_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_sea_zone_name"):
+		return ""
+	var zname := str(MapManager.get_sea_zone_name(province.id)).strip_edges()
+	if zname.is_empty():
+		return ""
+	if MapManager.has_method("get_sea_zone_control"):
+		var ctrl: Dictionary = MapManager.get_sea_zone_control(zname)
+		if not ctrl.is_empty():
+			return _MapPolishFormatters.format_sea_zone_control_badge(
+				str(ctrl.get("zone", zname)),
+				str(ctrl.get("controller", "")),
+				bool(ctrl.get("contested", false)),
+				bool(ctrl.get("unowned", false)),
+			)
+	# Fallback: still show strategic modifiers if control API missing but zone known
+	if MapManager.has_method("get_sea_zone_strategic_modifiers"):
+		var mods: Dictionary = MapManager.get_sea_zone_strategic_modifiers(zname)
+		if not mods.is_empty():
+			return (
+				"[color=#5ec8ff]🌊 Sea zone[/color] [color=#8899aa]%s — %s[/color]"
+				% [zname, str(mods.get("summary", "naval theater"))]
+			)
+	return "[color=#5ec8ff]🌊 Sea zone[/color] [color=#8899aa]%s — naval ops / convoy theater[/color]" % zname
+
+
 ## Shows active "Invest in Infrastructure" project status in hover tooltips and inspector.
+## Uses real IDM get_project_status → MapPolishFormatters pure line builder.
 static func _build_active_investment_project_line(province: Province, country_tag: String) -> String:
 	if province == null:
 		return ""
@@ -3518,22 +7704,7 @@ static func _build_active_investment_project_line(province: Province, country_ta
 		st = mgr.get_project_status(province.id)
 	if st.is_empty():
 		return ""
-
-	var pct := int(round(float(st.get("progress", 0.0))))
-	var eta := int(st.get("eta_days", 0))
-	var target := int(st.get("target_level", province.infrastructure + 1))
-	var sabotaged := bool(st.get("is_sabotaged", false))
-
-	var color := COLOR_TECH
-	var icon := "🚧"
-	if sabotaged:
-		color = COLOR_WARN
-		icon = "⚠"
-
-	var sab := " (under sabotage)" if sabotaged else ""
-	return "%s%s Infra Investment → Lv.%d  %d%%%s (ETA %dd)[/color]" % [
-		color, icon, target, pct, sab, eta
-	]
+	return _MapPolishFormatters.format_investment_status_line(st, province.infrastructure)
 
 
 static func _get_infra_mgr_for_insight() -> Object:
@@ -4242,6 +8413,14 @@ static func format_report_tooltip(report: Dictionary) -> String:
 	var glance := build_province_glance_bbcode(p, pe, 4, skip_dual_glance, omit_support_in_glance)
 	if not glance.is_empty():
 		lines.append(glance)
+	# Special sites + chokepoint on hover even when sabotage card is empty.
+	if infra_card.is_empty() or "Sites:" not in infra_card:
+		var sites_tip := build_special_sites_effect_bbcode(p, true)
+		if not sites_tip.is_empty():
+			lines.append(sites_tip)
+	var choke_tip := build_naval_chokepoint_badge_bbcode(p)
+	if not choke_tip.is_empty() and (infra_card.is_empty() or "Naval chokepoint" not in infra_card):
+		lines.append(choke_tip)
 	var bd_dev := _infra_repair_breakdown(p)
 	var dev_extra := ""
 	if has_engineers_stationed(bd_dev):
@@ -5210,6 +9389,16 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 	var def_pow: float = 100.0 + float(defender.infrastructure) * 3.0 + float(defender.development_level) * 2.0
 	var ratio: float = att_pow / maxf(1.0, att_pow + def_pow)
 	var odds: float = clampf(ratio * 100.0, 15.0, 85.0)
+	# Live multi-phase assault estimate card pilot (BattleManager).
+	var assault_card: Dictionary = {}
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("build_weather_aware_assault_estimate_card"):
+		assault_card = BattleManager.build_weather_aware_assault_estimate_card(
+			att_pow, def_pow, defender.id, 1.0, str(defender.name)
+		)
+	elif typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("build_assault_estimate_card"):
+		assault_card = BattleManager.build_assault_estimate_card(
+			att_pow, def_pow, 1.0, 1.0, str(defender.name)
+		)
 
 	# Supply (use depot if available)
 	var supply_mod: float = 1.0
@@ -5298,6 +9487,25 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 	if float(preview.get("snow_coverage", 0.0)) > 0.1 or float(preview.get("snow_potential", 0.0)) > 0.1:
 		preview["snow_note"] = "❄ Snow cov %.0f%% (layer pot %.0f%%) - attack/mobility hit" % [float(preview["snow_coverage"])*100, float(preview["snow_potential"])*100]
 	preview["odds_attacker_win"] = odds
+	# Explicit power fields for map assault toast (was missing → GER 0 vs FRA 0).
+	preview["attack_power"] = att_pow
+	preview["defense_power"] = def_pow
+	# Optional: fold live divisions if BattleManager can list them.
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
+		var att_divs: Array = BattleManager.get_divisions_at_province(attacker.id, "")
+		var def_divs: Array = BattleManager.get_divisions_at_province(defender.id, "")
+		var att_n := att_divs.size()
+		var def_n := def_divs.size()
+		if att_n > 0:
+			preview["attack_power"] = att_pow + float(att_n) * 25.0
+			preview["attacker_divisions"] = att_n
+		if def_n > 0:
+			preview["defense_power"] = def_pow + float(def_n) * 25.0
+			preview["defender_divisions"] = def_n
+		# Recompute rough odds with division-weighted power.
+		var ap2 := float(preview["attack_power"])
+		var dp2 := float(preview["defense_power"])
+		preview["odds_attacker_win"] = clampf((ap2 / maxf(1.0, ap2 + dp2)) * 100.0, 10.0, 90.0)
 	preview["engaged_units_att"] = ["Infantry x4", "Armor x2", "Support x1"]
 	preview["engaged_units_def"] = ["Infantry x3", "Fort x1"]
 	preview["leaders_att"] = ["Rommel (+15% attack, +org)"]
@@ -5307,11 +9515,11 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 	var air_recon_b := 0.0
 	var sm_pi := _supply_manager()
 	if sm_pi and sm_pi.has_method("get_combat_presence_registry"):
-		var reg_pi := sm_pi.call("get_combat_presence_registry")
-		if reg_pi:
-			var rpt_pi := reg_pi.get_report(attacker.id) if attacker else null
-			if rpt_pi and rpt_pi.has_method("get_air_recon_bonus"):
-				air_recon_b = float(rpt_pi.get_air_recon_bonus("player"))
+		var reg_pi: Variant = sm_pi.call("get_combat_presence_registry")
+		if reg_pi != null and attacker != null and reg_pi.has_method("get_report"):
+			var rpt_pi: Variant = reg_pi.call("get_report", attacker.id)
+			if rpt_pi != null and rpt_pi.has_method("get_air_recon_bonus"):
+				air_recon_b = float(rpt_pi.call("get_air_recon_bonus", "player"))
 	if air_recon_b > 0.05:
 		preview["air_recon_bonus"] = air_recon_b
 		preview["air_factors"] += " +recon intel"
@@ -5324,6 +9532,13 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 		preview["sabotage_level"] = sabo_level
 		preview["modifiers"].append("-%.0f%% defender fort/readiness (pre-battle agent sabotage/intel)" % (sabo_level * 40))
 	preview["odds_note"] = "Est. attacker success odds: %.0f%% (power %.1f:%.1f)" % [odds, att_pow, def_pow]
+	# Attach multi-phase assault estimate card for inspector/combat surfaces.
+	if not assault_card.is_empty():
+		preview["assault_estimate_card"] = assault_card
+		preview["assault_estimate_plain"] = str(assault_card.get("plain", ""))
+		preview["assault_recommendation"] = str(assault_card.get("recommendation", ""))
+		if not str(assault_card.get("recommendation", "")).is_empty():
+			preview["modifiers"].append(str(assault_card.get("recommendation", "")))
 	return preview
 
 
@@ -5577,3 +9792,7085 @@ static func _get_stationed_missions_summary(province_id: int, country_tag: Strin
 		if line != "":
 			parts.append(line)
 	return "; ".join(parts) if parts.size() > 0 else "None (assign via F10 Debug missions/orders sub-menu or full formation UI)"
+
+## Next-70 playability chips.
+
+static func build_leader_weather_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_weather_day_for_province"):
+		var day: Dictionary = MapManager.leader_weather_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_oob_factory_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("oob_factory_day_for_province"):
+		var day: Dictionary = MapManager.oob_factory_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_move_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("move_ops_day_for_province"):
+		var day: Dictionary = MapManager.move_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_wx_mission_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_wx_mission_day_for_province"):
+		var day: Dictionary = MapManager.fleet_wx_mission_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_player_surface_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("player_surface_day_live"):
+		var day: Dictionary = MapManager.player_surface_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_province_plan_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_province_plan_day_for_province"):
+		var day: Dictionary = MapManager.multi_province_plan_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_prod_auto_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_prod_auto_day_for_province"):
+		var day: Dictionary = MapManager.theater_prod_auto_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_mutation_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_mutation_day_for_province"):
+		var day: Dictionary = MapManager.focus_mutation_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_mutation_feedback_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("mutation_feedback_day_live"):
+		var day: Dictionary = MapManager.mutation_feedback_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_quarterly_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_quarterly_day_live"):
+		var day: Dictionary = MapManager.hh_quarterly_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_depot_weather_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("depot_weather_day_for_province"):
+		var day: Dictionary = MapManager.depot_weather_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_patrol_strip_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_patrol_strip_day_for_province"):
+		var day: Dictionary = MapManager.fleet_patrol_strip_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_close_loop_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("close_loop_day_live"):
+		var day: Dictionary = MapManager.close_loop_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_missions_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_missions_day_live"):
+		var day: Dictionary = MapManager.agent_missions_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_supply_route_mutation_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("supply_route_mutation_day_for_province"):
+		var day: Dictionary = MapManager.supply_route_mutation_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_basing_fuel_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_fuel_day_for_province"):
+		var day: Dictionary = MapManager.basing_fuel_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_ops_dashboard_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("ops_dashboard_day_for_province"):
+		var day: Dictionary = MapManager.ops_dashboard_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_theater_tick_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_theater_tick_day_for_province"):
+		var day: Dictionary = MapManager.daily_theater_tick_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_command_log_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("command_log_day_live"):
+		var day: Dictionary = MapManager.command_log_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_integrity_gate_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("integrity_gate_day_live"):
+		var day: Dictionary = MapManager.integrity_gate_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+## Next-80 execution surface chips.
+
+static func build_result_feedback_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("result_feedback_day_live"):
+		var day: Dictionary = MapManager.result_feedback_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_day_budget_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("day_budget_day_for_province"):
+		var day: Dictionary = MapManager.day_budget_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_auto_plan_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_auto_plan_day_live"):
+		var day: Dictionary = MapManager.hh_auto_plan_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_append_log_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("append_log_day_live"):
+		var day: Dictionary = MapManager.append_log_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_log_strip_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("log_strip_day_live"):
+		var day: Dictionary = MapManager.log_strip_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_readiness_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_readiness_day_for_province"):
+		var day: Dictionary = MapManager.assault_readiness_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_coherence_delta_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("coherence_delta_day_for_province"):
+		var day: Dictionary = MapManager.coherence_delta_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_order_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_order_day_live"):
+		var day: Dictionary = MapManager.agent_order_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_execution_gate_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("execution_gate_day_live"):
+		var day: Dictionary = MapManager.execution_gate_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_cohesion_gate_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("cohesion_gate_day_live"):
+		var day: Dictionary = MapManager.cohesion_gate_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_command_gate_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("command_gate_day_live"):
+		var day: Dictionary = MapManager.command_gate_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_execute_order_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("execute_order_day_for_province"):
+		var day: Dictionary = MapManager.execute_order_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_sortie_ready_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_sortie_ready_day_for_province"):
+		var day: Dictionary = MapManager.air_sortie_ready_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_combat_brief_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_combat_brief_day_for_province"):
+		var day: Dictionary = MapManager.weather_combat_brief_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_day_audit_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("day_audit_day_live"):
+		var day: Dictionary = MapManager.day_audit_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_map_visible_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("map_visible_day_for_province"):
+		var day: Dictionary = MapManager.map_visible_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_card_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_card_day_for_province"):
+		var day: Dictionary = MapManager.assault_card_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_slot_list_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_slot_list_day_for_province"):
+		var day: Dictionary = MapManager.save_slot_list_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_phase_estimate_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_phase_estimate_day_for_province"):
+		var day: Dictionary = MapManager.multi_phase_estimate_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_strip_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_strip_day_for_province"):
+		var day: Dictionary = MapManager.campaign_strip_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+## Next-90 live command chips.
+
+static func build_mutation_result_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("mutation_result_day_live"):
+		var day: Dictionary = MapManager.mutation_result_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_mutation_strip_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("mutation_strip_day_live"):
+		var day: Dictionary = MapManager.mutation_strip_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_close_mutation_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("close_mutation_day_live"):
+		var day: Dictionary = MapManager.close_mutation_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_mutation_gate_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("mutation_gate_day_live"):
+		var day: Dictionary = MapManager.mutation_gate_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agenda_pick_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agenda_pick_day_live"):
+		var day: Dictionary = MapManager.agenda_pick_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agenda_actions_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agenda_actions_day_live"):
+		var day: Dictionary = MapManager.agenda_actions_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_commit_order_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_commit_order_day_live"):
+		var day: Dictionary = MapManager.hh_commit_order_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_hh_commit_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_hh_commit_day_live"):
+		var day: Dictionary = MapManager.theater_hh_commit_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_counterplay_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_counterplay_day_live"):
+		var day: Dictionary = MapManager.hh_counterplay_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_task_group_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("task_group_day_for_province"):
+		var day: Dictionary = MapManager.task_group_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_basing_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_basing_day_for_province"):
+		var day: Dictionary = MapManager.naval_basing_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_multi_phase_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_multi_phase_day_for_province"):
+		var day: Dictionary = MapManager.naval_multi_phase_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_coastal_fog_gate_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("coastal_fog_gate_day_for_province"):
+		var day: Dictionary = MapManager.coastal_fog_gate_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_phase_ribbon_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("phase_ribbon_day_for_province"):
+		var day: Dictionary = MapManager.phase_ribbon_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_rank_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_rank_day_for_province"):
+		var day: Dictionary = MapManager.assault_rank_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_joint_timeline_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("joint_timeline_day_for_province"):
+		var day: Dictionary = MapManager.joint_timeline_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daylight_combat_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daylight_combat_day_for_province"):
+		var day: Dictionary = MapManager.daylight_combat_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_production_auto_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_auto_day_for_province"):
+		var day: Dictionary = MapManager.production_auto_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_production_risk_alert_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_risk_alert_day_for_province"):
+		var day: Dictionary = MapManager.production_risk_alert_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_day_results_flair_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("day_results_flair_day_live"):
+		var day: Dictionary = MapManager.day_results_flair_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+## Next-100 world-class chips.
+
+static func build_best_assault_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("best_assault_live_day_live"):
+		var day: Dictionary = MapManager.best_assault_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_best_station_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("best_station_live_day_live"):
+		var day: Dictionary = MapManager.best_station_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_execute_one_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("execute_one_live_day_live"):
+		var day: Dictionary = MapManager.execute_one_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_basing_fuel_loop_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_fuel_loop_day_for_province"):
+		var day: Dictionary = MapManager.basing_fuel_loop_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_wx_package_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_wx_package_day_for_province"):
+		var day: Dictionary = MapManager.fleet_wx_package_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_convoy_wx_window_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_wx_window_day_for_province"):
+		var day: Dictionary = MapManager.convoy_wx_window_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_wx_score_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_wx_score_day_for_province"):
+		var day: Dictionary = MapManager.focus_wx_score_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_morale_wx_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("morale_wx_day_for_province"):
+		var day: Dictionary = MapManager.morale_wx_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_risk_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_risk_live_day_live"):
+		var day: Dictionary = MapManager.campaign_risk_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_depot_wx_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("depot_wx_live_day_for_province"):
+		var day: Dictionary = MapManager.depot_wx_live_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_fleet_auto_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_fleet_auto_day_live"):
+		var day: Dictionary = MapManager.daily_fleet_auto_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_combat_auto_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_combat_auto_day_live"):
+		var day: Dictionary = MapManager.daily_combat_auto_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_agent_auto_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_agent_auto_day_live"):
+		var day: Dictionary = MapManager.daily_agent_auto_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_supply_auto_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_supply_auto_day_live"):
+		var day: Dictionary = MapManager.daily_supply_auto_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_basing_signals_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_signals_day_for_province"):
+		var day: Dictionary = MapManager.basing_signals_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_basing_rates_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_rates_day_for_province"):
+		var day: Dictionary = MapManager.basing_rates_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_wx_mult_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_wx_mult_day_for_province"):
+		var day: Dictionary = MapManager.combat_wx_mult_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_sea_zone_trade_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("sea_zone_trade_day_for_province"):
+		var day: Dictionary = MapManager.sea_zone_trade_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_secondary_trail_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_secondary_trail_day_live"):
+		var day: Dictionary = MapManager.hh_secondary_trail_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_campaign_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_campaign_live_day_live"):
+		var day: Dictionary = MapManager.agent_campaign_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+## Next-110 incomplete loops chips.
+
+static func build_live_mut_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("live_mut_board_day_live"):
+		var day: Dictionary = MapManager.live_mut_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_feedback_chain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("feedback_chain_day_live"):
+		var day: Dictionary = MapManager.feedback_chain_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_mut_close_stack_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("mut_close_stack_day_live"):
+		var day: Dictionary = MapManager.mut_close_stack_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_dual_domain_mutate_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("dual_domain_mutate_day_live"):
+		var day: Dictionary = MapManager.dual_domain_mutate_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_mut_fb_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_mut_fb_day_live"):
+		var day: Dictionary = MapManager.assault_mut_fb_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_mut_log_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_mut_log_day_live"):
+		var day: Dictionary = MapManager.agent_mut_log_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_supply_mut_fb_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("supply_mut_fb_day_live"):
+		var day: Dictionary = MapManager.supply_mut_fb_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_surface_stack_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_surface_stack_day_for_province"):
+		var day: Dictionary = MapManager.combat_surface_stack_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_phase_timeline_stack_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("phase_timeline_stack_day_for_province"):
+		var day: Dictionary = MapManager.phase_timeline_stack_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_rank_card_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_rank_card_day_for_province"):
+		var day: Dictionary = MapManager.assault_rank_card_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_joint_naval_land_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("joint_naval_land_day_for_province"):
+		var day: Dictionary = MapManager.joint_naval_land_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_front_surface_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_front_surface_day_for_province"):
+		var day: Dictionary = MapManager.multi_front_surface_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_depth_strip_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_depth_strip_day_for_province"):
+		var day: Dictionary = MapManager.combat_depth_strip_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_phase_estimate_ribbon_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("phase_estimate_ribbon_day_for_province"):
+		var day: Dictionary = MapManager.phase_estimate_ribbon_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_path_stack_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_path_stack_day_for_province"):
+		var day: Dictionary = MapManager.fleet_path_stack_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_basing_mission_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_mission_day_for_province"):
+		var day: Dictionary = MapManager.basing_mission_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_path_stack_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_path_stack_day_live"):
+		var day: Dictionary = MapManager.hh_path_stack_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_trail_counter_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_trail_counter_day_live"):
+		var day: Dictionary = MapManager.hh_trail_counter_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_mission_path_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_mission_path_day_live"):
+		var day: Dictionary = MapManager.agent_mission_path_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_incomplete_loop_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("incomplete_loop_close_day_live"):
+		var day: Dictionary = MapManager.incomplete_loop_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+## Next-120 industry/save chips.
+
+static func build_prod_mut_apply_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("prod_mut_apply_day_live"):
+		var day: Dictionary = MapManager.prod_mut_apply_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_supply_mut_apply_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("supply_mut_apply_day_live"):
+		var day: Dictionary = MapManager.supply_mut_apply_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_execute_prod_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("execute_prod_live_day_live"):
+		var day: Dictionary = MapManager.execute_prod_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_day_budget_apply_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("day_budget_apply_day_live"):
+		var day: Dictionary = MapManager.day_budget_apply_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_audit_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_audit_live_day_live"):
+		var day: Dictionary = MapManager.apply_audit_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_live_apply_results_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("live_apply_results_day_live"):
+		var day: Dictionary = MapManager.live_apply_results_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_mutation_gate_apply_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("mutation_gate_apply_day_live"):
+		var day: Dictionary = MapManager.mutation_gate_apply_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_prod_auto_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_prod_auto_live_day_live"):
+		var day: Dictionary = MapManager.daily_prod_auto_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_prod_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_prod_live_day_live"):
+		var day: Dictionary = MapManager.theater_prod_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_prod_campaign_risk_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("prod_campaign_risk_day_for_province"):
+		var day: Dictionary = MapManager.prod_campaign_risk_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_prod_wx_stack_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("prod_wx_stack_day_for_province"):
+		var day: Dictionary = MapManager.prod_wx_stack_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_factory_risk_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("factory_risk_live_day_for_province"):
+		var day: Dictionary = MapManager.factory_risk_live_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_depot_prod_stack_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("depot_prod_stack_day_for_province"):
+		var day: Dictionary = MapManager.depot_prod_stack_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_industry_close_loop_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("industry_close_loop_day_for_province"):
+		var day: Dictionary = MapManager.industry_close_loop_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_slot_surface_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_slot_surface_day_live"):
+		var day: Dictionary = MapManager.save_slot_surface_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_browser_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_browser_live_day_live"):
+		var day: Dictionary = MapManager.save_browser_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_continuity_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_continuity_day_live"):
+		var day: Dictionary = MapManager.campaign_continuity_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_ops_dash_continuity_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("ops_dash_continuity_day_for_province"):
+		var day: Dictionary = MapManager.ops_dash_continuity_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_execution_gate_cont_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("execution_gate_cont_day_live"):
+		var day: Dictionary = MapManager.execution_gate_cont_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_industry_save_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("industry_save_close_day_live"):
+		var day: Dictionary = MapManager.industry_save_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+## Next-130 fleet/HH/combat chips.
+
+static func build_fleet_ai_task_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_ai_task_day_live"):
+		var day: Dictionary = MapManager.fleet_ai_task_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_wx_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_wx_ops_day_live"):
+		var day: Dictionary = MapManager.fleet_wx_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_basing_fuel_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_fuel_ops_day_for_province"):
+		var day: Dictionary = MapManager.basing_fuel_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_phase_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_phase_ops_day_for_province"):
+		var day: Dictionary = MapManager.naval_phase_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_coastal_fog_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("coastal_fog_ops_day_for_province"):
+		var day: Dictionary = MapManager.coastal_fog_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_station_mut_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_station_mut_day_live"):
+		var day: Dictionary = MapManager.fleet_station_mut_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_task_mut_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_task_mut_day_live"):
+		var day: Dictionary = MapManager.naval_task_mut_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_agenda_pick_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_agenda_pick_day_live"):
+		var day: Dictionary = MapManager.hh_agenda_pick_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_agenda_actions_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_agenda_actions_day_live"):
+		var day: Dictionary = MapManager.hh_agenda_actions_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_order_path_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_order_path_day_live"):
+		var day: Dictionary = MapManager.hh_order_path_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_hh_path_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_hh_path_day_live"):
+		var day: Dictionary = MapManager.theater_hh_path_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_trail_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_trail_ops_day_live"):
+		var day: Dictionary = MapManager.hh_trail_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_mission_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_mission_ops_day_live"):
+		var day: Dictionary = MapManager.agent_mission_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_campaign_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_campaign_ops_day_live"):
+		var day: Dictionary = MapManager.agent_campaign_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_inspect_stack_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_inspect_stack_day_live"):
+		var day: Dictionary = MapManager.combat_inspect_stack_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_phase_ribbon_inspect_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("phase_ribbon_inspect_day_for_province"):
+		var day: Dictionary = MapManager.phase_ribbon_inspect_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_joint_timeline_inspect_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("joint_timeline_inspect_day_for_province"):
+		var day: Dictionary = MapManager.joint_timeline_inspect_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_rank_inspect_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_rank_inspect_day_for_province"):
+		var day: Dictionary = MapManager.assault_rank_inspect_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_campaign_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_campaign_ops_day_for_province"):
+		var day: Dictionary = MapManager.combat_campaign_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_hh_combat_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_hh_combat_close_day_live"):
+		var day: Dictionary = MapManager.fleet_hh_combat_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+## Next-140 logistics/force/panel chips.
+
+static func build_depot_logistics_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("depot_logistics_day_live"):
+		var day: Dictionary = MapManager.depot_logistics_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_supply_route_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("supply_route_ops_day_live"):
+		var day: Dictionary = MapManager.supply_route_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_move_path_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("move_path_ops_day_for_province"):
+		var day: Dictionary = MapManager.move_path_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_province_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_province_ops_day_for_province"):
+		var day: Dictionary = MapManager.multi_province_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_auto_tick_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_auto_tick_day_live"):
+		var day: Dictionary = MapManager.theater_auto_tick_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_supply_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_supply_ops_day_for_province"):
+		var day: Dictionary = MapManager.daily_supply_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_logistics_theater_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("logistics_theater_close_day_for_province"):
+		var day: Dictionary = MapManager.logistics_theater_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_force_readiness_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_readiness_ops_day_live"):
+		var day: Dictionary = MapManager.force_readiness_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_oob_factory_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("oob_factory_ops_day_live"):
+		var day: Dictionary = MapManager.oob_factory_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_equip_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_equip_ops_day_live"):
+		var day: Dictionary = MapManager.medium_equip_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_skim_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_skim_ops_day_for_province"):
+		var day: Dictionary = MapManager.naval_skim_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_basing_logistics_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_logistics_ops_day_for_province"):
+		var day: Dictionary = MapManager.basing_logistics_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_production_force_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_force_ops_day_for_province"):
+		var day: Dictionary = MapManager.production_force_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_force_oob_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_oob_close_day_live"):
+		var day: Dictionary = MapManager.force_oob_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_player_surface_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("player_surface_ops_day_live"):
+		var day: Dictionary = MapManager.player_surface_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_order_panel_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("order_panel_ops_day_live"):
+		var day: Dictionary = MapManager.order_panel_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_panel_sections_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("panel_sections_ops_day_live"):
+		var day: Dictionary = MapManager.panel_sections_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_tooltip_flair_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tooltip_flair_ops_day_for_province"):
+		var day: Dictionary = MapManager.tooltip_flair_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_audit_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_audit_ops_day_for_province"):
+		var day: Dictionary = MapManager.apply_audit_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_logistics_force_panel_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("logistics_force_panel_close_day_live"):
+		var day: Dictionary = MapManager.logistics_force_panel_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_wx_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_wx_ops_day_live"):
+		var day: Dictionary = MapManager.combat_wx_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_prod_wx_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("prod_wx_ops_day_live"):
+		var day: Dictionary = MapManager.prod_wx_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_sortie_wx_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_sortie_wx_day_for_province"):
+		var day: Dictionary = MapManager.air_sortie_wx_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_morale_wx_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("morale_wx_ops_day_for_province"):
+		var day: Dictionary = MapManager.morale_wx_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_convoy_wx_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_wx_ops_day_live"):
+		var day: Dictionary = MapManager.convoy_wx_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daylight_wx_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daylight_wx_ops_day_for_province"):
+		var day: Dictionary = MapManager.daylight_wx_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_ops_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_ops_close_day_live"):
+		var day: Dictionary = MapManager.weather_ops_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_economy_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_ops_day_live"):
+		var day: Dictionary = MapManager.war_economy_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_prod_campaign_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("prod_campaign_ops_day_for_province"):
+		var day: Dictionary = MapManager.prod_campaign_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_wx_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_wx_ops_day_live"):
+		var day: Dictionary = MapManager.focus_wx_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_mut_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_mut_ops_day_for_province"):
+		var day: Dictionary = MapManager.focus_mut_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_supply_economy_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("supply_economy_ops_day_for_province"):
+		var day: Dictionary = MapManager.supply_economy_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_depot_economy_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("depot_economy_ops_day_for_province"):
+		var day: Dictionary = MapManager.depot_economy_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_economy_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_close_day_live"):
+		var day: Dictionary = MapManager.war_economy_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_counter_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_counter_ops_day_live"):
+		var day: Dictionary = MapManager.intel_counter_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_intel_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_intel_ops_day_live"):
+		var day: Dictionary = MapManager.agent_intel_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_counter_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_counter_ops_day_for_province"):
+		var day: Dictionary = MapManager.hh_counter_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_map_effect_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("map_effect_ops_day_for_province"):
+		var day: Dictionary = MapManager.map_effect_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_coherence_intel_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("coherence_intel_day_for_province"):
+		var day: Dictionary = MapManager.coherence_intel_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_economy_intel_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_economy_intel_close_day_live"):
+		var day: Dictionary = MapManager.weather_economy_intel_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_province_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_province_campaign_day_live"):
+		var day: Dictionary = MapManager.multi_province_campaign_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_auto_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_auto_campaign_day_live"):
+		var day: Dictionary = MapManager.theater_auto_campaign_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_command_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_command_ops_day_for_province"):
+		var day: Dictionary = MapManager.daily_command_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_readiness_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_readiness_ops_day_live"):
+		var day: Dictionary = MapManager.theater_readiness_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_move_path_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("move_path_campaign_day_for_province"):
+		var day: Dictionary = MapManager.move_path_campaign_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_order_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_order_board_day_for_province"):
+		var day: Dictionary = MapManager.theater_order_board_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_campaign_close_day_live"):
+		var day: Dictionary = MapManager.theater_campaign_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_basing_fleet_sustain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_fleet_sustain_day_live"):
+		var day: Dictionary = MapManager.basing_fleet_sustain_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_wx_sustain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_wx_sustain_day_for_province"):
+		var day: Dictionary = MapManager.fleet_wx_sustain_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_convoy_sustain_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_sustain_ops_day_live"):
+		var day: Dictionary = MapManager.convoy_sustain_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_sealane_joint_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("sealane_joint_ops_day_live"):
+		var day: Dictionary = MapManager.sealane_joint_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_order_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_order_ops_day_for_province"):
+		var day: Dictionary = MapManager.naval_order_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_station_sustain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_station_sustain_day_for_province"):
+		var day: Dictionary = MapManager.fleet_station_sustain_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_sealane_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_sealane_close_day_live"):
+		var day: Dictionary = MapManager.naval_sealane_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_player_surface_session_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("player_surface_session_day_live"):
+		var day: Dictionary = MapManager.player_surface_session_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_order_panel_session_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("order_panel_session_day_live"):
+		var day: Dictionary = MapManager.order_panel_session_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_mutation_feedback_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("mutation_feedback_ops_day_for_province"):
+		var day: Dictionary = MapManager.mutation_feedback_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_audit_session_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_audit_session_day_for_province"):
+		var day: Dictionary = MapManager.apply_audit_session_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_decision_strip_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("decision_strip_ops_day_for_province"):
+		var day: Dictionary = MapManager.decision_strip_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_naval_session_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_naval_session_close_day_live"):
+		var day: Dictionary = MapManager.theater_naval_session_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_phase_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_phase_ops_day_live"):
+		var day: Dictionary = MapManager.combat_phase_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_ready_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_ready_ops_day_live"):
+		var day: Dictionary = MapManager.assault_ready_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_phase_est_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_phase_est_ops_day_live"):
+		var day: Dictionary = MapManager.multi_phase_est_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_order_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_order_ops_day_for_province"):
+		var day: Dictionary = MapManager.combat_order_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_rank_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_rank_ops_day_for_province"):
+		var day: Dictionary = MapManager.assault_rank_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_phase_ribbon_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("phase_ribbon_ops_day_for_province"):
+		var day: Dictionary = MapManager.phase_ribbon_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_phase_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_phase_close_day_live"):
+		var day: Dictionary = MapManager.combat_phase_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_mission_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_mission_campaign_day_live"):
+		var day: Dictionary = MapManager.agent_mission_campaign_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_dispatch_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_dispatch_ops_day_for_province"):
+		var day: Dictionary = MapManager.agent_dispatch_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_commit_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_commit_campaign_day_for_province"):
+		var day: Dictionary = MapManager.hh_commit_campaign_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_counterplay_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("counterplay_campaign_day_live"):
+		var day: Dictionary = MapManager.counterplay_campaign_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_agenda_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_agenda_ops_day_for_province"):
+		var day: Dictionary = MapManager.hh_agenda_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_hh_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_hh_joint_day_for_province"):
+		var day: Dictionary = MapManager.agent_hh_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_hh_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_hh_close_day_live"):
+		var day: Dictionary = MapManager.agent_hh_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_joint_theater_combat_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("joint_theater_combat_day_live"):
+		var day: Dictionary = MapManager.joint_theater_combat_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_joint_naval_combat_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("joint_naval_combat_day_live"):
+		var day: Dictionary = MapManager.joint_naval_combat_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_joint_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_joint_ops_day_for_province"):
+		var day: Dictionary = MapManager.focus_joint_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_joint_command_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("joint_command_ops_day_live"):
+		var day: Dictionary = MapManager.joint_command_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_domain_strip_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_domain_strip_day_for_province"):
+		var day: Dictionary = MapManager.multi_domain_strip_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_agent_joint_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_agent_joint_close_day_live"):
+		var day: Dictionary = MapManager.combat_agent_joint_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_prod_factory_risk_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("prod_factory_risk_ops_day_live"):
+		var day: Dictionary = MapManager.prod_factory_risk_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_equip_horizon_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_equip_horizon_ops_day_live"):
+		var day: Dictionary = MapManager.medium_equip_horizon_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_production_priority_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_priority_ops_day_live"):
+		var day: Dictionary = MapManager.production_priority_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_oob_equip_continuity_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("oob_equip_continuity_day_for_province"):
+		var day: Dictionary = MapManager.oob_equip_continuity_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_factory_line_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("factory_line_ops_day_for_province"):
+		var day: Dictionary = MapManager.factory_line_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_stockpile_growth_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("stockpile_growth_ops_day_for_province"):
+		var day: Dictionary = MapManager.stockpile_growth_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_production_oob_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_oob_close_day_live"):
+		var day: Dictionary = MapManager.production_oob_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_sortie_front_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_sortie_front_ops_day_live"):
+		var day: Dictionary = MapManager.air_sortie_front_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_front_rank_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_front_rank_ops_day_live"):
+		var day: Dictionary = MapManager.multi_front_rank_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_land_joint_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_land_joint_ops_day_live"):
+		var day: Dictionary = MapManager.air_land_joint_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_front_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_front_ops_day_for_province"):
+		var day: Dictionary = MapManager.assault_front_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_forecast_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_forecast_ops_day_for_province"):
+		var day: Dictionary = MapManager.air_forecast_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_front_supply_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_front_supply_ops_day_for_province"):
+		var day: Dictionary = MapManager.multi_front_supply_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_front_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_front_close_day_live"):
+		var day: Dictionary = MapManager.air_front_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_path_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_path_ops_day_live"):
+		var day: Dictionary = MapManager.focus_path_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_cabinet_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_cabinet_ops_day_live"):
+		var day: Dictionary = MapManager.war_cabinet_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_strip_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_strip_ops_day_for_province"):
+		var day: Dictionary = MapManager.strategic_strip_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_priority_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_priority_ops_day_for_province"):
+		var day: Dictionary = MapManager.focus_priority_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_continuity_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_continuity_ops_day_for_province"):
+		var day: Dictionary = MapManager.strategic_continuity_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_prod_air_focus_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("prod_air_focus_close_day_live"):
+		var day: Dictionary = MapManager.prod_air_focus_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_slot_integrity_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_slot_integrity_ops_day_live"):
+		var day: Dictionary = MapManager.save_slot_integrity_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_autosave_session_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("autosave_session_ops_day_live"):
+		var day: Dictionary = MapManager.autosave_session_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_session_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_session_ops_day_for_province"):
+		var day: Dictionary = MapManager.campaign_session_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_resume_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_resume_ops_day_for_province"):
+		var day: Dictionary = MapManager.save_resume_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_session_checkpoint_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("session_checkpoint_ops_day_for_province"):
+		var day: Dictionary = MapManager.session_checkpoint_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_audit_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_audit_ops_day_for_province"):
+		var day: Dictionary = MapManager.save_audit_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_session_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_session_close_day_live"):
+		var day: Dictionary = MapManager.save_session_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_assign_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_assign_ops_day_live"):
+		var day: Dictionary = MapManager.leader_assign_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_formation_ready_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("formation_ready_ops_day_live"):
+		var day: Dictionary = MapManager.formation_ready_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_oob_assign_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("oob_assign_ops_day_for_province"):
+		var day: Dictionary = MapManager.oob_assign_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_command_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_command_ops_day_for_province"):
+		var day: Dictionary = MapManager.leader_command_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_formation_station_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("formation_station_ops_day_for_province"):
+		var day: Dictionary = MapManager.formation_station_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_formation_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_formation_joint_day_for_province"):
+		var day: Dictionary = MapManager.leader_formation_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_formation_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_formation_close_day_live"):
+		var day: Dictionary = MapManager.leader_formation_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_trade_chain_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("trade_chain_ops_day_live"):
+		var day: Dictionary = MapManager.trade_chain_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_convoy_escort_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_escort_ops_day_live"):
+		var day: Dictionary = MapManager.convoy_escort_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_sealane_economy_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("sealane_economy_ops_day_live"):
+		var day: Dictionary = MapManager.sealane_economy_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_trade_route_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("trade_route_ops_day_for_province"):
+		var day: Dictionary = MapManager.trade_route_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_convoy_trade_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_trade_joint_day_for_province"):
+		var day: Dictionary = MapManager.convoy_trade_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_leader_trade_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_leader_trade_close_day_live"):
+		var day: Dictionary = MapManager.save_leader_trade_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_panel_surface_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("panel_surface_ops_day_live"):
+		var day: Dictionary = MapManager.panel_surface_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_tooltip_chip_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tooltip_chip_ops_day_live"):
+		var day: Dictionary = MapManager.tooltip_chip_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_insight_budget_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("insight_budget_ops_day_live"):
+		var day: Dictionary = MapManager.insight_budget_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_order_surface_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("order_surface_ops_day_for_province"):
+		var day: Dictionary = MapManager.order_surface_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_product_chip_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("product_chip_ops_day_for_province"):
+		var day: Dictionary = MapManager.product_chip_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_surface_refresh_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("surface_refresh_ops_day_for_province"):
+		var day: Dictionary = MapManager.surface_refresh_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_inspector_surface_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("inspector_surface_close_day_live"):
+		var day: Dictionary = MapManager.inspector_surface_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_infra_invest_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("infra_invest_ops_day_live"):
+		var day: Dictionary = MapManager.infra_invest_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_special_site_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("special_site_ops_day_live"):
+		var day: Dictionary = MapManager.special_site_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_construction_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("construction_ops_day_for_province"):
+		var day: Dictionary = MapManager.construction_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_infra_project_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("infra_project_ops_day_for_province"):
+		var day: Dictionary = MapManager.infra_project_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_investment_status_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("investment_status_ops_day_for_province"):
+		var day: Dictionary = MapManager.investment_status_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_infra_site_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("infra_site_joint_day_for_province"):
+		var day: Dictionary = MapManager.infra_site_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_infra_invest_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("infra_invest_close_day_live"):
+		var day: Dictionary = MapManager.infra_invest_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_auto_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_auto_ops_day_live"):
+		var day: Dictionary = MapManager.daily_auto_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_tick_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_tick_ops_day_live"):
+		var day: Dictionary = MapManager.theater_tick_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_domain_auto_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_domain_auto_ops_day_for_province"):
+		var day: Dictionary = MapManager.multi_domain_auto_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_apply_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_apply_ops_day_live"):
+		var day: Dictionary = MapManager.daily_apply_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_auto_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_auto_joint_day_for_province"):
+		var day: Dictionary = MapManager.theater_auto_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_inspector_infra_auto_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("inspector_infra_auto_close_day_live"):
+		var day: Dictionary = MapManager.inspector_infra_auto_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_follow_on_assault_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("follow_on_assault_ops_day_live"):
+		var day: Dictionary = MapManager.follow_on_assault_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_reinforced_combat_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("reinforced_combat_ops_day_live"):
+		var day: Dictionary = MapManager.reinforced_combat_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_path_urgency_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_path_urgency_ops_day_live"):
+		var day: Dictionary = MapManager.war_path_urgency_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_follow_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_follow_ops_day_for_province"):
+		var day: Dictionary = MapManager.assault_follow_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_reinforce_step_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("reinforce_step_ops_day_for_province"):
+		var day: Dictionary = MapManager.reinforce_step_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_urgency_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_urgency_ops_day_for_province"):
+		var day: Dictionary = MapManager.combat_urgency_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_follow_reinforce_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("follow_reinforce_close_day_live"):
+		var day: Dictionary = MapManager.follow_reinforce_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_choke_sea_wx_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("choke_sea_wx_ops_day_live"):
+		var day: Dictionary = MapManager.choke_sea_wx_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_sea_zone_mod_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("sea_zone_mod_ops_day_for_province"):
+		var day: Dictionary = MapManager.sea_zone_mod_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_basing_choke_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_choke_ops_day_live"):
+		var day: Dictionary = MapManager.basing_choke_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_choke_control_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("choke_control_ops_day_live"):
+		var day: Dictionary = MapManager.choke_control_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_sea_zone_control_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("sea_zone_control_ops_day_for_province"):
+		var day: Dictionary = MapManager.sea_zone_control_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_choke_basing_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("choke_basing_joint_day_for_province"):
+		var day: Dictionary = MapManager.choke_basing_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_choke_sea_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("choke_sea_close_day_live"):
+		var day: Dictionary = MapManager.choke_sea_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_escalation_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_escalation_ops_day_live"):
+		var day: Dictionary = MapManager.agent_escalation_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_coverage_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("coverage_ops_day_live"):
+		var day: Dictionary = MapManager.coverage_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_counter_ops_board_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("counter_ops_board_ops_day_live"):
+		var day: Dictionary = MapManager.counter_ops_board_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_escalation_ladder_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("escalation_ladder_ops_day_for_province"):
+		var day: Dictionary = MapManager.escalation_ladder_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_coverage_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_coverage_joint_day_for_province"):
+		var day: Dictionary = MapManager.agent_coverage_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_choke_agent_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_choke_agent_close_day_live"):
+		var day: Dictionary = MapManager.assault_choke_agent_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_equip_horizon_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("equip_horizon_depth_day_live"):
+		var day: Dictionary = MapManager.equip_horizon_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_stockpile_line_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("stockpile_line_ops_day_for_province"):
+		var day: Dictionary = MapManager.stockpile_line_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_oob_line_continuity_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("oob_line_continuity_day_live"):
+		var day: Dictionary = MapManager.oob_line_continuity_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_factory_oob_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("factory_oob_depth_day_for_province"):
+		var day: Dictionary = MapManager.factory_oob_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_horizon_plan_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_horizon_plan_day_live"):
+		var day: Dictionary = MapManager.medium_horizon_plan_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_equip_stockpile_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("equip_stockpile_joint_day_for_province"):
+		var day: Dictionary = MapManager.equip_stockpile_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_equip_oob_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("equip_oob_close_day_live"):
+		var day: Dictionary = MapManager.equip_oob_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_multi_theater_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_multi_theater_ops_day_live"):
+		var day: Dictionary = MapManager.fleet_multi_theater_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_redeploy_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_redeploy_ops_day_live"):
+		var day: Dictionary = MapManager.fleet_redeploy_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_task_group_posture_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("task_group_posture_ops_day_for_province"):
+		var day: Dictionary = MapManager.task_group_posture_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_posture_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_posture_ops_day_for_province"):
+		var day: Dictionary = MapManager.fleet_posture_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_redeploy_route_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("redeploy_route_ops_day_for_province"):
+		var day: Dictionary = MapManager.redeploy_route_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_theater_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_theater_joint_day_for_province"):
+		var day: Dictionary = MapManager.fleet_theater_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_redeploy_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_redeploy_close_day_live"):
+		var day: Dictionary = MapManager.fleet_redeploy_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_monthly_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_monthly_ops_day_live"):
+		var day: Dictionary = MapManager.hh_monthly_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_quarterly_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_quarterly_ops_day_live"):
+		var day: Dictionary = MapManager.hh_quarterly_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agenda_pulse_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agenda_pulse_ops_day_live"):
+		var day: Dictionary = MapManager.agenda_pulse_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_trail_counterplay_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("trail_counterplay_ops_day_for_province"):
+		var day: Dictionary = MapManager.trail_counterplay_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_agenda_depth_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_agenda_depth_joint_day_for_province"):
+		var day: Dictionary = MapManager.hh_agenda_depth_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_oob_fleet_hh_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("oob_fleet_hh_close_day_live"):
+		var day: Dictionary = MapManager.oob_fleet_hh_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_force_readiness_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_readiness_depth_day_live"):
+		var day: Dictionary = MapManager.force_readiness_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_front_supply_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_front_supply_depth_day_live"):
+		var day: Dictionary = MapManager.multi_front_supply_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_depot_route_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("depot_route_ops_day_for_province"):
+		var day: Dictionary = MapManager.depot_route_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_force_posture_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_posture_depth_day_live"):
+		var day: Dictionary = MapManager.force_posture_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_front_supply_rank_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("front_supply_rank_day_for_province"):
+		var day: Dictionary = MapManager.front_supply_rank_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_force_supply_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_supply_joint_day_for_province"):
+		var day: Dictionary = MapManager.force_supply_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_force_supply_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_supply_close_day_live"):
+		var day: Dictionary = MapManager.force_supply_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_pressure_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_pressure_ops_day_live"):
+		var day: Dictionary = MapManager.weather_pressure_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_crisis_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_crisis_ops_day_live"):
+		var day: Dictionary = MapManager.campaign_crisis_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_prod_weather_crisis_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("prod_weather_crisis_day_for_province"):
+		var day: Dictionary = MapManager.prod_weather_crisis_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_weather_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_weather_ops_day_for_province"):
+		var day: Dictionary = MapManager.combat_weather_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_crisis_brief_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_crisis_brief_day_for_province"):
+		var day: Dictionary = MapManager.weather_crisis_brief_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_campaign_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_campaign_joint_day_for_province"):
+		var day: Dictionary = MapManager.weather_campaign_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_crisis_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_crisis_close_day_live"):
+		var day: Dictionary = MapManager.weather_crisis_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_war_path_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_war_path_ops_day_live"):
+		var day: Dictionary = MapManager.focus_war_path_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_strip_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_strip_depth_day_for_province"):
+		var day: Dictionary = MapManager.strategic_strip_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_continuity_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_continuity_depth_day_live"):
+		var day: Dictionary = MapManager.strategic_continuity_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_cabinet_pulse_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_cabinet_pulse_ops_day_live"):
+		var day: Dictionary = MapManager.war_cabinet_pulse_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_continuity_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_continuity_joint_day_for_province"):
+		var day: Dictionary = MapManager.focus_continuity_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_force_weather_focus_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_weather_focus_close_day_live"):
+		var day: Dictionary = MapManager.force_weather_focus_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_sortie_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_sortie_depth_day_live"):
+		var day: Dictionary = MapManager.air_sortie_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_land_joint_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_land_joint_depth_day_live"):
+		var day: Dictionary = MapManager.air_land_joint_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_domain_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_domain_ops_day_live"):
+		var day: Dictionary = MapManager.multi_domain_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_front_readiness_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_front_readiness_day_for_province"):
+		var day: Dictionary = MapManager.air_front_readiness_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_domain_joint_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("domain_joint_ops_day_for_province"):
+		var day: Dictionary = MapManager.domain_joint_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_land_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_land_campaign_day_for_province"):
+		var day: Dictionary = MapManager.air_land_campaign_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_domain_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_domain_close_day_live"):
+		var day: Dictionary = MapManager.air_domain_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_convoy_escort_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_escort_depth_day_live"):
+		var day: Dictionary = MapManager.convoy_escort_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_sealane_health_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("sealane_health_ops_day_live"):
+		var day: Dictionary = MapManager.sealane_health_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_trade_pressure_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("trade_pressure_ops_day_for_province"):
+		var day: Dictionary = MapManager.trade_pressure_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_convoy_sealane_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_sealane_joint_day_for_province"):
+		var day: Dictionary = MapManager.convoy_sealane_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_sealane_logistics_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("sealane_logistics_ops_day_for_province"):
+		var day: Dictionary = MapManager.sealane_logistics_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_wartime_trade_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("wartime_trade_ops_day_for_province"):
+		var day: Dictionary = MapManager.wartime_trade_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_convoy_sealane_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_sealane_close_day_live"):
+		var day: Dictionary = MapManager.convoy_sealane_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_order_execute_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("order_execute_depth_day_live"):
+		var day: Dictionary = MapManager.order_execute_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_map_effect_resolve_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("map_effect_resolve_day_live"):
+		var day: Dictionary = MapManager.map_effect_resolve_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_next_day_feedback_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("next_day_feedback_depth_day_live"):
+		var day: Dictionary = MapManager.next_day_feedback_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_order_effect_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("order_effect_joint_day_for_province"):
+		var day: Dictionary = MapManager.order_effect_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_feedback_loop_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("feedback_loop_ops_day_for_province"):
+		var day: Dictionary = MapManager.feedback_loop_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_convoy_order_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_convoy_order_close_day_live"):
+		var day: Dictionary = MapManager.air_convoy_order_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_assign_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_assign_depth_day_live"):
+		var day: Dictionary = MapManager.leader_assign_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_formation_ready_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("formation_ready_depth_day_live"):
+		var day: Dictionary = MapManager.formation_ready_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_weather_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_weather_depth_day_for_province"):
+		var day: Dictionary = MapManager.leader_weather_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_formation_station_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("formation_station_depth_day_for_province"):
+		var day: Dictionary = MapManager.formation_station_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_formation_joint_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_formation_joint_depth_day_live"):
+		var day: Dictionary = MapManager.leader_formation_joint_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_oob_leader_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("oob_leader_ops_day_for_province"):
+		var day: Dictionary = MapManager.oob_leader_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_formation_close_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_formation_close_depth_day_live"):
+		var day: Dictionary = MapManager.leader_formation_close_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_counter_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_counter_depth_day_live"):
+		var day: Dictionary = MapManager.intel_counter_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_hh_counterplay_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_counterplay_depth_day_for_province"):
+		var day: Dictionary = MapManager.hh_counterplay_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_response_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_response_depth_day_live"):
+		var day: Dictionary = MapManager.agent_response_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_trail_intel_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("trail_intel_ops_day_for_province"):
+		var day: Dictionary = MapManager.trail_intel_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_counterintel_board_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("counterintel_board_ops_day_for_province"):
+		var day: Dictionary = MapManager.counterintel_board_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_response_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_response_joint_day_for_province"):
+		var day: Dictionary = MapManager.intel_response_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_counter_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_counter_close_day_live"):
+		var day: Dictionary = MapManager.intel_counter_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_daily_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_daily_depth_day_live"):
+		var day: Dictionary = MapManager.theater_daily_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_province_rank_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_province_rank_depth_day_live"):
+		var day: Dictionary = MapManager.multi_province_rank_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_auto_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_auto_depth_day_for_province"):
+		var day: Dictionary = MapManager.daily_auto_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_brief_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_brief_ops_day_for_province"):
+		var day: Dictionary = MapManager.theater_brief_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_province_command_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_province_command_day_live"):
+		var day: Dictionary = MapManager.multi_province_command_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_intel_theater_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_intel_theater_close_day_live"):
+		var day: Dictionary = MapManager.leader_intel_theater_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_slot_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_slot_depth_day_live"):
+		var day: Dictionary = MapManager.save_slot_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_autosave_session_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("autosave_session_depth_day_for_province"):
+		var day: Dictionary = MapManager.autosave_session_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_session_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_session_depth_day_live"):
+		var day: Dictionary = MapManager.campaign_session_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_resume_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_resume_depth_day_for_province"):
+		var day: Dictionary = MapManager.save_resume_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_session_checkpoint_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("session_checkpoint_depth_day_for_province"):
+		var day: Dictionary = MapManager.session_checkpoint_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_audit_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_audit_depth_day_for_province"):
+		var day: Dictionary = MapManager.save_audit_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_session_close_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_session_close_depth_day_live"):
+		var day: Dictionary = MapManager.save_session_close_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_factory_risk_surge_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("factory_risk_surge_day_live"):
+		var day: Dictionary = MapManager.factory_risk_surge_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_production_priority_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_priority_depth_day_live"):
+		var day: Dictionary = MapManager.production_priority_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_stockpile_surge_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("stockpile_surge_ops_day_for_province"):
+		var day: Dictionary = MapManager.stockpile_surge_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_line_continuity_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("line_continuity_depth_day_for_province"):
+		var day: Dictionary = MapManager.line_continuity_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_industry_surge_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("industry_surge_joint_day_live"):
+		var day: Dictionary = MapManager.industry_surge_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_production_oob_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_oob_depth_day_for_province"):
+		var day: Dictionary = MapManager.production_oob_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_production_surge_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_surge_close_day_live"):
+		var day: Dictionary = MapManager.production_surge_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_phase_estimate_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_phase_estimate_depth_day_live"):
+		var day: Dictionary = MapManager.multi_phase_estimate_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_assault_ready_surface_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("assault_ready_surface_day_live"):
+		var day: Dictionary = MapManager.assault_ready_surface_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_order_surface_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_order_surface_day_for_province"):
+		var day: Dictionary = MapManager.combat_order_surface_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_phase_product_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("phase_product_ops_day_for_province"):
+		var day: Dictionary = MapManager.phase_product_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_phase_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_phase_joint_day_live"):
+		var day: Dictionary = MapManager.multi_phase_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_prod_combat_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_prod_combat_close_day_live"):
+		var day: Dictionary = MapManager.save_prod_combat_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_basing_sustain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_basing_sustain_day_live"):
+		var day: Dictionary = MapManager.naval_basing_sustain_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_port_fuel_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("port_fuel_depth_day_live"):
+		var day: Dictionary = MapManager.port_fuel_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_basing_repair_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_repair_depth_day_for_province"):
+		var day: Dictionary = MapManager.basing_repair_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_task_sustain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_task_sustain_day_live"):
+		var day: Dictionary = MapManager.fleet_task_sustain_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_convoy_basing_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_basing_joint_day_for_province"):
+		var day: Dictionary = MapManager.convoy_basing_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_logistics_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_logistics_depth_day_for_province"):
+		var day: Dictionary = MapManager.naval_logistics_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_basing_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_basing_close_day_live"):
+		var day: Dictionary = MapManager.naval_basing_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_day_theater_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_day_theater_depth_day_live"):
+		var day: Dictionary = MapManager.multi_day_theater_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_campaign_continuity_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_campaign_continuity_day_live"):
+		var day: Dictionary = MapManager.theater_campaign_continuity_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_day_chain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_day_chain_day_for_province"):
+		var day: Dictionary = MapManager.campaign_day_chain_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_session_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_session_ops_day_for_province"):
+		var day: Dictionary = MapManager.theater_session_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_daily_theater_sustain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("daily_theater_sustain_day_for_province"):
+		var day: Dictionary = MapManager.daily_theater_sustain_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_continuity_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_continuity_joint_day_live"):
+		var day: Dictionary = MapManager.theater_continuity_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_campaign_depth_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_campaign_depth_close_day_live"):
+		var day: Dictionary = MapManager.theater_campaign_depth_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_inspector_decision_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("inspector_decision_depth_day_live"):
+		var day: Dictionary = MapManager.inspector_decision_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_decision_strip_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("decision_strip_depth_day_live"):
+		var day: Dictionary = MapManager.decision_strip_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_insight_strip_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("insight_strip_depth_day_for_province"):
+		var day: Dictionary = MapManager.insight_strip_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_province_decision_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("province_decision_joint_day_live"):
+		var day: Dictionary = MapManager.province_decision_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_inspector_campaign_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("inspector_campaign_ops_day_for_province"):
+		var day: Dictionary = MapManager.inspector_campaign_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_naval_inspector_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_naval_inspector_close_day_live"):
+		var day: Dictionary = MapManager.theater_naval_inspector_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_pressure_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_pressure_depth_day_live"):
+		var day: Dictionary = MapManager.weather_pressure_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_foul_combat_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("foul_combat_ops_day_live"):
+		var day: Dictionary = MapManager.foul_combat_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_logistics_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_logistics_depth_day_for_province"):
+		var day: Dictionary = MapManager.weather_logistics_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_move_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_move_depth_day_for_province"):
+		var day: Dictionary = MapManager.weather_move_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_crisis_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_crisis_depth_day_live"):
+		var day: Dictionary = MapManager.weather_crisis_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_pressure_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_pressure_joint_day_for_province"):
+		var day: Dictionary = MapManager.weather_pressure_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_ops_close_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_ops_close_depth_day_live"):
+		var day: Dictionary = MapManager.weather_ops_close_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_trade_pressure_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("trade_pressure_depth_day_live"):
+		var day: Dictionary = MapManager.trade_pressure_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_sealane_health_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("sealane_health_depth_day_for_province"):
+		var day: Dictionary = MapManager.sealane_health_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_economy_sustain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_sustain_day_live"):
+		var day: Dictionary = MapManager.war_economy_sustain_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_stockpile_economy_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("stockpile_economy_depth_day_for_province"):
+		var day: Dictionary = MapManager.stockpile_economy_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_convoy_economy_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_economy_joint_day_for_province"):
+		var day: Dictionary = MapManager.convoy_economy_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_trade_sealane_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("trade_sealane_joint_day_live"):
+		var day: Dictionary = MapManager.trade_sealane_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_economy_close_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_close_depth_day_live"):
+		var day: Dictionary = MapManager.war_economy_close_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_force_ready_surface_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_ready_surface_day_live"):
+		var day: Dictionary = MapManager.force_ready_surface_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_formation_equip_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("formation_equip_depth_day_live"):
+		var day: Dictionary = MapManager.formation_equip_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_reinforce_stockpile_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("reinforce_stockpile_depth_day_for_province"):
+		var day: Dictionary = MapManager.reinforce_stockpile_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_readiness_board_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("readiness_board_ops_day_for_province"):
+		var day: Dictionary = MapManager.readiness_board_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_force_reinforce_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_reinforce_joint_day_live"):
+		var day: Dictionary = MapManager.force_reinforce_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_economy_force_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_economy_force_close_day_live"):
+		var day: Dictionary = MapManager.weather_economy_force_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_phase_combat_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_phase_combat_product_for_province"):
+		var day: Dictionary = MapManager.multi_phase_combat_product_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_fleet_multi_day_autonomy_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_multi_day_autonomy_product_for_province"):
+		var day: Dictionary = MapManager.fleet_multi_day_autonomy_product_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_save_browser_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("save_browser_campaign_product_live"):
+		var day: Dictionary = GameData.save_browser_campaign_product_live()
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_medium_tank_oob_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_tank_oob_product_for_province"):
+		var day: Dictionary = MapManager.medium_tank_oob_product_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_hh_multi_month_agenda_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("hh_multi_month_agenda_product_live"):
+		var day: Dictionary = MapManager.hh_multi_month_agenda_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_agent_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_campaign_product_live"):
+		var day: Dictionary = MapManager.agent_campaign_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_inspector_decision_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("inspector_decision_product_live"):
+		var day: Dictionary = MapManager.inspector_decision_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_theater_command_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_command_product_live"):
+		var day: Dictionary = MapManager.theater_command_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_multi_faction_strategic_ai_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_faction_strategic_ai_product_live"):
+		var day: Dictionary = MapManager.multi_faction_strategic_ai_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_strategic_ai_daily_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_ai_daily_campaign_product_live"):
+		var day: Dictionary = MapManager.strategic_ai_daily_campaign_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_designer_suite_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_suite_product_live"):
+		var day: Dictionary = MapManager.designer_suite_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_ai_doctrine_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_ai_doctrine_depth_day_live"):
+		var day: Dictionary = MapManager.strategic_ai_doctrine_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_ai_urgency_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_ai_urgency_board_day_live"):
+		var day: Dictionary = MapManager.strategic_ai_urgency_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_ai_player_skip_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_ai_player_skip_day_for_province"):
+		var day: Dictionary = MapManager.strategic_ai_player_skip_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_ai_budget_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_ai_budget_depth_day_live"):
+		var day: Dictionary = MapManager.strategic_ai_budget_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_ai_domain_weight_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_ai_domain_weight_day_for_province"):
+		var day: Dictionary = MapManager.strategic_ai_domain_weight_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_ai_daily_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_ai_daily_joint_day_for_province"):
+		var day: Dictionary = MapManager.strategic_ai_daily_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_ai_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_ai_campaign_close_day_live"):
+		var day: Dictionary = MapManager.strategic_ai_campaign_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_catalog_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_catalog_depth_day_live"):
+		var day: Dictionary = MapManager.designer_catalog_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_seed_production_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_seed_production_day_live"):
+		var day: Dictionary = MapManager.designer_seed_production_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_domain_balance_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_domain_balance_day_for_province"):
+		var day: Dictionary = MapManager.designer_domain_balance_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_oob_horizon_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("oob_horizon_joint_day_live"):
+		var day: Dictionary = MapManager.oob_horizon_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_production_line_bootstrap_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("production_line_bootstrap_day_for_province"):
+		var day: Dictionary = MapManager.production_line_bootstrap_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_industry_design_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("industry_design_joint_day_for_province"):
+		var day: Dictionary = MapManager.industry_design_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_industry_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_industry_close_day_live"):
+		var day: Dictionary = MapManager.designer_industry_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_ai_command_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_ai_command_joint_day_live"):
+		var day: Dictionary = MapManager.theater_ai_command_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_fleet_ai_campaign_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("fleet_ai_campaign_depth_day_live"):
+		var day: Dictionary = MapManager.fleet_ai_campaign_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_agent_ai_campaign_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("agent_ai_campaign_depth_day_live"):
+		var day: Dictionary = MapManager.agent_ai_campaign_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_combat_ai_phase_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("combat_ai_phase_depth_day_live"):
+		var day: Dictionary = MapManager.combat_ai_phase_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_save_session_ai_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_session_ai_joint_day_for_province"):
+		var day: Dictionary = MapManager.save_session_ai_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_full_game_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("full_game_campaign_close_day_live"):
+		var day: Dictionary = MapManager.full_game_campaign_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_ops_sortie_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_ops_sortie_depth_day_live"):
+		var day: Dictionary = MapManager.air_ops_sortie_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_forecast_planning_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_forecast_planning_depth_day_live"):
+		var day: Dictionary = MapManager.air_forecast_planning_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_sortie_weather_gate_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_sortie_weather_gate_day_for_province"):
+		var day: Dictionary = MapManager.air_sortie_weather_gate_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_convoy_escort_campaign_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("convoy_escort_campaign_depth_day_live"):
+		var day: Dictionary = MapManager.convoy_escort_campaign_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_land_campaign_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_land_campaign_depth_day_live"):
+		var day: Dictionary = MapManager.air_land_campaign_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_front_readiness_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_front_readiness_depth_day_for_province"):
+		var day: Dictionary = MapManager.air_front_readiness_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_air_convoy_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_convoy_campaign_close_day_live"):
+		var day: Dictionary = MapManager.air_convoy_campaign_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_pick_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_pick_depth_day_live"):
+		var day: Dictionary = MapManager.focus_pick_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_order_path_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_order_path_day_live"):
+		var day: Dictionary = MapManager.focus_order_path_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_war_path_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_war_path_depth_day_live"):
+		var day: Dictionary = MapManager.focus_war_path_depth_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_path_urgency_depth_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_path_urgency_depth_day_for_province"):
+		var day: Dictionary = MapManager.war_path_urgency_depth_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_counter_depth_campaign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_counter_depth_campaign_day_for_province"):
+		var day: Dictionary = MapManager.intel_counter_depth_campaign_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_campaign_assign_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_campaign_assign_day_for_province"):
+		var day: Dictionary = MapManager.leader_campaign_assign_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_intel_leader_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_intel_leader_close_day_live"):
+		var day: Dictionary = MapManager.focus_intel_leader_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_order_execute_session_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("order_execute_session_day_live"):
+		var day: Dictionary = MapManager.order_execute_session_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_next_day_feedback_session_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("next_day_feedback_session_day_for_province"):
+		var day: Dictionary = MapManager.next_day_feedback_session_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_decision_session_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_decision_session_day_live"):
+		var day: Dictionary = MapManager.campaign_decision_session_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_theater_ai_session_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("theater_ai_session_joint_day_live"):
+		var day: Dictionary = MapManager.theater_ai_session_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_force_readiness_session_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("force_readiness_session_day_for_province"):
+		var day: Dictionary = MapManager.force_readiness_session_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_play_session_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("play_session_campaign_close_day_live"):
+		var day: Dictionary = MapManager.play_session_campaign_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_play_session_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("play_session_campaign_product_live"):
+		var day: Dictionary = MapManager.play_session_campaign_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_air_ops_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_ops_campaign_product_live"):
+		var day: Dictionary = MapManager.air_ops_campaign_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_war_path_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_war_path_product_live"):
+		var day: Dictionary = MapManager.focus_war_path_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_multi_phase_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_multi_phase_campaign_product_live"):
+		var day: Dictionary = MapManager.naval_multi_phase_campaign_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_pick_board_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_pick_board_advanced_day_live"):
+		var day: Dictionary = MapManager.focus_pick_board_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_war_path_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_war_path_advanced_day_live"):
+		var day: Dictionary = MapManager.focus_war_path_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_commit_execute_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_commit_execute_advanced_day_live"):
+		var day: Dictionary = MapManager.focus_commit_execute_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_naval_effort_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_naval_effort_advanced_day_live"):
+		var day: Dictionary = MapManager.focus_naval_effort_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_industry_army_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_industry_army_joint_day_live"):
+		var day: Dictionary = MapManager.focus_industry_army_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_air_effort_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_air_effort_joint_day_live"):
+		var day: Dictionary = MapManager.focus_air_effort_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_focus_war_path_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_war_path_close_day_live"):
+		var day: Dictionary = MapManager.focus_war_path_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_posture_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_posture_advanced_day_live"):
+		var day: Dictionary = MapManager.naval_posture_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_escort_phase_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_escort_phase_advanced_day_live"):
+		var day: Dictionary = MapManager.naval_escort_phase_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_strike_phase_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_strike_phase_advanced_day_live"):
+		var day: Dictionary = MapManager.naval_strike_phase_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_fleet_fuel_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_fleet_fuel_advanced_day_live"):
+		var day: Dictionary = MapManager.naval_fleet_fuel_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_fleet_autonomy_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_fleet_autonomy_joint_day_live"):
+		var day: Dictionary = MapManager.naval_fleet_autonomy_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_air_joint_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_air_joint_advanced_day_for_province"):
+		var day: Dictionary = MapManager.naval_air_joint_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_naval_multi_phase_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_multi_phase_close_day_for_province"):
+		var day: Dictionary = MapManager.naval_multi_phase_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_domain_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_domain_advanced_day_for_province"):
+		var day: Dictionary = MapManager.designer_domain_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_seed_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_seed_advanced_day_for_province"):
+		var day: Dictionary = MapManager.designer_seed_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_ai_multi_day_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_ai_multi_day_advanced_day_for_province"):
+		var day: Dictionary = MapManager.strategic_ai_multi_day_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_ai_industry_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_ai_industry_joint_day_for_province"):
+		var day: Dictionary = MapManager.designer_ai_industry_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_play_session_advanced_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("play_session_advanced_joint_day_for_province"):
+		var day: Dictionary = MapManager.play_session_advanced_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_advanced_deferred_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("advanced_deferred_campaign_close_day_for_province"):
+		var day: Dictionary = MapManager.advanced_deferred_campaign_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_diplomacy_peace_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("diplomacy_peace_campaign_product_live"):
+		var day: Dictionary = MapManager.diplomacy_peace_campaign_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_tech_research_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_research_campaign_product_live"):
+		var day: Dictionary = MapManager.tech_research_campaign_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_diplomacy_board_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("diplomacy_board_advanced_day_live"):
+		var day: Dictionary = MapManager.diplomacy_board_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_diplomacy_leverage_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("diplomacy_leverage_advanced_day_live"):
+		var day: Dictionary = MapManager.diplomacy_leverage_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_diplomacy_settle_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("diplomacy_settle_advanced_day_live"):
+		var day: Dictionary = MapManager.diplomacy_settle_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_diplomacy_trade_pressure_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("diplomacy_trade_pressure_day_live"):
+		var day: Dictionary = MapManager.diplomacy_trade_pressure_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_diplomacy_agent_hh_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("diplomacy_agent_hh_joint_day_live"):
+		var day: Dictionary = MapManager.diplomacy_agent_hh_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_diplomacy_focus_peace_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("diplomacy_focus_peace_joint_day_live"):
+		var day: Dictionary = MapManager.diplomacy_focus_peace_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_diplomacy_peace_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("diplomacy_peace_close_day_live"):
+		var day: Dictionary = MapManager.diplomacy_peace_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_tech_catalog_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_catalog_advanced_day_live"):
+		var day: Dictionary = MapManager.tech_catalog_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_tech_priority_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_priority_advanced_day_live"):
+		var day: Dictionary = MapManager.tech_priority_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_tech_field_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_field_advanced_day_live"):
+		var day: Dictionary = MapManager.tech_field_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_tech_designer_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_designer_joint_day_live"):
+		var day: Dictionary = MapManager.tech_designer_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_tech_oob_fielding_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_oob_fielding_joint_day_live"):
+		var day: Dictionary = MapManager.tech_oob_fielding_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_tech_industry_focus_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_industry_focus_joint_day_for_province"):
+		var day: Dictionary = MapManager.tech_industry_focus_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_tech_research_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_research_close_day_for_province"):
+		var day: Dictionary = MapManager.tech_research_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_diplomacy_tech_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("diplomacy_tech_joint_day_for_province"):
+		var day: Dictionary = MapManager.diplomacy_tech_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_tech_ai_research_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_ai_research_joint_day_for_province"):
+		var day: Dictionary = MapManager.tech_ai_research_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_diplomacy_naval_air_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("diplomacy_naval_air_joint_day_for_province"):
+		var day: Dictionary = MapManager.diplomacy_naval_air_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_session_diplomacy_tech_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("session_diplomacy_tech_joint_day_for_province"):
+		var day: Dictionary = MapManager.session_diplomacy_tech_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_faction_diplo_tech_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_faction_diplo_tech_day_for_province"):
+		var day: Dictionary = MapManager.multi_faction_diplo_tech_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_diplomacy_tech_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("diplomacy_tech_campaign_close_day_for_province"):
+		var day: Dictionary = MapManager.diplomacy_tech_campaign_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_logistics_supply_theater_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("logistics_supply_theater_product_live"):
+		var day: Dictionary = MapManager.logistics_supply_theater_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intelligence_network_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intelligence_network_product_live"):
+		var day: Dictionary = MapManager.intelligence_network_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_world_class_campaign_command_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("world_class_campaign_command_product_live"):
+		var day: Dictionary = MapManager.world_class_campaign_command_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_logistics_route_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("logistics_route_advanced_day_live"):
+		var day: Dictionary = MapManager.logistics_route_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_logistics_sustain_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("logistics_sustain_advanced_day_live"):
+		var day: Dictionary = MapManager.logistics_sustain_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_logistics_readiness_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("logistics_readiness_advanced_day_live"):
+		var day: Dictionary = MapManager.logistics_readiness_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_logistics_naval_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("logistics_naval_joint_day_live"):
+		var day: Dictionary = MapManager.logistics_naval_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_logistics_tech_industry_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("logistics_tech_industry_joint_day_live"):
+		var day: Dictionary = MapManager.logistics_tech_industry_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_logistics_supply_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("logistics_supply_close_day_live"):
+		var day: Dictionary = MapManager.logistics_supply_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_coverage_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_coverage_advanced_day_live"):
+		var day: Dictionary = MapManager.intel_coverage_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_counterintel_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_counterintel_advanced_day_live"):
+		var day: Dictionary = MapManager.intel_counterintel_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_counterplay_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_counterplay_advanced_day_live"):
+		var day: Dictionary = MapManager.intel_counterplay_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_diplomacy_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_diplomacy_joint_day_live"):
+		var day: Dictionary = MapManager.intel_diplomacy_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_session_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_session_joint_day_live"):
+		var day: Dictionary = MapManager.intel_session_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intelligence_network_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intelligence_network_close_day_live"):
+		var day: Dictionary = MapManager.intelligence_network_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_world_class_scan_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("world_class_scan_advanced_day_for_province"):
+		var day: Dictionary = MapManager.world_class_scan_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_world_class_rank_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("world_class_rank_advanced_day_for_province"):
+		var day: Dictionary = MapManager.world_class_rank_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_world_class_execute_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("world_class_execute_advanced_day_for_province"):
+		var day: Dictionary = MapManager.world_class_execute_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_world_class_logistics_intel_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("world_class_logistics_intel_joint_day_for_province"):
+		var day: Dictionary = MapManager.world_class_logistics_intel_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_world_class_air_naval_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("world_class_air_naval_joint_day_for_province"):
+		var day: Dictionary = MapManager.world_class_air_naval_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_world_class_session_ai_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("world_class_session_ai_joint_day_for_province"):
+		var day: Dictionary = MapManager.world_class_session_ai_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_world_class_theater_command_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("world_class_theater_command_joint_day_for_province"):
+		var day: Dictionary = MapManager.world_class_theater_command_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_world_class_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("world_class_campaign_close_day_for_province"):
+		var day: Dictionary = MapManager.world_class_campaign_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_economy_mobilization_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_mobilization_product_live"):
+		var day: Dictionary = MapManager.war_economy_mobilization_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_theater_ops_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_theater_ops_product_live"):
+		var day: Dictionary = MapManager.weather_theater_ops_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_front_continuity_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("front_continuity_campaign_product_live"):
+		var day: Dictionary = MapManager.front_continuity_campaign_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_economy_board_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_board_advanced_day_live"):
+		var day: Dictionary = MapManager.war_economy_board_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_economy_allocate_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_allocate_advanced_day_live"):
+		var day: Dictionary = MapManager.war_economy_allocate_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_economy_sustain_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_sustain_advanced_day_live"):
+		var day: Dictionary = MapManager.war_economy_sustain_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_economy_logistics_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_logistics_joint_day_live"):
+		var day: Dictionary = MapManager.war_economy_logistics_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_economy_tech_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_tech_joint_day_live"):
+		var day: Dictionary = MapManager.war_economy_tech_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_economy_mobilization_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_mobilization_close_day_live"):
+		var day: Dictionary = MapManager.war_economy_mobilization_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_pressure_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_pressure_advanced_day_live"):
+		var day: Dictionary = MapManager.weather_pressure_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_gate_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_gate_advanced_day_live"):
+		var day: Dictionary = MapManager.weather_gate_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_crisis_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_crisis_advanced_day_live"):
+		var day: Dictionary = MapManager.weather_crisis_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_front_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_front_joint_day_live"):
+		var day: Dictionary = MapManager.weather_front_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_economy_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_economy_joint_day_live"):
+		var day: Dictionary = MapManager.weather_economy_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_theater_ops_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_theater_ops_close_day_live"):
+		var day: Dictionary = MapManager.weather_theater_ops_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_front_combat_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("front_combat_advanced_day_for_province"):
+		var day: Dictionary = MapManager.front_combat_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_front_assault_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("front_assault_advanced_day_for_province"):
+		var day: Dictionary = MapManager.front_assault_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_front_sustain_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("front_sustain_advanced_day_for_province"):
+		var day: Dictionary = MapManager.front_sustain_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_front_weather_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("front_weather_joint_day_for_province"):
+		var day: Dictionary = MapManager.front_weather_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_front_economy_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("front_economy_joint_day_for_province"):
+		var day: Dictionary = MapManager.front_economy_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_front_logistics_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("front_logistics_joint_day_for_province"):
+		var day: Dictionary = MapManager.front_logistics_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_front_theater_command_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("front_theater_command_joint_day_for_province"):
+		var day: Dictionary = MapManager.front_theater_command_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_front_continuity_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("front_continuity_campaign_close_day_for_province"):
+		var day: Dictionary = MapManager.front_continuity_campaign_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_control_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_control_product_live"):
+		var day: Dictionary = MapManager.occupation_control_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_reinforcement_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_reinforcement_product_live"):
+		var day: Dictionary = MapManager.manpower_reinforcement_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_command_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_command_product_live"):
+		var day: Dictionary = MapManager.leader_command_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_control_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_control_advanced_day_live"):
+		var day: Dictionary = MapManager.occupation_control_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_garrison_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_garrison_advanced_day_live"):
+		var day: Dictionary = MapManager.occupation_garrison_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_integrate_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_integrate_advanced_day_live"):
+		var day: Dictionary = MapManager.occupation_integrate_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_front_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_front_joint_day_live"):
+		var day: Dictionary = MapManager.occupation_front_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_economy_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_economy_joint_day_live"):
+		var day: Dictionary = MapManager.occupation_economy_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_control_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_control_close_day_live"):
+		var day: Dictionary = MapManager.occupation_control_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_draft_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_draft_advanced_day_live"):
+		var day: Dictionary = MapManager.manpower_draft_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_reinforce_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_reinforce_advanced_day_live"):
+		var day: Dictionary = MapManager.manpower_reinforce_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_field_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_field_advanced_day_live"):
+		var day: Dictionary = MapManager.manpower_field_advanced_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_front_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_front_joint_day_live"):
+		var day: Dictionary = MapManager.manpower_front_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_economy_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_economy_joint_day_live"):
+		var day: Dictionary = MapManager.manpower_economy_joint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_reinforcement_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_reinforcement_close_day_live"):
+		var day: Dictionary = MapManager.manpower_reinforcement_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_assign_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_assign_advanced_day_for_province"):
+		var day: Dictionary = MapManager.leader_assign_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_station_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_station_advanced_day_for_province"):
+		var day: Dictionary = MapManager.leader_station_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_ops_advanced_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_ops_advanced_day_for_province"):
+		var day: Dictionary = MapManager.leader_ops_advanced_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_occupation_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_occupation_joint_day_for_province"):
+		var day: Dictionary = MapManager.leader_occupation_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_manpower_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_manpower_joint_day_for_province"):
+		var day: Dictionary = MapManager.leader_manpower_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_intel_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_intel_joint_day_for_province"):
+		var day: Dictionary = MapManager.leader_intel_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_theater_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_theater_joint_day_for_province"):
+		var day: Dictionary = MapManager.leader_theater_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_manpower_leader_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_manpower_leader_close_day_for_province"):
+		var day: Dictionary = MapManager.occupation_manpower_leader_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_tank_production_honesty_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_tank_production_honesty_product_live"):
+		var day: Dictionary = MapManager.medium_tank_production_honesty_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_honesty_60d_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_honesty_60d_day_live"):
+		var day: Dictionary = MapManager.medium_honesty_60d_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_honesty_80d_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_honesty_80d_day_live"):
+		var day: Dictionary = MapManager.medium_honesty_80d_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_honesty_100d_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_honesty_100d_day_live"):
+		var day: Dictionary = MapManager.medium_honesty_100d_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_honesty_unit_stats_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_honesty_unit_stats_day_live"):
+		var day: Dictionary = MapManager.medium_honesty_unit_stats_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_honesty_factory_risk_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_honesty_factory_risk_day_live"):
+		var day: Dictionary = MapManager.medium_honesty_factory_risk_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_honesty_stockpile_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_honesty_stockpile_day_live"):
+		var day: Dictionary = MapManager.medium_honesty_stockpile_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_honesty_readiness_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_honesty_readiness_joint_day_for_province"):
+		var day: Dictionary = MapManager.medium_honesty_readiness_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_honesty_manpower_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_honesty_manpower_joint_day_for_province"):
+		var day: Dictionary = MapManager.medium_honesty_manpower_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_honesty_economy_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_honesty_economy_joint_day_for_province"):
+		var day: Dictionary = MapManager.medium_honesty_economy_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_medium_tank_production_honesty_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("medium_tank_production_honesty_close_day_for_province"):
+		var day: Dictionary = MapManager.medium_tank_production_honesty_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_queue_live_managers_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_queue_live_managers_product_live"):
+		var day: Dictionary = MapManager.apply_queue_live_managers_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_queue_audit_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_queue_audit_day_live"):
+		var day: Dictionary = MapManager.apply_queue_audit_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_queue_production_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_queue_production_live_day_live"):
+		var day: Dictionary = MapManager.apply_queue_production_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_queue_combat_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_queue_combat_live_day_live"):
+		var day: Dictionary = MapManager.apply_queue_combat_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_queue_supply_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_queue_supply_live_day_live"):
+		var day: Dictionary = MapManager.apply_queue_supply_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_queue_focus_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_queue_focus_live_day_live"):
+		var day: Dictionary = MapManager.apply_queue_focus_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_queue_agent_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_queue_agent_live_day_live"):
+		var day: Dictionary = MapManager.apply_queue_agent_live_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_queue_station_live_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_queue_station_live_day_for_province"):
+		var day: Dictionary = MapManager.apply_queue_station_live_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_queue_six_leaf_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_queue_six_leaf_joint_day_for_province"):
+		var day: Dictionary = MapManager.apply_queue_six_leaf_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_queue_honesty_joint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_queue_honesty_joint_day_for_province"):
+		var day: Dictionary = MapManager.apply_queue_honesty_joint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_apply_queue_live_managers_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("apply_queue_live_managers_close_day_for_province"):
+		var day: Dictionary = MapManager.apply_queue_live_managers_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_resistance_compliance_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_resistance_compliance_product_live"):
+		var day: Dictionary = MapManager.occupation_resistance_compliance_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_laws_training_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_laws_training_product_live"):
+		var day: Dictionary = MapManager.manpower_laws_training_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_peace_conference_settlement_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("peace_conference_settlement_product_live"):
+		var day: Dictionary = MapManager.peace_conference_settlement_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_resistance_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_resistance_board_day_live"):
+		var day: Dictionary = MapManager.occupation_resistance_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_resistance_policy_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_resistance_policy_day_live"):
+		var day: Dictionary = MapManager.occupation_resistance_policy_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_resistance_tick_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_resistance_tick_day_live"):
+		var day: Dictionary = MapManager.occupation_resistance_tick_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_resistance_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_resistance_close_day_live"):
+		var day: Dictionary = MapManager.occupation_resistance_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_law_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_law_board_day_live"):
+		var day: Dictionary = MapManager.manpower_law_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_train_pipeline_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_train_pipeline_day_live"):
+		var day: Dictionary = MapManager.manpower_train_pipeline_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_field_trained_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_field_trained_day_live"):
+		var day: Dictionary = MapManager.manpower_field_trained_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_laws_training_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_laws_training_close_day_live"):
+		var day: Dictionary = MapManager.manpower_laws_training_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_peace_conference_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("peace_conference_board_day_for_province"):
+		var day: Dictionary = MapManager.peace_conference_board_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_peace_conference_demands_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("peace_conference_demands_day_for_province"):
+		var day: Dictionary = MapManager.peace_conference_demands_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_peace_conference_settle_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("peace_conference_settle_day_for_province"):
+		var day: Dictionary = MapManager.peace_conference_settle_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_peace_conference_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("peace_conference_campaign_close_day_for_province"):
+		var day: Dictionary = MapManager.peace_conference_campaign_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_product_ux_command_polish_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("product_ux_command_polish_product_live"):
+		var day: Dictionary = MapManager.product_ux_command_polish_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_domain_live_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_domain_live_product_live"):
+		var day: Dictionary = MapManager.designer_domain_live_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_ai_multi_month_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_ai_multi_month_product_live"):
+		var day: Dictionary = MapManager.campaign_ai_multi_month_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_product_ux_compact_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("product_ux_compact_day_live"):
+		var day: Dictionary = MapManager.product_ux_compact_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_product_ux_chips_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("product_ux_chips_day_live"):
+		var day: Dictionary = MapManager.product_ux_chips_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_product_ux_hotkeys_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("product_ux_hotkeys_day_live"):
+		var day: Dictionary = MapManager.product_ux_hotkeys_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_product_ux_polish_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("product_ux_polish_close_day_live"):
+		var day: Dictionary = MapManager.product_ux_polish_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_domain_catalog_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_domain_catalog_day_live"):
+		var day: Dictionary = MapManager.designer_domain_catalog_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_domain_pick_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_domain_pick_day_live"):
+		var day: Dictionary = MapManager.designer_domain_pick_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_domain_seed_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_domain_seed_day_live"):
+		var day: Dictionary = MapManager.designer_domain_seed_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_domain_live_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_domain_live_close_day_live"):
+		var day: Dictionary = MapManager.designer_domain_live_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_ai_month_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_ai_month_board_day_for_province"):
+		var day: Dictionary = MapManager.campaign_ai_month_board_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_ai_weekly_plan_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_ai_weekly_plan_day_for_province"):
+		var day: Dictionary = MapManager.campaign_ai_weekly_plan_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_ai_theater_execute_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_ai_theater_execute_day_for_province"):
+		var day: Dictionary = MapManager.campaign_ai_theater_execute_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_ai_multi_month_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_ai_multi_month_close_day_for_province"):
+		var day: Dictionary = MapManager.campaign_ai_multi_month_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_revolt_garrison_product_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_revolt_garrison_product_live"):
+		var day: Dictionary = MapManager.occupation_revolt_garrison_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_cohort_reserve_product_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_cohort_reserve_product_live"):
+		var day: Dictionary = MapManager.manpower_cohort_reserve_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_party_peace_conference_product_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_party_peace_conference_product_live"):
+		var day: Dictionary = MapManager.multi_party_peace_conference_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_revolt_board_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_revolt_board_day_live"):
+		var day: Dictionary = MapManager.occupation_revolt_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_revolt_garrison_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_revolt_garrison_day_live"):
+		var day: Dictionary = MapManager.occupation_revolt_garrison_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_revolt_suppress_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_revolt_suppress_day_live"):
+		var day: Dictionary = MapManager.occupation_revolt_suppress_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_revolt_garrison_close_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_revolt_garrison_close_day_live"):
+		var day: Dictionary = MapManager.occupation_revolt_garrison_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_cohort_board_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_cohort_board_day_live"):
+		var day: Dictionary = MapManager.manpower_cohort_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_cohort_reserve_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_cohort_reserve_day_live"):
+		var day: Dictionary = MapManager.manpower_cohort_reserve_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_cohort_mobilize_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_cohort_mobilize_day_live"):
+		var day: Dictionary = MapManager.manpower_cohort_mobilize_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_manpower_cohort_reserve_close_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("manpower_cohort_reserve_close_day_live"):
+		var day: Dictionary = MapManager.manpower_cohort_reserve_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_party_peace_board_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_party_peace_board_day_for_province"):
+		var day: Dictionary = MapManager.multi_party_peace_board_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_party_peace_wargoals_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_party_peace_wargoals_day_for_province"):
+		var day: Dictionary = MapManager.multi_party_peace_wargoals_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_party_peace_settle_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_party_peace_settle_day_for_province"):
+		var day: Dictionary = MapManager.multi_party_peace_settle_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_party_peace_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_party_peace_campaign_close_day_for_province"):
+		var day: Dictionary = MapManager.multi_party_peace_campaign_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_historical_oob_content_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("historical_oob_content_product_live"):
+		var day: Dictionary = MapManager.historical_oob_content_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_tech_tree_branching_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_tree_branching_product_live"):
+		var day: Dictionary = MapManager.tech_tree_branching_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_save_resume_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_resume_campaign_product_live"):
+		var day: Dictionary = MapManager.save_resume_campaign_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_historical_oob_catalog_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("historical_oob_catalog_day_live"):
+		var day: Dictionary = MapManager.historical_oob_catalog_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_historical_oob_seed_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("historical_oob_seed_day_live"):
+		var day: Dictionary = MapManager.historical_oob_seed_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_historical_oob_equip_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("historical_oob_equip_day_live"):
+		var day: Dictionary = MapManager.historical_oob_equip_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_historical_oob_content_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("historical_oob_content_close_day_live"):
+		var day: Dictionary = MapManager.historical_oob_content_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_tech_tree_branches_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_tree_branches_day_live"):
+		var day: Dictionary = MapManager.tech_tree_branches_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_tech_tree_path_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_tree_path_day_live"):
+		var day: Dictionary = MapManager.tech_tree_path_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_tech_tree_field_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_tree_field_day_live"):
+		var day: Dictionary = MapManager.tech_tree_field_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_tech_tree_branching_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tech_tree_branching_close_day_live"):
+		var day: Dictionary = MapManager.tech_tree_branching_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_save_resume_checkpoint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_resume_checkpoint_day_for_province"):
+		var day: Dictionary = MapManager.save_resume_checkpoint_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_save_resume_save_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_resume_save_day_for_province"):
+		var day: Dictionary = MapManager.save_resume_save_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_save_resume_resume_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_resume_resume_day_for_province"):
+		var day: Dictionary = MapManager.save_resume_resume_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_save_resume_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("save_resume_campaign_close_day_for_province"):
+		var day: Dictionary = MapManager.save_resume_campaign_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_tutorial_first_session_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tutorial_first_session_product_live"):
+		var day: Dictionary = MapManager.tutorial_first_session_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_focus_tree_content_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_tree_content_product_live"):
+		var day: Dictionary = MapManager.focus_tree_content_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_balance_combat_supply_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("balance_combat_supply_product_live"):
+		var day: Dictionary = MapManager.balance_combat_supply_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_tutorial_session_brief_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tutorial_session_brief_day_live"):
+		var day: Dictionary = MapManager.tutorial_session_brief_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_tutorial_session_guide_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tutorial_session_guide_day_live"):
+		var day: Dictionary = MapManager.tutorial_session_guide_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_tutorial_session_checkpoint_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tutorial_session_checkpoint_day_live"):
+		var day: Dictionary = MapManager.tutorial_session_checkpoint_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_tutorial_first_session_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("tutorial_first_session_close_day_live"):
+		var day: Dictionary = MapManager.tutorial_first_session_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_focus_tree_catalog_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_tree_catalog_day_live"):
+		var day: Dictionary = MapManager.focus_tree_catalog_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_focus_tree_path_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_tree_path_day_live"):
+		var day: Dictionary = MapManager.focus_tree_path_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_focus_tree_commit_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_tree_commit_day_live"):
+		var day: Dictionary = MapManager.focus_tree_commit_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_focus_tree_content_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("focus_tree_content_close_day_live"):
+		var day: Dictionary = MapManager.focus_tree_content_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_balance_estimate_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("balance_estimate_board_day_for_province"):
+		var day: Dictionary = MapManager.balance_estimate_board_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_balance_live_sample_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("balance_live_sample_day_for_province"):
+		var day: Dictionary = MapManager.balance_live_sample_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_balance_variance_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("balance_variance_close_day_for_province"):
+		var day: Dictionary = MapManager.balance_variance_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_balance_combat_supply_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("balance_combat_supply_close_day_for_province"):
+		var day: Dictionary = MapManager.balance_combat_supply_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_air_multi_phase_theater_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_multi_phase_theater_product_live"):
+		var day: Dictionary = MapManager.air_multi_phase_theater_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_naval_search_strike_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_search_strike_product_live"):
+		var day: Dictionary = MapManager.naval_search_strike_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_war_economy_conversion_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_conversion_product_live"):
+		var day: Dictionary = MapManager.war_economy_conversion_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_air_theater_recon_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_theater_recon_day_live"):
+		var day: Dictionary = MapManager.air_theater_recon_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_air_theater_cas_gate_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_theater_cas_gate_day_live"):
+		var day: Dictionary = MapManager.air_theater_cas_gate_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_air_theater_interdiction_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_theater_interdiction_day_live"):
+		var day: Dictionary = MapManager.air_theater_interdiction_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_air_multi_phase_theater_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("air_multi_phase_theater_close_day_live"):
+		var day: Dictionary = MapManager.air_multi_phase_theater_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_naval_search_patrol_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_search_patrol_day_live"):
+		var day: Dictionary = MapManager.naval_search_patrol_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_naval_asw_escort_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_asw_escort_day_live"):
+		var day: Dictionary = MapManager.naval_asw_escort_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_naval_carrier_strike_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_carrier_strike_day_live"):
+		var day: Dictionary = MapManager.naval_carrier_strike_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_naval_search_strike_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("naval_search_strike_close_day_live"):
+		var day: Dictionary = MapManager.naval_search_strike_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_economy_civ_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("economy_civ_board_day_for_province"):
+		var day: Dictionary = MapManager.economy_civ_board_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_economy_war_convert_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("economy_war_convert_day_for_province"):
+		var day: Dictionary = MapManager.economy_war_convert_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_economy_stockpile_sustain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("economy_stockpile_sustain_day_for_province"):
+		var day: Dictionary = MapManager.economy_stockpile_sustain_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+
+static func build_war_economy_conversion_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_economy_conversion_close_day_for_province"):
+		var day: Dictionary = MapManager.war_economy_conversion_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_module_editor_product_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_module_editor_product_live"):
+		var day: Dictionary = MapManager.designer_module_editor_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_stats_field_product_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_stats_field_product_live"):
+		var day: Dictionary = MapManager.designer_stats_field_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_multi_domain_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_multi_domain_campaign_product_live"):
+		var day: Dictionary = MapManager.designer_multi_domain_campaign_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_module_board_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_module_board_day_live"):
+		var day: Dictionary = MapManager.designer_module_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_module_edit_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_module_edit_day_live"):
+		var day: Dictionary = MapManager.designer_module_edit_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_reliability_gate_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_reliability_gate_day_live"):
+		var day: Dictionary = MapManager.designer_reliability_gate_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_module_editor_close_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_module_editor_close_day_live"):
+		var day: Dictionary = MapManager.designer_module_editor_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_stats_board_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_stats_board_day_live"):
+		var day: Dictionary = MapManager.designer_stats_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_freeze_design_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_freeze_design_day_live"):
+		var day: Dictionary = MapManager.designer_freeze_design_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_field_seed_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_field_seed_day_live"):
+		var day: Dictionary = MapManager.designer_field_seed_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_stats_field_close_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_stats_field_close_day_live"):
+		var day: Dictionary = MapManager.designer_stats_field_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_catalog_all_domains_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_catalog_all_domains_day_for_province"):
+		var day: Dictionary = MapManager.designer_catalog_all_domains_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_seed_multi_domain_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_seed_multi_domain_day_for_province"):
+		var day: Dictionary = MapManager.designer_seed_multi_domain_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_equip_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_equip_campaign_close_day_for_province"):
+		var day: Dictionary = MapManager.designer_equip_campaign_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_designer_multi_domain_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null: return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("designer_multi_domain_campaign_close_day_for_province"):
+		var day: Dictionary = MapManager.designer_multi_domain_campaign_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_crisis_campaign_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_crisis_campaign_product_live"):
+		var day: Dictionary = MapManager.weather_crisis_campaign_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_cell_network_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_cell_network_product_live"):
+		var day: Dictionary = MapManager.intel_cell_network_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_theater_command_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_theater_command_product_live"):
+		var day: Dictionary = MapManager.leader_theater_command_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_crisis_forecast_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_crisis_forecast_day_live"):
+		var day: Dictionary = MapManager.weather_crisis_forecast_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_crisis_gate_multi_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_crisis_gate_multi_day_live"):
+		var day: Dictionary = MapManager.weather_crisis_gate_multi_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_crisis_sustain_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_crisis_sustain_day_live"):
+		var day: Dictionary = MapManager.weather_crisis_sustain_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_weather_crisis_campaign_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("weather_crisis_campaign_close_day_live"):
+		var day: Dictionary = MapManager.weather_crisis_campaign_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_cell_coverage_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_cell_coverage_day_live"):
+		var day: Dictionary = MapManager.intel_cell_coverage_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_cell_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_cell_ops_day_live"):
+		var day: Dictionary = MapManager.intel_cell_ops_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_counter_sweep_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_counter_sweep_day_live"):
+		var day: Dictionary = MapManager.intel_counter_sweep_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_intel_cell_network_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("intel_cell_network_close_day_live"):
+		var day: Dictionary = MapManager.intel_cell_network_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_hq_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_hq_board_day_for_province"):
+		var day: Dictionary = MapManager.leader_hq_board_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_multi_station_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_multi_station_day_for_province"):
+		var day: Dictionary = MapManager.leader_multi_station_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_theater_ops_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_theater_ops_day_for_province"):
+		var day: Dictionary = MapManager.leader_theater_ops_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_leader_theater_command_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("leader_theater_command_close_day_for_province"):
+		var day: Dictionary = MapManager.leader_theater_command_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_war_goal_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_war_goal_product_live"):
+		var day: Dictionary = MapManager.strategic_war_goal_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_front_campaign_ai_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_front_campaign_ai_product_live"):
+		var day: Dictionary = MapManager.multi_front_campaign_ai_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_grand_strategy_cycle_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("grand_strategy_cycle_product_live"):
+		var day: Dictionary = MapManager.grand_strategy_cycle_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_goal_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_goal_board_day_live"):
+		var day: Dictionary = MapManager.war_goal_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_goal_justify_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_goal_justify_day_live"):
+		var day: Dictionary = MapManager.war_goal_justify_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_war_goal_execute_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("war_goal_execute_day_live"):
+		var day: Dictionary = MapManager.war_goal_execute_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_strategic_war_goal_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("strategic_war_goal_close_day_live"):
+		var day: Dictionary = MapManager.strategic_war_goal_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_front_plan_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_front_plan_day_live"):
+		var day: Dictionary = MapManager.multi_front_plan_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_front_weekly_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_front_weekly_day_live"):
+		var day: Dictionary = MapManager.multi_front_weekly_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_front_execute_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_front_execute_day_live"):
+		var day: Dictionary = MapManager.multi_front_execute_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_multi_front_campaign_ai_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("multi_front_campaign_ai_close_day_live"):
+		var day: Dictionary = MapManager.multi_front_campaign_ai_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_gs_cycle_scan_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("gs_cycle_scan_day_for_province"):
+		var day: Dictionary = MapManager.gs_cycle_scan_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_gs_cycle_rank_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("gs_cycle_rank_day_for_province"):
+		var day: Dictionary = MapManager.gs_cycle_rank_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_gs_cycle_execute_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("gs_cycle_execute_day_for_province"):
+		var day: Dictionary = MapManager.gs_cycle_execute_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_grand_strategy_cycle_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("grand_strategy_cycle_close_day_for_province"):
+		var day: Dictionary = MapManager.grand_strategy_cycle_close_day_for_province(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_alliance_guarantee_network_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("alliance_guarantee_network_product_live"):
+		var day: Dictionary = MapManager.alliance_guarantee_network_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_faction_personality_ai_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("faction_personality_ai_product_live"):
+		var day: Dictionary = MapManager.faction_personality_ai_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_revolt_network_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_revolt_network_product_live"):
+		var day: Dictionary = MapManager.occupation_revolt_network_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_alliance_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("alliance_board_day_live"):
+		var day: Dictionary = MapManager.alliance_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_alliance_guarantee_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("alliance_guarantee_day_live"):
+		var day: Dictionary = MapManager.alliance_guarantee_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_alliance_coalition_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("alliance_coalition_day_live"):
+		var day: Dictionary = MapManager.alliance_coalition_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_alliance_guarantee_network_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("alliance_guarantee_network_close_day_live"):
+		var day: Dictionary = MapManager.alliance_guarantee_network_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_personality_board_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("personality_board_day_live"):
+		var day: Dictionary = MapManager.personality_board_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_personality_event_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("personality_event_day_live"):
+		var day: Dictionary = MapManager.personality_event_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_personality_drive_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("personality_drive_day_live"):
+		var day: Dictionary = MapManager.personality_drive_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_faction_personality_ai_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("faction_personality_ai_close_day_live"):
+		var day: Dictionary = MapManager.faction_personality_ai_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_revolt_network_map_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("revolt_network_map_day_live"):
+		var day: Dictionary = MapManager.revolt_network_map_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_revolt_cascade_risk_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("revolt_cascade_risk_day_live"):
+		var day: Dictionary = MapManager.revolt_cascade_risk_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_revolt_network_suppress_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("revolt_network_suppress_day_live"):
+		var day: Dictionary = MapManager.revolt_network_suppress_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_revolt_network_close_day_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("occupation_revolt_network_close_day_live"):
+		var day: Dictionary = MapManager.occupation_revolt_network_close_day_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_campaign_alpha_primary_strip_product_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("campaign_alpha_primary_strip_product_live"):
+		var day: Dictionary = MapManager.campaign_alpha_primary_strip_product_live(province.id)
+		if not day.is_empty() and not bool(day.get("empty", false)):
+			return str(day.get("bbcode", day.get("summary", ""))).strip_edges()
+	elif typeof(MapPolishFormatters) != TYPE_NIL:
+		var d: Dictionary = MapPolishFormatters.campaign_alpha_primary_strip_product(province.id)
+		if not d.is_empty() and not bool(d.get("empty", false)):
+			return str(d.get("bbcode", d.get("summary", ""))).strip_edges()
+	return ""
+
+static func build_occupation_visual_chip_bbcode(province: Province) -> String:
+	if province == null:
+		return ""
+	var occupied := not province.controller_tag.is_empty() and province.owner_tag != province.controller_tag
+	if not occupied and typeof(GameData) == TYPE_NIL:
+		return ""
+	var resistance := 0.0
+	var compliance := 0.0
+	var garr := 0.0
+	var mode := "standard"
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_occupation_province_state"):
+		var st: Dictionary = GameData.get_occupation_province_state(province.id)
+		resistance = float(st.get("resistance_level", 0.0))
+		compliance = float(st.get("compliance_level", 0.0))
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_occupation_revolt_state"):
+		var rv: Dictionary = GameData.get_occupation_revolt_state(province.id)
+		garr = float(rv.get("garrison_strength", 0.0))
+		mode = str(rv.get("garrison_mode", "standard"))
+	if not occupied and resistance <= 0.0 and compliance <= 0.0:
+		return ""
+	var tag := "OCC" if occupied else "CTRL"
+	return "[color=#e08060]⚑ %s[/color] [color=#8899aa]R %.0f%% · C %.0f%% · garr %.0f%% (%s)[/color]" % [
+		tag, resistance * 100.0, compliance * 100.0, garr * 100.0, mode
+	]

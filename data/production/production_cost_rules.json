@@ -81,8 +81,92 @@
     "min_output_multiplier": 0.55,
     "partial_efficiency_floor": 0.55,
     "min_reliability_multiplier": 0.72,
-    "critical_resources": ["electronics", "rubber", "explosives", "rare_earth", "advanced_electronics"],
+    "critical_resources": [
+      "electronics",
+      "rubber",
+      "specials",
+      "fissiles",
+      "explosives",
+      "rare_earth",
+      "rare_earths",
+      "advanced_electronics"
+    ],
     "critical_speed_weight": 1.45,
     "critical_reliability_weight": 1.25
-  }
+  },
+  "major_resources": {
+    "steel": {
+      "aliases": ["iron", "steel"],
+      "player_visible": "always",
+      "production_role": "hulls_armor_guns_ships",
+      "combat_ops_role": "repair_attrition_rebuild",
+      "scarcity_lever": "province_control_mines_industry"
+    },
+    "aluminum": {
+      "aliases": ["aluminum", "bauxite"],
+      "player_visible": "always",
+      "production_role": "airframes_light_structures",
+      "combat_ops_role": "air_force_generation",
+      "scarcity_lever": "province_control_trade"
+    },
+    "energy": {
+      "aliases": ["energy", "coal", "natural_gas", "gas", "biomass", "wood", "hydro", "geothermal"],
+      "player_visible": "always",
+      "province_source_types": ["coal", "natural_gas", "oil_power", "biomass", "hydro", "nuclear_plant", "fusion_plant"],
+      "production_role": "industry_power_conversion",
+      "combat_ops_role": "home_front_throughput",
+      "scarcity_lever": "sources_plus_plant_tech_size",
+      "notes": "Province deposits stay typed for plant icons; all feed Energy stockpile"
+    },
+    "fuel": {
+      "aliases": ["fuel", "oil", "petroleum"],
+      "player_visible": "always",
+      "production_role": "motorized_air_naval_rocket_lines",
+      "combat_ops_role": "all_vehicles_jets_rockets_ships_logistics",
+      "scarcity_lever": "oil_fields_energy_to_fuel_synthetics",
+      "burn_notes": "jets_higher_than_prop; rockets_very_high; naval_continuous"
+    },
+    "rubber": {
+      "aliases": ["rubber"],
+      "player_visible": "always",
+      "production_role": "tires_seals_air_ground",
+      "combat_ops_role": "mobility_readiness",
+      "scarcity_lever": "tropical_control_synthetics",
+      "tech_modifiers": ["plastics_improves_efficiency"]
+    },
+    "electronics": {
+      "aliases": ["electronics", "semiconductors", "copper"],
+      "player_visible": "always",
+      "production_role": "sensors_fc_computers",
+      "combat_ops_role": "detection_accuracy_c3",
+      "scarcity_lever": "advanced_industry_trade_critical",
+      "tech_modifiers": ["plastics_improves_efficiency"]
+    },
+    "specials": {
+      "aliases": ["specials", "rare_earth", "rare_earths", "chromium", "tungsten", "nickel", "explosives"],
+      "player_visible": "always",
+      "production_role": "alloys_special_ammo_quality_modules",
+      "combat_ops_role": "quality_edge",
+      "scarcity_lever": "sparse_deposits_critical"
+    },
+    "fissiles": {
+      "aliases": ["fissiles", "uranium", "plutonium"],
+      "player_visible": "unlock_nuclear_era",
+      "unlock_era": "early_cold_war",
+      "production_role": "reactors_nuclear_propulsion_warheads",
+      "combat_ops_role": "strategic_power_late_navy",
+      "scarcity_lever": "sparse_plus_tech_gates",
+      "hidden_until_unlocked": true
+    }
+  },
+  "ops_resources": {
+    "manpower": {"role": "raise_reinforce_train", "player_visible": "always"},
+    "supplies": {"role": "ground_sustainment_food_logistics", "player_visible": "always", "fed_by": ["food_abstraction", "logistics"]},
+    "fuel": {"role": "ops_mobility_shared_with_production", "player_visible": "always"}
+  },
+  "endgame_resources": {
+    "helium3": {"feeds": "energy", "player_visible": "endgame_unlock"},
+    "antimatter": {"feeds": "energy", "player_visible": "endgame_unlock"}
+  },
+  "integration_model": "strategic_stockpile_soft_shortage"
 }

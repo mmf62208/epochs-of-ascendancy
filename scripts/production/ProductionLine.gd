@@ -111,6 +111,33 @@ func set_template(template_id: String) -> Dictionary:
 		return result
 
 	var new_template : UnitTemplate = _design_data.get_template(template_id)
+	# Custom designer duties: attempt late bind from DesignManager / runtime register.
+	if new_template == null and template_id.begins_with("custom_"):
+		if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("get_custom_design"):
+			var owner_guess := ""
+			if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+				owner_guess = str(LeaderManager.get_player_country_tag())
+			var cdata: Dictionary = {}
+			if not owner_guess.is_empty():
+				cdata = DesignManager.get_custom_design(owner_guess, template_id)
+			if cdata.is_empty() and DesignManager.has_method("register_custom_design"):
+				# Minimal recovery so dual/designer seed does not WARN.
+				var dom := "land"
+				if "naval" in template_id:
+					dom = "naval"
+				elif "air" in template_id:
+					dom = "air"
+				elif "space" in template_id:
+					dom = "space"
+				var tag := owner_guess if not owner_guess.is_empty() else "GER"
+				DesignManager.register_custom_design(tag, {
+					"id": template_id,
+					"domain": dom,
+					"modules": [],
+					"owner": tag,
+				})
+				cdata = DesignManager.get_custom_design(tag, template_id)
+			new_template = _design_data.get_template(template_id)
 	if new_template == null:
 		if template_id.begins_with("civilian_"):
 			# Civilian goods lines (roadmap): no unit template, fixed consumer output for pop happiness.
@@ -172,7 +199,10 @@ func get_tooling_efficiency() -> float:
 
 func get_output_multiplier() -> float:
 	var multiplier : float = _base_output_multiplier()
-	return multiplier * _active_modifiers().get_total_output_multiplier()
+	var mods: ProductionModifiers = _active_modifiers()
+	if mods == null:
+		return multiplier
+	return multiplier * mods.get_total_output_multiplier()
 
 
 func _base_output_multiplier() -> float:
@@ -189,21 +219,27 @@ func _base_output_multiplier() -> float:
 	if active_refinement != null and not active_refinement.blocks_production:
 		multiplier *= 1.0 - active_refinement.production_penalty
 
-	# Weather full penalties integration (econ polish): cold/mud/snow/blackout drag factory output (province targeted via factory if avail)
-	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_production_weather_mult"):
-		var wmult : float = 1.0
-		# Resolve pid from factory if tracked on line/factory
+	# OOB factory risk loop: sole mult from production weather × factory risk compose.
+	if typeof(WeatherManager) != TYPE_NIL:
+		var pidv := -1
 		if typeof(FactoryManager) != TYPE_NIL and "factory_id" in self and self.factory_id != null:
 			var fdata = FactoryManager.get_factory(self.factory_id) if FactoryManager.has_method("get_factory") else null
-			var pidv := -1
 			if fdata:
 				if "province_id" in fdata:
 					pidv = int(fdata.province_id)
 				elif typeof(fdata) == TYPE_DICTIONARY and fdata.has("province_id"):
 					pidv = int(fdata.get("province_id"))
-			if pidv >= 0:
-				wmult = WeatherManager.get_production_weather_mult(pidv)
-		multiplier *= wmult
+		if pidv >= 0:
+			var wmult := 1.0
+			if WeatherManager.has_method("get_production_weather_mult"):
+				wmult = float(WeatherManager.get_production_weather_mult(pidv))
+			var temp := 10.0
+			var precip := clampf(1.0 - wmult, 0.0, 1.0)
+			if wmult < 0.85:
+				temp = -18.0
+			var oob: Dictionary = MapPolishFormatters.oob_factory_risk_loop(temp, precip, "dry", 1.0, 0.2, 1.0)
+			# Sole mult — oob effective_output already embeds production weather.
+			multiplier *= float(oob.get("effective_output", wmult))
 
 	return multiplier
 

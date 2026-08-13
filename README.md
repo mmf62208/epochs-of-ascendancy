@@ -1,8 +1,32 @@
 # Epochs of Ascendancy
 
+## Program plan & Cursor
+
+- **Master completion plan (no permanent deferrals):** [`docs/MASTER_COMPLETION_PLAN.md`](docs/MASTER_COMPLETION_PLAN.md)
+- **Open in Cursor:** `cursor /home/mikef/Projects/epochs-of-ascendancy` or `cursor-eoa` or workspace `epochs-of-ascendancy.code-workspace`
+- **Dual quality bar:** `EOA_SCENARIO=world_full tools/run_godot.sh --path . --headless res://scenes/TestScenario.tscn --quit-after 90` (do not set `EOA_HEADLESS_EVIDENCE=1` for dual proof)
+
+
 **A grand strategy game of empire, industry, and ascendancy across the 20th and 21st centuries.**
 
-Built in **Godot 4.6** — inspired by *Hearts of Iron IV*, *Terra Invicta*, and *Supreme Ruler*.
+Built in **Godot 4.7** (recommended **4.7.1+**) — inspired by *Hearts of Iron IV*, *Terra Invicta*, and *Supreme Ruler*.
+
+---
+
+## Current development status (2026-08-03)
+
+**Default test/play board:** **`world_accurate`** GIS hybrid **~3520** provinces (Europe NUTS + US playable + RoW sparse + seas). Scaffold **`world_full` ~2665** via `EOA_SCENARIO=world_full` (IDs never renumbered).
+
+- **Status snapshot (what is true now):** [`docs/GAME_STATUS_SNAPSHOT.md`](docs/GAME_STATUS_SNAPSHOT.md)
+- **HOI pillar matrix (open P0 = 0):** [`docs/HOI4_EOA_GAP_REVIEW.md`](docs/HOI4_EOA_GAP_REVIEW.md)
+- **Playtest checklist:** [`docs/PLAYTEST_AND_DECISION_GUIDE.md`](docs/PLAYTEST_AND_DECISION_GUIDE.md)
+- **Grok partner / gates:** [`docs/EOA_GROK_SETUP.md`](docs/EOA_GROK_SETUP.md) · `tools/eoa_full_test_gates.sh`
+- **Game director plan:** [`docs/GAME_DIRECTOR_PLAN.md`](docs/GAME_DIRECTOR_PLAN.md)
+
+**Machine full-test:** green (board QC · WarLoop/Fronts/supply · save · HOI matrix). **Human M6** 20d/60d narrative notes still open (not automated).
+
+**Play now:** default F5 = GER Europe theater · B Fronts · Shift+I WarLoop · G corridor · Ctrl+S save.
+
 
 ---
 
@@ -45,13 +69,24 @@ The game emphasizes **player freedom in design** — from customizing divisions,
 |-------|--------|
 | **Left click** | Select province → scrollable InfoPanel |
 | **Ctrl+click** | Assault adjacent enemy province (after staging a friendly division) |
-| **Attack** (InfoPanel) | Launch assault on selected enemy province |
-| **Esc / Close** | Dismiss inspector or open panels |
-| **F10** / Ctrl+Shift+R | Debug overlay (drag title · resize **⤡** corner) |
-| **L / R / T / C / Y** | Supply / roads / rails / cities / sites overlays |
-| **F5 / F9** | Quicksave / quickload |
-| **Menu** | Save manager, trade, help, restart scenario |
+| **B** / toolbar Fronts | Live border assault targets |
+| **Shift+I** / WarLoop | First-session war path (flow + fronts + brief) |
+| **G** | Supply hub → front corridor (fuel brief) |
+| **I** | Toggle EquipmentFlow glyphs |
+| **F1–F8** | Mapmodes (political…weather) |
+| **F9 / Shift+F9 / Ctrl+F9** | Resources / states / terrain |
+| **Ctrl+S / Ctrl+L** | Quicksave / quickload |
+| **Ctrl+Shift+S** | Save browser |
+| **Home / End / Shift+Home** | Europe / Asia / full world |
+| **?** | First-session help toast |
+| **Esc** | Dismiss overlays / Command Center |
+| **F10** | Debug overlay |
 | Camera | Zoom wheel · WASD / edge pan · middle-drag |
+
+```bash
+tools/run_godot.sh --path . res://scenes/TestScenario.tscn
+tools/eoa_full_test_gates.sh --quick
+```
 
 ---
 
@@ -109,10 +144,11 @@ Production lines feed these designs. Key equipment categories include infantry g
 
 ### Playtest quick start
 
-1. Godot **4.6.2+** → open `scenes/TestScenario.tscn` → **F5**
-2. Default: **phase1_europe_test** with grand theater underlay
-3. **F10** — debug overlay (collapsible sections, map editor, border/combat tools)
-4. Headless smoke: `godot --headless --path . res://scenes/TestScenario.tscn --quit-after 15`
+1. Godot **4.7.1+** → open `scenes/TestScenario.tscn` → **F5** (or `tools/run_godot.sh`)
+2. **Default:** scenario **`world_accurate`** → `data/provinces_world_accurate` (**~3520** GIS hybrid, post US+RoW sparse)
+3. **Scaffold fallback:** `EOA_SCENARIO=world_full tools/run_godot.sh` (**2665**; IDs never renumbered)
+4. **F10** — debug overlay (collapsible sections, map editor, border/combat tools)
+5. Status / director plan: [`docs/GAME_STATUS_SNAPSHOT.md`](docs/GAME_STATUS_SNAPSHOT.md) · [`docs/GAME_DIRECTOR_PLAN.md`](docs/GAME_DIRECTOR_PLAN.md)
 
 ---
 
@@ -177,7 +213,7 @@ Production lines feed these designs. Key equipment categories include infantry g
 
 ## Tech Stack & Development
 
-- **Godot Engine 4.6+** + **GDScript**
+- **Godot Engine 4.7+** (project features flag `4.7`) + **GDScript**
 - Data-driven design (JSON + Godot Resources for provinces, countries, tech, focuses, units, etc.)
 - Networking: Godot built-in (ENet/WebRTC) or plugins evaluated for multiplayer
 - Development aided by **Cursor** + latest **Grok / Grok Build** multi-agent coding tools for rapid iteration on complex systems
@@ -187,7 +223,7 @@ Production lines feed these designs. Key equipment categories include infantry g
 ## How to Run (Development)
 
 1. Clone the repository
-2. Open in **Godot 4.6.2** or newer
+2. Open in **Godot 4.7.1** (or 4.7 stable) or newer
 3. For full playtest harness: open `scenes/TestScenario.tscn` and press **F5**
 4. Or open `scenes/WorldMap.tscn` for the base map scene
 

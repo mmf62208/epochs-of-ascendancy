@@ -56,9 +56,9 @@
     "name": "Sabotage Industrial Production",
     "category": "sabotage",
     "description": "Infiltrate key factories and delay or damage production lines.",
-    "base_success_chance": 0.50,
+    "base_success_chance": 0.5,
     "duration_months": 3,
-    "detection_risk": 0.40,
+    "detection_risk": 0.4,
     "skill_requirement": "sabotage",
     "min_skill_level": 3,
     "outcomes": {
@@ -70,7 +70,7 @@
       },
       "partial": {
         "effect": "production_delay",
-        "magnitude": 0.10,
+        "magnitude": 0.1,
         "prestige_gain": 2,
         "description": "Minor delays inflicted on production."
       },
@@ -92,7 +92,7 @@
     "outcomes": {
       "success": {
         "effect": "supply_disruption",
-        "magnitude": 0.20,
+        "magnitude": 0.2,
         "prestige_gain": 5,
         "description": "Enemy supply lines were successfully harassed."
       },
@@ -140,21 +140,21 @@
     "name": "Resource Exploration & Prospecting",
     "category": "intelligence",
     "description": "Deploy agents for geological surveys, prospecting, or acquiring resource maps/tech. Can discover new resource deposits, improve gathering efficiency, or reduce resource costs in production. Ties to resource gathering/exploration.",
-    "base_success_chance": 0.50,
+    "base_success_chance": 0.5,
     "duration_months": 6,
-    "detection_risk": 0.30,
+    "detection_risk": 0.3,
     "skill_requirement": "intelligence",
     "min_skill_level": 4,
     "outcomes": {
       "success": {
         "effect": "resource_discovery",
-        "magnitude": 0.20,
+        "magnitude": 0.2,
         "prestige_gain": 5,
         "description": "New resources prospected or extraction methods improved."
       },
       "partial": {
         "effect": "resource_discovery",
-        "magnitude": 0.10,
+        "magnitude": 0.1,
         "prestige_gain": 2,
         "description": "Some resource intelligence gained."
       },
@@ -196,9 +196,9 @@
     "name": "Run Influence Campaign",
     "category": "influence",
     "description": "Spread propaganda and support opposition groups within the target nation.",
-    "base_success_chance": 0.60,
+    "base_success_chance": 0.6,
     "duration_months": 6,
-    "detection_risk": 0.20,
+    "detection_risk": 0.2,
     "skill_requirement": "influence",
     "min_skill_level": 3,
     "outcomes": {
@@ -224,9 +224,9 @@
     "name": "Corrupt Key Officials",
     "category": "influence",
     "description": "Bribe or compromise mid-to-high level government and military officials.",
-    "base_success_chance": 0.40,
+    "base_success_chance": 0.4,
     "duration_months": 5,
-    "detection_risk": 0.50,
+    "detection_risk": 0.5,
     "skill_requirement": "influence",
     "min_skill_level": 5,
     "outcomes": {
@@ -332,9 +332,9 @@
     "name": "Turn Enemy Agents",
     "category": "counter_intelligence",
     "description": "Identify and flip enemy operatives operating inside your borders.",
-    "base_success_chance": 0.40,
+    "base_success_chance": 0.4,
     "duration_months": 5,
-    "detection_risk": 0.30,
+    "detection_risk": 0.3,
     "skill_requirement": "counter_intelligence",
     "min_skill_level": 5,
     "outcomes": {
@@ -359,9 +359,9 @@
     "category": "counter_intelligence",
     "allow_self_target": true,
     "description": "Tighten security around sensitive research programs to prevent technology theft.",
-    "base_success_chance": 0.50,
+    "base_success_chance": 0.5,
     "duration_months": 4,
-    "detection_risk": 0.20,
+    "detection_risk": 0.2,
     "skill_requirement": "counter_intelligence",
     "min_skill_level": 4,
     "outcomes": {
@@ -425,7 +425,7 @@
         "effect": "inclusion_leverage",
         "magnitude": 55,
         "prestige_gain": 12,
-        "description": "Major diplomatic breakthrough — your side gains real negotiating weight or forces observer/full participant status."
+        "description": "Major diplomatic breakthrough \u2014 your side gains real negotiating weight or forces observer/full participant status."
       },
       "partial": {
         "effect": "inclusion_leverage",
@@ -590,7 +590,7 @@
     "id": "lobby_domestic_law",
     "name": "Lobby / Campaign for Policy or Law Change",
     "category": "influence",
-    "description": "Long-duration domestic influence operation: bribe parliamentarians, run propaganda campaigns, twist arms, plant stories, or directly influence a king/court to pass or block a major policy/law (pro-natal, borders, conscription, police type, money supply, justice, welfare/social services, etc.). Ties up the agent(s) for months — real trade-off vs Tech development, Intel, Trade, Vision (Initiatives), or Diplomacy work. Changing laws is a big deal; this is the primary lever for most players. Includes cultural war policies (elite 'healthcare' control vs traditional family).",
+    "description": "Long-duration domestic influence operation: bribe parliamentarians, run propaganda campaigns, twist arms, plant stories, or directly influence a king/court to pass or block a major policy/law (pro-natal, borders, conscription, police type, money supply, justice, welfare/social services, etc.). Ties up the agent(s) for months \u2014 real trade-off vs Tech development, Intel, Trade, Vision (Initiatives), or Diplomacy work. Changing laws is a big deal; this is the primary lever for most players. Includes cultural war policies (elite 'healthcare' control vs traditional family).",
     "base_success_chance": 0.48,
     "duration_months": 8,
     "detection_risk": 0.15,
@@ -605,7 +605,7 @@
       "partial": {
         "effect": "policy_shift",
         "magnitude": 0,
-        "description": "Modest progress — player change cost reduced or public opinion moved slightly."
+        "description": "Modest progress \u2014 player change cost reduced or public opinion moved slightly."
       },
       "failure": {
         "description": "Effort exposed or blocked. Possible small backlash or wasted agent time."
@@ -640,7 +640,7 @@
     "description": "Use black market, front companies, or influence ops to channel hidden funds into secret space/rocket projects. Requires or boosts 'secret_funding' tech path. Low visibility but high reward for covert space race.",
     "base_success_chance": 0.55,
     "duration_months": 5,
-    "detection_risk": 0.30,
+    "detection_risk": 0.3,
     "skill_requirement": "technology",
     "min_skill_level": 4,
     "target_tech_required": false,
@@ -653,7 +653,7 @@
       },
       "partial": {
         "effect": "secret_space_funding",
-        "magnitude": 0.10,
+        "magnitude": 0.1,
         "prestige_gain": 1,
         "description": "Partial funding secured; some progress on clandestine assets."
       },
@@ -669,7 +669,7 @@
     "description": "Target rival's public or secret space efforts for blueprints, sat imagery, or rocket tech. Synergizes with v2_rocket / sputnik tech trees.",
     "base_success_chance": 0.48,
     "duration_months": 4,
-    "detection_risk": 0.40,
+    "detection_risk": 0.4,
     "skill_requirement": "technology",
     "min_skill_level": 4,
     "target_tech_required": true,
@@ -698,7 +698,7 @@
     "description": "Infiltrate enemy depots, rails, and command pre-offensive to degrade readiness, fort effectiveness, and org (directly feeds battle preview and combat power).",
     "base_success_chance": 0.55,
     "duration_months": 2,
-    "detection_risk": 0.30,
+    "detection_risk": 0.3,
     "skill_requirement": "intelligence",
     "min_skill_level": 4,
     "outcomes": {
@@ -724,7 +724,7 @@
     "name": "Infiltrate July Crisis (1914)",
     "category": "diplomatic",
     "description": "1910-era special: manipulate SER/AUH/RUS/GER/ENG/FRA decision-makers or leak intel during the July Crisis to tilt avert/limited/escalated outcome (ripples to 1918 peace_state and OOB mods).",
-    "base_success_chance": 0.40,
+    "base_success_chance": 0.4,
     "duration_months": 1,
     "detection_risk": 0.35,
     "skill_requirement": "diplomatic",
@@ -738,7 +738,7 @@
       },
       "partial": {
         "effect": "1914_crisis_shift",
-        "magnitude": -0.10,
+        "magnitude": -0.1,
         "prestige_gain": 2,
         "description": "Some influence applied to crisis participants."
       },
@@ -752,7 +752,7 @@
     "name": "Balkan League Intelligence",
     "category": "intelligence",
     "description": "1910-era: penetrate Balkan League vs Ottoman networks (1912-13) to shape intervention odds and alt border outcomes (affects 1918 grievances/leverage via 1912_balkan_alt flag).",
-    "base_success_chance": 0.60,
+    "base_success_chance": 0.6,
     "duration_months": 3,
     "detection_risk": 0.22,
     "skill_requirement": "intelligence",
@@ -760,7 +760,7 @@
     "outcomes": {
       "success": {
         "effect": "balkan_alt",
-        "magnitude": 0.30,
+        "magnitude": 0.3,
         "prestige_gain": 3,
         "description": "Key intel or agent pressure alters Balkan War path (flag set for 1918 ripple)."
       },
@@ -772,6 +772,82 @@
       },
       "failure": {
         "description": "Balkan networks remain opaque."
+      }
+    }
+  },
+  "steal_genetic_research": {
+    "id": "steal_genetic_research",
+    "name": "Steal Genetic Research",
+    "category": "biotech",
+    "description": "Infiltrate labs to steal genetic engineering data (crops/soldiers) for reverse or counter.",
+    "base_success_chance": 0.55,
+    "duration_months": 5,
+    "detection_risk": 0.35,
+    "skill_requirement": "intelligence",
+    "min_skill_level": 4,
+    "outcomes": {
+      "success": {
+        "intel_type": "biotech_genetic",
+        "prestige_gain": 4,
+        "description": "Genetic blueprints stolen - tech edge or counter."
+      },
+      "partial": {
+        "intel_type": "biotech_genetic",
+        "prestige_gain": 2,
+        "description": "Partial genetic data recovered."
+      },
+      "failure": {
+        "description": "Lab security prevented theft; ethics backlash risk."
+      }
+    }
+  },
+  "sabotage_clone_vat": {
+    "id": "sabotage_clone_vat",
+    "name": "Sabotage Cloning Vats",
+    "category": "biotech",
+    "description": "Target cloning facilities to disrupt manpower solution or cause identity crisis blowback.",
+    "base_success_chance": 0.48,
+    "duration_months": 3,
+    "detection_risk": 0.4,
+    "skill_requirement": "sabotage",
+    "min_skill_level": 3,
+    "outcomes": {
+      "success": {
+        "sabotage_level": 0.6,
+        "description": "Vats damaged - mp loss + ethics scandal spike."
+      },
+      "partial": {
+        "sabotage_level": 0.3,
+        "description": "Partial disruption."
+      },
+      "failure": {
+        "description": "Failed; exposure increases Hand."
+      }
+    }
+  },
+  "scanner_bio_intel": {
+    "id": "scanner_bio_intel",
+    "name": "Biotech Scanner Intel",
+    "category": "intelligence",
+    "description": "Use advanced scanners for bio-signature intel on enemy enhancements or hidden genetic programs.",
+    "base_success_chance": 0.7,
+    "duration_months": 2,
+    "detection_risk": 0.15,
+    "skill_requirement": "intelligence",
+    "min_skill_level": 2,
+    "outcomes": {
+      "success": {
+        "intel_type": "biotech_scanner",
+        "prestige_gain": 3,
+        "description": "Bio scans reveal enemy cloning/genetic activity."
+      },
+      "partial": {
+        "intel_type": "biotech_scanner",
+        "prestige_gain": 1,
+        "description": "Weak bio returns."
+      },
+      "failure": {
+        "description": "No useful scan data."
       }
     }
   }

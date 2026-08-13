@@ -1,0 +1,7362 @@
+{
+  "700000": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700001": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700002": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700003": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700004": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700005": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700006": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700007": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700008": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700009": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700010": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700011": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700012": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700013": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700014": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700015": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700016": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700017": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700018": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700019": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700020": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700021": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700022": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700023": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700024": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700025": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700026": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700027": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700028": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700029": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700030": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700031": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700032": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700033": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700034": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700035": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700036": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700037": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700038": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700039": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700040": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700041": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700042": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700043": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700044": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700045": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700046": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700047": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700048": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700049": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700050": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700051": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700052": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700053": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700054": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700055": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700056": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700057": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700058": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700059": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700060": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700061": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700062": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700063": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700064": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700065": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700066": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700067": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700068": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700069": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700070": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700071": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700072": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700073": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700074": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700075": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700076": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700077": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700078": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700079": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700080": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700081": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700082": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700083": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700084": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700085": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700086": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700087": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700088": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700089": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700090": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700091": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700092": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700093": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700094": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700095": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700096": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700097": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700098": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700099": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700100": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700101": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700102": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700103": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700104": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700105": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700106": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700107": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700108": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700109": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700110": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700111": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700112": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700113": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700114": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700115": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700116": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700117": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700118": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700119": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700120": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700121": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700122": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700123": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700124": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700125": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700126": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700127": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700128": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700129": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700130": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700131": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700132": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700133": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700134": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700135": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700136": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700137": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700138": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700139": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700140": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700141": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700142": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700143": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700144": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700145": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700146": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700147": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700148": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700149": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700150": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700151": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700152": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700153": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700154": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700155": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700156": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700157": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700158": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700159": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700160": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700161": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700162": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700163": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700164": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700165": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700166": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700167": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700168": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700169": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700170": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700171": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700172": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700173": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700174": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700175": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700176": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700177": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700178": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700179": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700180": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700181": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700182": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700183": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700184": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700185": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700186": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700187": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700188": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700189": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700190": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700191": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700192": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700193": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700194": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700195": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700196": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700197": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700198": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700199": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700200": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700201": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700202": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700203": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700204": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700205": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700206": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700207": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700208": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700209": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700210": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700211": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700212": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700213": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700214": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700215": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700216": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700217": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700218": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700219": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700220": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700221": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700222": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700223": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700224": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700225": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700226": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700227": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700228": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700229": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700230": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700231": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700232": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700233": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700234": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700235": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700236": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700237": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700238": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700239": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700240": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700241": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700242": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700243": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700244": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700245": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700246": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700247": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700248": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700249": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700250": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700251": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700252": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700253": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700254": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700255": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700256": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700257": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700258": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700259": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700260": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700261": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700262": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700263": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700264": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700265": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700266": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700267": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700268": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700269": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700270": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700271": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700272": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700273": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700274": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700275": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700276": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700277": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700278": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700279": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700280": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700281": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700282": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700283": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700284": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700285": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700286": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700287": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700288": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700289": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700290": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700291": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700292": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700293": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700294": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700295": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700296": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700297": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700298": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700299": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700300": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700301": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700302": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700303": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700304": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700305": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700306": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700307": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700308": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700309": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700310": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700311": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700312": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700313": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700314": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700315": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700316": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700317": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700318": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700319": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700320": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700321": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700322": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700323": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700324": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700325": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700326": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700327": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700328": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700329": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700330": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700331": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700332": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700333": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700334": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700335": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700336": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700337": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700338": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700339": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700340": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700341": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700342": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700343": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700344": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700345": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700346": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700347": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700348": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700349": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700350": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700351": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700352": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700353": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700354": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700355": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700356": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700357": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700358": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700359": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700360": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700361": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700362": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700363": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700364": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700365": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700366": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700367": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700368": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700369": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700370": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700371": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700372": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700373": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700374": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700375": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700376": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700377": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700378": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700379": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700380": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700381": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700382": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700383": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700384": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700385": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700386": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700387": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700388": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700389": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700390": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700391": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700392": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700393": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700394": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700395": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700396": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700397": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700398": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700399": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700400": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700401": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700402": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700403": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700404": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700405": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700406": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700407": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700408": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700409": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700410": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700411": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700412": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700413": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700414": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700415": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700416": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700417": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700418": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700419": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700420": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700421": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700422": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700423": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700424": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700425": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700426": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700427": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700428": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700429": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700430": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700431": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700432": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700433": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700434": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700435": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700436": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700437": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700438": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700439": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700440": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700441": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700442": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700443": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700444": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700445": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700446": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700447": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700448": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700449": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700450": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700451": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700452": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700453": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700454": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700455": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700456": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700457": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700458": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700459": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700460": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700461": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700462": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700463": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700464": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700465": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700466": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700467": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700468": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700469": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700470": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700471": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700472": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700473": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700474": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700475": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700476": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700477": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700478": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700479": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700480": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700481": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700482": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700483": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700484": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700485": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700486": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700487": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700488": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700489": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700490": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700491": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700492": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700493": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700494": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700495": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700496": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700497": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700498": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700499": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700500": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700501": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700502": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700503": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700504": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700505": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700506": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700507": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700508": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700509": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700510": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700511": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700512": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700513": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700514": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700515": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700516": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700517": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700518": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700519": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700520": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700521": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700522": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700523": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700524": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700525": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700526": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700527": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700528": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700529": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700530": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700531": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700532": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700533": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700534": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700535": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700536": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700537": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700538": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700539": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700540": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700541": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700542": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700543": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700544": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700545": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700546": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700547": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700548": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700549": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700550": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700551": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700552": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700553": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700554": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700555": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700556": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700557": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700558": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700559": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700560": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700561": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700562": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700563": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700564": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700565": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700566": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700567": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700568": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700569": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700570": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700571": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700572": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700573": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700574": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700575": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700576": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700577": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700578": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700579": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700580": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700581": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700582": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700583": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700584": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700585": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700586": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700587": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700588": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700589": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700590": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700591": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700592": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700593": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700594": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700595": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700596": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700597": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700598": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700599": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700600": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700601": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700602": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700603": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700604": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700605": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700606": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700607": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700608": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700609": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700610": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700611": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700612": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700613": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700614": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700615": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700616": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700617": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700618": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700619": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700620": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700621": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700622": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700623": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700624": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700625": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700626": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700627": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700628": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700629": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700630": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700631": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700632": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700633": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700634": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700635": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700636": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700637": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700638": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700639": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700640": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700641": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700642": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700643": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700644": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700645": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700646": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700647": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700648": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700649": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700650": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700651": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700652": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700653": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700654": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700655": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700656": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700657": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700658": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700659": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700660": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700661": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700662": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700663": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700664": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700665": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700666": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700667": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700668": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700669": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700670": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700671": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700672": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700673": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700674": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700675": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700676": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700677": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700678": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700679": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700680": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700681": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700682": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700683": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700684": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700685": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700686": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700687": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700688": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700689": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700690": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700691": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700692": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700693": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700694": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700695": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700696": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700697": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700698": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700699": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700700": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700701": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700702": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700703": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700704": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700705": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700706": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700707": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700708": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700709": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700710": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700711": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700712": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700713": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700714": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700715": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700716": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700717": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700718": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700719": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700720": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700721": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700722": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700723": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700724": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700725": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700726": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700727": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700728": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700729": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700730": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700731": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700732": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700733": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700734": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700735": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700736": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700737": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700738": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700739": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700740": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700741": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700742": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700743": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700744": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700745": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700746": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700747": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700748": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700749": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700750": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700751": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700752": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700753": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700754": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700755": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700756": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700757": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700758": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700759": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700760": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700761": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700762": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700763": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700764": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700765": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700766": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700767": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700768": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700769": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700770": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700771": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700772": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700773": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700774": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700775": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700776": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700777": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700778": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700779": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700780": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700781": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700782": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700783": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700784": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700785": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700786": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700787": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700788": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700789": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700790": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700791": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700792": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700793": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700794": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700795": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700796": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700797": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700798": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700799": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700800": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700801": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700802": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700803": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700804": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700805": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700806": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700807": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700808": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700809": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700810": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700811": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700812": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700813": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700814": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700815": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700816": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700817": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700818": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700819": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700820": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700821": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700822": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700823": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700824": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700825": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700826": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700827": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700828": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700829": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700830": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700831": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700832": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700833": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700834": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700835": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700836": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700837": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700838": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700839": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700840": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700841": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700842": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700843": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700844": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700845": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700846": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700847": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700848": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700849": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700850": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700851": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700852": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700853": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700854": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700855": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700856": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700857": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700858": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700859": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700860": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700861": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700862": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700863": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700864": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700865": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700866": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700867": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700868": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700869": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700870": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700871": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700872": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700873": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700874": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700875": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700876": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700877": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700878": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700879": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700880": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700881": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700882": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700883": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700884": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700885": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700886": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700887": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700888": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700889": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700890": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700891": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700892": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700893": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700894": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700895": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700896": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700897": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700898": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700899": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700900": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700901": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700902": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700903": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700904": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700905": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700906": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700907": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700908": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700909": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700910": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700911": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700912": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700913": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700914": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700915": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700916": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700917": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700918": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700919": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700920": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700921": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700922": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700923": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700924": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700925": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700926": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700927": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700928": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700929": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700930": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700931": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700932": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700933": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700934": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700935": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700936": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700937": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700938": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700939": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700940": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700941": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700942": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700943": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700944": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700945": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700946": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700947": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700948": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700949": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700950": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700951": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700952": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700953": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700954": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700955": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700956": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700957": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700958": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700959": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700960": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700961": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700962": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700963": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700964": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700965": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700966": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700967": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700968": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700969": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700970": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700971": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700972": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700973": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700974": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700975": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700976": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700977": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700978": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700979": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700980": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700981": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700982": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700983": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700984": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700985": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700986": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700987": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700988": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700989": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700990": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700991": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700992": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700993": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700994": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700995": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700996": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700997": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700998": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "700999": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701000": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701001": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701002": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701003": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701004": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701005": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701006": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701007": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701008": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701009": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701010": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701011": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701012": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701013": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701014": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701015": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701016": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701017": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701018": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701019": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701020": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701021": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701022": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701023": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701024": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701025": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701026": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701027": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701028": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701029": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701030": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701031": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701032": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701033": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701034": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701035": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701036": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701037": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701038": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701039": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701040": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701041": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701042": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701043": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701044": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701045": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701046": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701047": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701048": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701049": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701050": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701051": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701052": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701053": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701054": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701055": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701056": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701057": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701058": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701059": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701060": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701061": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701062": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701063": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701064": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701065": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701066": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701067": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701068": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701069": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701070": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701071": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701072": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701073": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701074": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701075": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701076": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701077": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701078": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701079": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701080": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701081": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701082": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701083": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701084": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701085": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701086": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701087": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701088": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701089": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701090": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701091": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701092": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701093": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701094": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701095": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701096": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701097": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701098": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701099": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701100": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701101": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701102": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701103": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701104": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701105": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701106": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701107": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701108": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701109": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701110": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701111": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701112": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701113": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701114": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701115": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701116": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701117": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701118": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701119": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701120": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701121": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701122": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701123": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701124": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701125": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701126": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701127": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701128": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701129": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701130": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701131": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701132": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701133": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701134": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701135": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701136": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701137": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701138": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701139": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701140": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701141": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701142": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701143": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701144": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701145": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701146": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701147": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701148": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701149": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701150": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701151": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701152": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701153": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701154": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701155": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701156": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701157": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701158": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701159": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701160": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701161": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701162": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701163": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701164": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701165": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701166": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701167": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701168": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701169": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701170": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701171": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701172": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701173": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701174": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701175": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701176": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701177": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701178": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701179": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701180": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701181": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701182": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701183": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701184": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701185": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701186": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701187": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701188": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701189": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701190": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701191": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701192": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701193": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701194": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701195": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701196": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701197": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701198": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701199": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701200": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701201": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701202": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701203": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701204": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701205": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701206": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701207": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701208": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701209": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701210": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701211": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701212": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701213": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701214": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701215": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701216": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701217": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701218": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701219": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701220": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701221": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701222": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701223": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701224": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701225": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701226": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701227": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701228": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701229": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701230": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701231": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701232": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701233": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701234": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701235": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701236": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701237": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701238": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701239": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701240": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701241": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701242": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701243": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701244": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701245": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701246": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701247": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701248": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701249": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701250": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701251": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701252": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701253": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701254": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701255": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701256": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701257": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701258": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701259": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701260": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701261": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701262": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701263": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701264": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701265": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701266": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701267": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701268": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701269": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701270": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701271": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701272": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701273": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701274": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701275": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701276": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701277": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701278": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701279": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701280": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701281": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701282": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701283": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701284": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701285": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701286": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701287": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701288": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701289": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701290": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701291": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701292": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701293": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701294": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701295": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701296": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701297": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701298": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701299": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701300": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701301": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701302": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701303": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701304": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701305": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701306": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701307": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701308": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701309": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701310": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701311": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701312": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701313": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701314": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701315": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701316": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701317": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701318": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701319": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701320": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701321": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701322": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701323": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701324": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701325": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701326": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701327": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701328": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701329": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701330": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701331": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701332": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701333": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701334": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701335": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701336": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701337": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701338": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701339": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701340": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701341": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701342": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701343": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701344": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701345": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701346": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701347": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701348": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701349": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701350": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701351": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701352": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701353": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701354": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701355": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701356": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701357": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701358": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701359": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701360": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701361": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701362": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701363": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701364": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701365": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701366": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701367": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701368": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701369": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701370": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701371": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701372": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701373": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701374": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701375": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701376": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701377": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701378": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701379": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701380": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701381": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701382": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701383": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701384": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701385": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701386": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701387": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701388": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701389": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701390": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701391": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701392": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701393": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701394": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701395": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701396": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701397": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701398": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701399": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701400": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701401": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701402": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701403": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701404": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701405": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701406": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701407": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701408": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701409": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701410": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701411": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701412": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701413": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701414": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701415": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701416": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701417": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701418": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701419": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701420": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701421": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701422": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701423": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701424": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701425": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701426": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701427": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701428": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701429": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701430": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701431": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701432": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701433": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701434": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701435": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701436": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701437": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701438": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701439": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701440": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701441": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701442": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701443": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701444": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701445": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701446": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701447": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701448": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701449": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701450": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701451": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701452": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701453": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701454": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701455": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701456": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701457": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701458": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701459": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701460": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701461": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701462": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701463": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701464": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701465": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701466": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701467": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701468": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701469": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701470": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701471": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701472": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701473": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701474": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701475": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701476": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701477": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701478": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701479": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701480": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701481": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701482": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701483": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701484": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701485": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701486": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701487": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701488": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701489": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701490": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701491": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701492": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701493": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701494": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701495": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701496": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701497": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701498": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701499": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701500": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701501": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701502": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701503": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701504": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701505": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701506": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701507": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701508": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701509": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701510": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701511": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701512": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701513": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701514": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701515": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701516": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701517": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701518": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701519": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701520": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701521": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701522": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701523": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701524": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701525": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701526": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701527": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701528": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701529": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701530": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701531": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701532": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701533": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701534": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701535": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701536": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701537": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701538": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701539": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701540": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701541": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701542": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701543": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701544": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701545": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701546": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701547": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701548": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701549": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701550": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701551": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701552": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701553": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701554": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701555": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701556": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701557": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701558": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701559": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701560": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701561": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701562": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701563": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701564": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701565": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701566": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701567": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701568": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701569": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701570": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701571": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701572": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701573": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701574": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701575": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701576": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701577": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701578": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701579": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701580": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701581": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701582": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701583": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701584": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701585": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701586": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701587": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701588": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701589": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701590": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701591": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701592": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701593": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701594": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701595": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701596": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701597": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701598": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701599": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701600": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701601": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701602": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701603": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701604": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701605": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701606": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701607": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701608": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701609": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701610": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701611": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701612": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701613": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701614": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701615": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701616": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701617": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701618": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701619": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701620": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701621": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701622": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701623": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701624": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701625": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701626": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701627": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701628": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701629": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701630": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701631": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701632": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701633": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701634": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701635": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701636": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701637": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701638": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701639": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701640": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701641": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701642": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701643": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701644": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701645": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701646": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701647": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701648": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701649": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701650": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701651": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701652": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701653": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701654": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701655": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701656": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701657": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701658": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701659": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701660": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701661": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701662": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701663": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701664": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701665": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701666": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701667": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701668": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701669": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701670": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701671": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701672": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701673": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701674": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701675": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701676": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701677": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701678": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701679": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701680": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701681": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701682": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701683": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701684": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701685": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701686": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701687": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701688": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701689": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701690": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701691": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701692": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701693": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701694": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701695": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701696": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701697": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701698": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701699": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701700": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701701": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701702": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701703": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701704": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701705": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701706": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701707": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701708": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701709": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701710": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701711": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701712": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701713": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701714": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701715": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701716": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701717": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701718": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701719": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701720": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701721": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701722": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701723": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701724": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701725": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701726": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701727": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701728": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701729": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701730": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701731": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701732": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701733": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701734": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701735": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701736": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701737": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701738": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701739": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701740": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701741": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701742": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701743": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701744": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701745": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701746": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701747": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701748": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701749": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701750": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701751": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701752": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701753": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701754": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701755": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701756": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701757": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701758": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701759": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701760": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701761": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701762": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701763": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701764": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701765": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701766": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701767": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701768": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701769": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701770": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701771": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701772": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701773": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701774": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701775": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701776": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701777": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701778": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701779": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701780": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701781": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701782": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701783": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701784": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701785": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701786": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701787": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701788": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701789": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701790": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701791": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701792": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701793": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701794": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701795": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701796": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701797": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701798": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701799": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701800": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701801": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701802": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701803": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701804": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701805": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701806": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701807": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701808": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701809": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701810": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701811": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701812": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701813": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701814": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701815": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701816": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701817": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701818": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701819": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701820": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701821": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701822": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701823": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701824": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701825": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701826": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701827": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701828": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701829": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701830": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701831": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701832": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701833": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701834": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701835": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701836": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701837": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701838": {
+    "terrain": "plains",
+    "domain": "land"
+  },
+  "701839": {
+    "terrain": "plains",
+    "domain": "land"
+  }
+}

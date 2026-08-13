@@ -155,18 +155,22 @@ theme_override_constants/separation = 4
 [node name="DetailPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer/MainArea"]
 layout_mode = 2
 size_flags_vertical = 3
-custom_minimum_size = Vector2(300, 0)
+size_flags_horizontal = 3
+custom_minimum_size = Vector2(320, 0)
 
 [node name="DetailMargin" type="MarginContainer" parent="MarginContainer/VBoxContainer/MainArea/DetailPanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 12
 
 [node name="DetailScroll" type="ScrollContainer" parent="MarginContainer/VBoxContainer/MainArea/DetailPanel/DetailMargin"]
 layout_mode = 2
 size_flags_vertical = 3
+size_flags_horizontal = 3
+horizontal_scroll_mode = 0
+clip_contents = true
 
 [node name="DetailVBox" type="VBoxContainer" parent="MarginContainer/VBoxContainer/MainArea/DetailPanel/DetailMargin/DetailScroll"]
 layout_mode = 2
@@ -176,6 +180,7 @@ theme_override_constants/separation = 8
 [node name="DetailLabel" type="Label" parent="MarginContainer/VBoxContainer/MainArea/DetailPanel/DetailMargin/DetailScroll/DetailVBox"]
 layout_mode = 2
 size_flags_horizontal = 3
+horizontal_alignment = 1
 text = "Select a leader for details."
 autowrap_mode = 3
 

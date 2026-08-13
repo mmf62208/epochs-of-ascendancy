@@ -2,6 +2,8 @@
 class_name DesignPickerPopup
 extends Window
 
+const _UnitIcons = preload("res://scripts/ui/UnitIconLibrary.gd")
+
 const MAX_WINDOW_SIZE := Vector2i(600, 680)
 const ROW_DOMESTIC := Color("#d8f4ff")
 const MIN_LIST_HEIGHT := 200
@@ -814,6 +816,9 @@ func _append_design_section(
 			ROW_INDENT + _design_list_label(design_id, status, is_foreign, locked_section),
 		)
 		design_list.set_item_tooltip(row_idx, _design_row_tooltip(design_id, status, locked_section))
+		var dtex: Texture2D = _UnitIcons.icon_for_design_id(str(design_id), 32)
+		if dtex != null:
+			design_list.set_item_icon(row_idx, dtex)
 		_list_entries.append({
 			"design_id": design_id,
 			"is_header": false,

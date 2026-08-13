@@ -1,0 +1,12 @@
+{
+  "phase": "grand_theater_v1",
+  "stats": {
+    "total": 1133,
+    "added": 673,
+    "europe_base": 460,
+    "sea_or_strait": 131,
+    "landish": 1002
+  },
+  "id_base_expansion": 20000,
+  "source_europe": "data/provinces_full_europe"
+}

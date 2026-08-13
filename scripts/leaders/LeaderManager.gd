@@ -116,6 +116,11 @@ const SCENARIO_LEADER_ROSTER_CHAIN: Dictionary = {
 	"1918": [HISTORICAL_LEADERS_1918_PATH],
 	"1936": [HISTORICAL_LEADERS_1918_PATH, HISTORICAL_LEADERS_1936_PATH],
 	"2026": [HISTORICAL_LEADERS_2026_PATH],
+	# Full-world / grand-theater / europe playtests share 1936 start → same 1918+1936 chain.
+	"world_full": [HISTORICAL_LEADERS_1918_PATH, HISTORICAL_LEADERS_1936_PATH],
+	"world_accurate": [HISTORICAL_LEADERS_1918_PATH, HISTORICAL_LEADERS_1936_PATH],
+	"grand_theater": [HISTORICAL_LEADERS_1918_PATH, HISTORICAL_LEADERS_1936_PATH],
+	"phase1_europe_test": [HISTORICAL_LEADERS_1918_PATH, HISTORICAL_LEADERS_1936_PATH],
 }
 const MODERN_LEADER_MIN_BIRTH_YEAR := 1950
 const MAX_SKILL := 10
@@ -460,6 +465,200 @@ func get_formations_for_country(country_tag: String) -> Array[Formation]:
 		if formation != null and formation.country_tag == country_tag:
 			result.append(formation)
 	return result
+
+
+## Formation type sets for auto-assign (mirrors _is_leader_valid_for_formation).
+const LAND_FORMATION_TYPES_FOR_ASSIGN: Array[String] = [
+	Formation.TYPE_DIVISION,
+	Formation.TYPE_ARMY,
+	Formation.TYPE_ARMY_GROUP,
+	Formation.TYPE_GARRISON,
+	Formation.TYPE_BRIGADE,
+]
+const NAVAL_FORMATION_TYPES_FOR_ASSIGN: Array[String] = [
+	Formation.TYPE_FLEET,
+	Formation.TYPE_TASK_FORCE,
+	Formation.TYPE_SHIP,
+]
+const AIR_FORMATION_TYPES_FOR_ASSIGN: Array[String] = [
+	Formation.TYPE_AIR_WING,
+	Formation.TYPE_AIR_SQUADRON,
+	Formation.TYPE_AIR_GROUP,
+]
+
+
+func _allowed_leader_types_for_formation_type(formation_type: String) -> Array[String]:
+	if formation_type in LAND_FORMATION_TYPES_FOR_ASSIGN:
+		return ["general", "field_marshal"] as Array[String]
+	if formation_type in NAVAL_FORMATION_TYPES_FOR_ASSIGN:
+		return ["admiral"] as Array[String]
+	if formation_type in AIR_FORMATION_TYPES_FOR_ASSIGN:
+		return ["air_marshal"] as Array[String]
+	return [] as Array[String]
+
+
+## Pure-style pick: next available same-tag leader of allowed types. Deterministic skill sort.
+## Mirrors tools/map_generation/lib/leader_formation_assigner.py
+func pick_leader_id_for_formation(
+	country_tag: String,
+	formation_type: String,
+	used_leader_ids: Dictionary,
+	allowed_leader_types: Array = [],
+) -> String:
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		return ""
+	var allowed: Array = allowed_leader_types
+	if allowed.is_empty():
+		allowed = _allowed_leader_types_for_formation_type(formation_type)
+	if allowed.is_empty():
+		return ""
+	var candidates: Array[Leader] = []
+	for lid in leaders.keys():
+		var leader: Leader = leaders[lid] as Leader
+		if leader == null:
+			continue
+		if str(leader.country_tag).strip_edges().to_upper() != tag:
+			continue
+		if leader.leader_type not in allowed:
+			continue
+		if leader.is_deceased or leader.is_retired or leader.is_captured:
+			continue
+		var id_str := str(leader.leader_id)
+		if used_leader_ids.has(id_str):
+			continue
+		if not str(leader.assigned_army_id).is_empty():
+			continue
+		candidates.append(leader)
+	if candidates.is_empty():
+		return ""
+	candidates.sort_custom(func(a: Leader, b: Leader) -> bool:
+		var sa := a.attack_skill + a.defense_skill + a.planning_skill + a.organization_skill
+		var sb := b.attack_skill + b.defense_skill + b.planning_skill + b.organization_skill
+		if sa != sb:
+			return sa > sb
+		return a.leader_id < b.leader_id
+	)
+	return candidates[0].leader_id
+
+
+func pick_leader_id_for_land_formation(
+	country_tag: String,
+	formation_type: String,
+	used_leader_ids: Dictionary,
+) -> String:
+	if formation_type not in LAND_FORMATION_TYPES_FOR_ASSIGN:
+		return ""
+	return pick_leader_id_for_formation(
+		country_tag, formation_type, used_leader_ids, ["general", "field_marshal"]
+	)
+
+
+func _seed_used_leader_ids() -> Dictionary:
+	var used: Dictionary = {}
+	for lid in leaders.keys():
+		var L: Leader = leaders[lid] as Leader
+		if L != null and not str(L.assigned_army_id).is_empty():
+			used[str(L.leader_id)] = true
+	return used
+
+
+## Assign free leaders of allowed types to vacant formations of matching types for one country.
+func auto_assign_leaders_for_country(
+	country_tag: String,
+	formation_types: Array,
+	allowed_leader_types: Array,
+) -> int:
+	var tag := country_tag.strip_edges().to_upper()
+	var used: Dictionary = _seed_used_leader_ids()
+	var forms: Array[Formation] = get_formations_for_country(tag)
+	forms.sort_custom(func(a: Formation, b: Formation) -> bool:
+		return a.formation_id < b.formation_id
+	)
+	var assigned_n := 0
+	for formation in forms:
+		if formation == null:
+			continue
+		if formation.formation_type not in formation_types:
+			continue
+		if formation.has_leader():
+			var cur := str(formation.leader_id)
+			if not cur.is_empty():
+				used[cur] = true
+			continue
+		var pick := pick_leader_id_for_formation(
+			tag, formation.formation_type, used, allowed_leader_types
+		)
+		if pick.is_empty():
+			continue
+		if assign_leader_to_formation(pick, formation.formation_id):
+			used[pick] = true
+			assigned_n += 1
+	return assigned_n
+
+
+func auto_assign_land_leaders_for_country(country_tag: String) -> int:
+	return auto_assign_leaders_for_country(
+		country_tag, LAND_FORMATION_TYPES_FOR_ASSIGN, ["general", "field_marshal"]
+	)
+
+
+func auto_assign_naval_leaders_for_country(country_tag: String) -> int:
+	return auto_assign_leaders_for_country(
+		country_tag, NAVAL_FORMATION_TYPES_FOR_ASSIGN, ["admiral"]
+	)
+
+
+func auto_assign_air_leaders_for_country(country_tag: String) -> int:
+	return auto_assign_leaders_for_country(
+		country_tag, AIR_FORMATION_TYPES_FOR_ASSIGN, ["air_marshal"]
+	)
+
+
+func _country_tags_with_formations() -> Array[String]:
+	var tags: Array[String] = []
+	for formation_id in formations:
+		var f: Formation = formations[formation_id] as Formation
+		if f == null:
+			continue
+		var t := str(f.country_tag).strip_edges().to_upper()
+		if t.is_empty() or t in tags:
+			continue
+		tags.append(t)
+	tags.sort()
+	return tags
+
+
+## Auto-assign land commanders for every country that has formations.
+func auto_assign_land_leaders_for_all_countries() -> Dictionary:
+	var by_tag: Dictionary = {}
+	var total := 0
+	for tag in _country_tags_with_formations():
+		var n := auto_assign_land_leaders_for_country(tag)
+		by_tag[tag] = n
+		total += n
+	return {"total_assigned": total, "by_tag": by_tag}
+
+
+## Auto-assign admirals to naval formations and air marshals to air formations.
+func auto_assign_branch_leaders_for_all_countries() -> Dictionary:
+	var by_tag_naval: Dictionary = {}
+	var by_tag_air: Dictionary = {}
+	var total_naval := 0
+	var total_air := 0
+	for tag in _country_tags_with_formations():
+		var nn := auto_assign_naval_leaders_for_country(tag)
+		var na := auto_assign_air_leaders_for_country(tag)
+		by_tag_naval[tag] = nn
+		by_tag_air[tag] = na
+		total_naval += nn
+		total_air += na
+	return {
+		"total_naval_assigned": total_naval,
+		"total_air_assigned": total_air,
+		"by_tag_naval": by_tag_naval,
+		"by_tag_air": by_tag_air,
+	}
 
 
 func assign_leader_to_formation(leader_id: String, formation_id: String) -> bool:
@@ -2969,6 +3168,10 @@ func get_save_data() -> Dictionary:
 			"country_tag": f.country_tag,
 			"leader_id": f.leader_id,
 			"stationed_province_id": f.stationed_province_id,
+			# design_id required so post-load reinforce / combat equip stats resolve OOB requirements
+			"design_id": f.design_id if "design_id" in f else "",
+			"air_design_id": f.air_design_id if "air_design_id" in f else "",
+			"naval_design_id": f.naval_design_id if "naval_design_id" in f else "",
 			"is_training": f.is_training,
 			"is_in_combat": f.is_in_combat,
 			"training_progress": f.training_progress,
@@ -3072,6 +3275,9 @@ func apply_save_data(data: Dictionary) -> void:
 			f.country_tag = str(fd.get("country_tag", ""))
 			f.leader_id = str(fd.get("leader_id", ""))
 			f.stationed_province_id = int(fd.get("stationed_province_id", -1))
+			f.design_id = str(fd.get("design_id", ""))
+			f.air_design_id = str(fd.get("air_design_id", ""))
+			f.naval_design_id = str(fd.get("naval_design_id", ""))
 			f.is_training = bool(fd.get("is_training", false))
 			f.is_in_combat = bool(fd.get("is_in_combat", false))
 			f.training_progress = float(fd.get("training_progress", 0.0))

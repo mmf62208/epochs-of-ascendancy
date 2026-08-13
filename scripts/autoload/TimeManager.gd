@@ -56,21 +56,40 @@ signal game_day_advanced(year: int, month: int, day: int)   # For daily ticks
 var current_year: int = 1936
 var current_month: int = 1
 var current_day: int = 1
+## 0–23. 1× clock advances hours first (not whole days per wall second).
+var current_hour: int = 0
 
 var scenario_start_date: String = "1936-01-01"
 var scenario_start_year: int = 1936
 
 var paused: bool = false
-var time_scale: float = 1.0   # Future use for simulation speed (1.0, 2.0, 5.0, etc.)
+var time_scale: float = 1.0   # Interactive: multipliers on hours/wall-sec (1×, 2×, 3×, 4×)
 
 ## Monotonic day counter since scenario start (incremented in advance_days).
 var total_days_elapsed: int = 0
 
 # Internal accumulator for real-time driven simulation (in game days)
 var _accumulated_game_days: float = 0.0
+## Fractional hour accumulator (1.0 = one game hour).
+var _accumulated_game_hours: float = 0.0
+
+## Interactive F5: calendar advances immediately; day/month *signals* flush on later frames
+## so a heavy listener cannot freeze the clock at Feb 28 (main thread never returns to TopInfoBar).
+var _pending_sim_events: Array = []
+var _sim_flush_scheduled: bool = false
+## Soft budget (ms) for deferred sim work per frame — keeps pan/hover live past month ends.
+const INTERACTIVE_SIM_FLUSH_BUDGET_MS := 10
 
 func _ready() -> void:
 	print("TimeManager: Initialized (default 1936-01-01)")
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	set_process(true)
+
+
+func _process(_delta: float) -> void:
+	# Safety net: if deferred flush stalled (e.g. pause race), keep draining the queue.
+	if not paused and not _pending_sim_events.is_empty() and not _sim_flush_scheduled:
+		_schedule_sim_flush()
 
 ## Called by ScenarioLoader when a scenario is loaded.
 ## Parses "YYYY-MM-DD" (falls back gracefully to year-only).
@@ -97,6 +116,8 @@ func initialize_from_scenario_start_date(start_date_str: String) -> void:
 	else:
 		current_day = 1
 
+	current_hour = 0
+	_accumulated_game_hours = 0.0
 	total_days_elapsed = 0
 
 	print("TimeManager: Scenario start date set to %s (year %d)" % [scenario_start_date, current_year])
@@ -139,8 +160,14 @@ func get_current_date() -> Dictionary:
 		"year": current_year,
 		"month": current_month,
 		"day": current_day,
-		"date_string": "%04d-%02d-%02d" % [current_year, current_month, current_day]
+		"hour": current_hour,
+		"date_string": "%04d-%02d-%02d %02d:00" % [current_year, current_month, current_day, current_hour],
+		"date_day_only": "%04d-%02d-%02d" % [current_year, current_month, current_day],
 	}
+
+
+func get_current_hour() -> int:
+	return current_hour
 
 func get_scenario_start_date() -> String:
 	return scenario_start_date
@@ -152,6 +179,18 @@ func set_paused(p: bool) -> void:
 	if paused != p:
 		paused = p
 		print("TimeManager: Paused = %s" % paused)
+	# Flush deferred month boundary that landed while paused (Feb→Mar safety).
+	if not paused and has_meta("pending_month_boundary"):
+		var pending: Dictionary = get_meta("pending_month_boundary")
+		remove_meta("pending_month_boundary")
+		_pending_sim_events.append({
+			"kind": "month",
+			"year": int(pending.get("year", current_year)),
+			"month": int(pending.get("month", current_month)),
+			"crossed_year": bool(pending.get("crossed_year", false)),
+		})
+	if not paused and not _pending_sim_events.is_empty():
+		_schedule_sim_flush()
 
 func set_time_scale(scale: float) -> void:
 	time_scale = maxf(0.1, scale)   # Safety clamp
@@ -193,6 +232,10 @@ func sync_year_from_external(year: int) -> void:
 ## When a year boundary is crossed, calls LeaderManager.advance_game_year() (the heavy simulation)
 ## and ensures `game_year_advanced(year)` is emitted.
 ## This is the main method the game clock uses to drive yearly progression.
+##
+## Interactive F5 (is_interactive_light_sim): calendar fields update *immediately* so the top bar
+## never freezes on Feb 28 while listeners run. Day/month signals are queued and flushed across
+## frames with a time budget (see _flush_sim_events).
 func advance_days(days: float) -> void:
 	if paused or days <= 0.0:
 		return
@@ -205,11 +248,11 @@ func advance_days(days: float) -> void:
 
 	_accumulated_game_days -= days_to_advance
 
+	var light := is_interactive_light_sim()
 	for i in days_to_advance:
 		current_day += 1
 
-		# Normalize BEFORE emit so all daily listeners (Supply, Agent, Map, Production, UI) always receive a valid calendar date.
-		# Previously emitted e.g. day=32 on 31-day month rollovers — polluted trackers, pulses, and date logic.
+		# Normalize BEFORE emit so all daily listeners always receive a valid calendar date.
 		var crossed_month := false
 		var crossed_year := false
 		var days_in_month := _get_days_in_month(current_month, current_year)
@@ -222,44 +265,182 @@ func advance_days(days: float) -> void:
 				current_year += 1
 				crossed_year = true
 
-		# Emit daily tick for every day advanced (guaranteed valid day 1-31)
 		total_days_elapsed += 1
+
+		if light:
+			# Calendar already on the new day — queue sim so TopInfoBar can return instantly.
+			_pending_sim_events.append({
+				"kind": "day",
+				"year": current_year,
+				"month": current_month,
+				"day": current_day,
+			})
+			if crossed_month:
+				_pending_sim_events.append({
+					"kind": "month",
+					"year": current_year,
+					"month": current_month,
+					"crossed_year": crossed_year,
+				})
+				print(
+					"TimeManager: calendar → %04d-%02d-%02d (month rollover queued, interactive)"
+					% [current_year, current_month, current_day]
+				)
+			continue
+
+		# Headless / harness: synchronous path (evidence needs ordered listeners in one step).
 		game_day_advanced.emit(current_year, current_month, current_day)
-
-		# Main-loop AI combat for non-player majors (world-class: scored targets on supply/infra/low-org + weather mud/snow avoid + ascend geo stub + chain/flank; promoted from F10 harness base).
-		# Wired to daily for autonomous AI battle initiation (not debug-only) -- enables integrated 50+ turn playtesting with wars, captures, recovery, econ/peace ties.
-		# Uses BattleManager.simulate_daily_ai_combat (limited actions, real execute_province_assault + chain path, weather/infra/org aware).
-		# Polish: caps + player skip prevent spam; full weather/air/terrain in resolver feeds outcomes.
-		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("simulate_daily_ai_combat"):
-			BattleManager.simulate_daily_ai_combat()
-
+		if _should_run_daily_ai_combat():
+			if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("simulate_daily_ai_combat"):
+				BattleManager.simulate_daily_ai_combat()
 		if crossed_month:
-			# Emit monthly tick signal whenever we cross into a new month (fires on day 1 of the new month)
-			game_month_advanced.emit(current_year, current_month)
+			_emit_month_year_boundary(current_year, current_month, crossed_year)
 
-			if crossed_year:
-				# Drive the full yearly simulation through LeaderManager (the heavy work)
-				if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("advance_game_year"):
-					LeaderManager.advance_game_year()
-				# (No else emit here — we always emit the central TM year signal below for consistency.)
+	if light and not _pending_sim_events.is_empty():
+		_schedule_sim_flush()
 
-				# Central TM year signal — this is what makes TimeManager the single source of truth
-				# for year events per its own documentation. Dual listeners protected by guards.
-				game_year_advanced.emit(current_year)
 
-				print("TimeManager: Year boundary crossed → %d (driven by central clock)" % current_year)
+func _schedule_sim_flush() -> void:
+	if _sim_flush_scheduled:
+		return
+	_sim_flush_scheduled = true
+	call_deferred("_flush_sim_events")
+
+
+func _flush_sim_events() -> void:
+	_sim_flush_scheduled = false
+	if paused:
+		# Keep queue; resume via set_paused(false) / _process.
+		return
+	if _pending_sim_events.is_empty():
+		return
+
+	# Exactly one event per frame — never chain day+month in the same frame (Mar 1936 monthly
+	# used to freeze the main thread for so long the clock looked stuck at Feb 28).
+	var ev: Dictionary = _pending_sim_events.pop_front() as Dictionary
+	var kind := str(ev.get("kind", ""))
+	if kind == "day":
+		game_day_advanced.emit(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
+		# Budgeted non-player major AI (production/soft) — not full simulate_daily_ai_combat.
+		_maybe_run_interactive_multi_ai()
+	elif kind == "month":
+		var y := int(ev.get("year", 0))
+		var m := int(ev.get("month", 0))
+		print("TimeManager: flushing month boundary %04d-%02d (interactive, isolated frame)" % [y, m])
+		_emit_month_year_boundary(y, m, bool(ev.get("crossed_year", false)))
+
+	if not _pending_sim_events.is_empty():
+		_schedule_sim_flush()
+
+
+func _emit_month_year_boundary(year: int, month: int, crossed_year: bool) -> void:
+	# Emit monthly tick whenever we cross into a new month (fires on day 1 of the new month).
+	game_month_advanced.emit(year, month)
+	if not crossed_year:
+		return
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("advance_game_year"):
+		LeaderManager.advance_game_year()
+	game_year_advanced.emit(year)
+	print("TimeManager: Year boundary crossed → %d (driven by central clock)" % year)
+
+
+func _emit_month_year_boundary_deferred(year: int, month: int, crossed_year: bool) -> void:
+	# Legacy entry: route through the same queue as interactive day ticks.
+	if paused:
+		if not has_meta("pending_month_boundary"):
+			set_meta("pending_month_boundary", {"year": year, "month": month, "crossed_year": crossed_year})
+		return
+	_pending_sim_events.append({
+		"kind": "month",
+		"year": year,
+		"month": month,
+		"crossed_year": crossed_year,
+	})
+	_schedule_sim_flush()
+
+func _should_run_daily_ai_combat() -> bool:
+	return not is_interactive_light_sim()
+
+
+## Light interactive multi-AI: budgeted major production on F5 day ticks.
+## Default ON under interactive light sim. Killswitch: EOA_INTERACTIVE_MULTI_AI=0.
+## Never runs full BattleManager.simulate_daily_ai_combat (OOM history).
+func _should_run_interactive_multi_ai() -> bool:
+	if OS.get_environment("EOA_INTERACTIVE_MULTI_AI").strip_edges() == "0":
+		return false
+	if OS.get_environment("EOA_YEAR_MULTI_AI").strip_edges() == "1":
+		return false
+	if OS.get_environment("EOA_UI_SMOKE").strip_edges() == "1":
+		return false
+	# Explicit opt-out of all interactive extras
+	if not is_interactive_light_sim():
+		return false
+	return true
+
+
+func _maybe_run_interactive_multi_ai() -> void:
+	if not _should_run_interactive_multi_ai():
+		return
+	if typeof(GameData) == TYPE_NIL:
+		return
+	if not GameData.has_method("apply_interactive_multi_ai_day_live"):
+		return
+	GameData.call("apply_interactive_multi_ai_day_live", 1)
+
+
+## True for normal graphical F5 play — keep day ticks light so HUD/map stay responsive.
+func is_interactive_light_sim() -> bool:
+	if OS.get_environment("EOA_UI_SMOKE").strip_edges() == "1":
+		return true
+	if OS.get_environment("EOA_HEAVY_DAILY").strip_edges() == "1":
+		return false
+	if OS.get_environment("EOA_RUN_SIM_CYCLES").strip_edges() == "1":
+		return false
+	if OS.get_environment("EOA_RUN_50_TURN_SIM").strip_edges() == "1":
+		return false
+	if OS.get_environment("EOA_RUN_LONG_SIM").strip_edges() == "1":
+		return false
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	return true
+
 
 ## Called by real-time timers (e.g. TopInfoBar) to advance simulation based on wall time.
 ## `real_seconds` is real elapsed time since last call.
 ## Respects `time_scale` and `paused`.
-## This is what makes "press Play and watch the world move" work.
+## 1× rate: **1 wall second ≈ 1 game hour** (not 1 day). 2×/3×/4× scale hours.
+## Full day handlers only fire when the calendar day rolls (after 24 hours).
 func advance_real_time(real_seconds: float) -> void:
 	if paused:
 		return
+	if real_seconds <= 0.0:
+		return
+	# Hours this tick: 1.0 wall-sec * scale = hours at 1×…4×.
+	var hours_this_tick := real_seconds * maxf(time_scale, 0.1)
+	# Cap: never more than 6 game hours per wall tick (keeps UI live at high speed).
+	if not _should_run_daily_ai_combat():
+		hours_this_tick = minf(hours_this_tick, 6.0)
+	advance_hours(hours_this_tick)
 
-	# Base rate: 1 real second = 1 game day at speed 1.0 (tunable later)
-	var game_days_this_tick := real_seconds * time_scale
-	advance_days(game_days_this_tick)
+
+## Advance fractional game hours. Rolls into advance_days when 24h accumulate.
+func advance_hours(hours: float) -> void:
+	if paused or hours <= 0.0:
+		return
+	_accumulated_game_hours += hours
+	var whole := int(_accumulated_game_hours)
+	if whole <= 0:
+		return
+	_accumulated_game_hours -= float(whole)
+	var days_crossed := 0
+	for _i in whole:
+		current_hour += 1
+		if current_hour >= 24:
+			current_hour = 0
+			days_crossed += 1
+	if days_crossed > 0:
+		# Advance whole days (emits day signals / multi-AI once per day, not per hour).
+		advance_days(float(days_crossed))
 
 ## Returns number of days in the given month (MVP: no leap years).
 func _get_days_in_month(month: int, year: int) -> int:
@@ -280,14 +461,19 @@ func get_save_data() -> Dictionary:
 		"paused": paused,
 		"time_scale": time_scale,
 		"total_days_elapsed": total_days_elapsed,
+		"current_hour": current_hour,
 	}
 
 ## Applies previously saved calendar state. Does NOT emit day/month/year signals
 ## (we are restoring, not simulating forward).
 func apply_save_data(data: Dictionary) -> void:
+	if data.has("current_hour"):
+		current_hour = clampi(int(data.get("current_hour", 0)), 0, 23)
 	if data.has("current_date"):
 		var d: Dictionary = data["current_date"]
 		current_year = int(d.get("year", 1936))
+		if d.has("hour"):
+			current_hour = clampi(int(d.get("hour", current_hour)), 0, 23)
 		current_month = int(d.get("month", 1))
 		current_day = int(d.get("day", 1))
 	if data.has("scenario_start_date"):

@@ -47,6 +47,8 @@ func apply_unlock(
 			_apply_production_category_unlock(state, unlock, tech_id)
 		"rule_flag":
 			_append_unique(state, "rule_flags", str(unlock.get("flag", "")))
+		"resource":
+			_apply_resource_unlock(state, unlock)
 		"building", "equipment_module":
 			_store_deferred_unlock(state, unlock_type, unlock)
 		"division_template":
@@ -102,6 +104,26 @@ func _apply_production_category_unlock(state: Dictionary, unlock: Dictionary, te
 		"min_factory_type": str(unlock.get("min_factory_type", "")),
 		"source_tech": tech_id,
 	}
+
+
+## Strategic resource unlock (fissiles / uranium visibility) + optional output bonus.
+func _apply_resource_unlock(state: Dictionary, unlock: Dictionary) -> void:
+	var resource := str(unlock.get("resource", "")).strip_edges().to_lower()
+	if resource.is_empty():
+		return
+	_append_unique(state, "unlocked_resources", resource)
+	# Map uranium → fissiles major visibility for harvest / UI
+	if resource in ["uranium", "plutonium", "fissiles"]:
+		_append_unique(state, "unlocked_resources", "fissiles")
+		_append_unique(state, "rule_flags", "nuclear_fuel")
+	var bonus := float(unlock.get("bonus", 0.0))
+	if bonus != 0.0:
+		if not state.has("permanent_modifiers"):
+			state["permanent_modifiers"] = {}
+		var mods: Dictionary = state["permanent_modifiers"]
+		var key := "resource_output_%s" % resource
+		mods[key] = float(mods.get(key, 0.0)) + bonus
+		mods["resource_output"] = float(mods.get("resource_output", 0.0)) + bonus * 0.5
 
 
 func _append_unique(state: Dictionary, key: String, value: String) -> void:

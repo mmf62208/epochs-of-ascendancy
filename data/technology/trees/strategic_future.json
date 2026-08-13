@@ -1108,8 +1108,21 @@
         "bonus": 0.2
       },
       {
+        "type": "resource",
+        "resource": "fissiles",
+        "bonus": 0.15
+      },
+      {
         "type": "rule_flag",
         "flag": "nuclear_fuel"
+      },
+      {
+        "type": "factory_type",
+        "factory_type": "nuclear_plant"
+      },
+      {
+        "type": "factory_type",
+        "factory_type": "enrichment_plant"
       },
       {
         "type": "modifier",
@@ -1118,7 +1131,7 @@
       }
     ],
     "ui": {
-      "short_effect": "Unlocks uranium as strategic resource. Enables nuclear engines/power. Provinces with uranium deposits become critical.",
+      "short_effect": "Unlocks Fissiles major + nuclear/enrichment plants. Uranium provinces become critical.",
       "flavor": "Manhattan + postwar. Local uranium + processing = independent nuke path. Without it you are dependent on trade or conquest. Pairs with computers for safe control; without good electronics, nuclear programs are risky and slow.",
       "icon": "res://assets/graphics/icons/engines/rare_earth_refinery.png"
     }

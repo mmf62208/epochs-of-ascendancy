@@ -802,3 +802,57 @@ func _rebuild_all_editor_previews() -> void:
 			var preview_poly := data["preview_node"] as Polygon2D
 			preview_poly.polygon = data["points"]
 			_sync_editor_polygon_outline(preview_poly)
+
+
+## Phase 3: province property inspector board + export roundtrip helpers.
+func get_selected_property_board() -> Dictionary:
+	var attrs: Dictionary = {}
+	if _selected_prov_id >= 0 and _editor_provinces.has(_selected_prov_id):
+		var rec: Dictionary = _editor_provinces[_selected_prov_id]
+		attrs = (rec.get("attrs", {}) as Dictionary).duplicate(true)
+		attrs["temp_id"] = _selected_prov_id
+		attrs["vertex_n"] = (rec.get("points", PackedVector2Array()) as PackedVector2Array).size()
+	else:
+		attrs = _default_attrs.duplicate(true)
+		attrs["temp_id"] = -1
+		attrs["vertex_n"] = _current_points.size()
+	return {
+		"ok": true,
+		"selected_id": _selected_prov_id,
+		"attrs": attrs,
+		"active": _is_active,
+		"province_n": _editor_provinces.size(),
+		"summary": "Editor inspector · sel %d · provinces %d · verts %d" % [
+			_selected_prov_id, _editor_provinces.size(), int(attrs.get("vertex_n", 0))
+		],
+		"empty": false,
+	}
+
+
+func set_selected_property(key: String, value: Variant) -> Dictionary:
+	if _selected_prov_id < 0 or not _editor_provinces.has(_selected_prov_id):
+		return {"ok": false, "reason": "no selection", "empty": true}
+	var rec: Dictionary = _editor_provinces[_selected_prov_id]
+	if not rec.has("attrs") or not (rec["attrs"] is Dictionary):
+		rec["attrs"] = _default_attrs.duplicate(true)
+	(rec["attrs"] as Dictionary)[key] = value
+	_editor_provinces[_selected_prov_id] = rec
+	province_edited.emit(_selected_prov_id)
+	return {"ok": true, "key": key, "value": value, "province_id": _selected_prov_id, "empty": false}
+
+
+func export_roundtrip_check(base_path: String = "user://editor_provinces/") -> Dictionary:
+	var exported := export_to_json(base_path)
+	var ok := not exported.is_empty() and int(exported.get("count", 0)) >= 0
+	var geom_path := str(exported.get("geometry_path", base_path + "provinces_geometry.json"))
+	var exists := FileAccess.file_exists(geom_path) if ok else false
+	return {
+		"ok": ok and (exists or int(exported.get("count", 0)) == 0),
+		"export": exported,
+		"geometry_path": geom_path,
+		"exists": exists,
+		"summary": "Editor export roundtrip · count %d · %s" % [
+			int(exported.get("count", 0)), "PASS" if ok else "FAIL"
+		],
+		"empty": false,
+	}

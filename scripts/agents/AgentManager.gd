@@ -78,7 +78,11 @@ func _on_game_year_advanced(year: int) -> void:
 
 func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
 	# Daily updates for persistent agent networks + real sabotage effects (supply/infra).
-	# Primary path (TimeManager central clock). Legacy monthly/yearly paths still exist for missions.
+	# Interactive F5: run every 3rd day only (full daily freezes map/HUD after multi-week 1x).
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+		var day_n := int(TimeManager.total_days_elapsed) if "total_days_elapsed" in TimeManager else _day
+		if day_n % 3 != 0:
+			return
 	advance_networks_daily()
 
 
@@ -355,6 +359,7 @@ func _apply_mission_outcome(agent: Agent, mission: Dictionary, outcome: String, 
 		"minister_compromised":
 			_apply_minister_compromised(agent, magnitude)
 		"narrative_shift":
+			pass  # narrative payload applied via mission text / GameData hooks elsewhere
 		# === 1910-era crisis / pre-battle espionage effects (keep going) ===
 		"sabotage_level":
 			# Accumulates on target depot (if mission had target); preview already reads it for fort/power bias.
@@ -363,23 +368,23 @@ func _apply_mission_outcome(agent: Agent, mission: Dictionary, outcome: String, 
 			else:
 				# Fallback: direct on Supply if depot registry exists
 				if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("get_depot_state"):
-					var dep = SupplyManager.get_depot_state(agent.target_province_id if hasattr(agent,"target_province_id") else 0)
+					var dep = SupplyManager.get_depot_state(int(agent.target_province_id) if "target_province_id" in agent else 0)
 					if dep and "sabotage_level" in dep:
-						dep.sabotage_level = clampf(float(getattr(dep,"sabotage_level",0.0)) + magnitude, 0.0, 0.9)
+						dep.sabotage_level = clampf(float(dep.sabotage_level) if "sabotage_level" in dep else 0.0 + magnitude, 0.0, 0.9)
 		"1914_crisis_shift":
 			if typeof(GameData) != TYPE_NIL:
-				var ps = GameData.get("peace_state", {})
-				cur = str(ps.get("1914_crisis", "escalated"))
+				var ps: Dictionary = GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
+				var cur := str(ps.get("1914_crisis", "escalated"))
 				# magnitude negative favors de-escalate
 				if magnitude < -0.15:
 					ps["1914_crisis"] = "averted" if randf() < 0.6 else "limited"
 				elif magnitude < 0:
 					ps["1914_crisis"] = "limited" if cur != "averted" else cur
-				GameData.set("peace_state", ps)
+				pass  # peace_state is live reference via get_peace_state
 				print("[AGENT 1910] July crisis shift applied via mission, new state:", ps.get("1914_crisis"))
 		"balkan_alt":
 			if typeof(GameData) != TYPE_NIL:
-				var ps2 = GameData.get("peace_state", {})
+				var ps2: Dictionary = GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
 				ps2["1912_balkan_alt"] = true if magnitude > 0.2 or randf() < 0.5 else ps2.get("1912_balkan_alt", false)
 				GameData.set("peace_state", ps2)
 				print("[AGENT 1910] Balkan alt flag set via mission:", ps2.get("1912_balkan_alt"))
@@ -1923,6 +1928,10 @@ func _apply_enemy_agent_disruption(target_country: String, magnitude: float) -> 
 		disrupted += 1
 
 	print("  [COUNTER-INTEL] %s sweep: disrupted %d enemy networks, cleared effects in %d provinces (mag %.1f)" % [tag, disrupted, cleared_effects, magnitude])
+	# Hidden Hand counterplay: reduce global hand influence + clear monthly map signal (player-facing toast/news).
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_hh_counterplay"):
+		var red := 0.10 + clampf(magnitude * 0.04, 0.0, 0.15)
+		GameData.apply_hh_counterplay("counter_intel", red, true)
 
 
 func _apply_enemy_intel_degradation(actor_country: String, magnitude: float) -> void:

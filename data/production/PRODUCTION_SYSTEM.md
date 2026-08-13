@@ -70,21 +70,33 @@
 
 ### Current State
 - Designs carry `daily_resource_cost` (steel, aluminum, fuel, electronics, etc.).
+- **Player-facing majors (8):** steel · aluminum · **energy** · fuel · rubber · electronics · **specials** · **fissiles** (see `docs/RESOURCE_PRODUCTION_STRATEGIC_DESIGN.md` and `production_cost_rules.json` → `major_resources`).
+- Province deposits stay typed (coal, oil, uranium…) for plant icons; coal/gas/biomass feed **Energy**; oil feeds **Fuel** (+ Energy conversion); uranium → **Fissiles** (unlock).
 - `get_design_resource_preview()` and updated info methods expose daily costs for UI.
 - Shortages apply `resource_shortage_penalty` on the line (reduces production speed; floor ~55% in `production_cost_rules.json`).
 - Production **continues** during shortages (does not halt completely).
-- **Critical resources** (electronics, rubber, explosives, rare earth, etc.) use stronger weighted fill ratios than common materials.
+- **Critical resources** (electronics, rubber, specials, fissiles, …) use stronger weighted fill ratios than common materials.
 - Finished units under shortage carry a lower **`shortage_reliability_multiplier`** (logged on completion; hook for combat/readiness later).
 - National stockpile is consumed proportionally when supply is partial (`ProductionManager.evaluate_line_resources`).
+- **Ops triad** (separate from factory majors UI): manpower · supplies (food feeds this) · fuel.
+
+### Harvest & plants (implemented)
+- **`ResourceHarvestCalculator`** + `resource_harvest_rules.json`: province deposits auto-fold into the 8 majors (aliases).
+- **Daily tick:** `ProductionManager.daily_resource_harvest_tick` runs before equipment lines consume stockpile.
+- **Plant types:** coal/oil/gas/hydro/biomass/nuclear/fusion energy plants; steel mill, aluminum smelter, refinery, rubber works, electronics fab, specials refinery, enrichment plant — size_tier 1–5 scales output; no equipment lines.
+- **Tech:** plastics_industry buffs rubber/electronics; synthetic_fuel converts Energy→Fuel; nuclear_fuel unlocks Fissiles + nuclear/enrichment plants; fusion_power_industry unlocks fusion plants / He-3 harvest visibility.
+- **Ops:** food/grain deposits feed **supplies** (not a factory major).
 
 ### Recommended Future Behavior
 - Connect consumption to **provincial stockpiles** / `ProvinceDepotState` and supply lines instead of national pool only.
-- Surface shortage severity on the Production Assignment UI and on deployed unit readiness.
+- Map UI for plant placement/upgrade (icons already type-keyed in harvest rules).
+- Food→supplies **stability** cohesion; surface shortage severity on Production Assignment UI.
 - Optional: **partial production** variants (lower-quality unit when specific inputs are missing).
 
 ### Design Intent
-- Missing critical resources should hurt more than missing steel/coal.
+- Missing critical resources should hurt more than missing steel/energy.
 - Shortages should motivate exploration, synthetics, trade, and conquest of resource-rich areas.
+- Soft shortage model: `strategic_stockpile_soft_shortage`.
 
 ---
 

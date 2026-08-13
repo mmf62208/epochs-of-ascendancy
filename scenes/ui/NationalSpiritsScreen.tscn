@@ -9,10 +9,12 @@ anchor_left = 0.5
 anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
-offset_left = -460.0
-offset_top = -320.0
-offset_right = 460.0
-offset_bottom = 320.0
+offset_left = -480.0
+offset_top = -340.0
+offset_right = 480.0
+offset_bottom = 340.0
+grow_horizontal = 2
+grow_vertical = 2
 clip_contents = true
 script = ExtResource("1_screen")
 country_tag = "USA"
@@ -98,24 +100,41 @@ layout_mode = 2
 autowrap_mode = 3
 text = ""
 
-[node name="DetailPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer"]
+[node name="DetailScroll" type="ScrollContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
+custom_minimum_size = Vector2(0, 140)
+size_flags_horizontal = 3
+size_flags_vertical = 0
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
+clip_contents = true
 
-[node name="DetailMargin" type="MarginContainer" parent="MarginContainer/VBoxContainer/DetailPanel"]
+[node name="DetailPanel" type="PanelContainer" parent="MarginContainer/VBoxContainer/DetailScroll"]
 layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 8
+size_flags_horizontal = 3
 
-[node name="DetailLabel" type="Label" parent="MarginContainer/VBoxContainer/DetailPanel/DetailMargin"]
+[node name="DetailMargin" type="MarginContainer" parent="MarginContainer/VBoxContainer/DetailScroll/DetailPanel"]
 layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 10
+
+[node name="DetailLabel" type="Label" parent="MarginContainer/VBoxContainer/DetailScroll/DetailPanel/DetailMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
 autowrap_mode = 3
 text = "Select a spirit or effect for details."
 
 [node name="MainScroll" type="ScrollContainer" parent="MarginContainer/VBoxContainer"]
 layout_mode = 2
 size_flags_vertical = 3
+size_flags_horizontal = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
+clip_contents = true
 
 [node name="MainVBox" type="VBoxContainer" parent="MarginContainer/VBoxContainer/MainScroll"]
 layout_mode = 2

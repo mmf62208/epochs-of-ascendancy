@@ -16,7 +16,8 @@ const MAX_SLOTS_PER_PROVINCE := 99
 
 @export var assigned_lines: Array[String] = []  # Active ProductionLine ids (production slots)
 @export var max_production_lines: int = 1
-@export var factory_type: String = "standard"  # standard | shipyard | aircraft_factory
+@export var factory_type: String = "standard"  # standard | shipyard | aircraft_factory | coal_plant | refinery | …
+@export var size_tier: int = 1  ## Resource/energy plant size (1–5); scales harvest output
 @export var current_production_design: String = ""
 
 @export var is_retooling: bool = false

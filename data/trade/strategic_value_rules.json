@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "model": "strategic_compact_ledger",
+  "unit": "suu",
+  "resource_base_suu": {
+    "steel": 1.0,
+    "aluminum": 1.5,
+    "energy": 1.2,
+    "fuel": 1.8,
+    "rubber": 2.2,
+    "electronics": 3.0,
+    "specials": 2.8,
+    "fissiles": 4.5,
+    "supplies": 0.8,
+    "oil": 1.8,
+    "coal": 0.6,
+    "iron": 0.7
+  },
+  "critical_resource_suu_weight": {
+    "electronics": 1.35,
+    "rubber": 1.25,
+    "specials": 1.3,
+    "fissiles": 1.5,
+    "fuel": 1.15
+  },
+  "scarcity": {
+    "empty_below": 20,
+    "tight_below": 50,
+    "ample_above": 200,
+    "empty_mult": 1.35,
+    "tight_mult": 1.15,
+    "ample_mult": 0.9
+  },
+  "equipment_suu_per_production_cost": 1.0,
+  "equipment_fallback_suu": 80.0,
+  "design_tech_gap_premium_per_year": 0.08,
+  "design_max_gap_premium": 2.5,
+  "tech_share_base_suu": 120.0,
+  "intel_base_suu": 60.0,
+  "province": {
+    "base": 400.0,
+    "per_dev": 25.0,
+    "per_infra": 20.0,
+    "port_bonus": 350.0,
+    "resource_score_scale": 0.15,
+    "factory_bonus": 120.0,
+    "choke_bonus": 500.0,
+    "core_multiplier": 1.75,
+    "durable_premium": 3.5
+  },
+  "docking_rights": {
+    "base_per_month": 18.0,
+    "major_port_mult": 2.0,
+    "sovereignty_premium": 1.4
+  },
+  "military_access": {
+    "base_per_month": 12.0
+  },
+  "alliance_package_suu": 2500.0,
+  "guarantee_package_suu": 900.0,
+  "tariff_bands": [0.0, 0.125, 0.25, 0.5],
+  "subsidy_bands": [0.0, 0.125, 0.25, 0.5],
+  "acceptance": {
+    "refuse_below": 0.85,
+    "fair_low": 0.85,
+    "fair_high": 1.05,
+    "generous_above": 1.05
+  },
+  "relation_accept_mult": {
+    "hostile": 0.55,
+    "cold": 0.75,
+    "neutral": 1.0,
+    "cordial": 1.08,
+    "partner": 1.15,
+    "ally_ready": 1.22
+  },
+  "black_risk_premium": 1.2,
+  "comparisons": {
+    "notes": "Territory durable_premium makes cores >> tank batches; basing is time-bounded state power",
+    "medium_tank_batch_hint_suu": 110,
+    "fighter_hint_suu": 180,
+    "peripheral_province_hint_suu": 3500,
+    "core_port_province_hint_suu": 12000
+  }
+}

@@ -7,16 +7,20 @@
 [sub_resource type="Theme" id="Theme_ej7nn"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fgl0d"]
-bg_color = Color(0.11764706, 0.11764706, 0.18039216, 1)
+bg_color = Color(0.0588235, 0.0588235, 0.117647, 1)
 border_width_left = 2
 border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
-border_color = Color(0.2901961, 0.5647059, 0.8862745, 1)
+border_color = Color(0.2, 0.9, 1, 0.85)
 corner_radius_top_left = 8
 corner_radius_top_right = 8
 corner_radius_bottom_right = 8
 corner_radius_bottom_left = 8
+content_margin_left = 4
+content_margin_top = 4
+content_margin_right = 4
+content_margin_bottom = 4
 shadow_size = 8
 shadow_offset = Vector2(4, 4)
 
@@ -34,19 +38,19 @@ bg_color = Color(1, 0.36862746, 0.36862746, 1)
 script = ExtResource("1_ej7nn")
 container = NodePath("ProvinceContainers")
 info_panel = NodePath("UI/InfoPanel")
-info_name = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelName")
-info_owner = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelOwner")
-info_population = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelPopulation")
-info_terrain = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelTerrain")
-info_factories = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelFactories")
-info_dev = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelDev")
-info_resources = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelResources")
-info_core = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelCore")
-info_special = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelSpecial")
-info_logistics = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelLogistics")
-info_combat = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelCombat")
-info_modifiers = NodePath("UI/InfoPanel/InfoScroll/InfoContent/RichTextModifiers")
-info_national = NodePath("UI/InfoPanel/InfoScroll/InfoContent/LabelNationalHeader")
+info_name = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelName")
+info_owner = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelOwner")
+info_population = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelPopulation")
+info_terrain = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelTerrain")
+info_factories = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelFactories")
+info_dev = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelDev")
+info_resources = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelResources")
+info_core = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelCore")
+info_special = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelSpecial")
+info_logistics = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelLogistics")
+info_combat = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelCombat")
+info_modifiers = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/RichTextModifiers")
+info_national = NodePath("UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent/LabelNationalHeader")
 btn_national_spirits = NodePath("UI/InfoPanel/BtnNationalSpirits")
 btn_close = NodePath("UI/InfoPanel/BtnClose")
 
@@ -67,88 +71,99 @@ layer = 20
 
 [node name="InfoPanel" type="Panel" parent="UI" unique_id=878940038]
 visible = false
-offset_left = 40.0
-offset_top = 40.0
-offset_right = 590.0
-offset_bottom = 680.0
+clip_contents = true
+offset_left = 365.0
+offset_top = 82.0
+offset_right = 925.0
+offset_bottom = 638.0
 mouse_filter = 0
 theme = SubResource("Theme_ej7nn")
 theme_override_styles/panel = SubResource("StyleBoxFlat_fgl0d")
 
 [node name="InfoScroll" type="ScrollContainer" parent="UI/InfoPanel"]
 layout_mode = 0
-offset_left = 12.0
-offset_top = 36.0
-offset_right = 538.0
-offset_bottom = 628.0
+anchors_preset = 0
+offset_left = 18.0
+offset_top = 40.0
+offset_right = 544.0
+offset_bottom = 544.0
 horizontal_scroll_mode = 0
 vertical_scroll_mode = 2
+clip_contents = true
 
-[node name="InfoContent" type="VBoxContainer" parent="UI/InfoPanel/InfoScroll" unique_id=953045890]
+[node name="InfoContentMargin" type="MarginContainer" parent="UI/InfoPanel/InfoScroll"]
+layout_mode = 2
+size_flags_horizontal = 0
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 4
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 6
+
+[node name="InfoContent" type="VBoxContainer" parent="UI/InfoPanel/InfoScroll/InfoContentMargin" unique_id=953045890]
 layout_mode = 2
 size_flags_horizontal = 3
-custom_minimum_size = Vector2(480, 0)
-theme_override_constants/separation = 10
+custom_minimum_size = Vector2(0, 0)
+theme_override_constants/separation = 8
 
-[node name="LabelName" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=626102969]
+[node name="LabelName" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent" unique_id=626102969]
 custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 18
 autowrap_mode = 3
 
-[node name="LabelOwner" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=1232100560]
+[node name="LabelOwner" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent" unique_id=1232100560]
 custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelPopulation" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=1757176493]
+[node name="LabelPopulation" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent" unique_id=1757176493]
 custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelTerrain" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=605035102]
+[node name="LabelTerrain" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent" unique_id=605035102]
 custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelFactories" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=1607590146]
+[node name="LabelFactories" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent" unique_id=1607590146]
 custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelDev" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=164803705]
+[node name="LabelDev" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent" unique_id=164803705]
 custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelResources" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=639170995]
+[node name="LabelResources" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent" unique_id=639170995]
 custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelCore" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=1127494955]
+[node name="LabelCore" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent" unique_id=1127494955]
 custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelSpecial" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent" unique_id=1151884655]
+[node name="LabelSpecial" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent" unique_id=1151884655]
 custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 autowrap_mode = 3
 
-[node name="LabelLogistics" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent"]
-custom_minimum_size = Vector2(0, 0)
-layout_mode = 2
-theme_override_font_sizes/font_size = 13
-autowrap_mode = 3
-
-[node name="LabelCombat" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent"]
+[node name="LabelLogistics" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent"]
 custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
 autowrap_mode = 3
 
-[node name="LabelNationalHeader" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContent"]
+[node name="LabelCombat" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent"]
+custom_minimum_size = Vector2(0, 0)
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+autowrap_mode = 3
+
+[node name="LabelNationalHeader" type="Label" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent"]
 custom_minimum_size = Vector2(0, 0)
 layout_mode = 2
 theme_override_colors/font_color = Color(0.431373, 0.705882, 1, 1)
@@ -156,28 +171,35 @@ theme_override_font_sizes/font_size = 14
 text = "Modifiers (base → effective)"
 autowrap_mode = 3
 
-[node name="RichTextModifiers" type="RichTextLabel" parent="UI/InfoPanel/InfoScroll/InfoContent"]
-custom_minimum_size = Vector2(460, 160)
+[node name="RichTextModifiers" type="RichTextLabel" parent="UI/InfoPanel/InfoScroll/InfoContentMargin/InfoContent"]
+custom_minimum_size = Vector2(0, 80)
 layout_mode = 2
+size_flags_horizontal = 0
 bbcode_enabled = true
 fit_content = true
-scroll_active = true
+scroll_active = false
+autowrap_mode = 3
+clip_contents = false
 
 [node name="BtnNationalSpirits" type="Button" parent="UI/InfoPanel"]
 layout_mode = 0
-offset_left = 16.0
-offset_top = 8.0
-offset_right = 200.0
+offset_left = 12.0
+offset_top = 6.0
+offset_right = 180.0
 offset_bottom = 32.0
 text = "National Spirits"
 
 [node name="BtnClose" type="Button" parent="UI/InfoPanel" unique_id=713871471]
-layout_mode = 0
-mouse_filter = 0
-offset_left = 445.0
-offset_top = 8.0
-offset_right = 510.0
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -76.0
+offset_top = 6.0
+offset_right = -12.0
 offset_bottom = 32.0
+grow_horizontal = 0
+mouse_filter = 0
 focus_mode = 0
 theme_override_colors/font_color = Color(1, 1, 1, 1)
 theme_override_font_sizes/font_size = 14

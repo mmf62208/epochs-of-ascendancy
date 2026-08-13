@@ -17,8 +17,13 @@ signal production_resource_shortage(line_id: String, missing: Dictionary)
 signal equipment_added_to_stockpile(equipment_id: String, amount: int)
 signal equipment_taken_from_stockpile(equipment_id: String, amount: int)
 signal unit_reinforced(unit_id: String, equipment_fulfilled: Dictionary)
+signal equipment_flow_created(flow_id: String, equipment_id: String, amount: int, mode: String)
+signal equipment_flow_interdicted(flow_id: String, cause: String, lost: int, delivered: int)
+signal equipment_flow_delivered(flow_id: String, equipment_id: String, amount: int, to_unit_id: String)
 
 const GLOBAL_MODIFIERS_PATH := "res://data/production/global_modifiers.json"
+const EQUIP_FLOW_CALC_PATH := "res://scripts/production/EquipmentFlowCalculator.gd"
+const REINF_LOG_CALC_PATH := "res://scripts/production/ReinforcementLogisticsCalculator.gd"
 const STANCE_TAG := "stance"
 const RETOOLING_RULES_PATH := "res://data/production/retooling_similarity.json"
 
@@ -44,11 +49,25 @@ var country_equipment_stockpiles: Dictionary = {}  # country_tag -> {equipment_i
 var country_civilian_goods: Dictionary = {}  # country_tag -> int goods (civilian output from factories; drives happiness per roadmap)
 ## unit_id -> { equipment_template_id: count } currently assigned to the formation.
 var _unit_equipment_stock: Dictionary = {}
+## Rolling average production reliability by design (from resource shortage at completion).
+## design_id -> { "reliability": float 0.72–1.0, "samples": int }
+var equipment_production_reliability: Dictionary = {}
+## One-shot auto-seed flag so daily harvest does not spam plants.
+var _resource_plants_seeded: bool = false
 
 var _equipment_shortage_tracker := EquipmentShortageTracker.new()
 
 # === Reinforcement & priority system ===
 var priority_reinforcement_units: Dictionary = {}  # unit_id -> bool
+
+# === EquipmentFlow ledger (CP1 — factory/stock → front; interdictable) ===
+## flow_id -> EquipmentFlow dict
+var _equipment_flows: Dictionary = {}
+var _equipment_flow_seq: int = 0
+
+# === RF1 reinforcement logistics (experience + transit policy) ===
+## country_tag -> training policy id (see ReinforcementLogisticsCalculator.TRAINING_POLICIES)
+var country_training_policy: Dictionary = {}
 
 # === Screen data caching ===
 var _production_screen_cache: Dictionary = {}  # country_tag -> ProductionScreenData
@@ -308,6 +327,50 @@ func advance_days(days: float) -> Dictionary:
 	return report
 
 
+## Tag-scoped day advance — only lines owned by country_tag (interactive multi-AI / lean majors).
+## Does NOT run global daily_production_tick (avoids N× player harvest when N majors apply).
+func advance_days_for_country(country_tag: String, days: float = 1.0) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var report := {
+		"ok": true,
+		"days_advanced": days,
+		"country_tag": tag,
+		"lines": {},
+		"total_units_completed": 0,
+		"lines_touched": 0,
+		"empty": true,
+	}
+	if tag.is_empty() or days <= 0.0:
+		report["ok"] = false
+		report["reason"] = "bad_tag_or_days"
+		return report
+	for line_id in _lines:
+		var line: ProductionLine = _lines[line_id]
+		if line == null:
+			continue
+		var owner := _get_line_owner_tag(line)
+		if owner.is_empty() and str(line_id).begins_with("oob_"):
+			var parts: PackedStringArray = str(line_id).split("_", false, 2)
+			if parts.size() >= 2:
+				owner = parts[1].to_upper()
+		if owner != tag:
+			continue
+		_refresh_line_modifiers(line)
+		var line_report: Dictionary = line.advance_days(days)
+		report["lines"][line_id] = line_report
+		report["total_units_completed"] += int(line_report.get("units_completed", 0))
+		report["lines_touched"] = int(report["lines_touched"]) + 1
+		report["empty"] = false
+	# Soft stockpile credit when no lines exist yet (majors without seeded OOB still "act")
+	if bool(report["empty"]):
+		add_to_country_equipment_stockpile(tag, "infantry_equipment", 1)
+		report["soft_stock_credit"] = 1
+		report["empty"] = false
+		report["ok"] = true
+		report["reason"] = "soft_stock_credit"
+	return report
+
+
 func register_modifier(modifier: ProductionModifier) -> void:
 	if modifier == null or modifier.id.is_empty():
 		push_warning("ProductionManager.register_modifier: invalid modifier")
@@ -326,9 +389,17 @@ func unregister_modifier(modifier_id: String) -> void:
 func clear_modifiers_by_source(source_prefix: String) -> void:
 	var to_remove: Array[String] = []
 	for modifier_id in _active_modifiers:
-		var mod: ProductionModifier = _active_modifiers[modifier_id]
-		if mod.source.begins_with(source_prefix):
-			to_remove.append(modifier_id)
+		var raw: Variant = _active_modifiers[modifier_id]
+		var src := ""
+		if raw is ProductionModifier:
+			src = (raw as ProductionModifier).source
+		elif typeof(raw) == TYPE_DICTIONARY:
+			src = str((raw as Dictionary).get("source", ""))
+		else:
+			to_remove.append(str(modifier_id))
+			continue
+		if src.begins_with(source_prefix):
+			to_remove.append(str(modifier_id))
 	for modifier_id in to_remove:
 		unregister_modifier(modifier_id)
 
@@ -524,11 +595,12 @@ func get_or_create_country_equipment_stockpile(country_tag: String) -> Dictionar
 
 func _on_production_completed(_line_id: String, design_id: String, count: int) -> void:
 	var line := get_line(_line_id)
-	var owner_tag := ""
-	if line != null and line.factory_id > 0 and typeof(FactoryManager) != TYPE_NIL:
-		var fac: Variant = FactoryManager.get_factory(line.factory_id)
-		if fac != null and "owner_tag" in fac:
-			owner_tag = str(fac.owner_tag).strip_edges().to_upper()
+	var owner_tag := _get_line_owner_tag(line) if line != null else ""
+	# OOB line ids are oob_{TAG}_{design} — recover owner when factory lookup is empty.
+	if owner_tag.is_empty() and str(_line_id).begins_with("oob_"):
+		var parts: PackedStringArray = str(_line_id).split("_", false, 2)
+		if parts.size() >= 2 and parts[1].length() >= 2 and parts[1].length() <= 4:
+			owner_tag = parts[1].to_upper()
 	if owner_tag != "":
 		if design_id.begins_with("civilian_"):
 			add_civilian_goods(owner_tag, count)
@@ -537,8 +609,15 @@ func _on_production_completed(_line_id: String, design_id: String, count: int) -
 				GameData.produce_civilian_goods(owner_tag, count)
 			print("Civilian production complete: %s × %d goods for %s (happiness/cohesion/mandate + local supply wiring hook)." % [design_id, count, owner_tag])
 		else:
-			add_to_country_equipment_stockpile(owner_tag, design_id, count)
-			print("Production complete: %s × %d added to %s stockpile" % [design_id, count, owner_tag])
+			# CP2: complete always lands batch-scaled stock units in country stockpile.
+			var credit: Dictionary = credit_production_complete_to_stockpile(
+				owner_tag, design_id, count, {},
+			)
+			var units := int(credit.get("stock_units", count))
+			print("Production complete: %s × %d added to %s stockpile" % [design_id, units, owner_tag])
+			# Stamp shortage reliability onto design quality for combat hook.
+			if line != null:
+				_record_equipment_production_reliability(design_id, float(line.shortage_reliability_multiplier), count)
 		# Wiring prod output -> prov supply (factories in controlled prov boost local depot for supply/combat/recovery)
 		if line != null and line.factory_id > 0 and typeof(FactoryManager) != TYPE_NIL:
 			var facv: Variant = FactoryManager.get_factory(line.factory_id)
@@ -550,6 +629,56 @@ func _on_production_completed(_line_id: String, design_id: String, count: int) -
 	else:
 		add_to_national_stockpile(design_id, count)
 		print("Production complete: %s × %d added to national stockpile" % [design_id, count])
+		if line != null and not design_id.begins_with("civilian_"):
+			_record_equipment_production_reliability(design_id, float(line.shortage_reliability_multiplier), count)
+
+
+func _record_equipment_production_reliability(design_id: String, reliability: float, count: int = 1) -> void:
+	if design_id.is_empty() or count <= 0:
+		return
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	var rel := clampf(reliability, 0.5, 1.0)
+	if rhc != null and rhc.has_method("combat_reliability_from_production"):
+		rel = float(rhc.combat_reliability_from_production(rel))
+	var prev: Dictionary = equipment_production_reliability.get(design_id, {}) as Dictionary if equipment_production_reliability.get(design_id) is Dictionary else {}
+	var samples := int(prev.get("samples", 0))
+	var old_r := float(prev.get("reliability", 1.0))
+	var n := maxi(count, 1)
+	var new_samples := samples + n
+	var new_r := (old_r * float(samples) + rel * float(n)) / float(new_samples) if new_samples > 0 else rel
+	equipment_production_reliability[design_id] = {
+		"reliability": clampf(new_r, 0.5, 1.0),
+		"samples": new_samples,
+	}
+
+
+func get_equipment_production_reliability(design_id: String) -> float:
+	if design_id.is_empty() or not equipment_production_reliability.has(design_id):
+		return 1.0
+	var e: Dictionary = equipment_production_reliability[design_id] as Dictionary
+	return clampf(float(e.get("reliability", 1.0)), 0.5, 1.0)
+
+
+## Ops triad fuel burn: vehicle class (jet/rocket higher) draws national Fuel stockpile.
+func burn_ops_fuel(vehicle_class: String, units: float = 1.0, days: float = 1.0) -> Dictionary:
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	var need := 0.25 * maxf(units, 0.0) * maxf(days, 0.0)
+	if rhc != null and rhc.has_method("compute_ops_fuel_cost"):
+		need = float(rhc.compute_ops_fuel_cost(vehicle_class, units, days))
+	var have := float(national_stockpile.get("fuel", 0.0))
+	var paid := minf(have, need)
+	national_stockpile["fuel"] = have - paid
+	var fill := 1.0 if need <= 0.0 else clampf(paid / need, 0.0, 1.0)
+	# Soft ops mobility: empty fuel → ~55% mobility (mirrors production soft shortage floor)
+	var mobility := 0.55 + 0.45 * fill
+	return {
+		"needed": need,
+		"paid": paid,
+		"fill_ratio": fill,
+		"mobility_multiplier": mobility,
+		"vehicle_class": vehicle_class,
+		"shortage": paid + 0.001 < need,
+	}
 
 
 # === Equipment shortages (formation readiness / organization) ===
@@ -570,6 +699,45 @@ func get_unit_equipment_stock(unit_id: String) -> Dictionary:
 
 func clear_unit_equipment_stock(unit_id: String) -> void:
 	_unit_equipment_stock.erase(unit_id)
+
+
+## Combat outcome: destroy/write-off unit equipment proportional to battle severity.
+## severity 0–1 (losers typically ≥0.35). Returns {equipment_id: amount_removed, ...}.
+## No-op / empty when unit has no on-hand stock (safe for unequipped formations).
+func apply_combat_equipment_loss(formation_id: String, severity: float = 0.5) -> Dictionary:
+	var removed: Dictionary = {}
+	if formation_id.is_empty():
+		return removed
+	var sev := clampf(severity, 0.0, 1.0)
+	if sev < 0.05:
+		return removed
+	var stock := get_unit_equipment_stock(formation_id)
+	if stock.is_empty():
+		return removed
+	var next_stock: Dictionary = {}
+	for equipment_id in stock.keys():
+		var have := int(stock[equipment_id])
+		if have <= 0:
+			continue
+		# At least 1 destroyed when severity is meaningful and unit had equipment.
+		var loss := int(ceil(float(have) * sev))
+		if loss < 1 and sev >= 0.25:
+			loss = 1
+		loss = mini(loss, have)
+		if loss <= 0:
+			next_stock[str(equipment_id)] = have
+			continue
+		removed[str(equipment_id)] = loss
+		var left := have - loss
+		if left > 0:
+			next_stock[str(equipment_id)] = left
+	set_unit_equipment_stock(formation_id, next_stock)
+	if not removed.is_empty():
+		print(
+			"[COMBAT EQUIP LOSS] %s lost %s (severity=%.2f)"
+			% [formation_id, str(removed), sev]
+		)
+	return removed
 
 
 func get_division_required_equipment(division_template_id: String) -> Dictionary:
@@ -717,23 +885,125 @@ func get_division_combat_modifiers(division_template_id: String) -> Dictionary:
 
 func get_division_final_combat_stats(division_template_id: String, unit_id: String = "") -> Dictionary:
 	if division_template_id.is_empty() or GameData.design_data == null:
-		return {}
+		# Formation-id callers (BattleManager passes formation_id as first arg): design equipment path.
+		var fid := unit_id if not unit_id.is_empty() else division_template_id
+		return get_formation_equipment_combat_stats(fid)
 	var supply := get_node_or_null("/root/SupplyManager")
 	if supply == null:
-		return {}
+		return get_formation_equipment_combat_stats(unit_id if not unit_id.is_empty() else division_template_id)
 	var template: DivisionTemplate = supply.division_templates.get_division(division_template_id)
 	if template == null:
-		return {}
+		# Not a division template — resolve as formation (world_full OOB land designs).
+		var form_id := unit_id if not unit_id.is_empty() else division_template_id
+		return get_formation_equipment_combat_stats(form_id)
 
 	var shortages: Dictionary = {}
 	if not unit_id.is_empty():
 		var required := template.get_required_equipment(GameData.design_data)
-		shortages = get_unit_shortages(unit_id, required)
+		# On-hand equipment only for combat shortages (stockpile is reinforce pool, not free combat power).
+		shortages = get_unit_on_hand_shortages(unit_id, required)
 
 	var stats := template.get_final_combat_stats(shortages, GameData.design_data)
 	if typeof(LeaderManager) != TYPE_NIL and not unit_id.is_empty():
 		stats = LeaderManager.apply_training_path_supply_to_stats(stats, unit_id)
 	return stats
+
+
+## Shortages from unit equipment only (not country/national stockpile). Used for combat power.
+func get_unit_on_hand_shortages(unit_id: String, required_equipment: Dictionary) -> Dictionary:
+	var current_stock := get_unit_equipment_stock(unit_id)
+	var shortages: Dictionary = {}
+	for equipment_id in required_equipment:
+		var needed := int(required_equipment[equipment_id])
+		var have := int(current_stock.get(equipment_id, 0))
+		if have < needed:
+			shortages[str(equipment_id)] = needed - have
+	return shortages
+
+
+## Land OOB formations: required equipment is 1× formation.design_id (scenario equip path).
+func get_formation_required_equipment(formation_id: String) -> Dictionary:
+	if formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return {}
+	var f: Formation = LeaderManager.get_formation(formation_id) if LeaderManager.has_method("get_formation") else null
+	if f == null:
+		return {}
+	var did := str(f.design_id).strip_edges() if "design_id" in f else ""
+	if did.is_empty():
+		return {}
+	return {did: 1}
+
+
+## Combat stats for design-equipped land formations (no full DivisionTemplate required).
+## Empty/insufficient unit equipment → has_shortages + reduced soft/hard/readiness.
+func get_formation_equipment_combat_stats(formation_id: String) -> Dictionary:
+	if formation_id.is_empty():
+		return {}
+	var f: Formation = null
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		f = LeaderManager.get_formation(formation_id)
+	var design := ""
+	if f != null and "design_id" in f:
+		design = str(f.design_id).strip_edges()
+	var required: Dictionary = {}
+	if not design.is_empty():
+		required[design] = 1
+	elif f != null:
+		# No design: treat as fully shorted soft infantry stub
+		return {
+			"soft_attack": 0.35,
+			"hard_attack": 0.02,
+			"readiness": 0.55,
+			"organization": 0.7,
+			"supply_consumption": 1.0,
+			"has_shortages": true,
+			"reliability": 0.6,
+		}
+	else:
+		return {}
+
+	var shortages := get_unit_on_hand_shortages(formation_id, required)
+	var soft := 0.9
+	var hard := 0.08
+	var readiness := 1.0
+	var reliability := 0.9
+	var supply_need := 1.0
+	if GameData.design_data != null and not design.is_empty():
+		var tpl: UnitTemplate = GameData.design_data.get_template(design)
+		if tpl != null:
+			var bs: Dictionary = tpl.base_stats if "base_stats" in tpl else {}
+			if typeof(bs) != TYPE_DICTIONARY:
+				bs = {}
+			var hardness := float(bs.get("hardness", 0.0))
+			var armor := float(bs.get("armor", 0.0))
+			reliability = clampf(float(bs.get("reliability", 70.0)) / 100.0, 0.4, 1.0)
+			supply_need = maxf(float(bs.get("supply_need", 10.0)) / 12.0, 0.5)
+			# Armor/hardness → hard attack; soft from inverse hardness (tanks still have soft).
+			hard = clampf(0.05 + armor / 80.0 + hardness / 200.0, 0.05, 2.5)
+			soft = clampf(0.7 + (100.0 - hardness) / 120.0, 0.4, 2.2)
+	if not shortages.is_empty():
+		soft *= 0.62
+		hard *= 0.58
+		readiness *= 0.68
+		reliability *= 0.85
+	# Production-era resource shortage reliability (soft floor ~0.72) hits field readiness/reliability.
+	var prod_rel := get_equipment_production_reliability(design) if not design.is_empty() else 1.0
+	if prod_rel < 0.999:
+		reliability *= prod_rel
+		soft *= lerpf(0.92, 1.0, prod_rel)
+		hard *= lerpf(0.92, 1.0, prod_rel)
+		readiness *= lerpf(0.9, 1.0, prod_rel)
+	return {
+		"soft_attack": soft,
+		"hard_attack": hard,
+		"readiness": clampf(readiness, 0.3, 1.5),
+		"organization": 1.0 if shortages.is_empty() else 0.82,
+		"supply_consumption": supply_need,
+		"reliability": clampf(reliability, 0.4, 1.0),
+		"production_reliability": prod_rel,
+		"has_shortages": not shortages.is_empty(),
+		"missing_equipment": shortages.duplicate(true),
+	}
 
 
 func request_equipment_for_unit(unit_id: String, equipment_id: String, amount: int) -> int:
@@ -832,7 +1102,1153 @@ func reinforce_all_units(required_map: Dictionary) -> Dictionary:
 
 
 func daily_reinforcement_tick(required_map: Dictionary) -> Dictionary:
-	return reinforce_all_units(required_map)
+	var flows: Dictionary = advance_equipment_flows(1.0)
+	# RF2 path: ship deficits via EquipmentFlow (in transit — not force-deliver).
+	# Instant stockpile top-up is intentionally skipped so reinforce takes time.
+	var via_flow: Dictionary = demand_reinforce_tick_via_flow(required_map, {"force_deliver": false})
+	var reinf := {
+		"units": {},
+		"equipment_flows": flows,
+		"via_flow": via_flow,
+		"instant_topup": false,
+		"model": "reinforce_experience_logistics_ledger",
+	}
+	return reinf
+
+
+## --- EquipmentFlow (CP1) + stock/reinforce (CP2) + RF logistics ----------------
+
+func _equip_flow_calc():
+	return load(EQUIP_FLOW_CALC_PATH)
+
+
+func _reinf_log_calc():
+	return load(REINF_LOG_CALC_PATH)
+
+
+func set_country_training_policy(country_tag: String, policy_id: String) -> void:
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		return
+	var pid := policy_id.strip_edges().to_lower()
+	var calc = _reinf_log_calc()
+	if calc != null and calc.has_method("list_training_policy_ids"):
+		var ids: PackedStringArray = calc.list_training_policy_ids()
+		if not ids.is_empty() and not ids.has(pid):
+			pid = "two_year_service"
+	country_training_policy[tag] = pid
+
+
+func get_country_training_policy(country_tag: String) -> String:
+	var tag := country_tag.strip_edges().to_upper()
+	return str(country_training_policy.get(tag, "two_year_service"))
+
+
+func list_training_policies() -> Array:
+	var calc = _reinf_log_calc()
+	var out: Array = []
+	if calc == null or not calc.has_method("list_training_policy_ids"):
+		return out
+	for pid in calc.list_training_policy_ids():
+		var score: Dictionary = {}
+		if calc.has_method("policy_tradeoff_score"):
+			score = calc.policy_tradeoff_score(str(pid)) as Dictionary
+		else:
+			score = {"policy_id": str(pid)}
+		out.append(score)
+	return out
+
+
+## RF3: apply policy and return trade-off card (quantity vs quality).
+## CP6: AI logistics doctrine — reinforce mode + escort preference for EquipmentFlows.
+## context: { year, overseas, fuel 0–1, threat 0–1, high_value, tech_flags }
+func ai_select_logistics_doctrine(country_tag: String, context: Dictionary = {}) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var year := int(context.get("year", 1939))
+	var overseas := bool(context.get("overseas", false))
+	var fuel := clampf(float(context.get("fuel", 1.0)), 0.0, 1.0)
+	var threat := clampf(float(context.get("threat", 0.3)), 0.0, 1.0)
+	var high_value := bool(context.get("high_value", false))
+	var tech_flags: Dictionary = {}
+	if context.get("tech_flags") is Dictionary:
+		tech_flags = context.get("tech_flags") as Dictionary
+	var mode := preferred_reinforce_mode(year, tech_flags, overseas)
+	# Fuel starvation forces slower surface modes
+	if fuel < 0.35 and mode in ["airlift", "helicopter", "drone_logistics", "orbital"]:
+		mode = "sealift" if overseas else "rail"
+	var escort := false
+	var reason := "default_auto"
+	if high_value or threat >= 0.55:
+		escort = true
+		reason = "escort_high_value_or_threat"
+	elif mode in ["sealift", "airlift"] and threat >= 0.35:
+		escort = true
+		reason = "escort_exposed_mode"
+	elif threat < 0.2 and fuel > 0.7:
+		reason = "fast_unescorted"
+	# Corridor risk bias
+	var risk_bias := 0.08
+	if mode == "airlift":
+		risk_bias = 0.14
+	elif mode == "sealift":
+		risk_bias = 0.16
+	elif mode == "drone_logistics":
+		risk_bias = 0.11
+	elif mode == "orbital":
+		risk_bias = 0.18
+	if escort:
+		risk_bias *= 0.55
+	return {
+		"ok": true,
+		"country_tag": tag,
+		"mode": mode,
+		"escort": escort,
+		"corridor_risk_bias": risk_bias,
+		"reason": reason,
+		"year": year,
+		"logistics_ok": true,
+		"model": "reinforce_experience_logistics_ledger",
+		"plain": "AI logistics: %s via %s%s." % [
+			tag, mode, " (escorted)" if escort else "",
+		],
+	}
+
+
+## RF6: AI doctrine pick for training/recruit policy (cadre vs crash vs clone).
+## context: { at_war, manpower_strain 0–1, elite_focus, industry_stress 0–1, year }
+func ai_select_training_policy(country_tag: String, context: Dictionary = {}) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var at_war := bool(context.get("at_war", false))
+	var strain := clampf(float(context.get("manpower_strain", 0.0)), 0.0, 1.0)
+	var elite := bool(context.get("elite_focus", false))
+	var industry := clampf(float(context.get("industry_stress", 0.0)), 0.0, 1.0)
+	var year := int(context.get("year", 1939))
+	var pick := "two_year_service"
+	var reason := "peacetime_balanced"
+	if elite and not at_war:
+		pick = "volunteer_cadre"
+		reason = "elite_peacetime_cadre"
+	elif at_war and strain >= 0.75:
+		if year >= 2040 and industry >= 0.6:
+			pick = "clone_batch_fill"
+			reason = "existential_quantity_crisis_fiction"
+		else:
+			pick = "wartime_crash"
+			reason = "high_strain_wartime_draft"
+	elif at_war and strain >= 0.4:
+		pick = "short_conscript" if year < 1970 else "selective_service"
+		reason = "moderate_wartime_expansion"
+	elif at_war and elite:
+		pick = "all_volunteer_force" if year >= 1973 else "volunteer_cadre"
+		reason = "quality_war_core"
+	elif year >= 2000 and not at_war:
+		pick = "all_volunteer_force"
+		reason = "modern_avf"
+	elif year >= 1950 and not at_war:
+		pick = "national_service"
+		reason = "cold_war_baseline"
+	var applied: Dictionary = apply_training_policy_decision(tag, pick)
+	applied["ai_pick"] = pick
+	applied["ai_reason"] = reason
+	applied["context"] = context.duplicate(true)
+	applied["model"] = "reinforce_experience_logistics_ledger"
+	return applied
+
+
+func apply_training_policy_decision(country_tag: String, policy_id: String) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var before := get_country_training_policy(tag)
+	set_country_training_policy(tag, policy_id)
+	var after := get_country_training_policy(tag)
+	var calc = _reinf_log_calc()
+	var score: Dictionary = {}
+	if calc != null and calc.has_method("policy_tradeoff_score"):
+		score = calc.policy_tradeoff_score(after) as Dictionary
+	var before_xp := 38.0
+	var after_xp := float(score.get("recruit_xp", 38.0))
+	if calc != null and calc.has_method("recruit_xp_for_policy"):
+		before_xp = float(calc.recruit_xp_for_policy(before))
+		after_xp = float(calc.recruit_xp_for_policy(after))
+	var want := policy_id.strip_edges().to_lower()
+	return {
+		"ok": after == want and not after.is_empty(),
+		"country_tag": tag,
+		"policy_before": before,
+		"policy_after": after,
+		"recruit_xp_before": before_xp,
+		"recruit_xp_after": after_xp,
+		"tradeoff": score,
+		"model": "reinforce_experience_logistics_ledger",
+	}
+
+
+func is_reinforce_mode_unlocked(mode: String, year: int = 1939, tech_flags: Dictionary = {}) -> bool:
+	var calc = _reinf_log_calc()
+	if calc != null and calc.has_method("mode_unlocked"):
+		return bool(calc.mode_unlocked(mode, year, tech_flags))
+	return mode in ["rail", "road", "sealift", "river"]
+
+
+func preferred_reinforce_mode(year: int = 1939, tech_flags: Dictionary = {}, overseas: bool = false) -> String:
+	var calc = _reinf_log_calc()
+	if calc != null and calc.has_method("preferred_reinforce_mode"):
+		return str(calc.preferred_reinforce_mode(year, tech_flags, overseas))
+	return "rail"
+
+
+## RF2: create in-transit flow (force_deliver false) and prove it remains active.
+func run_non_instant_reinforce_demo(
+	country_tag: String = "USA",
+	equipment_id: String = "medium_tank_mk4",
+	amount: int = 3,
+	opts: Dictionary = {},
+) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var eid := equipment_id.strip_edges()
+	if has_method("reset_equipment_flows") and bool(opts.get("reset", true)):
+		reset_equipment_flows()
+	add_to_country_equipment_stockpile(tag, eid, maxi(amount, 1) + 2)
+	var year := int(opts.get("year", 1916))
+	var mode := str(opts.get("mode", "rail"))
+	var unit_id := str(opts.get("to_unit_id", "usa_non_instant_demo"))
+	clear_unit_equipment_stock(unit_id)
+	var stock_before_unit := int(get_unit_equipment_stock(unit_id).get(eid, 0))
+	var created: Dictionary = create_equipment_flow(
+		tag, eid, amount,
+		int(opts.get("from_province", 1)),
+		int(opts.get("to_province", 2)),
+		unit_id,
+		mode,
+		{
+			"hops": int(opts.get("hops", 3)),
+			"distance_km": float(opts.get("distance_km", 1200.0)),
+			"year": year,
+			"depot_fill": float(opts.get("depot_fill", 0.85)),
+			"corridor_control": float(opts.get("corridor_control", 0.8)),
+			"fuel": float(opts.get("fuel", 0.7)),
+			"supplies": float(opts.get("supplies", 0.8)),
+		},
+	)
+	if not bool(created.get("ok", false)):
+		return created
+	var flow: Dictionary = created.get("flow", {}) if created.get("flow") is Dictionary else {}
+	var days_total := float(flow.get("days_total", 0.0))
+	var fid := str(created.get("flow_id", ""))
+	# Advance only 0.25 day — must still be active (non-instant)
+	var adv: Dictionary = advance_equipment_flows(0.25)
+	var after: Dictionary = get_equipment_flow(fid)
+	var still_active := bool(after.get("active", false))
+	var unit_after := int(get_unit_equipment_stock(unit_id).get(eid, 0))
+	var calc = _reinf_log_calc()
+	var non_instant := still_active and days_total >= 0.75 and unit_after == stock_before_unit
+	if calc != null and calc.has_method("is_non_instant_flow"):
+		non_instant = bool(calc.is_non_instant_flow(days_total, false, still_active)) and unit_after == stock_before_unit
+	return {
+		"ok": non_instant and bool(created.get("ok", false)),
+		"non_instant_ok": non_instant,
+		"days_total": days_total,
+		"days_left": float(after.get("days_left", 0.0)),
+		"still_active": still_active,
+		"unit_received": unit_after,
+		"advance": adv,
+		"flow_id": fid,
+		"model": "reinforce_experience_logistics_ledger",
+	}
+
+
+## RF2: combat mult from formation XP (uses calculator; optional real formation).
+func evaluate_combat_experience_mult(formation_id: String = "") -> Dictionary:
+	var calc = _reinf_log_calc()
+	var green_xp := 15.0
+	var vet_xp := 90.0
+	var pair: Dictionary = {"ok": false, "green_mult": 0.8, "vet_mult": 1.1}
+	if calc != null and calc.has_method("combat_xp_mult_ok_pair"):
+		pair = calc.combat_xp_mult_ok_pair(green_xp, vet_xp) as Dictionary
+	var form_mult := 1.0
+	var form_xp := 48.0
+	if not formation_id.is_empty():
+		form_xp = get_formation_combat_experience(formation_id)
+		if calc != null and calc.has_method("experience_combat_mult"):
+			form_mult = float(calc.experience_combat_mult(form_xp))
+	return {
+		"ok": bool(pair.get("ok", false)),
+		"combat_xp_ok": bool(pair.get("ok", false)),
+		"green_mult": float(pair.get("green_mult", 0.0)),
+		"vet_mult": float(pair.get("vet_mult", 0.0)),
+		"formation_id": formation_id,
+		"formation_xp": form_xp,
+		"formation_mult": form_mult,
+		"model": "reinforce_experience_logistics_ledger",
+	}
+
+
+func estimate_reinforce_transit_days(
+	mode: String = "rail",
+	hops: int = 1,
+	distance_km: float = 0.0,
+	year: int = 1939,
+	opts: Dictionary = {},
+) -> Dictionary:
+	var calc = _reinf_log_calc()
+	if calc == null or not calc.has_method("transit_days"):
+		return {"ok": false, "days": 1.0, "error": "no_calc"}
+	var policy := str(opts.get("policy_id", "two_year_service"))
+	var days := float(calc.transit_days(
+		mode, hops, distance_km, year,
+		float(opts.get("depot_fill", 1.0)),
+		float(opts.get("corridor_control", 1.0)),
+		float(opts.get("fuel", 1.0)),
+		float(opts.get("supplies", 1.0)),
+		float(opts.get("electronics", 1.0)),
+		policy,
+		bool(opts.get("for_manpower", false)),
+	))
+	var plain := ""
+	if calc.has_method("attribution_plain_transit"):
+		plain = str(calc.attribution_plain_transit(mode, days, distance_km, year))
+	return {
+		"ok": true, "days": days, "mode": mode, "year": year, "distance_km": distance_km,
+		"plain": plain, "model": "reinforce_experience_logistics_ledger",
+	}
+
+
+## Manpower strength fill with experience dilution (RF1). Caps daily absorb.
+func apply_manpower_reinforce_with_experience(
+	formation_id: String,
+	strength_target_delta: float = 0.05,
+	opts: Dictionary = {},
+) -> Dictionary:
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return {"ok": false, "error": "no_leader_manager"}
+	var f = LeaderManager.get_formation(formation_id)
+	if f == null:
+		return {"ok": false, "error": "no_formation"}
+	var calc = _reinf_log_calc()
+	var tag := str(f.country_tag).strip_edges().to_upper() if "country_tag" in f else ""
+	var policy := str(opts.get("policy_id", get_country_training_policy(tag)))
+	var old_xp := 48.0
+	if "combat_experience" in f:
+		old_xp = float(f.combat_experience)
+	var old_str := float(f.strength) if "strength" in f else 1.0
+	var recruit_xp := 30.0
+	if calc != null and calc.has_method("recruit_xp_for_policy"):
+		recruit_xp = float(calc.recruit_xp_for_policy(policy))
+	if opts.has("recruit_xp"):
+		recruit_xp = float(opts["recruit_xp"])
+	var hub := float(opts.get("hub_access", 1.0))
+	var org_v := float(f.organization) if "organization" in f else 1.0
+	var cap := 0.05
+	if calc != null and calc.has_method("daily_strength_absorb_cap"):
+		cap = float(calc.daily_strength_absorb_cap(hub, policy, org_v))
+	if bool(opts.get("force_full", false)):
+		cap = clampf(absf(strength_target_delta), 0.0, 1.0)
+	var delta := clampf(strength_target_delta, 0.0, cap)
+	if bool(opts.get("force_full", false)):
+		delta = clampf(strength_target_delta, 0.0, 1.0 - old_str + 0.001)
+	var new_str := clampf(old_str + delta, 0.35, 1.0)
+	var actual := new_str - old_str
+	if actual <= 0.0001:
+		return {"ok": false, "error": "no_room", "strength": old_str, "combat_experience": old_xp}
+	var frac := actual / maxf(new_str, 0.05)
+	var new_xp := old_xp
+	if calc != null and calc.has_method("blend_combat_experience_manpower"):
+		new_xp = float(calc.blend_combat_experience_manpower(old_xp, recruit_xp, frac))
+	else:
+		new_xp = clampf((1.0 - frac) * old_xp + frac * recruit_xp, 0.0, 100.0)
+	f.strength = new_str
+	if "combat_experience" in f:
+		f.combat_experience = new_xp
+	var plain := ""
+	if calc != null and calc.has_method("attribution_plain_xp_dilution"):
+		plain = str(calc.attribution_plain_xp_dilution(old_xp, new_xp, formation_id))
+	return {
+		"ok": true,
+		"formation_id": formation_id,
+		"strength_before": old_str,
+		"strength_after": new_str,
+		"strength_added": actual,
+		"fraction_replaced": frac,
+		"combat_experience_before": old_xp,
+		"combat_experience_after": new_xp,
+		"recruit_xp": recruit_xp,
+		"policy_id": policy,
+		"plain": plain,
+		"model": "reinforce_experience_logistics_ledger",
+	}
+
+
+## Equipment rearm XP friction — much smaller than manpower (RF1 asymmetry).
+func apply_equipment_rearm_experience(
+	formation_id: String,
+	rearm_fraction: float = 0.2,
+	novelty: float = 0.35,
+) -> Dictionary:
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return {"ok": false, "error": "no_leader_manager"}
+	var f = LeaderManager.get_formation(formation_id)
+	if f == null:
+		return {"ok": false, "error": "no_formation"}
+	var calc = _reinf_log_calc()
+	var old_xp := 48.0
+	if "combat_experience" in f:
+		old_xp = float(f.combat_experience)
+	var new_xp := old_xp
+	if calc != null and calc.has_method("blend_combat_experience_rearm"):
+		new_xp = float(calc.blend_combat_experience_rearm(old_xp, rearm_fraction, novelty))
+	else:
+		new_xp = clampf(old_xp - 8.0 * clampf(rearm_fraction, 0.0, 1.0) * clampf(novelty, 0.0, 1.0), 0.0, 100.0)
+	if "combat_experience" in f:
+		f.combat_experience = new_xp
+	return {
+		"ok": true,
+		"formation_id": formation_id,
+		"combat_experience_before": old_xp,
+		"combat_experience_after": new_xp,
+		"rearm_fraction": rearm_fraction,
+		"novelty": novelty,
+		"model": "reinforce_experience_logistics_ledger",
+	}
+
+
+func get_formation_combat_experience(formation_id: String) -> float:
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return 48.0
+	var f = LeaderManager.get_formation(formation_id)
+	if f == null:
+		return 48.0
+	if "combat_experience" in f:
+		return float(f.combat_experience)
+	return 48.0
+
+
+func set_formation_combat_experience(formation_id: String, xp: float) -> void:
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return
+	var f = LeaderManager.get_formation(formation_id)
+	if f == null:
+		return
+	if "combat_experience" in f:
+		f.combat_experience = clampf(xp, 0.0, 100.0)
+
+
+func reset_equipment_flows() -> void:
+	_equipment_flows.clear()
+	_equipment_flow_seq = 0
+
+
+func create_equipment_flow(
+	country_tag: String,
+	equipment_id: String,
+	amount: int,
+	from_province: int = 0,
+	to_province: int = 0,
+	to_unit_id: String = "",
+	mode: String = "rail",
+	opts: Dictionary = {},
+) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var eid := equipment_id.strip_edges()
+	var amt := maxi(0, amount)
+	if tag.is_empty() or eid.is_empty() or amt <= 0:
+		return {"ok": false, "error": "bad_args"}
+	# Pull from country stockpile (in-transit reservation)
+	var available := get_country_equipment_amount(tag, eid)
+	if available < amt and not bool(opts.get("allow_overdraw", false)):
+		if available <= 0:
+			return {"ok": false, "error": "insufficient_stock", "have": available, "need": amt}
+		amt = available
+	var taken := take_from_country_equipment_stockpile(tag, eid, amt)
+	if taken <= 0:
+		return {"ok": false, "error": "stock_take_failed"}
+	amt = taken
+	var calc = _equip_flow_calc()
+	var mode_n := "rail"
+	var risk := 0.08
+	var symbol := "train"
+	var days := 1.0
+	var hops := int(opts.get("hops", 1))
+	if calc != null:
+		if calc.has_method("normalize_mode"):
+			mode_n = str(calc.normalize_mode(mode))
+		if calc.has_method("base_corridor_risk"):
+			risk = float(calc.base_corridor_risk(mode_n))
+		if calc.has_method("symbol_for_mode"):
+			symbol = str(calc.symbol_for_mode(mode_n))
+		if calc.has_method("transit_days"):
+			days = float(calc.transit_days(mode_n, hops))
+	# RF1: hub distance / era / resources stretch EquipmentFlow clock (non-instant reinforce).
+	if opts.has("distance_km") or opts.has("year") or opts.has("depot_fill"):
+		var est: Dictionary = estimate_reinforce_transit_days(
+			mode_n, hops, float(opts.get("distance_km", 0.0)), int(opts.get("year", 1939)), opts,
+		)
+		if bool(est.get("ok", false)):
+			days = float(est.get("days", days))
+	if opts.has("corridor_risk"):
+		risk = clampf(float(opts["corridor_risk"]), 0.0, 1.0)
+	_equipment_flow_seq += 1
+	var fid := "eflow_%s_%d" % [tag.to_lower(), _equipment_flow_seq]
+	var flow := {
+		"flow_id": fid,
+		"country_tag": tag,
+		"equipment_id": eid,
+		"amount": amt,
+		"amount_remaining": amt,
+		"from_province": from_province,
+		"to_province": to_province,
+		"to_unit_id": to_unit_id.strip_edges(),
+		"mode": mode_n,
+		"symbol": symbol,
+		"corridor_risk": risk,
+		"escort": bool(opts.get("escort", false)),
+		"days_total": days,
+		"days_left": days,
+		"active": true,
+		"delivered": 0,
+		"lost": 0,
+		"path": (opts.get("path", []) as Array).duplicate() if opts.get("path") is Array else [],
+		"model": "equipment_flow_compact_ledger",
+	}
+	_equipment_flows[fid] = flow
+	equipment_flow_created.emit(fid, eid, amt, mode_n)
+	return {"ok": true, "flow": flow.duplicate(true), "flow_id": fid}
+
+
+func get_equipment_flow(flow_id: String) -> Dictionary:
+	if not _equipment_flows.has(flow_id):
+		return {}
+	return (_equipment_flows[flow_id] as Dictionary).duplicate(true)
+
+
+func get_active_equipment_flows(country_tag: String = "") -> Array:
+	var tag := country_tag.strip_edges().to_upper()
+	var out: Array = []
+	for fid in _equipment_flows.keys():
+		var f: Dictionary = _equipment_flows[fid] as Dictionary
+		if not bool(f.get("active", false)):
+			continue
+		if not tag.is_empty() and str(f.get("country_tag", "")) != tag:
+			continue
+		out.append(f.duplicate(true))
+	return out
+
+
+func interdict_equipment_flow(flow_id: String, cause: String, loss_fraction: float = 0.4, opts: Dictionary = {}) -> Dictionary:
+	if not _equipment_flows.has(flow_id):
+		return {"ok": false, "error": "unknown_flow"}
+	var f: Dictionary = (_equipment_flows[flow_id] as Dictionary).duplicate(true)
+	if not bool(f.get("active", false)):
+		return {"ok": false, "error": "inactive"}
+	var calc = _equip_flow_calc()
+	var risk := float(f.get("corridor_risk", 0.1))
+	var escorted := bool(f.get("escort", false))
+	var effective := clampf(loss_fraction, 0.05, 0.95)
+	if calc != null and calc.has_method("effective_interdict_loss"):
+		effective = float(calc.effective_interdict_loss(loss_fraction, risk, escorted))
+	var amt := int(f.get("amount_remaining", f.get("amount", 0)))
+	var split: Dictionary = {"lost": 0, "delivered": amt}
+	if calc != null and calc.has_method("amount_after_interdict"):
+		split = calc.amount_after_interdict(amt, effective) as Dictionary
+	else:
+		var lost_i := int(floor(float(amt) * effective))
+		split = {"lost": lost_i, "delivered": maxi(0, amt - lost_i)}
+	var lost := int(split.get("lost", 0))
+	var remaining := int(split.get("delivered", amt))
+	f["lost"] = int(f.get("lost", 0)) + lost
+	f["amount_remaining"] = remaining
+	var plain := ""
+	if calc != null and calc.has_method("attribution_plain"):
+		plain = str(calc.attribution_plain(
+			cause, str(f.get("mode", "rail")), str(f.get("equipment_id", "")),
+			str(f.get("from_province", 0)), str(f.get("to_unit_id", f.get("to_province", 0))),
+			lost, amt,
+		))
+	else:
+		plain = "EquipmentFlow interdicted (%s): lost %d" % [cause, lost]
+	if not f.get("metadata") is Dictionary:
+		f["metadata"] = {}
+	var md: Dictionary = f["metadata"] as Dictionary
+	if not md.has("interdiction_history"):
+		md["interdiction_history"] = []
+	(md["interdiction_history"] as Array).append({
+		"cause": cause, "loss": effective, "lost": lost, "plain": plain,
+	})
+	md["last_interdiction_plain"] = plain
+	f["metadata"] = md
+	if remaining <= 0:
+		f["active"] = false
+		f["amount_remaining"] = 0
+	_equipment_flows[flow_id] = f
+	equipment_flow_interdicted.emit(flow_id, cause, lost, remaining)
+	return {
+		"ok": true, "flow_id": flow_id, "lost": lost, "remaining": remaining,
+		"effective_loss": effective, "plain": plain, "flow": f.duplicate(true),
+	}
+
+
+func advance_equipment_flows(days: float = 1.0) -> Dictionary:
+	var report := {"advanced": 0, "delivered_n": 0, "delivered_amount": 0, "events": []}
+	var d := maxf(0.0, days)
+	for fid in _equipment_flows.keys():
+		var f: Dictionary = (_equipment_flows[fid] as Dictionary).duplicate(true)
+		if not bool(f.get("active", false)):
+			continue
+		report["advanced"] = int(report["advanced"]) + 1
+		f["days_left"] = float(f.get("days_left", 1.0)) - d
+		if float(f["days_left"]) > 0.001:
+			_equipment_flows[fid] = f
+			continue
+		# Deliver remaining to unit or country stockpile at destination
+		var amt := int(f.get("amount_remaining", 0))
+		var tag := str(f.get("country_tag", ""))
+		var eid := str(f.get("equipment_id", ""))
+		var unit_id := str(f.get("to_unit_id", ""))
+		if amt > 0:
+			if not unit_id.is_empty():
+				var cur := get_unit_equipment_stock(unit_id)
+				cur[eid] = int(cur.get(eid, 0)) + amt
+				set_unit_equipment_stock(unit_id, cur)
+				unit_reinforced.emit(unit_id, {eid: int(cur[eid])})
+			else:
+				add_to_country_equipment_stockpile(tag, eid, amt)
+			f["delivered"] = int(f.get("delivered", 0)) + amt
+			report["delivered_n"] = int(report["delivered_n"]) + 1
+			report["delivered_amount"] = int(report["delivered_amount"]) + amt
+			(report["events"] as Array).append({
+				"flow_id": fid, "equipment_id": eid, "amount": amt,
+				"to_unit_id": unit_id, "symbol": f.get("symbol", ""),
+			})
+			equipment_flow_delivered.emit(fid, eid, amt, unit_id)
+		f["amount_remaining"] = 0
+		f["active"] = false
+		f["days_left"] = 0.0
+		_equipment_flows[fid] = f
+	report["ok"] = true
+	report["model"] = "equipment_flow_compact_ledger"
+	return report
+
+
+func get_equipment_flow_board(country_tag: String = "") -> Dictionary:
+	var active := get_active_equipment_flows(country_tag)
+	var by_symbol: Dictionary = {}
+	var by_mode: Dictionary = {}
+	var glyphs: Array = []
+	for f in active:
+		if not (f is Dictionary):
+			continue
+		var fd: Dictionary = f as Dictionary
+		var sym := str(fd.get("symbol", "train"))
+		var mode := str(fd.get("mode", "rail"))
+		by_symbol[sym] = int(by_symbol.get(sym, 0)) + 1
+		by_mode[mode] = int(by_mode.get(mode, 0)) + 1
+		glyphs.append({
+			"flow_id": str(fd.get("flow_id", "")),
+			"symbol": sym,
+			"mode": mode,
+			"from_province": int(fd.get("from_province", 0)),
+			"to_province": int(fd.get("to_province", 0)),
+			"to_unit_id": str(fd.get("to_unit_id", "")),
+			"amount_remaining": int(fd.get("amount_remaining", 0)),
+			"days_left": float(fd.get("days_left", 0.0)),
+			"equipment_id": str(fd.get("equipment_id", "")),
+		})
+	return {
+		"ok": true,
+		"active_n": active.size(),
+		"flows": active,
+		"symbols": by_symbol,
+		"by_mode": by_mode,
+		"glyphs": glyphs,
+		"model": "equipment_flow_compact_ledger",
+	}
+
+
+## CP3: player-facing map symbol strip for active EquipmentFlows (story glyphs, not every vehicle).
+## CP4: consume munitions/drone stock for a fire mission or sortie (burns country stockpile).
+func consume_munitions_from_stockpile(
+	country_tag: String,
+	equipment_id: String,
+	volleys: int = 1,
+	intensity: float = 1.0,
+	opts: Dictionary = {},
+) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var eid := equipment_id.strip_edges()
+	if tag.is_empty() or eid.is_empty():
+		return {"ok": false, "error": "bad_args", "consumed": 0}
+	var dclass := str(opts.get("design_class", ""))
+	if dclass.is_empty():
+		dclass = resolve_design_class_for_stock(eid)
+	var calc = _equip_flow_calc()
+	var need := maxi(1, volleys)
+	if calc != null and calc.has_method("munitions_consume_amount"):
+		need = int(calc.munitions_consume_amount(dclass, volleys, intensity))
+	var have := get_country_equipment_amount(tag, eid)
+	var taken := take_from_country_equipment_stockpile(tag, eid, need)
+	var ok := taken > 0
+	var short := need - taken
+	return {
+		"ok": ok,
+		"country_tag": tag,
+		"equipment_id": eid,
+		"design_class": dclass,
+		"needed": need,
+		"consumed": taken,
+		"short": maxi(0, short),
+		"have_before": have,
+		"have_after": get_country_equipment_amount(tag, eid),
+		"model": "equipment_flow_compact_ledger",
+	}
+
+
+## RF5: player plain stories — XP dilution, transit, flow symbols, policy.
+func format_reinforce_story_plain(country_tag: String = "USA", opts: Dictionary = {}) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "USA"
+	var lines: PackedStringArray = []
+	var policy := get_country_training_policy(tag)
+	var calc = _reinf_log_calc()
+	var recruit_xp := 38.0
+	if calc != null and calc.has_method("recruit_xp_for_policy"):
+		recruit_xp = float(calc.recruit_xp_for_policy(policy))
+	lines.append("Training policy: %s (recruit XP ~%.0f)." % [policy, recruit_xp])
+	# Transit estimate
+	var year := int(opts.get("year", 1939))
+	var tech_flags: Dictionary = {}
+	if opts.get("tech_flags") is Dictionary:
+		tech_flags = opts.get("tech_flags") as Dictionary
+	var mode := str(opts.get("mode", ""))
+	if mode.is_empty():
+		mode = preferred_reinforce_mode(year, tech_flags)
+	var dist := float(opts.get("distance_km", 400.0))
+	var est: Dictionary = estimate_reinforce_transit_days(mode, int(opts.get("hops", 2)), dist, year, opts)
+	if bool(est.get("ok", false)):
+		lines.append(str(est.get("plain", "Transit ~%.1f days via %s." % [float(est.get("days", 1)), mode])))
+	# Active flows strip
+	var strip: Dictionary = format_equipment_flow_map_strip(tag)
+	if int(strip.get("active_n", 0)) > 0:
+		lines.append(str(strip.get("plain", "")))
+	else:
+		lines.append("No equipment flows en route.")
+	# Formation XP sample
+	var xp_line := "No formation XP sample."
+	if typeof(LeaderManager) != TYPE_NIL and "formations" in LeaderManager:
+		for k in LeaderManager.formations.keys():
+			var f = LeaderManager.formations[k]
+			if f == null:
+				continue
+			var ftag := str(f.country_tag).to_upper() if "country_tag" in f else ""
+			if not ftag.is_empty() and ftag != tag:
+				continue
+			var xp := float(f.combat_experience) if "combat_experience" in f else 48.0
+			var band := "regular"
+			if calc != null and calc.has_method("experience_band"):
+				band = str(calc.experience_band(xp))
+			var name_s := str(f.name) if "name" in f else str(k)
+			xp_line = "%s combat experience: %s (%.0f)." % [name_s, band, xp]
+			break
+	lines.append(xp_line)
+	var plain := " ".join(lines)
+	return {
+		"ok": not plain.is_empty(),
+		"plain": plain,
+		"lines": Array(lines),
+		"policy_id": policy,
+		"recruit_xp": recruit_xp,
+		"transit": est,
+		"strip": strip,
+		"model": "reinforce_experience_logistics_ledger",
+	}
+
+
+func format_equipment_flow_map_strip(country_tag: String = "") -> Dictionary:
+	var board: Dictionary = get_equipment_flow_board(country_tag)
+	var glyphs: Array = board.get("glyphs", []) if board.get("glyphs") is Array else []
+	var symbols: Dictionary = board.get("symbols", {}) if board.get("symbols") is Dictionary else {}
+	var parts: PackedStringArray = []
+	for sym in symbols.keys():
+		parts.append("%s×%d" % [str(sym), int(symbols[sym])])
+	var plain := "No active equipment movements."
+	if parts.size() > 0:
+		plain = "Map flow symbols: %s (%d active)." % [", ".join(parts), int(board.get("active_n", 0))]
+	elif glyphs.size() > 0:
+		plain = "Map flow symbols: %d glyph(s) en route." % glyphs.size()
+	# Sample attribution from first glyph
+	if glyphs.size() > 0 and glyphs[0] is Dictionary:
+		var g0: Dictionary = glyphs[0] as Dictionary
+		plain += " e.g. %s %s → %s (%s, %.1fd left)." % [
+			str(g0.get("symbol", "train")),
+			str(g0.get("from_province", 0)),
+			str(g0.get("to_unit_id", g0.get("to_province", 0))),
+			str(g0.get("equipment_id", "")),
+			float(g0.get("days_left", 0.0)),
+		]
+	return {
+		"ok": true,
+		"symbols_ok": true,
+		"plain": plain,
+		"glyphs": glyphs,
+		"symbols": symbols,
+		"active_n": int(board.get("active_n", 0)),
+		"model": "equipment_flow_compact_ledger",
+	}
+
+
+## CP2 helper: stock → flow → (optional force deliver) → unit reinforce.
+## opts.force_deliver (default true): advance full transit so unit receives now.
+## opts.force_deliver=false: leave flow in transit for daily advance_equipment_flows.
+func ship_and_reinforce_unit(
+	country_tag: String,
+	unit_id: String,
+	equipment_id: String,
+	amount: int,
+	mode: String = "rail",
+	opts: Dictionary = {},
+) -> Dictionary:
+	var created: Dictionary = create_equipment_flow(
+		country_tag, equipment_id, amount, int(opts.get("from_province", 0)),
+		int(opts.get("to_province", 0)), unit_id, mode, opts,
+	)
+	if not bool(created.get("ok", false)):
+		return created
+	var fid := str(created.get("flow_id", ""))
+	if bool(opts.get("force_interdict", false)):
+		interdict_equipment_flow(fid, str(opts.get("interdict_cause", "partisan")), float(opts.get("loss", 0.4)))
+	var adv: Dictionary = {"advanced": 0, "delivered_n": 0, "delivered_amount": 0, "events": [], "skipped": true}
+	var force_deliver := true if not opts.has("force_deliver") else bool(opts.get("force_deliver", true))
+	if force_deliver:
+		var days := 99.0
+		if created.get("flow") is Dictionary:
+			days = float((created["flow"] as Dictionary).get("days_total", 1.0)) + 0.01
+		adv = advance_equipment_flows(days)
+	var on_hand := get_unit_equipment_stock(unit_id)
+	return {
+		"ok": true,
+		"create": created,
+		"advance": adv,
+		"unit_stock": on_hand.duplicate(true),
+		"received": int(on_hand.get(equipment_id, 0)),
+		"in_transit": not force_deliver,
+		"flow_id": fid,
+		"model": "equipment_flow_compact_ledger",
+	}
+
+
+## --- CP2: complete → stockpile (batch scale) + demand reinforce via flow ------
+
+## Infer design class for hybrid batch scale (identity-weighted freeze §3).
+func resolve_design_class_for_stock(design_id: String) -> String:
+	var did := design_id.strip_edges()
+	if did.is_empty():
+		return "generic"
+	var cat := ""
+	if typeof(GameData) != TYPE_NIL and GameData.design_data != null:
+		var template: UnitTemplate = GameData.design_data.get_template(did)
+		if template != null:
+			if "is_drone_swarm" in template and bool(template.is_drone_swarm):
+				return "drone_swarm"
+			if not str(template.production_category).is_empty():
+				cat = str(template.production_category).strip_edges().to_lower()
+			elif template.has_method("get_inferred_production_category"):
+				cat = str(template.get_inferred_production_category()).strip_edges().to_lower()
+	if cat.is_empty():
+		var id_lower := did.to_lower()
+		if "truck" in id_lower or "transport" in id_lower or "cargo" in id_lower:
+			cat = "truck"
+		elif "apc" in id_lower or "ifv" in id_lower:
+			cat = "apc"
+		elif "drone" in id_lower and ("swarm" in id_lower or "loiter" in id_lower or "is_drone" in id_lower):
+			cat = "drone_swarm"
+		elif "missile" in id_lower or ("rocket" in id_lower and "artillery" not in id_lower):
+			cat = "missile"
+		elif "rocket" in id_lower and "artillery" in id_lower:
+			cat = "rocket_artillery"
+		elif "towed" in id_lower and "artillery" in id_lower:
+			cat = "artillery_towed"
+		else:
+			cat = "generic"
+	# Map production categories onto freeze class keys (CP4 munitions/drone).
+	match cat:
+		"light_vehicle", "vehicle", "transport":
+			return "truck"
+		"mbt", "tank", "armor":
+			return "tank"
+		"fighter", "bomber", "attack_aircraft", "aircraft":
+			return "fighter"
+		"drone", "uav", "drone_system":
+			return "drone_swarm"
+		"missile", "missile_system", "ballistic_missile", "cruise_missile", "tactical_missile", "strategic_missile":
+			return "missile"
+		"munition", "munitions", "shell", "ammo_stock":
+			return "munition"
+		_:
+			return cat
+
+
+func resolve_batch_size_for_design(design_id: String) -> int:
+	var did := design_id.strip_edges()
+	if did.is_empty():
+		return -1
+	if typeof(GameData) != TYPE_NIL and GameData.design_data != null:
+		var template: UnitTemplate = GameData.design_data.get_template(did)
+		if template != null:
+			var raw: Variant = template.get("batch_size")
+			if raw != null and int(raw) >= 1:
+				return int(raw)
+	return -1
+
+
+func resolve_stock_units_on_complete(design_id: String, completes: int = 1) -> int:
+	var c := maxi(0, completes)
+	var calc = _equip_flow_calc()
+	var dclass := resolve_design_class_for_stock(design_id)
+	var batch := resolve_batch_size_for_design(design_id)
+	if calc != null and calc.has_method("stock_units_on_complete"):
+		return int(calc.stock_units_on_complete(dclass, c, batch))
+	if batch >= 1:
+		return c * batch
+	return c
+
+
+## Always credit country equipment stockpile on line complete (CP2 P4).
+## opts: design_class, batch_size, to_unit_id, mode, auto_flow (bool), from/to_province
+func credit_production_complete_to_stockpile(
+	country_tag: String,
+	design_id: String,
+	completes: int = 1,
+	opts: Dictionary = {},
+) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var eid := design_id.strip_edges()
+	if tag.is_empty() or eid.is_empty() or completes <= 0:
+		return {"ok": false, "error": "bad_args", "stock_units": 0}
+	var dclass := str(opts.get("design_class", ""))
+	if dclass.is_empty():
+		dclass = resolve_design_class_for_stock(eid)
+	var batch := int(opts.get("batch_size", -1))
+	if batch < 1:
+		batch = resolve_batch_size_for_design(eid)
+	var units := completes
+	var calc = _equip_flow_calc()
+	if calc != null and calc.has_method("stock_units_on_complete"):
+		units = int(calc.stock_units_on_complete(dclass, completes, batch))
+	elif batch >= 1:
+		units = completes * batch
+	var before := get_country_equipment_amount(tag, eid)
+	add_to_country_equipment_stockpile(tag, eid, units)
+	var after := get_country_equipment_amount(tag, eid)
+	var flow_res: Dictionary = {}
+	var auto_flow := bool(opts.get("auto_flow", false))
+	var to_unit := str(opts.get("to_unit_id", "")).strip_edges()
+	if auto_flow and not to_unit.is_empty() and units > 0:
+		var ship_amt := int(opts.get("flow_amount", units))
+		ship_amt = mini(ship_amt, units)
+		flow_res = create_equipment_flow(
+			tag, eid, ship_amt,
+			int(opts.get("from_province", 0)),
+			int(opts.get("to_province", 0)),
+			to_unit,
+			str(opts.get("mode", "rail")),
+			opts,
+		)
+	return {
+		"ok": after == before + units and units > 0,
+		"country_tag": tag,
+		"equipment_id": eid,
+		"completes": completes,
+		"design_class": dclass,
+		"stock_units": units,
+		"before": before,
+		"after": after,
+		"flow": flow_res,
+		"model": "equipment_flow_compact_ledger",
+	}
+
+
+func equipment_demand_deficit(unit_id: String, required_equipment: Dictionary) -> Dictionary:
+	var current := get_unit_equipment_stock(unit_id)
+	var deficit: Dictionary = {}
+	var total := 0
+	for eid in required_equipment.keys():
+		var need := int(required_equipment[eid])
+		var have := int(current.get(eid, 0))
+		var gap := maxi(0, need - have)
+		if gap > 0:
+			deficit[str(eid)] = gap
+			total += gap
+	return {"unit_id": unit_id, "deficit": deficit, "total": total, "ok": true}
+
+
+## CP2 demand path: ship TOE deficit (need − on-hand) via EquipmentFlow.
+## amount: absolute TOE need (≥0). If <0, uses formation required or opts.need.
+## opts.as_ship_amount=true: treat amount as exact ship qty (skip deficit math).
+func demand_reinforce_via_equipment_flow(
+	country_tag: String,
+	unit_id: String,
+	equipment_id: String,
+	amount: int = -1,
+	mode: String = "rail",
+	opts: Dictionary = {},
+) -> Dictionary:
+	var eid := equipment_id.strip_edges()
+	var need := amount
+	if need < 0:
+		var req_map: Dictionary = get_formation_required_equipment(unit_id)
+		if req_map.has(eid):
+			need = int(req_map[eid])
+		else:
+			need = maxi(1, int(opts.get("need", 1)))
+	var gap := maxi(0, need)
+	if not bool(opts.get("as_ship_amount", false)):
+		var have := int(get_unit_equipment_stock(unit_id).get(eid, 0))
+		gap = maxi(0, need - have)
+	if gap <= 0:
+		return {"ok": false, "error": "no_deficit", "received": 0, "gap": 0, "need": need}
+	var ship_opts := opts.duplicate(true)
+	var res: Dictionary = ship_and_reinforce_unit(country_tag, unit_id, eid, gap, mode, ship_opts)
+	res["gap"] = gap
+	res["need"] = need
+	res["demand"] = true
+	return res
+
+
+## Priority-first demand reinforce tick via EquipmentFlow (CP2).
+## required_map: unit_id -> { equipment_id: need_count }
+func demand_reinforce_tick_via_flow(required_map: Dictionary, opts: Dictionary = {}) -> Dictionary:
+	var report := {
+		"ok": true,
+		"units": {},
+		"shipped_n": 0,
+		"received_total": 0,
+		"model": "equipment_flow_compact_ledger",
+	}
+	if required_map.is_empty():
+		return report
+	var mode := str(opts.get("mode", "rail"))
+	var order: Array = []
+	for unit_id in priority_reinforcement_units.keys():
+		if required_map.has(unit_id) and is_unit_priority_reinforced(str(unit_id)):
+			order.append(str(unit_id))
+	for unit_id in required_map.keys():
+		var uid := str(unit_id)
+		if not order.has(uid):
+			order.append(uid)
+	for unit_id in order:
+		var req: Variant = required_map[unit_id]
+		if typeof(req) != TYPE_DICTIONARY:
+			continue
+		var tag := str(opts.get("country_tag", "")).strip_edges().to_upper()
+		if tag.is_empty() and typeof(LeaderManager) != TYPE_NIL and "formations" in LeaderManager:
+			var f = LeaderManager.formations.get(unit_id) if LeaderManager.formations is Dictionary else null
+			if f != null and "country_tag" in f:
+				tag = str(f.country_tag).strip_edges().to_upper()
+		if tag.is_empty():
+			tag = str((req as Dictionary).get("_country_tag", "USA")).to_upper()
+		var unit_report: Dictionary = {}
+		for eid in (req as Dictionary).keys():
+			if str(eid).begins_with("_"):
+				continue
+			var need := int((req as Dictionary)[eid])
+			var ship_opts := opts.duplicate(true)
+			ship_opts["as_deficit"] = true
+			# When force_deliver (default true for dual), advance full transit immediately.
+			if not ship_opts.has("force_deliver"):
+				ship_opts["force_deliver"] = true
+			var ship: Dictionary = demand_reinforce_via_equipment_flow(
+				tag, str(unit_id), str(eid), need, mode, ship_opts,
+			)
+			unit_report[str(eid)] = ship
+			if bool(ship.get("ok", false)):
+				report["shipped_n"] = int(report["shipped_n"]) + 1
+				report["received_total"] = int(report["received_total"]) + int(ship.get("received", 0))
+		report["units"][str(unit_id)] = unit_report
+	# ok when at least one ship succeeded, or nothing needed (no deficit path is still healthy)
+	report["ok"] = int(report["shipped_n"]) > 0 or order.is_empty()
+	return report
+
+
+func get_country_equipment_amount(country_tag: String, equipment_id: String) -> int:
+	var tag := country_tag.strip_edges().to_upper()
+	var eid := equipment_id.strip_edges()
+	if not country_equipment_stockpiles.has(tag):
+		return 0
+	return int((country_equipment_stockpiles[tag] as Dictionary).get(eid, 0))
+
+
+## Shipped recovery path: land formations pull missing design equipment from country stockpile,
+## then slowly recover strength when equipped (combat losses → stockpile as repair pool).
+func daily_formation_reinforce_from_stockpile() -> Dictionary:
+	var report := {
+		"units_reinforced": 0,
+		"equipment_moved": 0,
+		"strength_recovered": 0,
+		"by_tag": {},
+	}
+	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
+		return report
+	var formations: Array = []
+	for fid in LeaderManager.formations:
+		var ff = LeaderManager.formations[fid]
+		if ff != null:
+			formations.append(ff)
+	for f in formations:
+		if f == null:
+			continue
+		var ftype := str(f.formation_type) if "formation_type" in f else ""
+		if ftype != Formation.TYPE_DIVISION and ftype != Formation.TYPE_GARRISON:
+			continue
+		var fid := str(f.formation_id) if "formation_id" in f else ""
+		if fid.is_empty():
+			continue
+		var tag := str(f.country_tag).strip_edges().to_upper() if "country_tag" in f else ""
+		var required: Dictionary = get_formation_required_equipment(fid)
+		if required.is_empty():
+			continue
+		var design := str(required.keys()[0]) if not required.is_empty() else ""
+		var before_country := 0
+		if not tag.is_empty() and not design.is_empty():
+			before_country = int(get_country_equipment_stockpile(tag).get(design, 0))
+		var fulfilled: Dictionary = auto_reinforce_unit_from_stockpile(fid, required)
+		var after_country := before_country
+		if not tag.is_empty() and not design.is_empty():
+			after_country = int(get_country_equipment_stockpile(tag).get(design, 0))
+		var taken := before_country - after_country
+		if taken > 0:
+			report["equipment_moved"] = int(report["equipment_moved"]) + taken
+			report["units_reinforced"] = int(report["units_reinforced"]) + 1
+			if not tag.is_empty():
+				var bt: Dictionary = report["by_tag"]
+				bt[tag] = int(bt.get(tag, 0)) + taken
+		# Strength recovery when unit has on-hand equipment (stockpile paid the rebuild).
+		# RF1: partial absorb + experience dilution (greens are not instant veterans).
+		var on_hand := get_unit_equipment_stock(fid)
+		var has_eq := false
+		for k in on_hand.keys():
+			if int(on_hand[k]) > 0:
+				has_eq = true
+				break
+		if has_eq and "strength" in f and float(f.strength) < 0.99:
+			var old_s := float(f.strength)
+			var want := 0.05
+			# Extra stockpile pull when heavily damaged (rebuild costs equipment).
+			if old_s < 0.75 and not design.is_empty() and not tag.is_empty():
+				var rebuild := take_from_country_equipment_stockpile(tag, design, 1)
+				if rebuild > 0:
+					report["equipment_moved"] = int(report["equipment_moved"]) + rebuild
+					want = 0.08
+					apply_equipment_rearm_experience(fid, 0.12, 0.25)
+			var man: Dictionary = apply_manpower_reinforce_with_experience(fid, want, {
+				"policy_id": get_country_training_policy(tag),
+				"hub_access": 1.0,
+			})
+			if bool(man.get("ok", false)):
+				report["strength_recovered"] = int(report["strength_recovered"]) + 1
+				if not report.has("xp_events"):
+					report["xp_events"] = []
+				(report["xp_events"] as Array).append(man)
+			elif float(f.strength) > old_s + 0.001:
+				report["strength_recovered"] = int(report["strength_recovered"]) + 1
+	return report
 
 
 func get_line_resource_cost_for_days(line_id: String, days: float) -> Dictionary:
@@ -876,54 +2292,15 @@ func _shortage_rules() -> Dictionary:
 
 
 func _critical_resource_set() -> Dictionary:
-	var raw: Variant = _shortage_rules().get("critical_resources", [])
-	var critical_set: Dictionary = {}
-	if typeof(raw) == TYPE_ARRAY:
-		for item in raw:
-			critical_set[str(item).to_lower()] = true
-	return critical_set
+	return ProductionCostCalculator.get_critical_resource_set()
 
 
 func _weighted_fill_ratio(needed: Dictionary) -> float:
-	if needed.is_empty():
-		return 1.0
-
-	var critical := _critical_resource_set()
-	var speed_weight := float(_shortage_rules().get("critical_speed_weight", 1.45))
-	var effective := 1.0
-
-	for resource in needed:
-		var required := float(needed[resource])
-		if required <= 0.0:
-			continue
-		var have := float(national_stockpile.get(resource, 0.0))
-		var ratio := clampf(have / required, 0.0, 1.0)
-		if critical.has(str(resource).to_lower()):
-			ratio = pow(ratio, 1.0 / maxf(speed_weight, 1.0))
-		effective = minf(effective, ratio)
-
-	return effective
+	return ProductionCostCalculator.compute_weighted_fill_ratio(needed, national_stockpile)
 
 
 func _shortage_multipliers(fill_ratio: float) -> Dictionary:
-	var rules := _shortage_rules()
-	var min_output := float(rules.get("min_output_multiplier", 0.55))
-	var min_reliability := float(rules.get("min_reliability_multiplier", 0.72))
-	var ratio := clampf(fill_ratio, 0.0, 1.0)
-	var speed := lerpf(min_output, 1.0, ratio)
-	var reliability := lerpf(min_reliability, 1.0, ratio)
-
-	var critical := _critical_resource_set()
-	if not critical.is_empty():
-		var crit_weight := float(rules.get("critical_reliability_weight", 1.25))
-		var crit_floor := lerpf(min_reliability, min_reliability * 0.9, 1.0 - ratio)
-		if ratio < 1.0:
-			reliability = minf(reliability, lerpf(crit_floor, 1.0, pow(ratio, 1.0 / maxf(crit_weight, 1.0))))
-
-	return {
-		"speed": clampf(speed, min_output, 1.0),
-		"reliability": clampf(reliability, min_reliability, 1.0),
-	}
+	return ProductionCostCalculator.compute_shortage_multipliers(fill_ratio)
 
 
 func _missing_resources(needed: Dictionary, fill_ratio: float) -> Dictionary:
@@ -1061,7 +2438,13 @@ func _resolve_modifiers_for_line(line: ProductionLine) -> ProductionModifiers:
 	var mods := ProductionModifiers.new()
 
 	for modifier_id in _active_modifiers:
-		mods.absorb(_active_modifiers[modifier_id])
+		var raw_mod: Variant = _active_modifiers[modifier_id]
+		# After JSON save/load, values may be Dictionary or corrupt String — rebuild safely.
+		if raw_mod is ProductionModifier:
+			mods.absorb(raw_mod as ProductionModifier)
+		elif typeof(raw_mod) == TYPE_DICTIONARY:
+			mods.absorb(ProductionModifier.from_dict(raw_mod as Dictionary))
+		# else: skip non-modifier entries (do not SCRIPT ERROR on String/nil)
 
 	# === National Spirit + Temporary Modifier Integration (Option B) ===
 	var owner_tag := _get_line_owner_tag(line)
@@ -1076,9 +2459,9 @@ func _resolve_modifiers_for_line(line: ProductionLine) -> ProductionModifiers:
 		if national_mods.get("cost_multiplier", 1.0) != 1.0:
 			mods.cost_multiplier *= float(national_mods["cost_multiplier"])
 		if national_mods.get("resource_output_multiplier", 1.0) != 1.0:
-			# Resource boost from agents can mitigate shortages or boost effective output
+			# Resource boost from agents can mitigate shortages or boost effective output.
+			# ProductionModifiers is a RefCounted (not Dictionary) — apply only known fields.
 			mods.output_multiplier *= float(national_mods["resource_output_multiplier"])
-			mods.resource_shortage_penalty = min(1.0, mods.resource_shortage_penalty * float(national_mods["resource_output_multiplier"])) if mods.has("resource_shortage_penalty") else 1.0
 
 	var template: UnitTemplate = line.get_current_template()
 	if template != null and not template.design_family.is_empty():
@@ -1206,15 +2589,20 @@ func _on_line_unit_completed(
 	template_id: String,
 	_reliability: float,
 	_profile: ReliabilityProfile,
-	_line_id: String,
+	line_id: String,
 ) -> void:
-	var template: UnitTemplate = GameData.design_data.get_template(template_id)
-	if template == null or template.design_family.is_empty():
-		return
-	var family_id: String = template.design_family
-	var total := int(_family_units_produced.get(family_id, 0)) + 1
-	_family_units_produced[family_id] = total
-	family_experience_changed.emit(family_id, total)
+	# Family XP (optional when template missing family)
+	if typeof(GameData) != TYPE_NIL and GameData.design_data != null:
+		var template: UnitTemplate = GameData.design_data.get_template(template_id)
+		if template != null and not template.design_family.is_empty():
+			var family_id: String = template.design_family
+			var total := int(_family_units_produced.get(family_id, 0)) + 1
+			_family_units_produced[family_id] = total
+			family_experience_changed.emit(family_id, total)
+	# Deposit completed unit into country stockpile (factory→line→stockpile loop).
+	# Same sink as production_completed path.
+	if not template_id.is_empty():
+		production_completed.emit(line_id, template_id, 1)
 
 
 func _load_modifier_presets() -> void:
@@ -1263,9 +2651,19 @@ func _naval_production_allowed(line: ProductionLine, design_id: String) -> bool:
 func _clear_modifiers_with_tag(tag: String) -> void:
 	var to_remove: Array[String] = []
 	for modifier_id in _active_modifiers:
-		var mod: ProductionModifier = _active_modifiers[modifier_id]
-		if tag in mod.tags:
-			to_remove.append(modifier_id)
+		var raw: Variant = _active_modifiers[modifier_id]
+		var tags: Array = []
+		if raw is ProductionModifier:
+			tags = (raw as ProductionModifier).tags
+		elif typeof(raw) == TYPE_DICTIONARY:
+			var t: Variant = (raw as Dictionary).get("tags", [])
+			if typeof(t) == TYPE_ARRAY:
+				tags = t as Array
+		else:
+			to_remove.append(str(modifier_id))
+			continue
+		if tag in tags:
+			to_remove.append(str(modifier_id))
 	for modifier_id in to_remove:
 		unregister_modifier(modifier_id)
 
@@ -1304,6 +2702,38 @@ func get_concentrated_production_multiplier(factory_id: int, design_id: String) 
 	var cap := float(slot_rules.get("max_multiplier", 1.6))
 	var bonus := 1.0 + float(lines_on_design - 1) * per_line
 	return minf(bonus, cap)
+
+
+## Scenario/OOB bootstrap: assign factory + design without tech/retool gates so starting lines produce.
+## Seeds modest tooling (historical starting industry already builds these designs) and skips retool delay.
+func bootstrap_line_on_factory(line_id: String, design_id: String, factory_id: int) -> bool:
+	var line := get_line(line_id)
+	if line == null:
+		line = create_line(line_id)
+	if line == null or design_id.is_empty() or factory_id <= 0:
+		return false
+	if not assign_line_to_factory(line_id, factory_id):
+		# Still force factory_id if assign failed due to slot cap — allow production evidence path
+		line.factory_id = factory_id
+	var result: Dictionary = line.set_template(design_id)
+	if not bool(result.get("success", false)):
+		# Force design fields even if template lookup fails (still allows progress defaults)
+		line.current_template_id = design_id
+		line.design_id = design_id
+		line.retooling_days_remaining = 0.0
+		line.production_progress = 0.0
+		if line.has_method("refresh_required_progress"):
+			line.refresh_required_progress()
+		if line.has_method("reset_progress"):
+			line.reset_progress()
+	else:
+		# Scenario start: skip retooling delay so first days produce immediately
+		line.retooling_days_remaining = 0.0
+	# Starting OOB: factories are already tooled for their national designs (not greenfield).
+	var state: DesignLineState = line.get_current_state() if line.has_method("get_current_state") else null
+	if state != null:
+		state.tooling_efficiency = maxf(state.tooling_efficiency, 45.0)
+	return true
 
 
 func assign_line_to_factory(line_id: String, factory_id: int) -> bool:
@@ -1733,10 +3163,40 @@ func get_save_data() -> Dictionary:
 		"national_equipment_stockpile": national_equipment_stockpile.duplicate(true),
 		"country_equipment_stockpiles": country_equipment_stockpiles.duplicate(true),
 		"unit_equipment_stock": _unit_equipment_stock.duplicate(true),
-		"active_modifiers": _active_modifiers.duplicate(true),
+		"active_modifiers": _serialize_active_modifiers(),
 		"lines": lines_data,
 		# family experience, priority etc. can be added later if they prove important
 	}
+
+
+func _serialize_active_modifiers() -> Dictionary:
+	var out: Dictionary = {}
+	for modifier_id in _active_modifiers:
+		var raw: Variant = _active_modifiers[modifier_id]
+		if raw is ProductionModifier:
+			out[str(modifier_id)] = (raw as ProductionModifier).to_dict()
+		elif typeof(raw) == TYPE_DICTIONARY:
+			out[str(modifier_id)] = (raw as Dictionary).duplicate(true)
+		# drop String/nil corrupt entries
+	return out
+
+
+func _restore_active_modifiers(raw: Variant) -> void:
+	_active_modifiers.clear()
+	if typeof(raw) != TYPE_DICTIONARY:
+		return
+	var src: Dictionary = raw as Dictionary
+	for modifier_id in src:
+		var entry: Variant = src[modifier_id]
+		if entry is ProductionModifier:
+			_active_modifiers[str(modifier_id)] = entry
+		elif typeof(entry) == TYPE_DICTIONARY:
+			var mod := ProductionModifier.from_dict(entry as Dictionary)
+			if mod.id.is_empty():
+				mod.id = str(modifier_id)
+			_active_modifiers[str(modifier_id)] = mod
+		# ignore plain String keys-as-values from legacy/corrupt saves
+
 
 func apply_save_data(data: Dictionary) -> void:
 	if data.has("production_stance"):
@@ -1750,7 +3210,7 @@ func apply_save_data(data: Dictionary) -> void:
 	if data.has("unit_equipment_stock"):
 		_unit_equipment_stock = (data["unit_equipment_stock"] as Dictionary).duplicate(true)
 	if data.has("active_modifiers"):
-		_active_modifiers = (data["active_modifiers"] as Dictionary).duplicate(true)
+		_restore_active_modifiers(data["active_modifiers"])
 
 	if data.has("lines"):
 		var lines_data: Dictionary = data["lines"]
@@ -1786,14 +3246,172 @@ func apply_save_data(data: Dictionary) -> void:
 
 
 ## Game loop entry point: one day of national production (supply hooks can chain here later).
+## Uses day-based line.advance_days (proven factory→stockpile for OOB lines), not only the
+## separate PP accumulator in advance_production — so TimeManager days fill country stockpiles.
 func daily_production_tick() -> void:
-	advance_production(1.0)
+	# Province deposits → major stockpiles before equipment lines consume inputs.
+	daily_resource_harvest_tick(1.0)
+	advance_days(1.0)
+
+
+## Auto-harvest strategic resources from owned provinces into national_stockpile.
+## Plants (coal_plant, refinery, …) and tech (plastics, synthetic fuel, nuclear) scale income.
+func daily_resource_harvest_tick(days: float = 1.0) -> Dictionary:
+	var report := {"days": days, "by_tag": {}, "total_added": {}}
+	if days <= 0.0:
+		return report
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	if rhc == null or not rhc.has_method("compute_national_daily_income"):
+		return report
+	if typeof(MapManager) == TYPE_NIL:
+		return report
+	var provinces_payload: Array = []
+	var unlocks_by_tag: Dictionary = {}
+	var owners: Dictionary = {}
+	var light := (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_interactive_light_sim")
+		and bool(TimeManager.is_interactive_light_sim())
+	)
+	var player_tag_pref := ""
+	if light and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		player_tag_pref = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+	# Collect owned land provinces with resources (MapManager.get_all_provinces → id→Province).
+	# Interactive: prefer player-owned deposits and cap scan so world_full cannot stall the clock.
+	var harvest_cap := 220 if light else 100000
+	var harvested := 0
+	if MapManager.has_method("get_all_provinces"):
+		var all_p: Variant = MapManager.get_all_provinces()
+		if all_p is Dictionary:
+			for pid_key in (all_p as Dictionary):
+				if harvested >= harvest_cap:
+					break
+				var p: Province = (all_p as Dictionary)[pid_key] as Province
+				if p == null:
+					continue
+				var tag := str(p.owner_tag).strip_edges().to_upper()
+				var res: Dictionary = p.resources if p.resources is Dictionary else {}
+				var pid := int(p.id) if "id" in p else int(pid_key)
+				if tag.is_empty() or res.is_empty():
+					continue
+				if light and not player_tag_pref.is_empty() and tag != player_tag_pref:
+					continue
+				owners[tag] = true
+				var plants: Array = []
+				if typeof(FactoryManager) != TYPE_NIL and FactoryManager.has_method("get_resource_plants_in_province") and pid > 0:
+					plants = FactoryManager.get_resource_plants_in_province(pid)
+				provinces_payload.append({"owner_tag": tag, "resources": res, "plants": plants})
+				harvested += 1
+	for tag in owners:
+		unlocks_by_tag[tag] = _harvest_unlocks_for_tag(str(tag))
+	var by_tag: Dictionary = rhc.compute_national_daily_income(provinces_payload, unlocks_by_tag) as Dictionary
+	# Apply to player/national stockpile (single-nation production path uses national_stockpile).
+	# Multi-tag: merge player country if GameData exposes it; otherwise sum all into national.
+	var player_tag := ""
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		player_tag = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+	var total_added: Dictionary = {}
+	var cohesion_events: Array = []
+	for tag in by_tag:
+		var income: Dictionary = by_tag[tag] as Dictionary
+		# Single-nation / player stockpile path: apply player income, or all when player unknown.
+		var apply := player_tag.is_empty() or str(tag) == player_tag or by_tag.size() == 1
+		if not apply:
+			continue
+		for resource in income:
+			var amt := float(income[resource]) * days
+			if amt <= 0.0:
+				continue
+			# supplies is ops triad; store alongside majors in national_stockpile
+			national_stockpile[resource] = float(national_stockpile.get(resource, 0.0)) + amt
+			total_added[resource] = float(total_added.get(resource, 0.0)) + amt
+		# Food → supplies → cohesion (ops triad; soft stability from harvest)
+		if rhc.has_method("compute_food_cohesion_delta"):
+			var sup_inc := float(income.get("supplies", 0.0)) * days
+			var sup_stock := float(national_stockpile.get("supplies", 0.0))
+			var coh: Dictionary = rhc.compute_food_cohesion_delta(sup_inc, sup_stock) as Dictionary
+			var d_coh := int(coh.get("cohesion_delta", 0))
+			if d_coh != 0 and typeof(GameData) != TYPE_NIL and GameData.has_method("apply_pillar_shift"):
+				GameData.apply_pillar_shift(str(tag), "cohesion", d_coh, "food_supplies_harvest")
+				cohesion_events.append({"tag": tag, "delta": d_coh, "reason": str(coh.get("reason", ""))})
+	report["by_tag"] = by_tag
+	report["total_added"] = total_added
+	report["cohesion_events"] = cohesion_events
+	return report
+
+
+## Bootstrap resource/energy plants from province deposits (once per session unless force).
+func auto_seed_resource_plants_from_map(force: bool = false, max_per_owner: int = 12) -> Dictionary:
+	if _resource_plants_seeded and not force:
+		return {"seeded": 0, "already_seeded": true}
+	if typeof(FactoryManager) == TYPE_NIL or not FactoryManager.has_method("auto_seed_resource_plants"):
+		return {"seeded": 0, "error": "no_factory_manager"}
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_all_provinces"):
+		return {"seeded": 0, "error": "no_map"}
+	var provinces_payload: Array = []
+	var unlocks_by_tag: Dictionary = {}
+	var all_p: Variant = MapManager.get_all_provinces()
+	if all_p is Dictionary:
+		for pid_key in (all_p as Dictionary):
+			var p: Province = (all_p as Dictionary)[pid_key] as Province
+			if p == null:
+				continue
+			var tag := str(p.owner_tag).strip_edges().to_upper()
+			var res: Dictionary = p.resources if p.resources is Dictionary else {}
+			var pid := int(p.id) if "id" in p else int(pid_key)
+			if tag.is_empty() or res.is_empty():
+				continue
+			provinces_payload.append({"province_id": pid, "owner_tag": tag, "resources": res})
+			if not unlocks_by_tag.has(tag):
+				unlocks_by_tag[tag] = _harvest_unlocks_for_tag(tag)
+	var report: Dictionary = FactoryManager.auto_seed_resource_plants(provinces_payload, unlocks_by_tag, max_per_owner)
+	_resource_plants_seeded = true
+	return report
+
+
+func _harvest_unlocks_for_tag(tag: String) -> Dictionary:
+	var unlocks := {"rule_flags": [], "unlocked_resources": [], "permanent_modifiers": {}}
+	if typeof(TechnologyManager) == TYPE_NIL:
+		return unlocks
+	var state: Dictionary = TechnologyManager.get_country_state(tag) if TechnologyManager.has_method("get_country_state") else {}
+	if state.get("rule_flags") is Array:
+		unlocks["rule_flags"] = (state["rule_flags"] as Array).duplicate()
+	if state.get("unlocked_resources") is Array:
+		unlocks["unlocked_resources"] = (state["unlocked_resources"] as Array).duplicate()
+	if state.get("permanent_modifiers") is Dictionary:
+		unlocks["permanent_modifiers"] = (state["permanent_modifiers"] as Dictionary).duplicate(true)
+	if TechnologyManager.has_method("get_technology_modifiers"):
+		var mods: Dictionary = TechnologyManager.get_technology_modifiers(tag)
+		for k in mods:
+			var pm: Dictionary = unlocks["permanent_modifiers"] as Dictionary
+			pm[k] = float(pm.get(k, 0.0)) + float(mods[k])
+	return unlocks
 
 
 ## Listener for central TimeManager daily tick (wired in _ready).
 ## Keeps production in sync with the rest of the daily simulation loop (Supply/Agents/Repair).
 func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
+	var light := (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_interactive_light_sim")
+		and bool(TimeManager.is_interactive_light_sim())
+	)
+	var day_n := 0
+	if typeof(TimeManager) != TYPE_NIL:
+		if TimeManager.has_method("get_total_days_elapsed"):
+			day_n = int(TimeManager.get_total_days_elapsed())
+		elif "total_days_elapsed" in TimeManager:
+			day_n = int(TimeManager.total_days_elapsed)
+	# Interactive: keep production line ticks cheap; harvest/reinforce only every 5th day.
+	# (Daily harvest + reinforce scans were still heavy enough to stall 1x near Feb→Mar.)
+	if light:
+		advance_days(1.0)
+		if day_n % 5 == 0:
+			daily_resource_harvest_tick(5.0)
+			daily_formation_reinforce_from_stockpile()
+		return
 	daily_production_tick()
+	daily_formation_reinforce_from_stockpile()
 
 
 func advance_production(days: float) -> void:

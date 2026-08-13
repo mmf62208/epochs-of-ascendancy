@@ -1,0 +1,66 @@
+{
+  "version": 4,
+  "source": "hierarchy_system_product",
+  "regions": [
+    {
+      "id": 104,
+      "name": "Low Countries",
+      "province_ids": [
+        700901,
+        700902,
+        700903,
+        700904,
+        700905,
+        700906,
+        700911,
+        700912,
+        700913,
+        700914,
+        700915
+      ],
+      "state_ids": [
+        201,
+        202
+      ],
+      "super_region_id": 1,
+      "theater": "europe_core"
+    },
+    {
+      "id": 105,
+      "name": "Germany",
+      "province_ids": [
+        700921,
+        700922,
+        700923,
+        700924,
+        700925,
+        700926,
+        700927
+      ],
+      "state_ids": [
+        203
+      ],
+      "super_region_id": 1,
+      "theater": "europe_core"
+    },
+    {
+      "id": 103,
+      "name": "France",
+      "province_ids": [
+        700931,
+        700932,
+        700933,
+        700934,
+        700935,
+        700936,
+        700937,
+        700938
+      ],
+      "state_ids": [
+        204
+      ],
+      "super_region_id": 1,
+      "theater": "europe_core"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "name": "provinces_pilot_europe_nuts3",
+  "id_base": 710000,
+  "stats": {
+    "province_n": 1514,
+    "land_n": 1514,
+    "feature_n_source": 1514,
+    "state_n": 210,
+    "region_n": 12,
+    "mean_verts": 21.243064729194188,
+    "id_base": 710000,
+    "id_min": 710000,
+    "id_max": 711513,
+    "unique_names": 1514,
+    "name_ok": true,
+    "method": "eurostat_nuts3_20m_projected_simplified",
+    "densify_pilot_land_n": 1840,
+    "europe_core_parent_approx": 460,
+    "denser_than_europe_core": true,
+    "vs_densify_pilot": "gis_truth_not_procedural_split"
+  },
+  "gis_source": "Eurostat GISCO NUTS_RG_20M_2021_4326_LEVL_3",
+  "method": "eurostat_nuts3_20m_projected_simplified",
+  "parent_world_full_renumbered": false
+}

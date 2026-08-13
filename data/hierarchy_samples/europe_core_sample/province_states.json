@@ -1,0 +1,97 @@
+{
+  "version": 3,
+  "source": "hierarchy_system_product",
+  "naming": "sample",
+  "states": [
+    {
+      "id": 201,
+      "name": "Flanders",
+      "province_ids": [
+        700901,
+        700902,
+        700903,
+        700904,
+        700905,
+        700906
+      ],
+      "province_n": 6,
+      "capital_province_id": 700901,
+      "region_id": 104,
+      "region_hint": "Low Countries",
+      "owner_hint": "BEL",
+      "theater": "europe_core",
+      "tags": [
+        "historical_province",
+        "sample"
+      ]
+    },
+    {
+      "id": 202,
+      "name": "Brabant",
+      "province_ids": [
+        700911,
+        700912,
+        700913,
+        700914,
+        700915
+      ],
+      "province_n": 5,
+      "capital_province_id": 700911,
+      "region_id": 104,
+      "region_hint": "Low Countries",
+      "owner_hint": "BEL",
+      "theater": "europe_core",
+      "tags": [
+        "historical_province",
+        "sample"
+      ]
+    },
+    {
+      "id": 203,
+      "name": "Bavaria",
+      "province_ids": [
+        700921,
+        700922,
+        700923,
+        700924,
+        700925,
+        700926,
+        700927
+      ],
+      "province_n": 7,
+      "capital_province_id": 700921,
+      "region_id": 105,
+      "region_hint": "Germany",
+      "owner_hint": "GER",
+      "theater": "europe_core",
+      "tags": [
+        "historical_province",
+        "sample"
+      ]
+    },
+    {
+      "id": 204,
+      "name": "Île-de-France",
+      "province_ids": [
+        700931,
+        700932,
+        700933,
+        700934,
+        700935,
+        700936,
+        700937,
+        700938
+      ],
+      "province_n": 8,
+      "capital_province_id": 700931,
+      "region_id": 103,
+      "region_hint": "France",
+      "owner_hint": "FRA",
+      "theater": "europe_core",
+      "tags": [
+        "historical_province",
+        "sample"
+      ]
+    }
+  ]
+}

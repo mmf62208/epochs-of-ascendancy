@@ -1,0 +1,13 @@
+{
+  "name": "provinces_pilot_global_density",
+  "id_base": 900000,
+  "land_before": 2325,
+  "land_after": 4650,
+  "province_n": 4990,
+  "geometry_quality": "procedural_interim",
+  "target_band": [
+    5000,
+    7000
+  ],
+  "pilot_banner": true
+}

@@ -59,6 +59,10 @@ func is_daily_pulse_active() -> bool:
 
 
 func _process(delta: float) -> void:
+	# Never thrash redraws while sim is paused — that kills pan/hover/UI on world_full.
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_paused") and bool(TimeManager.is_paused()):
+		set_process(false)
+		return
 	var daily_pulse := is_daily_pulse_active()
 	if daily_pulse:
 		_pulse_phase += delta * 4.5
@@ -73,7 +77,10 @@ func _process(delta: float) -> void:
 		else:
 			set_process(false)
 			return
-	queue_redraw()
+	# Ambient pulse must NOT redraw every frame (was freezing F5 after 1x day advances).
+	var every := 8 if _ambient_pressure_active and not daily_pulse else 3
+	if Engine.get_process_frames() % every == 0:
+		queue_redraw()
 
 
 func _on_province_data_changed(_pid: int, what: String) -> void:
@@ -82,6 +89,11 @@ func _on_province_data_changed(_pid: int, what: String) -> void:
 
 
 func _on_daily_tick(_year: int, _month: int, _day: int) -> void:
+	# Interactive: pulse every 5th day only — daily redraw storms helped freeze 1x at month ends.
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+		var day_n := int(TimeManager.total_days_elapsed) if "total_days_elapsed" in TimeManager else _day
+		if day_n % 5 != 0:
+			return
 	trigger_daily_pulse()
 
 

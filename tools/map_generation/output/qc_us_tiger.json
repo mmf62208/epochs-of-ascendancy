@@ -1,0 +1,123 @@
+{
+  "data_dir": "data/provinces_pilot_us_tiger",
+  "ok_hard": true,
+  "ok_ne": true,
+  "errors": [],
+  "warnings": [],
+  "total_base": 3221,
+  "total_geometry": 3221,
+  "matched": 3221,
+  "orphan_base_only_count": 0,
+  "orphan_geo_only_count": 0,
+  "orphan_base_sample": [],
+  "orphan_geo_sample": [],
+  "land": 3221,
+  "sea": 0,
+  "empty_or_placeholder_names": 0,
+  "densify_style_names": 1,
+  "region_assigned": 3221,
+  "region_assigned_pct": 100.0,
+  "geometry_no_polygon": 0,
+  "ne_land_path": "/home/mikef/Projects/epochs-of-ascendancy/tools/map_generation/data/cache/map_tiles/https_raw.githubusercontent.com_nvkelso_natural-earth-vector_master_geojson_ne_10m_land.geojson",
+  "ne_land_centroids_tested": 3221,
+  "ne_land_centroids_hit": 3200,
+  "ne_land_hit_rate": 0.9935,
+  "ne_land_miss_samples": [
+    {
+      "id": 800019,
+      "name": "Northwest Arctic",
+      "centroid": [
+        412.31,
+        479.31
+      ]
+    },
+    {
+      "id": 800675,
+      "name": "Dillingham",
+      "centroid": [
+        485.32,
+        710.24
+      ]
+    },
+    {
+      "id": 801067,
+      "name": "Lincoln",
+      "centroid": [
+        2512.8,
+        1151.88
+      ]
+    },
+    {
+      "id": 801506,
+      "name": "New Hanover",
+      "centroid": [
+        2323.87,
+        1439.07
+      ]
+    },
+    {
+      "id": 801509,
+      "name": "Perquimans",
+      "centroid": [
+        2358.25,
+        1379.95
+      ]
+    },
+    {
+      "id": 801816,
+      "name": "Gloucester",
+      "centroid": [
+        2355.83,
+        1345.14
+      ]
+    },
+    {
+      "id": 801829,
+      "name": "Gu\u00e1nica",
+      "centroid": [
+        2572.93,
+        1915.69
+      ]
+    },
+    {
+      "id": 801847,
+      "name": "Lajas",
+      "centroid": [
+        2570.52,
+        1915.42
+      ]
+    },
+    {
+      "id": 801860,
+      "name": "Mathews",
+      "centroid": [
+        2359.23,
+        1342.42
+      ]
+    },
+    {
+      "id": 801905,
+      "name": "Vieques",
+      "centroid": [
+        2606.97,
+        1911.61
+      ]
+    },
+    {
+      "id": 801948,
+      "name": "Wakulla",
+      "centroid": [
+        2179.08,
+        1559.2
+      ]
+    },
+    {
+      "id": 802319,
+      "name": "Glynn",
+      "centroid": [
+        2243.15,
+        1527.05
+      ]
+    }
+  ]
+}

@@ -32,12 +32,16 @@ const PANEL_HEIGHT := 680
 const MIN_PANEL_SIZE := Vector2(380, 420)
 const MAX_PANEL_SIZE := Vector2(960, 920)
 const MARGIN := 12
+const _MapNextListHelpers := preload("res://scripts/map/MapNextListHelpers.gd")
 
 static var instance: DebugOverlay = null
 
 var _main_container: PanelContainer
 var _content_vbox: VBoxContainer
-var _sections: Dictionary = {}           # title -> VBoxContainer
+var _sections: Dictionary = {}           # title -> content VBoxContainer (compat)
+var _section_meta: Dictionary = {}       # title -> {content, collapse_btn, section_root, kind}
+var _harness_visible: bool = false       # Dev Harness default hidden for F5 play
+var _btn_toggle_harness: Button = null
 var _status_label: Label
 var _last_refresh_time := 0.0
 
@@ -90,7 +94,8 @@ func _ready() -> void:
 	name = "DebugOverlay"
 	visible = false
 	process_mode = Node.PROCESS_MODE_ALWAYS   # still respond when game is paused
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	# IGNORE while hidden so we never steal top-bar / map clicks after precreate.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	_build_ui()
 	_apply_theme()
@@ -102,6 +107,7 @@ func _ready() -> void:
 
 	# Auto-refresh content when we become visible
 	visibility_changed.connect(_on_visibility_changed)
+	_sync_mouse_filter_for_visibility()
 
 	# Ensure initial clamp for the wider readable panel
 	call_deferred("_clamp_panel_to_screen")
@@ -109,49 +115,68 @@ func _ready() -> void:
 	resized.connect(func(): _sync_content_width())
 
 
+## Create the panel hidden (for F5 precreate). Never flash visible.
+static func precreate_hidden() -> void:
+	if instance != null and is_instance_valid(instance):
+		instance.visible = false
+		instance._sync_mouse_filter_for_visibility()
+		return
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null:
+		return
+	var root := tree.current_scene
+	if root == null:
+		return
+	var existing := root.find_child("DebugOverlay", true, false)
+	if existing:
+		instance = existing as DebugOverlay
+		if instance:
+			instance.visible = false
+			instance._sync_mouse_filter_for_visibility()
+		return
+	var overlay := DebugOverlay.new()
+	overlay._build_ui()
+	overlay._apply_theme()
+	overlay._position_default()
+	overlay.visible = false
+	overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var ui_layer := root.get_node_or_null("UILayer") as CanvasLayer
+	if ui_layer:
+		ui_layer.add_child(overlay)
+	else:
+		root.add_child(overlay)
+	instance = overlay
+	instance._sync_mouse_filter_for_visibility()
+
+
 static func toggle() -> void:
 	if instance == null:
-		# Try to find or create one in the current tree
-		var tree := Engine.get_main_loop() as SceneTree
-		if tree:
-			var root := tree.current_scene
-			if root:
-				var existing := root.find_child("DebugOverlay", true, false)
-				if existing:
-					instance = existing as DebugOverlay
-				else:
-					var overlay := DebugOverlay.new()
-					# Build immediately (before add_child/_ready) so set_meta for infra etc. are present
-					# even if visibility/refresh fires synchronously on some paths (menu->debug).
-					overlay._build_ui()
-					overlay._apply_theme()
-					overlay._position_default()
-					# Add to UILayer (CanvasLayer) if present so the debug panel is always in screen space,
-					# independent of the map camera/transform. This prevents cutoff when panning/zooming
-					# the map and allows proper dragging/scrolling without being "cut off on left and right".
-					var ui_layer := root.get_node_or_null("UILayer") as CanvasLayer
-					if ui_layer:
-						ui_layer.add_child(overlay)
-					else:
-						root.add_child(overlay)
-					instance = overlay
+		precreate_hidden()
 	if instance:
 		instance.visible = not instance.visible
+		instance._sync_mouse_filter_for_visibility()
 		if instance.visible:
 			instance.call_deferred("_refresh_all_content")
 
 
 static func show_overlay() -> void:
+	if instance == null:
+		precreate_hidden()
 	if instance:
 		instance.visible = true
+		instance._sync_mouse_filter_for_visibility()
 		instance._refresh_all_content()
-	elif Engine.get_main_loop():
-		toggle()
 
 
 static func hide_overlay() -> void:
 	if instance:
 		instance.visible = false
+		instance._sync_mouse_filter_for_visibility()
+
+
+func _sync_mouse_filter_for_visibility() -> void:
+	# Hidden debug panel must not block TopInfoBar or map input.
+	mouse_filter = Control.MOUSE_FILTER_STOP if visible else Control.MOUSE_FILTER_IGNORE
 
 
 static func is_overlay_visible() -> bool:
@@ -316,7 +341,7 @@ func _build_ui() -> void:
 	_outer_vbox.add_child(_title_bar)
 
 	var title := Label.new()
-	title.text = "DEBUG OVERLAY"
+	title.text = "MAP TOOLS · Player Map"
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_title_bar.add_child(title)
 
@@ -329,6 +354,26 @@ func _build_ui() -> void:
 	_title_bar.mouse_filter = Control.MOUSE_FILTER_STOP
 	_title_bar.gui_input.connect(_on_title_drag_input)
 
+	# Player Map vs Dev Harness split — F5 play shows map UX; harness collapsed/hidden by default.
+	_harness_visible = _MapNextListHelpers.default_harness_visible()
+	var mode_hbox := HBoxContainer.new()
+	mode_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	mode_hbox.add_theme_constant_override("separation", 6)
+	var player_lbl := Label.new()
+	player_lbl.text = "Player Map (map modes, infra, time)"
+	player_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	player_lbl.add_theme_font_size_override("font_size", 11)
+	player_lbl.modulate = Color(0.75, 0.9, 1.0)
+	mode_hbox.add_child(player_lbl)
+	_btn_toggle_harness = Button.new()
+	_btn_toggle_harness.name = "BtnToggleDevHarness"
+	_btn_toggle_harness.text = "Show Dev Harness"
+	_btn_toggle_harness.tooltip_text = "Dev Harness holds playtest/force buttons. Hidden by default so F5 play stays clean."
+	_btn_toggle_harness.custom_minimum_size = Vector2(150, 26)
+	_btn_toggle_harness.pressed.connect(_on_toggle_dev_harness_pressed)
+	mode_hbox.add_child(_btn_toggle_harness)
+	_outer_vbox.add_child(mode_hbox)
+
 	# Section expand/collapse — keep above scroll so it stays visible
 	var layout_hbox := HBoxContainer.new()
 	layout_hbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -336,16 +381,19 @@ func _build_ui() -> void:
 	collapse_all_btn.text = "Collapse All"
 	collapse_all_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	collapse_all_btn.pressed.connect(func():
-		for v in _sections.values():
-			v.visible = false
+		for title_k in _section_meta.keys():
+			_set_section_collapsed(str(title_k), true)
 	)
 	layout_hbox.add_child(collapse_all_btn)
 	var expand_all_btn := Button.new()
 	expand_all_btn.text = "Expand All"
 	expand_all_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	expand_all_btn.pressed.connect(func():
-		for v in _sections.values():
-			v.visible = true
+		for title_k in _section_meta.keys():
+			var kind := str(_section_meta[title_k].get("kind", "player_map"))
+			if kind == "dev_harness" and not _harness_visible:
+				continue
+			_set_section_collapsed(str(title_k), false)
 	)
 	layout_hbox.add_child(expand_all_btn)
 	_outer_vbox.add_child(layout_hbox)
@@ -891,7 +939,7 @@ func _build_ui() -> void:
 						var reg = sm0.force_registry
 						reg.add_naval_presence(999, "USA", 5.0, false)
 						reg.add_naval_presence(999, "GER", 2.0, false)
-					if typeof(WeatherManager) != TYPE_NIL: WeatherManager._province_weather[999] = {"visibility": 0.3, "precip_intensity": 0.7}
+					if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("debug_set_province_weather"): WeatherManager.debug_set_province_weather(999, {"visibility": 0.3, "precip_intensity": 0.7})
 					sm0._process_naval_recon(1.0)
 				print("[SUBMENU NAVAL] SEARCH vs S&D + recon assigned. Check logs for [NAVAL ORDERS CONVOY vs S&D] etc.")
 			1:
@@ -962,7 +1010,7 @@ func _build_ui() -> void:
 			reg.add_naval_presence(999, "GER", 2.5, false)
 		var wm := get_node_or_null("/root/WeatherManager")
 		if wm and wm.has_method("simulate_day"):
-			wm._province_weather[999] = {"visibility": 0.25, "precip_intensity": 0.85, "wind": 0.6}
+			wm.debug_set_province_weather(999, {"visibility": 0.25, "precip_intensity": 0.85, "wind": 0.6}) if wm.has_method("debug_set_province_weather") else null
 		if sm and sm.has_method("_process_naval_recon"):
 			sm._process_naval_recon(1.0)
 		print("[QUICK NAVAL] orders+stormy spot forced (subs/choke/closer). See [NAVAL SPOTTING SIM] + resolver.")
@@ -1277,6 +1325,145 @@ func _build_ui() -> void:
 	)
 	harness_section.add_child(mesh_toggle_btn)
 
+	var signal_graph_btn := Button.new()
+	signal_graph_btn.text = "📡 Signal Graph Visualizer (F11) — MapManager / day packages / panel routes"
+	signal_graph_btn.pressed.connect(func():
+		var script = load("res://scripts/debug/SignalGraphHarness.gd")
+		if script and script.has_method("toggle"):
+			script.toggle()
+		elif script:
+			var inst = script.new()
+			get_tree().root.add_child(inst)
+			if inst.has_method("toggle_window"):
+				inst.toggle_window()
+		toast_map_debug("Signal Graph toggled (F11). Trace MapManager + overlay + OrderCommandPanel connections.")
+	)
+	harness_section.add_child(signal_graph_btn)
+
+	var occupation_overlay_btn := Button.new()
+	occupation_overlay_btn.text = "⚑ Toggle Occupation Overlay (O) — resistance tint + garrison icons (#24 visual)"
+	occupation_overlay_btn.pressed.connect(func():
+		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+		if mr == null:
+			mr = get_node_or_null("/root/WorldMap")
+		if mr and mr.has_method("toggle_occupation_overlay"):
+			var on: bool = mr.call("toggle_occupation_overlay")
+			var st: Dictionary = mr.call("get_occupation_overlay_stats") if mr.has_method("get_occupation_overlay_stats") else {}
+			toast_map_debug("Occupation overlay %s · draws=%s icons=%s" % ["ON" if on else "OFF", st.get("draw_n", 0), st.get("icon_n", 0)])
+		else:
+			toast_map_debug("Occupation overlay API missing on MapRenderer")
+	)
+	harness_section.add_child(occupation_overlay_btn)
+
+	var map_perf_btn := Button.new()
+	map_perf_btn.text = "⏱ Map Perf — MapRenderer profile dump (EOA_MAP_PERF / hotspots)"
+	map_perf_btn.pressed.connect(func():
+		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+		if mr == null:
+			mr = get_node_or_null("/root/WorldMap")
+		if mr and mr.has_method("dump_perf_profile"):
+			var rep: Dictionary = mr.call("dump_perf_profile")
+			toast_map_debug(str(rep.get("summary", "perf dump")))
+			print("[F10 MAP PERF] ", rep)
+		else:
+			toast_map_debug("MapRenderer.dump_perf_profile missing")
+	)
+	harness_section.add_child(map_perf_btn)
+
+	var map_perf_toggle_btn := Button.new()
+	map_perf_toggle_btn.text = "⏱ Toggle continuous MapRenderer perf sampling"
+	map_perf_toggle_btn.pressed.connect(func():
+		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+		if mr == null:
+			mr = get_node_or_null("/root/WorldMap")
+		if mr and mr.has_method("set_perf_profile_enabled"):
+			var cur := bool(mr.get("enable_perf_profile"))
+			mr.call("set_perf_profile_enabled", not cur)
+			toast_map_debug("Map perf sampling %s" % ("ON" if not cur else "OFF"))
+		else:
+			toast_map_debug("perf toggle missing")
+	)
+	harness_section.add_child(map_perf_toggle_btn)
+
+	var p23_title := Label.new()
+	p23_title.text = "— Phase 2/3 map gap-closure —"
+	p23_title.add_theme_color_override("font_color", Color(0.7, 0.85, 1.0))
+	harness_section.add_child(p23_title)
+
+	var flow_btn := Button.new()
+	flow_btn.text = "⬆ Toggle Supply/Sealane Flow (U)"
+	flow_btn.pressed.connect(func():
+		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+		if mr and mr.has_method("toggle_strategic_flow_overlay"):
+			toast_map_debug("Supply flow %s" % ("ON" if mr.call("toggle_strategic_flow_overlay") else "OFF"))
+	)
+	harness_section.add_child(flow_btn)
+
+	var battle_btn := Button.new()
+	battle_btn.text = "⚔ Toggle Battle Indicators (J)"
+	battle_btn.pressed.connect(func():
+		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+		if mr and mr.has_method("toggle_battle_indicator_overlay"):
+			toast_map_debug("Battle indicators %s" % ("ON" if mr.call("toggle_battle_indicator_overlay") else "OFF"))
+	)
+	harness_section.add_child(battle_btn)
+
+	var domain_btn := Button.new()
+	domain_btn.text = "🚢✈ Toggle Naval/Air Domain Ops (K)"
+	domain_btn.pressed.connect(func():
+		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+		if mr and mr.has_method("toggle_domain_ops_overlay"):
+			toast_map_debug("Domain ops %s" % ("ON" if mr.call("toggle_domain_ops_overlay") else "OFF"))
+	)
+	harness_section.add_child(domain_btn)
+
+	var leader_btn := Button.new()
+	leader_btn.text = "★ Toggle Leader Station Overlay"
+	leader_btn.pressed.connect(func():
+		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+		if mr and mr.has_method("toggle_leader_station_overlay"):
+			toast_map_debug("Leader stations %s" % ("ON" if mr.call("toggle_leader_station_overlay") else "OFF"))
+	)
+	harness_section.add_child(leader_btn)
+
+	var build_btn := Button.new()
+	build_btn.text = "🏗 Toggle Construction Progress Rings"
+	build_btn.pressed.connect(func():
+		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+		if mr and mr.has_method("toggle_construction_progress_overlay"):
+			toast_map_debug("Construction %s" % ("ON" if mr.call("toggle_construction_progress_overlay") else "OFF"))
+	)
+	harness_section.add_child(build_btn)
+
+	var occ_mode_btn := Button.new()
+	occ_mode_btn.text = "⚑ Occupation mapmodes: occupation→resistance→compliance"
+	occ_mode_btn.pressed.connect(func():
+		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+		if mr == null:
+			return
+		var modes = ["occupation", "resistance", "compliance"]
+		var cur = str(mr.get("current_map_mode") if mr.get("current_map_mode") != null else "occupation")
+		var idx2 = modes.find(cur)
+		var nxt = modes[(idx2 + 1) % modes.size()] if idx2 >= 0 else "resistance"
+		if mr.has_method("set_map_mode"):
+			mr.call("set_map_mode", nxt)
+		toast_map_debug("Map mode → %s" % nxt)
+	)
+	harness_section.add_child(occ_mode_btn)
+
+	var p23_stats_btn := Button.new()
+	p23_stats_btn.text = "📊 Dump Phase 2/3 overlay stats + LOD targets"
+	p23_stats_btn.pressed.connect(func():
+		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+		if mr and mr.has_method("get_phase23_overlay_stats"):
+			var st: Dictionary = mr.call("get_phase23_overlay_stats")
+			print("[F10 P23 OVERLAY STATS] ", st)
+			toast_map_debug("P23 stats dumped to log · target_ms=%s" % str(st.get("target_frame_ms", "?")))
+	)
+	harness_section.add_child(p23_stats_btn)
+
+
+
 	var era_infra_1918_btn := Button.new()
 	era_infra_1918_btn.text = "🛤️ Preview Era Infra: 1918 sparse (unpaved roads, few rails)"
 	era_infra_1918_btn.pressed.connect(func(): _debug_preview_era_infra(1918))
@@ -1329,7 +1516,7 @@ func _build_ui() -> void:
 		# Force storm/low vis for test
 		var wm := get_node_or_null("/root/WeatherManager")
 		if wm and wm.has_method("simulate_day"):
-			wm._province_weather[999] = {"visibility": 0.25, "precip_intensity": 0.85, "wind": 0.6}  # storm
+			wm.debug_set_province_weather(999, {"visibility": 0.25, "precip_intensity": 0.85, "wind": 0.6}) if wm.has_method("debug_set_province_weather") else null  # storm
 		sm._process_naval_recon(1.0)
 		toast_map_debug("Forced naval recon in stormy sea 999 (USA surface vs GER sub mix). Check logs for spot chance (group+choke+vis+sub mods), possible combat trigger with range_mod.")
 	)
@@ -1356,7 +1543,7 @@ func _build_ui() -> void:
 				reg.add_naval_presence(999, "USA", 5.0, false)
 				reg.add_naval_presence(999, "GER", 2.0, false)
 			if typeof(WeatherManager) != TYPE_NIL:
-				WeatherManager._province_weather[999] = {"visibility": 0.3, "precip_intensity": 0.7}
+				if WeatherManager.has_method("debug_set_province_weather"): WeatherManager.debug_set_province_weather(999, {"visibility": 0.3, "precip_intensity": 0.7})
 			sm._process_naval_recon(1.0)
 		toast_map_debug("Orders assigned (SEARCH vs S&D). Recon forced w/ storm. Spot chance/engage range/closer affected by order + vis + class + group + choke. Check logs.")
 	)
@@ -2301,6 +2488,12 @@ func _build_ui() -> void:
 	space_btn.pressed.connect(_open_space_designer)
 	harness_section.add_child(space_btn)
 
+	# Full multi-domain designer duties (land/naval/air/space)
+	var domain_designer_btn := Button.new()
+	domain_designer_btn.text = "Open Domain Designer (land/naval/air/space)"
+	domain_designer_btn.pressed.connect(_open_domain_designer)
+	harness_section.add_child(domain_designer_btn)
+
 	# Simple Mech Designer stub (from F10 or unlock): popup choice diesel/steam/steampunk alt for armor/mech. Persist choice. Wire note to div templates.
 	var mech_designer_btn := Button.new()
 	mech_designer_btn.text = "🤖 Force Mech Designer Unlock + Open Variant Choice (diesel/steam/steampunk stub popup)"
@@ -3140,16 +3333,64 @@ func _build_ui() -> void:
 
 	# Footer hint
 	var hint := Label.new()
-	hint.text = "This panel is only available in debug builds."
+	hint.text = "Player Map open by default · Dev Harness collapsed (debug builds)."
 	hint.modulate = Color(0.6, 0.6, 0.7)
 	_content_vbox.add_child(hint)
+
+	# Apply Player Map / Dev Harness defaults after all sections exist.
+	_apply_player_harness_defaults()
+
+
+func _on_toggle_dev_harness_pressed() -> void:
+	_harness_visible = not _harness_visible
+	_apply_player_harness_defaults()
+	if _btn_toggle_harness:
+		_btn_toggle_harness.text = "Hide Dev Harness" if _harness_visible else "Show Dev Harness"
+	toast_map_debug("Dev Harness %s" % ("visible" if _harness_visible else "hidden"))
+
+
+func _set_section_collapsed(title: String, collapsed: bool) -> void:
+	if not _section_meta.has(title):
+		return
+	var meta: Dictionary = _section_meta[title]
+	var content: Control = meta.get("content") as Control
+	var btn: Button = meta.get("collapse_btn") as Button
+	if content:
+		content.visible = not collapsed
+	if btn:
+		btn.text = "[+]" if collapsed else "[-]"
+	meta["collapsed"] = collapsed
+
+
+func _apply_player_harness_defaults() -> void:
+	"""Player Map sections expanded; Dev Harness section roots hidden unless toggled on."""
+	for title_k in _section_meta.keys():
+		var title := str(title_k)
+		var meta: Dictionary = _section_meta[title]
+		var kind := str(meta.get("kind", "player_map"))
+		var section_root: Control = meta.get("section_root") as Control
+		if kind == "dev_harness":
+			if section_root:
+				section_root.visible = _harness_visible
+			# When shown, keep content collapsed until user expands (less dump).
+			_set_section_collapsed(title, true)
+		else:
+			if section_root:
+				section_root.visible = true
+			_set_section_collapsed(title, false)
+	if _btn_toggle_harness:
+		_btn_toggle_harness.text = "Hide Dev Harness" if _harness_visible else "Show Dev Harness"
 
 
 func _ensure_section(title: String) -> VBoxContainer:
 	if _sections.has(title):
 		return _sections[title]
 
+	var kind := _MapNextListHelpers.section_kind(title)
+	var start_collapsed := _MapNextListHelpers.section_start_collapsed(title)
+
 	var section_vbox := VBoxContainer.new()
+	section_vbox.name = "Section_%s" % title.replace(" ", "_").substr(0, 40)
 	section_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	section_vbox.add_theme_constant_override("separation", 2)
 	_content_vbox.add_child(section_vbox)
@@ -3159,14 +3400,18 @@ func _ensure_section(title: String) -> VBoxContainer:
 	section_vbox.add_child(header_hbox)
 
 	var header := Label.new()
-	header.text = title
+	var kind_tag := " · DEV" if kind == "dev_harness" else ""
+	header.text = title + kind_tag
 	header.add_theme_font_size_override("font_size", 15)
-	header.add_theme_color_override("font_color", Color(0.9, 0.95, 1.0))
+	header.add_theme_color_override(
+		"font_color",
+		Color(0.95, 0.75, 0.55) if kind == "dev_harness" else Color(0.9, 0.95, 1.0)
+	)
 	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header_hbox.add_child(header)
 
 	var collapse_btn := Button.new()
-	collapse_btn.text = "[-]"
+	collapse_btn.text = "[+]" if start_collapsed else "[-]"
 	collapse_btn.custom_minimum_size = Vector2(32, 22)
 	collapse_btn.add_theme_font_size_override("font_size", 10)
 	header_hbox.add_child(collapse_btn)
@@ -3174,16 +3419,26 @@ func _ensure_section(title: String) -> VBoxContainer:
 	var content_vbox := VBoxContainer.new()
 	content_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	content_vbox.add_theme_constant_override("separation", 4)
+	content_vbox.visible = not start_collapsed
 	section_vbox.add_child(content_vbox)
 
-	var collapsed := false
+	# Dev harness sections hidden at root until player toggles "Show Dev Harness".
+	if kind == "dev_harness" and not _harness_visible:
+		section_vbox.visible = false
+
 	collapse_btn.pressed.connect(func():
-		collapsed = not collapsed
-		content_vbox.visible = not collapsed
-		collapse_btn.text = "[+]" if collapsed else "[-]"
+		var now_collapsed := content_vbox.visible
+		_set_section_collapsed(title, now_collapsed)
 	)
 
 	_sections[title] = content_vbox
+	_section_meta[title] = {
+		"content": content_vbox,
+		"collapse_btn": collapse_btn,
+		"section_root": section_vbox,
+		"kind": kind,
+		"collapsed": start_collapsed,
+	}
 	return content_vbox
 
 
@@ -3325,6 +3580,7 @@ func _on_title_drag_input(event: InputEvent) -> void:
 
 
 func _on_visibility_changed() -> void:
+	_sync_mouse_filter_for_visibility()
 	if visible:
 		call_deferred("_sync_content_width")
 		call_deferred("_refresh_all_content")
@@ -3982,21 +4238,40 @@ func _on_highlight_naval_pressed() -> void:
 
 
 func _on_highlight_chokepoints_pressed() -> void:
-	var plan := _load_phase1_plan_dict()
-	var ranked: Array = plan.get("high_priority_candidates", [])
-	var choke: Array = []
-	for entry in ranked:
-		if entry is Dictionary and bool(entry.get("is_chokepoint", false)):
-			choke.append(entry)
-	print("Highlighting chokepoints and straits...")
-	print("  Chokepoint candidates in plan: %d" % choke.size())
-	for i in mini(choke.size(), 10):
-		var e: Dictionary = choke[i]
-		print(
-			"    pid %s  priority=%.2f  naval=%.2f"
-			% [e.get("province_id", "?"), float(e.get("priority_score", 0.0)), float(e.get("naval_importance", 0.0))]
-		)
-	_toast("Chokepoint highlight: see console (overlay tint TBD)")
+	## Live MapManager naval_chokepoints.json IDs → naval mapmode tint + overlay markers.
+	var live: Array = []
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_naval_chokepoint_provinces"):
+		live = MapManager.get_naval_chokepoint_provinces()
+	print("Highlighting chokepoints and straits (live MapManager)...")
+	print("  Data-driven chokepoint provinces: %d" % live.size())
+	for i in mini(live.size(), 16):
+		var pid := int(live[i])
+		var pname := str(pid)
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+			var p: Province = MapManager.get_province(pid)
+			if p != null:
+				pname = "%s (%d)" % [p.name, pid]
+		var has_c := false
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint"):
+			has_c = MapManager.has_strategic_chokepoint(pid)
+		print("    ⚓ %s  has_strategic_chokepoint=%s" % [pname, has_c])
+	# Fall back to phase1 plan candidates for legacy debug if live set empty.
+	if live.is_empty():
+		var plan := _load_phase1_plan_dict()
+		var ranked: Array = plan.get("high_priority_candidates", [])
+		var choke: Array = []
+		for entry in ranked:
+			if entry is Dictionary and bool(entry.get("is_chokepoint", false)):
+				choke.append(entry)
+		print("  (fallback) plan candidates: %d" % choke.size())
+	var map_r := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+	if map_r == null:
+		map_r = get_node_or_null("/root/MapRenderer")
+	if map_r and map_r.has_method("set_map_mode"):
+		map_r.set_map_mode("naval")
+		_toast("Naval chokepoints map mode ON (%d straits)" % live.size())
+	else:
+		_toast("Chokepoints: %d IDs (map renderer missing set_map_mode)" % live.size())
 
 
 func _on_show_subdivision_pressed() -> void:
@@ -4987,6 +5262,24 @@ func _open_space_designer() -> void:
 	get_tree().root.add_child(popup)
 	popup.set_player_tag("USA")
 	toast_map_debug("Space Designer opened. Choose base, add modules (propulsion, sensors, life support), finalize to unlock custom design for production.")
+
+
+func _open_domain_designer() -> void:
+	# Use load() not preload() so parse-time dependency on DomainDesignPopup cannot break DebugOverlay.
+	var scr = load("res://scripts/ui/DomainDesignPopup.gd")
+	if scr == null:
+		toast_map_debug("DomainDesignPopup failed to load")
+		return
+	var popup = scr.new()
+	get_tree().root.add_child(popup)
+	var tag := _debug_player_country_tag()
+	if tag.is_empty():
+		tag = "USA"
+	if popup.has_method("set_player_tag"):
+		popup.set_player_tag(tag)
+	if popup.has_method("popup_centered"):
+		popup.popup_centered()
+	toast_map_debug("Domain Designer opened for %s - catalog/compose/freeze/register all domains." % tag)
 
 func show_battle_aar(result: Dictionary = {}) -> void:
 	# Enhanced specific + accessible AAR panel: unit combat logs (from Formation.combat_log via BM), leader impacts, full modifiers w/ % , space/air effects, tips.

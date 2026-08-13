@@ -1,0 +1,351 @@
+{
+  "meta": {
+    "source": "polish_world_accurate_board.py",
+    "count": 34,
+    "mapped_from_world_full": 20,
+    "notes": "Sea/strait + Panama only; centroid map rejects inland false positives."
+  },
+  "chokepoint_province_ids": [
+    950001,
+    950006,
+    950007,
+    950008,
+    950012,
+    950019,
+    950020,
+    950021,
+    950022,
+    950023,
+    950024,
+    950025,
+    950058,
+    950080,
+    950081,
+    950093,
+    950108,
+    950114,
+    950135,
+    950138,
+    950188,
+    950236,
+    950241,
+    950246,
+    950260,
+    950269,
+    950274,
+    950276,
+    950280,
+    950287,
+    950294,
+    950295,
+    950300,
+    950301
+  ],
+  "remap_details": [
+    {
+      "to": 950001,
+      "name": "English Channel Zone",
+      "via": "curated_name"
+    },
+    {
+      "to": 950006,
+      "name": "Black Sea Zone",
+      "via": "curated_name"
+    },
+    {
+      "to": 950007,
+      "name": "Red Sea Zone",
+      "via": "curated_name"
+    },
+    {
+      "to": 950008,
+      "name": "Persian Gulf Zone",
+      "via": "curated_name"
+    },
+    {
+      "to": 950019,
+      "name": "Gibraltar Strait Zone",
+      "via": "curated_name"
+    },
+    {
+      "to": 950020,
+      "name": "Bosporus Approaches",
+      "via": "curated_name"
+    },
+    {
+      "to": 950021,
+      "name": "Suez Canal Zone",
+      "via": "curated_name"
+    },
+    {
+      "to": 950022,
+      "name": "Hormuz Approaches",
+      "via": "curated_name"
+    },
+    {
+      "to": 950023,
+      "name": "Malacca Strait Zone",
+      "via": "curated_name"
+    },
+    {
+      "to": 950024,
+      "name": "Tsushima Strait Zone",
+      "via": "curated_name"
+    },
+    {
+      "to": 950025,
+      "name": "Danish Straits Zone",
+      "via": "curated_name"
+    },
+    {
+      "to": 950138,
+      "name": "Cape Basin Approaches",
+      "via": "curated_name"
+    },
+    {
+      "to": 950188,
+      "name": "Bering Approaches",
+      "via": "curated_name"
+    },
+    {
+      "to": 950196,
+      "name": "Bering Approaches North",
+      "via": "curated_name"
+    },
+    {
+      "to": 950197,
+      "name": "Bering Approaches South",
+      "via": "curated_name"
+    },
+    {
+      "to": 950203,
+      "name": "Bering Approaches East",
+      "via": "curated_name"
+    },
+    {
+      "to": 950206,
+      "name": "Bering Approaches West",
+      "via": "curated_name"
+    },
+    {
+      "to": 950211,
+      "name": "Bering Approaches Central",
+      "via": "curated_name"
+    },
+    {
+      "to": 950214,
+      "name": "Bering Approaches Outer",
+      "via": "curated_name"
+    },
+    {
+      "to": 950251,
+      "name": "Bering Approaches Inner",
+      "via": "curated_name"
+    },
+    {
+      "to": 950254,
+      "name": "Bering Approaches Deep",
+      "via": "curated_name"
+    },
+    {
+      "to": 950259,
+      "name": "Bering Approaches Rise",
+      "via": "curated_name"
+    },
+    {
+      "to": 950262,
+      "name": "Bering Approaches Trough",
+      "via": "curated_name"
+    },
+    {
+      "to": 950268,
+      "name": "Bering Approaches Abyssal",
+      "via": "curated_name"
+    },
+    {
+      "to": 950269,
+      "name": "Bering Approaches Approaches",
+      "via": "curated_name"
+    },
+    {
+      "to": 950274,
+      "name": "Mozambique Channel Edge",
+      "via": "curated_name"
+    },
+    {
+      "to": 950280,
+      "name": "Gulf of Aden Approaches",
+      "via": "curated_name"
+    },
+    {
+      "to": 950287,
+      "name": "Mozambique Channel Edge North",
+      "via": "curated_name"
+    },
+    {
+      "to": 950294,
+      "name": "Mozambique Channel Edge South",
+      "via": "curated_name"
+    },
+    {
+      "to": 950295,
+      "name": "Mozambique Channel Edge East",
+      "via": "curated_name"
+    },
+    {
+      "to": 950300,
+      "name": "Mozambique Channel Edge West",
+      "via": "curated_name"
+    },
+    {
+      "to": 950301,
+      "name": "Mozambique Channel Edge Central",
+      "via": "curated_name"
+    },
+    {
+      "from": 9131,
+      "to": 950135,
+      "name": "Sargasso Sea Waters",
+      "via": "wf_centroid",
+      "dist2": 23346.3
+    },
+    {
+      "from": 20002,
+      "to": 950080,
+      "name": "South Atlantic Waters",
+      "via": "wf_centroid",
+      "dist2": 2054.3
+    },
+    {
+      "from": 20055,
+      "to": 950058,
+      "name": "WestPac",
+      "via": "wf_centroid",
+      "dist2": 758.2
+    },
+    {
+      "from": 20229,
+      "to": 950081,
+      "name": "Tropical Atlantic Waters",
+      "via": "wf_centroid",
+      "dist2": 2646.6
+    },
+    {
+      "from": 20231,
+      "to": 950074,
+      "name": "Tropical Atlantic Waters",
+      "via": "wf_centroid",
+      "dist2": 1990.0
+    },
+    {
+      "from": 20234,
+      "to": 950073,
+      "name": "South Atlantic Waters",
+      "via": "wf_centroid",
+      "dist2": 1001.4
+    },
+    {
+      "from": 20456,
+      "to": 950012,
+      "name": "East China Sea Zone",
+      "via": "wf_centroid",
+      "dist2": 22974.1
+    },
+    {
+      "from": 20457,
+      "to": 950108,
+      "name": "Mid Indian Waters",
+      "via": "wf_centroid",
+      "dist2": 5219.7
+    },
+    {
+      "from": 20458,
+      "to": 950113,
+      "name": "Mid Indian Waters",
+      "via": "wf_centroid",
+      "dist2": 6201.1
+    },
+    {
+      "from": 20459,
+      "to": 950103,
+      "name": "Mid Indian Waters",
+      "via": "wf_centroid",
+      "dist2": 3881.2
+    },
+    {
+      "from": 20460,
+      "to": 950118,
+      "name": "Mid Indian Waters",
+      "via": "wf_centroid",
+      "dist2": 6339.8
+    },
+    {
+      "from": 40080,
+      "to": 950236,
+      "name": "Philippine Sea Edge North",
+      "via": "wf_centroid",
+      "dist2": 213955.6
+    },
+    {
+      "from": 50081,
+      "to": 950093,
+      "name": "North Atlantic Waters",
+      "via": "wf_centroid",
+      "dist2": 2895.4
+    },
+    {
+      "from": 50208,
+      "to": 950046,
+      "name": "WestPac",
+      "via": "wf_centroid",
+      "dist2": 7581.8
+    },
+    {
+      "from": 50209,
+      "to": 950241,
+      "name": "South Pacific Basin Abyssal",
+      "via": "wf_centroid",
+      "dist2": 10181.7
+    },
+    {
+      "from": 50276,
+      "to": 950260,
+      "name": "Tasman Abyssal",
+      "via": "wf_centroid",
+      "dist2": 20360.6
+    },
+    {
+      "from": 50292,
+      "to": 950276,
+      "name": "Bay of Bengal Approaches",
+      "via": "wf_centroid",
+      "dist2": 14510.0
+    },
+    {
+      "from": 50641,
+      "to": 950047,
+      "name": "WestPac",
+      "via": "wf_centroid",
+      "dist2": 11185.2
+    },
+    {
+      "from": 51020,
+      "to": 950246,
+      "name": "Tasman Sea Edge Trough",
+      "via": "wf_centroid",
+      "dist2": 177661.2
+    },
+    {
+      "from": 51023,
+      "to": 950114,
+      "name": "South Indian Waters",
+      "via": "wf_centroid",
+      "dist2": 581.6
+    }
+  ],
+  "sources": [
+    "world_full naval_chokepoints",
+    "domain=strait",
+    "curated names"
+  ]
+}

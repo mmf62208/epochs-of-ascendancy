@@ -4,6 +4,7 @@ class_name MapRegionHighlightLayer
 extends Node2D
 
 const MapZoomLODScript = preload("res://scripts/map/MapZoomLOD.gd")
+const ProvincePolygonUtil = preload("res://scripts/map/ProvincePolygonUtil.gd")
 
 const FILL_ALPHA: float = 0.28
 const BORDER_ALPHA: float = 0.72
@@ -29,10 +30,17 @@ func rebuild_from_geometry(geometry: Dictionary, world_canvas: bool) -> void:
 	for pid_var in geometry.keys():
 		var pid := int(pid_var)
 		var geo: Dictionary = geometry[pid_var]
-		var raw: PackedVector2Array = geo.get("points", PackedVector2Array())
+		var raw: PackedVector2Array = ProvincePolygonUtil.from_variant_points(geo.get("points", []))
 		if raw.size() < 3:
 			continue
-		_province_points[pid] = MapCanvasConfig.transform_province_points(raw, world_canvas, true)
+		var _wn := false
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("is_geometry_world_native"):
+			_wn = MapManager.is_geometry_world_native()
+		var transformed := MapCanvasConfig.transform_province_points(raw, world_canvas, true, _wn)
+		# Only store drawable outlines — hover region fills must never triangulate-fail.
+		var drawable := ProvincePolygonUtil.make_drawable(transformed)
+		if drawable.size() >= 3:
+			_province_points[pid] = drawable
 	_clear_overlay_cache()
 	_hover_region_id = -1
 
@@ -121,7 +129,7 @@ func _build_region_overlay(region_id: int) -> void:
 			continue
 
 		var fill := Polygon2D.new()
-		fill.polygon = pts
+		ProvincePolygonUtil.assign_polygon2d(fill, pts)
 		fill.color = fill_col
 		fill.antialiased = true
 		fill.z_index = 0

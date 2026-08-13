@@ -1,0 +1,51 @@
+{
+  "data_dir": "data/provinces_pilot_europe_nuts3",
+  "ok_hard": true,
+  "ok_ne": true,
+  "errors": [],
+  "warnings": [],
+  "total_base": 1514,
+  "total_geometry": 1514,
+  "matched": 1514,
+  "orphan_base_only_count": 0,
+  "orphan_geo_only_count": 0,
+  "orphan_base_sample": [],
+  "orphan_geo_sample": [],
+  "land": 1514,
+  "sea": 0,
+  "empty_or_placeholder_names": 0,
+  "densify_style_names": 0,
+  "region_assigned": 1514,
+  "region_assigned_pct": 100.0,
+  "geometry_no_polygon": 0,
+  "ne_land_path": "/home/mikef/Projects/epochs-of-ascendancy/tools/map_generation/data/cache/map_tiles/https_raw.githubusercontent.com_nvkelso_natural-earth-vector_master_geojson_ne_10m_land.geojson",
+  "ne_land_centroids_tested": 1514,
+  "ne_land_centroids_hit": 1511,
+  "ne_land_hit_rate": 0.998,
+  "ne_land_miss_samples": [
+    {
+      "id": 710597,
+      "name": "\u0398\u03ac\u03c3\u03bf\u03c2, \u039a\u03b1\u03b2\u03ac\u03bb\u03b1",
+      "centroid": [
+        4649.6,
+        1238.91
+      ]
+    },
+    {
+      "id": 710613,
+      "name": "\u039c\u03b1\u03b3\u03bd\u03b7\u03c3\u03af\u03b1, \u03a3\u03c0\u03bf\u03c1\u03ac\u03b4\u03b5\u03c2",
+      "centroid": [
+        4615.96,
+        1288.82
+      ]
+    },
+    {
+      "id": 710680,
+      "name": "Melilla",
+      "centroid": [
+        4028.42,
+        1405.5
+      ]
+    }
+  ]
+}

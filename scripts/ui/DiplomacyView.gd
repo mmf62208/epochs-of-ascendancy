@@ -98,6 +98,14 @@ func _ready() -> void:
 
 	refresh_btn.pressed.connect(_refresh_view)
 	trade_btn.pressed.connect(_open_trade_market_filtered)
+	# Space layer board — peer path next to Trade (orbital compact ledger)
+	if button_hbox and button_hbox.get_node_or_null("SpaceBoardButton") == null:
+		var space_btn: Button = Button.new()
+		space_btn.name = "SpaceBoardButton"
+		space_btn.text = "Space Board"
+		space_btn.pressed.connect(_open_space_layer_board)
+		button_hbox.add_child(space_btn)
+		button_hbox.move_child(space_btn, trade_btn.get_index() + 1)
 	close_btn.pressed.connect(_on_close_pressed)
 
 	# Default selection
@@ -105,7 +113,7 @@ func _ready() -> void:
 	_populate_country_selector()
 	_refresh_view()
 
-	popup_centered(Vector2(1000, 620))
+	popup_centered(Vector2(1040, 720))
 
 	# Subtle open animation
 	margin.modulate.a = 0.0
@@ -155,25 +163,53 @@ func _build_dynamic_ui() -> void:
 	_add_bilateral_filter_button("Sent by you", "SENT")
 	_add_bilateral_filter_button("Received by you", "RECEIVED")
 
-	# Offers list
+	# Deals + overview scroll so multiple bilateral deals and long treaty text stay readable.
+	var lower_scroll := ScrollContainer.new()
+	lower_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	lower_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lower_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	lower_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	lower_scroll.clip_contents = true
+	lower_scroll.custom_minimum_size = Vector2(0, 360)
+	main_vbox.add_child(lower_scroll)
+
+	var lower_vbox := VBoxContainer.new()
+	lower_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lower_vbox.add_theme_constant_override("separation", 10)
+	lower_scroll.add_child(lower_vbox)
+
+	# Offers list (scrollable; taller so multiple deals fit cleanly)
 	offers_scroll = ScrollContainer.new()
 	offers_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	offers_scroll.custom_minimum_size.y = 220
-	main_vbox.add_child(offers_scroll)
+	offers_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	offers_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	offers_scroll.custom_minimum_size.y = 200
+	offers_scroll.clip_contents = true
+	lower_vbox.add_child(offers_scroll)
 
 	offers_vbox = VBoxContainer.new()
 	offers_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	offers_vbox.add_theme_constant_override("separation", 4)
 	offers_scroll.add_child(offers_vbox)
 
-	# === Relations Overview (improved lightweight summary) ===
+	# === Relations Overview (larger flat box for readable wrap) ===
 	var relations_panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(relations_panel)
-	main_vbox.add_child(relations_panel)
+	RetrowaveTheme.style_detail_panel_flat(relations_panel)
+	relations_panel.custom_minimum_size = Vector2(0, 110)
+	relations_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lower_vbox.add_child(relations_panel)
+
+	var rel_margin := MarginContainer.new()
+	rel_margin.add_theme_constant_override("margin_left", 12)
+	rel_margin.add_theme_constant_override("margin_right", 12)
+	rel_margin.add_theme_constant_override("margin_top", 10)
+	rel_margin.add_theme_constant_override("margin_bottom", 10)
+	relations_panel.add_child(rel_margin)
 
 	var rel_vbox := VBoxContainer.new()
-	rel_vbox.add_theme_constant_override("separation", 4)
-	relations_panel.add_child(rel_vbox)
+	rel_vbox.add_theme_constant_override("separation", 6)
+	rel_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rel_margin.add_child(rel_vbox)
 
 	var rel_header := Label.new()
 	rel_header.text = "Relations Overview"
@@ -189,31 +225,42 @@ func _build_dynamic_ui() -> void:
 	var rel_note := Label.new()
 	rel_note.text = "Future: Opinion, prestige, diplomatic events, and national focus effects will integrate here via Relations system."
 	rel_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rel_note.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	RetrowaveTheme.style_body_label(rel_note)
 	rel_note.add_theme_color_override("font_color", Color(0.65, 0.7, 0.8))
 	rel_vbox.add_child(rel_note)
 
-	# 1918 Peace / Armistice Treaty Status (Phase 2+ surface in Diplomacy per DESIGN_1918_ARMISTICE... ; live leverage/terms/grievance for 50+ turn playtest feedback)
+	# 1918 Peace / Armistice Treaty Status — larger wrap box
 	var treaty_panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(treaty_panel)
-	main_vbox.add_child(treaty_panel)
+	RetrowaveTheme.style_detail_panel_flat(treaty_panel)
+	treaty_panel.custom_minimum_size = Vector2(0, 130)
+	treaty_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lower_vbox.add_child(treaty_panel)
+	var treaty_margin := MarginContainer.new()
+	treaty_margin.add_theme_constant_override("margin_left", 12)
+	treaty_margin.add_theme_constant_override("margin_right", 12)
+	treaty_margin.add_theme_constant_override("margin_top", 10)
+	treaty_margin.add_theme_constant_override("margin_bottom", 10)
+	treaty_panel.add_child(treaty_margin)
 	var treaty_vbox := VBoxContainer.new()
-	treaty_vbox.add_theme_constant_override("separation", 3)
-	treaty_panel.add_child(treaty_vbox)
+	treaty_vbox.add_theme_constant_override("separation", 4)
+	treaty_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	treaty_margin.add_child(treaty_vbox)
 	var treaty_header := Label.new()
 	treaty_header.text = "1918 Armistice Treaty Status + Ripples"
 	RetrowaveTheme.style_column_header(treaty_header)
 	treaty_vbox.add_child(treaty_header)
 	var treaty_label := Label.new()
 	treaty_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	treaty_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
 		var ps: Dictionary = GameData.get_peace_state()
 		var ptag := _player_country
-		var lev := GameData.get_inclusion_leverage(ptag) if GameData.has_method("get_inclusion_leverage") else 0
-		var gr := int(ps.get("grievance", {}).get(ptag, 0))
-		var completed := ps.get("conference_1918_completed", false)
-		var terms: Dictionary = ps.get("term_choices", {})
-		var seat := str(terms.get("central_powers_seating", "pre-conference" if not completed else "resolved"))
+		var lev: int = int(GameData.get_inclusion_leverage(ptag)) if GameData.has_method("get_inclusion_leverage") else 0
+		var gr: int = int((ps.get("grievance", {}) as Dictionary).get(ptag, 0)) if ps.get("grievance") is Dictionary else 0
+		var completed: bool = bool(ps.get("conference_1918_completed", false))
+		var terms: Dictionary = ps.get("term_choices", {}) as Dictionary if ps.get("term_choices") is Dictionary else {}
+		var seat: String = str(terms.get("central_powers_seating", "pre-conference" if not completed else "resolved"))
 		if completed:
 			treaty_label.text = "Resolved. Lev used:%d Grievance:%d Seating:%s | %d terms recorded. Follow-ons (1919-1925) via TimeManager/year advance. Tech gates + spirits active. Use Agent diplomacy pre-resolve in replays for alt-history." % [lev, gr, seat, terms.size()]
 		else:
@@ -223,10 +270,11 @@ func _build_dynamic_ui() -> void:
 	RetrowaveTheme.style_body_label(treaty_label)
 	treaty_vbox.add_child(treaty_label)
 
-	# === New: Agent Networks Status + Diplomatic Actions (flesh out beyond trade/1918 stub; persistent effects + detection surfaced)
+	# === Agent Networks Status + Diplomatic Actions
 	var agent_panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(agent_panel)
-	main_vbox.add_child(agent_panel)
+	RetrowaveTheme.style_detail_panel_flat(agent_panel)
+	agent_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lower_vbox.add_child(agent_panel)
 	var agent_vbox := VBoxContainer.new()
 	agent_vbox.add_theme_constant_override("separation", 3)
 	agent_panel.add_child(agent_vbox)
@@ -264,9 +312,16 @@ func _build_dynamic_ui() -> void:
 	guarantee_btn.custom_minimum_size.x = 140
 	RetrowaveTheme.style_secondary_button(guarantee_btn)
 	guarantee_btn.pressed.connect(func():
+		var player_g := ""
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+			player_g = str(LeaderManager.get_player_country_tag()).to_upper()
+		var other_g := str(_selected_country).to_upper()
+		# Pass 24: formal independence guarantee on RelationsManager pair policy.
+		if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("set_guarantee") and not player_g.is_empty() and not other_g.is_empty():
+			RelationsManager.set_guarantee(player_g, other_g, true)
 		if typeof(LeaderEventUI) != TYPE_NIL:
-			LeaderEventUI.post_news("Diplomatic Guarantee", "You guarantee %s independence. +Prestige for player, tension with rivals. (Agent ops can enforce or sabotage.)" % _selected_country, "diplomatic")
-			LeaderEventUI.show_toast("Guarantee issued to " + _selected_country + " — relations shifted.", 4.0)
+			LeaderEventUI.post_news("Diplomatic Guarantee", "You guarantee %s independence. Formal guarantee recorded — repair queue treaty scope can include them." % _selected_country, "diplomatic")
+			LeaderEventUI.show_toast("Guarantee issued to " + _selected_country + " — treaty recorded.", 4.0)
 	)
 	dip_actions.add_child(guarantee_btn)
 
@@ -274,16 +329,7 @@ func _build_dynamic_ui() -> void:
 	alliance_btn.text = "Propose Alliance"
 	alliance_btn.custom_minimum_size.x = 120
 	RetrowaveTheme.style_secondary_button(alliance_btn)
-	alliance_btn.pressed.connect(func():
-		if typeof(LeaderEventUI) != TYPE_NIL:
-			LeaderEventUI.post_news("Alliance Proposal", "Alliance offer to %s sent. Trade + mutual defense hooks. Success depends on current relations/leverage (use agents)." % _selected_country, "diplomatic")
-			LeaderEventUI.show_toast("Alliance proposal to " + _selected_country, 3.0)
-		# Optional dialogue launch for flavor
-		if typeof(DialogueManager) != TYPE_NIL:
-			var dip_res = load("res://data/peace/population_policies.dialogue")  # reuse any; real would have dip specific
-			if dip_res:
-				DialogueManager.show_dialogue_balloon(dip_res, "welfare_burden_crisis")  # placeholder branch for demo; future dedicated
-	)
+	alliance_btn.pressed.connect(_on_propose_alliance_pressed)
 	dip_actions.add_child(alliance_btn)
 
 	var intel_btn := Button.new()
@@ -297,11 +343,30 @@ func _build_dynamic_ui() -> void:
 	)
 	dip_actions.add_child(intel_btn)
 
-	# Stub opinion/relations display (flesh; future real RelationsManager, now heuristic from trade + hand)
+	# Pass 25: alliance negotiation desk (pending in/out + accept/decline).
+	var nego_header := Label.new()
+	nego_header.text = "Alliance negotiation"
+	RetrowaveTheme.style_column_header(nego_header)
+	agent_vbox.add_child(nego_header)
+	var nego_status := Label.new()
+	nego_status.name = "AllianceNegoStatus"
+	nego_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	nego_status.add_theme_font_size_override("font_size", 11)
+	RetrowaveTheme.style_body_label(nego_status)
+	agent_vbox.add_child(nego_status)
+	var nego_row := HBoxContainer.new()
+	nego_row.name = "AllianceNegoRow"
+	nego_row.add_theme_constant_override("separation", 8)
+	agent_vbox.add_child(nego_row)
+	_refresh_alliance_negotiation_ui(nego_status, nego_row)
+
+	# Opinion / CRS live readout
 	var opinion_label := Label.new()
-	opinion_label.text = "Opinion (stub): Neutral (+0; future: deltas from deals, guarantees, agent influence, hand exposure)"
+	opinion_label.name = "OpinionLabel"
+	opinion_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	RetrowaveTheme.style_body_label(opinion_label)
 	agent_vbox.add_child(opinion_label)
+	_refresh_opinion_label(opinion_label)
 
 	# Bottom buttons (reuse existing nodes from .tscn)
 	refresh_btn.text = "Refresh"
@@ -325,6 +390,579 @@ func _on_country_selected(_index: int) -> void:
 	_selected_country = country_selector.get_item_text(_index)
 	_refresh_view()
 
+
+## Pass 25: propose alliance (negotiation — not instant treaty).
+func _on_propose_alliance_pressed() -> void:
+	var player_a := str(_player_country).to_upper()
+	var other_a := str(_selected_country).to_upper()
+	if player_a.is_empty() or other_a.is_empty():
+		return
+	if typeof(RelationsManager) == TYPE_NIL:
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.show_toast("RelationsManager unavailable", 2.5)
+		return
+	# Already allied?
+	if RelationsManager.has_method("is_allied") and bool(RelationsManager.is_allied(player_a, other_a)):
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.show_toast("Already allied with " + other_a, 2.5)
+		return
+	# Incoming from them — offer Accept instead of new propose.
+	if RelationsManager.has_method("has_pending_alliance") and RelationsManager.has_pending_alliance(other_a, player_a):
+		_on_accept_alliance(other_a)
+		return
+	if RelationsManager.has_method("propose_alliance"):
+		var res: Dictionary = RelationsManager.propose_alliance(player_a, other_a)
+		var reason := str(res.get("reason", ""))
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			if bool(res.get("ok", false)):
+				if reason == "reciprocal_pending":
+					LeaderEventUI.show_toast("%s already proposed to you — accept below" % other_a, 3.5)
+				else:
+					LeaderEventUI.post_news(
+						"Alliance Proposal",
+						"Alliance offer to %s is pending negotiation. AI may accept after 1–5 days based on CRS; or they can counter." % other_a,
+						"diplomatic"
+					)
+					LeaderEventUI.show_toast("Alliance proposal to %s · pending" % other_a, 3.0)
+			else:
+				LeaderEventUI.show_toast("Propose failed · %s" % reason, 3.0)
+	_refresh_view()
+
+
+func _on_accept_alliance(from_tag: String) -> void:
+	var player := str(_player_country).to_upper()
+	if typeof(RelationsManager) == TYPE_NIL or not RelationsManager.has_method("accept_alliance"):
+		return
+	var res: Dictionary = RelationsManager.accept_alliance(player, from_tag)
+	if typeof(LeaderEventUI) != TYPE_NIL:
+		if bool(res.get("ok", false)):
+			LeaderEventUI.post_news(
+				"Alliance Treaty",
+				"Mutual alliance with %s ratified after negotiation." % from_tag,
+				"diplomatic"
+			)
+			LeaderEventUI.show_toast("Alliance with %s · formal treaty" % from_tag, 3.5)
+		else:
+			LeaderEventUI.show_toast("Accept failed · %s" % str(res.get("reason", "")), 3.0)
+	_refresh_view()
+
+
+func _on_decline_alliance(from_tag: String) -> void:
+	var player := str(_player_country).to_upper()
+	if typeof(RelationsManager) == TYPE_NIL or not RelationsManager.has_method("decline_alliance"):
+		return
+	var res: Dictionary = RelationsManager.decline_alliance(player, from_tag)
+	if typeof(LeaderEventUI) != TYPE_NIL:
+		if bool(res.get("ok", false)):
+			LeaderEventUI.post_news("Alliance Declined", "You declined an alliance offer from %s." % from_tag, "diplomatic")
+			LeaderEventUI.show_toast("Declined alliance from %s" % from_tag, 3.0)
+		else:
+			LeaderEventUI.show_toast("Decline failed · %s" % str(res.get("reason", "")), 2.5)
+	_refresh_view()
+
+
+## Pass 26/27: open free-form counter terms panel, then submit.
+func _on_counter_alliance(from_tag: String) -> void:
+	_open_counter_terms_dialog(from_tag)
+
+
+## Pass 28: built-in counter templates (fill the free-form form).
+const COUNTER_TEMPLATES: Array[Dictionary] = [
+	{
+		"id": "soft",
+		"label": "Soft",
+		"require_guarantee": false,
+		"min_crs": 25.0,
+		"note": "Soft counter: alliance welcome, light conditions",
+	},
+	{
+		"id": "standard",
+		"label": "Standard",
+		"require_guarantee": true,
+		"min_crs": 40.0,
+		"note": "Standard: mutual defense + independence guarantee",
+	},
+	{
+		"id": "hard",
+		"label": "Hard",
+		"require_guarantee": true,
+		"min_crs": 60.0,
+		"note": "Hard: high trust required + guarantee",
+	},
+	{
+		"id": "guarantee_only",
+		"label": "Guarantee",
+		"require_guarantee": true,
+		"min_crs": 0.0,
+		"note": "Counter: alliance contingent on independence guarantee only",
+	},
+	{
+		"id": "crs_gate",
+		"label": "CRS gate",
+		"require_guarantee": false,
+		"min_crs": 55.0,
+		"note": "CRS gate: deepen relations first, then alliance",
+	},
+]
+
+const USER_COUNTER_TEMPLATES_PATH := "user://alliance_counter_templates.json"
+const USER_TEMPLATE_MAX := 8
+
+
+## Pass 29: load user-saved counter templates from disk.
+func _load_user_counter_templates() -> Array:
+	var out: Array = []
+	if not FileAccess.file_exists(USER_COUNTER_TEMPLATES_PATH):
+		return out
+	var f := FileAccess.open(USER_COUNTER_TEMPLATES_PATH, FileAccess.READ)
+	if f == null:
+		return out
+	var p := JSON.new()
+	if p.parse(f.get_as_text()) != OK:
+		return out
+	if p.data is Array:
+		for item in p.data:
+			if item is Dictionary:
+				out.append((item as Dictionary).duplicate(true))
+	elif p.data is Dictionary and p.data.has("templates"):
+		var arr = p.data["templates"]
+		if arr is Array:
+			for item in arr:
+				if item is Dictionary:
+					out.append((item as Dictionary).duplicate(true))
+	return out
+
+
+func _save_user_counter_templates(templates: Array) -> bool:
+	var f := FileAccess.open(USER_COUNTER_TEMPLATES_PATH, FileAccess.WRITE)
+	if f == null:
+		return false
+	var payload := {"version": 1, "templates": templates}
+	f.store_string(JSON.stringify(payload))
+	f.close()
+	return true
+
+
+func _add_user_counter_template(tpl: Dictionary) -> bool:
+	var list := _load_user_counter_templates()
+	var label := str(tpl.get("label", "Custom")).strip_edges()
+	if label.is_empty():
+		label = "Custom"
+	tpl["label"] = label
+	tpl["id"] = "user_%d" % Time.get_ticks_msec()
+	tpl["user"] = true
+	# Replace same label if exists.
+	var replaced := false
+	for i in list.size():
+		if str((list[i] as Dictionary).get("label", "")) == label:
+			list[i] = tpl.duplicate(true)
+			replaced = true
+			break
+	if not replaced:
+		list.append(tpl.duplicate(true))
+	while list.size() > USER_TEMPLATE_MAX:
+		list.pop_front()
+	return _save_user_counter_templates(list)
+
+
+func _delete_user_counter_template(label: String) -> bool:
+	var list := _load_user_counter_templates()
+	var next: Array = []
+	for item in list:
+		if str((item as Dictionary).get("label", "")) != label:
+			next.append(item)
+	return _save_user_counter_templates(next)
+
+
+## Pass 30: campaign-shared templates (via RelationsManager save).
+func _load_campaign_counter_templates() -> Array:
+	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("get_campaign_counter_templates"):
+		return RelationsManager.get_campaign_counter_templates()
+	return []
+
+
+func _add_campaign_counter_template(tpl: Dictionary) -> bool:
+	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("add_campaign_counter_template"):
+		tpl["campaign"] = true
+		return bool(RelationsManager.add_campaign_counter_template(tpl))
+	return false
+
+
+func _delete_campaign_counter_template(label: String) -> bool:
+	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("delete_campaign_counter_template"):
+		return bool(RelationsManager.delete_campaign_counter_template(label))
+	return false
+
+
+## Pass 27–29: free-form counter terms + built-in + user templates.
+func _open_counter_terms_dialog(from_tag: String) -> void:
+	var player := str(_player_country).to_upper()
+	var other := from_tag.strip_edges().to_upper()
+	# Reuse existing dialog if open.
+	var existing := get_node_or_null("CounterTermsDialog") as Window
+	if existing != null and is_instance_valid(existing):
+		existing.queue_free()
+	var dlg := Window.new()
+	dlg.name = "CounterTermsDialog"
+	dlg.title = "Counter-offer to %s" % other
+	dlg.size = Vector2i(440, 420)
+	dlg.unresizable = false
+	dlg.transient = true
+	dlg.exclusive = true
+	add_child(dlg)
+	RetrowaveTheme.style_popup_root(dlg)
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 12)
+	margin.add_theme_constant_override("margin_bottom", 12)
+	dlg.add_child(margin)
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 8)
+	margin.add_child(v)
+	var hint := Label.new()
+	hint.text = "Set terms for your counter-offer. Templates fill the form; edit before send."
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.add_theme_font_size_override("font_size", 11)
+	RetrowaveTheme.style_body_label(hint)
+	v.add_child(hint)
+	# Pass 28: template chips.
+	var tpl_cap := Label.new()
+	tpl_cap.text = "Templates"
+	tpl_cap.add_theme_font_size_override("font_size", 10)
+	tpl_cap.add_theme_color_override("font_color", Color(0.7, 0.8, 0.95))
+	v.add_child(tpl_cap)
+	var tpl_row := HBoxContainer.new()
+	tpl_row.add_theme_constant_override("separation", 4)
+	v.add_child(tpl_row)
+	var chk_g := CheckBox.new()
+	chk_g.text = "Require independence guarantee"
+	chk_g.button_pressed = true
+	chk_g.focus_mode = Control.FOCUS_NONE
+	v.add_child(chk_g)
+	var crs_row := HBoxContainer.new()
+	crs_row.add_theme_constant_override("separation", 8)
+	v.add_child(crs_row)
+	var crs_lbl := Label.new()
+	crs_lbl.text = "Min CRS"
+	crs_lbl.custom_minimum_size = Vector2(72, 0)
+	RetrowaveTheme.style_body_label(crs_lbl)
+	crs_row.add_child(crs_lbl)
+	var crs_spin := SpinBox.new()
+	crs_spin.min_value = 0.0
+	crs_spin.max_value = 100.0
+	crs_spin.step = 5.0
+	crs_spin.value = 40.0
+	crs_spin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	crs_spin.tooltip_text = "Counterparty must meet this CRS when accepting."
+	crs_row.add_child(crs_spin)
+	var note_lbl := Label.new()
+	note_lbl.text = "Note"
+	RetrowaveTheme.style_body_label(note_lbl)
+	v.add_child(note_lbl)
+	var note_edit := LineEdit.new()
+	note_edit.placeholder_text = "e.g. mutual defense + guarantee of borders"
+	note_edit.text = "Counter: alliance + terms"
+	note_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	v.add_child(note_edit)
+	var all_tpls: Array = []
+	for bt in COUNTER_TEMPLATES:
+		all_tpls.append(bt)
+	for ut in _load_user_counter_templates():
+		all_tpls.append(ut)
+	for ct in _load_campaign_counter_templates():
+		all_tpls.append(ct)
+	for tpl in all_tpls:
+		var tb := Button.new()
+		var is_user := bool(tpl.get("user", false))
+		var is_camp := bool(tpl.get("campaign", false))
+		tb.text = str(tpl.get("label", tpl.get("id", "?")))
+		if is_user:
+			tb.text = "★ " + tb.text
+		elif is_camp:
+			tb.text = "◆ " + tb.text
+		tb.focus_mode = Control.FOCUS_NONE
+		tb.custom_minimum_size = Vector2(0, 22)
+		tb.add_theme_font_size_override("font_size", 10)
+		var tip := str(tpl.get("note", ""))
+		if is_user:
+			tip += "\n(local user · Shift+click to delete)"
+		elif is_camp:
+			tip += "\n(campaign save · Shift+click to delete)"
+		tb.tooltip_text = tip
+		RetrowaveTheme.style_secondary_button(tb)
+		if is_user:
+			tb.modulate = Color(1.08, 1.0, 0.85, 1.0)
+		elif is_camp:
+			tb.modulate = Color(0.9, 1.05, 1.1, 1.0)
+		var tcopy: Dictionary = tpl.duplicate(true)
+		tb.pressed.connect(func() -> void:
+			if (is_user or is_camp) and Input.is_key_pressed(KEY_SHIFT):
+				var lab := str(tcopy.get("label", ""))
+				if is_user:
+					_delete_user_counter_template(lab)
+				else:
+					_delete_campaign_counter_template(lab)
+				if typeof(LeaderEventUI) != TYPE_NIL:
+					LeaderEventUI.show_toast("Deleted template «%s»" % lab, 2.5)
+				dlg.queue_free()
+				_open_counter_terms_dialog(other)
+				return
+			chk_g.button_pressed = bool(tcopy.get("require_guarantee", false))
+			crs_spin.value = float(tcopy.get("min_crs", 40.0))
+			note_edit.text = str(tcopy.get("note", ""))
+		)
+		tpl_row.add_child(tb)
+	# Pass 29/30: save current form as local or campaign template.
+	var save_tpl_row := HBoxContainer.new()
+	save_tpl_row.add_theme_constant_override("separation", 6)
+	v.add_child(save_tpl_row)
+	var name_edit := LineEdit.new()
+	name_edit.placeholder_text = "Template name"
+	name_edit.custom_minimum_size = Vector2(100, 0)
+	name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	save_tpl_row.add_child(name_edit)
+	var save_tpl_btn := Button.new()
+	save_tpl_btn.text = "Save local"
+	save_tpl_btn.focus_mode = Control.FOCUS_NONE
+	save_tpl_btn.add_theme_font_size_override("font_size", 10)
+	save_tpl_btn.tooltip_text = "Save to this machine (user://), max %d." % USER_TEMPLATE_MAX
+	RetrowaveTheme.style_secondary_button(save_tpl_btn)
+	save_tpl_btn.pressed.connect(func() -> void:
+		var nm := name_edit.text.strip_edges()
+		if nm.is_empty():
+			nm = "Custom %.0f" % crs_spin.value
+		var ok := _add_user_counter_template({
+			"label": nm,
+			"require_guarantee": chk_g.button_pressed,
+			"min_crs": float(crs_spin.value),
+			"note": note_edit.text.strip_edges(),
+		})
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.show_toast(
+				("Saved local «%s»" % nm) if ok else "Failed to save template",
+				2.5
+			)
+		if ok:
+			dlg.queue_free()
+			_open_counter_terms_dialog(other)
+	)
+	save_tpl_row.add_child(save_tpl_btn)
+	var save_camp_btn := Button.new()
+	save_camp_btn.text = "Save campaign"
+	save_camp_btn.focus_mode = Control.FOCUS_NONE
+	save_camp_btn.add_theme_font_size_override("font_size", 10)
+	save_camp_btn.tooltip_text = "Save into campaign save (shared across devices via save file)."
+	RetrowaveTheme.style_secondary_button(save_camp_btn)
+	save_camp_btn.modulate = Color(0.9, 1.05, 1.1, 1.0)
+	save_camp_btn.pressed.connect(func() -> void:
+		var nm := name_edit.text.strip_edges()
+		if nm.is_empty():
+			nm = "Camp %.0f" % crs_spin.value
+		var ok := _add_campaign_counter_template({
+			"label": nm,
+			"require_guarantee": chk_g.button_pressed,
+			"min_crs": float(crs_spin.value),
+			"note": note_edit.text.strip_edges(),
+		})
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.show_toast(
+				("Saved campaign «%s»" % nm) if ok else "Failed to save campaign template",
+				2.5
+			)
+		if ok:
+			dlg.queue_free()
+			_open_counter_terms_dialog(other)
+	)
+	save_tpl_row.add_child(save_camp_btn)
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 8)
+	v.add_child(btn_row)
+	var cancel := Button.new()
+	cancel.text = "Cancel"
+	cancel.focus_mode = Control.FOCUS_NONE
+	RetrowaveTheme.style_secondary_button(cancel)
+	cancel.pressed.connect(func() -> void:
+		dlg.queue_free()
+	)
+	btn_row.add_child(cancel)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	btn_row.add_child(spacer)
+	var submit := Button.new()
+	submit.text = "Send counter"
+	submit.focus_mode = Control.FOCUS_NONE
+	RetrowaveTheme.style_secondary_button(submit)
+	submit.modulate = Color(1.05, 0.95, 0.7, 1.0)
+	submit.pressed.connect(func() -> void:
+		_submit_counter_terms(player, other, {
+			"require_guarantee": chk_g.button_pressed,
+			"min_crs": float(crs_spin.value),
+			"note": note_edit.text.strip_edges(),
+		})
+		dlg.queue_free()
+	)
+	btn_row.add_child(submit)
+	dlg.close_requested.connect(func() -> void:
+		dlg.queue_free()
+	)
+	dlg.popup_centered()
+
+
+func _submit_counter_terms(player: String, from_tag: String, terms: Dictionary) -> void:
+	if typeof(RelationsManager) == TYPE_NIL or not RelationsManager.has_method("counter_alliance_offer"):
+		return
+	if str(terms.get("note", "")).is_empty():
+		terms["note"] = "Counter-offer"
+	var res: Dictionary = RelationsManager.counter_alliance_offer(player, from_tag, terms)
+	if typeof(LeaderEventUI) != TYPE_NIL:
+		if bool(res.get("ok", false)):
+			var g := " + guarantee" if bool(terms.get("require_guarantee", false)) else ""
+			var mcrs := float(terms.get("min_crs", 0.0))
+			LeaderEventUI.post_news(
+				"Alliance Counter-Offer",
+				"You countered %s: note «%s» · min CRS %.0f%s." % [
+					from_tag, str(terms.get("note", "")), mcrs, g
+				],
+				"diplomatic"
+			)
+			LeaderEventUI.show_toast("Counter to %s · CRS≥%.0f%s" % [from_tag, mcrs, g], 3.5)
+		else:
+			LeaderEventUI.show_toast("Counter failed · %s" % str(res.get("reason", "")), 3.0)
+	_refresh_view()
+
+
+func _on_cancel_alliance(to_tag: String) -> void:
+	var player := str(_player_country).to_upper()
+	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("cancel_alliance_proposal"):
+		RelationsManager.cancel_alliance_proposal(player, to_tag)
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.show_toast("Withdrew alliance offer to %s" % to_tag, 2.5)
+	_refresh_view()
+
+
+func _refresh_opinion_label(lbl: Label) -> void:
+	if lbl == null:
+		return
+	var other := str(_selected_country).to_upper()
+	var player := str(_player_country).to_upper()
+	if typeof(RelationsManager) == TYPE_NIL or other.is_empty():
+		lbl.text = "Opinion: RelationsManager offline"
+		return
+	var crs := 0.0
+	var band_lbl := "Neutral"
+	var allied := false
+	if RelationsManager.has_method("get_crs"):
+		crs = float(RelationsManager.get_crs(player, other))
+	if RelationsManager.has_method("get_band"):
+		var band: Dictionary = RelationsManager.get_band(player, other)
+		band_lbl = str(band.get("label", band.get("id", "Neutral")))
+	if RelationsManager.has_method("is_allied"):
+		allied = bool(RelationsManager.is_allied(player, other))
+	lbl.text = "CRS %.0f · %s%s" % [crs, band_lbl, " · ALLIED" if allied else ""]
+
+
+func _refresh_alliance_negotiation_ui(status_lbl: Label = null, row: HBoxContainer = null) -> void:
+	if status_lbl == null and main_vbox != null:
+		status_lbl = main_vbox.find_child("AllianceNegoStatus", true, false) as Label
+	if row == null and main_vbox != null:
+		row = main_vbox.find_child("AllianceNegoRow", true, false) as HBoxContainer
+	if status_lbl == null:
+		return
+	var player := str(_player_country).to_upper()
+	var other := str(_selected_country).to_upper()
+	if typeof(RelationsManager) == TYPE_NIL:
+		status_lbl.text = "No RelationsManager — negotiation offline."
+		return
+	if RelationsManager.has_method("is_allied") and bool(RelationsManager.is_allied(player, other)):
+		status_lbl.text = "Formal alliance active with %s." % other
+		if row:
+			for c in row.get_children():
+				c.queue_free()
+		return
+	var lines: PackedStringArray = PackedStringArray()
+	var incoming: Array = []
+	var outgoing: Array = []
+	if RelationsManager.has_method("get_incoming_alliance_proposals"):
+		incoming = RelationsManager.get_incoming_alliance_proposals(player)
+	if RelationsManager.has_method("get_outgoing_alliance_proposals"):
+		outgoing = RelationsManager.get_outgoing_alliance_proposals(player)
+	var from_other := false
+	var to_other := false
+	for p in incoming:
+		if str(p.get("from", "")) == other:
+			from_other = true
+			var cnote := " · COUNTER" if bool(p.get("is_counter", false)) else ""
+			var gnote := " · needs guarantee" if bool(p.get("require_guarantee", false)) else ""
+			lines.append("Incoming from %s · CRS %.0f (pending)%s%s" % [other, float(p.get("crs", 0.0)), cnote, gnote])
+	for p in outgoing:
+		if str(p.get("to", "")) == other:
+			to_other = true
+			var cnote2 := " · COUNTER" if bool(p.get("is_counter", false)) else ""
+			lines.append("Outgoing to %s · day %d (awaiting reply)%s" % [other, int(p.get("day", 0)), cnote2])
+	if lines.is_empty():
+		lines.append("No pending proposal with %s. Propose Alliance to open negotiation." % other)
+	# Also summarize other pending not with selected.
+	var other_in := 0
+	for p in incoming:
+		if str(p.get("from", "")) != other:
+			other_in += 1
+	if other_in > 0:
+		lines.append("+%d other incoming proposal(s)" % other_in)
+	status_lbl.text = "\n".join(lines)
+	if row == null:
+		return
+	for c in row.get_children():
+		c.queue_free()
+	if from_other:
+		var acc := Button.new()
+		acc.text = "Accept %s" % other
+		acc.focus_mode = Control.FOCUS_NONE
+		acc.custom_minimum_size = Vector2(0, 26)
+		RetrowaveTheme.style_secondary_button(acc)
+		acc.modulate = Color(0.85, 1.08, 0.9, 1.0)
+		acc.pressed.connect(func() -> void: _on_accept_alliance(other))
+		row.add_child(acc)
+		var ctr := Button.new()
+		ctr.text = "Counter…"
+		ctr.focus_mode = Control.FOCUS_NONE
+		ctr.custom_minimum_size = Vector2(0, 26)
+		ctr.tooltip_text = "Open free-form counter terms (guarantee, min CRS, note)."
+		RetrowaveTheme.style_secondary_button(ctr)
+		ctr.modulate = Color(1.05, 0.95, 0.7, 1.0)
+		ctr.pressed.connect(func() -> void: _on_counter_alliance(other))
+		row.add_child(ctr)
+		var dec := Button.new()
+		dec.text = "Decline"
+		dec.focus_mode = Control.FOCUS_NONE
+		dec.custom_minimum_size = Vector2(0, 26)
+		RetrowaveTheme.style_secondary_button(dec)
+		dec.pressed.connect(func() -> void: _on_decline_alliance(other))
+		row.add_child(dec)
+	elif to_other:
+		var can := Button.new()
+		can.text = "Withdraw offer"
+		can.focus_mode = Control.FOCUS_NONE
+		can.custom_minimum_size = Vector2(0, 26)
+		RetrowaveTheme.style_secondary_button(can)
+		can.pressed.connect(func() -> void: _on_cancel_alliance(other))
+		row.add_child(can)
+	# Accept any other incoming
+	for p in incoming:
+		var fr := str(p.get("from", ""))
+		if fr == other or fr.is_empty():
+			continue
+		var acc2 := Button.new()
+		acc2.text = "Accept %s" % fr
+		acc2.focus_mode = Control.FOCUS_NONE
+		acc2.custom_minimum_size = Vector2(0, 26)
+		acc2.add_theme_font_size_override("font_size", 10)
+		RetrowaveTheme.style_secondary_button(acc2)
+		acc2.pressed.connect(func() -> void: _on_accept_alliance(fr))
+		row.add_child(acc2)
+
+
 # Lightweight helper for bilateral offer filters
 func _add_bilateral_filter_button(label: String, mode: String) -> void:
 	var btn := Button.new()
@@ -347,6 +985,12 @@ func _refresh_view() -> void:
 		return
 
 	bilateral_title.text = "Bilateral Trade Activity — " + _selected_country
+	# Pass 25: refresh negotiation + CRS readout.
+	_refresh_alliance_negotiation_ui()
+	if main_vbox != null:
+		var op := main_vbox.find_child("OpinionLabel", true, false) as Label
+		if op:
+			_refresh_opinion_label(op)
 
 	for child in offers_vbox.get_children():
 		child.queue_free()
@@ -725,6 +1369,27 @@ func _open_trade_market_for_country(country: String) -> void:
 	else:
 		if typeof(LeaderEventUI) != TYPE_NIL:
 			LeaderEventUI.show_toast("Trade Market not available.", 2.0, true)
+
+
+func _open_space_layer_board() -> void:
+	var existing := get_tree().root.get_node_or_null("SpaceLayerBoardView")
+	if existing != null:
+		if existing is Window:
+			existing.hide()
+		existing.call_deferred("queue_free")
+	var script = load("res://scripts/ui/SpaceLayerBoardView.gd")
+	if script == null:
+		if typeof(LeaderEventUI) != TYPE_NIL:
+			LeaderEventUI.show_toast("Space board not available.", 2.0, true)
+		return
+	var view = script.new()
+	view.name = "SpaceLayerBoardView"
+	get_tree().root.add_child(view)
+	var tag := _player_country if not _player_country.is_empty() else "USA"
+	if view.has_method("show_board"):
+		view.show_board(tag)
+	elif view is Window:
+		(view as Window).popup_centered()
 
 func _on_trade_outcome(offer_id: String, from: String, to: String, _status: int, _vis, _meta) -> void:
 	# Refresh if this deal involves the currently viewed bilateral pair

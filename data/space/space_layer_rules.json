@@ -1,0 +1,781 @@
+{
+  "version": 2,
+  "model": "orbital_compact_ledger",
+  "notes": "S1: full Sol multi-site graph, habitability, lift/orbital_command capacity, space power, colony relations, generational independence",
+  "capacity_model": {
+    "rename_from_mission_control": "orbital_command",
+    "player_facing_labels": {
+      "lift_capacity": "Launch / lift capacity (spaceports + boost industry)",
+      "orbital_command": "Orbital command capacity (stations, electronics, trained crews)",
+      "expansion_strain": "Political expansion strain (mandate/cohesion soft cost when overextended)"
+    },
+    "lift_sources": {
+      "per_spaceport_tier": [0, 2, 5, 10, 18],
+      "per_orbital_yard": 4,
+      "per_reusable_flag": 3
+    },
+    "orbital_command_sources": {
+      "base": 2,
+      "per_station_platform": 1,
+      "per_station_orbital": 2,
+      "per_station_ring": 4,
+      "electronics_stock_scale": 0.002,
+      "per_space_flag": 1
+    },
+    "expansion_strain": {
+      "per_habitat_over_command": 0.03,
+      "per_outer_system_habitat": 0.04,
+      "soft_cap_not_hard_block": true,
+      "affects": ["mandate_drag", "cohesion_risk", "autonomy_drift"]
+    }
+  },
+  "development_phases": [
+    {
+      "id": "phase_0_rockets",
+      "label": "Ballistic / early rocketry",
+      "requires_any": ["rocketry_foundations", "v2_rocket"],
+      "unlocks": ["suborbital_tests"],
+      "player_hint": "Build rocketry tech and early launch sites."
+    },
+    {
+      "id": "phase_1_satellites",
+      "label": "Satellites & LEO",
+      "requires_any_flags": ["allow_satellites"],
+      "requires_any_milestones": ["first_satellite"],
+      "unlocks": ["near_earth", "isr_constellations", "comms"],
+      "player_hint": "Need spaceport lift + satellite designs. Buy/trade lift if you lack spaceports."
+    },
+    {
+      "id": "phase_2_crew_station",
+      "label": "Crewed orbit & stations",
+      "requires_any_flags": ["allow_manned_space", "allow_space_station"],
+      "unlocks": ["crew_transfer", "station_research_bonus", "orbital_command_growth"],
+      "player_hint": "Life support + crew vehicles. Stations raise orbital command and space RP."
+    },
+    {
+      "id": "phase_3_cis_lunar",
+      "label": "Cis-lunar ops & Moon sites",
+      "requires_any_flags": ["allow_lunar_operations", "allow_moon_base"],
+      "unlocks": ["luna_sites", "l_points", "staging_for_mars"],
+      "player_hint": "Moon base is the cheap staging step before Mars loft costs."
+    },
+    {
+      "id": "phase_4_inner",
+      "label": "Inner system (Mars, NEAs, Ceres)",
+      "requires_any_flags": ["allow_mars_ops", "allow_mars_base"],
+      "requires_any_milestones": ["mars_probe", "mars_landing"],
+      "unlocks": ["mars_sites", "asteroid_mining", "long_hauls"],
+      "player_hint": "Direct Earth→Mars is expensive; cis-lunar staging cuts loft cost."
+    },
+    {
+      "id": "phase_5_outer",
+      "label": "Outer system",
+      "requires_any_flags": ["allow_outer_system", "fusion_power", "nuclear_thermal"],
+      "unlocks": ["jovian_moons", "saturn_system", "deep_isolation_risk"],
+      "player_hint": "Local propellant/ISRU mandatory; neglect → generational independence drift."
+    }
+  ],
+  "layers": [
+    {
+      "id": "earth_surface",
+      "label": "Earth surface",
+      "order": 0,
+      "always_visible": true,
+      "gate_flags": [],
+      "gate_milestones": []
+    },
+    {
+      "id": "near_earth",
+      "label": "Near-Earth orbits",
+      "order": 1,
+      "always_visible": false,
+      "gate_flags": ["allow_satellites"],
+      "gate_milestones": ["first_satellite"],
+      "gate_mode": "any"
+    },
+    {
+      "id": "cis_lunar",
+      "label": "Cis-lunar space",
+      "order": 2,
+      "always_visible": false,
+      "gate_flags": ["allow_lunar_operations", "allow_moon_base"],
+      "gate_milestones": ["moon_landing", "moon_base"],
+      "gate_mode": "any"
+    },
+    {
+      "id": "inner_system",
+      "label": "Inner solar system",
+      "order": 3,
+      "always_visible": false,
+      "gate_flags": ["allow_mars_ops", "allow_mars_base"],
+      "gate_milestones": ["mars_landing", "mars_base", "mars_probe"],
+      "gate_mode": "any"
+    },
+    {
+      "id": "main_belt",
+      "label": "Main asteroid belt",
+      "order": 3.5,
+      "always_visible": false,
+      "gate_flags": ["allow_mars_ops", "allow_asteroid_ops"],
+      "gate_milestones": ["mars_probe", "explore_other"],
+      "gate_mode": "any"
+    },
+    {
+      "id": "outer_system",
+      "label": "Outer solar system",
+      "order": 4,
+      "always_visible": false,
+      "gate_flags": ["allow_outer_system", "fusion_power", "nuclear_thermal"],
+      "gate_milestones": ["explore_other"],
+      "gate_mode": "any"
+    },
+    {
+      "id": "galaxy_bridge",
+      "label": "Galaxy bridge",
+      "order": 5,
+      "always_visible": false,
+      "gate_flags": ["solar_industrial_base", "allow_galaxy_bridge"],
+      "gate_milestones": [],
+      "gate_mode": "all_flags"
+    }
+  ],
+  "habitability": {
+    "axes": ["pressure", "temperature", "radiation", "gravity", "local_volatiles", "local_metals"],
+    "life_support_majors": ["food", "water", "oxygen", "propellant", "energy"],
+    "bands": {
+      "garden": {"life_support_mult": 0.35, "max_pop_scale": 1.0, "notes": "Earth-like / terraformed"},
+      "harsh": {"life_support_mult": 1.0, "max_pop_scale": 0.55, "notes": "Mars-like; full closed loop needed"},
+      "hostile": {"life_support_mult": 1.45, "max_pop_scale": 0.25, "notes": "Vacuum rock / extreme radiation"},
+      "orbital": {"life_support_mult": 1.25, "max_pop_scale": 0.4, "notes": "Stations — fully imported LS"},
+      "cryogenic": {"life_support_mult": 1.6, "max_pop_scale": 0.2, "notes": "Icy outer moons; power hungry heat"}
+    }
+  },
+  "asteroid_size_table": {
+    "tiny": {"sites": 1, "max_pop": 200, "max_building_slots": 2, "resource_roll_slots": 1},
+    "small": {"sites": 1, "max_pop": 800, "max_building_slots": 3, "resource_roll_slots": 2},
+    "medium": {"sites": 2, "max_pop": 5000, "max_building_slots": 5, "resource_roll_slots": 3},
+    "large": {"sites": 3, "max_pop": 25000, "max_building_slots": 8, "resource_roll_slots": 4},
+    "dwarf": {"sites": 6, "max_pop": 200000, "max_building_slots": 14, "resource_roll_slots": 5}
+  },
+  "bodies": [
+    {
+      "id": "earth",
+      "label": "Earth",
+      "layer": "earth_surface",
+      "class": "homeworld",
+      "parent": null,
+      "sites": 0,
+      "habitability_band": "garden",
+      "capture_sites": []
+    },
+    {
+      "id": "leo_band",
+      "label": "Low Earth Orbit",
+      "layer": "near_earth",
+      "class": "orbit_band",
+      "parent": "earth",
+      "sites": 6,
+      "habitability_band": "orbital",
+      "capture_sites": [
+        {"id": "leo_equatorial_a", "label": "LEO Equatorial A", "resources": ["energy"]},
+        {"id": "leo_equatorial_b", "label": "LEO Equatorial B", "resources": ["energy"]},
+        {"id": "leo_polar", "label": "LEO Polar ISR arc", "resources": ["rare_samples"]},
+        {"id": "leo_depot", "label": "LEO logistics depot", "resources": ["propellant"]},
+        {"id": "leo_yard", "label": "LEO assembly yard slot", "resources": ["structural_metals"]},
+        {"id": "leo_secret", "label": "Covert LEO hangar", "resources": ["energy"]}
+      ]
+    },
+    {
+      "id": "meo_band",
+      "label": "Medium Earth Orbit",
+      "layer": "near_earth",
+      "class": "orbit_band",
+      "parent": "earth",
+      "sites": 2,
+      "habitability_band": "orbital",
+      "capture_sites": [
+        {"id": "meo_nav", "label": "MEO navigation belt", "resources": ["energy"]},
+        {"id": "meo_relay", "label": "MEO relay", "resources": ["energy"]}
+      ]
+    },
+    {
+      "id": "geo_band",
+      "label": "Geostationary belt",
+      "layer": "near_earth",
+      "class": "orbit_band",
+      "parent": "earth",
+      "sites": 4,
+      "habitability_band": "orbital",
+      "capture_sites": [
+        {"id": "geo_comms_0", "label": "GEO Comms 0°", "resources": ["energy"]},
+        {"id": "geo_comms_90", "label": "GEO Comms 90°", "resources": ["energy"]},
+        {"id": "geo_military", "label": "GEO early-warning arc", "resources": ["rare_samples"]},
+        {"id": "geo_slot_contested", "label": "Contested GEO slot", "resources": ["energy"]}
+      ]
+    },
+    {
+      "id": "luna",
+      "label": "Luna",
+      "layer": "cis_lunar",
+      "class": "moon",
+      "parent": "earth",
+      "sites": 8,
+      "habitability_band": "hostile",
+      "capture_sites": [
+        {"id": "luna_mare_tranquillitatis", "label": "Mare Tranquillitatis", "resources": ["structural_metals", "energy"]},
+        {"id": "luna_mare_imbrium", "label": "Mare Imbrium", "resources": ["structural_metals"]},
+        {"id": "luna_south_pole", "label": "South Pole (PSR ice)", "resources": ["water", "propellant", "oxygen"]},
+        {"id": "luna_north_pole", "label": "North Pole ice fields", "resources": ["water", "propellant"]},
+        {"id": "luna_farside", "label": "Farside radio quiet", "resources": ["rare_samples", "energy"]},
+        {"id": "luna_oceanus_procellarum", "label": "Oceanus Procellarum", "resources": ["structural_metals"]},
+        {"id": "luna_aristarchus", "label": "Aristarchus plateau", "resources": ["rare_samples"]},
+        {"id": "luna_shackleton_rim", "label": "Shackleton rim power sites", "resources": ["energy", "water"]}
+      ]
+    },
+    {
+      "id": "earth_luna_l1",
+      "label": "Earth–Luna L1",
+      "layer": "cis_lunar",
+      "class": "lagrange",
+      "parent": "earth",
+      "sites": 1,
+      "habitability_band": "orbital",
+      "capture_sites": [{"id": "el1_depot", "label": "L1 transfer depot", "resources": ["propellant", "energy"]}]
+    },
+    {
+      "id": "earth_luna_l2",
+      "label": "Earth–Luna L2",
+      "layer": "cis_lunar",
+      "class": "lagrange",
+      "parent": "earth",
+      "sites": 1,
+      "habitability_band": "orbital",
+      "capture_sites": [{"id": "el2_observatory", "label": "L2 deep-space observatory", "resources": ["rare_samples", "energy"]}]
+    },
+    {
+      "id": "earth_luna_l4",
+      "label": "Earth–Luna L4",
+      "layer": "cis_lunar",
+      "class": "lagrange",
+      "parent": "earth",
+      "sites": 1,
+      "habitability_band": "orbital",
+      "capture_sites": [{"id": "el4_staging", "label": "L4 staging cloud", "resources": ["propellant"]}]
+    },
+    {
+      "id": "earth_luna_l5",
+      "label": "Earth–Luna L5",
+      "layer": "cis_lunar",
+      "class": "lagrange",
+      "parent": "earth",
+      "sites": 1,
+      "habitability_band": "orbital",
+      "capture_sites": [{"id": "el5_staging", "label": "L5 staging cloud", "resources": ["propellant"]}]
+    },
+    {
+      "id": "venus",
+      "label": "Venus",
+      "layer": "inner_system",
+      "class": "planet",
+      "parent": "sol",
+      "sites": 3,
+      "habitability_band": "hostile",
+      "notes": "Surface hostile; aerostat / orbital focus",
+      "capture_sites": [
+        {"id": "venus_orbit_high", "label": "Venus high orbit", "resources": ["energy", "rare_samples"]},
+        {"id": "venus_aerostat_a", "label": "Aerostat band A", "resources": ["energy"]},
+        {"id": "venus_aerostat_b", "label": "Aerostat band B", "resources": ["rare_samples"]}
+      ]
+    },
+    {
+      "id": "mercury",
+      "label": "Mercury",
+      "layer": "inner_system",
+      "class": "planet",
+      "parent": "sol",
+      "sites": 3,
+      "habitability_band": "hostile",
+      "capture_sites": [
+        {"id": "merc_north_pole", "label": "Mercury north polar ice", "resources": ["water", "energy"]},
+        {"id": "merc_caloris", "label": "Caloris basin metals", "resources": ["structural_metals"]},
+        {"id": "merc_orbit", "label": "Mercury parking orbit", "resources": ["energy"]}
+      ]
+    },
+    {
+      "id": "mars",
+      "label": "Mars",
+      "layer": "inner_system",
+      "class": "planet",
+      "parent": "sol",
+      "sites": 10,
+      "habitability_band": "harsh",
+      "capture_sites": [
+        {"id": "mars_olympus", "label": "Olympus Mons approaches", "resources": ["structural_metals", "energy"]},
+        {"id": "mars_tharsis", "label": "Tharsis rise", "resources": ["structural_metals"]},
+        {"id": "mars_valles", "label": "Valles Marineris", "resources": ["water", "rare_samples"]},
+        {"id": "mars_hellas", "label": "Hellas basin", "resources": ["water", "structural_metals"]},
+        {"id": "mars_arcadia", "label": "Arcadia Planitia", "resources": ["water", "propellant"]},
+        {"id": "mars_utopia", "label": "Utopia Planitia", "resources": ["structural_metals"]},
+        {"id": "mars_polar_n", "label": "North polar cap", "resources": ["water", "oxygen", "propellant"]},
+        {"id": "mars_polar_s", "label": "South polar cap", "resources": ["water", "propellant"]},
+        {"id": "mars_jezero", "label": "Jezero crater science", "resources": ["rare_samples", "water"]},
+        {"id": "mars_phobos_view", "label": "Equatorial loft sites", "resources": ["energy", "propellant"]}
+      ]
+    },
+    {
+      "id": "phobos",
+      "label": "Phobos",
+      "layer": "inner_system",
+      "class": "moon",
+      "parent": "mars",
+      "sites": 2,
+      "habitability_band": "hostile",
+      "asteroid_size": "medium",
+      "capture_sites": [
+        {"id": "phobos_stickney", "label": "Stickney crater", "resources": ["structural_metals", "propellant"]},
+        {"id": "phobos_yard", "label": "Phobos shipyard face", "resources": ["structural_metals", "energy"]}
+      ]
+    },
+    {
+      "id": "deimos",
+      "label": "Deimos",
+      "layer": "inner_system",
+      "class": "moon",
+      "parent": "mars",
+      "sites": 1,
+      "habitability_band": "hostile",
+      "asteroid_size": "small",
+      "capture_sites": [
+        {"id": "deimos_depot", "label": "Deimos fuel depot", "resources": ["propellant"]}
+      ]
+    },
+    {
+      "id": "nea_belt",
+      "label": "Near-Earth asteroids (abstract belt)",
+      "layer": "inner_system",
+      "class": "belt",
+      "parent": "sol",
+      "sites": 8,
+      "habitability_band": "hostile",
+      "notes": "Procedural NEAs roll size + resources; caps from asteroid_size_table",
+      "capture_sites": [
+        {"id": "nea_alpha", "label": "NEA Alpha", "asteroid_size": "small", "resources_roll": true},
+        {"id": "nea_beta", "label": "NEA Beta", "asteroid_size": "medium", "resources_roll": true},
+        {"id": "nea_gamma", "label": "NEA Gamma", "asteroid_size": "tiny", "resources_roll": true},
+        {"id": "nea_delta", "label": "NEA Delta", "asteroid_size": "small", "resources_roll": true},
+        {"id": "nea_epsilon", "label": "NEA Epsilon", "asteroid_size": "medium", "resources_roll": true},
+        {"id": "nea_zeta", "label": "NEA Zeta", "asteroid_size": "large", "resources_roll": true},
+        {"id": "nea_eta", "label": "NEA Eta", "asteroid_size": "tiny", "resources_roll": true},
+        {"id": "nea_theta", "label": "NEA Theta", "asteroid_size": "small", "resources_roll": true}
+      ]
+    },
+    {
+      "id": "ceres",
+      "label": "Ceres",
+      "layer": "main_belt",
+      "class": "dwarf",
+      "parent": "sol",
+      "sites": 6,
+      "habitability_band": "hostile",
+      "asteroid_size": "dwarf",
+      "capture_sites": [
+        {"id": "ceres_occator", "label": "Occator crater", "resources": ["water", "rare_samples"]},
+        {"id": "ceres_kerwan", "label": "Kerwan basin", "resources": ["structural_metals", "water"]},
+        {"id": "ceres_polar", "label": "Ceres polar ice", "resources": ["water", "propellant", "oxygen"]},
+        {"id": "ceres_equator", "label": "Equatorial yards", "resources": ["structural_metals", "energy"]},
+        {"id": "ceres_ahuna", "label": "Ahuna Mons", "resources": ["rare_samples"]},
+        {"id": "ceres_orbit", "label": "Ceres parking orbit", "resources": ["propellant", "energy"]}
+      ]
+    },
+    {
+      "id": "vesta",
+      "label": "Vesta",
+      "layer": "main_belt",
+      "class": "asteroid",
+      "parent": "sol",
+      "sites": 3,
+      "habitability_band": "hostile",
+      "asteroid_size": "large",
+      "capture_sites": [
+        {"id": "vesta_rheasilvia", "label": "Rheasilvia basin", "resources": ["structural_metals"]},
+        {"id": "vesta_equator", "label": "Vesta equatorial", "resources": ["structural_metals", "energy"]},
+        {"id": "vesta_orbit", "label": "Vesta orbit", "resources": ["propellant"]}
+      ]
+    },
+    {
+      "id": "pallas",
+      "label": "Pallas",
+      "layer": "main_belt",
+      "class": "asteroid",
+      "parent": "sol",
+      "sites": 2,
+      "habitability_band": "hostile",
+      "asteroid_size": "large",
+      "capture_sites": [
+        {"id": "pallas_main", "label": "Pallas main face", "resources": ["structural_metals", "rare_samples"]},
+        {"id": "pallas_orbit", "label": "Pallas orbit", "resources": ["propellant"]}
+      ]
+    },
+    {
+      "id": "hygiea",
+      "label": "Hygiea",
+      "layer": "main_belt",
+      "class": "asteroid",
+      "parent": "sol",
+      "sites": 2,
+      "habitability_band": "hostile",
+      "asteroid_size": "large",
+      "capture_sites": [
+        {"id": "hygiea_main", "label": "Hygiea body", "resources": ["water", "structural_metals"]},
+        {"id": "hygiea_orbit", "label": "Hygiea orbit", "resources": ["propellant"]}
+      ]
+    },
+    {
+      "id": "main_belt_swarm",
+      "label": "Main-belt swarm (abstract)",
+      "layer": "main_belt",
+      "class": "belt",
+      "parent": "sol",
+      "sites": 10,
+      "habitability_band": "hostile",
+      "notes": "Randomized small/medium rocks; size caps buildings & pop",
+      "capture_sites": [
+        {"id": "mb_01", "label": "Belt rock 01", "asteroid_size": "tiny", "resources_roll": true},
+        {"id": "mb_02", "label": "Belt rock 02", "asteroid_size": "small", "resources_roll": true},
+        {"id": "mb_03", "label": "Belt rock 03", "asteroid_size": "medium", "resources_roll": true},
+        {"id": "mb_04", "label": "Belt rock 04", "asteroid_size": "tiny", "resources_roll": true},
+        {"id": "mb_05", "label": "Belt rock 05", "asteroid_size": "small", "resources_roll": true},
+        {"id": "mb_06", "label": "Belt rock 06", "asteroid_size": "medium", "resources_roll": true},
+        {"id": "mb_07", "label": "Belt rock 07", "asteroid_size": "large", "resources_roll": true},
+        {"id": "mb_08", "label": "Belt rock 08", "asteroid_size": "small", "resources_roll": true},
+        {"id": "mb_09", "label": "Belt rock 09", "asteroid_size": "tiny", "resources_roll": true},
+        {"id": "mb_10", "label": "Belt rock 10", "asteroid_size": "medium", "resources_roll": true}
+      ]
+    },
+    {
+      "id": "jupiter",
+      "label": "Jupiter system (system node)",
+      "layer": "outer_system",
+      "class": "gas_giant",
+      "parent": "sol",
+      "sites": 2,
+      "habitability_band": "orbital",
+      "capture_sites": [
+        {"id": "jup_high_orbit", "label": "Jupiter high orbit", "resources": ["energy", "rare_samples"]},
+        {"id": "jup_radiation_edge", "label": "Radiation belt edge", "resources": ["rare_samples"]}
+      ]
+    },
+    {
+      "id": "io",
+      "label": "Io",
+      "layer": "outer_system",
+      "class": "moon",
+      "parent": "jupiter",
+      "sites": 2,
+      "habitability_band": "hostile",
+      "capture_sites": [
+        {"id": "io_volcanic", "label": "Io volcanic plains", "resources": ["structural_metals", "energy"]},
+        {"id": "io_orbit", "label": "Io orbit", "resources": ["propellant"]}
+      ]
+    },
+    {
+      "id": "europa",
+      "label": "Europa",
+      "layer": "outer_system",
+      "class": "moon",
+      "parent": "jupiter",
+      "sites": 3,
+      "habitability_band": "cryogenic",
+      "capture_sites": [
+        {"id": "europa_chaos", "label": "Europa chaos terrain", "resources": ["water", "oxygen", "rare_samples"]},
+        {"id": "europa_ice_shell", "label": "Ice shell drill sites", "resources": ["water", "propellant"]},
+        {"id": "europa_orbit", "label": "Europa orbit", "resources": ["energy"]}
+      ]
+    },
+    {
+      "id": "ganymede",
+      "label": "Ganymede",
+      "layer": "outer_system",
+      "class": "moon",
+      "parent": "jupiter",
+      "sites": 3,
+      "habitability_band": "cryogenic",
+      "capture_sites": [
+        {"id": "ganymede_regio", "label": "Ganymede dark regio", "resources": ["structural_metals", "water"]},
+        {"id": "ganymede_polar", "label": "Ganymede polar", "resources": ["water", "oxygen"]},
+        {"id": "ganymede_orbit", "label": "Ganymede orbit", "resources": ["propellant", "energy"]}
+      ]
+    },
+    {
+      "id": "callisto",
+      "label": "Callisto",
+      "layer": "outer_system",
+      "class": "moon",
+      "parent": "jupiter",
+      "sites": 3,
+      "habitability_band": "cryogenic",
+      "capture_sites": [
+        {"id": "callisto_valhalla", "label": "Valhalla basin", "resources": ["structural_metals", "water"]},
+        {"id": "callisto_safe", "label": "Low-radiation yards", "resources": ["structural_metals", "energy"]},
+        {"id": "callisto_orbit", "label": "Callisto orbit", "resources": ["propellant"]}
+      ]
+    },
+    {
+      "id": "saturn",
+      "label": "Saturn system (system node)",
+      "layer": "outer_system",
+      "class": "gas_giant",
+      "parent": "sol",
+      "sites": 2,
+      "habitability_band": "orbital",
+      "capture_sites": [
+        {"id": "sat_rings_edge", "label": "Ring-edge mining", "resources": ["structural_metals", "water"]},
+        {"id": "sat_high_orbit", "label": "Saturn high orbit", "resources": ["energy"]}
+      ]
+    },
+    {
+      "id": "titan",
+      "label": "Titan",
+      "layer": "outer_system",
+      "class": "moon",
+      "parent": "saturn",
+      "sites": 4,
+      "habitability_band": "cryogenic",
+      "capture_sites": [
+        {"id": "titan_kraken", "label": "Kraken Mare", "resources": ["propellant", "rare_samples"]},
+        {"id": "titan_xanadu", "label": "Xanadu", "resources": ["structural_metals", "energy"]},
+        {"id": "titan_dunes", "label": "Equatorial dunes", "resources": ["rare_samples"]},
+        {"id": "titan_orbit", "label": "Titan orbit", "resources": ["propellant", "energy"]}
+      ]
+    },
+    {
+      "id": "enceladus",
+      "label": "Enceladus",
+      "layer": "outer_system",
+      "class": "moon",
+      "parent": "saturn",
+      "sites": 2,
+      "habitability_band": "cryogenic",
+      "capture_sites": [
+        {"id": "enc_plumes", "label": "South plume fields", "resources": ["water", "oxygen", "rare_samples"]},
+        {"id": "enc_orbit", "label": "Enceladus orbit", "resources": ["propellant"]}
+      ]
+    },
+    {
+      "id": "uranus",
+      "label": "Uranus system",
+      "layer": "outer_system",
+      "class": "ice_giant",
+      "parent": "sol",
+      "sites": 2,
+      "habitability_band": "orbital",
+      "capture_sites": [
+        {"id": "ura_orbit", "label": "Uranus orbit", "resources": ["energy", "rare_samples"]},
+        {"id": "ura_titania_view", "label": "Titania approach", "resources": ["water", "structural_metals"]}
+      ]
+    },
+    {
+      "id": "neptune",
+      "label": "Neptune system",
+      "layer": "outer_system",
+      "class": "ice_giant",
+      "parent": "sol",
+      "sites": 2,
+      "habitability_band": "orbital",
+      "capture_sites": [
+        {"id": "nep_orbit", "label": "Neptune orbit", "resources": ["energy", "rare_samples"]},
+        {"id": "nep_triton", "label": "Triton polar", "resources": ["water", "propellant", "rare_samples"]}
+      ]
+    }
+  ],
+  "habitat_tiers": {
+    "outpost": {"orbital_command_cost": 1, "slots": 2, "label": "Outpost", "max_on_tiny_asteroid": true},
+    "settlement": {"orbital_command_cost": 3, "slots": 5, "label": "Settlement"},
+    "colony": {"orbital_command_cost": 5, "slots": 9, "label": "Colony"},
+    "platform": {"orbital_command_cost": 1, "slots": 2, "label": "Platform", "orbital": true, "space_rp_bonus": 0.02},
+    "orbital": {"orbital_command_cost": 3, "slots": 6, "label": "Orbital", "orbital": true, "space_rp_bonus": 0.06},
+    "ring": {"orbital_command_cost": 6, "slots": 12, "label": "Ring", "orbital": true, "space_rp_bonus": 0.12}
+  },
+  "station_bonuses": {
+    "space_research_mult_per_orbital": 0.06,
+    "space_research_mult_per_ring": 0.12,
+    "growth_mult_per_crew_station": 0.04,
+    "notes": "Operating stations = training ground + RP for space tech"
+  },
+  "staging_discounts": {
+    "earth_direct_to_mars_loft_mult": 1.0,
+    "via_luna_base_loft_mult": 0.62,
+    "via_l1_depot_loft_mult": 0.72,
+    "via_station_then_luna_mult": 0.55,
+    "notes": "Moon base / L1 staging makes Mars cheaper — explicit capability ladder"
+  },
+  "space_majors": {
+    "boost": {"earth_linked": true, "base_value": 2.0, "label": "Lift / boost"},
+    "orbital_command": {"earth_linked": true, "base_value": 5.0, "label": "Orbital command capacity"},
+    "propellant": {"earth_linked": false, "base_value": 1.5, "label": "Propellant"},
+    "structural_metals": {"earth_linked": true, "base_value": 1.2, "label": "Structural metals"},
+    "food": {"earth_linked": true, "base_value": 1.0, "label": "Food"},
+    "water": {"earth_linked": false, "base_value": 1.4, "label": "Water"},
+    "oxygen": {"earth_linked": false, "base_value": 1.6, "label": "Oxygen"},
+    "energy": {"earth_linked": false, "base_value": 1.1, "label": "Energy"},
+    "volatiles": {"earth_linked": false, "base_value": 1.8, "label": "Volatiles (legacy alias)"},
+    "rare_samples": {"earth_linked": false, "base_value": 8.0, "label": "Rare samples"}
+  },
+  "space_power": {
+    "weights": {
+      "fleet_strength": 1.0,
+      "orbital_weapons": 40.0,
+      "bombardment_capable_ships": 25.0,
+      "orbital_defenses": 18.0,
+      "isr_coverage": 12.0,
+      "habitats": 8.0,
+      "stations": 15.0,
+      "lift_capacity": 3.0
+    },
+    "undefended_earth_threat_mult": 2.2,
+    "notes": "Space power feeds national threat; undefended surface states face higher effective threat from bombardment fleets"
+  },
+  "space_combat": {
+    "model": "sea_zone_like",
+    "engagement_not_guaranteed": true,
+    "spotting": {
+      "base_detect": 0.25,
+      "radar_bonus": 0.2,
+      "isr_constellation_bonus": 0.25,
+      "stealth_fleet_penalty": 0.15,
+      "range_falloff_per_au": 0.12
+    },
+    "weapon_ranges": {
+      "kinetic_close": 0.15,
+      "missile": 0.45,
+      "dew_beam": 0.35,
+      "bombardment_to_surface": "requires_orbital_superiority_or_window"
+    },
+    "landing_craft_required": ["dropship", "shuttle", "lander", "assault_pod"],
+    "notes": "Mirrors naval search/strike: spot first, then engage; gravity wells need landers"
+  },
+  "spaceflow": {
+    "refuse_delivery_below": 0.05,
+    "base_interdiction_chance": 0.04,
+    "causes": ["asat", "patrol_cutter", "minefield", "piracy", "solar_storm", "debris_cascade", "radiation_belt"],
+    "hit_chance_scale": 0.55,
+    "hit_chance_min": 0.02,
+    "hit_chance_max": 0.5,
+    "loss_min": 0.08,
+    "loss_max": 0.7,
+    "range_interaction": {
+      "max_trade_au_without_relay": 1.6,
+      "relay_extends_au": 4.0,
+      "notes": "Reach/range gates who can trade or reinforce whom"
+    }
+  },
+  "colony_control": {
+    "loyalty_default": 55,
+    "autonomy_default": 15,
+    "starvation_months": 3,
+    "parent_relation_vectors": ["public", "elite", "military", "trust", "dependency"],
+    "independence": {
+      "drift_per_year_if_neglected": 2.5,
+      "generation_years": 25,
+      "min_years_to_breakaway": 20,
+      "mitigations": ["supply_buffer", "local_isru", "governor", "charter_rights", "cultural_ties"],
+      "notes": "Slow generational drift; mismanagement accelerates but not instant"
+    },
+    "third_party_relations": {
+      "requires_comms_or_range": true,
+      "can_trade_if_in_range": true
+    },
+    "admin_modes": ["direct", "charter", "military_gov", "open_port"]
+  },
+  "commercial_lift": {
+    "non_space_power_can_buy_lift": true,
+    "requires_seller_lift_surplus": true,
+    "price_suu_per_boost_unit": 12.0,
+    "tech_trade_or_theft_required_for_colony": true,
+    "notes": "Cannot found Mars colony without tech path, trade, theft, or bought designs + lift"
+  },
+  "corridors": [
+    {"id": "earth_leo", "from": "earth", "to": "leo_band", "layer": "near_earth", "base_risk": 0.05, "au": 0.0},
+    {"id": "leo_meo", "from": "leo_band", "to": "meo_band", "layer": "near_earth", "base_risk": 0.05, "au": 0.0},
+    {"id": "leo_geo", "from": "leo_band", "to": "geo_band", "layer": "near_earth", "base_risk": 0.06, "au": 0.0},
+    {"id": "leo_l1", "from": "leo_band", "to": "earth_luna_l1", "layer": "cis_lunar", "base_risk": 0.1, "au": 0.002},
+    {"id": "l1_luna", "from": "earth_luna_l1", "to": "luna", "layer": "cis_lunar", "base_risk": 0.08, "au": 0.001},
+    {"id": "l1_l2", "from": "earth_luna_l1", "to": "earth_luna_l2", "layer": "cis_lunar", "base_risk": 0.07, "au": 0.001},
+    {"id": "leo_mars", "from": "leo_band", "to": "mars", "layer": "inner_system", "base_risk": 0.18, "au": 0.5},
+    {"id": "luna_mars", "from": "luna", "to": "mars", "layer": "inner_system", "base_risk": 0.14, "au": 0.5, "staging_bonus": true},
+    {"id": "mars_phobos", "from": "mars", "to": "phobos", "layer": "inner_system", "base_risk": 0.06, "au": 0.0},
+    {"id": "mars_deimos", "from": "mars", "to": "deimos", "layer": "inner_system", "base_risk": 0.06, "au": 0.0},
+    {"id": "mars_nea", "from": "mars", "to": "nea_belt", "layer": "inner_system", "base_risk": 0.12, "au": 0.3},
+    {"id": "mars_ceres", "from": "mars", "to": "ceres", "layer": "main_belt", "base_risk": 0.15, "au": 1.2},
+    {"id": "ceres_vesta", "from": "ceres", "to": "vesta", "layer": "main_belt", "base_risk": 0.1, "au": 0.4},
+    {"id": "ceres_swarm", "from": "ceres", "to": "main_belt_swarm", "layer": "main_belt", "base_risk": 0.11, "au": 0.5},
+    {"id": "mars_jupiter", "from": "mars", "to": "jupiter", "layer": "outer_system", "base_risk": 0.22, "au": 3.5},
+    {"id": "jup_europa", "from": "jupiter", "to": "europa", "layer": "outer_system", "base_risk": 0.12, "au": 0.0},
+    {"id": "jup_ganymede", "from": "jupiter", "to": "ganymede", "layer": "outer_system", "base_risk": 0.1, "au": 0.0},
+    {"id": "jup_callisto", "from": "jupiter", "to": "callisto", "layer": "outer_system", "base_risk": 0.09, "au": 0.0},
+    {"id": "jup_io", "from": "jupiter", "to": "io", "layer": "outer_system", "base_risk": 0.14, "au": 0.0},
+    {"id": "jup_saturn", "from": "jupiter", "to": "saturn", "layer": "outer_system", "base_risk": 0.2, "au": 4.0},
+    {"id": "sat_titan", "from": "saturn", "to": "titan", "layer": "outer_system", "base_risk": 0.11, "au": 0.0},
+    {"id": "sat_enceladus", "from": "saturn", "to": "enceladus", "layer": "outer_system", "base_risk": 0.12, "au": 0.0}
+  ],
+  "survey": {
+    "notes": "S4: few high-value discoveries per body; not spam anomalies",
+    "base_months": 6,
+    "months_per_au": 2.0,
+    "success_base": 0.55,
+    "isr_bonus": 0.15,
+    "radar_bonus": 0.1,
+    "probe_bonus": 0.12,
+    "max_discoveries_per_body": 3,
+    "discovery_classes": [
+      {"id": "resource_assay", "weight": 35, "payoff": "high_yield_site"},
+      {"id": "hazard_map", "weight": 25, "payoff": "corridor_risk_mod"},
+      {"id": "deep_time_relic", "weight": 15, "payoff": "multi_year_project"},
+      {"id": "biosignature", "weight": 15, "payoff": "terraform_candidate"},
+      {"id": "first_contact_signal", "weight": 10, "payoff": "narrative_optional"}
+    ]
+  },
+  "layer_fog": {
+    "notes": "S5: locked layers show fogged silhouettes; unlock clears fog",
+    "show_fogged_silhouettes": true,
+    "silhouette_alpha": 0.28,
+    "reveal_on_any_gate": true
+  },
+  "terraform": {
+    "notes": "S6: multi-decade megaproject; 0–2 gardens per campaign; Mars default candidate",
+    "max_garden_worlds": 2,
+    "stages": ["candidate", "seed", "stabilize", "garden"],
+    "months_per_stage": {"candidate": 12, "seed": 60, "stabilize": 120, "garden": 24},
+    "seed_flow_item": "volatiles",
+    "crisis_chance_per_year": 0.18,
+    "sabotage_risk_scale": 0.12,
+    "default_candidate_body": "mars",
+    "food_export_on_garden": true
+  },
+  "galaxy_bridge": {
+    "notes": "S7: sparse stellar nodes after solar mastery — not full Stellaris density",
+    "gate_flags": ["allow_galaxy_bridge", "allow_ftl_relay"],
+    "gate_milestones": ["solar_industrial_mastery", "first_ftl_probe"],
+    "gate_mode": "any",
+    "max_active_nodes": 8,
+    "nodes": [
+      {"id": "sol_exit", "label": "Sol exit relay", "order": 0, "always_home": true},
+      {"id": "proxima", "label": "Proxima Centauri", "order": 1, "ly": 4.2},
+      {"id": "barnards", "label": "Barnard's Star", "order": 2, "ly": 6.0},
+      {"id": "sirius", "label": "Sirius A system", "order": 3, "ly": 8.6},
+      {"id": "epsilon_eri", "label": "Epsilon Eridani", "order": 4, "ly": 10.5},
+      {"id": "tau_ceti", "label": "Tau Ceti", "order": 5, "ly": 11.9},
+      {"id": "trappist", "label": "TRAPPIST-1", "order": 6, "ly": 39.5},
+      {"id": "kepler442", "label": "Kepler-442", "order": 7, "ly": 1200.0}
+    ],
+    "corridors": [
+      {"id": "sol_prox", "from": "sol_exit", "to": "proxima", "base_risk": 0.25},
+      {"id": "sol_barn", "from": "sol_exit", "to": "barnards", "base_risk": 0.28},
+      {"id": "prox_sirius", "from": "proxima", "to": "sirius", "base_risk": 0.22},
+      {"id": "sirius_eps", "from": "sirius", "to": "epsilon_eri", "base_risk": 0.3},
+      {"id": "eps_tau", "from": "epsilon_eri", "to": "tau_ceti", "base_risk": 0.27},
+      {"id": "tau_trap", "from": "tau_ceti", "to": "trappist", "base_risk": 0.4},
+      {"id": "trap_kep", "from": "trappist", "to": "kepler442", "base_risk": 0.55}
+    ]
+  }
+}

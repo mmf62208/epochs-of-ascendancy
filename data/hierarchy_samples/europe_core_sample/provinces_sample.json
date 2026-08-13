@@ -1,0 +1,194 @@
+{
+  "provinces": [
+    {
+      "id": 700901,
+      "name": "Antwerp District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700902,
+      "name": "Ghent District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700903,
+      "name": "Bruges District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700904,
+      "name": "Leuven District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700905,
+      "name": "Mechelen District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700906,
+      "name": "Hasselt District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700911,
+      "name": "Brussels District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700912,
+      "name": "Nivelles District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700913,
+      "name": "Louvain Outer",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700914,
+      "name": "Wavre District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700915,
+      "name": "Halle District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700921,
+      "name": "Munich District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700922,
+      "name": "Nuremberg District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700923,
+      "name": "Augsburg District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700924,
+      "name": "Regensburg District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700925,
+      "name": "Würzburg District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700926,
+      "name": "Passau District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700927,
+      "name": "Ingolstadt District",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700931,
+      "name": "Paris",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700932,
+      "name": "Seine-et-Marne",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700933,
+      "name": "Yvelines",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700934,
+      "name": "Essonne",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700935,
+      "name": "Hauts-de-Seine",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700936,
+      "name": "Seine-Saint-Denis",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700937,
+      "name": "Val-de-Marne",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    },
+    {
+      "id": 700938,
+      "name": "Val-d'Oise",
+      "domain": "land",
+      "theater": "europe_core",
+      "sample": true
+    }
+  ],
+  "meta": {
+    "sample": "europe_core",
+    "province_n": 26,
+    "state_n": 4,
+    "region_n": 3,
+    "super_region_n": 1,
+    "design": "district→historical state→strategic region→Europe"
+  }
+}

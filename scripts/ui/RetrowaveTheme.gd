@@ -58,7 +58,116 @@ static func style_row_label(label: Label) -> void:
 
 
 static func style_detail_panel(panel: PanelContainer) -> void:
-	panel.add_theme_stylebox_override("panel", _panel_style())
+	# Prefer generated 9-slice retrowave frame when present.
+	var framed := _panel_texture_style()
+	if framed != null:
+		panel.add_theme_stylebox_override("panel", framed)
+	else:
+		panel.add_theme_stylebox_override("panel", _panel_style())
+
+
+static func style_detail_panel_flat(panel: PanelContainer) -> void:
+	## Clean inset panel without ornamented corner chrome (avoids L/R clip on scroll/lists).
+	if panel == null:
+		return
+	var style := _panel_style()
+	style.content_margin_left = 10
+	style.content_margin_right = 10
+	style.content_margin_top = 8
+	style.content_margin_bottom = 8
+	panel.add_theme_stylebox_override("panel", style)
+
+
+static func style_world_panel(control: Control) -> void:
+	## Style any Panel / PanelContainer with the world-class framed chrome.
+	if control == null:
+		return
+	var framed_tex := _panel_texture_style()
+	var box: StyleBox = framed_tex if framed_tex != null else _panel_style()
+	if control is PanelContainer or control is Panel:
+		control.add_theme_stylebox_override("panel", box)
+
+
+static func style_info_panel_flat(control: Control) -> void:
+	## Province/region inspector: light cyan outline, no magenta corner ornaments.
+	if control == null:
+		return
+	var style := StyleBoxFlat.new()
+	style.bg_color = BG_DEEP
+	var border := CYAN
+	border.a = 0.85
+	style.border_color = border
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(8)
+	style.shadow_size = 8
+	style.shadow_offset = Vector2(4, 4)
+	style.shadow_color = Color(0, 0, 0, 0.35)
+	# Zero style content margins — Panel children use explicit layout pads (avoids double-inset mismatch).
+	style.content_margin_left = 0
+	style.content_margin_right = 0
+	style.content_margin_top = 0
+	style.content_margin_bottom = 0
+	if control is PanelContainer or control is Panel:
+		control.add_theme_stylebox_override("panel", style)
+	else:
+		control.add_theme_stylebox_override("panel", style)
+
+
+static func style_menu_panel(control: Control) -> void:
+	## Slightly richer chrome for Main Menu / command center surfaces.
+	if control == null:
+		return
+	var tex := _load_tex("res://assets/graphics/ui/menu_panel_frame_512.png")
+	if tex == null:
+		style_world_panel(control)
+		return
+	var style := StyleBoxTexture.new()
+	style.texture = tex
+	style.texture_margin_left = 48
+	style.texture_margin_right = 48
+	style.texture_margin_top = 48
+	style.texture_margin_bottom = 48
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 14
+	style.content_margin_bottom = 14
+	if control is PanelContainer or control is Panel:
+		control.add_theme_stylebox_override("panel", style)
+	else:
+		# Generic Control fallback (PanelContainer is the usual target).
+		style_world_panel(control)
+
+
+static func style_progress_bar(bar: ProgressBar) -> void:
+	if bar == null:
+		return
+	var bg_tex := _load_tex("res://assets/graphics/ui/progress_bar_frame.png")
+	var fill_tex := _load_tex("res://assets/graphics/ui/progress_bar_fill.png")
+	if bg_tex != null:
+		var bg := StyleBoxTexture.new()
+		bg.texture = bg_tex
+		bg.texture_margin_left = 24
+		bg.texture_margin_right = 24
+		bg.texture_margin_top = 12
+		bg.texture_margin_bottom = 12
+		bg.content_margin_left = 4
+		bg.content_margin_right = 4
+		bg.content_margin_top = 2
+		bg.content_margin_bottom = 2
+		bar.add_theme_stylebox_override("background", bg)
+	if fill_tex != null:
+		var fill := StyleBoxTexture.new()
+		fill.texture = fill_tex
+		fill.texture_margin_left = 8
+		fill.texture_margin_right = 8
+		fill.texture_margin_top = 4
+		fill.texture_margin_bottom = 4
+		bar.add_theme_stylebox_override("fill", fill)
+	else:
+		var fill_flat := StyleBoxFlat.new()
+		fill_flat.bg_color = CYAN
+		fill_flat.set_corner_radius_all(2)
+		bar.add_theme_stylebox_override("fill", fill_flat)
 
 
 static func style_detail_label(label: Label) -> void:
@@ -139,6 +248,30 @@ static func style_danger_button(button: Button) -> void:
 	button.add_theme_stylebox_override("pressed", _button_style(Color("#1a0f14"), WARNING))
 	button.add_theme_color_override("font_color", WARNING)
 	button.add_theme_font_size_override("font_size", 15)
+
+
+static func _load_tex(path: String) -> Texture2D:
+	if not ResourceLoader.exists(path):
+		return null
+	return load(path) as Texture2D
+
+
+static func _panel_texture_style() -> StyleBoxTexture:
+	var tex := _load_tex("res://assets/graphics/ui/panel_frame_512.png")
+	if tex == null:
+		return null
+	var style := StyleBoxTexture.new()
+	style.texture = tex
+	# Corner ornaments live in ~48px; edges uniform for 9-slice.
+	style.texture_margin_left = 48
+	style.texture_margin_right = 48
+	style.texture_margin_top = 48
+	style.texture_margin_bottom = 48
+	style.content_margin_left = 14
+	style.content_margin_right = 14
+	style.content_margin_top = 12
+	style.content_margin_bottom = 12
+	return style
 
 
 static func _panel_style() -> StyleBoxFlat:

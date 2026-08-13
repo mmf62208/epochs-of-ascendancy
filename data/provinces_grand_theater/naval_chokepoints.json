@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "source": "filtered from world_full for data/provinces_grand_theater",
+    "count": 13
+  },
+  "chokepoint_province_ids": [
+    20087,
+    20105,
+    20106,
+    20107,
+    20108,
+    20109,
+    20110,
+    20111,
+    20055,
+    20093,
+    20040,
+    9131,
+    20002
+  ]
+}

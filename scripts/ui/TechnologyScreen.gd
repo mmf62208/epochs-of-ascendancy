@@ -2,6 +2,8 @@
 class_name TechnologyScreen
 extends DraggablePanel
 
+const TECH_DOMAIN_ICON_DIR := "res://assets/graphics/icons/tech_domains/"
+
 @export var country_tag: String = "USA"
 
 @onready var title_label: Label = $TitleBar/TitleLabel
@@ -49,8 +51,14 @@ extends DraggablePanel
 @onready var inspector_title: Label = (
 	$MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox/InspectorTitle
 )
+@onready var inspector_benefit: Label = (
+	$MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox/InspectorBenefit
+)
+@onready var inspector_body_scroll: ScrollContainer = (
+	$MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox/InspectorBodyScroll
+)
 @onready var inspector_body: Label = (
-	$MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox/InspectorBody
+	$MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox/InspectorBodyScroll/InspectorBody
 )
 @onready var research_button: Button = (
 	$MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox/InspectorActions/ResearchButton
@@ -73,12 +81,17 @@ func _ready() -> void:
 	add_to_group("technology_screen")
 	drag_handle = $TitleBar
 	super._ready()
+	# Stay above map/HUD; root-child Controls can sit under map canvas layers otherwise.
+	z_index = 80
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	close_button.pressed.connect(_on_close_pressed)
 	research_button.pressed.connect(_on_research_pressed)
 	cancel_button.pressed.connect(_on_cancel_pressed)
 	domain_filter.item_selected.connect(_on_domain_changed)
 	view_mode_filter.item_selected.connect(_on_view_mode_changed)
-	era_slider.value_changed.connect(_on_era_slider_changed)
+	# Do NOT connect era_slider before first paint — value_changed→refresh_screen in _setup
+	# was stacking 2–3 full tree rebuilds and freezing F5 before the panel appeared.
 	reset_view_button.pressed.connect(_on_reset_view_pressed)
 	open_training_button.pressed.connect(_on_open_training_pressed)
 	open_agents_button.pressed.connect(_on_open_agents_pressed)
@@ -86,10 +99,60 @@ func _ready() -> void:
 		graph_view.node_selected.connect(_on_graph_node_selected)
 	_apply_screen_theme()
 	_connect_manager_signals()
-	_setup_era_slider()
 	_setup_view_mode_filter()
-	_setup_domain_filter()
+	_setup_domain_filter_shell()
+	_center_on_viewport()
+	# First visible frame, then load data once.
+	call_deferred("_deferred_first_refresh")
+
+
+func _center_on_viewport() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var sz: Vector2 = vp.get_visible_rect().size
+	var panel_sz := size
+	if panel_sz.x < 8.0 or panel_sz.y < 8.0:
+		panel_sz = Vector2(1040, 680)
+		custom_minimum_size = panel_sz
+		size = panel_sz
+	global_position = (sz - panel_sz) * 0.5
+	global_position.x = maxf(8.0, global_position.x)
+	global_position.y = maxf(56.0, global_position.y)  # below top bar
+
+
+func _setup_domain_filter_shell() -> void:
+	# Minimal filter UI without full domain scan (scan happens in first refresh).
+	domain_filter.clear()
+	domain_filter.add_item("All")
+	domain_filter.set_item_metadata(0, "all")
+	domain_filter.select(0)
+	_domain_filter_id = "all"
+	_domain_filter_ready = true
+
+
+func _deferred_first_refresh() -> void:
+	if not is_inside_tree():
+		return
+	_setup_era_slider_quiet()
+	if not era_slider.value_changed.is_connected(_on_era_slider_changed):
+		era_slider.value_changed.connect(_on_era_slider_changed)
 	refresh_screen()
+	_center_on_viewport()
+	print("TechnologyScreen: opened for %s (entries will list after refresh)" % country_tag)
+
+
+func _setup_era_slider_quiet() -> void:
+	## Set era slider without emitting value_changed (avoids double refresh).
+	var keys := TechnologyManager.get_era_swimlane_keys()
+	var labels := TechnologyManager.get_era_swimlane_labels()
+	era_slider.min_value = 0
+	era_slider.max_value = maxf(float(keys.size() - 1), 0.0)
+	era_slider.step = 1.0
+	era_slider.set_value_no_signal(0.0)
+	_era_filter_key = str(keys[0]) if not keys.is_empty() else "all"
+	if not labels.is_empty():
+		era_value_label.text = str(labels[0])
 
 
 func _exit_tree() -> void:
@@ -129,16 +192,14 @@ func _setup_view_mode_filter() -> void:
 
 
 func _setup_era_slider() -> void:
-	var keys := TechnologyManager.get_era_swimlane_keys()
-	era_slider.min_value = 0
-	era_slider.max_value = maxf(float(keys.size() - 1), 0.0)
-	era_slider.step = 1.0
-	era_slider.value = 0.0
-	_on_era_slider_changed(0.0)
+	## Legacy entry used by callers; quiet setup + one refresh.
+	_setup_era_slider_quiet()
+	if not era_slider.value_changed.is_connected(_on_era_slider_changed):
+		era_slider.value_changed.connect(_on_era_slider_changed)
 
 
 func _setup_domain_filter() -> void:
-	_rebuild_domain_filter(["all", "support"])
+	_setup_domain_filter_shell()
 
 
 func _rebuild_domain_filter(
@@ -164,6 +225,9 @@ func _rebuild_domain_filter(
 			label = "● " + label
 		domain_filter.add_item(label)
 		domain_filter.set_item_metadata(idx, domain_id)
+		var dtex := _tech_domain_icon(domain_id)
+		if dtex != null:
+			domain_filter.set_item_icon(idx, dtex)
 	var pick := 0
 	for i in range(domain_filter.item_count):
 		if str(domain_filter.get_item_metadata(i)) == previous:
@@ -177,7 +241,30 @@ func _rebuild_domain_filter(
 	_domain_filter_ready = true
 
 
+func _tech_domain_icon(domain_id: String) -> Texture2D:
+	var d := domain_id.strip_edges().to_lower()
+	if d == "all" or d.is_empty():
+		return null
+	# Map doctrine subdomains to doctrine pack icon
+	if d.ends_with("_doctrine") or d == "doctrine":
+		d = "doctrine"
+	var path32 := "%s%s_32.png" % [TECH_DOMAIN_ICON_DIR, d]
+	var path64 := "%s%s_64.png" % [TECH_DOMAIN_ICON_DIR, d]
+	if ResourceLoader.exists(path32):
+		return load(path32) as Texture2D
+	if ResourceLoader.exists(path64):
+		return load(path64) as Texture2D
+	return null
+
+
 func _apply_screen_theme() -> void:
+	# Nudge content ~6px right / ~4px down for HUD chrome alignment.
+	var margin := get_node_or_null("MarginContainer") as MarginContainer
+	if margin != null:
+		margin.add_theme_constant_override("margin_left", 26)
+		margin.add_theme_constant_override("margin_top", 16)
+		margin.add_theme_constant_override("margin_right", 20)
+		margin.add_theme_constant_override("margin_bottom", 12)
 	RetrowaveTheme.style_production_screen(self)
 	RetrowaveTheme.style_title(title_label, RetrowaveTheme.CYAN)
 	RetrowaveTheme.style_secondary_button(close_button)
@@ -191,10 +278,36 @@ func _apply_screen_theme() -> void:
 	RetrowaveTheme.style_secondary_button(open_agents_button)
 	RetrowaveTheme.style_filter_option(domain_filter)
 	RetrowaveTheme.style_filter_option(view_mode_filter)
-	RetrowaveTheme.style_detail_panel(inspector_panel)
-	RetrowaveTheme.style_detail_panel(doctrine_panel)
-	RetrowaveTheme.style_detail_label(inspector_title)
+	# Flat panels — no ornamented red corner chrome on Technology.
+	RetrowaveTheme.style_detail_panel_flat(inspector_panel)
+	RetrowaveTheme.style_detail_panel_flat(doctrine_panel)
+	var inspector_margin := get_node_or_null(
+		"MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin"
+	) as MarginContainer
+	if inspector_margin != null:
+		# Title down ~2px, text inside box ~1px right.
+		inspector_margin.add_theme_constant_override("margin_left", 15)
+		inspector_margin.add_theme_constant_override("margin_top", 14)
+		inspector_margin.add_theme_constant_override("margin_right", 12)
+		inspector_margin.add_theme_constant_override("margin_bottom", 10)
+	# Bold tech name line (e.g. Biplane Airframes): larger + primary color.
+	RetrowaveTheme.style_title(inspector_title, RetrowaveTheme.TEXT_PRIMARY)
+	inspector_title.add_theme_font_size_override("font_size", 18)
+	inspector_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	inspector_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	if inspector_benefit != null:
+		RetrowaveTheme.style_body_label(inspector_benefit)
+		inspector_benefit.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		inspector_benefit.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		inspector_benefit.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+	if inspector_body_scroll != null:
+		inspector_body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		inspector_body_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		inspector_body_scroll.clip_contents = true
+		inspector_body_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	RetrowaveTheme.style_body_label(inspector_body)
+	inspector_body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	inspector_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	RetrowaveTheme.style_body_label(doctrine_header)
 	RetrowaveTheme.style_body_label(doctrine_xp_label)
 	RetrowaveTheme.style_primary_button(research_button)
@@ -205,6 +318,7 @@ func _apply_screen_theme() -> void:
 	RetrowaveTheme.style_body_label(active_research_label)
 	RetrowaveTheme.style_body_label(era_value_label)
 	RetrowaveTheme.style_body_label(footer_label)
+	call_deferred("_relayout_inspector_wrap")
 
 
 func _on_close_pressed() -> void:
@@ -319,12 +433,19 @@ func _strip_bbcode_tags(text: String) -> String:
 
 
 func _count_entries_by_domain(tag: String, era_key: String) -> Dictionary:
+	## Prefer counting from an already-fetched list; avoid a second full tree build.
 	if typeof(TechnologyManager) == TYPE_NIL:
 		return {}
+	if current_data != null and not current_data.research_entries.is_empty() and era_key == _era_filter_key:
+		return _count_entries_by_domain_from_entries(current_data.research_entries)
 	var preview = TechnologyManager.get_technology_screen_data(tag, "all", "", era_key)
+	return _count_entries_by_domain_from_entries(preview.research_entries)
+
+
+func _count_entries_by_domain_from_entries(entries: Array) -> Dictionary:
 	var counts: Dictionary = {}
 	var status_counts: Dictionary = {}
-	for entry in preview.research_entries:
+	for entry in entries:
 		if typeof(entry) != TYPE_DICTIONARY:
 			continue
 		var row := entry as Dictionary
@@ -338,7 +459,7 @@ func _count_entries_by_domain(tag: String, era_key: String) -> Dictionary:
 		var st := str(row.get("status", ""))
 		if bucket.has(st):
 			bucket[st] = int(bucket[st]) + 1
-	counts["all"] = preview.research_entries.size()
+	counts["all"] = entries.size()
 	counts["_status_by_domain"] = status_counts
 	return counts
 
@@ -401,7 +522,8 @@ func _on_cancel_pressed() -> void:
 func refresh_screen() -> void:
 	if typeof(TechnologyManager) == TYPE_NIL:
 		return
-	var preview = TechnologyManager.get_technology_screen_data(
+	# Single data pull (was 2× get_technology_screen_data + domain recount = freeze on open).
+	current_data = TechnologyManager.get_technology_screen_data(
 		country_tag,
 		_domain_filter_id,
 		_selected_tech_id,
@@ -409,24 +531,24 @@ func refresh_screen() -> void:
 	)
 	if not _selected_tech_id.is_empty():
 		var still_visible := false
-		for entry in preview.research_entries:
+		for entry in current_data.research_entries:
 			if str(entry.get("tech_id", "")) == _selected_tech_id:
 				still_visible = true
 				break
-		if not still_visible and not preview.research_entries.is_empty():
-			_selected_tech_id = str(preview.research_entries[0].get("tech_id", ""))
-	elif not preview.research_entries.is_empty():
-		_selected_tech_id = str(preview.research_entries[0].get("tech_id", ""))
+		if not still_visible and not current_data.research_entries.is_empty():
+			_selected_tech_id = str(current_data.research_entries[0].get("tech_id", ""))
+			current_data = TechnologyManager.get_technology_screen_data(
+				country_tag,
+				_domain_filter_id,
+				_selected_tech_id,
+				_era_filter_key,
+			)
+	elif not current_data.research_entries.is_empty():
+		_selected_tech_id = str(current_data.research_entries[0].get("tech_id", ""))
 
-	var domain_counts := _count_entries_by_domain(country_tag, _era_filter_key)
+	var domain_counts := _count_entries_by_domain_from_entries(current_data.research_entries)
 	_domain_counts_cache = domain_counts
-	_rebuild_domain_filter(preview.domains_present, domain_counts, preview.active_research)
-	current_data = TechnologyManager.get_technology_screen_data(
-		country_tag,
-		_domain_filter_id,
-		_selected_tech_id,
-		_era_filter_key,
-	)
+	_rebuild_domain_filter(current_data.domains_present, domain_counts, current_data.active_research)
 
 	title_label.text = "Technology — %s" % country_tag
 	slots_label.text = "Slots: %d/%d" % [
@@ -579,7 +701,7 @@ func _populate_doctrine_panel() -> void:
 
 func _create_doctrine_row(entry: Dictionary) -> PanelContainer:
 	var panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(panel)
+	RetrowaveTheme.style_detail_panel_flat(panel)
 	var unlocked := bool(entry.get("doctrine_unlocked", false))
 	if unlocked:
 		panel.modulate = Color(0.85, 1.0, 0.92)
@@ -625,8 +747,11 @@ func _create_doctrine_row(entry: Dictionary) -> PanelContainer:
 func _create_research_row(entry: Dictionary) -> PanelContainer:
 	var tech_id := str(entry.get("tech_id", ""))
 	var panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(panel)
+	# Flat highlight only — no red ornamented corners on tech rows.
+	RetrowaveTheme.style_detail_panel_flat(panel)
 	panel.gui_input.connect(_on_row_gui_input.bind(tech_id, panel))
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	panel.clip_contents = true
 
 	var status := str(entry.get("status", "locked"))
 	var selected := tech_id == _selected_tech_id
@@ -643,10 +768,39 @@ func _create_research_row(entry: Dictionary) -> PanelContainer:
 	else:
 		panel.modulate = Color(0.65, 0.65, 0.7)
 
+	# Keep locked / row text ~4px inside the highlighted area.
+	var inset := MarginContainer.new()
+	inset.add_theme_constant_override("margin_left", 4)
+	inset.add_theme_constant_override("margin_right", 4)
+	inset.add_theme_constant_override("margin_top", 0)
+	inset.add_theme_constant_override("margin_bottom", 0)
+	inset.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	inset.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(inset)
+
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
-	panel.add_child(box)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	inset.add_child(box)
 
+	var header := HBoxContainer.new()
+	header.add_theme_constant_override("separation", 8)
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	box.add_child(header)
+	var domain_id := str(entry.get("domain", ""))
+	var dtex := _tech_domain_icon(domain_id)
+	if dtex != null:
+		var tr := TextureRect.new()
+		tr.texture = dtex
+		tr.custom_minimum_size = Vector2(28, 28)
+		tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		header.add_child(tr)
+
+	# Headline: tech name (status as subtitle).
 	var title := Label.new()
 	var status_icon := ""
 	match status:
@@ -660,11 +814,32 @@ func _create_research_row(entry: Dictionary) -> PanelContainer:
 			status_icon = "⚠ "
 		"locked":
 			status_icon = "🔒 "
-	if str(entry.get("domain", "")) == "support":
+	if domain_id == "support":
 		status_icon = "📡 " + status_icon
-	title.text = "%s%s · %s" % [status_icon, entry.get("name", ""), status.replace("_", " ").capitalize()]
-	RetrowaveTheme.style_body_label(title)
-	box.add_child(title)
+	title.text = "%s%s" % [status_icon, entry.get("name", "")]
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	RetrowaveTheme.style_detail_label(title)
+	header.add_child(title)
+
+	# Major benefit line — always visible under the name.
+	var effect := Label.new()
+	var effect_txt := str(entry.get("short_effect", "")).strip_edges()
+	if effect_txt.is_empty():
+		effect_txt = "%s · %d days" % [
+			status.replace("_", " ").capitalize(),
+			int(entry.get("cost_days", 0)),
+		]
+	else:
+		effect_txt = "%s — %s" % [status.replace("_", " ").capitalize(), effect_txt]
+	effect.text = effect_txt
+	effect.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	effect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	effect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	RetrowaveTheme.style_body_label(effect)
+	effect.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+	box.add_child(effect)
 
 	if status == "in_progress":
 		var bar := ProgressBar.new()
@@ -673,19 +848,15 @@ func _create_research_row(entry: Dictionary) -> PanelContainer:
 		bar.value = float(entry.get("progress_pct", 0.0))
 		bar.show_percentage = true
 		bar.custom_minimum_size = Vector2(0, 14)
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = Color(0.35, 0.75, 1.0, 0.95)
-		bar.add_theme_stylebox_override("fill", fill)
-		var bg := StyleBoxFlat.new()
-		bg.bg_color = Color(0.12, 0.16, 0.22, 0.9)
-		bar.add_theme_stylebox_override("background", bg)
+		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		RetrowaveTheme.style_progress_bar(bar)
 		box.add_child(bar)
 
 	var meta := Label.new()
-	var meta_text := "%s · %d days · tier %d" % [
+	var meta_text := "%s · tier %d · %s" % [
 		entry.get("epoch", ""),
-		int(entry.get("cost_days", 0)),
 		int(entry.get("tier", 0)),
+		entry.get("domain", ""),
 	]
 	if status == "in_progress":
 		var pct := int(round(float(entry.get("progress_pct", 0.0)) * 100.0))
@@ -693,16 +864,12 @@ func _create_research_row(entry: Dictionary) -> PanelContainer:
 		if eta > 0.0:
 			meta_text += " · %d%% · ~%.0fd ETA" % [pct, eta]
 	meta.text = meta_text
+	meta.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	meta.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	meta.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	RetrowaveTheme.style_body_label(meta)
 	meta.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
 	box.add_child(meta)
-
-	var effect := Label.new()
-	effect.text = str(entry.get("short_effect", ""))
-	effect.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	RetrowaveTheme.style_body_label(effect)
-	effect.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
-	box.add_child(effect)
 
 	return panel
 
@@ -716,10 +883,27 @@ func _on_row_gui_input(event: InputEvent, tech_id: String, panel: PanelContainer
 			panel.accept_event()
 
 
+func _relayout_inspector_wrap() -> void:
+	if inspector_body_scroll == null or inspector_body == null:
+		return
+	var w := inspector_body_scroll.size.x
+	if w < 40.0 and inspector_panel != null:
+		w = maxf(inspector_panel.size.x - 40.0, 160.0)
+	if w < 40.0:
+		w = 220.0
+	inspector_body.custom_minimum_size = Vector2(w - 8.0, 0)
+	if inspector_title != null:
+		inspector_title.custom_minimum_size = Vector2(w - 8.0, 0)
+	if inspector_benefit != null:
+		inspector_benefit.custom_minimum_size = Vector2(w - 8.0, 0)
+
+
 func _update_inspector() -> void:
 	var info: Dictionary = current_data.inspector
 	if info.is_empty():
 		inspector_title.text = "Select a technology"
+		if inspector_benefit != null:
+			inspector_benefit.text = ""
 		inspector_body.text = ""
 		research_button.disabled = true
 		cancel_button.disabled = true
@@ -729,11 +913,23 @@ func _update_inspector() -> void:
 	var title_prefix := ""
 	if domain_id == "support":
 		title_prefix = "📡 "
-	inspector_title.text = "%s%s [%s]" % [
-		title_prefix,
-		info.get("name", ""),
-		str(info.get("status", "")).capitalize(),
-	]
+	# Headline: name + status (always visible above scroll).
+	inspector_title.text = "%s%s" % [title_prefix, str(info.get("name", ""))]
+	# Major benefit line (always visible under headline).
+	var benefit := str(info.get("short_effect", "")).strip_edges()
+	if benefit.is_empty():
+		benefit = "%s · %s · %d days" % [
+			str(info.get("domain", "")).capitalize(),
+			str(info.get("status", "")).replace("_", " ").capitalize(),
+			int(info.get("cost_days", 0)),
+		]
+	else:
+		benefit = "[%s] %s" % [
+			str(info.get("status", "")).replace("_", " ").capitalize(),
+			benefit,
+		]
+	if inspector_benefit != null:
+		inspector_benefit.text = benefit
 
 	var lines: PackedStringArray = []
 	lines.append("Domain: %s · %s" % [info.get("domain", ""), info.get("epoch", "")])
@@ -770,8 +966,6 @@ func _update_inspector() -> void:
 		var support := MapTechnologyContext.build_support_radio_glance_bbcode(country_tag)
 		if not support.is_empty():
 			lines.append(_strip_bbcode_tags(support))
-	if str(info.get("short_effect", "")) != "":
-		lines.append(str(info.get("short_effect", "")))
 	if str(info.get("flavor", "")) != "":
 		lines.append(str(info.get("flavor", "")))
 
@@ -796,6 +990,9 @@ func _update_inspector() -> void:
 		lines.append("After research: open Leader Training Paths to spend XP on schools.")
 
 	inspector_body.text = "\n".join(lines)
+	if inspector_body_scroll != null:
+		inspector_body_scroll.scroll_vertical = 0
+	call_deferred("_relayout_inspector_wrap")
 
 	research_button.disabled = status == "compromised" or not bool(info.get("can_start", false))
 	cancel_button.disabled = not bool(info.get("can_cancel", false))

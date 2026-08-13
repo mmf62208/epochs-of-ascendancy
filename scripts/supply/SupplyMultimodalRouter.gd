@@ -39,6 +39,24 @@ static func find_best_route(
 			continue
 		if best == null or plan.total_days < best.total_days:
 			best = plan
+	# Land-only cargo still needs sea when own land is discontinuous (East Prussia,
+	# overseas holdings) and no alliance/transit rights allow overland through neutrals.
+	if best == null or best.path_length() < 2:
+		if not modes.has("sea"):
+			var sea_plan := SupplyPathfinder.find_route_for_mode(
+				"sea", source_id, target_id, owner_tag,
+				provinces, adjacency, hubs, rules, waypoints,
+			)
+			if sea_plan != null and sea_plan.path_length() >= 2:
+				best = sea_plan
+		if best == null or best.path_length() < 2:
+			if not modes.has("air"):
+				var air_plan := SupplyPathfinder.find_route_for_mode(
+					"air", source_id, target_id, owner_tag,
+					provinces, adjacency, hubs, rules, waypoints,
+				)
+				if air_plan != null and air_plan.path_length() >= 2:
+					best = air_plan
 	if best == null:
 		best = SupplyPathfinder.find_route(
 			source_id, target_id, owner_tag, provinces, adjacency, hubs, rules, waypoints,

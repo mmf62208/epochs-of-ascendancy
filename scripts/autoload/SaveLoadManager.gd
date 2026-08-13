@@ -178,18 +178,52 @@ func _notification(what: int) -> void:
 				# No toast on shutdown to avoid UI issues
 		# Do not block exit
 
+## OS absolute path for user://saves/ (DirAccess absolute APIs are flaky with user:// alone).
+func get_saves_dir_global() -> String:
+	return ProjectSettings.globalize_path(SAVE_DIR)
+
+
 func _ensure_save_dir() -> void:
-	if not DirAccess.dir_exists_absolute(SAVE_DIR):
-		var err := DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	var global_dir := get_saves_dir_global()
+	# Prefer user:// relative open; fall back to globalized absolute.
+	var exists := DirAccess.dir_exists_absolute(SAVE_DIR) or DirAccess.dir_exists_absolute(global_dir)
+	if not exists:
+		var err := DirAccess.make_dir_recursive_absolute(global_dir)
 		if err != OK:
-			push_error("SaveLoadManager: Failed to create saves dir: %s" % SAVE_DIR)
+			# Second try with user:// form
+			err = DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+		if err != OK:
+			push_error("SaveLoadManager: Failed to create saves dir: %s (global=%s err=%d)" % [SAVE_DIR, global_dir, err])
+		else:
+			print("SaveLoadManager: Created saves dir → %s" % global_dir)
+	# Verify we can open it
+	var d := DirAccess.open(SAVE_DIR)
+	if d == null:
+		push_error("SaveLoadManager: Cannot open saves dir after ensure: %s" % SAVE_DIR)
+
 
 func get_save_path(slot_name: String) -> String:
+	var safe := _sanitize_slot(slot_name)
+	return SAVE_DIR + safe + ".json"
+
+
+func get_save_path_global(slot_name: String) -> String:
+	return ProjectSettings.globalize_path(get_save_path(slot_name))
+
+
+func _sanitize_slot(slot_name: String) -> String:
 	var safe := slot_name.strip_edges().to_lower()
 	safe = safe.replace(" ", "_").replace("/", "_").replace("\\", "_").replace(":", "_")
-	if safe.is_empty():
-		safe = DEFAULT_SLOT
-	return SAVE_DIR + safe + ".json"
+	var cleaned := ""
+	for i in safe.length():
+		var ch := safe[i]
+		var code := ch.unicode_at(0)
+		var is_alnum := (code >= 97 and code <= 122) or (code >= 48 and code <= 57)
+		if is_alnum or ch == "_" or ch == "-":
+			cleaned += ch
+	if cleaned.is_empty():
+		cleaned = DEFAULT_SLOT
+	return cleaned
 
 ## Returns rich data for a future save menu UI:
 ##   [{ "slot": "quicksave", "path": "...", "metadata": {
@@ -199,9 +233,14 @@ func get_save_path(slot_name: String) -> String:
 ## Sorted newest first by timestamp/last_played.
 ## Future menu should use this + delete_save/rename_save + detailed save/load for errors/toasts.
 func list_saves() -> Array[Dictionary]:
+	_ensure_save_dir()
 	var result: Array[Dictionary] = []
 	var dir := DirAccess.open(SAVE_DIR)
 	if dir == null:
+		# Fallback: absolute path
+		dir = DirAccess.open(get_saves_dir_global())
+	if dir == null:
+		push_warning("SaveLoadManager: list_saves — cannot open %s" % SAVE_DIR)
 		return result
 	dir.list_dir_begin()
 	var file_name := dir.get_next()
@@ -220,6 +259,87 @@ func list_saves() -> Array[Dictionary]:
 		return ta > tb
 	)
 	return result
+
+
+## Fixed browser slots always shown in Save Manager (empty vs occupied).
+const BROWSER_SLOTS: PackedStringArray = [
+	"quicksave", "autosave", "slot1", "slot2", "slot3", "slot4", "slot5"
+]
+
+
+## Player-facing slot list: fixed empty slots + occupied files from list_saves().
+## Each row: slot, occupied, status, label, can_load, can_save, api_save, api_load, metadata.
+## Load/save actions must use save_game_detailed / load_game_detailed (not reimplemented).
+func list_slots_for_ui() -> Array[Dictionary]:
+	var occupied: Dictionary = {}  # slot -> entry from list_saves
+	for e in list_saves():
+		if typeof(e) != TYPE_DICTIONARY:
+			continue
+		var s := str(e.get("slot", "")).strip_edges()
+		if s.is_empty():
+			continue
+		occupied[s] = e
+	var rows: Array[Dictionary] = []
+	var seen: Dictionary = {}
+	for slot in BROWSER_SLOTS:
+		var name := str(slot).strip_edges()
+		if name.is_empty() or seen.has(name):
+			continue
+		seen[name] = true
+		if occupied.has(name):
+			rows.append(_format_slot_ui_row(name, true, occupied[name].get("metadata", {})))
+		else:
+			rows.append(_format_slot_ui_row(name, false, {}))
+	# Extra discovered slots
+	var extras: Array = []
+	for s in occupied.keys():
+		if seen.has(str(s)):
+			continue
+		extras.append(occupied[s])
+	extras.sort_custom(func(a, b):
+		var ta := str(a.get("metadata", {}).get("timestamp", a.get("metadata", {}).get("last_played", "")))
+		var tb := str(b.get("metadata", {}).get("timestamp", b.get("metadata", {}).get("last_played", "")))
+		return ta > tb
+	)
+	for e in extras:
+		var sn := str(e.get("slot", ""))
+		rows.append(_format_slot_ui_row(sn, true, e.get("metadata", {})))
+	return rows
+
+
+func _format_slot_ui_row(slot: String, occupied: bool, metadata: Variant) -> Dictionary:
+	var meta: Dictionary = metadata if typeof(metadata) == TYPE_DICTIONARY else {}
+	var name := slot.strip_edges()
+	if name.is_empty():
+		name = "unnamed"
+	var label := ""
+	var status := "empty"
+	if occupied:
+		status = "occupied"
+		var bits: PackedStringArray = [name]
+		var scenario := str(meta.get("scenario_id", "")).strip_edges()
+		var player := str(meta.get("player_tag", "")).strip_edges().to_upper()
+		var ts := str(meta.get("timestamp", meta.get("last_played", "")))
+		if not scenario.is_empty():
+			bits.append(scenario)
+		if not player.is_empty():
+			bits.append(player)
+		if not ts.is_empty():
+			bits.append(ts.substr(0, mini(16, ts.length())))
+		label = " · ".join(bits)
+	else:
+		label = "%s · empty" % name
+	return {
+		"slot": name,
+		"occupied": occupied,
+		"status": status,
+		"label": label,
+		"metadata": meta.duplicate(true) if not meta.is_empty() else {},
+		"can_load": occupied,
+		"can_save": true,
+		"api_save": "save_game_detailed",
+		"api_load": "load_game_detailed",
+	}
 
 func _peek_metadata(path: String) -> Dictionary:
 	if not FileAccess.file_exists(path):
@@ -397,6 +517,9 @@ func _gather_save_data() -> Dictionary:
 	if typeof(TradeManager) != TYPE_NIL and TradeManager.has_method("get_save_data"):
 		data["trade"] = TradeManager.get_save_data()
 
+	if typeof(SpaceLayerManager) != TYPE_NIL and SpaceLayerManager.has_method("get_save_data"):
+		data["space_layer"] = SpaceLayerManager.get_save_data()
+
 	# --- GameData (demographic/policy state for Ascendancy Initiatives, Policy/Law screen, Trust Erosion, manpower, relocation/settlement) ---
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_save_data"):
 		data["game_data"] = GameData.get_save_data()
@@ -421,6 +544,15 @@ func _gather_save_data() -> Dictionary:
 	if pe and pe.has_method("get_save_data"):
 		data["province_editor"] = pe.get_save_data()
 
+	# --- Pass 22: MapRenderer UI (compare slots, tint intensities, last mapmode) ---
+	var mr_save := get_tree().get_first_node_in_group("map_renderer") if get_tree() != null else null
+	if mr_save and mr_save.has_method("get_save_data"):
+		data["map_ui"] = mr_save.get_save_data()
+
+	# --- Pass 24: RelationsManager (formal alliances / guarantees / CRS pairs) ---
+	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("get_save_data"):
+		data["relations"] = RelationsManager.get_save_data()
+
 	return data
 
 
@@ -433,6 +565,9 @@ func _apply_save_data(data: Dictionary) -> void:
 
 	# 2. Map provinces (owner/controller/dev/infra + now settlement/built_road/rail for Phase 3 persistence) — triggers province_data_changed + MapRenderer tints/inspector/layers
 	if data.has("map") and typeof(MapManager) != TYPE_NIL:
+		var map_check: Dictionary = validate_map_save_payload(data["map"] as Dictionary, data)
+		if not bool(map_check.get("ok", false)):
+			push_warning("SaveLoad: map payload missing keys %s (continuing best-effort)" % str(map_check.get("missing", [])))
 		_apply_map_state(data["map"])
 		# Re-init hook for MapManager/MapRenderer on load (per WORLD_CLASS_MAP_ROADMAP Phase 3): force full refresh so runtime province state (settlement_level, built_* from actions) + owner changes survive roundtrip and drive live visuals on 460-prov map. Uses existing force + emit listeners.
 		var mr_refresh := get_tree().get_first_node_in_group("map_renderer") if get_tree() != null else null
@@ -515,6 +650,10 @@ func _apply_save_data(data: Dictionary) -> void:
 				if f and TradeManager.has_method("_try_assign_supply_route_to_flow"):
 					TradeManager._try_assign_supply_route_to_flow(f)
 
+	if data.has("space_layer") and typeof(SpaceLayerManager) != TYPE_NIL:
+		if SpaceLayerManager.has_method("apply_save_data"):
+			SpaceLayerManager.apply_save_data(data["space_layer"])
+
 	# --- GameData demographic/policy state (after core managers) ---
 	if data.has("game_data") and typeof(GameData) != TYPE_NIL:
 		if GameData.has_method("clear_for_load"):
@@ -527,6 +666,17 @@ func _apply_save_data(data: Dictionary) -> void:
 		var pe := get_tree().get_first_node_in_group("province_editor")
 		if pe and pe.has_method("apply_save_data"):
 			pe.apply_save_data(data["province_editor"])
+
+	# --- Pass 22: MapRenderer UI (compare slots / intensities / mapmode) ---
+	if data.has("map_ui"):
+		var mr_load := get_tree().get_first_node_in_group("map_renderer") if get_tree() != null else null
+		if mr_load and mr_load.has_method("apply_save_data"):
+			mr_load.apply_save_data(data["map_ui"])
+
+	# --- Pass 24: RelationsManager alliances / guarantees ---
+	if data.has("relations") and typeof(RelationsManager) != TYPE_NIL:
+		if RelationsManager.has_method("apply_save_data"):
+			RelationsManager.apply_save_data(data["relations"])
 
 	# Future: after all core state, allow other managers to react
 	# e.g. if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("on_game_loaded"):
@@ -701,6 +851,48 @@ func _serialize_map_state() -> Dictionary:
 			# Add more mutables (factories, resources, special_features deltas, cores, etc.) as they gain runtime mutation.
 		})
 	return out
+
+
+## Required keys per province entry in save["map"] (audit / unit tests / load hardening).
+static func map_province_required_keys() -> PackedStringArray:
+	return PackedStringArray([
+		"id",
+		"owner_tag",
+		"controller_tag",
+		"development_level",
+		"infrastructure",
+		"settlement_level",
+		"built_road_neighbors",
+		"built_rail_neighbors",
+	])
+
+
+## Validate a map save blob: provinces array + required keys + optional infrastructure_projects sibling.
+## Pure structure check — used by tests and can be called after serialize/before apply.
+static func validate_map_save_payload(map_data: Dictionary, full_save: Dictionary = {}) -> Dictionary:
+	var missing: Array[String] = []
+	if not map_data.has("provinces"):
+		return {"ok": false, "missing": ["map.provinces"], "province_count": 0}
+	var list: Array = map_data.get("provinces", []) as Array
+	var req := map_province_required_keys()
+	for entry in list:
+		if typeof(entry) != TYPE_DICTIONARY:
+			missing.append("non_dict_province_entry")
+			continue
+		var e: Dictionary = entry
+		for k in req:
+			if not e.has(k):
+				missing.append("province.%s" % k)
+				break
+	# Full save should also carry active infra projects when InfrastructureDevelopmentManager exists
+	if not full_save.is_empty() and not full_save.has("infrastructure_projects"):
+		missing.append("infrastructure_projects")
+	return {
+		"ok": missing.is_empty(),
+		"missing": missing,
+		"province_count": list.size(),
+	}
+
 
 func _apply_map_state(m: Dictionary) -> void:
 	var list: Array = m.get("provinces", []) as Array
@@ -1037,23 +1229,53 @@ func _get_infrastructure_save_data(save_root: Dictionary) -> Dictionary:
 
 ## Enhanced save with better error object (for future UI).
 func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
-	var path := get_save_path(slot_name)
-	var data := _gather_save_data()
+	_ensure_save_dir()
+	var safe_slot := _sanitize_slot(slot_name)
+	var path := get_save_path(safe_slot)
+	var abs_path := get_save_path_global(safe_slot)
+	print("SaveLoadManager: Saving slot=%s → %s" % [safe_slot, abs_path])
+
+	var data: Dictionary = {}
+	# Guard: gather can be heavy on world_accurate; never let a script error leave silent UI.
+	data = _gather_save_data()
+	if data.is_empty():
+		var empty_msg := "Save data empty (gather failed)"
+		push_error("SaveLoadManager: %s" % empty_msg)
+		return {"ok": false, "error": empty_msg, "path": path, "absolute_path": abs_path}
+
 	var json_text := JSON.stringify(data, "\t")
+	if json_text.is_empty() or json_text == "null":
+		var jmsg := "JSON stringify failed"
+		push_error("SaveLoadManager: %s" % jmsg)
+		return {"ok": false, "error": jmsg, "path": path, "absolute_path": abs_path}
 
 	var f := FileAccess.open(path, FileAccess.WRITE)
 	if f == null:
+		# Retry with absolute path
+		f = FileAccess.open(abs_path, FileAccess.WRITE)
+	if f == null:
 		var err := FileAccess.get_open_error()
-		var msg := "Cannot write save (error %d)" % err
-		push_error("SaveLoadManager: %s -> %s" % [msg, path])
+		var msg := "Cannot write save (error %d) — path %s" % [err, abs_path]
+		push_error("SaveLoadManager: %s" % msg)
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-			LeaderEventUI.show_toast("Save failed: " + msg, 3.0, true)
-		return {"ok": false, "error": msg, "path": path, "code": err}
+			LeaderEventUI.show_toast("Save failed: " + msg, 4.0, true)
+		return {"ok": false, "error": msg, "path": path, "absolute_path": abs_path, "code": err}
 
 	f.store_string(json_text)
 	f.close()
 	_last_save_path = path
-	return {"ok": true, "path": path, "bytes": json_text.length(), "version": SAVE_VERSION}
+	var bytes := json_text.length()
+	print("SaveLoadManager: Game saved → %s (v%d, %d bytes, slot=%s)" % [abs_path, SAVE_VERSION, bytes, safe_slot])
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast("Saved %s (%d KB)" % [safe_slot, int(bytes / 1024)], 2.5)
+	return {
+		"ok": true,
+		"path": path,
+		"absolute_path": abs_path,
+		"slot": safe_slot,
+		"bytes": bytes,
+		"version": SAVE_VERSION,
+	}
 
 ## Enhanced load with migration + feedback.
 func load_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:

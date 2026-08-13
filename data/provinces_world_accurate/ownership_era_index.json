@@ -1,0 +1,20 @@
+{
+  "eras": [
+    1910,
+    1918,
+    1936,
+    1945,
+    2026
+  ],
+  "default": 1936,
+  "files": {
+    "1910": "province_ownership_1910.json",
+    "1918": "province_ownership_1918.json",
+    "1936": "province_ownership_1936.json",
+    "1945": "province_ownership_1945.json",
+    "2026": "province_ownership_2026.json"
+  },
+  "meta": {
+    "source": "assign_world_accurate_ownership_eras"
+  }
+}

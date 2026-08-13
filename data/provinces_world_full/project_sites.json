@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "sites": [
+    {
+      "province_id": 9101,
+      "project_type": "major_port",
+      "max_level": 5
+    },
+    {
+      "province_id": 9297,
+      "project_type": "mega_factory",
+      "max_level": 5
+    },
+    {
+      "province_id": 10,
+      "project_type": "major_port",
+      "max_level": 5
+    }
+  ]
+}

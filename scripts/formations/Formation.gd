@@ -109,6 +109,9 @@ const LAND_MISSION_ARTILLERY_PREP := "ARTILLERY_PREP"  # Pre-bombard before assa
 @export var organization: float = 1.0
 @export var readiness: float = 1.0
 @export var strength: float = 1.0  # 1.0 = full TOE; <1.0 from unreplaced casualties (future: manpower/equip tracking)
+## Formation troop combat experience band 0–100 (RF1). Diluted by green manpower; rearm hits lightly.
+## Green 0–20 · trained 21–40 · regular 41–60 · seasoned 61–80 · veteran 81–100.
+@export var combat_experience: float = 48.0
 @export var fuel_level: float = 1.0  # for naval (and future air/land vehicles): 1.0 full, low = reduced power/speed, vuln in combat; consumed on ops, resupplied at hubs/ports/tenders. Naval long endurance but limited.
 
 var assigned_leader: Leader = null
@@ -476,9 +479,13 @@ func get_mission_supply_cost(base_cost: float = 1.0) -> float:
 func get_effective_air_sorties(distance_km: float = 500.0, base_infra: int = 5, enemy_aa: float = 0.0, weather_eff: float = 1.0, jamming: float = 1.0, stealth: float = 1.0, year: int = 1942) -> Dictionary:
 	var prof := AirMissionProfile.new(formation_id if "formation_id" in self else "", get_air_design_id(), air_range_config)
 	var base_r := float(prof.get_effective_range(distance_km, -1)) if prof.has_method("get_effective_range") else distance_km
-	var org := float(get("organization", 1.0)) if has_method("get") or "organization" in self else 1.0
-	var sup := float(get("supply_level", 1.0)) if "supply_level" in self else 1.0  # proxy; real from Supply calc
-	var stren := float(strength) if "strength" in self else 1.0
+	var org := 1.0
+	if "organization" in self:
+		org = float(self.organization)
+	var sup := 1.0
+	if "supply_level" in self:
+		sup = float(self.supply_level)  # proxy; real from Supply calc
+	var stren := float(self.strength) if "strength" in self else 1.0
 	var skill := 0.6
 	if typeof(LeaderManager) != TYPE_NIL:
 		var ldr = LeaderManager.get_leader_for_army(formation_id) if LeaderManager.has_method("get_leader_for_army") else null
@@ -494,7 +501,10 @@ func get_effective_air_sorties(distance_km: float = 500.0, base_infra: int = 5, 
 		if TechnologyManager.has_method("has_tech_unlock"):
 			has_tank = TechnologyManager.has_tech_unlock(tag, "air_equipment", "aerial_refueling") or year >= 1955
 			has_aw = TechnologyManager.has_tech_unlock(tag, "strategic_future", "awacs") or year >= 1970
-	var is_car := "carrier" in str(get("formation_type", "")).to_lower() or "naval" in str(current_air_mission).to_lower()
+	var ftype := ""
+	if "formation_type" in self:
+		ftype = str(formation_type)
+	var is_car := "carrier" in ftype.to_lower() or "naval" in str(current_air_mission).to_lower()
 	# Call the model (also uses mission for recon calc but here general; caller filters)
 	var res := prof.compute_effective_sorties(stren * 1.2, base_r, org, sup, base_infra, skill, doctrine, year, has_tank, has_aw, is_car, enemy_aa, weather_eff, jamming, stealth)
 	# Scale by our mission intensity (more aggressive = potentially more but riskier)

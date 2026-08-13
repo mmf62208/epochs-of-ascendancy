@@ -11,5 +11,9 @@
   "infantry_equipment_per_soldier": 1.15,
   "sustainment_equipment_per_soldier": 1.10,
   "era": "ww2",
+  "production_category": "infantry_equipment",
+  "base_production_days": 16,
+  "production_cost": 18.0,
+  "daily_resource_cost": { "steel": 0.5, "rubber": 0.25 },
   "description": "Semi-automatic rifle. Significantly higher practical rate of fire than bolt-action rifles."
 }

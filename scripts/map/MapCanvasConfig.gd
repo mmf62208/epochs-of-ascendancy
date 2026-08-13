@@ -9,8 +9,9 @@ const BASE_GRAND_SIZE := Vector2(5000.0, 2000.0)
 const BASE_WORLD_SIZE := Vector2(8192.0, 4096.0)
 const BASE_EUROPE_CENTER := Vector2(2500.0, 1000.0)
 
-const GRAND_THEATER_BOUNDS := Rect2(0.0, 0.0, 8640.0, 3456.0)
-const WORLD_CANONICAL_BOUNDS := Rect2(0.0, 0.0, 14155.776, 7078.848)
+const GRAND_THEATER_BOUNDS := Rect2(0.0, 0.0, 5000.0 * THEATER_SCALE, 2000.0 * THEATER_SCALE)
+## Exact equirect canvas × THEATER_SCALE (must match province transform + underlay fit 1:1).
+const WORLD_CANONICAL_BOUNDS := Rect2(0.0, 0.0, 8192.0 * THEATER_SCALE, 4096.0 * THEATER_SCALE)
 
 const BASE_EU_WX0: float = 3526.0
 const BASE_EU_WY0: float = 979.0
@@ -177,14 +178,21 @@ static func remap_europe_to_world(local_pts: PackedVector2Array) -> PackedVector
 	return out
 
 
-static func transform_province_points(pts: PackedVector2Array, world_mode: bool, apply_island_inflate: bool = true) -> PackedVector2Array:
+## geometry_is_world_native: points already live in full-world equirectangular canvas (8192×4096 base).
+## When true, skip Europe-local → world-slot remapping so Americas/Asia/etc. land on the world underlay.
+static func transform_province_points(
+	pts: PackedVector2Array,
+	world_mode: bool,
+	apply_island_inflate: bool = true,
+	geometry_is_world_native: bool = false,
+) -> PackedVector2Array:
 	var working := pts
 	if apply_island_inflate:
 		var inflate := island_inflation_factor(pts)
 		if inflate > 1.001:
 			working = inflate_points_from_centroid(pts, inflate)
 	var scaled := scale_points(working)
-	if world_mode:
+	if world_mode and not geometry_is_world_native:
 		return remap_europe_to_world(scaled)
 	return scaled
 

@@ -11,5 +11,9 @@
   "infantry_equipment_per_soldier": 1.0,
   "sustainment_equipment_per_soldier": 1.0,
   "era": "ww2",
+  "production_category": "infantry_equipment",
+  "base_production_days": 14,
+  "production_cost": 12.0,
+  "daily_resource_cost": { "steel": 0.4, "rubber": 0.2 },
   "description": "Standard German bolt-action rifle. Reliable and accurate at long range but slow rate of fire."
 }

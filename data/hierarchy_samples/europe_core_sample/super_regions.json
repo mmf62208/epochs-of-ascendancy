@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "super_regions": [
+    {
+      "id": 1,
+      "name": "Europe",
+      "region_ids": [
+        104,
+        105,
+        103
+      ],
+      "theaters": [
+        "europe_core"
+      ],
+      "province_n": 26
+    }
+  ]
+}

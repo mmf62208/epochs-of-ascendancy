@@ -12,8 +12,13 @@ extends DraggablePanel
 @onready var category_filter: OptionButton = $MarginContainer/VBoxContainer/FilterRow/CategoryFilter
 @onready var search_edit: LineEdit = $MarginContainer/VBoxContainer/FilterRow/SearchEdit
 @onready var filter_status_label: Label = $MarginContainer/VBoxContainer/FilterStatusLabel
-@onready var detail_label: Label = $MarginContainer/VBoxContainer/DetailPanel/DetailMargin/DetailLabel
-@onready var detail_panel: PanelContainer = $MarginContainer/VBoxContainer/DetailPanel
+@onready var detail_label: Label = (
+	$MarginContainer/VBoxContainer/DetailScroll/DetailPanel/DetailMargin/DetailLabel
+)
+@onready var detail_panel: PanelContainer = (
+	$MarginContainer/VBoxContainer/DetailScroll/DetailPanel
+)
+@onready var detail_scroll: ScrollContainer = $MarginContainer/VBoxContainer/DetailScroll
 @onready var permanent_list: VBoxContainer = (
 	$MarginContainer/VBoxContainer/MainScroll/MainVBox/PermanentList
 )
@@ -57,6 +62,14 @@ func _setup_filters() -> void:
 
 
 func _apply_screen_theme() -> void:
+	clip_contents = true
+	# Recenter / size for modern HUD so content is not clipped.
+	set_anchors_preset(Control.PRESET_CENTER)
+	custom_minimum_size = Vector2(920, 640)
+	offset_left = -460.0
+	offset_top = -340.0
+	offset_right = 460.0
+	offset_bottom = 340.0
 	RetrowaveTheme.style_production_screen(self)
 	RetrowaveTheme.style_title(title_label, RetrowaveTheme.CYAN)
 	RetrowaveTheme.style_secondary_button(close_button)
@@ -67,8 +80,30 @@ func _apply_screen_theme() -> void:
 	RetrowaveTheme.style_search(search_edit)
 	RetrowaveTheme.style_body_label(filter_status_label)
 	filter_status_label.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
-	RetrowaveTheme.style_detail_panel(detail_panel)
+	# Flat frame so L/R border + text are not clipped by 9-slice ornaments.
+	RetrowaveTheme.style_detail_panel_flat(detail_panel)
 	RetrowaveTheme.style_detail_label(detail_label)
+	detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	detail_panel.clip_contents = false
+	detail_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var detail_margin := get_node_or_null(
+		"MarginContainer/VBoxContainer/DetailScroll/DetailPanel/DetailMargin"
+	) as MarginContainer
+	if detail_margin != null:
+		detail_margin.add_theme_constant_override("margin_left", 14)
+		detail_margin.add_theme_constant_override("margin_right", 14)
+		detail_margin.add_theme_constant_override("margin_top", 10)
+		detail_margin.add_theme_constant_override("margin_bottom", 10)
+		detail_margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if detail_scroll != null:
+		detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		detail_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		detail_scroll.clip_contents = true
+		detail_scroll.custom_minimum_size = Vector2(0, 140)
+		detail_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_apply_wrap(detail_label)
+	_apply_wrap(filter_status_label)
+	var footer := $MarginContainer/VBoxContainer/MainScroll/MainVBox/FooterLabel as Label
 	RetrowaveTheme.style_title(
 		$MarginContainer/VBoxContainer/MainScroll/MainVBox/PermanentTitle,
 	)
@@ -76,8 +111,20 @@ func _apply_screen_theme() -> void:
 		$MarginContainer/VBoxContainer/MainScroll/MainVBox/TemporaryTitle,
 		RetrowaveTheme.MAGENTA,
 	)
-	RetrowaveTheme.style_body_label($MarginContainer/VBoxContainer/MainScroll/MainVBox/FooterLabel)
+	RetrowaveTheme.style_body_label(footer)
+	_apply_wrap(footer)
+	var main_scroll := $MarginContainer/VBoxContainer/MainScroll as ScrollContainer
+	if main_scroll != null:
+		main_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		main_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		main_scroll.clip_contents = true
+		main_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	var main_vbox := $MarginContainer/VBoxContainer/MainScroll/MainVBox as VBoxContainer
+	if main_vbox != null:
+		main_vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	search_edit.placeholder_text = "Search spirits and effects..."
+	# Re-wrap detail after layout settles.
+	call_deferred("_relayout_wrap")
 
 
 func _connect_signals() -> void:
@@ -336,10 +383,41 @@ func _empty_message_temporary() -> String:
 	return "No temporary effects. Influence missions and events will appear here."
 
 
+func _content_wrap_width() -> float:
+	# Prefer live scroll width so cards wrap inside the panel; fall back to scene size.
+	# Subtract enough for panel content margins + DetailMargin so text is not cut L/R.
+	var scroll := get_node_or_null("MarginContainer/VBoxContainer/MainScroll") as Control
+	if scroll != null and scroll.size.x > 80.0:
+		return maxf(scroll.size.x - 36.0, 180.0)
+	if detail_scroll != null and detail_scroll.size.x > 80.0:
+		return maxf(detail_scroll.size.x - 48.0, 180.0)
+	return maxf(size.x - 72.0, 180.0)
+
+
+func _relayout_wrap() -> void:
+	_apply_wrap(detail_label)
+	_apply_wrap(filter_status_label)
+	var footer := get_node_or_null("MarginContainer/VBoxContainer/MainScroll/MainVBox/FooterLabel") as Label
+	_apply_wrap(footer)
+
+
+func _apply_wrap(label: Label, width: float = -1.0) -> void:
+	if label == null:
+		return
+	var w := width if width > 0.0 else _content_wrap_width()
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.custom_minimum_size = Vector2(w, 0)
+
+
 func _create_entry_panel(row: Dictionary, is_temporary: bool) -> PanelContainer:
 	var panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(panel)
+	RetrowaveTheme.style_detail_panel_flat(panel)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.clip_contents = true
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+
+	var wrap_w := maxf(_content_wrap_width() - 28.0, 160.0)
 
 	var entry_id := (
 		str(row.get("effect_id", ""))
@@ -354,18 +432,21 @@ func _create_entry_panel(row: Dictionary, is_temporary: bool) -> PanelContainer:
 	panel.tooltip_text = str(row.get("tooltip_text", ""))
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 8)
+	margin.add_theme_constant_override("margin_left", 10)
 	margin.add_theme_constant_override("margin_top", 6)
-	margin.add_theme_constant_override("margin_right", 8)
+	margin.add_theme_constant_override("margin_right", 10)
 	margin.add_theme_constant_override("margin_bottom", 6)
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.add_child(margin)
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 4)
+	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	margin.add_child(box)
 
 	var header := HBoxContainer.new()
 	header.add_theme_constant_override("separation", 8)
+	header.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(header)
 
 	var title := Label.new()
@@ -373,8 +454,7 @@ func _create_entry_panel(row: Dictionary, is_temporary: bool) -> PanelContainer:
 		title.text = str(row.get("source_label", "Effect"))
 	else:
 		title.text = str(row.get("name", ""))
-	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_apply_wrap(title, maxf(wrap_w - 90.0, 120.0))
 	RetrowaveTheme.style_body_label(title)
 	if is_temporary:
 		title.add_theme_color_override(
@@ -390,11 +470,13 @@ func _create_entry_panel(row: Dictionary, is_temporary: bool) -> PanelContainer:
 		badge.text = str(row.get("category", "")).capitalize()
 	RetrowaveTheme.style_body_label(badge)
 	badge.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	badge.size_flags_horizontal = Control.SIZE_SHRINK_END
 	header.add_child(badge)
 
 	if is_temporary:
 		var duration_row := HBoxContainer.new()
 		duration_row.add_theme_constant_override("separation", 8)
+		duration_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		box.add_child(duration_row)
 
 		var bar := ProgressBar.new()
@@ -403,6 +485,7 @@ func _create_entry_panel(row: Dictionary, is_temporary: bool) -> PanelContainer:
 		bar.max_value = 1.0
 		bar.value = float(row.get("progress_ratio", 0.0))
 		bar.show_percentage = false
+		RetrowaveTheme.style_progress_bar(bar)
 		duration_row.add_child(bar)
 
 		var time_label := Label.new()
@@ -415,12 +498,12 @@ func _create_entry_panel(row: Dictionary, is_temporary: bool) -> PanelContainer:
 	else:
 		var desc := Label.new()
 		desc.text = str(row.get("description", ""))
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_apply_wrap(desc, wrap_w)
 		RetrowaveTheme.style_body_label(desc)
 		desc.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
 		box.add_child(desc)
 
-	box.add_child(_create_modifier_grid(row))
+	box.add_child(_create_modifier_grid(row, wrap_w))
 
 	var select_btn := Button.new()
 	select_btn.text = "Details"
@@ -432,54 +515,55 @@ func _create_entry_panel(row: Dictionary, is_temporary: bool) -> PanelContainer:
 	return panel
 
 
-func _create_modifier_grid(row: Dictionary) -> GridContainer:
-	var grid := GridContainer.new()
-	grid.columns = 2
-	grid.add_theme_constant_override("h_separation", 12)
-	grid.add_theme_constant_override("v_separation", 2)
+func _create_modifier_grid(row: Dictionary, wrap_w: float = -1.0) -> VBoxContainer:
+	# Use a vertical list instead of a rigid 2-col grid so long labels wrap cleanly.
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 2)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var w := wrap_w if wrap_w > 0.0 else _content_wrap_width()
 
 	for detail in row.get("modifier_details", []) as Array:
 		if typeof(detail) != TYPE_DICTIONARY:
 			continue
 		var d := detail as Dictionary
-		var name_label := Label.new()
-		name_label.text = str(d.get("label", ""))
-		RetrowaveTheme.style_body_label(name_label)
-		name_label.tooltip_text = str(d.get("tooltip", ""))
-
-		var value_label := Label.new()
-		value_label.text = str(d.get("value_text", ""))
-		RetrowaveTheme.style_body_label(value_label)
+		var line := Label.new()
+		var label_txt := str(d.get("label", ""))
+		var value_txt := str(d.get("value_text", ""))
+		line.text = "%s  %s" % [label_txt, value_txt]
+		_apply_wrap(line, w)
+		RetrowaveTheme.style_body_label(line)
 		if bool(d.get("is_positive", true)):
-			value_label.add_theme_color_override("font_color", RetrowaveTheme.SUCCESS)
+			line.add_theme_color_override("font_color", RetrowaveTheme.SUCCESS)
 		else:
-			value_label.add_theme_color_override("font_color", RetrowaveTheme.WARNING)
-		value_label.tooltip_text = str(d.get("tooltip", ""))
+			line.add_theme_color_override("font_color", RetrowaveTheme.WARNING)
+		line.tooltip_text = str(d.get("tooltip", ""))
+		list.add_child(line)
 
-		grid.add_child(name_label)
-		grid.add_child(value_label)
-
-	if grid.get_child_count() == 0:
-		for line in row.get("modifier_lines", []) as Array:
+	if list.get_child_count() == 0:
+		for raw in row.get("modifier_lines", []) as Array:
 			var fallback := Label.new()
-			fallback.text = "• %s" % str(line)
+			fallback.text = "• %s" % str(raw)
+			_apply_wrap(fallback, w)
 			RetrowaveTheme.style_body_label(fallback)
 			fallback.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
-			grid.add_child(fallback)
+			list.add_child(fallback)
 
-	return grid
+	return list
 
 
 func _on_entry_selected(entry_id: String, row: Dictionary, is_temporary: bool) -> void:
 	_selected_entry_id = entry_id
+	_apply_wrap(detail_label)
 	detail_label.text = str(row.get("tooltip_text", "No details available."))
+	if detail_scroll != null:
+		detail_scroll.scroll_vertical = 0
 	_populate_lists()
 
 
 func _empty_label(text: String) -> Label:
 	var label := Label.new()
 	label.text = text
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_apply_wrap(label)
 	RetrowaveTheme.style_body_label(label)
 	label.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
 	return label

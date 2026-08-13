@@ -1,0 +1,36 @@
+{
+  "name": "provinces_pilot_us",
+  "parent": "provinces_world_full",
+  "stats": {
+    "province_n": 1488,
+    "land_before": 186,
+    "land_after": 1488,
+    "densify_ratio": 8.0,
+    "state_n": 154,
+    "region_n": 8,
+    "bands_present": [
+      "Great Plains",
+      "Mid-Atlantic",
+      "Midwest",
+      "Mountain West",
+      "Northeast",
+      "Pacific",
+      "Southeast",
+      "Southwest"
+    ],
+    "mean_verts": 32.9005376344086
+  },
+  "id_base": 800000,
+  "eight_band": [
+    "Northeast",
+    "Mid-Atlantic",
+    "Southeast",
+    "Midwest",
+    "Great Plains",
+    "Southwest",
+    "Mountain West",
+    "Pacific"
+  ],
+  "geometry_quality": "procedural_interim",
+  "pilot_banner": true
+}

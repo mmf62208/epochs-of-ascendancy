@@ -1,0 +1,96 @@
+{
+  "version": 1,
+  "model": "strategic_compact_ledger",
+  "vectors": ["public", "elite", "military", "alignment", "trust", "dependency"],
+  "vector_default": 0,
+  "vector_min": -100,
+  "vector_max": 100,
+  "crs_weights": {
+    "public": 0.2,
+    "elite": 0.2,
+    "military": 0.2,
+    "alignment": 0.2,
+    "trust": 0.2
+  },
+  "dependency_tilt_scale": 0.15,
+  "bands": [
+    {"max_crs": -40, "id": "hostile", "label": "Hostile", "accept_floor": 1.35},
+    {"max_crs": -10, "id": "cold", "label": "Cold", "accept_floor": 1.15},
+    {"max_crs": 25, "id": "neutral", "label": "Neutral", "accept_floor": 0.95},
+    {"max_crs": 55, "id": "cordial", "label": "Cordial", "accept_floor": 0.88},
+    {"max_crs": 80, "id": "partner", "label": "Partner", "accept_floor": 0.82},
+    {"max_crs": 100, "id": "ally_ready", "label": "Ally-ready", "accept_floor": 0.75}
+  ],
+  "deal_outcome_deltas": {
+    "accept_fair_public": {"public": 2, "elite": 2, "trust": 1},
+    "accept_generous_public": {"public": 4, "elite": 3, "trust": 2},
+    "accept_black": {"public": -3, "elite": 1, "trust": -1},
+    "reject": {"public": -1, "elite": -1},
+    "break_flow": {"trust": -8, "elite": -4, "military": -2},
+    "interdict_their_convoy": {"military": -12, "trust": -6, "public": -3},
+    "province_cession": {"public": -15, "trust": -10, "alignment": -5},
+    "arms_deal": {"military": 3, "elite": 2, "public": -1},
+    "basing_grant": {"military": 5, "public": -4, "trust": 2},
+    "tech_share": {"elite": 3, "military": 2, "trust": 1},
+    "tariff_hike": {"elite": -4, "public": -1},
+    "subsidy_to_partner": {"elite": 3, "public": 1}
+  },
+  "concern_flags": {
+    "resource_dependency_critical": {
+      "threshold_import_share": 0.4,
+      "crs_penalty": -5,
+      "hard_block_categories": []
+    },
+    "enemy_arming": {
+      "triggers_on": ["equipment", "design"],
+      "to_rival": true,
+      "hard_block_if_crs_below": 25
+    },
+    "tech_leak_risk": {
+      "triggers_on": ["design", "tech_share"],
+      "tech_gap_years": 8,
+      "hard_block_if_crs_below": 40
+    },
+    "basing_sovereignty": {
+      "triggers_on": ["docking_rights", "military_access"],
+      "hard_block_if_crs_below": 55
+    },
+    "embargo_evasion": {
+      "triggers_on": ["black_visibility"],
+      "public_hit": -8
+    },
+    "tariff_war": {
+      "tariff_sum_threshold": 0.5,
+      "elite_hit": -3
+    },
+    "convoy_hostility": {
+      "from_interdiction": true,
+      "military_hit": -10
+    },
+    "black_market_scandal": {
+      "exposure_risk_threshold": 0.7,
+      "public_hit": -10
+    },
+    "territory_humiliation": {
+      "triggers_on": ["province"],
+      "trust_hit": -12
+    },
+    "nuclear_intimidation": {
+      "from_power_asymmetry": true,
+      "notes": "Non-nuclear vs nuclear arsenal — AI placates harder"
+    },
+    "hopelessly_outmatched": {
+      "from_power_asymmetry": true,
+      "notes": "Effective threat ratio hopeless — expect concessions"
+    },
+    "transit_interdiction_crisis": {
+      "from_trade_losses": true,
+      "military_hit": -4
+    }
+  },
+
+  "monthly_decay": {
+    "toward_zero": 0.5,
+    "flag_decay_chance": 0.15
+  }
+}

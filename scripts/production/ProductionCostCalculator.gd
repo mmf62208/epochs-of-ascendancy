@@ -386,6 +386,103 @@ static func resolve_daily_resource_cost_from_dict(template: Dictionary) -> Dicti
 	return out
 
 
+## Strategic shortage math (single source for ProductionManager + pure tests).
+## Soft shortage: never fully halt; floor from resource_shortage.min_output_multiplier.
+static func get_major_resource_ids() -> PackedStringArray:
+	_load_rules()
+	var majors: Variant = _rules.get("major_resources", {})
+	var out: PackedStringArray = []
+	if majors is Dictionary:
+		for k in majors:
+			out.append(str(k))
+	if out.is_empty():
+		out = PackedStringArray([
+			"steel", "aluminum", "energy", "fuel", "rubber", "electronics", "specials", "fissiles"
+		])
+	return out
+
+
+static func get_critical_resource_set() -> Dictionary:
+	_load_rules()
+	var rs: Variant = _rules.get("resource_shortage", {})
+	var raw: Variant = []
+	if rs is Dictionary:
+		raw = (rs as Dictionary).get("critical_resources", [])
+	var critical_set: Dictionary = {}
+	if typeof(raw) == TYPE_ARRAY:
+		for item in raw:
+			critical_set[str(item).to_lower()] = true
+	return critical_set
+
+
+static func compute_weighted_fill_ratio(needed: Dictionary, have: Dictionary) -> float:
+	"""Fill ratio in [0,1] from stockpile vs daily need. Critical resources weight shortages harder."""
+	if needed.is_empty():
+		return 1.0
+	_load_rules()
+	var critical := get_critical_resource_set()
+	var rs: Variant = _rules.get("resource_shortage", {})
+	var speed_weight := 1.45
+	if rs is Dictionary:
+		speed_weight = float((rs as Dictionary).get("critical_speed_weight", 1.45))
+	var effective := 1.0
+	for resource in needed:
+		var required := float(needed[resource])
+		if required <= 0.0:
+			continue
+		var have_amt := float(have.get(resource, 0.0))
+		var ratio := clampf(have_amt / required, 0.0, 1.0)
+		# Critical shortages hurt more: power > 1 compresses fill (0.5^1.45 ≈ 0.37).
+		if critical.has(str(resource).to_lower()):
+			ratio = pow(ratio, maxf(speed_weight, 1.0))
+		effective = minf(effective, ratio)
+	return effective
+
+
+static func compute_shortage_multipliers(fill_ratio: float) -> Dictionary:
+	"""Map fill_ratio → production speed + finished-unit reliability multipliers."""
+	_load_rules()
+	var rules: Dictionary = {}
+	if _rules.get("resource_shortage") is Dictionary:
+		rules = _rules["resource_shortage"] as Dictionary
+	var min_output := float(rules.get("min_output_multiplier", 0.55))
+	var min_reliability := float(rules.get("min_reliability_multiplier", 0.72))
+	var ratio := clampf(fill_ratio, 0.0, 1.0)
+	var speed := lerpf(min_output, 1.0, ratio)
+	var reliability := lerpf(min_reliability, 1.0, ratio)
+	var critical := get_critical_resource_set()
+	if not critical.is_empty() and ratio < 1.0:
+		var crit_weight := float(rules.get("critical_reliability_weight", 1.25))
+		var crit_floor := lerpf(min_reliability, min_reliability * 0.9, 1.0 - ratio)
+		reliability = minf(reliability, lerpf(crit_floor, 1.0, pow(ratio, maxf(crit_weight, 1.0))))
+	return {
+		"speed": clampf(speed, min_output, 1.0),
+		"reliability": clampf(reliability, min_reliability, 1.0),
+		"fill_ratio": ratio,
+	}
+
+
+static func compute_resource_outcome(needed: Dictionary, have: Dictionary) -> Dictionary:
+	"""End-to-end shortage outcome without mutating stockpiles (preview / dual evidence)."""
+	var fill := compute_weighted_fill_ratio(needed, have)
+	var mults := compute_shortage_multipliers(fill)
+	var missing: Dictionary = {}
+	for resource in needed:
+		var required := float(needed[resource])
+		var have_amt := float(have.get(resource, 0.0))
+		if have_amt + 0.001 < required:
+			missing[resource] = required - have_amt
+	return {
+		"fill_ratio": fill,
+		"output_multiplier": float(mults.get("speed", 1.0)),
+		"reliability_multiplier": float(mults.get("reliability", 1.0)),
+		"afforded": fill >= 1.0,
+		"partial": fill > 0.0 and fill < 1.0,
+		"missing": missing,
+		"shortage_ok": float(mults.get("speed", 1.0)) < 0.999 or fill >= 1.0,
+	}
+
+
 static func _load_rules() -> void:
 	if _loaded:
 		return

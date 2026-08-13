@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "policy": {
+    "seed_on_scenario_load": true,
+    "reapply_on_year_tick": false,
+    "player_conquest_preserved": true
+  },
+  "eras": [
+    {
+      "year": 1910,
+      "path": "province_ownership_1910.json",
+      "owner_n": 1840,
+      "ok": true
+    },
+    {
+      "year": 1918,
+      "path": "province_ownership_1918.json",
+      "owner_n": 1840,
+      "ok": true
+    },
+    {
+      "year": 1936,
+      "path": "province_ownership_1936.json",
+      "owner_n": 1840,
+      "ok": true
+    },
+    {
+      "year": 1945,
+      "path": "province_ownership_1945.json",
+      "owner_n": 1840,
+      "ok": true
+    },
+    {
+      "year": 2026,
+      "path": "province_ownership_2026.json",
+      "owner_n": 1840,
+      "ok": true
+    }
+  ],
+  "pilot": true
+}

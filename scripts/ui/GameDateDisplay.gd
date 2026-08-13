@@ -128,6 +128,9 @@ static func format_top_bar_line(include_pause_glyph: bool = true) -> String:
 		int(date.get("day", 1)),
 		true,
 	)
+	# Hour hand (1× advances hour-by-hour).
+	var hour := int(date.get("hour", 0))
+	line += " %02d:00" % hour
 	line += format_elapsed_suffix()
 	if include_pause_glyph and has_time_manager():
 		if TimeManager.is_paused():
@@ -143,11 +146,14 @@ static func format_top_bar_tooltip() -> String:
 	var current := TimeManager.get_current_date()
 	var start_iso := TimeManager.get_scenario_start_date()
 	var start_readable := format_iso_date_readable(start_iso)
-	var now_readable := format_iso_date_readable(str(current.get("date_string", "")))
+	var now_readable := "%s %02d:00" % [
+		format_iso_date_readable(str(current.get("date_day_only", current.get("date_string", "")))),
+		int(current.get("hour", 0)),
+	]
 	var elapsed := days_since_scenario_start()
 	var lines: PackedStringArray = [
 		"Scenario start: %s" % start_readable,
-		"Current date: %s" % now_readable,
+		"Current: %s" % now_readable,
 	]
 	var months := months_since_scenario_start()
 	if elapsed > 0:
@@ -159,9 +165,9 @@ static func format_top_bar_tooltip() -> String:
 		else:
 			lines.append("Time elapsed: %d day(s) since scenario start" % elapsed)
 	else:
-		lines.append("Day 1 — time advances when unpaused.")
+		lines.append("Day 1 — unpause: 1× advances ~1 game hour per real second.")
 	lines.append(
-		"Daily ticks advance each game day; monthly and yearly ticks run at calendar boundaries."
+		"1× = hour-by-hour · 2×/3×/4× faster hours · full day sim fires at midnight."
 	)
 	if TimeManager.is_paused():
 		lines.append("Simulation paused.")

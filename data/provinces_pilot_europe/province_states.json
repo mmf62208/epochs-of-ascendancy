@@ -1,0 +1,3611 @@
+{
+  "version": 3,
+  "source": "europe_pilot_densify",
+  "states": [
+    {
+      "id": 1,
+      "name": "Flanders",
+      "owner_hint": "BEL",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701180,
+        701181,
+        701182,
+        701183,
+        701196,
+        701197,
+        701198,
+        701199,
+        701200,
+        701201
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 2,
+      "name": "Wallonia",
+      "owner_hint": "BEL",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701202,
+        701203,
+        701204,
+        701205,
+        701206,
+        701207
+      ],
+      "province_n": 6
+    },
+    {
+      "id": 3,
+      "name": "Brabant",
+      "owner_hint": "DNK",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700272,
+        700273,
+        700274,
+        700275,
+        701220,
+        701221,
+        701222,
+        701223,
+        701500,
+        701501
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 4,
+      "name": "Holland",
+      "owner_hint": "DNK",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701502,
+        701503,
+        701504,
+        701505,
+        701506,
+        701507,
+        701508,
+        701509,
+        701510,
+        701511
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 5,
+      "name": "Zeeland",
+      "owner_hint": "DNK",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701512,
+        701513,
+        701514,
+        701515,
+        701516,
+        701517,
+        701518,
+        701519
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 6,
+      "name": "Thrace",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        700400,
+        700401,
+        700402,
+        700403,
+        700404,
+        700405,
+        700406,
+        700407,
+        700408,
+        700409
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 7,
+      "name": "Macedonia",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        700410,
+        700411,
+        700412,
+        700413,
+        700414,
+        700415,
+        700416,
+        700417,
+        700418,
+        700419
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 8,
+      "name": "Epirus",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        700420,
+        700421,
+        700422,
+        700423,
+        700808,
+        700809,
+        700810,
+        700811,
+        700812,
+        700813
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 9,
+      "name": "Thessaly",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        700814,
+        700815,
+        700816,
+        700817,
+        700818,
+        700819,
+        700820,
+        700821,
+        700822,
+        700823
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 10,
+      "name": "Peloponnese",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        700824,
+        700825,
+        700826,
+        700827,
+        700828,
+        700829,
+        700830,
+        700831,
+        701380,
+        701381
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 11,
+      "name": "Bosnia",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        701382,
+        701383,
+        701384,
+        701385,
+        701386,
+        701387,
+        701388,
+        701389,
+        701390,
+        701391
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 12,
+      "name": "Serbia",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        701392,
+        701393,
+        701394,
+        701395,
+        701396,
+        701397,
+        701398,
+        701399,
+        701400,
+        701401
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 13,
+      "name": "Croatia",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        701402,
+        701403,
+        701404,
+        701405,
+        701406,
+        701407,
+        701408,
+        701409,
+        701410,
+        701411
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 14,
+      "name": "Slovenia",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        701412,
+        701413,
+        701414,
+        701415,
+        701416,
+        701417,
+        701418,
+        701419,
+        701420,
+        701421
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 15,
+      "name": "Albania",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        701422,
+        701423,
+        701424,
+        701425,
+        701426,
+        701427,
+        701428,
+        701429,
+        701430,
+        701431
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 16,
+      "name": "Montenegro",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        701432,
+        701433,
+        701434,
+        701435,
+        701436,
+        701437,
+        701438,
+        701439,
+        701600,
+        701601
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 17,
+      "name": "Kosovo",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        701602,
+        701603,
+        701604,
+        701605,
+        701606,
+        701607,
+        701608,
+        701609,
+        701610,
+        701611
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 18,
+      "name": "Vojvodina",
+      "owner_hint": "ENG",
+      "region_hint": "Balkans",
+      "province_ids": [
+        701612,
+        701613,
+        701614,
+        701615,
+        701616,
+        701617,
+        701618,
+        701619
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 19,
+      "name": "Bohemia",
+      "owner_hint": "ENG",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        700160,
+        700161,
+        700162,
+        700163,
+        700164,
+        700165,
+        700166,
+        700167,
+        700168,
+        700169
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 20,
+      "name": "Moravia",
+      "owner_hint": "ENG",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        700170,
+        700171,
+        700172,
+        700173,
+        700174,
+        700175,
+        700176,
+        700177,
+        700178,
+        700179
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 21,
+      "name": "Austria Proper",
+      "owner_hint": "ENG",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        700180,
+        700181,
+        700182,
+        700183,
+        700448,
+        700449,
+        700450,
+        700451,
+        700452,
+        700453
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 22,
+      "name": "Tyrol",
+      "owner_hint": "ENG",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        700454,
+        700455,
+        700456,
+        700457,
+        700458,
+        700459,
+        700460,
+        700461,
+        700462,
+        700463
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 23,
+      "name": "Styria",
+      "owner_hint": "ENG",
+      "region_hint": "Central Europe",
+      "province_ids": [
+        700464,
+        700465,
+        700466,
+        700467,
+        700468,
+        700469,
+        700470,
+        700471
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 24,
+      "name": "Brandenburg",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700016,
+        700017,
+        700018,
+        700019,
+        700020,
+        700021,
+        700022,
+        700023,
+        700048,
+        700049
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 25,
+      "name": "Bavaria",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700050,
+        700051,
+        700064,
+        700065,
+        700066,
+        700067,
+        700068,
+        700069,
+        700070,
+        700071
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 26,
+      "name": "Saxony",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700080,
+        700081,
+        700082,
+        700083,
+        700136,
+        700137,
+        700138,
+        700139,
+        700140,
+        700141
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 27,
+      "name": "Rhineland",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700142,
+        700143,
+        700144,
+        700145,
+        700146,
+        700147,
+        700148,
+        700149,
+        700150,
+        700151
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 28,
+      "name": "Westphalia",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700152,
+        700153,
+        700154,
+        700155,
+        700156,
+        700157,
+        700158,
+        700159,
+        700424,
+        700425
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 29,
+      "name": "Silesia",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700426,
+        700427,
+        700428,
+        700429,
+        700430,
+        700431,
+        700432,
+        700433,
+        700434,
+        700435
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 30,
+      "name": "Hanover",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700436,
+        700437,
+        700438,
+        700439,
+        700440,
+        700441,
+        700442,
+        700443,
+        700444,
+        700445
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 31,
+      "name": "Württemberg",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700446,
+        700447,
+        700472,
+        700473,
+        700474,
+        700475,
+        700476,
+        700477,
+        700478,
+        700479
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 32,
+      "name": "Hesse",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700480,
+        700481,
+        700482,
+        700483,
+        700484,
+        700485,
+        700486,
+        700487,
+        700488,
+        700489
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 33,
+      "name": "Pomerania",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700490,
+        700491,
+        700492,
+        700493,
+        700494,
+        700495,
+        700616,
+        700617,
+        700618,
+        700619
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 34,
+      "name": "Mecklenburg",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700620,
+        700621,
+        700622,
+        700623,
+        700624,
+        700625,
+        700626,
+        700627,
+        700628,
+        700629
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 35,
+      "name": "Thuringia",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        700630,
+        700631,
+        700632,
+        700633,
+        700634,
+        700635,
+        700636,
+        700637,
+        700638,
+        700639
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 36,
+      "name": "Baden",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701024,
+        701025,
+        701026,
+        701027,
+        701028,
+        701029,
+        701030,
+        701031,
+        701032,
+        701033
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 37,
+      "name": "Schleswig-Holstein",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701034,
+        701035,
+        701036,
+        701037,
+        701038,
+        701039,
+        701040,
+        701041,
+        701042,
+        701043
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 38,
+      "name": "East Prussia",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701044,
+        701045,
+        701046,
+        701047,
+        701072,
+        701073,
+        701074,
+        701075,
+        701076,
+        701077
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 39,
+      "name": "Franconia",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701078,
+        701079,
+        701080,
+        701081,
+        701082,
+        701083,
+        701084,
+        701085,
+        701086,
+        701087
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 40,
+      "name": "Palatinate",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701088,
+        701089,
+        701090,
+        701091,
+        701092,
+        701093,
+        701094,
+        701095,
+        701240,
+        701241
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 41,
+      "name": "Holstein",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701242,
+        701243,
+        701244,
+        701245,
+        701246,
+        701247,
+        701248,
+        701249,
+        701250,
+        701251
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 42,
+      "name": "Anhalt",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701252,
+        701253,
+        701254,
+        701255,
+        701256,
+        701257,
+        701258,
+        701259,
+        701272,
+        701273
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 43,
+      "name": "Oldenburg",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701274,
+        701275,
+        701276,
+        701277,
+        701278,
+        701279,
+        701440,
+        701441,
+        701442,
+        701443
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 44,
+      "name": "Brunswick",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701444,
+        701445,
+        701446,
+        701447,
+        701448,
+        701449,
+        701450,
+        701451,
+        701452,
+        701453
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 45,
+      "name": "Nassau",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701454,
+        701455,
+        701456,
+        701457,
+        701458,
+        701459,
+        701460,
+        701461,
+        701462,
+        701463
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 46,
+      "name": "West Prussia",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701464,
+        701465,
+        701466,
+        701467,
+        701468,
+        701469,
+        701470,
+        701471,
+        701472,
+        701473
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 47,
+      "name": "Upper Silesia",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701474,
+        701475,
+        701476,
+        701477,
+        701478,
+        701479,
+        701620,
+        701621,
+        701622,
+        701623
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 48,
+      "name": "Lower Saxony",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701624,
+        701625,
+        701626,
+        701627,
+        701628,
+        701629,
+        701630,
+        701631,
+        701632,
+        701633
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 49,
+      "name": "Swabia",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701634,
+        701635,
+        701636,
+        701637,
+        701638,
+        701639,
+        701640,
+        701641,
+        701642,
+        701643
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 50,
+      "name": "Moselle",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701644,
+        701645,
+        701646,
+        701647,
+        701648,
+        701649,
+        701650,
+        701651,
+        701652,
+        701653
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 51,
+      "name": "Saarland",
+      "owner_hint": "ENG",
+      "region_hint": "Germany",
+      "province_ids": [
+        701654,
+        701655,
+        701656,
+        701657,
+        701658,
+        701659
+      ],
+      "province_n": 6
+    },
+    {
+      "id": 52,
+      "name": "Castile",
+      "owner_hint": "ENG",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700028,
+        700029,
+        700030,
+        700031,
+        700904,
+        700905,
+        700906,
+        700907,
+        700916,
+        700917
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 53,
+      "name": "Aragon",
+      "owner_hint": "ENG",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700918,
+        700919,
+        700920,
+        700921,
+        700922,
+        700923,
+        700924,
+        700925,
+        700926,
+        700927
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 54,
+      "name": "Limburg",
+      "owner_hint": "ENG",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701168,
+        701169,
+        701170,
+        701171,
+        701172,
+        701173,
+        701174,
+        701175,
+        701184,
+        701185
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 55,
+      "name": "Hainaut",
+      "owner_hint": "ENG",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701186,
+        701187,
+        701188,
+        701189,
+        701190,
+        701191,
+        701192,
+        701193,
+        701194,
+        701195
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 56,
+      "name": "Languedoc Coast",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700112,
+        700113,
+        700114,
+        700115,
+        700116,
+        700117,
+        700118,
+        700119,
+        700120,
+        700121
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 57,
+      "name": "Catalan Coast",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700122,
+        700123,
+        700124,
+        700125,
+        700126,
+        700127,
+        700128,
+        700129,
+        700130,
+        700131
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 58,
+      "name": "Provence Littoral",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700132,
+        700133,
+        700134,
+        700135,
+        700184,
+        700185,
+        700186,
+        700187,
+        700188,
+        700189
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 59,
+      "name": "Liguria Coast",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700190,
+        700191,
+        700192,
+        700193,
+        700194,
+        700195,
+        700196,
+        700197,
+        700198,
+        700199
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 60,
+      "name": "Corsica",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700200,
+        700201,
+        700202,
+        700203,
+        700204,
+        700205,
+        700206,
+        700207,
+        700232,
+        700233
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 61,
+      "name": "Sardinia West",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700234,
+        700235,
+        700236,
+        700237,
+        700238,
+        700239,
+        700240,
+        700241,
+        700242,
+        700243
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 62,
+      "name": "Balearic Sea",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700244,
+        700245,
+        700246,
+        700247,
+        700248,
+        700249,
+        700250,
+        700251,
+        700252,
+        700253
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 63,
+      "name": "Gulf of Lion",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700254,
+        700255,
+        700328,
+        700329,
+        700330,
+        700331,
+        700332,
+        700333,
+        700334,
+        700335
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 64,
+      "name": "Toulon Approach",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700336,
+        700337,
+        700338,
+        700339,
+        700340,
+        700341,
+        700342,
+        700343,
+        700344,
+        700345
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 65,
+      "name": "Genoa Riviera",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700346,
+        700347,
+        700348,
+        700349,
+        700350,
+        700351,
+        700496,
+        700497,
+        700498,
+        700499
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 66,
+      "name": "Nice",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700500,
+        700501,
+        700502,
+        700503,
+        700504,
+        700505,
+        700506,
+        700507,
+        700508,
+        700509
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 67,
+      "name": "Marseille Basin",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700510,
+        700511,
+        700512,
+        700513,
+        700514,
+        700515,
+        700516,
+        700517,
+        700518,
+        700519
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 68,
+      "name": "Valencia Coast",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700520,
+        700521,
+        700522,
+        700523,
+        700524,
+        700525,
+        700526,
+        700527,
+        700528,
+        700529
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 69,
+      "name": "Alboran North",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700530,
+        700531,
+        700532,
+        700533,
+        700534,
+        700535,
+        700536,
+        700537,
+        700538,
+        700539
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 70,
+      "name": "Tyrrhenian Rim",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700540,
+        700541,
+        700542,
+        700543,
+        700568,
+        700569,
+        700570,
+        700571,
+        700572,
+        700573
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 71,
+      "name": "Gulf of Valencia",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700574,
+        700575,
+        700576,
+        700577,
+        700578,
+        700579,
+        700580,
+        700581,
+        700582,
+        700583
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 72,
+      "name": "Northern Languedoc Coast",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        700584,
+        700585,
+        700586,
+        700587,
+        700588,
+        700589,
+        700590,
+        700591,
+        701760,
+        701761
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 73,
+      "name": "Northern Catalan Coast",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        701762,
+        701763,
+        701764,
+        701765,
+        701766,
+        701767,
+        701768,
+        701769,
+        701770,
+        701771
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 74,
+      "name": "Northern Provence Littoral",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        701772,
+        701773,
+        701774,
+        701775,
+        701776,
+        701777,
+        701778,
+        701779,
+        701780,
+        701781
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 75,
+      "name": "Northern Liguria Coast",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        701782,
+        701783,
+        701784,
+        701785,
+        701786,
+        701787,
+        701788,
+        701789,
+        701790,
+        701791
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 76,
+      "name": "Northern Corsica",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        701792,
+        701793,
+        701794,
+        701795,
+        701796,
+        701797,
+        701798,
+        701799,
+        701800,
+        701801
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 77,
+      "name": "Northern Sardinia West",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        701802,
+        701803,
+        701804,
+        701805,
+        701806,
+        701807,
+        701808,
+        701809,
+        701810,
+        701811
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 78,
+      "name": "Northern Balearic Sea",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        701812,
+        701813,
+        701814,
+        701815,
+        701816,
+        701817,
+        701818,
+        701819,
+        701820,
+        701821
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 79,
+      "name": "Northern Gulf of Lion",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        701822,
+        701823,
+        701824,
+        701825,
+        701826,
+        701827,
+        701828,
+        701829,
+        701830,
+        701831
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 80,
+      "name": "Northern Toulon Approach",
+      "owner_hint": "ENG",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        701832,
+        701833,
+        701834,
+        701835,
+        701836,
+        701837,
+        701838,
+        701839
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 81,
+      "name": "Luxembourg",
+      "owner_hint": "FIN",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700712,
+        700713,
+        700714,
+        700715,
+        700716,
+        700717,
+        700718,
+        700719,
+        700720,
+        700721
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 82,
+      "name": "Gelderland",
+      "owner_hint": "FIN",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700722,
+        700723,
+        700724,
+        700725,
+        700726,
+        700727,
+        700728,
+        700729,
+        700730,
+        700731
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 83,
+      "name": "Utrecht",
+      "owner_hint": "FIN",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700732,
+        700733,
+        700734,
+        700735,
+        700952,
+        700953,
+        700954,
+        700955,
+        700956,
+        700957
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 84,
+      "name": "Antwerp",
+      "owner_hint": "FIN",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700958,
+        700959,
+        700960,
+        700961,
+        700962,
+        700963,
+        700964,
+        700965,
+        700966,
+        700967
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 85,
+      "name": "Liège",
+      "owner_hint": "FIN",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700968,
+        700969,
+        700970,
+        700971,
+        700972,
+        700973,
+        700974,
+        700975,
+        701488,
+        701489
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 86,
+      "name": "Namur",
+      "owner_hint": "FIN",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701490,
+        701491,
+        701492,
+        701493,
+        701494,
+        701495,
+        701496,
+        701497,
+        701498,
+        701499
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 87,
+      "name": "Southeast England",
+      "owner_hint": "FRA",
+      "region_hint": "British Isles",
+      "province_ids": [
+        700076,
+        700077,
+        700078
+      ],
+      "province_n": 3
+    },
+    {
+      "id": 88,
+      "name": "Île-de-France",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        700000,
+        700001,
+        700002,
+        700003,
+        700084,
+        700085,
+        700086,
+        700087,
+        700088,
+        700089
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 89,
+      "name": "Normandy",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        700090,
+        700091,
+        700092,
+        700093,
+        700094,
+        700095,
+        700096,
+        700097,
+        700098,
+        700099
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 90,
+      "name": "Brittany",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        700100,
+        700101,
+        700102,
+        700103,
+        700104,
+        700105,
+        700106,
+        700107,
+        700108,
+        700109
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 91,
+      "name": "Aquitaine",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        700110,
+        700111,
+        700280,
+        700281,
+        700282,
+        700283,
+        700284,
+        700285,
+        700286,
+        700287
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 92,
+      "name": "Provence",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        700288,
+        700289,
+        700290,
+        700291,
+        700292,
+        700293,
+        700294,
+        700295,
+        700296,
+        700297
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 93,
+      "name": "Alsace",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        700298,
+        700299,
+        700300,
+        700301,
+        700302,
+        700303,
+        700664,
+        700665,
+        700666,
+        700667
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 94,
+      "name": "Lorraine",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        700668,
+        700669,
+        700670,
+        700671,
+        700680,
+        700681,
+        700682,
+        700683,
+        700684,
+        700685
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 95,
+      "name": "Burgundy",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        700686,
+        700687,
+        700760,
+        700761,
+        700762,
+        700763,
+        700764,
+        700765,
+        700766,
+        700767
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 96,
+      "name": "Languedoc",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        700768,
+        700769,
+        700770,
+        700771,
+        700772,
+        700773,
+        700774,
+        700775,
+        700776,
+        700777
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 97,
+      "name": "Champagne",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        700778,
+        700779,
+        700780,
+        700781,
+        700782,
+        700783,
+        700784,
+        700785,
+        700804,
+        700805
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 98,
+      "name": "Picardy",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        701120,
+        701121,
+        701122,
+        701123,
+        701124,
+        701125,
+        701126,
+        701127,
+        701128,
+        701129
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 99,
+      "name": "Auvergne",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        701130,
+        701131,
+        701132,
+        701133,
+        701134,
+        701135,
+        701136,
+        701137,
+        701138,
+        701139
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 100,
+      "name": "Poitou",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        701140,
+        701141,
+        701142,
+        701143,
+        701336,
+        701337,
+        701338,
+        701339,
+        701340,
+        701341
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 101,
+      "name": "Gascony",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        701342,
+        701343,
+        701344,
+        701345,
+        701346,
+        701347,
+        701348,
+        701349,
+        701350,
+        701351
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 102,
+      "name": "Franche-Comté",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        701352,
+        701353,
+        701354,
+        701355,
+        701356,
+        701357,
+        701358,
+        701359,
+        701360,
+        701361
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 103,
+      "name": "Limousin",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        701362,
+        701363,
+        701364,
+        701365,
+        701366,
+        701367,
+        701369,
+        701370,
+        701371,
+        701372
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 104,
+      "name": "Dauphiné",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        701373,
+        701374,
+        701375,
+        701376,
+        701377,
+        701378,
+        701680,
+        701681,
+        701682,
+        701683
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 105,
+      "name": "Anjou",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        701684,
+        701685,
+        701686,
+        701687,
+        701688,
+        701689,
+        701690,
+        701691,
+        701692,
+        701693
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 106,
+      "name": "Touraine",
+      "owner_hint": "FRA",
+      "region_hint": "France",
+      "province_ids": [
+        701694,
+        701695,
+        701696,
+        701697,
+        701698,
+        701699
+      ],
+      "province_n": 6
+    },
+    {
+      "id": 107,
+      "name": "Ruhr",
+      "owner_hint": "FRA",
+      "region_hint": "Germany",
+      "province_ids": [
+        700640,
+        700641,
+        700642,
+        700643,
+        700644,
+        700645,
+        700646,
+        700647,
+        700648,
+        700649
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 108,
+      "name": "Harz",
+      "owner_hint": "FRA",
+      "region_hint": "Germany",
+      "province_ids": [
+        700650,
+        700651,
+        700652,
+        700653,
+        700654,
+        700655,
+        700656,
+        700657,
+        700658,
+        700659
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 109,
+      "name": "Lusatia",
+      "owner_hint": "FRA",
+      "region_hint": "Germany",
+      "province_ids": [
+        700660,
+        700661,
+        700662,
+        700663,
+        700672,
+        700673,
+        700674,
+        700675,
+        700676,
+        700677
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 110,
+      "name": "Northern Brandenburg",
+      "owner_hint": "FRA",
+      "region_hint": "Germany",
+      "province_ids": [
+        700678,
+        700679,
+        700786,
+        700787,
+        700788,
+        700789,
+        700790,
+        700791,
+        700792,
+        700793
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 111,
+      "name": "Northern Bavaria",
+      "owner_hint": "FRA",
+      "region_hint": "Germany",
+      "province_ids": [
+        700794,
+        700795,
+        700796,
+        700797,
+        700798,
+        700799,
+        700800,
+        700801,
+        700802,
+        700803
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 112,
+      "name": "Northern Saxony",
+      "owner_hint": "FRA",
+      "region_hint": "Germany",
+      "province_ids": [
+        700806,
+        700807,
+        701260,
+        701261,
+        701262,
+        701263,
+        701264,
+        701265,
+        701266,
+        701267
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 113,
+      "name": "Northern Rhineland",
+      "owner_hint": "FRA",
+      "region_hint": "Germany",
+      "province_ids": [
+        701268,
+        701269,
+        701270,
+        701271,
+        701368,
+        701379,
+        701660,
+        701661,
+        701662,
+        701663
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 114,
+      "name": "Northern Westphalia",
+      "owner_hint": "FRA",
+      "region_hint": "Germany",
+      "province_ids": [
+        701664,
+        701665,
+        701666,
+        701667,
+        701668,
+        701669,
+        701670,
+        701671,
+        701672,
+        701673
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 115,
+      "name": "Northern Silesia",
+      "owner_hint": "FRA",
+      "region_hint": "Germany",
+      "province_ids": [
+        701674,
+        701675,
+        701676,
+        701677,
+        701678,
+        701679
+      ],
+      "province_n": 6
+    },
+    {
+      "id": 116,
+      "name": "Catalonia",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700008,
+        700009,
+        700010,
+        700011,
+        700012,
+        700013,
+        700014,
+        700015,
+        700072,
+        700073
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 117,
+      "name": "Andalusia",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700074,
+        700075,
+        700079,
+        700544,
+        700545,
+        700546,
+        700547,
+        700548,
+        700549,
+        700550
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 118,
+      "name": "Galicia",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700551,
+        700552,
+        700553,
+        700554,
+        700555,
+        700556,
+        700557,
+        700558,
+        700559,
+        700560
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 119,
+      "name": "Portugal Norte",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700561,
+        700562,
+        700563,
+        700564,
+        700565,
+        700566,
+        700567,
+        700592,
+        700593,
+        700594
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 120,
+      "name": "Portugal Sul",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700595,
+        700596,
+        700597,
+        700598,
+        700599,
+        700600,
+        700601,
+        700602,
+        700603,
+        700604
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 121,
+      "name": "Valencia",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700605,
+        700606,
+        700607,
+        700608,
+        700609,
+        700610,
+        700611,
+        700612,
+        700613,
+        700614
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 122,
+      "name": "Navarre",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700615,
+        700908,
+        700909,
+        700910,
+        700911,
+        700912,
+        700913,
+        700914,
+        700915,
+        700928
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 123,
+      "name": "Asturias",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700929,
+        700930,
+        700931,
+        700932,
+        700933,
+        700934,
+        700935,
+        700936,
+        700937,
+        700938
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 124,
+      "name": "León",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700939,
+        700940,
+        700941,
+        700942,
+        700943,
+        700944,
+        700945,
+        700946,
+        700947,
+        700948
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 125,
+      "name": "Extremadura",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700949,
+        700950,
+        700951,
+        700976,
+        700977,
+        700978,
+        700979,
+        700980,
+        700981,
+        700982
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 126,
+      "name": "Murcia",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700983,
+        700984,
+        700985,
+        700986,
+        700987,
+        700988,
+        700989,
+        700990,
+        700991,
+        700992
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 127,
+      "name": "Basque Country",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        700993,
+        700994,
+        700995,
+        700996,
+        700997,
+        700998,
+        700999,
+        701000,
+        701001,
+        701002
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 128,
+      "name": "Alentejo",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        701003,
+        701004,
+        701005,
+        701006,
+        701007,
+        701008,
+        701009,
+        701010,
+        701011,
+        701012
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 129,
+      "name": "Algarve",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        701013,
+        701014,
+        701015,
+        701016,
+        701017,
+        701018,
+        701019,
+        701020,
+        701021,
+        701022
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 130,
+      "name": "Balearics",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        701023,
+        701580,
+        701581,
+        701582,
+        701583,
+        701584,
+        701585,
+        701586,
+        701587,
+        701588
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 131,
+      "name": "Canaries",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        701589,
+        701590,
+        701591,
+        701592,
+        701593,
+        701594,
+        701595,
+        701596,
+        701597,
+        701598
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 132,
+      "name": "La Mancha",
+      "owner_hint": "FRA",
+      "region_hint": "Iberia",
+      "province_ids": [
+        701599
+      ],
+      "province_n": 1
+    },
+    {
+      "id": 133,
+      "name": "Lombardy",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700056,
+        700057,
+        700058,
+        700059,
+        700832,
+        700833,
+        700834,
+        700835,
+        700836,
+        700837
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 134,
+      "name": "Veneto",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700838,
+        700839,
+        700840,
+        700841,
+        700842,
+        700843,
+        700844,
+        700845,
+        700846,
+        700847
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 135,
+      "name": "Piedmont",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700848,
+        700849,
+        700850,
+        700851,
+        700852,
+        700853,
+        700854,
+        700855,
+        700856,
+        700857
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 136,
+      "name": "Tuscany",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700858,
+        700859,
+        700860,
+        700861,
+        700862,
+        700863,
+        700864,
+        700865,
+        700866,
+        700867
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 137,
+      "name": "Latium",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700868,
+        700869,
+        700870,
+        700871,
+        700872,
+        700873,
+        700874,
+        700875,
+        700876,
+        700877
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 138,
+      "name": "Campania",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700878,
+        700879,
+        701096,
+        701097,
+        701098,
+        701099,
+        701100,
+        701101,
+        701102,
+        701103
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 139,
+      "name": "Sicily",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701104,
+        701105,
+        701106,
+        701107,
+        701108,
+        701109,
+        701110,
+        701111,
+        701112,
+        701113
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 140,
+      "name": "Sardinia",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701114,
+        701115,
+        701116,
+        701117,
+        701118,
+        701119,
+        701540,
+        701541,
+        701542,
+        701543
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 141,
+      "name": "Emilia",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701544,
+        701545,
+        701546,
+        701547,
+        701548,
+        701549,
+        701550,
+        701551,
+        701552,
+        701553
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 142,
+      "name": "Romagna",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701554,
+        701555,
+        701556,
+        701557,
+        701558,
+        701559,
+        701560,
+        701561,
+        701562,
+        701563
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 143,
+      "name": "Umbria",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701564,
+        701565,
+        701566,
+        701567,
+        701568,
+        701569,
+        701570,
+        701571,
+        701572,
+        701573
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 144,
+      "name": "Marche",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701574,
+        701575,
+        701576,
+        701577,
+        701578,
+        701579,
+        701720,
+        701721,
+        701722,
+        701723
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 145,
+      "name": "Abruzzo",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701724,
+        701725,
+        701726,
+        701727,
+        701728,
+        701729,
+        701730,
+        701731,
+        701732,
+        701733
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 146,
+      "name": "Calabria",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701734,
+        701735,
+        701736,
+        701737,
+        701738,
+        701739,
+        701748,
+        701749,
+        701750,
+        701752
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 147,
+      "name": "Apulia",
+      "owner_hint": "FRA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701753,
+        701754,
+        701755,
+        701758,
+        701759
+      ],
+      "province_n": 5
+    },
+    {
+      "id": 148,
+      "name": "Overijssel",
+      "owner_hint": "FRA",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701208,
+        701209,
+        701210,
+        701211,
+        701212,
+        701213,
+        701214,
+        701215
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 149,
+      "name": "Northern Genoa Riviera",
+      "owner_hint": "FRA",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        701740,
+        701741,
+        701742,
+        701743,
+        701744,
+        701745,
+        701746,
+        701747,
+        701751,
+        701756
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 150,
+      "name": "Northern Nice",
+      "owner_hint": "FRA",
+      "region_hint": "Western Mediterranean",
+      "province_ids": [
+        701757
+      ],
+      "province_n": 1
+    },
+    {
+      "id": 151,
+      "name": "Drenthe",
+      "owner_hint": "GER",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700004,
+        700005,
+        700006,
+        700007,
+        701216,
+        701217,
+        701218,
+        701219,
+        701224,
+        701225
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 152,
+      "name": "Friesland",
+      "owner_hint": "GER",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701226,
+        701227,
+        701228,
+        701229,
+        701230,
+        701231,
+        701232,
+        701233,
+        701234,
+        701235
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 153,
+      "name": "Groningen",
+      "owner_hint": "GER",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701236,
+        701237,
+        701238,
+        701239,
+        701288,
+        701289,
+        701290,
+        701291,
+        701292,
+        701293
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 154,
+      "name": "Artois Border",
+      "owner_hint": "GER",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701294,
+        701295
+      ],
+      "province_n": 2
+    },
+    {
+      "id": 155,
+      "name": "Orléanais",
+      "owner_hint": "ITA",
+      "region_hint": "France",
+      "province_ids": [
+        700032,
+        700033,
+        700034,
+        700035,
+        700040,
+        700041,
+        700042,
+        700043,
+        700044,
+        700045
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 156,
+      "name": "Berry",
+      "owner_hint": "ITA",
+      "region_hint": "France",
+      "province_ids": [
+        700046,
+        700047,
+        701049,
+        701050,
+        701051,
+        701052,
+        701053,
+        701054,
+        701055,
+        701056
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 157,
+      "name": "Maine",
+      "owner_hint": "ITA",
+      "region_hint": "France",
+      "province_ids": [
+        701057,
+        701058,
+        701059,
+        701060,
+        701061,
+        701062,
+        701063,
+        701064,
+        701065,
+        701066
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 158,
+      "name": "Artois",
+      "owner_hint": "ITA",
+      "region_hint": "France",
+      "province_ids": [
+        701067,
+        701068,
+        701069,
+        701070,
+        701071
+      ],
+      "province_n": 5
+    },
+    {
+      "id": 159,
+      "name": "Liguria",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700052,
+        700053,
+        700054,
+        700055,
+        700208,
+        700209,
+        700210,
+        700211,
+        700212,
+        700213
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 160,
+      "name": "Trentino",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700214,
+        700215,
+        700216,
+        700217,
+        700218,
+        700219,
+        700220,
+        700221,
+        700222,
+        700223
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 161,
+      "name": "Friuli",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700224,
+        700225,
+        700226,
+        700227,
+        700228,
+        700229,
+        700230,
+        700231,
+        700304,
+        700305
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 162,
+      "name": "South Tyrol",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700306,
+        700307,
+        700308,
+        700309,
+        700310,
+        700311,
+        700312,
+        700313,
+        700314,
+        700315
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 163,
+      "name": "Basilicata",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700316,
+        700317,
+        700318,
+        700319,
+        700320,
+        700321,
+        700322,
+        700323,
+        700324,
+        700325
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 164,
+      "name": "Molise",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        700326,
+        700327,
+        701520,
+        701521,
+        701522,
+        701523,
+        701524,
+        701525,
+        701526,
+        701527
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 165,
+      "name": "Aosta",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701528,
+        701529,
+        701530,
+        701531,
+        701532,
+        701533,
+        701534,
+        701535,
+        701536,
+        701537
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 166,
+      "name": "Istria",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701538,
+        701539,
+        701700,
+        701701,
+        701702,
+        701703,
+        701704,
+        701705,
+        701706,
+        701707
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 167,
+      "name": "Dalmatian Rim",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701708,
+        701709,
+        701710,
+        701711,
+        701712,
+        701713,
+        701714,
+        701715,
+        701716,
+        701717
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 168,
+      "name": "Northern Lombardy",
+      "owner_hint": "ITA",
+      "region_hint": "Italy",
+      "province_ids": [
+        701718,
+        701719
+      ],
+      "province_n": 2
+    },
+    {
+      "id": 169,
+      "name": "Scheldt Mouth",
+      "owner_hint": "ITA",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701048
+      ],
+      "province_n": 1
+    },
+    {
+      "id": 170,
+      "name": "Meuse Valley",
+      "owner_hint": "NLD",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701176,
+        701177,
+        701178,
+        701179,
+        701280,
+        701281,
+        701282,
+        701283,
+        701284,
+        701285
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 171,
+      "name": "Kempen",
+      "owner_hint": "NLD",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701286,
+        701287,
+        701296,
+        701297,
+        701298,
+        701299
+      ],
+      "province_n": 6
+    },
+    {
+      "id": 172,
+      "name": "Ardennes",
+      "owner_hint": "NOR",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700256,
+        700257,
+        700258,
+        700259,
+        700260,
+        700261,
+        700262,
+        700263,
+        700264,
+        700265
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 173,
+      "name": "Brabant Wallon",
+      "owner_hint": "NOR",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700266,
+        700267,
+        700268,
+        700269,
+        700270,
+        700271,
+        700276,
+        700277,
+        700278,
+        700279
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 174,
+      "name": "Dutch Limburg",
+      "owner_hint": "NOR",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700388,
+        700389,
+        700390,
+        700391,
+        701480,
+        701481,
+        701482,
+        701483,
+        701484,
+        701485
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 175,
+      "name": "West Flanders",
+      "owner_hint": "NOR",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701486,
+        701487
+      ],
+      "province_n": 2
+    },
+    {
+      "id": 176,
+      "name": "East Flanders",
+      "owner_hint": "POL",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700036,
+        700037,
+        700038,
+        700039
+      ],
+      "province_n": 4
+    },
+    {
+      "id": 177,
+      "name": "Roussillon",
+      "owner_hint": "SOV",
+      "region_hint": "France",
+      "province_ids": [
+        700062,
+        700352,
+        700353,
+        700354,
+        700355,
+        700359,
+        700360,
+        700361,
+        700362,
+        700363
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 178,
+      "name": "Savoy",
+      "owner_hint": "SOV",
+      "region_hint": "France",
+      "province_ids": [
+        700364,
+        700365,
+        700366,
+        700367,
+        700368,
+        700369,
+        700370,
+        700371,
+        700372,
+        700373
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 179,
+      "name": "Corsica",
+      "owner_hint": "SOV",
+      "region_hint": "France",
+      "province_ids": [
+        700374,
+        700375,
+        701320,
+        701321,
+        701322,
+        701323,
+        701324,
+        701325,
+        701326,
+        701327
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 180,
+      "name": "Narbonne",
+      "owner_hint": "SOV",
+      "region_hint": "France",
+      "province_ids": [
+        701328,
+        701329,
+        701330,
+        701331,
+        701332,
+        701333,
+        701334,
+        701335
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 181,
+      "name": "Northern Hanover",
+      "owner_hint": "SOV",
+      "region_hint": "Germany",
+      "province_ids": [
+        700024,
+        700025,
+        700026,
+        700027,
+        700063
+      ],
+      "province_n": 5
+    },
+    {
+      "id": 182,
+      "name": "Northern Flanders",
+      "owner_hint": "SOV",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700060,
+        700061,
+        700356,
+        700357,
+        700358,
+        700736,
+        700737,
+        700738,
+        700739,
+        700740
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 183,
+      "name": "Northern Wallonia",
+      "owner_hint": "SOV",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700741,
+        700742,
+        700743,
+        700744,
+        700745,
+        700746,
+        700747,
+        700748,
+        700749,
+        700750
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 184,
+      "name": "Northern Brabant",
+      "owner_hint": "SOV",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700751,
+        700752,
+        700753,
+        700754,
+        700755,
+        700756,
+        700757,
+        700758,
+        700759,
+        701144
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 185,
+      "name": "Northern Holland",
+      "owner_hint": "SOV",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701145,
+        701146,
+        701147,
+        701148,
+        701149,
+        701150,
+        701151,
+        701152,
+        701153,
+        701154
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 186,
+      "name": "Northern Zeeland",
+      "owner_hint": "SOV",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701155,
+        701156,
+        701157,
+        701158,
+        701159,
+        701160,
+        701161,
+        701162,
+        701163,
+        701164
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 187,
+      "name": "Northern Limburg",
+      "owner_hint": "SOV",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701165,
+        701166,
+        701167,
+        701300,
+        701301,
+        701302,
+        701303,
+        701304,
+        701305,
+        701306
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 188,
+      "name": "Northern Hainaut",
+      "owner_hint": "SOV",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701307,
+        701308,
+        701309,
+        701310,
+        701311,
+        701312,
+        701313,
+        701314,
+        701315,
+        701316
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 189,
+      "name": "Northern Luxembourg",
+      "owner_hint": "SOV",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        701317,
+        701318,
+        701319
+      ],
+      "province_n": 3
+    },
+    {
+      "id": 190,
+      "name": "Zealand",
+      "owner_hint": "SOV",
+      "region_hint": "Nordic",
+      "province_ids": [
+        700688,
+        700689,
+        700690,
+        700691,
+        700692,
+        700693,
+        700694,
+        700695,
+        700696,
+        700697
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 191,
+      "name": "Jutland",
+      "owner_hint": "SOV",
+      "region_hint": "Nordic",
+      "province_ids": [
+        700698,
+        700699,
+        700700,
+        700701,
+        700702,
+        700703,
+        700704,
+        700705,
+        700706,
+        700707
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 192,
+      "name": "Scania",
+      "owner_hint": "SOV",
+      "region_hint": "Nordic",
+      "province_ids": [
+        700708,
+        700709,
+        700710,
+        700711,
+        700880,
+        700881,
+        700882,
+        700883,
+        700884,
+        700885
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 193,
+      "name": "Svealand",
+      "owner_hint": "SOV",
+      "region_hint": "Nordic",
+      "province_ids": [
+        700886,
+        700887,
+        700888,
+        700889,
+        700890,
+        700891,
+        700892,
+        700893,
+        700894,
+        700895
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 194,
+      "name": "Götaland",
+      "owner_hint": "SOV",
+      "region_hint": "Nordic",
+      "province_ids": [
+        700896,
+        700897,
+        700898,
+        700899,
+        700900,
+        700901,
+        700902,
+        700903
+      ],
+      "province_n": 8
+    },
+    {
+      "id": 195,
+      "name": "Northern Gelderland",
+      "owner_hint": "SWE",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700376,
+        700377,
+        700378,
+        700379,
+        700380,
+        700381,
+        700382,
+        700383,
+        700384,
+        700385
+      ],
+      "province_n": 10
+    },
+    {
+      "id": 196,
+      "name": "Northern Utrecht",
+      "owner_hint": "SWE",
+      "region_hint": "Low Countries",
+      "province_ids": [
+        700386,
+        700387,
+        700392,
+        700393,
+        700394,
+        700395,
+        700396,
+        700397,
+        700398,
+        700399
+      ],
+      "province_n": 10
+    }
+  ],
+  "naming": "state_name_gazetteer"
+}

@@ -2,6 +2,8 @@
 class_name FormationPickerPopup
 extends Window
 
+const _UnitIcons = preload("res://scripts/ui/UnitIconLibrary.gd")
+
 signal formation_assigned(formation_id: String)
 
 @export var leader_id: String = ""
@@ -77,7 +79,11 @@ func _refresh_list() -> void:
 		var formation_type: String = str(formation.get("type", "division"))
 		var category: String = str(formation.get("category", ""))
 		var suffix := " [%s]" % category if not category.is_empty() else ""
+		var idx := formation_list.item_count
 		formation_list.add_item("%s (%s)%s" % [display_name, formation_type, suffix])
+		var tex: Texture2D = _UnitIcons.icon_for_formation_dict(formation as Dictionary, 32)
+		if tex != null:
+			formation_list.set_item_icon(idx, tex)
 
 
 func _on_search_changed(new_text: String) -> void:

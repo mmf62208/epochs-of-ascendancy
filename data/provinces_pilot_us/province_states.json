@@ -1,0 +1,3969 @@
+{
+  "version": 3,
+  "source": "us_pilot_densify",
+  "naming": "us_band_states",
+  "eight_band": [
+    "Northeast",
+    "Mid-Atlantic",
+    "Southeast",
+    "Midwest",
+    "Great Plains",
+    "Southwest",
+    "Mountain West",
+    "Pacific"
+  ],
+  "states": [
+    {
+      "id": 1,
+      "name": "North Dakota",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800200,
+        800201,
+        800202,
+        800203,
+        800204,
+        800205,
+        800207,
+        800208,
+        800209,
+        800210
+      ],
+      "province_n": 10,
+      "capital_province_id": 800200,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "South Dakota",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800211,
+        800212,
+        800213,
+        800214,
+        800215,
+        800216,
+        800217,
+        800218,
+        800219,
+        800220
+      ],
+      "province_n": 10,
+      "capital_province_id": 800211,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 3,
+      "name": "Nebraska",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800221,
+        800222,
+        800223,
+        800224,
+        800225,
+        800226,
+        800227,
+        800228,
+        800229,
+        800230
+      ],
+      "province_n": 10,
+      "capital_province_id": 800221,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 4,
+      "name": "Kansas",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800232,
+        800233,
+        800234,
+        800235,
+        800236,
+        800237,
+        800238,
+        800239,
+        800240,
+        800241
+      ],
+      "province_n": 10,
+      "capital_province_id": 800232,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 5,
+      "name": "Oklahoma",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800242,
+        800243,
+        800244,
+        800245,
+        800246,
+        800247,
+        800248,
+        800249,
+        800250,
+        800251
+      ],
+      "province_n": 10,
+      "capital_province_id": 800242,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 6,
+      "name": "High Plains North",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800252,
+        800253,
+        800254,
+        800255,
+        800256,
+        800257,
+        800258,
+        800259,
+        800260,
+        800261
+      ],
+      "province_n": 10,
+      "capital_province_id": 800252,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 7,
+      "name": "High Plains South",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800262,
+        800263,
+        800264,
+        800265,
+        800266,
+        800267,
+        800268,
+        800269,
+        800270,
+        800271
+      ],
+      "province_n": 10,
+      "capital_province_id": 800262,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Red River Valley",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800272,
+        800273,
+        800274,
+        800275,
+        800276,
+        800277,
+        800278,
+        800279,
+        800282,
+        800283
+      ],
+      "province_n": 10,
+      "capital_province_id": 800272,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 9,
+      "name": "Flint Hills",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800284,
+        800285,
+        800286,
+        800287,
+        800288,
+        800289,
+        800290,
+        800291,
+        800292,
+        800293
+      ],
+      "province_n": 10,
+      "capital_province_id": 800284,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 10,
+      "name": "Oklahoma Panhandle",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800294,
+        800295,
+        800297,
+        800298,
+        800299,
+        800300,
+        800301,
+        800302,
+        800303,
+        800304
+      ],
+      "province_n": 10,
+      "capital_province_id": 800294,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 11,
+      "name": "Badlands",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800305,
+        800306,
+        800307,
+        800308,
+        800309,
+        800310,
+        800311,
+        800312,
+        800313,
+        800314
+      ],
+      "province_n": 10,
+      "capital_province_id": 800305,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 12,
+      "name": "Platte Valley",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800315,
+        800316,
+        800317,
+        800318,
+        800319,
+        800320,
+        800321,
+        800322,
+        800323,
+        800324
+      ],
+      "province_n": 10,
+      "capital_province_id": 800315,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Northern North Dakota",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800325,
+        800326,
+        800327,
+        800600,
+        800601,
+        800602,
+        800603,
+        800604,
+        800605,
+        800606
+      ],
+      "province_n": 10,
+      "capital_province_id": 800325,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 14,
+      "name": "Northern South Dakota",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800607,
+        800608,
+        800610,
+        800612,
+        800614,
+        800704,
+        800705,
+        800706,
+        800707,
+        800708
+      ],
+      "province_n": 10,
+      "capital_province_id": 800607,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Northern Nebraska",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800709,
+        800710,
+        800711,
+        800712,
+        800713,
+        800714,
+        800715,
+        800716,
+        800717,
+        800718
+      ],
+      "province_n": 10,
+      "capital_province_id": 800709,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 16,
+      "name": "Northern Kansas",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        800719,
+        801232,
+        801233,
+        801234,
+        801235,
+        801236,
+        801237,
+        801238,
+        801239,
+        801240
+      ],
+      "province_n": 10,
+      "capital_province_id": 800719,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 17,
+      "name": "Northern Oklahoma",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        801241,
+        801242,
+        801243,
+        801244,
+        801245,
+        801246,
+        801247,
+        801248,
+        801249,
+        801250
+      ],
+      "province_n": 10,
+      "capital_province_id": 801241,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Northern High Plains North",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        801251,
+        801252,
+        801253,
+        801254,
+        801255,
+        801256,
+        801257,
+        801258,
+        801259,
+        801260
+      ],
+      "province_n": 10,
+      "capital_province_id": 801251,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 19,
+      "name": "Northern High Plains South",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        801261,
+        801264,
+        801265,
+        801266,
+        801267,
+        801268,
+        801269,
+        801270,
+        801271,
+        801272
+      ],
+      "province_n": 10,
+      "capital_province_id": 801261,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 20,
+      "name": "Northern Red River Valley",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        801273,
+        801274,
+        801275,
+        801276,
+        801277,
+        801278,
+        801279,
+        801280,
+        801281,
+        801282
+      ],
+      "province_n": 10,
+      "capital_province_id": 801273,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 21,
+      "name": "Northern Flint Hills",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        801283,
+        801284,
+        801285,
+        801286,
+        801287,
+        801288,
+        801289,
+        801290,
+        801291,
+        801292
+      ],
+      "province_n": 10,
+      "capital_province_id": 801283,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 22,
+      "name": "Northern Oklahoma Panhandle",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        801293,
+        801294,
+        801295,
+        801300,
+        801301,
+        801302,
+        801303,
+        801304,
+        801305,
+        801306
+      ],
+      "province_n": 10,
+      "capital_province_id": 801293,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 23,
+      "name": "Northern Badlands",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        801307,
+        801308,
+        801309,
+        801310,
+        801311,
+        801312,
+        801313,
+        801314,
+        801315,
+        801316
+      ],
+      "province_n": 10,
+      "capital_province_id": 801307,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 24,
+      "name": "Northern Platte Valley",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        801317,
+        801318,
+        801319,
+        801320,
+        801321,
+        801322,
+        801323,
+        801324,
+        801325,
+        801326
+      ],
+      "province_n": 10,
+      "capital_province_id": 801317,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 25,
+      "name": "Southern North Dakota",
+      "owner_hint": "USA",
+      "region_id": 5,
+      "region_hint": "Great Plains",
+      "theater": "north_america",
+      "province_ids": [
+        801327
+      ],
+      "province_n": 1,
+      "capital_province_id": 801327,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 26,
+      "name": "Pennsylvania",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800000,
+        800001,
+        800002,
+        800003,
+        800004,
+        800005,
+        800006,
+        800007,
+        800008,
+        800009
+      ],
+      "province_n": 10,
+      "capital_province_id": 800000,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 27,
+      "name": "New Jersey",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800010,
+        800011,
+        800012,
+        800013,
+        800014,
+        800015,
+        800016,
+        800017,
+        800018,
+        800019
+      ],
+      "province_n": 10,
+      "capital_province_id": 800010,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 28,
+      "name": "Delaware",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800020,
+        800021,
+        800022,
+        800023,
+        800024,
+        800025,
+        800026,
+        800027,
+        800028,
+        800029
+      ],
+      "province_n": 10,
+      "capital_province_id": 800020,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 29,
+      "name": "Maryland",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800030,
+        800031,
+        800032,
+        800033,
+        800034,
+        800035,
+        800036,
+        800037,
+        800038,
+        800039
+      ],
+      "province_n": 10,
+      "capital_province_id": 800030,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 30,
+      "name": "District of Columbia",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800040,
+        800043,
+        800044,
+        800045,
+        800046,
+        800047,
+        800048,
+        800049,
+        800050,
+        800051
+      ],
+      "province_n": 10,
+      "capital_province_id": 800040,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 31,
+      "name": "Virginia",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800052,
+        800053,
+        800054,
+        800055,
+        800061,
+        800064,
+        800065,
+        800067,
+        800068,
+        800069
+      ],
+      "province_n": 10,
+      "capital_province_id": 800052,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 32,
+      "name": "West Virginia",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800070,
+        800071,
+        800072,
+        800073,
+        800074,
+        800075,
+        800076,
+        800077,
+        800078,
+        800079
+      ],
+      "province_n": 10,
+      "capital_province_id": 800070,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 33,
+      "name": "Philadelphia Basin",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800080,
+        800081,
+        800082,
+        800083,
+        800084,
+        800085,
+        800086,
+        800087,
+        800088,
+        800089
+      ],
+      "province_n": 10,
+      "capital_province_id": 800080,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 34,
+      "name": "Chesapeake",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800090,
+        800091,
+        800092,
+        800093,
+        800094,
+        800095,
+        800176,
+        800178,
+        800179,
+        800180
+      ],
+      "province_n": 10,
+      "capital_province_id": 800090,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 35,
+      "name": "Shenandoah",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800181,
+        800182,
+        800183,
+        800184,
+        800185,
+        800186,
+        800187,
+        800188,
+        800189,
+        800190
+      ],
+      "province_n": 10,
+      "capital_province_id": 800181,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 36,
+      "name": "Allegheny",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800191,
+        800195,
+        800197,
+        800451,
+        800453,
+        800466,
+        800467,
+        800471,
+        800475,
+        800478
+      ],
+      "province_n": 10,
+      "capital_province_id": 800191,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 37,
+      "name": "Tidewater",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800486,
+        800487,
+        800699,
+        800703,
+        800738,
+        800739,
+        800742,
+        800743,
+        800746,
+        800747
+      ],
+      "province_n": 10,
+      "capital_province_id": 800486,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 38,
+      "name": "Northern Virginia",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800749,
+        800750,
+        800751,
+        800752,
+        800753,
+        800754,
+        800755,
+        800756,
+        800757,
+        800758
+      ],
+      "province_n": 10,
+      "capital_province_id": 800749,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 39,
+      "name": "Piedmont Virginia",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800759,
+        800760,
+        800761,
+        800762,
+        800763,
+        800764,
+        800765,
+        800766,
+        800767,
+        800768
+      ],
+      "province_n": 10,
+      "capital_province_id": 800759,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 40,
+      "name": "Northern Pennsylvania",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800769,
+        800770,
+        800771,
+        800772,
+        800773,
+        800774,
+        800775,
+        800776,
+        800777,
+        800778
+      ],
+      "province_n": 10,
+      "capital_province_id": 800769,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 41,
+      "name": "Northern New Jersey",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800779,
+        800780,
+        800781,
+        800782,
+        800783,
+        800784,
+        800785,
+        800786,
+        800787,
+        800788
+      ],
+      "province_n": 10,
+      "capital_province_id": 800779,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 42,
+      "name": "Northern Delaware",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800789,
+        800790,
+        800791,
+        800792,
+        800793,
+        800794,
+        800795,
+        800796,
+        800797,
+        800798
+      ],
+      "province_n": 10,
+      "capital_province_id": 800789,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 43,
+      "name": "Northern Maryland",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800799,
+        800800,
+        800801,
+        800802,
+        800803,
+        800804,
+        800805,
+        800806,
+        800807,
+        800808
+      ],
+      "province_n": 10,
+      "capital_province_id": 800799,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 44,
+      "name": "Northern District of Columbia",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800809,
+        800810,
+        800811,
+        800812,
+        800813,
+        800814,
+        800815,
+        800864,
+        800865,
+        800866
+      ],
+      "province_n": 10,
+      "capital_province_id": 800809,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 45,
+      "name": "Northern West Virginia",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800867,
+        800868,
+        800869,
+        800870,
+        800871,
+        800873,
+        800875,
+        800877,
+        800879,
+        800892
+      ],
+      "province_n": 10,
+      "capital_province_id": 800867,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 46,
+      "name": "Northern Philadelphia Basin",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800893,
+        800894,
+        800895,
+        800896,
+        800897,
+        800898,
+        800899,
+        800900,
+        800901,
+        800902
+      ],
+      "province_n": 10,
+      "capital_province_id": 800893,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 47,
+      "name": "Northern Chesapeake",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800903,
+        800936,
+        800937,
+        800938,
+        800939,
+        800940,
+        800941,
+        800942,
+        800943,
+        800944
+      ],
+      "province_n": 10,
+      "capital_province_id": 800903,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 48,
+      "name": "Northern Shenandoah",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800945,
+        800946,
+        800947,
+        800948,
+        800949,
+        800950,
+        800951,
+        800952,
+        800953,
+        800954
+      ],
+      "province_n": 10,
+      "capital_province_id": 800945,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 49,
+      "name": "Northern Allegheny",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800955,
+        800956,
+        800957,
+        800958,
+        800959,
+        800960,
+        800961,
+        800962,
+        800963,
+        800964
+      ],
+      "province_n": 10,
+      "capital_province_id": 800955,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 50,
+      "name": "Northern Tidewater",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800965,
+        800966,
+        800967,
+        800968,
+        800969,
+        800970,
+        800971,
+        800972,
+        800973,
+        800974
+      ],
+      "province_n": 10,
+      "capital_province_id": 800965,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 51,
+      "name": "Northern Northern Virginia",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800975,
+        800976,
+        800977,
+        800978,
+        800979,
+        800980,
+        800981,
+        800982,
+        800983,
+        800984
+      ],
+      "province_n": 10,
+      "capital_province_id": 800975,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 52,
+      "name": "Northern Piedmont Virginia",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800985,
+        800986,
+        800987,
+        800988,
+        800989,
+        800990,
+        800991,
+        800992,
+        800993,
+        800994
+      ],
+      "province_n": 10,
+      "capital_province_id": 800985,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 53,
+      "name": "Southern Pennsylvania",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        800995,
+        800996,
+        800997,
+        800998,
+        800999,
+        801048,
+        801049,
+        801050,
+        801051,
+        801052
+      ],
+      "province_n": 10,
+      "capital_province_id": 800995,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 54,
+      "name": "Southern New Jersey",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        801053,
+        801054,
+        801055,
+        801060,
+        801061,
+        801062,
+        801063,
+        801073,
+        801075,
+        801077
+      ],
+      "province_n": 10,
+      "capital_province_id": 801053,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 55,
+      "name": "Southern Delaware",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        801079,
+        801080,
+        801081,
+        801082,
+        801083,
+        801084,
+        801085,
+        801086,
+        801087,
+        801450
+      ],
+      "province_n": 10,
+      "capital_province_id": 801079,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 56,
+      "name": "Southern Maryland",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        801451,
+        801454,
+        801470,
+        801471,
+        801472,
+        801473,
+        801474,
+        801475,
+        801476,
+        801477
+      ],
+      "province_n": 10,
+      "capital_province_id": 801451,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 57,
+      "name": "Southern District of Columbia",
+      "owner_hint": "USA",
+      "region_id": 2,
+      "region_hint": "Mid-Atlantic",
+      "theater": "north_america",
+      "province_ids": [
+        801478,
+        801479,
+        801486,
+        801487
+      ],
+      "province_n": 4,
+      "capital_province_id": 801478,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 58,
+      "name": "Ohio",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800041,
+        800042,
+        800056,
+        800057,
+        800058,
+        800059,
+        800060,
+        800062,
+        800063,
+        800066
+      ],
+      "province_n": 10,
+      "capital_province_id": 800041,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 59,
+      "name": "Indiana",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800096,
+        800097,
+        800098,
+        800099,
+        800100,
+        800101,
+        800102,
+        800103,
+        800104,
+        800105
+      ],
+      "province_n": 10,
+      "capital_province_id": 800096,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 60,
+      "name": "Illinois",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800106,
+        800107,
+        800108,
+        800109,
+        800110,
+        800111,
+        800112,
+        800113,
+        800114,
+        800115
+      ],
+      "province_n": 10,
+      "capital_province_id": 800106,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 61,
+      "name": "Michigan",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800116,
+        800117,
+        800118,
+        800119,
+        800120,
+        800121,
+        800122,
+        800123,
+        800124,
+        800125
+      ],
+      "province_n": 10,
+      "capital_province_id": 800116,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 62,
+      "name": "Wisconsin",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800126,
+        800127,
+        800128,
+        800129,
+        800130,
+        800131,
+        800132,
+        800133,
+        800134,
+        800135
+      ],
+      "province_n": 10,
+      "capital_province_id": 800126,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 63,
+      "name": "Minnesota",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800136,
+        800137,
+        800138,
+        800139,
+        800140,
+        800141,
+        800142,
+        800143,
+        800144,
+        800145
+      ],
+      "province_n": 10,
+      "capital_province_id": 800136,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 64,
+      "name": "Iowa",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800146,
+        800147,
+        800148,
+        800149,
+        800150,
+        800151,
+        800440,
+        800441,
+        800442,
+        800443
+      ],
+      "province_n": 10,
+      "capital_province_id": 800146,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 65,
+      "name": "Missouri",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800444,
+        800445,
+        800446,
+        800447,
+        800448,
+        800449,
+        800450,
+        800452,
+        800454,
+        800455
+      ],
+      "province_n": 10,
+      "capital_province_id": 800444,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 66,
+      "name": "Chicago Belt",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800456,
+        800457,
+        800458,
+        800459,
+        800460,
+        800461,
+        800462,
+        800463,
+        800488,
+        800489
+      ],
+      "province_n": 10,
+      "capital_province_id": 800456,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 67,
+      "name": "Detroit Corridor",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800490,
+        800491,
+        800492,
+        800493,
+        800494,
+        800495,
+        800496,
+        800497,
+        800498,
+        800499
+      ],
+      "province_n": 10,
+      "capital_province_id": 800490,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 68,
+      "name": "Twin Cities",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800500,
+        800501,
+        800502,
+        800503,
+        800656,
+        800657,
+        800658,
+        800659,
+        800660,
+        800661
+      ],
+      "province_n": 10,
+      "capital_province_id": 800500,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 69,
+      "name": "Ozarks North",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800662,
+        800663,
+        800664,
+        800665,
+        800666,
+        800667,
+        800668,
+        800669,
+        800670,
+        800671
+      ],
+      "province_n": 10,
+      "capital_province_id": 800662,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 70,
+      "name": "Great Lakes West",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800672,
+        800673,
+        800674,
+        800675,
+        800676,
+        800677,
+        800678,
+        800679,
+        800680,
+        800681
+      ],
+      "province_n": 10,
+      "capital_province_id": 800672,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 71,
+      "name": "Corn Belt East",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800682,
+        800683,
+        800684,
+        800685,
+        800686,
+        800687,
+        800688,
+        800689,
+        800690,
+        800691
+      ],
+      "province_n": 10,
+      "capital_province_id": 800682,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 72,
+      "name": "Northern Ohio",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800692,
+        800693,
+        800696,
+        800697,
+        800698,
+        800700,
+        800701,
+        800702,
+        800816,
+        800817
+      ],
+      "province_n": 10,
+      "capital_province_id": 800692,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 73,
+      "name": "Northern Indiana",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800818,
+        800819,
+        800820,
+        800821,
+        800822,
+        800823,
+        800824,
+        800825,
+        800826,
+        800827
+      ],
+      "province_n": 10,
+      "capital_province_id": 800818,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 74,
+      "name": "Northern Illinois",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800828,
+        800829,
+        800830,
+        800831,
+        800832,
+        800833,
+        800834,
+        800835,
+        800836,
+        800837
+      ],
+      "province_n": 10,
+      "capital_province_id": 800828,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 75,
+      "name": "Northern Michigan",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800838,
+        800839,
+        800840,
+        800841,
+        800842,
+        800843,
+        800844,
+        800845,
+        800846,
+        800847
+      ],
+      "province_n": 10,
+      "capital_province_id": 800838,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 76,
+      "name": "Northern Wisconsin",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800848,
+        800849,
+        800850,
+        800851,
+        800852,
+        800853,
+        800854,
+        800855,
+        800856,
+        800857
+      ],
+      "province_n": 10,
+      "capital_province_id": 800848,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 77,
+      "name": "Northern Minnesota",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800858,
+        800859,
+        800860,
+        800861,
+        800862,
+        800863,
+        800904,
+        800905,
+        800906,
+        800907
+      ],
+      "province_n": 10,
+      "capital_province_id": 800858,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 78,
+      "name": "Northern Iowa",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800908,
+        800909,
+        800910,
+        800911,
+        800912,
+        800913,
+        800914,
+        800915,
+        800916,
+        800917
+      ],
+      "province_n": 10,
+      "capital_province_id": 800908,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 79,
+      "name": "Northern Missouri",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800918,
+        800919,
+        800920,
+        800921,
+        800922,
+        800923,
+        800924,
+        800925,
+        800926,
+        800927
+      ],
+      "province_n": 10,
+      "capital_province_id": 800918,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 80,
+      "name": "Northern Chicago Belt",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        800928,
+        800929,
+        800930,
+        800931,
+        800932,
+        800933,
+        800934,
+        800935,
+        801000,
+        801001
+      ],
+      "province_n": 10,
+      "capital_province_id": 800928,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 81,
+      "name": "Northern Detroit Corridor",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801002,
+        801003,
+        801004,
+        801005,
+        801006,
+        801007,
+        801008,
+        801009,
+        801010,
+        801011
+      ],
+      "province_n": 10,
+      "capital_province_id": 801002,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 82,
+      "name": "Northern Twin Cities",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801012,
+        801013,
+        801014,
+        801015,
+        801016,
+        801017,
+        801018,
+        801019,
+        801020,
+        801021
+      ],
+      "province_n": 10,
+      "capital_province_id": 801012,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 83,
+      "name": "Northern Ozarks North",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801022,
+        801023,
+        801024,
+        801025,
+        801026,
+        801027,
+        801028,
+        801029,
+        801030,
+        801031
+      ],
+      "province_n": 10,
+      "capital_province_id": 801022,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 84,
+      "name": "Northern Great Lakes West",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801032,
+        801033,
+        801034,
+        801035,
+        801036,
+        801037,
+        801038,
+        801039,
+        801040,
+        801041
+      ],
+      "province_n": 10,
+      "capital_province_id": 801032,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 85,
+      "name": "Northern Corn Belt East",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801042,
+        801043,
+        801044,
+        801045,
+        801046,
+        801047,
+        801088,
+        801089,
+        801090,
+        801091
+      ],
+      "province_n": 10,
+      "capital_province_id": 801042,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 86,
+      "name": "Southern Ohio",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801092,
+        801093,
+        801094,
+        801095,
+        801096,
+        801097,
+        801098,
+        801099,
+        801100,
+        801101
+      ],
+      "province_n": 10,
+      "capital_province_id": 801092,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 87,
+      "name": "Southern Indiana",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801102,
+        801103,
+        801104,
+        801105,
+        801106,
+        801107,
+        801108,
+        801109,
+        801110,
+        801111
+      ],
+      "province_n": 10,
+      "capital_province_id": 801102,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 88,
+      "name": "Southern Illinois",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801112,
+        801113,
+        801114,
+        801115,
+        801116,
+        801117,
+        801118,
+        801119,
+        801328,
+        801329
+      ],
+      "province_n": 10,
+      "capital_province_id": 801112,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 89,
+      "name": "Southern Michigan",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801330,
+        801331,
+        801332,
+        801333,
+        801334,
+        801335,
+        801336,
+        801337,
+        801338,
+        801339
+      ],
+      "province_n": 10,
+      "capital_province_id": 801330,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 90,
+      "name": "Southern Wisconsin",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801340,
+        801341,
+        801342,
+        801343,
+        801344,
+        801345,
+        801346,
+        801347,
+        801348,
+        801349
+      ],
+      "province_n": 10,
+      "capital_province_id": 801340,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 91,
+      "name": "Southern Minnesota",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801350,
+        801351,
+        801352,
+        801353,
+        801354,
+        801355,
+        801356,
+        801357,
+        801358,
+        801359
+      ],
+      "province_n": 10,
+      "capital_province_id": 801350,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 92,
+      "name": "Southern Iowa",
+      "owner_hint": "USA",
+      "region_id": 4,
+      "region_hint": "Midwest",
+      "theater": "north_america",
+      "province_ids": [
+        801360,
+        801361,
+        801362,
+        801363,
+        801364,
+        801365,
+        801366,
+        801367
+      ],
+      "province_n": 8,
+      "capital_province_id": 801360,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 93,
+      "name": "Montana",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        800280,
+        800281,
+        800296,
+        800328,
+        800329,
+        800330,
+        800331,
+        800332,
+        800333,
+        800334
+      ],
+      "province_n": 10,
+      "capital_province_id": 800280,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 94,
+      "name": "Idaho",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        800335,
+        800336,
+        800337,
+        800338,
+        800339,
+        800340,
+        800341,
+        800342,
+        800343,
+        800344
+      ],
+      "province_n": 10,
+      "capital_province_id": 800335,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 95,
+      "name": "Wyoming",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        800345,
+        800346,
+        800347,
+        800348,
+        800349,
+        800350,
+        800351,
+        800352,
+        800353,
+        800354
+      ],
+      "province_n": 10,
+      "capital_province_id": 800345,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 96,
+      "name": "Colorado",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        800355,
+        800356,
+        800357,
+        800358,
+        800359,
+        800360,
+        800361,
+        800362,
+        800363,
+        800364
+      ],
+      "province_n": 10,
+      "capital_province_id": 800355,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 97,
+      "name": "Utah",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        800365,
+        800366,
+        800367,
+        800368,
+        800369,
+        800370,
+        800371,
+        800372,
+        800373,
+        800374
+      ],
+      "province_n": 10,
+      "capital_province_id": 800365,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 98,
+      "name": "Nevada",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        800375,
+        800376,
+        800377,
+        800378,
+        800379,
+        800380,
+        800381,
+        800382,
+        800383,
+        800384
+      ],
+      "province_n": 10,
+      "capital_province_id": 800375,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 99,
+      "name": "Rocky Mountains",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        800385,
+        800386,
+        800387,
+        800388,
+        800389,
+        800390,
+        800391,
+        800504,
+        800505,
+        800506
+      ],
+      "province_n": 10,
+      "capital_province_id": 800385,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 100,
+      "name": "Front Range",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        800507,
+        800508,
+        800509,
+        800510,
+        800511,
+        800512,
+        800513,
+        800514,
+        800515,
+        800516
+      ],
+      "province_n": 10,
+      "capital_province_id": 800507,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 101,
+      "name": "Great Basin",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        800517,
+        800518,
+        800519,
+        801120,
+        801121,
+        801122,
+        801123,
+        801124,
+        801125,
+        801126
+      ],
+      "province_n": 10,
+      "capital_province_id": 800517,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 102,
+      "name": "Yellowstone Country",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        801127,
+        801128,
+        801129,
+        801130,
+        801131,
+        801132,
+        801133,
+        801134,
+        801135,
+        801136
+      ],
+      "province_n": 10,
+      "capital_province_id": 801127,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 103,
+      "name": "Wasatch",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        801137,
+        801138,
+        801139,
+        801140,
+        801141,
+        801142,
+        801143,
+        801144,
+        801145,
+        801146
+      ],
+      "province_n": 10,
+      "capital_province_id": 801137,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 104,
+      "name": "Snake River Plain",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        801147,
+        801148,
+        801149,
+        801150,
+        801151,
+        801152,
+        801153,
+        801154,
+        801155,
+        801156
+      ],
+      "province_n": 10,
+      "capital_province_id": 801147,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 105,
+      "name": "Colorado Plateau North",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        801157,
+        801158,
+        801159,
+        801160,
+        801161,
+        801162,
+        801163,
+        801164,
+        801165,
+        801166
+      ],
+      "province_n": 10,
+      "capital_province_id": 801157,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 106,
+      "name": "Northern Montana",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        801167,
+        801168,
+        801169,
+        801170,
+        801171,
+        801172,
+        801173,
+        801174,
+        801175,
+        801176
+      ],
+      "province_n": 10,
+      "capital_province_id": 801167,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 107,
+      "name": "Northern Idaho",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        801177,
+        801178,
+        801179,
+        801180,
+        801181,
+        801182,
+        801183,
+        801296,
+        801297,
+        801298
+      ],
+      "province_n": 10,
+      "capital_province_id": 801177,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 108,
+      "name": "Northern Wyoming",
+      "owner_hint": "USA",
+      "region_id": 7,
+      "region_hint": "Mountain West",
+      "theater": "north_america",
+      "province_ids": [
+        801299
+      ],
+      "province_n": 1,
+      "capital_province_id": 801299,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 109,
+      "name": "Maine",
+      "owner_hint": "USA",
+      "region_id": 1,
+      "region_hint": "Northeast",
+      "theater": "north_america",
+      "province_ids": [
+        800464,
+        800465,
+        800468,
+        800469,
+        800470,
+        800472,
+        800473,
+        800474,
+        800476,
+        800477
+      ],
+      "province_n": 10,
+      "capital_province_id": 800464,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 110,
+      "name": "New Hampshire",
+      "owner_hint": "USA",
+      "region_id": 1,
+      "region_hint": "Northeast",
+      "theater": "north_america",
+      "province_ids": [
+        800479,
+        800480,
+        800481,
+        800482,
+        800483,
+        800484,
+        800485,
+        800720,
+        800721,
+        800722
+      ],
+      "province_n": 10,
+      "capital_province_id": 800479,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 111,
+      "name": "Vermont",
+      "owner_hint": "USA",
+      "region_id": 1,
+      "region_hint": "Northeast",
+      "theater": "north_america",
+      "province_ids": [
+        800723,
+        800724,
+        800725,
+        800726,
+        800727,
+        800728,
+        800729,
+        800730,
+        800731,
+        800732
+      ],
+      "province_n": 10,
+      "capital_province_id": 800723,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 112,
+      "name": "Massachusetts",
+      "owner_hint": "USA",
+      "region_id": 1,
+      "region_hint": "Northeast",
+      "theater": "north_america",
+      "province_ids": [
+        800733,
+        800734,
+        800735,
+        800736,
+        800737,
+        800740,
+        800741,
+        800744,
+        800745,
+        800748
+      ],
+      "province_n": 10,
+      "capital_province_id": 800733,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 113,
+      "name": "Rhode Island",
+      "owner_hint": "USA",
+      "region_id": 1,
+      "region_hint": "Northeast",
+      "theater": "north_america",
+      "province_ids": [
+        801448,
+        801449,
+        801452,
+        801453,
+        801455,
+        801456,
+        801457,
+        801458,
+        801459,
+        801460
+      ],
+      "province_n": 10,
+      "capital_province_id": 801448,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 114,
+      "name": "Connecticut",
+      "owner_hint": "USA",
+      "region_id": 1,
+      "region_hint": "Northeast",
+      "theater": "north_america",
+      "province_ids": [
+        801461,
+        801462,
+        801463,
+        801464,
+        801465,
+        801466,
+        801467,
+        801468,
+        801469,
+        801480
+      ],
+      "province_n": 10,
+      "capital_province_id": 801461,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 115,
+      "name": "Upstate New York",
+      "owner_hint": "USA",
+      "region_id": 1,
+      "region_hint": "Northeast",
+      "theater": "north_america",
+      "province_ids": [
+        801481,
+        801482,
+        801483,
+        801484,
+        801485
+      ],
+      "province_n": 5,
+      "capital_province_id": 801481,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 116,
+      "name": "California",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        800392,
+        800393,
+        800394,
+        800395,
+        800396,
+        800397,
+        800398,
+        800399,
+        800400,
+        800401
+      ],
+      "province_n": 10,
+      "capital_province_id": 800392,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 117,
+      "name": "Oregon",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        800402,
+        800403,
+        800404,
+        800405,
+        800406,
+        800407,
+        800408,
+        800409,
+        800410,
+        800411
+      ],
+      "province_n": 10,
+      "capital_province_id": 800402,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 118,
+      "name": "Washington",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        800412,
+        800413,
+        800414,
+        800415,
+        800416,
+        800417,
+        800418,
+        800419,
+        800420,
+        800421
+      ],
+      "province_n": 10,
+      "capital_province_id": 800412,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 119,
+      "name": "Alaska",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        800422,
+        800423,
+        800424,
+        800425,
+        800426,
+        800427,
+        800428,
+        800429,
+        800430,
+        800431
+      ],
+      "province_n": 10,
+      "capital_province_id": 800422,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 120,
+      "name": "Hawaii",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        800432,
+        800433,
+        800434,
+        800435,
+        800436,
+        800437,
+        800438,
+        800439,
+        800520,
+        800521
+      ],
+      "province_n": 10,
+      "capital_province_id": 800432,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 121,
+      "name": "Cascadia",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        800522,
+        800523,
+        800524,
+        800525,
+        800526,
+        800527,
+        800528,
+        800529,
+        800530,
+        800531
+      ],
+      "province_n": 10,
+      "capital_province_id": 800522,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 122,
+      "name": "Central Valley",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        800532,
+        800533,
+        800534,
+        800535,
+        801184,
+        801185,
+        801186,
+        801187,
+        801188,
+        801189
+      ],
+      "province_n": 10,
+      "capital_province_id": 800532,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 123,
+      "name": "Bay Area",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        801190,
+        801191,
+        801192,
+        801193,
+        801194,
+        801195,
+        801196,
+        801197,
+        801198,
+        801199
+      ],
+      "province_n": 10,
+      "capital_province_id": 801190,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 124,
+      "name": "Southern California",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        801200,
+        801201,
+        801202,
+        801203,
+        801204,
+        801205,
+        801206,
+        801207,
+        801208,
+        801209
+      ],
+      "province_n": 10,
+      "capital_province_id": 801200,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 125,
+      "name": "Puget Sound",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        801210,
+        801211,
+        801212,
+        801213,
+        801214,
+        801215,
+        801216,
+        801217,
+        801218,
+        801219
+      ],
+      "province_n": 10,
+      "capital_province_id": 801210,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 126,
+      "name": "Willamette",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        801220,
+        801221,
+        801222,
+        801223,
+        801224,
+        801225,
+        801226,
+        801227,
+        801228,
+        801229
+      ],
+      "province_n": 10,
+      "capital_province_id": 801220,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 127,
+      "name": "Sierra Nevada",
+      "owner_hint": "USA",
+      "region_id": 8,
+      "region_hint": "Pacific",
+      "theater": "north_america",
+      "province_ids": [
+        801230,
+        801231
+      ],
+      "province_n": 2,
+      "capital_province_id": 801230,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 128,
+      "name": "North Carolina",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        800152,
+        800153,
+        800154,
+        800155,
+        800156,
+        800157,
+        800158,
+        800159,
+        800160,
+        800161
+      ],
+      "province_n": 10,
+      "capital_province_id": 800152,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 129,
+      "name": "South Carolina",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        800162,
+        800163,
+        800164,
+        800165,
+        800166,
+        800167,
+        800168,
+        800169,
+        800170,
+        800171
+      ],
+      "province_n": 10,
+      "capital_province_id": 800162,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 130,
+      "name": "Georgia",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        800172,
+        800173,
+        800174,
+        800175,
+        800177,
+        800192,
+        800193,
+        800194,
+        800196,
+        800198
+      ],
+      "province_n": 10,
+      "capital_province_id": 800172,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 131,
+      "name": "Florida",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        800199,
+        800206,
+        800231,
+        800573,
+        800576,
+        800577,
+        800579,
+        800580,
+        800581,
+        800582
+      ],
+      "province_n": 10,
+      "capital_province_id": 800199,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 132,
+      "name": "Alabama",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        800583,
+        800616,
+        800617,
+        800618,
+        800619,
+        800620,
+        800621,
+        800622,
+        800623,
+        800624
+      ],
+      "province_n": 10,
+      "capital_province_id": 800583,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 133,
+      "name": "Mississippi",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        800625,
+        800626,
+        800627,
+        800628,
+        800629,
+        800630,
+        800631,
+        800632,
+        800633,
+        800634
+      ],
+      "province_n": 10,
+      "capital_province_id": 800625,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 134,
+      "name": "Tennessee",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        800635,
+        800636,
+        800637,
+        800638,
+        800639,
+        800640,
+        800641,
+        800642,
+        800643,
+        800644
+      ],
+      "province_n": 10,
+      "capital_province_id": 800635,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 135,
+      "name": "Kentucky",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        800645,
+        800646,
+        800647,
+        800648,
+        800649,
+        800650,
+        800651,
+        800652,
+        800653,
+        800654
+      ],
+      "province_n": 10,
+      "capital_province_id": 800645,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 136,
+      "name": "Florida Panhandle",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        800655,
+        800694,
+        800695,
+        800872,
+        800874,
+        800876,
+        800878,
+        800880,
+        800881,
+        800882
+      ],
+      "province_n": 10,
+      "capital_province_id": 800655,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 137,
+      "name": "Atlanta Plateau",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        800883,
+        800884,
+        800885,
+        800886,
+        800887,
+        800888,
+        800889,
+        800890,
+        800891,
+        801056
+      ],
+      "province_n": 10,
+      "capital_province_id": 800883,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 138,
+      "name": "Appalachian South",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        801057,
+        801058,
+        801059,
+        801064,
+        801065,
+        801066,
+        801067,
+        801068,
+        801069,
+        801070
+      ],
+      "province_n": 10,
+      "capital_province_id": 801057,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 139,
+      "name": "Gulf Coast East",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        801071,
+        801072,
+        801074,
+        801076,
+        801078,
+        801417,
+        801420,
+        801421,
+        801422,
+        801423
+      ],
+      "province_n": 10,
+      "capital_province_id": 801071,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 140,
+      "name": "Bluegrass",
+      "owner_hint": "USA",
+      "region_id": 3,
+      "region_hint": "Southeast",
+      "theater": "north_america",
+      "province_ids": [
+        801431
+      ],
+      "province_n": 1,
+      "capital_province_id": 801431,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 141,
+      "name": "Texas",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        800536,
+        800537,
+        800538,
+        800539,
+        800540,
+        800541,
+        800542,
+        800543,
+        800544,
+        800545
+      ],
+      "province_n": 10,
+      "capital_province_id": 800536,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 142,
+      "name": "New Mexico",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        800546,
+        800547,
+        800548,
+        800549,
+        800550,
+        800551,
+        800552,
+        800553,
+        800554,
+        800555
+      ],
+      "province_n": 10,
+      "capital_province_id": 800546,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 143,
+      "name": "Arizona",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        800556,
+        800557,
+        800558,
+        800559,
+        800560,
+        800561,
+        800562,
+        800563,
+        800564,
+        800565
+      ],
+      "province_n": 10,
+      "capital_province_id": 800556,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 144,
+      "name": "West Texas",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        800566,
+        800567,
+        800568,
+        800569,
+        800570,
+        800571,
+        800572,
+        800574,
+        800575,
+        800578
+      ],
+      "province_n": 10,
+      "capital_province_id": 800566,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 145,
+      "name": "Rio Grande",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        800584,
+        800585,
+        800586,
+        800587,
+        800588,
+        800589,
+        800590,
+        800591,
+        800592,
+        800593
+      ],
+      "province_n": 10,
+      "capital_province_id": 800584,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 146,
+      "name": "Sonoran Rim",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        800594,
+        800595,
+        800596,
+        800597,
+        800598,
+        800599,
+        800609,
+        800611,
+        800613,
+        800615
+      ],
+      "province_n": 10,
+      "capital_province_id": 800594,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 147,
+      "name": "Llano Estacado",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        801262,
+        801263,
+        801368,
+        801369,
+        801370,
+        801371,
+        801372,
+        801373,
+        801374,
+        801375
+      ],
+      "province_n": 10,
+      "capital_province_id": 801262,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 148,
+      "name": "Hill Country",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        801376,
+        801377,
+        801378,
+        801379,
+        801380,
+        801381,
+        801382,
+        801383,
+        801384,
+        801385
+      ],
+      "province_n": 10,
+      "capital_province_id": 801376,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 149,
+      "name": "Gulf Coast Texas",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        801386,
+        801387,
+        801388,
+        801389,
+        801390,
+        801391,
+        801392,
+        801393,
+        801394,
+        801395
+      ],
+      "province_n": 10,
+      "capital_province_id": 801386,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 150,
+      "name": "Chihuahuan Desert",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        801396,
+        801397,
+        801398,
+        801399,
+        801400,
+        801401,
+        801402,
+        801403,
+        801404,
+        801405
+      ],
+      "province_n": 10,
+      "capital_province_id": 801396,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 151,
+      "name": "Four Corners South",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        801406,
+        801407,
+        801408,
+        801409,
+        801410,
+        801411,
+        801412,
+        801413,
+        801414,
+        801415
+      ],
+      "province_n": 10,
+      "capital_province_id": 801406,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 152,
+      "name": "Trans-Pecos",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        801416,
+        801418,
+        801419,
+        801424,
+        801425,
+        801426,
+        801427,
+        801428,
+        801429,
+        801430
+      ],
+      "province_n": 10,
+      "capital_province_id": 801416,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 153,
+      "name": "Northern Texas",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        801432,
+        801433,
+        801434,
+        801435,
+        801436,
+        801437,
+        801438,
+        801439,
+        801440,
+        801441
+      ],
+      "province_n": 10,
+      "capital_province_id": 801432,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    },
+    {
+      "id": 154,
+      "name": "Northern New Mexico",
+      "owner_hint": "USA",
+      "region_id": 6,
+      "region_hint": "Southwest",
+      "theater": "north_america",
+      "province_ids": [
+        801442,
+        801443,
+        801444,
+        801445,
+        801446,
+        801447
+      ],
+      "province_n": 6,
+      "capital_province_id": 801442,
+      "tags": [
+        "us_pilot",
+        "us_band_state"
+      ]
+    }
+  ]
+}

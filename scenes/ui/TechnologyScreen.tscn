@@ -52,8 +52,8 @@ anchor_bottom = 1.0
 offset_top = 40.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/margin_left = 20
-theme_override_constants/margin_top = 12
+theme_override_constants/margin_left = 26
+theme_override_constants/margin_top = 16
 theme_override_constants/margin_right = 20
 theme_override_constants/margin_bottom = 12
 
@@ -219,31 +219,53 @@ theme_override_constants/separation = 6
 layout_mode = 2
 size_flags_horizontal = 3
 size_flags_stretch_ratio = 1.0
+clip_contents = true
 
 [node name="InspectorMargin" type="MarginContainer" parent="MarginContainer/VBoxContainer/BodyRow/InspectorPanel"]
 layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 8
+theme_override_constants/margin_left = 15
+theme_override_constants/margin_top = 14
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
 
 [node name="InspectorVBox" type="VBoxContainer" parent="MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin"]
 layout_mode = 2
-theme_override_constants/separation = 6
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/separation = 8
 
 [node name="InspectorTitle" type="Label" parent="MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox"]
 layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
 autowrap_mode = 3
+theme_override_font_sizes/font_size = 18
 text = "Select a technology"
 
-[node name="InspectorBody" type="Label" parent="MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox"]
+[node name="InspectorBenefit" type="Label" parent="MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox"]
 layout_mode = 2
+size_flags_horizontal = 3
+horizontal_alignment = 1
+autowrap_mode = 3
+text = ""
+
+[node name="InspectorBodyScroll" type="ScrollContainer" parent="MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox"]
+layout_mode = 2
+size_flags_horizontal = 3
 size_flags_vertical = 3
+horizontal_scroll_mode = 0
+vertical_scroll_mode = 1
+clip_contents = true
+
+[node name="InspectorBody" type="Label" parent="MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox/InspectorBodyScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
 autowrap_mode = 3
 text = ""
 
 [node name="InspectorActions" type="HBoxContainer" parent="MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox"]
 layout_mode = 2
+alignment = 1
 theme_override_constants/separation = 8
 
 [node name="ResearchButton" type="Button" parent="MarginContainer/VBoxContainer/BodyRow/InspectorPanel/InspectorMargin/InspectorVBox/InspectorActions"]

@@ -197,6 +197,7 @@ func _ensure_country(tag: String) -> Dictionary:
 		"unlocked_agent_missions": [],
 		"unlocked_unit_designs": [],
 		"unlocked_factory_types": [],
+		"unlocked_resources": [],
 		"unlocked_production_categories": {},
 		"unlocked_division_templates": [],
 		"rule_flags": [],
@@ -229,6 +230,7 @@ func _migrate_legacy_state(tag: String, state: Dictionary) -> void:
 	for key in [
 		"unlocked_unit_designs",
 		"unlocked_factory_types",
+		"unlocked_resources",
 		"unlocked_division_templates",
 		"rule_flags",
 	]:
@@ -353,7 +355,7 @@ func get_effective_reconnaissance(country_tag: String) -> float:
 ##   if TechnologyManager.has_tech_unlock(tag, "division_capability", "motorized_logistics"): ...
 ##
 ## Supported unlock_types: "division_capability", "agent_mission", "doctrine_key",
-## "rule_flag", "factory_type", "unit_design", "division_template"
+## "rule_flag", "factory_type", "unit_design", "division_template", "resource"
 func has_tech_unlock(country_tag: String, unlock_type: String, value: String) -> bool:
 	var tag := country_tag.strip_edges().to_upper()
 	var state := _ensure_country(tag)
@@ -368,6 +370,8 @@ func has_tech_unlock(country_tag: String, unlock_type: String, value: String) ->
 			return value in (state.get("rule_flags", []) as Array)
 		"factory_type":
 			return value in (state.get("unlocked_factory_types", []) as Array)
+		"resource":
+			return value in (state.get("unlocked_resources", []) as Array)
 		"unit_design":
 			return value in (state.get("unlocked_unit_designs", []) as Array)
 		"division_template":
@@ -383,6 +387,24 @@ func has_tech_unlock(country_tag: String, unlock_type: String, value: String) ->
 			return false
 		_:
 			return false
+
+
+## Player-visible strategic majors for resource browser (era/tech gated).
+func get_visible_strategic_resources(country_tag: String) -> PackedStringArray:
+	var unlocks := {
+		"rule_flags": [],
+		"unlocked_resources": [],
+		"permanent_modifiers": get_technology_modifiers(country_tag),
+	}
+	var state := _ensure_country(country_tag.strip_edges().to_upper())
+	if state.get("rule_flags") is Array:
+		unlocks["rule_flags"] = state["rule_flags"]
+	if state.get("unlocked_resources") is Array:
+		unlocks["unlocked_resources"] = state["unlocked_resources"]
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	if rhc != null and rhc.has_method("get_visible_majors"):
+		return rhc.get_visible_majors(unlocks)
+	return ProductionCostCalculator.get_major_resource_ids()
 
 
 # === Production gates (Phase B) ===
@@ -739,6 +761,7 @@ func _calculate_ahead_penalty_multiplier(years_early: int, base_penalty: float) 
 
 
 func get_node_status(country_tag: String, tech_id: String) -> String:
+	## Pure status probe — MUST NOT call can_research (was infinite recursion → stack overflow → dead UI).
 	var tag := country_tag.strip_edges().to_upper()
 	if not technology_nodes.has(tech_id):
 		return "unknown"
@@ -752,9 +775,10 @@ func get_node_status(country_tag: String, tech_id: String) -> String:
 			return "in_progress"
 	if _is_research_blocked(tag, tech_id, state):
 		return "locked"
-	if can_research(tag, tech_id):
-		return "available"
-	return "locked"
+	if not _peace_allows_research(tag, tech_id):
+		return "locked"
+	# "available" means prereqs met (slot free is checked only in can_research).
+	return "available"
 
 
 func _is_research_blocked(tag: String, tech_id: String, state: Dictionary) -> bool:
@@ -770,27 +794,35 @@ func _is_research_blocked(tag: String, tech_id: String, state: Dictionary) -> bo
 	return false
 
 
+## 1918 peace ripple gates (shared by get_node_status + can_research; no recursion).
+func _peace_allows_research(tag: String, tech_id: String) -> bool:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("get_peace_state"):
+		return true
+	var ps: Dictionary = GameData.get_peace_state()
+	var completed: bool = bool(ps.get("conference_1918_completed", false))
+	var terms: Dictionary = ps.get("term_choices", {})
+	var seating := str(terms.get("central_powers_seating", ""))
+	var grievance_v: Variant = ps.get("grievance", {})
+	var grievance_n := 0
+	if grievance_v is Dictionary:
+		grievance_n = int((grievance_v as Dictionary).get(tag, 0))
+	var is_harsh: bool = seating == "full_exclusion" or grievance_n > 25
+	var tid := tech_id.to_lower()
+	var rearm_tech := (
+		tid.find("tank") != -1 or tid.find("aviation") != -1 or tid.find("armor") != -1
+		or tid.find("rearm") != -1 or tech_id.begins_with("medium_") or tech_id.begins_with("synth_")
+	)
+	if completed and is_harsh and tag == "GER" and rearm_tech:
+		return false
+	return true
+
+
 func can_research(country_tag: String, tech_id: String) -> bool:
 	var tag := country_tag.strip_edges().to_upper()
 	if not technology_nodes.has(tech_id):
 		return false
-	# 1918 Peace ripples (Phase 5): simple gates/discount hooks based on term_choices + grievance.
-	# E.g. historical harsh exclusion locks early rearm for GER (or raises cost elsewhere); inclusion or lenient opens alt paths early.
-	# Real nodes will have hidden_until or requires_peace_decision in data; this is runtime enforcement + discount signal.
-	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
-		var ps: Dictionary = GameData.get_peace_state()
-		var completed: bool = bool(ps.get("conference_1918_completed", false))
-		var terms: Dictionary = ps.get("term_choices", {})
-		var seating := str(terms.get("central_powers_seating", ""))
-		var is_harsh: bool = seating == "full_exclusion" or ps.get("grievance", {}).get(tag, 0) > 25
-		var rearm_tech := tech_id.to_lower().find("tank") != -1 or tech_id.to_lower().find("aviation") != -1 or tech_id.to_lower().find("armor") != -1 or tech_id.to_lower().find("rearm") != -1 or tech_id.begins_with("medium_") or tech_id.begins_with("synth_")
-		if completed and is_harsh and tag == "GER" and rearm_tech:
-			# Hard gate for demo/playtest: harsh 1918 blocks early interwar rearm for Germany unless alt path
-			# (alt: full_participants or low grievance lifts; player sees via UI or can_research false)
-			return false
-	# End peace ripple gate
-	var status := get_node_status(tag, tech_id)
-	if status != "available":
+	# Status without slot check (get_node_status never calls back into can_research).
+	if get_node_status(tag, tech_id) != "available":
 		return false
 	return get_active_research_count(tag) < get_research_slots_max(tag)
 
@@ -1076,10 +1108,22 @@ func _pick_leader_for_training_paths(country_tag: String) -> Dictionary:
 	for leader in leaders:
 		if leader == null:
 			continue
-		if leader.is_active and not leader.is_dead:
-			return {"leader_id": leader.id, "leader_name": leader.name}
+		# Leader uses is_deceased / is_available_for_command — not is_active/is_dead/id
+		# (those invalid property reads froze F5 when tech UI/training paths touched leaders).
+		var available := true
+		if leader.has_method("is_available_for_command"):
+			available = bool(leader.is_available_for_command())
+		else:
+			available = not bool(leader.is_deceased) and not bool(leader.is_retired) and not bool(leader.is_captured)
+		if available:
+			return {
+				"leader_id": str(leader.leader_id),
+				"leader_name": str(leader.name),
+			}
 	if leaders.size() > 0 and leaders[0] != null:
-		return {"leader_id": leaders[0].id, "leader_name": leaders[0].name}
+		var l0: Leader = leaders[0] as Leader
+		if l0 != null:
+			return {"leader_id": str(l0.leader_id), "leader_name": str(l0.name)}
 	return {}
 
 
@@ -1715,8 +1759,9 @@ func apply_scenario_starting_tech(
 
 func _load_starting_pack(scenario_name: String) -> Dictionary:
 	var sn := scenario_name.strip_edges()
-	if sn == "phase1_europe_test":
-		sn = "1936"  # Test scenario uses 1936-era starting tech + OOB (realistic 1918-36 base)
+	# 1936-start playboards share the full 1936 starting-tech pack (not minimal defaults).
+	if sn == "phase1_europe_test" or sn == "world_full" or sn == "world_accurate" or sn == "grand_theater":
+		sn = "1936"
 	var path := STARTING_DIR + sn + ".json"
 	if not FileAccess.file_exists(path):
 		return {}

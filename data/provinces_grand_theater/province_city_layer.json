@@ -1,0 +1,8396 @@
+{
+  "version": 1,
+  "provinces": {
+    "1": {
+      "cities": []
+    },
+    "3": {
+      "cities": []
+    },
+    "6": {
+      "cities": [
+        {
+          "id": "C6_1",
+          "name": "Washington DC",
+          "position": [
+            545.24,
+            62.6
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "7": {
+      "cities": [
+        {
+          "id": "C7_1",
+          "name": "Houston Energy Corridor",
+          "position": [
+            642.19,
+            62.6
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9": {
+      "cities": [
+        {
+          "id": "C9_1",
+          "name": "Tokyo",
+          "position": [
+            836.1,
+            62.6
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "10": {
+      "cities": [
+        {
+          "id": "C10_1",
+          "name": "Beijing",
+          "position": [
+            933.05,
+            62.6
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "13": {
+      "cities": []
+    },
+    "15": {
+      "cities": [
+        {
+          "id": "C15_1",
+          "name": "Silicon Valley",
+          "position": [
+            1417.81,
+            62.6
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "18": {
+      "cities": [
+        {
+          "id": "C18_1",
+          "name": "Istanbul",
+          "position": [
+            1708.67,
+            62.6
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "19": {
+      "cities": [
+        {
+          "id": "C19_1",
+          "name": "Warsaw",
+          "position": [
+            1805.62,
+            62.6
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "21": {
+      "cities": [
+        {
+          "id": "C21_1",
+          "name": "Rome",
+          "position": [
+            1999.52,
+            62.6
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "22": {
+      "cities": [
+        {
+          "id": "C22_1",
+          "name": "Madrid",
+          "position": [
+            2096.48,
+            62.6
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "25": {
+      "cities": [
+        {
+          "id": "C25_1",
+          "name": "Seoul",
+          "position": [
+            2387.33,
+            62.6
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "27": {
+      "cities": []
+    },
+    "30": {
+      "cities": [
+        {
+          "id": "C30_1",
+          "name": "Sao Paulo",
+          "position": [
+            2872.1,
+            62.6
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "31": {
+      "cities": [
+        {
+          "id": "C31_1",
+          "name": "Volgograd",
+          "position": [
+            2969.05,
+            62.6
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "33": {
+      "cities": [
+        {
+          "id": "C33_1",
+          "name": "Hong Kong",
+          "position": [
+            3162.95,
+            62.6
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "34": {
+      "cities": [
+        {
+          "id": "C34_1",
+          "name": "Singapore",
+          "position": [
+            3259.9,
+            62.6
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "37": {
+      "cities": [
+        {
+          "id": "C37_1",
+          "name": "Ottawa",
+          "position": [
+            3550.76,
+            62.6
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "39": {
+      "cities": [
+        {
+          "id": "C39_1",
+          "name": "Vancouver",
+          "position": [
+            3744.67,
+            62.6
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "43": {
+      "cities": [
+        {
+          "id": "C43_1",
+          "name": "Guangzhou",
+          "position": [
+            60.48,
+            163.8
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "85": {
+      "cities": [
+        {
+          "id": "C85_1",
+          "name": "Damascus",
+          "position": [
+            60.48,
+            265.0
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "101": {
+      "cities": []
+    },
+    "102": {
+      "cities": []
+    },
+    "103": {
+      "cities": []
+    },
+    "104": {
+      "cities": []
+    },
+    "105": {
+      "cities": [
+        {
+          "id": "C105_1",
+          "name": "Province 105",
+          "position": [
+            1999.52,
+            265.0
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "106": {
+      "cities": []
+    },
+    "107": {
+      "cities": []
+    },
+    "108": {
+      "cities": []
+    },
+    "109": {
+      "cities": []
+    },
+    "110": {
+      "cities": []
+    },
+    "111": {
+      "cities": []
+    },
+    "112": {
+      "cities": []
+    },
+    "113": {
+      "cities": []
+    },
+    "114": {
+      "cities": []
+    },
+    "115": {
+      "cities": []
+    },
+    "116": {
+      "cities": []
+    },
+    "117": {
+      "cities": []
+    },
+    "118": {
+      "cities": []
+    },
+    "119": {
+      "cities": []
+    },
+    "120": {
+      "cities": [
+        {
+          "id": "C120_1",
+          "name": "Province 120",
+          "position": [
+            3453.81,
+            265.0
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "121": {
+      "cities": []
+    },
+    "122": {
+      "cities": []
+    },
+    "123": {
+      "cities": []
+    },
+    "124": {
+      "cities": []
+    },
+    "125": {
+      "cities": []
+    },
+    "126": {
+      "cities": []
+    },
+    "127": {
+      "cities": [
+        {
+          "id": "C127_1",
+          "name": "Province 127",
+          "position": [
+            60.48,
+            366.2
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "128": {
+      "cities": [
+        {
+          "id": "C128_1",
+          "name": "Province 128",
+          "position": [
+            157.43,
+            366.2
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "129": {
+      "cities": []
+    },
+    "130": {
+      "cities": []
+    },
+    "131": {
+      "cities": []
+    },
+    "132": {
+      "cities": []
+    },
+    "133": {
+      "cities": []
+    },
+    "134": {
+      "cities": []
+    },
+    "135": {
+      "cities": [
+        {
+          "id": "C135_1",
+          "name": "Province 135",
+          "position": [
+            836.1,
+            366.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "136": {
+      "cities": []
+    },
+    "137": {
+      "cities": []
+    },
+    "138": {
+      "cities": []
+    },
+    "139": {
+      "cities": []
+    },
+    "140": {
+      "cities": [
+        {
+          "id": "C140_1",
+          "name": "Province 140",
+          "position": [
+            1320.86,
+            366.2
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "141": {
+      "cities": [
+        {
+          "id": "C141_1",
+          "name": "Province 141",
+          "position": [
+            1417.81,
+            366.2
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "142": {
+      "cities": []
+    },
+    "143": {
+      "cities": []
+    },
+    "144": {
+      "cities": []
+    },
+    "145": {
+      "cities": []
+    },
+    "146": {
+      "cities": []
+    },
+    "147": {
+      "cities": []
+    },
+    "148": {
+      "cities": []
+    },
+    "149": {
+      "cities": [
+        {
+          "id": "C149_1",
+          "name": "Province 149",
+          "position": [
+            2193.43,
+            366.2
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "150": {
+      "cities": [
+        {
+          "id": "C150_1",
+          "name": "Province 150",
+          "position": [
+            2290.38,
+            366.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "151": {
+      "cities": []
+    },
+    "152": {
+      "cities": []
+    },
+    "153": {
+      "cities": [
+        {
+          "id": "C153_1",
+          "name": "Province 153",
+          "position": [
+            2581.24,
+            366.2
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "154": {
+      "cities": [
+        {
+          "id": "C154_1",
+          "name": "Province 154",
+          "position": [
+            2678.19,
+            366.2
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "155": {
+      "cities": []
+    },
+    "156": {
+      "cities": []
+    },
+    "157": {
+      "cities": []
+    },
+    "158": {
+      "cities": []
+    },
+    "159": {
+      "cities": []
+    },
+    "160": {
+      "cities": [
+        {
+          "id": "C160_1",
+          "name": "Province 160",
+          "position": [
+            3259.9,
+            366.2
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "161": {
+      "cities": []
+    },
+    "162": {
+      "cities": []
+    },
+    "163": {
+      "cities": []
+    },
+    "164": {
+      "cities": []
+    },
+    "165": {
+      "cities": [
+        {
+          "id": "C165_1",
+          "name": "Province 165",
+          "position": [
+            3744.67,
+            366.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "166": {
+      "cities": [
+        {
+          "id": "C166_1",
+          "name": "Province 166",
+          "position": [
+            3841.62,
+            366.2
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "167": {
+      "cities": [
+        {
+          "id": "C167_1",
+          "name": "Province 167",
+          "position": [
+            3938.57,
+            366.2
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "168": {
+      "cities": []
+    },
+    "169": {
+      "cities": [
+        {
+          "id": "C169_1",
+          "name": "Province 169",
+          "position": [
+            60.48,
+            467.4
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "170": {
+      "cities": [
+        {
+          "id": "C170_1",
+          "name": "Province 170",
+          "position": [
+            157.43,
+            467.4
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "171": {
+      "cities": []
+    },
+    "172": {
+      "cities": []
+    },
+    "173": {
+      "cities": []
+    },
+    "174": {
+      "cities": []
+    },
+    "175": {
+      "cities": []
+    },
+    "176": {
+      "cities": []
+    },
+    "177": {
+      "cities": []
+    },
+    "178": {
+      "cities": []
+    },
+    "179": {
+      "cities": []
+    },
+    "180": {
+      "cities": [
+        {
+          "id": "C180_1",
+          "name": "Province 180",
+          "position": [
+            1126.95,
+            467.4
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "181": {
+      "cities": []
+    },
+    "182": {
+      "cities": [
+        {
+          "id": "C182_1",
+          "name": "Province 182",
+          "position": [
+            1320.86,
+            467.4
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "183": {
+      "cities": [
+        {
+          "id": "C183_1",
+          "name": "Province 183",
+          "position": [
+            1417.81,
+            467.4
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "184": {
+      "cities": []
+    },
+    "185": {
+      "cities": []
+    },
+    "186": {
+      "cities": []
+    },
+    "187": {
+      "cities": []
+    },
+    "188": {
+      "cities": []
+    },
+    "189": {
+      "cities": []
+    },
+    "190": {
+      "cities": []
+    },
+    "191": {
+      "cities": [
+        {
+          "id": "C191_1",
+          "name": "Province 191",
+          "position": [
+            2193.43,
+            467.4
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "192": {
+      "cities": []
+    },
+    "193": {
+      "cities": []
+    },
+    "194": {
+      "cities": []
+    },
+    "195": {
+      "cities": [
+        {
+          "id": "C195_1",
+          "name": "Province 195",
+          "position": [
+            2581.24,
+            467.4
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "196": {
+      "cities": [
+        {
+          "id": "C196_1",
+          "name": "Province 196",
+          "position": [
+            2678.19,
+            467.4
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "197": {
+      "cities": []
+    },
+    "198": {
+      "cities": []
+    },
+    "199": {
+      "cities": []
+    },
+    "200": {
+      "cities": []
+    },
+    "201": {
+      "cities": []
+    },
+    "202": {
+      "cities": [
+        {
+          "id": "C202_1",
+          "name": "Province 202",
+          "position": [
+            3259.9,
+            467.4
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "203": {
+      "cities": []
+    },
+    "204": {
+      "cities": []
+    },
+    "205": {
+      "cities": []
+    },
+    "206": {
+      "cities": []
+    },
+    "207": {
+      "cities": []
+    },
+    "208": {
+      "cities": [
+        {
+          "id": "C208_1",
+          "name": "Province 208",
+          "position": [
+            3841.62,
+            467.4
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "209": {
+      "cities": [
+        {
+          "id": "C209_1",
+          "name": "Province 209",
+          "position": [
+            3938.57,
+            467.4
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "210": {
+      "cities": [
+        {
+          "id": "C210_1",
+          "name": "Province 210",
+          "position": [
+            4035.52,
+            467.4
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "211": {
+      "cities": [
+        {
+          "id": "C211_1",
+          "name": "Province 211",
+          "position": [
+            60.48,
+            568.6
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "212": {
+      "cities": [
+        {
+          "id": "C212_1",
+          "name": "Province 212",
+          "position": [
+            157.43,
+            568.6
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "213": {
+      "cities": []
+    },
+    "214": {
+      "cities": []
+    },
+    "215": {
+      "cities": []
+    },
+    "216": {
+      "cities": []
+    },
+    "217": {
+      "cities": []
+    },
+    "218": {
+      "cities": []
+    },
+    "219": {
+      "cities": []
+    },
+    "220": {
+      "cities": []
+    },
+    "221": {
+      "cities": []
+    },
+    "222": {
+      "cities": [
+        {
+          "id": "C222_1",
+          "name": "Province 222",
+          "position": [
+            1126.95,
+            568.6
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "223": {
+      "cities": []
+    },
+    "224": {
+      "cities": [
+        {
+          "id": "C224_1",
+          "name": "Province 224",
+          "position": [
+            1320.86,
+            568.6
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "225": {
+      "cities": [
+        {
+          "id": "C225_1",
+          "name": "Province 225",
+          "position": [
+            1417.81,
+            568.6
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "226": {
+      "cities": []
+    },
+    "227": {
+      "cities": []
+    },
+    "228": {
+      "cities": []
+    },
+    "229": {
+      "cities": []
+    },
+    "230": {
+      "cities": []
+    },
+    "231": {
+      "cities": []
+    },
+    "232": {
+      "cities": []
+    },
+    "233": {
+      "cities": [
+        {
+          "id": "C233_1",
+          "name": "Province 233",
+          "position": [
+            2193.43,
+            568.6
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "234": {
+      "cities": []
+    },
+    "235": {
+      "cities": []
+    },
+    "236": {
+      "cities": []
+    },
+    "237": {
+      "cities": [
+        {
+          "id": "C237_1",
+          "name": "Province 237",
+          "position": [
+            2581.24,
+            568.6
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "238": {
+      "cities": [
+        {
+          "id": "C238_1",
+          "name": "Province 238",
+          "position": [
+            2678.19,
+            568.6
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "239": {
+      "cities": []
+    },
+    "240": {
+      "cities": [
+        {
+          "id": "C240_1",
+          "name": "Province 240",
+          "position": [
+            2872.1,
+            568.6
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "241": {
+      "cities": []
+    },
+    "242": {
+      "cities": []
+    },
+    "243": {
+      "cities": []
+    },
+    "244": {
+      "cities": [
+        {
+          "id": "C244_1",
+          "name": "Province 244",
+          "position": [
+            3259.9,
+            568.6
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "245": {
+      "cities": []
+    },
+    "246": {
+      "cities": []
+    },
+    "247": {
+      "cities": []
+    },
+    "248": {
+      "cities": []
+    },
+    "249": {
+      "cities": []
+    },
+    "250": {
+      "cities": [
+        {
+          "id": "C250_1",
+          "name": "Province 250",
+          "position": [
+            3841.62,
+            568.6
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "251": {
+      "cities": [
+        {
+          "id": "C251_1",
+          "name": "Province 251",
+          "position": [
+            3938.57,
+            568.6
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "252": {
+      "cities": []
+    },
+    "253": {
+      "cities": [
+        {
+          "id": "C253_1",
+          "name": "Province 253",
+          "position": [
+            60.48,
+            669.8
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "254": {
+      "cities": [
+        {
+          "id": "C254_1",
+          "name": "Province 254",
+          "position": [
+            157.43,
+            669.8
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "255": {
+      "cities": [
+        {
+          "id": "C255_1",
+          "name": "Province 255",
+          "position": [
+            254.38,
+            669.8
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "256": {
+      "cities": []
+    },
+    "257": {
+      "cities": []
+    },
+    "258": {
+      "cities": []
+    },
+    "259": {
+      "cities": []
+    },
+    "260": {
+      "cities": []
+    },
+    "261": {
+      "cities": []
+    },
+    "262": {
+      "cities": []
+    },
+    "263": {
+      "cities": []
+    },
+    "264": {
+      "cities": [
+        {
+          "id": "C264_1",
+          "name": "Province 264",
+          "position": [
+            1126.95,
+            669.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "265": {
+      "cities": []
+    },
+    "266": {
+      "cities": [
+        {
+          "id": "C266_1",
+          "name": "Province 266",
+          "position": [
+            1320.86,
+            669.8
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "267": {
+      "cities": [
+        {
+          "id": "C267_1",
+          "name": "Province 267",
+          "position": [
+            1417.81,
+            669.8
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "268": {
+      "cities": []
+    },
+    "269": {
+      "cities": []
+    },
+    "270": {
+      "cities": [
+        {
+          "id": "C270_1",
+          "name": "Province 270",
+          "position": [
+            1708.67,
+            669.8
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "271": {
+      "cities": []
+    },
+    "272": {
+      "cities": []
+    },
+    "273": {
+      "cities": []
+    },
+    "274": {
+      "cities": []
+    },
+    "275": {
+      "cities": []
+    },
+    "276": {
+      "cities": []
+    },
+    "277": {
+      "cities": []
+    },
+    "278": {
+      "cities": []
+    },
+    "279": {
+      "cities": [
+        {
+          "id": "C279_1",
+          "name": "Province 279",
+          "position": [
+            2581.24,
+            669.8
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "280": {
+      "cities": [
+        {
+          "id": "C280_1",
+          "name": "Province 280",
+          "position": [
+            2678.19,
+            669.8
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "281": {
+      "cities": []
+    },
+    "282": {
+      "cities": []
+    },
+    "283": {
+      "cities": []
+    },
+    "284": {
+      "cities": []
+    },
+    "285": {
+      "cities": [
+        {
+          "id": "C285_1",
+          "name": "Province 285",
+          "position": [
+            3162.95,
+            669.8
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "286": {
+      "cities": [
+        {
+          "id": "C286_1",
+          "name": "Province 286",
+          "position": [
+            3259.9,
+            669.8
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "287": {
+      "cities": []
+    },
+    "288": {
+      "cities": []
+    },
+    "289": {
+      "cities": []
+    },
+    "290": {
+      "cities": []
+    },
+    "291": {
+      "cities": []
+    },
+    "292": {
+      "cities": [
+        {
+          "id": "C292_1",
+          "name": "Province 292",
+          "position": [
+            3841.62,
+            669.8
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "293": {
+      "cities": [
+        {
+          "id": "C293_1",
+          "name": "Province 293",
+          "position": [
+            3938.57,
+            669.8
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "294": {
+      "cities": []
+    },
+    "295": {
+      "cities": [
+        {
+          "id": "C295_1",
+          "name": "Province 295",
+          "position": [
+            60.48,
+            771.0
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "296": {
+      "cities": [
+        {
+          "id": "C296_1",
+          "name": "Province 296",
+          "position": [
+            157.43,
+            771.0
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "297": {
+      "cities": []
+    },
+    "298": {
+      "cities": []
+    },
+    "299": {
+      "cities": []
+    },
+    "300": {
+      "cities": [
+        {
+          "id": "C300_1",
+          "name": "Province 300",
+          "position": [
+            545.24,
+            771.0
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "301": {
+      "cities": []
+    },
+    "302": {
+      "cities": []
+    },
+    "303": {
+      "cities": []
+    },
+    "304": {
+      "cities": []
+    },
+    "305": {
+      "cities": []
+    },
+    "306": {
+      "cities": []
+    },
+    "307": {
+      "cities": []
+    },
+    "308": {
+      "cities": []
+    },
+    "309": {
+      "cities": [
+        {
+          "id": "C309_1",
+          "name": "Province 309",
+          "position": [
+            1417.81,
+            771.0
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "310": {
+      "cities": []
+    },
+    "311": {
+      "cities": []
+    },
+    "312": {
+      "cities": []
+    },
+    "313": {
+      "cities": []
+    },
+    "314": {
+      "cities": []
+    },
+    "315": {
+      "cities": [
+        {
+          "id": "C315_1",
+          "name": "Province 315",
+          "position": [
+            1999.52,
+            771.0
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "316": {
+      "cities": []
+    },
+    "317": {
+      "cities": []
+    },
+    "318": {
+      "cities": []
+    },
+    "319": {
+      "cities": []
+    },
+    "320": {
+      "cities": []
+    },
+    "321": {
+      "cities": [
+        {
+          "id": "C321_1",
+          "name": "Province 321",
+          "position": [
+            2581.24,
+            771.0
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "322": {
+      "cities": [
+        {
+          "id": "C322_1",
+          "name": "Province 322",
+          "position": [
+            2678.19,
+            771.0
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "323": {
+      "cities": []
+    },
+    "324": {
+      "cities": []
+    },
+    "325": {
+      "cities": []
+    },
+    "326": {
+      "cities": []
+    },
+    "327": {
+      "cities": []
+    },
+    "328": {
+      "cities": [
+        {
+          "id": "C328_1",
+          "name": "Province 328",
+          "position": [
+            3259.9,
+            771.0
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "329": {
+      "cities": []
+    },
+    "330": {
+      "cities": [
+        {
+          "id": "C330_1",
+          "name": "Province 330",
+          "position": [
+            3453.81,
+            771.0
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "331": {
+      "cities": []
+    },
+    "332": {
+      "cities": []
+    },
+    "333": {
+      "cities": []
+    },
+    "334": {
+      "cities": []
+    },
+    "335": {
+      "cities": []
+    },
+    "336": {
+      "cities": []
+    },
+    "337": {
+      "cities": [
+        {
+          "id": "C337_1",
+          "name": "Province 337",
+          "position": [
+            60.48,
+            872.2
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "338": {
+      "cities": [
+        {
+          "id": "C338_1",
+          "name": "Province 338",
+          "position": [
+            157.43,
+            872.2
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "339": {
+      "cities": []
+    },
+    "340": {
+      "cities": []
+    },
+    "341": {
+      "cities": []
+    },
+    "342": {
+      "cities": []
+    },
+    "343": {
+      "cities": []
+    },
+    "344": {
+      "cities": []
+    },
+    "345": {
+      "cities": [
+        {
+          "id": "C345_1",
+          "name": "Province 345",
+          "position": [
+            836.1,
+            872.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "346": {
+      "cities": []
+    },
+    "347": {
+      "cities": []
+    },
+    "348": {
+      "cities": []
+    },
+    "349": {
+      "cities": []
+    },
+    "350": {
+      "cities": []
+    },
+    "351": {
+      "cities": [
+        {
+          "id": "C351_1",
+          "name": "Province 351",
+          "position": [
+            1417.81,
+            872.2
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "352": {
+      "cities": []
+    },
+    "353": {
+      "cities": []
+    },
+    "354": {
+      "cities": []
+    },
+    "355": {
+      "cities": []
+    },
+    "356": {
+      "cities": []
+    },
+    "357": {
+      "cities": []
+    },
+    "358": {
+      "cities": []
+    },
+    "359": {
+      "cities": []
+    },
+    "360": {
+      "cities": [
+        {
+          "id": "C360_1",
+          "name": "Province 360",
+          "position": [
+            2290.38,
+            872.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "361": {
+      "cities": []
+    },
+    "362": {
+      "cities": []
+    },
+    "363": {
+      "cities": [
+        {
+          "id": "C363_1",
+          "name": "Province 363",
+          "position": [
+            2581.24,
+            872.2
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "364": {
+      "cities": [
+        {
+          "id": "C364_1",
+          "name": "Province 364",
+          "position": [
+            2678.19,
+            872.2
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "365": {
+      "cities": []
+    },
+    "366": {
+      "cities": []
+    },
+    "367": {
+      "cities": []
+    },
+    "368": {
+      "cities": []
+    },
+    "369": {
+      "cities": []
+    },
+    "370": {
+      "cities": [
+        {
+          "id": "C370_1",
+          "name": "Province 370",
+          "position": [
+            3259.9,
+            872.2
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "371": {
+      "cities": []
+    },
+    "372": {
+      "cities": []
+    },
+    "373": {
+      "cities": []
+    },
+    "374": {
+      "cities": []
+    },
+    "375": {
+      "cities": [
+        {
+          "id": "C375_1",
+          "name": "Province 375",
+          "position": [
+            3744.67,
+            872.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "376": {
+      "cities": []
+    },
+    "377": {
+      "cities": []
+    },
+    "378": {
+      "cities": []
+    },
+    "379": {
+      "cities": [
+        {
+          "id": "C379_1",
+          "name": "Province 379",
+          "position": [
+            60.48,
+            973.4
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "380": {
+      "cities": [
+        {
+          "id": "C380_1",
+          "name": "Province 380",
+          "position": [
+            157.43,
+            973.4
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "381": {
+      "cities": []
+    },
+    "382": {
+      "cities": []
+    },
+    "383": {
+      "cities": []
+    },
+    "384": {
+      "cities": []
+    },
+    "385": {
+      "cities": []
+    },
+    "386": {
+      "cities": []
+    },
+    "387": {
+      "cities": []
+    },
+    "388": {
+      "cities": []
+    },
+    "389": {
+      "cities": []
+    },
+    "390": {
+      "cities": [
+        {
+          "id": "C390_1",
+          "name": "Province 390",
+          "position": [
+            1126.95,
+            973.4
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "391": {
+      "cities": []
+    },
+    "392": {
+      "cities": []
+    },
+    "393": {
+      "cities": [
+        {
+          "id": "C393_1",
+          "name": "Province 393",
+          "position": [
+            1417.81,
+            973.4
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "394": {
+      "cities": []
+    },
+    "395": {
+      "cities": []
+    },
+    "396": {
+      "cities": []
+    },
+    "397": {
+      "cities": []
+    },
+    "398": {
+      "cities": []
+    },
+    "399": {
+      "cities": []
+    },
+    "400": {
+      "cities": []
+    },
+    "401": {
+      "cities": []
+    },
+    "402": {
+      "cities": []
+    },
+    "403": {
+      "cities": []
+    },
+    "404": {
+      "cities": []
+    },
+    "405": {
+      "cities": [
+        {
+          "id": "C405_1",
+          "name": "Province 405",
+          "position": [
+            2581.24,
+            973.4
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "406": {
+      "cities": [
+        {
+          "id": "C406_1",
+          "name": "Province 406",
+          "position": [
+            2678.19,
+            973.4
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "407": {
+      "cities": []
+    },
+    "408": {
+      "cities": []
+    },
+    "409": {
+      "cities": []
+    },
+    "410": {
+      "cities": []
+    },
+    "411": {
+      "cities": []
+    },
+    "412": {
+      "cities": []
+    },
+    "413": {
+      "cities": []
+    },
+    "414": {
+      "cities": []
+    },
+    "415": {
+      "cities": []
+    },
+    "416": {
+      "cities": []
+    },
+    "417": {
+      "cities": []
+    },
+    "418": {
+      "cities": []
+    },
+    "419": {
+      "cities": []
+    },
+    "420": {
+      "cities": [
+        {
+          "id": "C420_1",
+          "name": "Province 420",
+          "position": [
+            4035.52,
+            973.4
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "421": {
+      "cities": [
+        {
+          "id": "C421_1",
+          "name": "Province 421",
+          "position": [
+            60.48,
+            1074.6
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "422": {
+      "cities": [
+        {
+          "id": "C422_1",
+          "name": "Province 422",
+          "position": [
+            157.43,
+            1074.6
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "423": {
+      "cities": []
+    },
+    "424": {
+      "cities": []
+    },
+    "425": {
+      "cities": []
+    },
+    "426": {
+      "cities": []
+    },
+    "427": {
+      "cities": []
+    },
+    "428": {
+      "cities": []
+    },
+    "429": {
+      "cities": []
+    },
+    "430": {
+      "cities": []
+    },
+    "431": {
+      "cities": []
+    },
+    "432": {
+      "cities": []
+    },
+    "433": {
+      "cities": []
+    },
+    "434": {
+      "cities": []
+    },
+    "435": {
+      "cities": [
+        {
+          "id": "C435_1",
+          "name": "Province 435",
+          "position": [
+            1417.81,
+            1074.6
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "436": {
+      "cities": []
+    },
+    "437": {
+      "cities": []
+    },
+    "438": {
+      "cities": []
+    },
+    "439": {
+      "cities": []
+    },
+    "440": {
+      "cities": []
+    },
+    "441": {
+      "cities": []
+    },
+    "442": {
+      "cities": []
+    },
+    "443": {
+      "cities": []
+    },
+    "444": {
+      "cities": []
+    },
+    "445": {
+      "cities": []
+    },
+    "446": {
+      "cities": []
+    },
+    "447": {
+      "cities": [
+        {
+          "id": "C447_1",
+          "name": "Province 447",
+          "position": [
+            2581.24,
+            1074.6
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "448": {
+      "cities": [
+        {
+          "id": "C448_1",
+          "name": "Province 448",
+          "position": [
+            2678.19,
+            1074.6
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "449": {
+      "cities": []
+    },
+    "450": {
+      "cities": [
+        {
+          "id": "C450_1",
+          "name": "Province 450",
+          "position": [
+            2872.1,
+            1074.6
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "451": {
+      "cities": []
+    },
+    "452": {
+      "cities": []
+    },
+    "453": {
+      "cities": []
+    },
+    "454": {
+      "cities": [
+        {
+          "id": "C454_1",
+          "name": "Province 454",
+          "position": [
+            3259.9,
+            1074.6
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "455": {
+      "cities": []
+    },
+    "456": {
+      "cities": []
+    },
+    "457": {
+      "cities": []
+    },
+    "458": {
+      "cities": []
+    },
+    "459": {
+      "cities": []
+    },
+    "460": {
+      "cities": []
+    },
+    "461": {
+      "cities": []
+    },
+    "462": {
+      "cities": []
+    },
+    "463": {
+      "cities": [
+        {
+          "id": "C463_1",
+          "name": "Province 463",
+          "position": [
+            60.48,
+            1175.8
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "464": {
+      "cities": [
+        {
+          "id": "C464_1",
+          "name": "Province 464",
+          "position": [
+            157.43,
+            1175.8
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "465": {
+      "cities": [
+        {
+          "id": "C465_1",
+          "name": "Province 465",
+          "position": [
+            254.38,
+            1175.8
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "466": {
+      "cities": []
+    },
+    "467": {
+      "cities": []
+    },
+    "468": {
+      "cities": [
+        {
+          "id": "C468_1",
+          "name": "Province 468",
+          "position": [
+            545.24,
+            1175.8
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "469": {
+      "cities": [
+        {
+          "id": "C469_1",
+          "name": "Province 469",
+          "position": [
+            642.19,
+            1175.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "470": {
+      "cities": [
+        {
+          "id": "C470_1",
+          "name": "Province 470",
+          "position": [
+            739.14,
+            1175.8
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "471": {
+      "cities": [
+        {
+          "id": "C471_1",
+          "name": "Province 471",
+          "position": [
+            836.1,
+            1175.8
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "472": {
+      "cities": [
+        {
+          "id": "C472_1",
+          "name": "Province 472",
+          "position": [
+            933.05,
+            1175.8
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "473": {
+      "cities": []
+    },
+    "474": {
+      "cities": []
+    },
+    "475": {
+      "cities": []
+    },
+    "476": {
+      "cities": []
+    },
+    "477": {
+      "cities": [
+        {
+          "id": "C477_1",
+          "name": "Province 477",
+          "position": [
+            1417.81,
+            1175.8
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "478": {
+      "cities": [
+        {
+          "id": "C478_1",
+          "name": "Province 478",
+          "position": [
+            1514.76,
+            1175.8
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "479": {
+      "cities": [
+        {
+          "id": "C479_1",
+          "name": "Province 479",
+          "position": [
+            1611.71,
+            1175.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "480": {
+      "cities": [
+        {
+          "id": "C480_1",
+          "name": "Province 480",
+          "position": [
+            1708.67,
+            1175.8
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "481": {
+      "cities": [
+        {
+          "id": "C481_1",
+          "name": "Province 481",
+          "position": [
+            1805.62,
+            1175.8
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "482": {
+      "cities": [
+        {
+          "id": "C482_1",
+          "name": "Province 482",
+          "position": [
+            1902.57,
+            1175.8
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "483": {
+      "cities": []
+    },
+    "484": {
+      "cities": []
+    },
+    "485": {
+      "cities": []
+    },
+    "486": {
+      "cities": [
+        {
+          "id": "C486_1",
+          "name": "Province 486",
+          "position": [
+            2290.38,
+            1175.8
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "487": {
+      "cities": []
+    },
+    "488": {
+      "cities": [
+        {
+          "id": "C488_1",
+          "name": "Province 488",
+          "position": [
+            2484.29,
+            1175.8
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "489": {
+      "cities": [
+        {
+          "id": "C489_1",
+          "name": "Province 489",
+          "position": [
+            2581.24,
+            1175.8
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "490": {
+      "cities": [
+        {
+          "id": "C490_1",
+          "name": "Province 490",
+          "position": [
+            2678.19,
+            1175.8
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "491": {
+      "cities": [
+        {
+          "id": "C491_1",
+          "name": "Province 491",
+          "position": [
+            2775.14,
+            1175.8
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "492": {
+      "cities": []
+    },
+    "493": {
+      "cities": []
+    },
+    "494": {
+      "cities": []
+    },
+    "495": {
+      "cities": [
+        {
+          "id": "C495_1",
+          "name": "Province 495",
+          "position": [
+            3162.95,
+            1175.8
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "496": {
+      "cities": [
+        {
+          "id": "C496_1",
+          "name": "Province 496",
+          "position": [
+            3259.9,
+            1175.8
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "497": {
+      "cities": [
+        {
+          "id": "C497_1",
+          "name": "Province 497",
+          "position": [
+            3356.86,
+            1175.8
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "498": {
+      "cities": [
+        {
+          "id": "C498_1",
+          "name": "Province 498",
+          "position": [
+            3453.81,
+            1175.8
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "499": {
+      "cities": [
+        {
+          "id": "C499_1",
+          "name": "Province 499",
+          "position": [
+            3550.76,
+            1175.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "500": {
+      "cities": [
+        {
+          "id": "C500_1",
+          "name": "Province 500",
+          "position": [
+            3647.71,
+            1175.8
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "501": {
+      "cities": []
+    },
+    "502": {
+      "cities": []
+    },
+    "503": {
+      "cities": []
+    },
+    "504": {
+      "cities": [
+        {
+          "id": "C504_1",
+          "name": "Province 504",
+          "position": [
+            4035.52,
+            1175.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "505": {
+      "cities": [
+        {
+          "id": "C505_1",
+          "name": "Province 505",
+          "position": [
+            60.48,
+            1277.0
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "506": {
+      "cities": [
+        {
+          "id": "C506_1",
+          "name": "Province 506",
+          "position": [
+            157.43,
+            1277.0
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "507": {
+      "cities": []
+    },
+    "508": {
+      "cities": []
+    },
+    "509": {
+      "cities": []
+    },
+    "510": {
+      "cities": [
+        {
+          "id": "C510_1",
+          "name": "Province 510",
+          "position": [
+            545.24,
+            1277.0
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "511": {
+      "cities": []
+    },
+    "512": {
+      "cities": []
+    },
+    "513": {
+      "cities": []
+    },
+    "514": {
+      "cities": []
+    },
+    "515": {
+      "cities": []
+    },
+    "516": {
+      "cities": []
+    },
+    "517": {
+      "cities": []
+    },
+    "518": {
+      "cities": []
+    },
+    "519": {
+      "cities": [
+        {
+          "id": "C519_1",
+          "name": "Province 519",
+          "position": [
+            1417.81,
+            1277.0
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "520": {
+      "cities": []
+    },
+    "521": {
+      "cities": []
+    },
+    "522": {
+      "cities": []
+    },
+    "523": {
+      "cities": []
+    },
+    "524": {
+      "cities": []
+    },
+    "525": {
+      "cities": [
+        {
+          "id": "C525_1",
+          "name": "Province 525",
+          "position": [
+            1999.52,
+            1277.0
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "526": {
+      "cities": []
+    },
+    "527": {
+      "cities": []
+    },
+    "528": {
+      "cities": []
+    },
+    "529": {
+      "cities": []
+    },
+    "530": {
+      "cities": []
+    },
+    "531": {
+      "cities": [
+        {
+          "id": "C531_1",
+          "name": "Province 531",
+          "position": [
+            2581.24,
+            1277.0
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "532": {
+      "cities": [
+        {
+          "id": "C532_1",
+          "name": "Province 532",
+          "position": [
+            2678.19,
+            1277.0
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "533": {
+      "cities": []
+    },
+    "534": {
+      "cities": []
+    },
+    "535": {
+      "cities": []
+    },
+    "536": {
+      "cities": []
+    },
+    "537": {
+      "cities": []
+    },
+    "538": {
+      "cities": [
+        {
+          "id": "C538_1",
+          "name": "Province 538",
+          "position": [
+            3259.9,
+            1277.0
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "539": {
+      "cities": []
+    },
+    "540": {
+      "cities": [
+        {
+          "id": "C540_1",
+          "name": "Province 540",
+          "position": [
+            3453.81,
+            1277.0
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "541": {
+      "cities": []
+    },
+    "542": {
+      "cities": []
+    },
+    "543": {
+      "cities": []
+    },
+    "544": {
+      "cities": []
+    },
+    "545": {
+      "cities": []
+    },
+    "546": {
+      "cities": []
+    },
+    "547": {
+      "cities": [
+        {
+          "id": "C547_1",
+          "name": "Province 547",
+          "position": [
+            60.48,
+            1378.2
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "548": {
+      "cities": [
+        {
+          "id": "C548_1",
+          "name": "Province 548",
+          "position": [
+            157.43,
+            1378.2
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "549": {
+      "cities": []
+    },
+    "550": {
+      "cities": []
+    },
+    "551": {
+      "cities": []
+    },
+    "552": {
+      "cities": []
+    },
+    "553": {
+      "cities": []
+    },
+    "554": {
+      "cities": []
+    },
+    "555": {
+      "cities": [
+        {
+          "id": "C555_1",
+          "name": "Province 555",
+          "position": [
+            836.1,
+            1378.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "556": {
+      "cities": []
+    },
+    "557": {
+      "cities": []
+    },
+    "558": {
+      "cities": [
+        {
+          "id": "C558_1",
+          "name": "Province 558",
+          "position": [
+            1126.95,
+            1378.2
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "559": {
+      "cities": []
+    },
+    "560": {
+      "cities": [
+        {
+          "id": "C560_1",
+          "name": "Province 560",
+          "position": [
+            1320.86,
+            1378.2
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "561": {
+      "cities": [
+        {
+          "id": "C561_1",
+          "name": "Province 561",
+          "position": [
+            1417.81,
+            1378.2
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "562": {
+      "cities": []
+    },
+    "563": {
+      "cities": []
+    },
+    "564": {
+      "cities": []
+    },
+    "565": {
+      "cities": []
+    },
+    "566": {
+      "cities": []
+    },
+    "567": {
+      "cities": []
+    },
+    "568": {
+      "cities": []
+    },
+    "569": {
+      "cities": []
+    },
+    "570": {
+      "cities": [
+        {
+          "id": "C570_1",
+          "name": "Province 570",
+          "position": [
+            2290.38,
+            1378.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "571": {
+      "cities": []
+    },
+    "572": {
+      "cities": []
+    },
+    "573": {
+      "cities": [
+        {
+          "id": "C573_1",
+          "name": "Province 573",
+          "position": [
+            2581.24,
+            1378.2
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "574": {
+      "cities": [
+        {
+          "id": "C574_1",
+          "name": "Province 574",
+          "position": [
+            2678.19,
+            1378.2
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "575": {
+      "cities": []
+    },
+    "576": {
+      "cities": []
+    },
+    "577": {
+      "cities": []
+    },
+    "578": {
+      "cities": []
+    },
+    "579": {
+      "cities": []
+    },
+    "580": {
+      "cities": [
+        {
+          "id": "C580_1",
+          "name": "Province 580",
+          "position": [
+            3259.9,
+            1378.2
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "581": {
+      "cities": []
+    },
+    "582": {
+      "cities": []
+    },
+    "583": {
+      "cities": []
+    },
+    "584": {
+      "cities": []
+    },
+    "585": {
+      "cities": [
+        {
+          "id": "C585_1",
+          "name": "Province 585",
+          "position": [
+            3744.67,
+            1378.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "586": {
+      "cities": [
+        {
+          "id": "C586_1",
+          "name": "Province 586",
+          "position": [
+            3841.62,
+            1378.2
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "587": {
+      "cities": [
+        {
+          "id": "C587_1",
+          "name": "Province 587",
+          "position": [
+            3938.57,
+            1378.2
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "588": {
+      "cities": []
+    },
+    "589": {
+      "cities": [
+        {
+          "id": "C589_1",
+          "name": "Province 589",
+          "position": [
+            60.48,
+            1479.4
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "590": {
+      "cities": [
+        {
+          "id": "C590_1",
+          "name": "Province 590",
+          "position": [
+            157.43,
+            1479.4
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "591": {
+      "cities": []
+    },
+    "592": {
+      "cities": []
+    },
+    "593": {
+      "cities": []
+    },
+    "594": {
+      "cities": []
+    },
+    "595": {
+      "cities": []
+    },
+    "596": {
+      "cities": []
+    },
+    "597": {
+      "cities": []
+    },
+    "598": {
+      "cities": []
+    },
+    "599": {
+      "cities": []
+    },
+    "600": {
+      "cities": [
+        {
+          "id": "C600_1",
+          "name": "Province 600",
+          "position": [
+            1126.95,
+            1479.4
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "601": {
+      "cities": []
+    },
+    "602": {
+      "cities": [
+        {
+          "id": "C602_1",
+          "name": "Province 602",
+          "position": [
+            1320.86,
+            1479.4
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "603": {
+      "cities": [
+        {
+          "id": "C603_1",
+          "name": "Province 603",
+          "position": [
+            1417.81,
+            1479.4
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "604": {
+      "cities": []
+    },
+    "605": {
+      "cities": []
+    },
+    "606": {
+      "cities": []
+    },
+    "607": {
+      "cities": []
+    },
+    "608": {
+      "cities": []
+    },
+    "609": {
+      "cities": []
+    },
+    "610": {
+      "cities": []
+    },
+    "611": {
+      "cities": [
+        {
+          "id": "C611_1",
+          "name": "Province 611",
+          "position": [
+            2193.43,
+            1479.4
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "612": {
+      "cities": []
+    },
+    "613": {
+      "cities": []
+    },
+    "614": {
+      "cities": []
+    },
+    "615": {
+      "cities": [
+        {
+          "id": "C615_1",
+          "name": "Province 615",
+          "position": [
+            2581.24,
+            1479.4
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "616": {
+      "cities": [
+        {
+          "id": "C616_1",
+          "name": "Province 616",
+          "position": [
+            2678.19,
+            1479.4
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "617": {
+      "cities": []
+    },
+    "618": {
+      "cities": []
+    },
+    "619": {
+      "cities": []
+    },
+    "620": {
+      "cities": []
+    },
+    "621": {
+      "cities": []
+    },
+    "622": {
+      "cities": [
+        {
+          "id": "C622_1",
+          "name": "Province 622",
+          "position": [
+            3259.9,
+            1479.4
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "623": {
+      "cities": []
+    },
+    "624": {
+      "cities": []
+    },
+    "625": {
+      "cities": []
+    },
+    "626": {
+      "cities": []
+    },
+    "627": {
+      "cities": []
+    },
+    "628": {
+      "cities": [
+        {
+          "id": "C628_1",
+          "name": "Province 628",
+          "position": [
+            3841.62,
+            1479.4
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "629": {
+      "cities": [
+        {
+          "id": "C629_1",
+          "name": "Province 629",
+          "position": [
+            3938.57,
+            1479.4
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "630": {
+      "cities": [
+        {
+          "id": "C630_1",
+          "name": "Province 630",
+          "position": [
+            4035.52,
+            1479.4
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "631": {
+      "cities": [
+        {
+          "id": "C631_1",
+          "name": "Province 631",
+          "position": [
+            60.48,
+            1580.6
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "632": {
+      "cities": [
+        {
+          "id": "C632_1",
+          "name": "Province 632",
+          "position": [
+            157.43,
+            1580.6
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "633": {
+      "cities": []
+    },
+    "634": {
+      "cities": []
+    },
+    "635": {
+      "cities": []
+    },
+    "636": {
+      "cities": []
+    },
+    "637": {
+      "cities": []
+    },
+    "638": {
+      "cities": []
+    },
+    "639": {
+      "cities": []
+    },
+    "640": {
+      "cities": []
+    },
+    "641": {
+      "cities": []
+    },
+    "642": {
+      "cities": [
+        {
+          "id": "C642_1",
+          "name": "Province 642",
+          "position": [
+            1126.95,
+            1580.6
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "643": {
+      "cities": []
+    },
+    "644": {
+      "cities": [
+        {
+          "id": "C644_1",
+          "name": "Province 644",
+          "position": [
+            1320.86,
+            1580.6
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "645": {
+      "cities": [
+        {
+          "id": "C645_1",
+          "name": "Province 645",
+          "position": [
+            1417.81,
+            1580.6
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "646": {
+      "cities": []
+    },
+    "647": {
+      "cities": []
+    },
+    "648": {
+      "cities": []
+    },
+    "649": {
+      "cities": []
+    },
+    "650": {
+      "cities": []
+    },
+    "651": {
+      "cities": []
+    },
+    "652": {
+      "cities": []
+    },
+    "653": {
+      "cities": [
+        {
+          "id": "C653_1",
+          "name": "Province 653",
+          "position": [
+            2193.43,
+            1580.6
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "654": {
+      "cities": []
+    },
+    "655": {
+      "cities": []
+    },
+    "656": {
+      "cities": []
+    },
+    "657": {
+      "cities": [
+        {
+          "id": "C657_1",
+          "name": "Province 657",
+          "position": [
+            2581.24,
+            1580.6
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "658": {
+      "cities": [
+        {
+          "id": "C658_1",
+          "name": "Province 658",
+          "position": [
+            2678.19,
+            1580.6
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "659": {
+      "cities": []
+    },
+    "660": {
+      "cities": [
+        {
+          "id": "C660_1",
+          "name": "Province 660",
+          "position": [
+            2872.1,
+            1580.6
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "661": {
+      "cities": []
+    },
+    "662": {
+      "cities": []
+    },
+    "663": {
+      "cities": []
+    },
+    "664": {
+      "cities": [
+        {
+          "id": "C664_1",
+          "name": "Province 664",
+          "position": [
+            3259.9,
+            1580.6
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "665": {
+      "cities": []
+    },
+    "666": {
+      "cities": []
+    },
+    "667": {
+      "cities": []
+    },
+    "668": {
+      "cities": []
+    },
+    "669": {
+      "cities": []
+    },
+    "670": {
+      "cities": [
+        {
+          "id": "C670_1",
+          "name": "Province 670",
+          "position": [
+            3841.62,
+            1580.6
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "671": {
+      "cities": [
+        {
+          "id": "C671_1",
+          "name": "Province 671",
+          "position": [
+            3938.57,
+            1580.6
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "672": {
+      "cities": []
+    },
+    "673": {
+      "cities": [
+        {
+          "id": "C673_1",
+          "name": "Province 673",
+          "position": [
+            60.48,
+            1681.8
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "674": {
+      "cities": [
+        {
+          "id": "C674_1",
+          "name": "Province 674",
+          "position": [
+            157.43,
+            1681.8
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "675": {
+      "cities": [
+        {
+          "id": "C675_1",
+          "name": "Province 675",
+          "position": [
+            254.38,
+            1681.8
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "676": {
+      "cities": []
+    },
+    "677": {
+      "cities": []
+    },
+    "678": {
+      "cities": []
+    },
+    "679": {
+      "cities": []
+    },
+    "680": {
+      "cities": []
+    },
+    "681": {
+      "cities": []
+    },
+    "682": {
+      "cities": []
+    },
+    "683": {
+      "cities": []
+    },
+    "684": {
+      "cities": [
+        {
+          "id": "C684_1",
+          "name": "Province 684",
+          "position": [
+            1126.95,
+            1681.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "685": {
+      "cities": []
+    },
+    "686": {
+      "cities": [
+        {
+          "id": "C686_1",
+          "name": "Province 686",
+          "position": [
+            1320.86,
+            1681.8
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "687": {
+      "cities": [
+        {
+          "id": "C687_1",
+          "name": "Province 687",
+          "position": [
+            1417.81,
+            1681.8
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "688": {
+      "cities": []
+    },
+    "689": {
+      "cities": []
+    },
+    "690": {
+      "cities": [
+        {
+          "id": "C690_1",
+          "name": "Province 690",
+          "position": [
+            1708.67,
+            1681.8
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "691": {
+      "cities": []
+    },
+    "692": {
+      "cities": []
+    },
+    "693": {
+      "cities": []
+    },
+    "694": {
+      "cities": []
+    },
+    "695": {
+      "cities": [
+        {
+          "id": "C695_1",
+          "name": "Province 695",
+          "position": [
+            2193.43,
+            1681.8
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "696": {
+      "cities": []
+    },
+    "697": {
+      "cities": []
+    },
+    "698": {
+      "cities": []
+    },
+    "699": {
+      "cities": [
+        {
+          "id": "C699_1",
+          "name": "Province 699",
+          "position": [
+            2581.24,
+            1681.8
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "700": {
+      "cities": [
+        {
+          "id": "C700_1",
+          "name": "Province 700",
+          "position": [
+            2678.19,
+            1681.8
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "701": {
+      "cities": []
+    },
+    "702": {
+      "cities": []
+    },
+    "703": {
+      "cities": []
+    },
+    "704": {
+      "cities": []
+    },
+    "705": {
+      "cities": [
+        {
+          "id": "C705_1",
+          "name": "Province 705",
+          "position": [
+            3162.95,
+            1681.8
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "706": {
+      "cities": []
+    },
+    "707": {
+      "cities": []
+    },
+    "708": {
+      "cities": []
+    },
+    "709": {
+      "cities": []
+    },
+    "710": {
+      "cities": []
+    },
+    "711": {
+      "cities": []
+    },
+    "712": {
+      "cities": [
+        {
+          "id": "C712_1",
+          "name": "Province 712",
+          "position": [
+            3841.62,
+            1681.8
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "713": {
+      "cities": [
+        {
+          "id": "C713_1",
+          "name": "Province 713",
+          "position": [
+            3938.57,
+            1681.8
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "714": {
+      "cities": []
+    },
+    "715": {
+      "cities": [
+        {
+          "id": "C715_1",
+          "name": "Province 715",
+          "position": [
+            60.48,
+            1783.0
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "716": {
+      "cities": [
+        {
+          "id": "C716_1",
+          "name": "Province 716",
+          "position": [
+            157.43,
+            1783.0
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "717": {
+      "cities": []
+    },
+    "718": {
+      "cities": []
+    },
+    "719": {
+      "cities": []
+    },
+    "720": {
+      "cities": [
+        {
+          "id": "C720_1",
+          "name": "Province 720",
+          "position": [
+            545.24,
+            1783.0
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "721": {
+      "cities": []
+    },
+    "722": {
+      "cities": []
+    },
+    "723": {
+      "cities": []
+    },
+    "724": {
+      "cities": []
+    },
+    "725": {
+      "cities": []
+    },
+    "726": {
+      "cities": []
+    },
+    "727": {
+      "cities": []
+    },
+    "728": {
+      "cities": [
+        {
+          "id": "C728_1",
+          "name": "Province 728",
+          "position": [
+            1320.86,
+            1783.0
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "729": {
+      "cities": [
+        {
+          "id": "C729_1",
+          "name": "Province 729",
+          "position": [
+            1417.81,
+            1783.0
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "730": {
+      "cities": []
+    },
+    "731": {
+      "cities": []
+    },
+    "732": {
+      "cities": []
+    },
+    "733": {
+      "cities": []
+    },
+    "734": {
+      "cities": []
+    },
+    "735": {
+      "cities": [
+        {
+          "id": "C735_1",
+          "name": "Province 735",
+          "position": [
+            1999.52,
+            1783.0
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "736": {
+      "cities": []
+    },
+    "737": {
+      "cities": [
+        {
+          "id": "C737_1",
+          "name": "Province 737",
+          "position": [
+            2193.43,
+            1783.0
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "738": {
+      "cities": []
+    },
+    "739": {
+      "cities": []
+    },
+    "740": {
+      "cities": []
+    },
+    "741": {
+      "cities": [
+        {
+          "id": "C741_1",
+          "name": "Province 741",
+          "position": [
+            2581.24,
+            1783.0
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "742": {
+      "cities": [
+        {
+          "id": "C742_1",
+          "name": "Province 742",
+          "position": [
+            2678.19,
+            1783.0
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "743": {
+      "cities": []
+    },
+    "744": {
+      "cities": []
+    },
+    "745": {
+      "cities": []
+    },
+    "746": {
+      "cities": []
+    },
+    "747": {
+      "cities": []
+    },
+    "748": {
+      "cities": [
+        {
+          "id": "C748_1",
+          "name": "Province 748",
+          "position": [
+            3259.9,
+            1783.0
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "749": {
+      "cities": []
+    },
+    "750": {
+      "cities": [
+        {
+          "id": "C750_1",
+          "name": "Province 750",
+          "position": [
+            3453.81,
+            1783.0
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "751": {
+      "cities": []
+    },
+    "752": {
+      "cities": []
+    },
+    "753": {
+      "cities": []
+    },
+    "754": {
+      "cities": [
+        {
+          "id": "C754_1",
+          "name": "Province 754",
+          "position": [
+            3841.62,
+            1783.0
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "755": {
+      "cities": [
+        {
+          "id": "C755_1",
+          "name": "Province 755",
+          "position": [
+            3938.57,
+            1783.0
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "756": {
+      "cities": []
+    },
+    "757": {
+      "cities": []
+    },
+    "758": {
+      "cities": []
+    },
+    "759": {
+      "cities": []
+    },
+    "760": {
+      "cities": []
+    },
+    "761": {
+      "cities": []
+    },
+    "762": {
+      "cities": []
+    },
+    "763": {
+      "cities": []
+    },
+    "764": {
+      "cities": []
+    },
+    "765": {
+      "cities": [
+        {
+          "id": "C765_1",
+          "name": "Province 765",
+          "position": [
+            836.1,
+            1884.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "766": {
+      "cities": []
+    },
+    "767": {
+      "cities": []
+    },
+    "768": {
+      "cities": []
+    },
+    "769": {
+      "cities": []
+    },
+    "770": {
+      "cities": []
+    },
+    "771": {
+      "cities": []
+    },
+    "772": {
+      "cities": []
+    },
+    "773": {
+      "cities": []
+    },
+    "774": {
+      "cities": []
+    },
+    "775": {
+      "cities": []
+    },
+    "776": {
+      "cities": []
+    },
+    "777": {
+      "cities": []
+    },
+    "778": {
+      "cities": []
+    },
+    "779": {
+      "cities": []
+    },
+    "780": {
+      "cities": [
+        {
+          "id": "C780_1",
+          "name": "Province 780",
+          "position": [
+            2290.38,
+            1884.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "781": {
+      "cities": []
+    },
+    "782": {
+      "cities": []
+    },
+    "783": {
+      "cities": []
+    },
+    "784": {
+      "cities": []
+    },
+    "785": {
+      "cities": []
+    },
+    "786": {
+      "cities": []
+    },
+    "787": {
+      "cities": []
+    },
+    "788": {
+      "cities": []
+    },
+    "789": {
+      "cities": []
+    },
+    "790": {
+      "cities": []
+    },
+    "791": {
+      "cities": []
+    },
+    "792": {
+      "cities": []
+    },
+    "793": {
+      "cities": []
+    },
+    "794": {
+      "cities": []
+    },
+    "795": {
+      "cities": [
+        {
+          "id": "C795_1",
+          "name": "Province 795",
+          "position": [
+            3744.67,
+            1884.2
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "796": {
+      "cities": []
+    },
+    "797": {
+      "cities": []
+    },
+    "798": {
+      "cities": []
+    },
+    "799": {
+      "cities": []
+    },
+    "800": {
+      "cities": []
+    },
+    "801": {
+      "cities": []
+    },
+    "802": {
+      "cities": []
+    },
+    "803": {
+      "cities": []
+    },
+    "804": {
+      "cities": []
+    },
+    "805": {
+      "cities": []
+    },
+    "806": {
+      "cities": []
+    },
+    "807": {
+      "cities": []
+    },
+    "808": {
+      "cities": []
+    },
+    "809": {
+      "cities": []
+    },
+    "810": {
+      "cities": [
+        {
+          "id": "C810_1",
+          "name": "Province 810",
+          "position": [
+            1126.95,
+            1985.4
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "811": {
+      "cities": []
+    },
+    "812": {
+      "cities": []
+    },
+    "813": {
+      "cities": []
+    },
+    "814": {
+      "cities": []
+    },
+    "815": {
+      "cities": []
+    },
+    "816": {
+      "cities": []
+    },
+    "817": {
+      "cities": []
+    },
+    "818": {
+      "cities": []
+    },
+    "819": {
+      "cities": []
+    },
+    "820": {
+      "cities": []
+    },
+    "821": {
+      "cities": []
+    },
+    "822": {
+      "cities": []
+    },
+    "823": {
+      "cities": []
+    },
+    "824": {
+      "cities": []
+    },
+    "825": {
+      "cities": [
+        {
+          "id": "C825_1",
+          "name": "Province 825",
+          "position": [
+            2581.24,
+            1985.4
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "826": {
+      "cities": []
+    },
+    "827": {
+      "cities": []
+    },
+    "828": {
+      "cities": []
+    },
+    "829": {
+      "cities": []
+    },
+    "830": {
+      "cities": []
+    },
+    "831": {
+      "cities": []
+    },
+    "832": {
+      "cities": []
+    },
+    "833": {
+      "cities": []
+    },
+    "834": {
+      "cities": []
+    },
+    "835": {
+      "cities": []
+    },
+    "836": {
+      "cities": []
+    },
+    "837": {
+      "cities": []
+    },
+    "838": {
+      "cities": []
+    },
+    "839": {
+      "cities": []
+    },
+    "840": {
+      "cities": [
+        {
+          "id": "C840_1",
+          "name": "Province 840",
+          "position": [
+            4035.52,
+            1985.4
+          ],
+          "population": 120000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9005": {
+      "cities": [
+        {
+          "id": "C73_1",
+          "name": "Caracas",
+          "position": [
+            2969.05,
+            163.8
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9011": {
+      "cities": [
+        {
+          "id": "C97_1",
+          "name": "Anchorage",
+          "position": [
+            1223.9,
+            265.0
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9017": {
+      "cities": [
+        {
+          "id": "C82_1",
+          "name": "Penang",
+          "position": [
+            3841.62,
+            163.8
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9023": {
+      "cities": [
+        {
+          "id": "C58_1",
+          "name": "Auckland",
+          "position": [
+            1514.76,
+            163.8
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9029": {
+      "cities": [
+        {
+          "id": "C94_1",
+          "name": "Santiago de Cuba",
+          "position": [
+            933.05,
+            265.0
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9035": {
+      "cities": [
+        {
+          "id": "C35_1",
+          "name": "Cape Town",
+          "position": [
+            3356.86,
+            62.6
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9041": {
+      "cities": [
+        {
+          "id": "C93_1",
+          "name": "Maracaibo",
+          "position": [
+            836.1,
+            265.0
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9047": {
+      "cities": [
+        {
+          "id": "C47_1",
+          "name": "Oslo",
+          "position": [
+            448.29,
+            163.8
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9053": {
+      "cities": [
+        {
+          "id": "C66_1",
+          "name": "Lagos",
+          "position": [
+            2290.38,
+            163.8
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9059": {
+      "cities": [
+        {
+          "id": "C87_1",
+          "name": "Durban",
+          "position": [
+            254.38,
+            265.0
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9065": {
+      "cities": [
+        {
+          "id": "C71_1",
+          "name": "Lima",
+          "position": [
+            2775.14,
+            163.8
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9071": {
+      "cities": [
+        {
+          "id": "C51_1",
+          "name": "Odessa",
+          "position": [
+            836.1,
+            163.8
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9077": {
+      "cities": [
+        {
+          "id": "C65_1",
+          "name": "Trondheim",
+          "position": [
+            2193.43,
+            163.8
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9083": {
+      "cities": [
+        {
+          "id": "C77_1",
+          "name": "Darwin",
+          "position": [
+            3356.86,
+            163.8
+          ],
+          "population": 168000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9089": {
+      "cities": [
+        {
+          "id": "C60_1",
+          "name": "Manila",
+          "position": [
+            1708.67,
+            163.8
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9095": {
+      "cities": [
+        {
+          "id": "C78_1",
+          "name": "Christchurch",
+          "position": [
+            3453.81,
+            163.8
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9101": {
+      "cities": [
+        {
+          "id": "C80_1",
+          "name": "Cebu",
+          "position": [
+            3647.71,
+            163.8
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9107": {
+      "cities": [
+        {
+          "id": "C96_1",
+          "name": "Honolulu",
+          "position": [
+            1126.95,
+            265.0
+          ],
+          "population": 144000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9113": {
+      "cities": [
+        {
+          "id": "C98_1",
+          "name": "Reykjavik",
+          "position": [
+            1320.86,
+            265.0
+          ],
+          "population": 192000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9119": {
+      "cities": [
+        {
+          "id": "C74_1",
+          "name": "Havana",
+          "position": [
+            3066.0,
+            163.8
+          ],
+          "population": 216000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9125": {
+      "cities": [
+        {
+          "id": "C95_1",
+          "name": "Colon",
+          "position": [
+            1030.0,
+            265.0
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9131": {
+      "cities": [
+        {
+          "id": "C75_1",
+          "name": "Panama Canal Zone",
+          "position": [
+            3162.95,
+            163.8
+          ],
+          "population": 120000,
+          "port_level": 2,
+          "airport_level": 0,
+          "industry_slots": 1
+        }
+      ]
+    },
+    "9137": {
+      "cities": [
+        {
+          "id": "C11_1",
+          "name": "Shanghai",
+          "position": [
+            1030.0,
+            62.6
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9143": {
+      "cities": [
+        {
+          "id": "C12_1",
+          "name": "New Delhi",
+          "position": [
+            1126.95,
+            62.6
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9161": {
+      "cities": [
+        {
+          "id": "C17_1",
+          "name": "St. Petersburg",
+          "position": [
+            1611.71,
+            62.6
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9167": {
+      "cities": [
+        {
+          "id": "C20_1",
+          "name": "Kiev",
+          "position": [
+            1902.57,
+            62.6
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9173": {
+      "cities": [
+        {
+          "id": "C23_1",
+          "name": "Cairo",
+          "position": [
+            2193.43,
+            62.6
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9179": {
+      "cities": [
+        {
+          "id": "C24_1",
+          "name": "Tehran",
+          "position": [
+            2290.38,
+            62.6
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9185": {
+      "cities": [
+        {
+          "id": "C26_1",
+          "name": "Sydney",
+          "position": [
+            2484.29,
+            62.6
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9191": {
+      "cities": [
+        {
+          "id": "C28_1",
+          "name": "Buenos Aires",
+          "position": [
+            2678.19,
+            62.6
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9197": {
+      "cities": [
+        {
+          "id": "C29_1",
+          "name": "Rio de Janeiro",
+          "position": [
+            2775.14,
+            62.6
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9203": {
+      "cities": [
+        {
+          "id": "C32_1",
+          "name": "Novosibirsk",
+          "position": [
+            3066.0,
+            62.6
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9209": {
+      "cities": [
+        {
+          "id": "C36_1",
+          "name": "Mexico City",
+          "position": [
+            3453.81,
+            62.6
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9215": {
+      "cities": [
+        {
+          "id": "C38_1",
+          "name": "Montreal",
+          "position": [
+            3647.71,
+            62.6
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9221": {
+      "cities": [
+        {
+          "id": "C40_1",
+          "name": "Helsinki",
+          "position": [
+            3841.62,
+            62.6
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9227": {
+      "cities": [
+        {
+          "id": "C41_1",
+          "name": "Chicago",
+          "position": [
+            3938.57,
+            62.6
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9233": {
+      "cities": [
+        {
+          "id": "C42_1",
+          "name": "Detroit",
+          "position": [
+            4035.52,
+            62.6
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9239": {
+      "cities": [
+        {
+          "id": "C46_1",
+          "name": "Bangalore",
+          "position": [
+            351.33,
+            163.8
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9245": {
+      "cities": [
+        {
+          "id": "C49_1",
+          "name": "Milan",
+          "position": [
+            642.19,
+            163.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9251": {
+      "cities": [
+        {
+          "id": "C61_1",
+          "name": "Bangkok",
+          "position": [
+            1805.62,
+            163.8
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9257": {
+      "cities": [
+        {
+          "id": "C70_1",
+          "name": "Sao Paulo",
+          "position": [
+            2678.19,
+            163.8
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9263": {
+      "cities": [
+        {
+          "id": "C84_1",
+          "name": "Baghdad",
+          "position": [
+            4035.52,
+            163.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9269": {
+      "cities": [
+        {
+          "id": "C8_1",
+          "name": "Moscow",
+          "position": [
+            739.14,
+            62.6
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9275": {
+      "cities": [
+        {
+          "id": "C5_1",
+          "name": "London",
+          "position": [
+            448.29,
+            62.6
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9281": {
+      "cities": [
+        {
+          "id": "C4_1",
+          "name": "Paris",
+          "position": [
+            351.33,
+            62.6
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9287": {
+      "cities": [
+        {
+          "id": "C2_1",
+          "name": "Berlin",
+          "position": [
+            157.43,
+            62.6
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9297": {
+      "cities": [
+        {
+          "id": "C45_1",
+          "name": "Mumbai",
+          "position": [
+            254.38,
+            163.8
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9302": {
+      "cities": [
+        {
+          "id": "C48_1",
+          "name": "Rotterdam",
+          "position": [
+            545.24,
+            163.8
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9307": {
+      "cities": [
+        {
+          "id": "C50_1",
+          "name": "Kharkiv",
+          "position": [
+            739.14,
+            163.8
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9312": {
+      "cities": [
+        {
+          "id": "C52_1",
+          "name": "Ankara",
+          "position": [
+            933.05,
+            163.8
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9317": {
+      "cities": [
+        {
+          "id": "C53_1",
+          "name": "Baghdad",
+          "position": [
+            1030.0,
+            163.8
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9327": {
+      "cities": [
+        {
+          "id": "C55_1",
+          "name": "Jakarta",
+          "position": [
+            1223.9,
+            163.8
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9332": {
+      "cities": [
+        {
+          "id": "C56_1",
+          "name": "Perth",
+          "position": [
+            1320.86,
+            163.8
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9337": {
+      "cities": [
+        {
+          "id": "C57_1",
+          "name": "Brisbane",
+          "position": [
+            1417.81,
+            163.8
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9342": {
+      "cities": [
+        {
+          "id": "C59_1",
+          "name": "Hanoi",
+          "position": [
+            1611.71,
+            163.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9347": {
+      "cities": [
+        {
+          "id": "C62_1",
+          "name": "Kuala Lumpur",
+          "position": [
+            1902.57,
+            163.8
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9352": {
+      "cities": [
+        {
+          "id": "C63_1",
+          "name": "Stockholm",
+          "position": [
+            1999.52,
+            163.8
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9357": {
+      "cities": [
+        {
+          "id": "C64_1",
+          "name": "Copenhagen",
+          "position": [
+            2096.48,
+            163.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9367": {
+      "cities": [
+        {
+          "id": "C68_1",
+          "name": "Buenos Aires",
+          "position": [
+            2484.29,
+            163.8
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9372": {
+      "cities": [
+        {
+          "id": "C69_1",
+          "name": "Rio de Janeiro",
+          "position": [
+            2581.24,
+            163.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9382": {
+      "cities": [
+        {
+          "id": "C76_1",
+          "name": "Adelaide",
+          "position": [
+            3259.9,
+            163.8
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9387": {
+      "cities": [
+        {
+          "id": "C79_1",
+          "name": "Ho Chi Minh City",
+          "position": [
+            3550.76,
+            163.8
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9397": {
+      "cities": [
+        {
+          "id": "C83_1",
+          "name": "Isfahan",
+          "position": [
+            3938.57,
+            163.8
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9402": {
+      "cities": [
+        {
+          "id": "C86_1",
+          "name": "Abuja",
+          "position": [
+            157.43,
+            265.0
+          ],
+          "population": 480000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9407": {
+      "cities": [
+        {
+          "id": "C88_1",
+          "name": "Pretoria",
+          "position": [
+            351.33,
+            265.0
+          ],
+          "population": 640000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9412": {
+      "cities": [
+        {
+          "id": "C89_1",
+          "name": "Cordoba",
+          "position": [
+            448.29,
+            265.0
+          ],
+          "population": 720000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9417": {
+      "cities": [
+        {
+          "id": "C90_1",
+          "name": "Santiago",
+          "position": [
+            545.24,
+            265.0
+          ],
+          "population": 400000,
+          "port_level": 0,
+          "airport_level": 1,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9427": {
+      "cities": [
+        {
+          "id": "C92_1",
+          "name": "Cali",
+          "position": [
+            739.14,
+            265.0
+          ],
+          "population": 560000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 3
+        }
+      ]
+    },
+    "9008": {
+      "cities": [
+        {
+          "id": "C9008_1",
+          "name": "New Settlement",
+          "position": [
+            820.2083333333333,
+            1294.5
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9009": {
+      "cities": [
+        {
+          "id": "C9009_1",
+          "name": "New Settlement",
+          "position": [
+            819.5416666666666,
+            1319.25
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9026": {
+      "cities": [
+        {
+          "id": "C9026_1",
+          "name": "New Settlement",
+          "position": [
+            1018.2083333333333,
+            1320.5
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9027": {
+      "cities": [
+        {
+          "id": "C9027_1",
+          "name": "New Settlement",
+          "position": [
+            1017.5416666666666,
+            1345.25
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9038": {
+      "cities": [
+        {
+          "id": "C9038_1",
+          "name": "New Settlement",
+          "position": [
+            1080.2083333333335,
+            1330.5
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9039": {
+      "cities": [
+        {
+          "id": "C9039_1",
+          "name": "New Settlement",
+          "position": [
+            1079.5416666666667,
+            1355.25
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9104": {
+      "cities": [
+        {
+          "id": "C9104_1",
+          "name": "New Settlement",
+          "position": [
+            886.2083333333333,
+            1300.5
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9105": {
+      "cities": [
+        {
+          "id": "C9105_1",
+          "name": "New Settlement",
+          "position": [
+            885.5416666666666,
+            1325.25
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9110": {
+      "cities": [
+        {
+          "id": "C9110_1",
+          "name": "New Settlement",
+          "position": [
+            754.2083333333333,
+            1284.5
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9111": {
+      "cities": [
+        {
+          "id": "C9111_1",
+          "name": "New Settlement",
+          "position": [
+            753.5416666666666,
+            1309.25
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9122": {
+      "cities": [
+        {
+          "id": "C9122_1",
+          "name": "New Settlement",
+          "position": [
+            952.2083333333333,
+            1308.5
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9123": {
+      "cities": [
+        {
+          "id": "C9123_1",
+          "name": "New Settlement",
+          "position": [
+            951.5416666666666,
+            1333.25
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9292": {
+      "cities": [
+        {
+          "id": "C9292_1",
+          "name": "New Settlement",
+          "position": [
+            3234.3764285714283,
+            684.8972448979591
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9322": {
+      "cities": [
+        {
+          "id": "C9322_1",
+          "name": "New Settlement",
+          "position": [
+            2599.8369387755097,
+            688.6630612244899
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9362": {
+      "cities": [
+        {
+          "id": "C9362_1",
+          "name": "New Settlement",
+          "position": [
+            2369.475,
+            1332.104693877551
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9377": {
+      "cities": [
+        {
+          "id": "C9377_1",
+          "name": "New Settlement",
+          "position": [
+            1207.6466326530613,
+            981.1610204081633
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9392": {
+      "cities": [
+        {
+          "id": "C9392_1",
+          "name": "New Settlement",
+          "position": [
+            3176.5643877551024,
+            820.474693877551
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9422": {
+      "cities": [
+        {
+          "id": "C9422_1",
+          "name": "New Settlement",
+          "position": [
+            1184.7755102040815,
+            1349.4795918367347
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9432": {
+      "cities": [
+        {
+          "id": "C9432_1",
+          "name": "New Settlement",
+          "position": [
+            660.8163265306122,
+            1300.3163265306123
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "9437": {
+      "cities": [
+        {
+          "id": "C9437_1",
+          "name": "New Settlement",
+          "position": [
+            594.8163265306122,
+            1292.3163265306123
+          ],
+          "population": 14000,
+          "port_level": 0,
+          "airport_level": 0,
+          "industry_slots": 2
+        }
+      ]
+    },
+    "20000": {
+      "cities": []
+    },
+    "20001": {
+      "cities": []
+    },
+    "20002": {
+      "cities": []
+    },
+    "20003": {
+      "cities": []
+    },
+    "20004": {
+      "cities": []
+    },
+    "20005": {
+      "cities": []
+    },
+    "20006": {
+      "cities": []
+    },
+    "20007": {
+      "cities": []
+    },
+    "20008": {
+      "cities": []
+    },
+    "20009": {
+      "cities": []
+    },
+    "20010": {
+      "cities": []
+    },
+    "20011": {
+      "cities": []
+    },
+    "20012": {
+      "cities": []
+    },
+    "20013": {
+      "cities": []
+    },
+    "20014": {
+      "cities": []
+    },
+    "20015": {
+      "cities": []
+    },
+    "20016": {
+      "cities": []
+    },
+    "20017": {
+      "cities": []
+    },
+    "20018": {
+      "cities": []
+    },
+    "20019": {
+      "cities": []
+    },
+    "20020": {
+      "cities": []
+    },
+    "20021": {
+      "cities": []
+    },
+    "20022": {
+      "cities": []
+    },
+    "20023": {
+      "cities": []
+    },
+    "20024": {
+      "cities": []
+    },
+    "20025": {
+      "cities": []
+    },
+    "20026": {
+      "cities": []
+    },
+    "20027": {
+      "cities": []
+    },
+    "20028": {
+      "cities": []
+    },
+    "20029": {
+      "cities": []
+    },
+    "20030": {
+      "cities": []
+    },
+    "20031": {
+      "cities": []
+    },
+    "20032": {
+      "cities": []
+    },
+    "20033": {
+      "cities": []
+    },
+    "20034": {
+      "cities": []
+    },
+    "20035": {
+      "cities": []
+    },
+    "20036": {
+      "cities": []
+    },
+    "20037": {
+      "cities": []
+    },
+    "20038": {
+      "cities": []
+    },
+    "20039": {
+      "cities": []
+    },
+    "20040": {
+      "cities": []
+    },
+    "20041": {
+      "cities": []
+    },
+    "20042": {
+      "cities": []
+    },
+    "20043": {
+      "cities": []
+    },
+    "20044": {
+      "cities": []
+    },
+    "20045": {
+      "cities": []
+    },
+    "20046": {
+      "cities": []
+    },
+    "20047": {
+      "cities": []
+    },
+    "20048": {
+      "cities": []
+    },
+    "20049": {
+      "cities": []
+    },
+    "20050": {
+      "cities": []
+    },
+    "20051": {
+      "cities": []
+    },
+    "20052": {
+      "cities": []
+    },
+    "20053": {
+      "cities": []
+    },
+    "20054": {
+      "cities": []
+    },
+    "20055": {
+      "cities": []
+    },
+    "20056": {
+      "cities": []
+    },
+    "20057": {
+      "cities": []
+    },
+    "20058": {
+      "cities": []
+    },
+    "20059": {
+      "cities": []
+    },
+    "20060": {
+      "cities": []
+    },
+    "20061": {
+      "cities": []
+    },
+    "20062": {
+      "cities": []
+    },
+    "20063": {
+      "cities": []
+    },
+    "20064": {
+      "cities": []
+    },
+    "20065": {
+      "cities": []
+    },
+    "20066": {
+      "cities": []
+    },
+    "20067": {
+      "cities": []
+    },
+    "20068": {
+      "cities": []
+    },
+    "20069": {
+      "cities": []
+    },
+    "20070": {
+      "cities": []
+    },
+    "20071": {
+      "cities": []
+    },
+    "20072": {
+      "cities": []
+    },
+    "20073": {
+      "cities": []
+    },
+    "20074": {
+      "cities": []
+    },
+    "20075": {
+      "cities": []
+    },
+    "20076": {
+      "cities": []
+    },
+    "20077": {
+      "cities": []
+    },
+    "20078": {
+      "cities": []
+    },
+    "20079": {
+      "cities": []
+    },
+    "20080": {
+      "cities": []
+    },
+    "20081": {
+      "cities": []
+    },
+    "20082": {
+      "cities": []
+    },
+    "20083": {
+      "cities": []
+    },
+    "20084": {
+      "cities": []
+    },
+    "20085": {
+      "cities": []
+    },
+    "20086": {
+      "cities": []
+    },
+    "20087": {
+      "cities": []
+    },
+    "20088": {
+      "cities": []
+    },
+    "20089": {
+      "cities": []
+    },
+    "20090": {
+      "cities": []
+    },
+    "20091": {
+      "cities": []
+    },
+    "20092": {
+      "cities": []
+    },
+    "20093": {
+      "cities": []
+    },
+    "20094": {
+      "cities": []
+    },
+    "20095": {
+      "cities": []
+    },
+    "20096": {
+      "cities": []
+    },
+    "20097": {
+      "cities": []
+    },
+    "20098": {
+      "cities": []
+    },
+    "20099": {
+      "cities": []
+    },
+    "20100": {
+      "cities": []
+    },
+    "20101": {
+      "cities": []
+    },
+    "20102": {
+      "cities": []
+    },
+    "20103": {
+      "cities": []
+    },
+    "20104": {
+      "cities": []
+    },
+    "20105": {
+      "cities": []
+    },
+    "20106": {
+      "cities": []
+    },
+    "20107": {
+      "cities": []
+    },
+    "20108": {
+      "cities": []
+    },
+    "20109": {
+      "cities": []
+    },
+    "20110": {
+      "cities": []
+    },
+    "20111": {
+      "cities": []
+    },
+    "20112": {
+      "cities": []
+    },
+    "20113": {
+      "cities": []
+    },
+    "20114": {
+      "cities": []
+    },
+    "20115": {
+      "cities": []
+    },
+    "20116": {
+      "cities": []
+    },
+    "20117": {
+      "cities": []
+    },
+    "20118": {
+      "cities": []
+    },
+    "20119": {
+      "cities": []
+    },
+    "20120": {
+      "cities": []
+    },
+    "20121": {
+      "cities": []
+    },
+    "20122": {
+      "cities": []
+    },
+    "20123": {
+      "cities": []
+    },
+    "20124": {
+      "cities": []
+    },
+    "20125": {
+      "cities": []
+    },
+    "20126": {
+      "cities": []
+    },
+    "20127": {
+      "cities": []
+    },
+    "20128": {
+      "cities": []
+    },
+    "20129": {
+      "cities": []
+    },
+    "20130": {
+      "cities": []
+    },
+    "20131": {
+      "cities": []
+    },
+    "20132": {
+      "cities": []
+    },
+    "20133": {
+      "cities": []
+    },
+    "20134": {
+      "cities": []
+    },
+    "20135": {
+      "cities": []
+    },
+    "20136": {
+      "cities": []
+    },
+    "20137": {
+      "cities": []
+    },
+    "20138": {
+      "cities": []
+    },
+    "20139": {
+      "cities": []
+    },
+    "20140": {
+      "cities": []
+    },
+    "20141": {
+      "cities": []
+    },
+    "20142": {
+      "cities": []
+    },
+    "20143": {
+      "cities": []
+    },
+    "20144": {
+      "cities": []
+    },
+    "20145": {
+      "cities": []
+    },
+    "20146": {
+      "cities": []
+    },
+    "20147": {
+      "cities": []
+    },
+    "20148": {
+      "cities": []
+    },
+    "20149": {
+      "cities": []
+    },
+    "20150": {
+      "cities": []
+    },
+    "20151": {
+      "cities": []
+    },
+    "20152": {
+      "cities": []
+    },
+    "20153": {
+      "cities": []
+    },
+    "20154": {
+      "cities": []
+    },
+    "20155": {
+      "cities": []
+    },
+    "20156": {
+      "cities": []
+    },
+    "20157": {
+      "cities": []
+    },
+    "20158": {
+      "cities": []
+    },
+    "20159": {
+      "cities": []
+    },
+    "20160": {
+      "cities": []
+    },
+    "20161": {
+      "cities": []
+    },
+    "20162": {
+      "cities": []
+    },
+    "20163": {
+      "cities": []
+    },
+    "20164": {
+      "cities": []
+    },
+    "20165": {
+      "cities": []
+    },
+    "20166": {
+      "cities": []
+    },
+    "20167": {
+      "cities": []
+    },
+    "20168": {
+      "cities": []
+    },
+    "20169": {
+      "cities": []
+    },
+    "20170": {
+      "cities": []
+    },
+    "20171": {
+      "cities": []
+    },
+    "20172": {
+      "cities": []
+    },
+    "20173": {
+      "cities": []
+    },
+    "20174": {
+      "cities": []
+    },
+    "20175": {
+      "cities": []
+    },
+    "20176": {
+      "cities": []
+    },
+    "20177": {
+      "cities": []
+    },
+    "20178": {
+      "cities": []
+    },
+    "20179": {
+      "cities": []
+    },
+    "20180": {
+      "cities": []
+    },
+    "20181": {
+      "cities": []
+    },
+    "20182": {
+      "cities": []
+    },
+    "20183": {
+      "cities": []
+    },
+    "20184": {
+      "cities": []
+    },
+    "20185": {
+      "cities": []
+    },
+    "20186": {
+      "cities": []
+    },
+    "20187": {
+      "cities": []
+    },
+    "20188": {
+      "cities": []
+    },
+    "20189": {
+      "cities": []
+    },
+    "20190": {
+      "cities": []
+    },
+    "20191": {
+      "cities": []
+    },
+    "20192": {
+      "cities": []
+    },
+    "20193": {
+      "cities": []
+    },
+    "20194": {
+      "cities": []
+    },
+    "20195": {
+      "cities": []
+    },
+    "20196": {
+      "cities": []
+    },
+    "20197": {
+      "cities": []
+    },
+    "20198": {
+      "cities": []
+    },
+    "20199": {
+      "cities": []
+    },
+    "20200": {
+      "cities": []
+    },
+    "20201": {
+      "cities": []
+    },
+    "20202": {
+      "cities": []
+    },
+    "20203": {
+      "cities": []
+    },
+    "20204": {
+      "cities": []
+    },
+    "20205": {
+      "cities": []
+    },
+    "20206": {
+      "cities": []
+    },
+    "20207": {
+      "cities": []
+    },
+    "20208": {
+      "cities": []
+    },
+    "20209": {
+      "cities": []
+    },
+    "20210": {
+      "cities": []
+    },
+    "20211": {
+      "cities": []
+    },
+    "20212": {
+      "cities": []
+    },
+    "20213": {
+      "cities": []
+    },
+    "20214": {
+      "cities": []
+    },
+    "20215": {
+      "cities": []
+    },
+    "20216": {
+      "cities": []
+    },
+    "20217": {
+      "cities": []
+    },
+    "20218": {
+      "cities": []
+    },
+    "20219": {
+      "cities": []
+    },
+    "20220": {
+      "cities": []
+    },
+    "20221": {
+      "cities": []
+    },
+    "20222": {
+      "cities": []
+    },
+    "20223": {
+      "cities": []
+    },
+    "20224": {
+      "cities": []
+    },
+    "20225": {
+      "cities": []
+    },
+    "20226": {
+      "cities": []
+    },
+    "20227": {
+      "cities": []
+    },
+    "20228": {
+      "cities": []
+    },
+    "20229": {
+      "cities": []
+    },
+    "20230": {
+      "cities": []
+    },
+    "20231": {
+      "cities": []
+    },
+    "20232": {
+      "cities": []
+    },
+    "20233": {
+      "cities": []
+    },
+    "20234": {
+      "cities": []
+    },
+    "20235": {
+      "cities": []
+    },
+    "20236": {
+      "cities": []
+    },
+    "20237": {
+      "cities": []
+    },
+    "20238": {
+      "cities": []
+    },
+    "20239": {
+      "cities": []
+    },
+    "20240": {
+      "cities": []
+    },
+    "20241": {
+      "cities": []
+    },
+    "20242": {
+      "cities": []
+    },
+    "20243": {
+      "cities": []
+    },
+    "20244": {
+      "cities": []
+    },
+    "20245": {
+      "cities": []
+    },
+    "20246": {
+      "cities": []
+    },
+    "20247": {
+      "cities": []
+    },
+    "20248": {
+      "cities": []
+    },
+    "20249": {
+      "cities": []
+    },
+    "20250": {
+      "cities": []
+    },
+    "20251": {
+      "cities": []
+    },
+    "20252": {
+      "cities": []
+    },
+    "20253": {
+      "cities": []
+    },
+    "20254": {
+      "cities": []
+    },
+    "20255": {
+      "cities": []
+    },
+    "20256": {
+      "cities": []
+    },
+    "20257": {
+      "cities": []
+    },
+    "20258": {
+      "cities": []
+    },
+    "20259": {
+      "cities": []
+    },
+    "20260": {
+      "cities": []
+    },
+    "20261": {
+      "cities": []
+    },
+    "20262": {
+      "cities": []
+    },
+    "20263": {
+      "cities": []
+    },
+    "20264": {
+      "cities": []
+    },
+    "20265": {
+      "cities": []
+    },
+    "20266": {
+      "cities": []
+    },
+    "20267": {
+      "cities": []
+    },
+    "20268": {
+      "cities": []
+    },
+    "20269": {
+      "cities": []
+    },
+    "20270": {
+      "cities": []
+    },
+    "20271": {
+      "cities": []
+    },
+    "20272": {
+      "cities": []
+    },
+    "20273": {
+      "cities": []
+    },
+    "20274": {
+      "cities": []
+    },
+    "20275": {
+      "cities": []
+    },
+    "20276": {
+      "cities": []
+    },
+    "20277": {
+      "cities": []
+    },
+    "20278": {
+      "cities": []
+    },
+    "20279": {
+      "cities": []
+    },
+    "20280": {
+      "cities": []
+    },
+    "20281": {
+      "cities": []
+    },
+    "20282": {
+      "cities": []
+    },
+    "20283": {
+      "cities": []
+    },
+    "20284": {
+      "cities": []
+    },
+    "20285": {
+      "cities": []
+    },
+    "20286": {
+      "cities": []
+    },
+    "20287": {
+      "cities": []
+    },
+    "20288": {
+      "cities": []
+    },
+    "20289": {
+      "cities": []
+    },
+    "20290": {
+      "cities": []
+    },
+    "20291": {
+      "cities": []
+    },
+    "20292": {
+      "cities": []
+    },
+    "20293": {
+      "cities": []
+    },
+    "20294": {
+      "cities": []
+    },
+    "20295": {
+      "cities": []
+    },
+    "20296": {
+      "cities": []
+    },
+    "20297": {
+      "cities": []
+    },
+    "20298": {
+      "cities": []
+    },
+    "20299": {
+      "cities": []
+    },
+    "20300": {
+      "cities": []
+    },
+    "20301": {
+      "cities": []
+    },
+    "20302": {
+      "cities": []
+    },
+    "20303": {
+      "cities": []
+    },
+    "20304": {
+      "cities": []
+    },
+    "20305": {
+      "cities": []
+    },
+    "20306": {
+      "cities": []
+    },
+    "20307": {
+      "cities": []
+    },
+    "20308": {
+      "cities": []
+    },
+    "20309": {
+      "cities": []
+    },
+    "20310": {
+      "cities": []
+    },
+    "20311": {
+      "cities": []
+    },
+    "20312": {
+      "cities": []
+    },
+    "20313": {
+      "cities": []
+    },
+    "20314": {
+      "cities": []
+    },
+    "20315": {
+      "cities": []
+    },
+    "20316": {
+      "cities": []
+    },
+    "20317": {
+      "cities": []
+    },
+    "20318": {
+      "cities": []
+    },
+    "20319": {
+      "cities": []
+    },
+    "20320": {
+      "cities": []
+    },
+    "20321": {
+      "cities": []
+    },
+    "20322": {
+      "cities": []
+    },
+    "20323": {
+      "cities": []
+    },
+    "20324": {
+      "cities": []
+    },
+    "20325": {
+      "cities": []
+    },
+    "20326": {
+      "cities": []
+    },
+    "20327": {
+      "cities": []
+    },
+    "20328": {
+      "cities": []
+    },
+    "20329": {
+      "cities": []
+    },
+    "20330": {
+      "cities": []
+    },
+    "20331": {
+      "cities": []
+    },
+    "20332": {
+      "cities": []
+    },
+    "20333": {
+      "cities": []
+    },
+    "20334": {
+      "cities": []
+    },
+    "20335": {
+      "cities": []
+    },
+    "20336": {
+      "cities": []
+    },
+    "20337": {
+      "cities": []
+    },
+    "20338": {
+      "cities": []
+    },
+    "20339": {
+      "cities": []
+    },
+    "20340": {
+      "cities": []
+    },
+    "20341": {
+      "cities": []
+    },
+    "20342": {
+      "cities": []
+    },
+    "20343": {
+      "cities": []
+    },
+    "20344": {
+      "cities": []
+    },
+    "20345": {
+      "cities": []
+    },
+    "20346": {
+      "cities": []
+    },
+    "20347": {
+      "cities": []
+    },
+    "20348": {
+      "cities": []
+    },
+    "20349": {
+      "cities": []
+    },
+    "20350": {
+      "cities": []
+    },
+    "20351": {
+      "cities": []
+    },
+    "20352": {
+      "cities": []
+    },
+    "20353": {
+      "cities": []
+    },
+    "20354": {
+      "cities": []
+    },
+    "20355": {
+      "cities": []
+    },
+    "20356": {
+      "cities": []
+    },
+    "20357": {
+      "cities": []
+    },
+    "20358": {
+      "cities": []
+    },
+    "20359": {
+      "cities": []
+    },
+    "20360": {
+      "cities": []
+    },
+    "20361": {
+      "cities": []
+    },
+    "20362": {
+      "cities": []
+    },
+    "20363": {
+      "cities": []
+    },
+    "20364": {
+      "cities": []
+    },
+    "20365": {
+      "cities": []
+    },
+    "20366": {
+      "cities": []
+    },
+    "20367": {
+      "cities": []
+    },
+    "20368": {
+      "cities": []
+    },
+    "20369": {
+      "cities": []
+    },
+    "20370": {
+      "cities": []
+    },
+    "20371": {
+      "cities": []
+    },
+    "20372": {
+      "cities": []
+    },
+    "20373": {
+      "cities": []
+    },
+    "20374": {
+      "cities": []
+    },
+    "20375": {
+      "cities": []
+    },
+    "20376": {
+      "cities": []
+    },
+    "20377": {
+      "cities": []
+    },
+    "20378": {
+      "cities": []
+    },
+    "20379": {
+      "cities": []
+    },
+    "20380": {
+      "cities": []
+    },
+    "20381": {
+      "cities": []
+    },
+    "20382": {
+      "cities": []
+    },
+    "20383": {
+      "cities": []
+    },
+    "20384": {
+      "cities": []
+    },
+    "20385": {
+      "cities": []
+    },
+    "20386": {
+      "cities": []
+    },
+    "20387": {
+      "cities": []
+    },
+    "20388": {
+      "cities": []
+    },
+    "20389": {
+      "cities": []
+    },
+    "20390": {
+      "cities": []
+    },
+    "20391": {
+      "cities": []
+    },
+    "20392": {
+      "cities": []
+    },
+    "20393": {
+      "cities": []
+    },
+    "20394": {
+      "cities": []
+    },
+    "20395": {
+      "cities": []
+    },
+    "20396": {
+      "cities": []
+    },
+    "20397": {
+      "cities": []
+    },
+    "20398": {
+      "cities": []
+    },
+    "20399": {
+      "cities": []
+    },
+    "20400": {
+      "cities": []
+    },
+    "20401": {
+      "cities": []
+    },
+    "20402": {
+      "cities": []
+    },
+    "20403": {
+      "cities": []
+    },
+    "20404": {
+      "cities": []
+    },
+    "20405": {
+      "cities": []
+    },
+    "20406": {
+      "cities": []
+    },
+    "20407": {
+      "cities": []
+    },
+    "20408": {
+      "cities": []
+    },
+    "20409": {
+      "cities": []
+    },
+    "20410": {
+      "cities": []
+    },
+    "20411": {
+      "cities": []
+    },
+    "20412": {
+      "cities": []
+    },
+    "20413": {
+      "cities": []
+    },
+    "20414": {
+      "cities": []
+    },
+    "20415": {
+      "cities": []
+    },
+    "20416": {
+      "cities": []
+    },
+    "20417": {
+      "cities": []
+    },
+    "20418": {
+      "cities": []
+    },
+    "20419": {
+      "cities": []
+    },
+    "20420": {
+      "cities": []
+    },
+    "20421": {
+      "cities": []
+    },
+    "20422": {
+      "cities": []
+    },
+    "20423": {
+      "cities": []
+    },
+    "20424": {
+      "cities": []
+    },
+    "20425": {
+      "cities": []
+    },
+    "20426": {
+      "cities": []
+    },
+    "20427": {
+      "cities": []
+    },
+    "20428": {
+      "cities": []
+    },
+    "20429": {
+      "cities": []
+    },
+    "20430": {
+      "cities": []
+    },
+    "20431": {
+      "cities": []
+    },
+    "20432": {
+      "cities": []
+    },
+    "20433": {
+      "cities": []
+    },
+    "20434": {
+      "cities": []
+    },
+    "20435": {
+      "cities": []
+    },
+    "20436": {
+      "cities": []
+    },
+    "20437": {
+      "cities": []
+    },
+    "20438": {
+      "cities": []
+    },
+    "20439": {
+      "cities": []
+    },
+    "20440": {
+      "cities": []
+    },
+    "20441": {
+      "cities": []
+    },
+    "20442": {
+      "cities": []
+    },
+    "20443": {
+      "cities": []
+    },
+    "20444": {
+      "cities": []
+    },
+    "20445": {
+      "cities": []
+    },
+    "20446": {
+      "cities": []
+    },
+    "20447": {
+      "cities": []
+    },
+    "20448": {
+      "cities": []
+    },
+    "20449": {
+      "cities": []
+    },
+    "20450": {
+      "cities": []
+    },
+    "20451": {
+      "cities": []
+    },
+    "20452": {
+      "cities": []
+    },
+    "20453": {
+      "cities": []
+    },
+    "20454": {
+      "cities": []
+    },
+    "20455": {
+      "cities": []
+    },
+    "20456": {
+      "cities": []
+    },
+    "20457": {
+      "cities": []
+    },
+    "20458": {
+      "cities": []
+    },
+    "20459": {
+      "cities": []
+    },
+    "20460": {
+      "cities": []
+    },
+    "20461": {
+      "cities": []
+    },
+    "20462": {
+      "cities": []
+    },
+    "20463": {
+      "cities": []
+    },
+    "20464": {
+      "cities": []
+    },
+    "20465": {
+      "cities": []
+    },
+    "20466": {
+      "cities": []
+    },
+    "20467": {
+      "cities": []
+    },
+    "20468": {
+      "cities": []
+    },
+    "20469": {
+      "cities": []
+    },
+    "20470": {
+      "cities": []
+    },
+    "20471": {
+      "cities": []
+    },
+    "20472": {
+      "cities": []
+    },
+    "20473": {
+      "cities": []
+    },
+    "20474": {
+      "cities": []
+    },
+    "20475": {
+      "cities": []
+    },
+    "20476": {
+      "cities": []
+    },
+    "20477": {
+      "cities": []
+    },
+    "20478": {
+      "cities": []
+    },
+    "20479": {
+      "cities": []
+    },
+    "20480": {
+      "cities": []
+    },
+    "20481": {
+      "cities": []
+    },
+    "20482": {
+      "cities": []
+    },
+    "20483": {
+      "cities": []
+    },
+    "20484": {
+      "cities": []
+    },
+    "20485": {
+      "cities": []
+    },
+    "20486": {
+      "cities": []
+    },
+    "20487": {
+      "cities": []
+    },
+    "20488": {
+      "cities": []
+    },
+    "20489": {
+      "cities": []
+    },
+    "20490": {
+      "cities": []
+    },
+    "20491": {
+      "cities": []
+    },
+    "20492": {
+      "cities": []
+    },
+    "20493": {
+      "cities": []
+    },
+    "20494": {
+      "cities": []
+    },
+    "20495": {
+      "cities": []
+    },
+    "20496": {
+      "cities": []
+    },
+    "20497": {
+      "cities": []
+    },
+    "20498": {
+      "cities": []
+    },
+    "20499": {
+      "cities": []
+    },
+    "20500": {
+      "cities": []
+    },
+    "20501": {
+      "cities": []
+    },
+    "20502": {
+      "cities": []
+    },
+    "20503": {
+      "cities": []
+    },
+    "20504": {
+      "cities": []
+    },
+    "20505": {
+      "cities": []
+    },
+    "20506": {
+      "cities": []
+    },
+    "20507": {
+      "cities": []
+    },
+    "20508": {
+      "cities": []
+    },
+    "20509": {
+      "cities": []
+    },
+    "20510": {
+      "cities": []
+    },
+    "20511": {
+      "cities": []
+    },
+    "20512": {
+      "cities": []
+    },
+    "20513": {
+      "cities": []
+    },
+    "20514": {
+      "cities": []
+    },
+    "20515": {
+      "cities": []
+    },
+    "20516": {
+      "cities": []
+    },
+    "20517": {
+      "cities": []
+    },
+    "20518": {
+      "cities": []
+    },
+    "20519": {
+      "cities": []
+    },
+    "20520": {
+      "cities": []
+    },
+    "20521": {
+      "cities": []
+    },
+    "20522": {
+      "cities": []
+    },
+    "20523": {
+      "cities": []
+    },
+    "20524": {
+      "cities": []
+    },
+    "20525": {
+      "cities": []
+    },
+    "20526": {
+      "cities": []
+    },
+    "20527": {
+      "cities": []
+    },
+    "20528": {
+      "cities": []
+    },
+    "20529": {
+      "cities": []
+    },
+    "20530": {
+      "cities": []
+    },
+    "20531": {
+      "cities": []
+    },
+    "20532": {
+      "cities": []
+    },
+    "20533": {
+      "cities": []
+    },
+    "20534": {
+      "cities": []
+    },
+    "20535": {
+      "cities": []
+    },
+    "20536": {
+      "cities": []
+    },
+    "20537": {
+      "cities": []
+    },
+    "20538": {
+      "cities": []
+    },
+    "20539": {
+      "cities": []
+    },
+    "20540": {
+      "cities": []
+    },
+    "20541": {
+      "cities": []
+    },
+    "20542": {
+      "cities": []
+    },
+    "20543": {
+      "cities": []
+    },
+    "20544": {
+      "cities": []
+    },
+    "20545": {
+      "cities": []
+    },
+    "20546": {
+      "cities": []
+    },
+    "20547": {
+      "cities": []
+    },
+    "20548": {
+      "cities": []
+    },
+    "20549": {
+      "cities": []
+    },
+    "20550": {
+      "cities": []
+    },
+    "20551": {
+      "cities": []
+    },
+    "20552": {
+      "cities": []
+    },
+    "20553": {
+      "cities": []
+    },
+    "20554": {
+      "cities": []
+    },
+    "20555": {
+      "cities": []
+    },
+    "20556": {
+      "cities": []
+    },
+    "20557": {
+      "cities": []
+    },
+    "20558": {
+      "cities": []
+    },
+    "20559": {
+      "cities": []
+    },
+    "20560": {
+      "cities": []
+    },
+    "20561": {
+      "cities": []
+    },
+    "20562": {
+      "cities": []
+    },
+    "20563": {
+      "cities": []
+    },
+    "20564": {
+      "cities": []
+    },
+    "20565": {
+      "cities": []
+    },
+    "20566": {
+      "cities": []
+    },
+    "20567": {
+      "cities": []
+    },
+    "20568": {
+      "cities": []
+    },
+    "20569": {
+      "cities": []
+    },
+    "20570": {
+      "cities": []
+    },
+    "20571": {
+      "cities": []
+    },
+    "20572": {
+      "cities": []
+    },
+    "20573": {
+      "cities": []
+    },
+    "20574": {
+      "cities": []
+    },
+    "20575": {
+      "cities": []
+    },
+    "20576": {
+      "cities": []
+    },
+    "20577": {
+      "cities": []
+    },
+    "20578": {
+      "cities": []
+    },
+    "20579": {
+      "cities": []
+    },
+    "20580": {
+      "cities": []
+    },
+    "20581": {
+      "cities": []
+    },
+    "20582": {
+      "cities": []
+    },
+    "20583": {
+      "cities": []
+    },
+    "20584": {
+      "cities": []
+    },
+    "20585": {
+      "cities": []
+    },
+    "20586": {
+      "cities": []
+    },
+    "20587": {
+      "cities": []
+    },
+    "20588": {
+      "cities": []
+    },
+    "20589": {
+      "cities": []
+    },
+    "20590": {
+      "cities": []
+    },
+    "20591": {
+      "cities": []
+    },
+    "20592": {
+      "cities": []
+    },
+    "20593": {
+      "cities": []
+    },
+    "20594": {
+      "cities": []
+    },
+    "20595": {
+      "cities": []
+    },
+    "20596": {
+      "cities": []
+    },
+    "20597": {
+      "cities": []
+    },
+    "20598": {
+      "cities": []
+    },
+    "20599": {
+      "cities": []
+    },
+    "20600": {
+      "cities": []
+    },
+    "20601": {
+      "cities": []
+    },
+    "20602": {
+      "cities": []
+    },
+    "20603": {
+      "cities": []
+    },
+    "20604": {
+      "cities": []
+    },
+    "20605": {
+      "cities": []
+    },
+    "20606": {
+      "cities": []
+    },
+    "20607": {
+      "cities": []
+    },
+    "20608": {
+      "cities": []
+    },
+    "20609": {
+      "cities": []
+    },
+    "20610": {
+      "cities": []
+    },
+    "20611": {
+      "cities": []
+    },
+    "20612": {
+      "cities": []
+    },
+    "20613": {
+      "cities": []
+    },
+    "20614": {
+      "cities": []
+    },
+    "20615": {
+      "cities": []
+    },
+    "20616": {
+      "cities": []
+    },
+    "20617": {
+      "cities": []
+    },
+    "20618": {
+      "cities": []
+    },
+    "20619": {
+      "cities": []
+    },
+    "20620": {
+      "cities": []
+    },
+    "20621": {
+      "cities": []
+    },
+    "20622": {
+      "cities": []
+    },
+    "20623": {
+      "cities": []
+    },
+    "20624": {
+      "cities": []
+    },
+    "20625": {
+      "cities": []
+    },
+    "20626": {
+      "cities": []
+    },
+    "20627": {
+      "cities": []
+    },
+    "20628": {
+      "cities": []
+    },
+    "20629": {
+      "cities": []
+    },
+    "20630": {
+      "cities": []
+    },
+    "20631": {
+      "cities": []
+    },
+    "20632": {
+      "cities": []
+    },
+    "20633": {
+      "cities": []
+    },
+    "20634": {
+      "cities": []
+    },
+    "20635": {
+      "cities": []
+    },
+    "20636": {
+      "cities": []
+    },
+    "20637": {
+      "cities": []
+    },
+    "20638": {
+      "cities": []
+    },
+    "20639": {
+      "cities": []
+    },
+    "20640": {
+      "cities": []
+    },
+    "20641": {
+      "cities": []
+    },
+    "20642": {
+      "cities": []
+    },
+    "20643": {
+      "cities": []
+    },
+    "20644": {
+      "cities": []
+    },
+    "20645": {
+      "cities": []
+    },
+    "20646": {
+      "cities": []
+    },
+    "20647": {
+      "cities": []
+    },
+    "20648": {
+      "cities": []
+    },
+    "20649": {
+      "cities": []
+    },
+    "20650": {
+      "cities": []
+    },
+    "20651": {
+      "cities": []
+    },
+    "20652": {
+      "cities": []
+    },
+    "20653": {
+      "cities": []
+    },
+    "20654": {
+      "cities": []
+    },
+    "20655": {
+      "cities": []
+    },
+    "20656": {
+      "cities": []
+    },
+    "20657": {
+      "cities": []
+    },
+    "20658": {
+      "cities": []
+    },
+    "20659": {
+      "cities": []
+    },
+    "20660": {
+      "cities": []
+    },
+    "20661": {
+      "cities": []
+    },
+    "20662": {
+      "cities": []
+    },
+    "20663": {
+      "cities": []
+    },
+    "20664": {
+      "cities": []
+    },
+    "20665": {
+      "cities": []
+    },
+    "20666": {
+      "cities": []
+    },
+    "20667": {
+      "cities": []
+    },
+    "20668": {
+      "cities": []
+    },
+    "20669": {
+      "cities": []
+    },
+    "20670": {
+      "cities": []
+    },
+    "20671": {
+      "cities": []
+    },
+    "20672": {
+      "cities": []
+    }
+  }
+}

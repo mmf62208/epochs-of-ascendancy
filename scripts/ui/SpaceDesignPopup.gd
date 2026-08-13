@@ -119,11 +119,29 @@ func _update_stats() -> void:
 		return
 	var stats_text := "Base: %s\n" % _selected_base.capitalize()
 	stats_text += "Modules: %d selected\n" % _selected_modules.size()
-	# Simulate stats (in full, use DesignManager or SpaceDesignSystem to compute)
-	var power := 50 + _selected_modules.size() * 10
-	var mass := 100 - _selected_modules.size() * 5
-	var cost := 200 + _selected_modules.size() * 30
-	stats_text += "Est. Power: %d  Mass: %d  Cost: %d\n" % [power, mass, cost]
+	## Pack J — live DesignManager.compute_design_stats (no simulated-only path)
+	var power := 50.0
+	var mass := 100.0
+	var cost := 200.0
+	var rel := 0.75
+	var dm = get_node_or_null("/root/DesignManager")
+	if dm != null and dm.has_method("compute_design_stats"):
+		var design_data := {
+			"domain": "space",
+			"base_type": _selected_base,
+			"modules": _selected_modules.keys(),
+		}
+		var st: Dictionary = dm.compute_design_stats(design_data)
+		power = float(st.get("power", power))
+		mass = float(st.get("mass", mass))
+		cost = float(st.get("cost", cost))
+		rel = float(st.get("reliability", rel))
+		stats_text += str(st.get("summary", "")) + "\n"
+	else:
+		power = 50.0 + float(_selected_modules.size()) * 10.0
+		mass = 100.0 - float(_selected_modules.size()) * 5.0
+		cost = 200.0 + float(_selected_modules.size()) * 30.0
+	stats_text += "Power: %.0f  Mass: %.0f  Cost: %.0f  Rel: %.0f%%\n" % [power, mass, cost, rel * 100.0]
 	stats_text += "\nTip: Select modules fitting your base. Propulsion for ships, sensors for sats."
 	_stats_label.text = stats_text
 

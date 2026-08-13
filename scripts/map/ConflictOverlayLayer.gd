@@ -5,6 +5,8 @@
 class_name ConflictOverlayLayer
 extends Node2D
 
+const ProvincePolygonUtil = preload("res://scripts/map/ProvincePolygonUtil.gd")
+
 @export var stripe_color: Color = Color(1.0, 0.38, 0.38, 0.32)
 @export var stripe_width: float = 3.0
 @export var stripe_spacing: float = 10.0
@@ -160,8 +162,16 @@ func _draw_contested_province(entry: Dictionary) -> void:
 	var offset := _province_node_offset(pid)
 	var world_pts := _offset_points(points, offset)
 	if draw_fill_tint:
-		draw_colored_polygon(world_pts, fill)
-	_draw_polygon_hatch(world_pts, stripe, width)
+		var c: Vector2 = _centroids.get(pid, Vector2.ZERO)
+		ProvincePolygonUtil.draw_fill(self, world_pts, fill, c, 16.0)
+	# Hatch only on drawable outlines (invalid polys skip hatch — no engine spam).
+	var drawable := ProvincePolygonUtil.make_drawable(world_pts)
+	if drawable.size() >= 3:
+		_draw_polygon_hatch(drawable, stripe, width)
+	else:
+		var c2: Vector2 = _centroids.get(pid, Vector2.ZERO)
+		if c2 != Vector2.ZERO:
+			_draw_centroid_hatch(c2, stripe, width)
 
 
 func _province_node_offset(pid: int) -> Vector2:
@@ -179,10 +189,12 @@ func _polygon_points_for(pid: int) -> PackedVector2Array:
 		if node != null:
 			for child in node.get_children():
 				if child is Polygon2D:
-					return (child as Polygon2D).polygon
+					return ProvincePolygonUtil.make_drawable((child as Polygon2D).polygon)
 	if _geometry.has(pid):
 		var geo: Dictionary = _geometry[pid]
-		return geo.get("points", PackedVector2Array()) as PackedVector2Array
+		return ProvincePolygonUtil.make_drawable(
+			ProvincePolygonUtil.from_variant_points(geo.get("points", []))
+		)
 	return PackedVector2Array()
 
 

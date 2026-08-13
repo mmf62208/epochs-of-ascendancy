@@ -5,7 +5,7 @@
 [node name="DiplomacyView" type="Window"]
 title = "Diplomacy"
 initial_position = 1
-size = Vector2i(1000, 620)
+size = Vector2i(1040, 720)
 visible = false
 script = ExtResource("1_diplo")
 

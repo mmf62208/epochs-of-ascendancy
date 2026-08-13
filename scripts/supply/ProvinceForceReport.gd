@@ -76,6 +76,23 @@ func air_dominance_level(tag: String) -> String:
 		return "none"
 
 
+func total_naval(tag: String) -> float:
+	return float(naval_by_tag.get(tag, 0.0))
+
+
+## Aggregate naval strength across all tags (sea-zone presence gate for recon/fuel).
+func get_navy_total() -> float:
+	var total := 0.0
+	for t in naval_by_tag.keys():
+		total += float(naval_by_tag[t])
+	return total
+
+
+## Alias used by SupplyManager naval recon/fuel loops (read-only view of naval_by_tag).
+func get_naval_strength() -> Dictionary:
+	return naval_by_tag
+
+
 func total_naval_at_port(tag: String) -> float:
 	return float(naval_at_port_by_tag.get(tag, 0.0))
 

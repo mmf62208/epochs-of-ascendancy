@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "model": "strategic_compact_ledger",
+  "weights": {
+    "factories": 12.0,
+    "steel_stock_scale": 0.02,
+    "fuel_stock_scale": 0.015,
+    "electronics_stock_scale": 0.04,
+    "equipment_units_scale": 0.08,
+    "tech_flags_scale": 8.0,
+    "naval_basing_scale": 15.0,
+    "trade_capacity_scale": 0.5,
+    "space_power_scale": 1.0,
+    "space_bombardment_threat_scale": 0.35
+  },
+  "space_threat": {
+    "undefended_surface_mult": 2.0,
+    "notes": "Space fleets with bombardment vs no orbital defenses raise effective threat like nuclear asymmetry soft cousin"
+  },
+  "nuclear": {
+    "has_fissiles_stock_bonus": 80.0,
+    "has_nuclear_fuel_flag_bonus": 120.0,
+    "has_warhead_program_flag_bonus": 200.0,
+    "has_nuclear_propulsion_flag_bonus": 40.0,
+    "danger_multiplier_min": 1.0,
+    "danger_multiplier_with_arsenal": 3.5,
+    "danger_multiplier_full_triad": 5.0,
+    "notes": "Nuclear nations are a different danger class — smaller AI placates harder"
+  },
+  "matchup": {
+    "hopeless_ratio": 0.22,
+    "outmatched_ratio": 0.45,
+    "contested_ratio": 0.75,
+    "peer_ratio": 1.15,
+    "dominant_ratio": 1.0
+  },
+  "ai_placate": {
+    "nuclear_vs_non_accept_floor_bonus": -0.12,
+    "hopeless_accept_floor_bonus": -0.18,
+    "outmatched_accept_floor_bonus": -0.08,
+    "placate_crs_nudge": 8,
+    "refuse_arms_to_nuclear_rival_unless_ally": true
+  },
+  "relationship_discounts": {
+    "cordial": {"trade_suu_mult": 0.97, "tech_share_suu_mult": 0.95},
+    "partner": {"trade_suu_mult": 0.9, "tech_share_suu_mult": 0.82, "design_license_mult": 0.88},
+    "ally_ready": {"trade_suu_mult": 0.82, "tech_share_suu_mult": 0.7, "design_license_mult": 0.75, "basing_suu_mult": 0.85},
+    "mfn_extra_trade_mult": 0.95,
+    "long_term_years_for_extra": 5,
+    "long_term_extra_mult": 0.93
+  },
+  "spy_intel": {
+    "base_clarity": 0.35,
+    "mission_bonus": 0.4,
+    "network_bonus": 0.15,
+    "reveal_third_party_trade_at": 0.55,
+    "reveal_flags_at": 0.4,
+    "reveal_vectors_at": 0.5,
+    "reveal_power_at": 0.45
+  }
+}

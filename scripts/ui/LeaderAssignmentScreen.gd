@@ -88,6 +88,15 @@ func _apply_content_margins() -> void:
 	margin.add_theme_constant_override("margin_right", 20)
 	margin.add_theme_constant_override("margin_top", 12)
 	margin.add_theme_constant_override("margin_bottom", 12)
+	# Nudge Chief of Army/Navy/Air/Space + Officer Training block up ~1px.
+	var root_vbox := get_node_or_null("MarginContainer/VBoxContainer") as VBoxContainer
+	if root_vbox != null:
+		root_vbox.add_theme_constant_override("separation", 9)
+	var nat_section := get_node_or_null(
+		"MarginContainer/VBoxContainer/NationalPositionsSection"
+	) as VBoxContainer
+	if nat_section != null:
+		nat_section.add_theme_constant_override("separation", 7)
 
 
 func _on_close_pressed() -> void:
@@ -110,8 +119,36 @@ func _apply_screen_theme() -> void:
 	RetrowaveTheme.style_title(
 		$MarginContainer/VBoxContainer/MainArea/ListsColumn/FormationsWithoutLeader/FormationsTitle,
 	)
-	RetrowaveTheme.style_detail_panel(detail_panel)
+	# Flat detail chrome; expand content margins ~2px so text fits cleanly inside the blue outline.
+	RetrowaveTheme.style_detail_panel_flat(detail_panel)
+	if detail_panel != null:
+		detail_panel.custom_minimum_size = Vector2(320, 0)
+		detail_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var flat := StyleBoxFlat.new()
+		flat.bg_color = RetrowaveTheme.BG_PANEL
+		var border := RetrowaveTheme.CYAN
+		border.a = 0.55
+		flat.border_color = border
+		flat.set_border_width_all(1)
+		flat.set_corner_radius_all(4)
+		flat.content_margin_left = 12
+		flat.content_margin_right = 12
+		flat.content_margin_top = 12
+		flat.content_margin_bottom = 12
+		detail_panel.add_theme_stylebox_override("panel", flat)
+	var detail_margin := get_node_or_null(
+		"MarginContainer/VBoxContainer/MainArea/DetailPanel/DetailMargin"
+	) as MarginContainer
+	if detail_margin != null:
+		detail_margin.add_theme_constant_override("margin_left", 12)
+		detail_margin.add_theme_constant_override("margin_right", 12)
+		detail_margin.add_theme_constant_override("margin_top", 12)
+		detail_margin.add_theme_constant_override("margin_bottom", 12)
 	RetrowaveTheme.style_detail_label(detail_label)
+	if detail_label != null:
+		detail_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		detail_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 
 func _setup_detail_panel() -> void:
@@ -333,7 +370,7 @@ func _create_officer_training_card() -> Control:
 
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(185, 155)  # Increased height to fit debuff info
-	RetrowaveTheme.style_detail_panel(panel)
+	RetrowaveTheme.style_detail_panel_flat(panel)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 4)
@@ -441,7 +478,7 @@ func _create_national_position_card(
 ) -> PanelContainer:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(180, 96)
-	RetrowaveTheme.style_detail_panel(panel)
+	RetrowaveTheme.style_detail_panel_flat(panel)
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 6)
@@ -553,9 +590,22 @@ func _populate_unassigned_formations() -> void:
 		formations_content.add_child(note)
 		return
 
+	const _UnitIcons = preload("res://scripts/ui/UnitIconLibrary.gd")
 	for formation in available_formations:
 		var row := HBoxContainer.new()
 		row.custom_minimum_size = Vector2(0, ROW_HEIGHT)
+		row.add_theme_constant_override("separation", 6)
+
+		var icon_tr := TextureRect.new()
+		icon_tr.custom_minimum_size = Vector2(28, 28)
+		icon_tr.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_tr.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon_tr.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		var utex: Texture2D = _UnitIcons.icon_for_formation_dict(formation as Dictionary, 32)
+		if utex != null:
+			icon_tr.texture = utex
+		icon_tr.visible = icon_tr.texture != null
+		row.add_child(icon_tr)
 
 		var name_label := Label.new()
 		name_label.text = str(formation.get("name", formation.get("formation_id", "")))

@@ -1,0 +1,513 @@
+{
+  "name": "Global Density Pilot (~4.6k land \u2192 6k band)",
+  "start_date": "1936-01-01",
+  "description": "Procedural densify of world_full land (2\u00d7 split, IDs 900000+). Toward ~6k density bar. Not NUTS GIS.",
+  "use_province_data_dir": "provinces_pilot_global_density",
+  "pilot_banner": true,
+  "geometry_quality": "procedural_interim",
+  "countries": [
+    {
+      "tag": "GER",
+      "name": "Germany",
+      "color": "#8B0000",
+      "capital_province_id": 900002,
+      "major_power": true,
+      "naval_power": true,
+      "industrial_weight": 2,
+      "key_provinces": [
+        900002
+      ],
+      "ideology": "fascism",
+      "current_tech_level": 9,
+      "focus_tree_path": "res://data/focus_trees/germany_1936.json",
+      "stability": 65.0,
+      "war_support": 75.0,
+      "population": 65000000,
+      "initial_factories": 85,
+      "starting_oob": {
+        "land_designs": [
+          "panzer_iii_j_medium",
+          "tiger_i_heavy_tank"
+        ],
+        "air_designs": [
+          "bf109g_fighter"
+        ],
+        "naval_designs": [
+          "type_viic_uboat",
+          "bismarck_battleship"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "panzer_iii_j_medium": 1200,
+        "tiger_i_heavy_tank": 150,
+        "bf109g_fighter": 2500,
+        "type_viic_uboat": 45,
+        "bismarck_battleship": 4
+      },
+      "starting_agents": 6
+    },
+    {
+      "tag": "FRA",
+      "name": "France",
+      "color": "#0000CD",
+      "capital_province_id": 900000,
+      "major_power": true,
+      "naval_power": true,
+      "industrial_weight": 2,
+      "key_provinces": [
+        900000
+      ],
+      "ideology": "democracy",
+      "current_tech_level": 9,
+      "focus_tree_path": "res://data/focus_trees/france_1936.json",
+      "stability": 70.0,
+      "war_support": 45.0,
+      "population": 40000000,
+      "initial_factories": 55,
+      "starting_oob": {
+        "land_designs": [
+          "somua_s35_medium"
+        ],
+        "air_designs": [
+          "spitfire_mk9_fighter"
+        ],
+        "naval_designs": [
+          "fletcher_class_destroyer"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "somua_s35_medium": 800,
+        "spitfire_mk9_fighter": 1200,
+        "fletcher_class_destroyer": 25
+      },
+      "starting_agents": 6
+    },
+    {
+      "tag": "ENG",
+      "name": "United Kingdom",
+      "color": "#FF0000",
+      "capital_province_id": 900008,
+      "major_power": true,
+      "naval_power": true,
+      "industrial_weight": 2,
+      "key_provinces": [
+        900008
+      ],
+      "ideology": "democracy",
+      "current_tech_level": 10,
+      "focus_tree_path": "res://data/focus_trees/uk_1936.json",
+      "stability": 80.0,
+      "war_support": 50.0,
+      "population": 45000000,
+      "initial_factories": 72,
+      "starting_oob": {
+        "land_designs": [
+          "m4_sherman_medium_tank"
+        ],
+        "air_designs": [
+          "spitfire_mk9_fighter"
+        ],
+        "naval_designs": [
+          "king_george_v_class_bb",
+          "fletcher_class_destroyer"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "m4_sherman_medium_tank": 1500,
+        "spitfire_mk9_fighter": 1800,
+        "king_george_v_class_bb": 8,
+        "fletcher_class_destroyer": 60
+      },
+      "starting_agents": 6
+    },
+    {
+      "tag": "USA",
+      "name": "United States of America",
+      "color": "#00BFFF",
+      "capital_province_id": 901074,
+      "major_power": true,
+      "naval_power": true,
+      "industrial_weight": 2,
+      "key_provinces": [
+        901074
+      ],
+      "ideology": "democracy",
+      "current_tech_level": 10,
+      "focus_tree_path": "res://data/focus_trees/usa_1936.json",
+      "stability": 85.0,
+      "war_support": 30.0,
+      "population": 120000000,
+      "initial_factories": 140,
+      "starting_oob": {
+        "land_designs": [
+          "m4_sherman_medium_tank",
+          "m4a3e8_sherman_medium"
+        ],
+        "air_designs": [
+          "p51d_mustang",
+          "b17g_fortress"
+        ],
+        "naval_designs": [
+          "fletcher_class_destroyer"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "m4_sherman_medium_tank": 2500,
+        "m4a3e8_sherman_medium": 800,
+        "p51d_mustang": 3000,
+        "b17g_fortress": 1200,
+        "fletcher_class_destroyer": 80
+      },
+      "starting_agents": 6
+    },
+    {
+      "tag": "SOV",
+      "name": "Soviet Union",
+      "color": "#8B0000",
+      "capital_province_id": 900012,
+      "major_power": true,
+      "naval_power": false,
+      "industrial_weight": 2,
+      "key_provinces": [
+        900012
+      ],
+      "ideology": "communism",
+      "current_tech_level": 8,
+      "focus_tree_path": "res://data/focus_trees/soviet_1936.json",
+      "stability": 60.0,
+      "war_support": 70.0,
+      "population": 160000000,
+      "initial_factories": 120,
+      "starting_oob": {
+        "land_designs": [
+          "t34_medium_tank",
+          "sov_armor_1936"
+        ],
+        "air_designs": [
+          "sov_fighter_1936"
+        ],
+        "naval_designs": [
+          "kirov_class_1936",
+          "sov_frigate_1936"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "t34_medium_tank": 3500,
+        "sov_armor_1936": 1200,
+        "sov_fighter_1936": 2800,
+        "kirov_class_1936": 15,
+        "sov_frigate_1936": 40
+      },
+      "starting_agents": 6
+    },
+    {
+      "tag": "ITA",
+      "name": "Italy",
+      "color": "#008000",
+      "capital_province_id": 900016,
+      "major_power": true,
+      "naval_power": true,
+      "industrial_weight": 2,
+      "key_provinces": [
+        900016
+      ],
+      "ideology": "fascism",
+      "current_tech_level": 8,
+      "focus_tree_path": "res://data/focus_trees/italy_1936.json",
+      "stability": 68.0,
+      "war_support": 65.0,
+      "population": 42000000,
+      "initial_factories": 45,
+      "starting_oob": {
+        "land_designs": [
+          "cv33_tankette",
+          "ita_armor_1936"
+        ],
+        "air_designs": [
+          "ita_fighter_1936"
+        ],
+        "naval_designs": [
+          "ita_frigate_1936"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "cv33_tankette": 600,
+        "ita_armor_1936": 400,
+        "ita_fighter_1936": 900,
+        "ita_frigate_1936": 30
+      },
+      "starting_agents": 6
+    },
+    {
+      "tag": "JAP",
+      "name": "Japan",
+      "color": "#FF4500",
+      "capital_province_id": 901018,
+      "major_power": true,
+      "naval_power": true,
+      "industrial_weight": 2,
+      "key_provinces": [
+        901018
+      ],
+      "ideology": "monarchy",
+      "current_tech_level": 9,
+      "focus_tree_path": "res://data/focus_trees/japan_1936.json",
+      "stability": 75.0,
+      "war_support": 80.0,
+      "population": 70000000,
+      "initial_factories": 80,
+      "starting_oob": {
+        "land_designs": [
+          "jap_armor_1936"
+        ],
+        "air_designs": [
+          "a6m_zero_fighter"
+        ],
+        "naval_designs": [
+          "akagi_carrier_1936",
+          "yamato_battleship"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "jap_armor_1936": 900,
+        "a6m_zero_fighter": 1500,
+        "akagi_carrier_1936": 6,
+        "yamato_battleship": 3
+      },
+      "starting_agents": 6
+    },
+    {
+      "tag": "POL",
+      "name": "Poland",
+      "color": "#DC143C",
+      "capital_province_id": 900018,
+      "ideology": "democracy",
+      "current_tech_level": 7,
+      "focus_tree_path": "res://data/focus_trees/poland_1936.json",
+      "stability": 55.0,
+      "war_support": 60.0,
+      "population": 35000000,
+      "initial_factories": 25,
+      "starting_oob": {
+        "land_designs": [
+          "pol_armor_1936",
+          "m3_stuart_light_tank"
+        ],
+        "air_designs": [
+          "pol_fighter_1936"
+        ],
+        "naval_designs": [
+          "pol_frigate_1936"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "pol_armor_1936": 250,
+        "m3_stuart_light_tank": 150,
+        "pol_fighter_1936": 400,
+        "pol_frigate_1936": 8
+      },
+      "starting_agents": 2,
+      "key_provinces": [
+        900018
+      ]
+    },
+    {
+      "tag": "FIN",
+      "name": "Finland",
+      "color": "#003580",
+      "capital_province_id": 900356,
+      "ideology": "democracy",
+      "current_tech_level": 7,
+      "focus_tree_path": "res://data/focus_trees/finland_1936.json",
+      "stability": 65.0,
+      "war_support": 35.0,
+      "population": 3500000,
+      "initial_factories": 8,
+      "starting_oob": {
+        "land_designs": [
+          "m3_stuart_light_tank"
+        ],
+        "air_designs": [
+          "bf109_fighter"
+        ],
+        "naval_designs": [
+          "v_class_destroyer"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "m3_stuart_light_tank": 80,
+        "bf109_fighter": 120,
+        "v_class_destroyer": 3
+      },
+      "starting_agents": 2,
+      "key_provinces": [
+        900356
+      ]
+    },
+    {
+      "tag": "NOR",
+      "name": "Norway",
+      "color": "#EF2B2D",
+      "capital_province_id": 900128,
+      "ideology": "democracy",
+      "current_tech_level": 8,
+      "focus_tree_path": "res://data/focus_trees/norway_1936.json",
+      "stability": 70.0,
+      "war_support": 30.0,
+      "population": 3000000,
+      "initial_factories": 6,
+      "starting_oob": {
+        "land_designs": [
+          "m3_stuart_light_tank"
+        ],
+        "air_designs": [
+          "spitfire_fighter"
+        ],
+        "naval_designs": [
+          "v_class_destroyer"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "m3_stuart_light_tank": 60,
+        "spitfire_fighter": 90,
+        "v_class_destroyer": 4
+      },
+      "starting_agents": 2,
+      "key_provinces": [
+        900128
+      ]
+    },
+    {
+      "tag": "SWE",
+      "name": "Sweden",
+      "color": "#006AA7",
+      "capital_province_id": 900188,
+      "ideology": "democracy",
+      "current_tech_level": 8,
+      "focus_tree_path": "res://data/focus_trees/sweden_1936.json",
+      "stability": 75.0,
+      "war_support": 25.0,
+      "population": 6000000,
+      "initial_factories": 12,
+      "starting_oob": {
+        "land_designs": [
+          "panzer_iii_j_medium"
+        ],
+        "air_designs": [
+          "bf109_fighter"
+        ],
+        "naval_designs": [
+          "fletcher_class_destroyer"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "panzer_iii_j_medium": 120,
+        "bf109_fighter": 180,
+        "fletcher_class_destroyer": 5
+      },
+      "starting_agents": 2,
+      "key_provinces": [
+        900188
+      ]
+    },
+    {
+      "tag": "DNK",
+      "name": "Denmark",
+      "color": "#C8102E",
+      "capital_province_id": 900136,
+      "ideology": "democracy",
+      "current_tech_level": 8,
+      "focus_tree_path": "res://data/focus_trees/denmark_1936.json",
+      "stability": 72.0,
+      "war_support": 30.0,
+      "population": 3500000,
+      "initial_factories": 7,
+      "starting_oob": {
+        "land_designs": [
+          "cv33_tankette"
+        ],
+        "air_designs": [
+          "ita_fighter_1936"
+        ],
+        "naval_designs": [
+          "v_class_destroyer"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "cv33_tankette": 70,
+        "ita_fighter_1936": 100,
+        "v_class_destroyer": 3
+      },
+      "starting_agents": 2,
+      "key_provinces": [
+        900136
+      ]
+    },
+    {
+      "tag": "NLD",
+      "name": "Netherlands",
+      "color": "#FF0000",
+      "capital_province_id": 900588,
+      "ideology": "democracy",
+      "current_tech_level": 8,
+      "focus_tree_path": "res://data/focus_trees/netherlands_1936.json",
+      "stability": 68.0,
+      "war_support": 35.0,
+      "population": 8000000,
+      "initial_factories": 15,
+      "starting_oob": {
+        "land_designs": [
+          "somua_s35_medium"
+        ],
+        "air_designs": [
+          "spitfire_mk9_fighter"
+        ],
+        "naval_designs": [
+          "fletcher_class_destroyer"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "somua_s35_medium": 180,
+        "spitfire_mk9_fighter": 250,
+        "fletcher_class_destroyer": 7
+      },
+      "starting_agents": 2,
+      "key_provinces": [
+        900588
+      ]
+    },
+    {
+      "tag": "BEL",
+      "name": "Belgium",
+      "color": "#FFD700",
+      "capital_province_id": 900590,
+      "ideology": "democracy",
+      "current_tech_level": 8,
+      "focus_tree_path": "res://data/focus_trees/belgium_1936.json",
+      "stability": 70.0,
+      "war_support": 30.0,
+      "population": 8000000,
+      "initial_factories": 10,
+      "starting_oob": {
+        "land_designs": [
+          "m3_stuart_light_tank"
+        ],
+        "air_designs": [
+          "spitfire_fighter"
+        ],
+        "naval_designs": [
+          "v_class_destroyer"
+        ]
+      },
+      "starting_equipment_stockpile": {
+        "m3_stuart_light_tank": 140,
+        "spitfire_fighter": 200,
+        "v_class_destroyer": 5
+      },
+      "starting_agents": 2,
+      "key_provinces": [
+        900590
+      ]
+    }
+  ]
+}

@@ -16,6 +16,209 @@ func _ready() -> void:
 	add_child(_resolver)
 
 
+## Multi-phase combat estimate pilot (approach/engage/disengage) — pure via MapPolishFormatters.
+func estimate_multi_phase_combat(
+	attacker_power: float,
+	defender_power: float,
+	attacker_supply: float = 1.0,
+	weather_mult: float = 1.0,
+) -> Dictionary:
+	if typeof(MapPolishFormatters) != TYPE_NIL:
+		return MapPolishFormatters.estimate_multi_phase_combat(
+			attacker_power, defender_power, attacker_supply, weather_mult
+		)
+	return {
+		"phases": [],
+		"overall_attacker_win_chance": 0.5,
+		"summary": "multi-phase unavailable",
+		"empty": true,
+	}
+
+
+## Phase ribbon UI labels for multi-phase estimate pilot.
+func format_combat_phase_ribbon(
+	attacker_power: float = 100.0,
+	defender_power: float = 80.0,
+) -> Dictionary:
+	var est := estimate_multi_phase_combat(attacker_power, defender_power)
+	if typeof(MapPolishFormatters) != TYPE_NIL:
+		return MapPolishFormatters.format_phase_ribbon(est)
+	return {"ribbon_plain": str(est.get("summary", "")), "empty": bool(est.get("empty", true))}
+
+
+
+## Assault estimate card pilot (power + phase ribbon + recommendation).
+func build_assault_estimate_card(
+	attacker_power: float,
+	defender_power: float,
+	attacker_supply: float = 1.0,
+	weather_mult: float = 1.0,
+	province_name: String = "",
+) -> Dictionary:
+	var est := estimate_multi_phase_combat(attacker_power, defender_power, attacker_supply, weather_mult)
+	var ribbon := format_combat_phase_ribbon(attacker_power, defender_power)
+	var overall := float(est.get("overall_attacker_win_chance", 0.0))
+	var rec := "Marginal — wait for supply/reinforce"
+	if overall >= 0.65:
+		rec = "Favorable — press assault"
+	elif overall < 0.45:
+		rec = "Unfavorable — avoid or soften first"
+	var plain := ""
+	if typeof(MapPolishFormatters) != TYPE_NIL:
+		plain = MapPolishFormatters.format_assault_estimate_card_plain(
+			attacker_power, defender_power, overall, str(ribbon.get("ribbon_plain", "")), rec, province_name
+		)
+	return {
+		"overall": overall,
+		"recommendation": rec,
+		"ribbon": ribbon,
+		"estimate": est,
+		"plain": plain,
+		"favorable": overall >= 0.65,
+		"empty": bool(est.get("empty", false)),
+	}
+
+
+## Weather-aware assault estimate: pulls combat weather mult for defender province when available.
+func build_weather_aware_assault_estimate_card(
+	attacker_power: float,
+	defender_power: float,
+	defender_province_id: int = -1,
+	attacker_supply: float = 1.0,
+	province_name: String = "",
+) -> Dictionary:
+	var wmult := 1.0
+	if defender_province_id >= 0 and typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_combat_weather_multiplier"):
+		wmult = float(WeatherManager.get_combat_weather_multiplier(defender_province_id))
+	return build_assault_estimate_card(attacker_power, defender_power, attacker_supply, wmult, province_name)
+
+
+## Weather-aware multi-phase combat ribbon (estimate × weather mult).
+func build_weather_phase_ribbon(
+	attacker_power: float,
+	defender_power: float,
+	defender_province_id: int = -1,
+) -> Dictionary:
+	var wmult := 1.0
+	if defender_province_id >= 0 and typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_combat_weather_multiplier"):
+		wmult = float(WeatherManager.get_combat_weather_multiplier(defender_province_id))
+	return MapPolishFormatters.format_weather_phase_ribbon(attacker_power, defender_power, wmult)
+
+
+## Weather combat briefing package (card + ribbon + wx mult; beyond ribbon alone).
+func build_weather_combat_briefing(
+	attacker_power: float,
+	defender_power: float,
+	defender_province_id: int = -1,
+	attacker_supply: float = 1.0,
+	province_name: String = "",
+) -> Dictionary:
+	var wmult := 1.0
+	if defender_province_id >= 0 and typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_combat_weather_multiplier"):
+		wmult = float(WeatherManager.get_combat_weather_multiplier(defender_province_id))
+	return MapPolishFormatters.build_weather_combat_briefing(
+		attacker_power, defender_power, wmult, attacker_supply, province_name
+	)
+
+
+## Assault follow-on loop: readiness → press/hold/soften.
+func build_assault_follow_on_loop(
+	target_specs: Array,
+	attacker_power: float = 100.0,
+	attacker_supply: float = 1.0,
+	weather_province_id: int = -1,
+) -> Dictionary:
+	var vis := 1.0
+	var precip := 0.0
+	var ground := "dry"
+	var wind := 0.2
+	if weather_province_id >= 0 and typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_combat_weather_multiplier"):
+			var cm := float(WeatherManager.get_combat_weather_multiplier(weather_province_id))
+			precip = clampf(1.0 - cm, 0.0, 0.95)
+			vis = clampf(cm + 0.15, 0.1, 1.0)
+		if WeatherManager.has_method("get_supply_weather_multiplier"):
+			var sm := float(WeatherManager.get_supply_weather_multiplier(weather_province_id))
+			if sm < 0.75:
+				ground = "mud"
+	return MapPolishFormatters.assault_follow_on_loop(
+		target_specs, attacker_power, attacker_supply, vis, precip, ground, wind
+	)
+
+
+## Reinforced assault: readiness × daylight × choke.
+func build_reinforced_assault_loop(
+	target_specs: Array,
+	attacker_power: float = 100.0,
+	attacker_supply: float = 1.0,
+	weather_province_id: int = -1,
+) -> Dictionary:
+	var vis := 1.0
+	var precip := 0.0
+	var ground := "dry"
+	var wind := 0.2
+	var month := 1
+	var is_choke := false
+	if weather_province_id >= 0 and typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_combat_weather_multiplier"):
+			var cm := float(WeatherManager.get_combat_weather_multiplier(weather_province_id))
+			precip = clampf(1.0 - cm, 0.0, 0.95)
+			vis = clampf(cm + 0.15, 0.1, 1.0)
+	if typeof(TimeManager) != TYPE_NIL and "current_month" in TimeManager:
+		month = int(TimeManager.current_month)
+	if weather_province_id >= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint"):
+		is_choke = bool(MapManager.has_strategic_chokepoint(weather_province_id))
+	return MapPolishFormatters.reinforced_assault_loop(
+		target_specs, attacker_power, attacker_supply, vis, precip, ground, wind, month, is_choke, true
+	)
+
+
+## Assault readiness compose: multi-front + supply wx + morale wx (combat+supply+weather).
+func build_assault_readiness_compose(
+	target_specs: Array,
+	attacker_power: float = 100.0,
+	attacker_supply: float = 1.0,
+	weather_province_id: int = -1,
+) -> Dictionary:
+	var vis := 1.0
+	var precip := 0.0
+	var ground := "dry"
+	var wind := 0.2
+	if weather_province_id >= 0 and typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_combat_weather_multiplier"):
+			var cm := float(WeatherManager.get_combat_weather_multiplier(weather_province_id))
+			precip = clampf(1.0 - cm, 0.0, 0.95)
+			vis = clampf(cm + 0.15, 0.1, 1.0)
+		if WeatherManager.has_method("get_supply_weather_multiplier"):
+			var sm := float(WeatherManager.get_supply_weather_multiplier(weather_province_id))
+			if sm < 0.75:
+				ground = "mud"
+	return MapPolishFormatters.assault_readiness_compose(
+		target_specs, attacker_power, attacker_supply, vis, precip, ground, wind
+	)
+
+
+## Multi-front assault priority: rank candidate targets (power + weather).
+func rank_multi_front_assault_targets(
+	target_specs: Array,
+	attacker_power: float = 100.0,
+	attacker_supply: float = 1.0,
+) -> Dictionary:
+	var enriched: Array = []
+	for t in target_specs:
+		if typeof(t) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = t.duplicate()
+		var pid := int(row.get("province_id", row.get("id", -1)))
+		if pid >= 0 and typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_combat_weather_multiplier"):
+			row["weather_mult"] = float(WeatherManager.get_combat_weather_multiplier(pid))
+		# Morale weather drag applied as soft attacker_supply hit
+		if pid >= 0 and typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_combat_morale_weather_mult"):
+			var morale := float(WeatherManager.get_combat_morale_weather_mult(pid))
+			row["attacker_supply_eff"] = attacker_supply * morale
+		enriched.append(row)
+	return MapPolishFormatters.rank_assault_targets(enriched, attacker_power, attacker_supply, 5)
+
 func can_assault_province(
 	attacker_tag: String,
 	target_province_id: int,
@@ -191,8 +394,15 @@ func execute_province_assault(
 		var t_id := target.id if target != null else -1
 		var t_dev := target.development_level if target != null else 0
 		var t_inf := target.infrastructure if target != null else 0
-		result["attacker_power_detail"] = _resolver.get_effective_combat_power(str(attacker.formation_id if attacker else ""), "", fid, t_terr, t_id, t_dev, t_inf)
-		result["defender_power_detail"] = _resolver.get_effective_combat_power(str(defender.formation_id if defender else ""), "", str(result.get("defender_formation_id","")), t_terr, t_id, t_dev, t_inf)
+		var def_fid_detail := str(result.get("defender_formation_id", ""))
+		var att_fid_detail := str(attacker.formation_id if attacker else fid)
+		# Pass unit_id so equipment-aware combat stats (has_shortages) match estimate/assault path.
+		result["attacker_power_detail"] = _resolver.get_effective_combat_power(
+			att_fid_detail, att_fid_detail, att_fid_detail, t_terr, t_id, t_dev, t_inf
+		)
+		result["defender_power_detail"] = _resolver.get_effective_combat_power(
+			def_fid_detail, def_fid_detail, def_fid_detail, t_terr, t_id, t_dev, t_inf
+		)
 
 	apply_combat_outcome(result, fid, from_pid)
 	battle_resolved.emit(result)
@@ -235,8 +445,14 @@ func _log_unit_combat(formation_id: String, province: int, other_province: int, 
 	var date := ""
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_date_string"):
 		date = TimeManager.call("get_current_date_string")
-	elif typeof(GameData) != TYPE_NIL:
-		date = "%04d-%02d" % [GameData.get_current_year(), GameData.get_current_month()]
+	elif typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year"):
+		var mo := int(TimeManager.get_current_month()) if TimeManager.has_method("get_current_month") else 1
+		date = "%04d-%02d" % [int(TimeManager.get_current_year()), mo]
+	elif typeof(GameData) != TYPE_NIL and GameData.has_method("get_current_year"):
+		var gmo := int(GameData.get_current_month()) if GameData.has_method("get_current_month") else 1
+		date = "%04d-%02d" % [int(GameData.get_current_year()), gmo]
+	else:
+		date = "1936-01"
 	var winner := str(result.get("winner", ""))
 	var res_str := "win" if winner == (result.get("attacker_tag", "") if role=="attacker" else result.get("defender_tag", "")) else "loss"
 	var captured := bool(result.get("province_control_change", false))
@@ -280,7 +496,8 @@ func _log_unit_combat(formation_id: String, province: int, other_province: int, 
 
 
 ## World-class enhancement: chain/flanking assault helper for multi-province operations.
-## After a successful capture, attempts follow-on assault on an adjacent enemy province from the new position (flanking via adjacent).
+## After a successful capture, attempts follow-on assault on an adjacent enemy province from the
+## **captured** staging province (attacker station / control after post-capture station update).
 ## Used by AI demo / harness for better multi-province feel. Returns list of executed results.
 func execute_chain_assault_or_flank(
 	attacker_tag: String,
@@ -289,34 +506,98 @@ func execute_chain_assault_or_flank(
 	max_chain: int = 2
 ) -> Array[Dictionary]:
 	var results: Array[Dictionary] = []
-	var current_from := initial_target_pid if initial_target_pid >= 0 else from_pid
-	var bm_res := execute_province_assault(attacker_tag, initial_target_pid, from_pid)
-	if not bm_res.get("success", false):
+	var tag := attacker_tag.strip_edges().to_upper()
+	var bm_res := execute_province_assault(tag, initial_target_pid, from_pid)
+	if not bool(bm_res.get("success", false)):
 		return results
 	results.append(bm_res)
-	# If captured, try 1- max_chain adjacent weak targets for chain/flank.
+	# If captured, try up to max_chain adjacent enemy targets from the new (captured) position.
+	var first_result: Dictionary = {}
 	var captured := false
-	if "result" in bm_res and typeof(bm_res.result) == TYPE_DICTIONARY:
-		captured = bool(bm_res.result.get("province_control_change", false))
-	if captured and typeof(MapManager) != TYPE_NIL and max_chain > 0:
-		var adjs: Array = []
-		if MapManager.has_method("get_adjacent_provinces"):
-			adjs = MapManager.get_adjacent_provinces(initial_target_pid)
-		var chained := 0
-		for aidv in adjs:
-			if chained >= max_chain: break
-			var aid := int(aidv)
-			var p: Province = MapManager.get_province(aid) if MapManager.has_method("get_province") else null
-			if p == null or p.is_sea or p.owner_tag == "" or p.owner_tag == attacker_tag: continue
-			var can2 := can_assault_province(attacker_tag, aid, current_from)
-			if bool(can2.get("ok", false)):
-				var follow := execute_province_assault(attacker_tag, aid, current_from)
-				if follow.get("success", false):
-					results.append(follow)
-					chained += 1
-					current_from = aid
-					print("[CHAIN/FLANK] Follow-on assault to %d from new pos; multi-province campaign step." % aid)
+	if bm_res.has("result") and typeof(bm_res.get("result")) == TYPE_DICTIONARY:
+		first_result = bm_res["result"] as Dictionary
+		captured = bool(first_result.get("province_control_change", false))
+	if not captured or typeof(MapManager) == TYPE_NIL or max_chain <= 0:
+		return results
+	# Stage follow-ons from the captured province id (post-capture station), not the old border.
+	var current_from := int(first_result.get("target_province_id", initial_target_pid))
+	if current_from < 0:
+		current_from = initial_target_pid
+	var adjs: Array = []
+	if MapManager.has_method("get_adjacent_provinces"):
+		adjs = MapManager.get_adjacent_provinces(current_from, true)
+	var chained := 0
+	for aidv in adjs:
+		if chained >= max_chain:
+			break
+		var aid := int(aidv)
+		if aid == current_from or aid < 0:
+			continue
+		var p: Province = MapManager.get_province(aid) if MapManager.has_method("get_province") else null
+		if p == null or p.is_sea:
+			continue
+		# Enemy-controlled land only (controller preferred after occupation updates).
+		var ctrl := _province_controller_tag(p)
+		if ctrl.is_empty() or ctrl == tag:
+			continue
+		var can2 := can_assault_province(tag, aid, current_from)
+		if not bool(can2.get("ok", false)):
+			continue
+		# Prefer formation already identified at the captured staging (OOB / post-capture station).
+		var follow_fid := str(can2.get("formation_id", "")).strip_edges()
+		var follow: Dictionary = execute_province_assault(tag, aid, current_from, follow_fid)
+		if not bool(follow.get("success", false)):
+			continue
+		results.append(follow)
+		chained += 1
+		# If follow-on also captured, advance staging for further chain steps.
+		var follow_res: Dictionary = {}
+		if follow.has("result") and typeof(follow.get("result")) == TYPE_DICTIONARY:
+			follow_res = follow["result"] as Dictionary
+		if bool(follow_res.get("province_control_change", false)):
+			current_from = aid
+		print(
+			"[CHAIN/FLANK] Follow-on assault to %d from captured staging %d (step %d); multi-province campaign."
+			% [aid, int(first_result.get("target_province_id", initial_target_pid)), chained]
+		)
 	return results
+
+
+func _apply_combat_damage_to_formations(_result: Dictionary, _attacker_formation_id: String) -> void:
+	# Damage application lives inline in apply_combat_outcome (org/rdy/strength).
+	# Kept as a named hook so call sites / future extraction compile under strict Godot 4.7.
+	pass
+
+
+## Write off unit equipment after strength/org damage (ProductionManager unit stockpile).
+## Losers take heavier equipment loss; winners light wear only if strength dropped.
+func _apply_combat_equipment_loss_for_formation(
+	formation_id: String,
+	strength_before: float,
+	strength_after: float,
+	is_winner: bool,
+	prolonged: bool = false,
+) -> Dictionary:
+	if formation_id.is_empty():
+		return {}
+	if typeof(ProductionManager) == TYPE_NIL or not ProductionManager.has_method("apply_combat_equipment_loss"):
+		return {}
+	var before := maxf(strength_before, 0.01)
+	var after := clampf(strength_after, 0.0, 1.0)
+	var drop_frac := clampf(1.0 - (after / before), 0.0, 1.0)
+	var severity := 0.0
+	if is_winner:
+		# Winners: light equipment wear only when strength actually dropped.
+		severity = drop_frac * 0.35
+		if severity < 0.08:
+			return {}
+	else:
+		# Losers: meaningful write-off even if strength clamp softens the drop.
+		severity = maxf(drop_frac, 0.4)
+		severity = clampf(severity, 0.35, 0.95)
+	if prolonged:
+		severity *= 0.7
+	return ProductionManager.apply_combat_equipment_loss(formation_id, severity)
 
 
 func apply_combat_outcome(
@@ -333,6 +614,7 @@ func apply_combat_outcome(
 
 	# === Balance integration: apply persistent org/readiness/strength damage here (from BM as per design)
 	# Loser heavier losses (strength hit), winner lighter org/rdy hit. Recovery via Supply daily (infra/supply mod).
+	# Unit equipment on hand is also written off with damage (equip→fight→loss→stockpile rebuild loop).
 	# This makes combat "have teeth", feeds AAR logs + inspector stationed units state.
 	if typeof(LeaderManager) != TYPE_NIL:
 		var att_f: Formation = LeaderManager.get_formation(attacker_formation_id) if not attacker_formation_id.is_empty() else null
@@ -348,11 +630,15 @@ func apply_combat_outcome(
 			if prolonged:
 				org_loss *= 0.55  # prolonged fights (high org def, similar strength, urban/fort) last longer, less quick decisive damage
 				rdy_loss *= 0.55
+			var att_str_before := float(att_f.strength) if "strength" in att_f else 1.0
 			att_f.organization = clampf(att_f.organization * (1.0 - org_loss + randf() * 0.04), 0.22, 1.0)
 			att_f.readiness = clampf(att_f.readiness * (1.0 - rdy_loss + randf() * 0.04), 0.28, 1.0)
 			if not is_win:
 				att_f.strength = clampf(att_f.strength * (0.72 + randf() * 0.12), 0.35, 1.0)
 			att_f.is_in_combat = true
+			_apply_combat_equipment_loss_for_formation(
+				attacker_formation_id, att_str_before, float(att_f.strength), is_win, prolonged
+			)
 			dmg_line += "ATT %s: org=%.2f rdy=%.2f str=%.2f ; " % [attacker_formation_id, att_f.organization, att_f.readiness, att_f.strength]
 		if def_f != null:
 			var is_win_def := (w == "defender")
@@ -361,27 +647,190 @@ func apply_combat_outcome(
 			if prolonged:
 				org_loss_d *= 0.5
 				rdy_loss_d *= 0.5
+			var def_str_before := float(def_f.strength) if "strength" in def_f else 1.0
 			def_f.organization = clampf(def_f.organization * (1.0 - org_loss_d + randf() * 0.04), 0.22, 1.0)
 			def_f.readiness = clampf(def_f.readiness * (1.0 - rdy_loss_d + randf() * 0.04), 0.28, 1.0)
 			if not is_win_def:
 				def_f.strength = clampf(def_f.strength * (0.62 + randf() * 0.12), 0.30, 1.0)
 			def_f.is_in_combat = true
+			_apply_combat_equipment_loss_for_formation(
+				def_fid, def_str_before, float(def_f.strength), is_win_def, prolonged
+			)
 			dmg_line += "DEF %s: org=%.2f rdy=%.2f str=%.2f" % [def_fid, def_f.organization, def_f.readiness, def_f.strength]
 		if att_f != null or def_f != null:
 			print(dmg_line + (" (prolonged - reduced losses, lasts longer)" if prolonged else ""))
 
 	if captured and target_pid >= 0 and typeof(MapManager) != TYPE_NIL:
 		MapManager.update_province_owner(target_pid, attacker_tag, attacker_tag, false)
-		if typeof(FormationMovement) != TYPE_NIL and not attacker_formation_id.is_empty():
-			FormationMovement.move_formation_to_province(
-				attacker_formation_id, target_pid, attacker_tag,
-			)
+		# Capture advances the attacker's land station onto the taken province so OOB /
+		# can_assault / get_land_divisions see them on the new border (not still on from_pid).
+		_station_attacker_on_captured_province(attacker_formation_id, target_pid, attacker_tag)
+		# Defenders cannot remain stationed on a province they just lost.
+		_displace_defender_from_captured_province(result, target_pid)
 		_notify_map_refresh()
 		_post_battle_news(result, true)
 	elif winner == "attacker":
 		_post_battle_news(result, false)
 	elif winner == "defender":
 		_post_battle_news(result, false)
+
+
+## After ownership flips, station the assaulting land formation on the captured province.
+## FormationMovement→SupplyManager may fail under headless/-s (no network, no division template
+## for OOB fids); LeaderManager.stationed_province_id is the combat OOB source of truth and
+## must still advance.
+func _station_attacker_on_captured_province(
+	attacker_formation_id: String,
+	target_pid: int,
+	attacker_tag: String,
+) -> void:
+	if attacker_formation_id.is_empty() or target_pid < 0:
+		return
+	var tag := attacker_tag.strip_edges().to_upper()
+	var moved := false
+	if typeof(FormationMovement) != TYPE_NIL:
+		var res: Dictionary = FormationMovement.move_formation_to_province(
+			attacker_formation_id, target_pid, tag,
+		)
+		moved = bool(res.get("ok", false))
+	elif typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("move_formation_to_province"):
+		var res2: Dictionary = SupplyManager.move_formation_to_province(
+			attacker_formation_id, target_pid, tag,
+		)
+		moved = bool(res2.get("ok", false))
+	if typeof(LeaderManager) != TYPE_NIL:
+		var f: Formation = LeaderManager.get_formation(attacker_formation_id)
+		if f != null:
+			f.stationed_province_id = target_pid
+	# Keep SupplyManager deployment registry aligned when move pipeline could not run fully.
+	if not moved and typeof(SupplyManager) != TYPE_NIL:
+		SupplyManager.division_deployments[attacker_formation_id] = {
+			"province_id": target_pid,
+			"country_tag": tag,
+			"order_type": "move_to_province",
+		}
+
+
+## After capture, defender land formations leave the lost province. Prefer adjacent friendly
+## land still controlled by the defender; else any remaining friendly land; else clear station (-1).
+func _displace_defender_from_captured_province(result: Dictionary, captured_pid: int) -> void:
+	if captured_pid < 0 or typeof(LeaderManager) == TYPE_NIL:
+		return
+	var def_tag := str(result.get("defender_tag", "")).strip_edges().to_upper()
+	var def_fid := str(result.get("defender_formation_id", "")).strip_edges()
+	var retreat_pid := _pick_defender_retreat_province(captured_pid, def_tag)
+
+	var seen: Dictionary = {}
+	var to_move: Array[Formation] = []
+	if not def_fid.is_empty():
+		var combat_def: Formation = LeaderManager.get_formation(def_fid)
+		if combat_def != null:
+			to_move.append(combat_def)
+			seen[def_fid] = true
+	if not def_tag.is_empty() and LeaderManager.has_method("get_formations_for_country"):
+		var country_forms: Array = LeaderManager.get_formations_for_country(def_tag)
+		for f_any in country_forms:
+			var f: Formation = f_any as Formation
+			if f == null:
+				continue
+			var fid := str(f.formation_id) if "formation_id" in f else ""
+			if fid.is_empty() or seen.has(fid):
+				continue
+			if "stationed_province_id" in f and int(f.stationed_province_id) == captured_pid:
+				if f.has_method("get_category") and str(f.get_category()) != "land":
+					continue
+				to_move.append(f)
+				seen[fid] = true
+
+	for f2 in to_move:
+		if f2 == null or not ("stationed_province_id" in f2):
+			continue
+		# Only displace if still on the lost province (or combat defender always leaves capture).
+		var was_on_capture := int(f2.stationed_province_id) == captured_pid
+		var is_combat_def := not def_fid.is_empty() and str(f2.formation_id) == def_fid
+		if not was_on_capture and not is_combat_def:
+			continue
+		f2.stationed_province_id = retreat_pid
+		var move_fid := str(f2.formation_id) if "formation_id" in f2 else ""
+		if move_fid.is_empty():
+			continue
+		if retreat_pid >= 0 and not def_tag.is_empty():
+			var moved := false
+			if typeof(FormationMovement) != TYPE_NIL:
+				var res: Dictionary = FormationMovement.move_formation_to_province(
+					move_fid, retreat_pid, def_tag,
+				)
+				moved = bool(res.get("ok", false))
+			if not moved and typeof(SupplyManager) != TYPE_NIL:
+				SupplyManager.division_deployments[move_fid] = {
+					"province_id": retreat_pid,
+					"country_tag": def_tag,
+					"order_type": "move_to_province",
+				}
+				# Station already set above; move may fail without templates.
+				f2.stationed_province_id = retreat_pid
+		elif typeof(SupplyManager) != TYPE_NIL and SupplyManager.division_deployments.has(move_fid):
+			SupplyManager.division_deployments.erase(move_fid)
+		print(
+			"[CAPTURE RETREAT] %s (%s) leaves province %d → station=%d"
+			% [move_fid, def_tag, captured_pid, retreat_pid]
+		)
+
+
+## Pick a remaining friendly land province for a defender forced off a captured id.
+## Prefer land-adjacent still controlled by def_tag; else any controlled land; else -1.
+func _pick_defender_retreat_province(captured_pid: int, defender_tag: String) -> int:
+	var tag := defender_tag.strip_edges().to_upper()
+	if tag.is_empty() or typeof(MapManager) == TYPE_NIL:
+		return -1
+	# Adjacent friendly land first (after capture ownership already flipped).
+	if MapManager.has_method("get_adjacent_provinces"):
+		var adj: Array = MapManager.get_adjacent_provinces(captured_pid, true)
+		for apid_v in adj:
+			var apid := int(apid_v)
+			if apid == captured_pid or apid < 0:
+				continue
+			if _province_controlled_by(apid, tag):
+				var p: Province = MapManager.get_province(apid) if MapManager.has_method("get_province") else null
+				if p != null and p.is_sea:
+					continue
+				return apid
+	# Any remaining friendly-controlled land (non-captured).
+	if MapManager.has_method("get_provinces_by_controller"):
+		var owned: Array = MapManager.get_provinces_by_controller(tag)
+		for pid_v in owned:
+			var pid := int(pid_v)
+			if pid == captured_pid or pid < 0:
+				continue
+			var p2: Province = MapManager.get_province(pid) if MapManager.has_method("get_province") else null
+			if p2 != null and p2.is_sea:
+				continue
+			return pid
+	elif MapManager.has_method("get_provinces_by_owner"):
+		var owned2: Array = MapManager.get_provinces_by_owner(tag)
+		for pid_v2 in owned2:
+			var pid2 := int(pid_v2)
+			if pid2 == captured_pid or pid2 < 0:
+				continue
+			var p3: Province = MapManager.get_province(pid2) if MapManager.has_method("get_province") else null
+			if p3 != null and p3.is_sea:
+				continue
+			return pid2
+	return -1
+
+
+func _province_controlled_by(province_id: int, tag: String) -> bool:
+	if typeof(MapManager) == TYPE_NIL or tag.is_empty():
+		return false
+	if MapManager.has_method("get_province_controller"):
+		return str(MapManager.get_province_controller(province_id)).strip_edges().to_upper() == tag
+	var p: Province = MapManager.get_province(province_id) if MapManager.has_method("get_province") else null
+	if p == null:
+		return false
+	var c := str(p.controller_tag).strip_edges().to_upper()
+	if c.is_empty():
+		c = str(p.owner_tag).strip_edges().to_upper()
+	return c == tag
 
 ## Main-loop AI battle initiation helper (for 50+ turn playtest integration).
 ## Called from TimeManager daily for non-player major powers to keep world alive with wars.
@@ -572,8 +1021,15 @@ func _do_naval_engagement(
 		"jam_def": jam_def,
 		"year": (TimeManager.get_current_year() if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year") else 1942),
 	}
-	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_naval_spotting_visibility"):
-		context["weather_vis"] = WeatherManager.get_naval_spotting_visibility(sea_province_id)
+	if typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_naval_spotting_visibility"):
+			context["weather_vis"] = WeatherManager.get_naval_spotting_visibility(sea_province_id)
+		# Pure naval spot mult also stored for resolver/UI (weather expand live path).
+		if WeatherManager.has_method("get_naval_spot_weather_multiplier"):
+			context["naval_spot_weather_mult"] = float(WeatherManager.get_naval_spot_weather_multiplier(sea_province_id))
+			# Blend pure mult into weather_vis when spotting API missing pure base.
+			if not context.has("weather_vis"):
+				context["weather_vis"] = float(context["naval_spot_weather_mult"])
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint"):
 		context["chokepoint"] = MapManager.has_strategic_chokepoint(sea_province_id)
 	# Adjust base powers (orders + sub/range will be re-applied richer in resolver)
@@ -590,9 +1046,9 @@ func _do_naval_engagement(
 	# Enrich from Supply combat presence if avail (air/naval totals for recon/strike power)
 	var sm := get_node_or_null("/root/SupplyManager")
 	if sm != null and sm.has_method("get_combat_presence_registry"):
-		var reg := sm.call("get_combat_presence_registry")
+		var reg: Variant = sm.call("get_combat_presence_registry")
 		if reg != null:
-			var rpt := reg.get_report(sea_province_id)
+			var rpt: Variant = reg.get_report(sea_province_id)
 			if rpt != null:
 				# Add air for recon/strike
 				var att_air := float(rpt.air_by_tag.get(attacker_tag, 0.0)) if "air_by_tag" in rpt else 0.0
@@ -635,11 +1091,44 @@ func execute_naval_engagement(
 
 
 func get_divisions_at_province(province_id: int, country_tag: String) -> Array[Dictionary]:
-	if typeof(SupplyManager) == TYPE_NIL:
-		return []
-	if SupplyManager.has_method("get_land_divisions_at_province"):
-		return SupplyManager.get_land_divisions_at_province(province_id, country_tag)
-	return []
+	## Prefer SupplyManager deployments (template-backed), then world_full OOB land stations
+	## on LeaderManager (formation_id like GER_formation_0 without DivisionTemplate).
+	var out: Array[Dictionary] = []
+	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("get_land_divisions_at_province"):
+		out = SupplyManager.get_land_divisions_at_province(province_id, country_tag)
+	if not out.is_empty():
+		return out
+	return _land_formations_stationed_at(province_id, country_tag)
+
+
+## Land divisions/garrisons stationed via Formation.stationed_province_id (scenario OOB path).
+func _land_formations_stationed_at(province_id: int, country_tag: String) -> Array[Dictionary]:
+	var tag := country_tag.strip_edges().to_upper()
+	var out: Array[Dictionary] = []
+	if province_id <= 0 or tag.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return out
+	if not LeaderManager.has_method("get_formations_for_country"):
+		return out
+	for f in LeaderManager.get_formations_for_country(tag):
+		if f == null:
+			continue
+		var ftype := str(f.formation_type) if "formation_type" in f else ""
+		if ftype != Formation.TYPE_DIVISION and ftype != Formation.TYPE_GARRISON:
+			continue
+		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+		if sid != province_id:
+			continue
+		var fid := str(f.formation_id) if "formation_id" in f else ""
+		if fid.is_empty():
+			continue
+		var display := str(f.name) if "name" in f and not str(f.name).is_empty() else fid
+		out.append({
+			"formation_id": fid,
+			"display_name": display,
+			"country_tag": tag,
+			"stationed_province_id": province_id,
+		})
+	return out
 
 
 func _validate_attack_source(
@@ -706,8 +1195,9 @@ func _estimate_attack_power(formation_id: String, province: Province, country_ta
 			terrain = eff
 	var dev := province.development_level if province != null else -1
 	var infra := province.infrastructure if province != null else -1
+	# unit_id + army_id both = formation_id so on-hand equipment shortages apply (same as assault resolve).
 	var stats: Dictionary = _resolver.get_effective_combat_power(
-		formation_id, "", formation_id, terrain, pid, dev, infra,
+		formation_id, formation_id, formation_id, terrain, pid, dev, infra,
 	)
 	return float(stats.get("soft_attack", 0.0)) + float(stats.get("hard_attack", 0.0)) * 1.6
 
@@ -801,12 +1291,16 @@ func _notify_map_refresh() -> void:
 	if tree == null:
 		return
 	for mr in tree.get_nodes_in_group("map_renderer"):
-		if mr.has_method("force_border_update"):
-			mr.call_deferred("force_border_update")
-		if mr.has_method("_update_unit_icons_for_test"):
+		# Prefer light capture refresh — full force_border_update freezes world_accurate.
+		if mr.has_method("refresh_after_capture_light"):
+			var pid := -1
+			# Best-effort last combat target if renderer tracks selection.
+			if "selected_province_id" in mr:
+				pid = int(mr.selected_province_id)
+			mr.call_deferred("refresh_after_capture_light", pid)
+		elif mr.has_method("_update_unit_icons_for_test"):
 			mr.call_deferred("_update_unit_icons_for_test")
-		if mr.has_method("_refresh_province_visuals"):
-			mr.call_deferred("_refresh_province_visuals")
+		# Do NOT call force_border_update here (O(all edges) hang after 2nd Ctrl+click).
 
 
 func _post_battle_news(result: Dictionary, captured: bool) -> void:
@@ -825,63 +1319,7 @@ func _post_battle_news(result: Dictionary, captured: bool) -> void:
 	var body := "%s vs %s at %s" % [attacker, defender, target_name if not target_name.is_empty() else str(pid)]
 	LeaderEventUI.post_news(title, body, "combat")
 
-
-## === HISTORICAL + MAIN-LOOP EXTENSIONS (for combat testing vs real history, 50T AI, naval) ===
-## Pragmatic additions to support direct OOB setup for WWI/WWII battles and referenced calls in harness/docs.
-## These enable recreating Marne/Verdun (attrition), Stalingrad (urban winter supply), Midway (naval air), D-Day (amphib).
-
-# (duplicate chain func removed for parse)
-
-func simulate_daily_ai_combat() -> void:
-	"""Main-loop autonomous AI combat for 50+ turn integrated playtests (promoted from harness; scored on supply/infra/low-org + weather + chain)."""
-	# Prefer DebugOverlay for full scored logic (weather/geo aware); fallback simple.
-	var dbg := get_node_or_null("/root/DebugOverlay")
-	if dbg != null and dbg.has_method("_simulate_ai_combat_turn"):
-		dbg.call("_simulate_ai_combat_turn")
-		print("[BM DAILY AI] delegated to DebugOverlay _simulate (full scoring + chain + weather).")
-		return
-	# Fallback direct (for pure BM headless without UI)
-	print("[BM DAILY AI] fallback simple AI assaults (limited). Extend via TestRunner historical harness for full OOB realism.")
-	var mm := get_node_or_null("/root/MapManager")
-	if mm == null or not mm.has_method("get_provinces_by_owner"):
-		return
-	var ai_tags := ["GER", "SOV", "JAP", "ITA"]
-	for tag in ai_tags:
-		var owned: Array = mm.call("get_provinces_by_owner", tag)
-		if owned.size() < 1: continue
-		var fromp := int(owned[0])
-		var adjs := mm.call("get_adjacent_provinces", fromp)
-		for aidv in adjs:
-			var aid := int(aidv)
-			var p: Province = mm.call("get_province", aid) if mm.has_method("get_province") else null
-			if p == null or p.owner_tag == tag or p.owner_tag == "": continue
-			var can: Dictionary = can_assault_province(tag, aid, fromp)
-			if bool(can.get("ok", false)):
-				var cres := execute_chain_assault_or_flank(tag, aid, fromp, 1)
-				print("[BM DAILY AI FALLBACK] %s chain assault on %d -> %d results" % [tag, aid, cres.size()])
-				break
-
-func execute_naval_engagement(attacker_tag: String, defender_tag: String, sea_province_id: int, intensity: float = 0.5, has_submarines: bool = false, bad_weather: bool = false) -> Dictionary:
-	"""Historical/Midway proxy entry (5-arg call from harness). Delegates to primary 6-arg strategic execute (now rich phased) after mapping params. Preserves registry air/naval for context. Use for OOB historical tests."""
-	var range_m := 0.6 if bad_weather else 1.1  # bad weather -> closer
-	var closer := bad_weather or intensity > 0.7
-	# Call internal strategic (avoids recursion on overload name)
-	var primary_res := _do_naval_engagement(attacker_tag, defender_tag, sea_province_id, range_m, has_submarines, closer)
-	# Enrich result with historical proxy fields for compatibility with old harness prints/AAR
-	primary_res["intensity"] = intensity
-	primary_res["bad_weather"] = bad_weather
-	primary_res["has_submarines"] = has_submarines
-	if "key_factors" not in primary_res or not primary_res["key_factors"] is Array:
-		primary_res["key_factors"] = []
-	primary_res["key_factors"].append_array(["historical_proxy_midway_leyte_falklands", "registry_air_nav_presence_used"])
-	# Legacy score fields if missing
-	if not primary_res.has("attacker_score"):
-		primary_res["attacker_score"] = float(primary_res.get("attacker_casualties", 0.2)) * 10.0 + 5.0
-	if not primary_res.has("defender_score"):
-		primary_res["defender_score"] = float(primary_res.get("defender_casualties", 0.2)) * 10.0 + 4.0
-	print("[BM NAVAL HIST PROXY] delegated to phased -> %s vs %s @%d winner=%s subs=%s storm=%s" % [attacker_tag, defender_tag, sea_province_id, primary_res.get("winner", "?"), has_submarines, bad_weather])
-	return primary_res
-
+## === HISTORICAL OOB (TestRunner / harness) ===
 func force_historical_oob_for_battle(battle_key: String, year: int = 1942, custom_pids: Dictionary = {}) -> Dictionary:
 	"""Force realistic OOB at representative provinces for history testing (called by TestRunner sims). Updates owners, deploys formations from templates, assigns historical leaders, seeds air/naval presence, sets weather proxy."""
 	print("[BM HIST OOB] Forcing OOB for battle=%s year=%d" % [battle_key, year])
@@ -969,14 +1407,14 @@ func force_historical_oob_for_battle(battle_key: String, year: int = 1942, custo
 
 	# Historical leader assign (use available historical; match era loosely)
 	if lm.has_method("get_leaders_for_country"):
-		var att_leaders := lm.call("get_leaders_for_country", att_tag)
+		var att_leaders: Variant = lm.call("get_leaders_for_country", att_tag)
 		if att_leaders.size() > 0 and att_divs.size() > 0:
-			var lid := att_leaders[0].leader_id if "leader_id" in att_leaders[0] else ""
+			var lid: String = str(att_leaders[0].get("leader_id", "")) if typeof(att_leaders[0]) == TYPE_DICTIONARY else (str(att_leaders[0].leader_id) if "leader_id" in att_leaders[0] else "")
 			if lid != "" and lm.has_method("assign_leader_to_formation"):
 				lm.call("assign_leader_to_formation", lid, att_divs[0])
-		var def_leaders := lm.call("get_leaders_for_country", def_tag)
+		var def_leaders: Variant = lm.call("get_leaders_for_country", def_tag)
 		if def_leaders.size() > 0 and def_divs.size() > 0:
-			var dlid := def_leaders[0].leader_id if "leader_id" in def_leaders[0] else ""
+			var dlid: String = str(def_leaders[0].get("leader_id", "")) if typeof(def_leaders[0]) == TYPE_DICTIONARY else (str(def_leaders[0].leader_id) if "leader_id" in def_leaders[0] else "")
 			if dlid != "" and lm.has_method("assign_leader_to_formation"):
 				lm.call("assign_leader_to_formation", dlid, def_divs[0])
 
@@ -990,3 +1428,47 @@ func force_historical_oob_for_battle(battle_key: String, year: int = 1942, custo
 
 	print("[BM HIST OOB] Deployed: %s@%d (%s divs + air %.1f) vs %s@%d (%s divs + air %.1f) sea=%d subs=%s storm=%s" % [att_tag, staging, att_divs, air_att, def_tag, target, def_divs, air_def, sea, use_subs, stormy])
 	return {"ok": true, "att_tag": att_tag, "def_tag": def_tag, "staging": staging, "target": target, "sea": sea, "year": year}
+
+
+## ---------------------------------------------------------------------------
+## Multi-phase combat product surface (major #1)
+## ---------------------------------------------------------------------------
+
+func build_multi_phase_combat_product(
+	attacker_power: float = 100.0,
+	defender_power: float = 80.0,
+	attacker_supply: float = 0.85,
+	weather_mult: float = 1.0,
+	province_id: int = 1,
+) -> Dictionary:
+	if typeof(MapPolishFormatters) != TYPE_NIL:
+		return MapPolishFormatters.multi_phase_combat_product(
+			attacker_power, defender_power, attacker_supply, weather_mult, province_id
+		)
+	return {"empty": true, "phase_rows": [], "apply_queue": []}
+
+
+func apply_combat_phase(
+	phase: String,
+	province_id: int = 1,
+	attacker_power: float = 100.0,
+	defender_power: float = 80.0,
+	attacker_supply: float = 0.85,
+	weather_mult: float = 1.0,
+) -> Dictionary:
+	var plan: Dictionary = {}
+	if typeof(MapPolishFormatters) != TYPE_NIL:
+		plan = MapPolishFormatters.execute_combat_phase_plan(
+			phase, province_id, attacker_power, defender_power, attacker_supply, weather_mult
+		)
+	else:
+		return {"ok": false, "reason": "no formatters"}
+	return {
+		"ok": bool(plan.get("ok", plan.get("enabled", false))),
+		"plan": plan,
+		"phase": str(plan.get("phase", phase)),
+		"leaf_action": str(plan.get("leaf_action", "")),
+		"score": float(plan.get("score", 0.0)),
+		"summary": str(plan.get("summary", "")),
+		"empty": false,
+	}

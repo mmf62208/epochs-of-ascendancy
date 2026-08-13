@@ -12,8 +12,8 @@ extends Node2D
 @export var enable_wasd: bool = true
 @export var wasd_speed: float = 600.0
 @export var enable_edge_pan: bool = true
-@export var edge_pan_margin: float = 36.0
-@export var edge_pan_speed: float = 720.0
+@export var edge_pan_margin: float = 56.0
+@export var edge_pan_speed: float = 980.0
 
 @export var enable_wrap: bool = true
 
@@ -27,9 +27,13 @@ const _ZOOM_LERP_SPEED: float = 12.0
 func _ready() -> void:
 	if target == null:
 		target = self
-	_target_zoom = clampf(target.scale.x, min_zoom, max_zoom)
-	target.scale = Vector2.ONE * _target_zoom
+	_target_zoom = clampf(target.scale.x if target.scale.x > 0.01 else 1.0, min_zoom, max_zoom)
+	# Do not force-scale target before MapRenderer can disable zoom for GIS boards.
+	if enable_zoom:
+		target.scale = Vector2.ONE * _target_zoom
 	add_to_group("camera_controller")
+	# ALWAYS so pan/zoom/edge work while TimeManager is paused (playtest look-around).
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process(true)
 	set_process_input(true)
 	set_process_unhandled_input(true)
@@ -38,6 +42,10 @@ func _ready() -> void:
 ## Public helper for debug / test scenario loading to set an initial view cleanly.
 func set_initial_view(target_position: Vector2, target_zoom_level: float, instant: bool = true):
 	if target == null:
+		return
+	# When MapRenderer drives MapCamera for GIS world boards, never scale ProvinceContainers
+	# (that produces dual map: small underlay + giant poly mesh).
+	if not enable_zoom:
 		return
 
 	target.position = target_position
@@ -55,14 +63,23 @@ func _process(delta: float) -> void:
 	if target == null:
 		return
 
+	# GIS / MapCamera boards: never leave a residual scale on ProvinceContainers
+	# (causes dual map: underlay at one scale + polys at another).
+	if not enable_zoom:
+		if target.scale != Vector2.ONE:
+			target.scale = Vector2.ONE
+		# Still allow wasd/edge only when explicitly enabled (legacy boards).
+		if enable_wasd:
+			_apply_wasd(delta)
+		if enable_edge_pan:
+			_apply_edge_pan(delta)
+		return
+
+	# Map navigation must work while sim is paused (playtest look-around).
 	if enable_wasd:
 		_apply_wasd(delta)
-
 	if enable_edge_pan:
 		_apply_edge_pan(delta)
-
-	if not enable_zoom:
-		return
 
 	var current := target.scale.x
 	if absf(current - _target_zoom) <= 0.001:
@@ -77,6 +94,9 @@ func _process(delta: float) -> void:
 
 
 func _apply_wasd(delta: float) -> void:
+	# Command Center / modals: no WASD pan under overlay.
+	if MapViewInput.modal_blocks_map_nav(get_viewport()):
+		return
 	var nav_delta := MapViewInput.motion_delta(delta)
 	var move := Vector2.ZERO
 	if Input.is_action_pressed("ui_left") or Input.is_action_pressed("move_left"):
@@ -114,10 +134,17 @@ func _apply_edge_pan(delta: float) -> void:
 		dir.x -= 1.0
 	elif m.x >= sz.x - edge_pan_margin:
 		dir.x += 1.0
-	if m.y <= edge_pan_margin:
-		dir.y -= 1.0
-	elif m.y >= sz.y - edge_pan_margin:
+	if m.y >= sz.y - edge_pan_margin:
 		dir.y += 1.0
+	else:
+		# Pan north under the HUD strip (not raw screen top — avoids thrash over TopInfoBar).
+		var top_safe := 90.0
+		if get_tree() and typeof(TopInfoBar) != TYPE_NIL:
+			var tib = TopInfoBar.find_in_tree(get_tree())
+			if tib != null and tib.has_method("get_bar_height"):
+				top_safe = maxf(top_safe, float(tib.call("get_bar_height")) + 60.0)
+		if m.y >= top_safe and m.y < top_safe + edge_pan_margin:
+			dir.y -= 1.0
 	if dir.length_squared() < 0.0001:
 		return
 	target.position += dir.normalized() * edge_pan_speed * nav_delta
@@ -130,12 +157,31 @@ func _input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton:
 		var mb := event as InputEventMouseButton
-		if mb.button_index == MOUSE_BUTTON_MIDDLE:
+		# Middle-drag OR right-drag pan (laptops often lack middle button).
+		if mb.button_index == MOUSE_BUTTON_MIDDLE or mb.button_index == MOUSE_BUTTON_RIGHT:
+			# Do not start pan when clicking UI chrome.
+			if mb.pressed and MapViewInput.edge_pan_blocked_by_gui(get_viewport()):
+				# Skip pan start over HUD/modals (TopInfoBar blocks edge pan on purpose).
+				var hov := get_viewport().gui_get_hovered_control()
+				if hov != null and not _is_under_top_info_bar(hov):
+					return
 			_is_panning = mb.pressed
+			if mb.pressed:
+				get_viewport().set_input_as_handled()
 
 	if _is_panning and event is InputEventMouseMotion:
 		target.position += (event as InputEventMouseMotion).relative
 		_apply_wrap()
+		get_viewport().set_input_as_handled()
+
+
+func _is_under_top_info_bar(node: Node) -> bool:
+	var n := node
+	while n != null:
+		if str(n.name) == "TopInfoBar":
+			return true
+		n = n.get_parent()
+	return false
 
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -146,11 +192,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		var mb := event as InputEventMouseButton
 		if not mb.pressed:
 			return
+		# Fallback wheel when MapRenderer did not handle (unhandled path).
 		if mb.button_index == MOUSE_BUTTON_WHEEL_UP:
-			_zoom_toward_mouse(1.0 + zoom_speed)
+			_zoom_toward_mouse(1.0 + zoom_speed * 1.35)
 			get_viewport().set_input_as_handled()
 		elif mb.button_index == MOUSE_BUTTON_WHEEL_DOWN:
-			_zoom_toward_mouse(1.0 - zoom_speed)
+			_zoom_toward_mouse(1.0 - zoom_speed * 1.35)
 			get_viewport().set_input_as_handled()
 
 

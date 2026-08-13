@@ -15,6 +15,8 @@ var outbound_per_day: float = 0.0
 var sabotage_level: float = 0.0
 ## Local fuel from oil refineries (simplified depot-side tracking).
 var fuel_stockpile: float = 0.0
+## Pass 18: munitions share of general stockpile (updated when munitions cargo delivers).
+var munitions_stockpile: float = 0.0
 
 
 func _init(pid: int = -1, capacity: float = 0.0) -> void:
@@ -22,6 +24,8 @@ func _init(pid: int = -1, capacity: float = 0.0) -> void:
 	storage_capacity = capacity
 	throughput_capacity = capacity * 0.15
 	stockpile = capacity * 0.65
+	# Seed munitions as a fraction of general stock (land ammo baseline).
+	munitions_stockpile = stockpile * 0.35
 
 
 func apply_inflow(tons: float) -> float:
@@ -47,3 +51,24 @@ func fill_ratio() -> float:
 	if storage_capacity <= 0.0:
 		return 0.0
 	return clampf(stockpile / storage_capacity, 0.0, 1.0)
+
+
+## Pass 18: munitions readiness for OOB ammo bar (0–1).
+func munitions_ratio() -> float:
+	if storage_capacity <= 0.0:
+		return 0.0
+	# Cap munitions at capacity; if never tracked, fall back to 35% of general stock.
+	var mun := munitions_stockpile
+	if mun <= 0.0 and stockpile > 0.0:
+		mun = stockpile * 0.35
+	return clampf(mun / storage_capacity, 0.0, 1.0)
+
+
+## Accept munitions-tagged cargo into munitions_stockpile (also adds to general stockpile).
+func apply_munitions_inflow(tons: float) -> float:
+	var room := maxf(storage_capacity - stockpile, 0.0)
+	var accepted := minf(tons, room)
+	stockpile += accepted
+	munitions_stockpile = minf(storage_capacity, munitions_stockpile + accepted)
+	inbound_per_day = accepted
+	return tons - accepted

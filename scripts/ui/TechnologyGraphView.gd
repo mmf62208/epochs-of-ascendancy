@@ -163,7 +163,7 @@ func _rebuild_nodes() -> void:
 func _create_node_panel(entry: Dictionary) -> PanelContainer:
 	var tech_id := str(entry.get("tech_id", ""))
 	var panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(panel)
+	RetrowaveTheme.style_detail_panel_flat(panel)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.gui_input.connect(_on_node_gui_input.bind(tech_id))
 

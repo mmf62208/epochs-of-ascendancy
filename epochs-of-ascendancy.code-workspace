@@ -1,0 +1,22 @@
+{
+  "folders": [
+    {
+      "name": "Epochs of Ascendancy",
+      "path": "."
+    }
+  ],
+  "settings": {
+    "files.exclude": {
+      "**/.godot": true,
+      "**/__pycache__": true,
+      "**/*.import": false
+    },
+    "search.exclude": {
+      "**/.godot": true,
+      "**/__pycache__": true
+    }
+  },
+  "extensions": {
+    "recommendations": []
+  }
+}

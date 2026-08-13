@@ -1,0 +1,14 @@
+{
+  "name": "provinces_pilot_europe",
+  "parent": "provinces_world_full",
+  "stats": {
+    "province_n": 1840,
+    "land_before": 460,
+    "land_after": 1840,
+    "densify_ratio": 4.0,
+    "state_n": 196,
+    "region_n": 10,
+    "mean_verts": 38.1375
+  },
+  "id_base": 700000
+}

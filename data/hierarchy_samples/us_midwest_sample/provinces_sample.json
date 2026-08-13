@@ -1,0 +1,204 @@
+{
+  "provinces": [
+    {
+      "id": 800001,
+      "name": "Cuyahoga",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "OH",
+      "sample": true
+    },
+    {
+      "id": 800002,
+      "name": "Franklin",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "OH",
+      "sample": true
+    },
+    {
+      "id": 800003,
+      "name": "Hamilton",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "OH",
+      "sample": true
+    },
+    {
+      "id": 800004,
+      "name": "Summit",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "OH",
+      "sample": true
+    },
+    {
+      "id": 800005,
+      "name": "Lucas",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "OH",
+      "sample": true
+    },
+    {
+      "id": 800006,
+      "name": "Montgomery",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "OH",
+      "sample": true
+    },
+    {
+      "id": 800011,
+      "name": "Marion",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IN",
+      "sample": true
+    },
+    {
+      "id": 800012,
+      "name": "Lake",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IN",
+      "sample": true
+    },
+    {
+      "id": 800013,
+      "name": "Allen",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IN",
+      "sample": true
+    },
+    {
+      "id": 800014,
+      "name": "Hamilton IN",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IN",
+      "sample": true
+    },
+    {
+      "id": 800015,
+      "name": "St. Joseph",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IN",
+      "sample": true
+    },
+    {
+      "id": 800016,
+      "name": "Vanderburgh",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IN",
+      "sample": true
+    },
+    {
+      "id": 800021,
+      "name": "Cook",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IL",
+      "sample": true
+    },
+    {
+      "id": 800022,
+      "name": "DuPage",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IL",
+      "sample": true
+    },
+    {
+      "id": 800023,
+      "name": "Lake IL",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IL",
+      "sample": true
+    },
+    {
+      "id": 800024,
+      "name": "Will",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IL",
+      "sample": true
+    },
+    {
+      "id": 800025,
+      "name": "Kane",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IL",
+      "sample": true
+    },
+    {
+      "id": 800026,
+      "name": "Sangamon",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "IL",
+      "sample": true
+    },
+    {
+      "id": 800031,
+      "name": "Wayne",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "MI",
+      "sample": true
+    },
+    {
+      "id": 800032,
+      "name": "Oakland",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "MI",
+      "sample": true
+    },
+    {
+      "id": 800033,
+      "name": "Macomb",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "MI",
+      "sample": true
+    },
+    {
+      "id": 800034,
+      "name": "Kent",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "MI",
+      "sample": true
+    },
+    {
+      "id": 800035,
+      "name": "Genesee",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "MI",
+      "sample": true
+    },
+    {
+      "id": 800036,
+      "name": "Washtenaw",
+      "domain": "land",
+      "theater": "north_america",
+      "state_postal": "MI",
+      "sample": true
+    }
+  ],
+  "meta": {
+    "sample": "us_midwest",
+    "province_n": 24,
+    "state_n": 4,
+    "region_n": 1,
+    "super_region_n": 1,
+    "design": "county→state→Midwest→North America"
+  }
+}

@@ -164,6 +164,10 @@ var _last_used_year: Dictionary = {}
 ## country_tag -> design_id -> true
 var _acquired_foreign_designs: Dictionary = {}
 
+## Player/AI authored custom designs (designer duties authoring path).
+## country_tag (upper) -> design_id -> design_data Dictionary
+var _custom_designs: Dictionary = {}
+
 
 func _ready() -> void:
 	if typeof(TimeManager) != TYPE_NIL:
@@ -644,6 +648,7 @@ func get_save_data() -> Dictionary:
 		"last_used_year": _last_used_year.duplicate(true),
 		"acquired_designs": _acquired_designs.duplicate(true),
 		"acquired_foreign_designs": _acquired_foreign_designs.duplicate(true),
+		"custom_designs": _custom_designs.duplicate(true),
 	}
 
 
@@ -667,6 +672,244 @@ func apply_save_data(data: Dictionary) -> void:
 			for did in bucket.keys():
 				if not (_acquired_designs[tag] as Dictionary).has(str(did)):
 					(_acquired_designs[tag] as Dictionary)[str(did)] = ACQUISITION_CAPTURED
+
+	if data.has("custom_designs"):
+		_custom_designs = (data.get("custom_designs", {}) as Dictionary).duplicate(true)
+
+
+## === Custom designer authoring (full designer duties) ===
+
+## Pack J — compute live design stats from modules (no simulated-only space stats).
+func compute_design_stats(design_data: Dictionary) -> Dictionary:
+	var data := design_data.duplicate(true) if design_data is Dictionary else {}
+	var modules: Array = data.get("modules", []) if data.get("modules") is Array else []
+	var domain := str(data.get("domain", "land")).strip_edges().to_lower()
+	var power := 40.0
+	var mass := 100.0
+	var cost := 80.0
+	var reliability := 0.75
+	var soft_attack := 0.0
+	var hard_attack := 0.0
+	for raw in modules:
+		var mid := ""
+		var mod: Dictionary = {}
+		if raw is Dictionary:
+			mod = raw
+			mid = str(raw.get("id", raw.get("module_id", "")))
+		else:
+			mid = str(raw)
+		## Prefer catalog stats when module dict already carries stats
+		power += float(mod.get("power", mod.get("power_draw", 8.0)))
+		mass += float(mod.get("mass", mod.get("weight", 6.0)))
+		cost += float(mod.get("cost", mod.get("ic_cost", 12.0)))
+		reliability = clampf(reliability + float(mod.get("reliability", 0.0)) * 0.01, 0.35, 0.99)
+		soft_attack += float(mod.get("soft_attack", mod.get("attack", 0.0)))
+		hard_attack += float(mod.get("hard_attack", 0.0))
+		## Optional catalog lookup via ClassDB if DesignDataLoader exists as global class
+		if mid != "" and ClassDB.class_exists("DesignDataLoader"):
+			pass  # catalog enrichment optional; module dict stats preferred
+	if domain == "space":
+		power = maxf(power, 50.0 + float(modules.size()) * 12.0)
+		mass = maxf(20.0, 120.0 - float(modules.size()) * 4.0)
+	var score := clampf(0.35 + 0.04 * float(modules.size()) + reliability * 0.3, 0.35, 1.0)
+	return {
+		"ok": true,
+		"live": true,
+		"domain": domain,
+		"module_count": modules.size(),
+		"power": power,
+		"mass": mass,
+		"cost": cost,
+		"reliability": reliability,
+		"soft_attack": soft_attack,
+		"hard_attack": hard_attack,
+		"score": score,
+		"summary": "Design stats · %s · mods %d · power %.0f · mass %.0f · cost %.0f · rel %.0f%%" % [
+			domain, modules.size(), power, mass, cost, reliability * 100.0,
+		],
+		"empty": false,
+	}
+
+
+## Register a player/AI authored design for a country. Single source of truth for
+## SpaceDesignPopup / DomainDesignPopup finalize and dual full_designer_duties path.
+func register_custom_design(country_tag: String, design_data: Dictionary) -> Dictionary:
+	var tag := _norm_tag(country_tag)
+	if tag.is_empty():
+		return {"ok": false, "error": "empty_tag"}
+	var data := design_data.duplicate(true) if design_data is Dictionary else {}
+	var design_id := str(data.get("id", data.get("design_id", ""))).strip_edges()
+	if design_id.is_empty():
+		var dom := str(data.get("domain", "land")).strip_edges().to_lower()
+		design_id = "custom_%s_%s_%d" % [tag.to_lower(), dom, Time.get_ticks_msec() % 100000]
+		data["id"] = design_id
+	data["id"] = design_id
+	data["design_id"] = design_id
+	data["owner"] = tag
+	data["owner_countries"] = [tag]
+	if not data.has("domain") or str(data.get("domain", "")).is_empty():
+		data["domain"] = _infer_domain_from_id(design_id)
+	if not data.has("modules"):
+		data["modules"] = []
+	data["frozen"] = true
+	data["custom"] = true
+	data["registered_year"] = get_current_year()
+	if not _custom_designs.has(tag):
+		_custom_designs[tag] = {}
+	(_custom_designs[tag] as Dictionary)[design_id] = data.duplicate(true)
+	# Register as live UnitTemplate so ProductionLine/bootstrap do not WARN Unknown unit template.
+	var template_ok := _register_custom_as_unit_template(tag, design_id, data)
+	# Mark used + grant as domestic active path so picker / production see it.
+	mark_design_used(tag, design_id)
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("unlock_design"):
+		GameData.call("unlock_design", tag, design_id)
+	print("[DesignManager] register_custom_design %s for %s domain=%s modules=%s template=%s" % [
+		design_id, tag, str(data.get("domain", "")), str(data.get("modules", [])), str(template_ok),
+	])
+	return {
+		"ok": true,
+		"live": true,
+		"design_id": design_id,
+		"country_tag": tag,
+		"domain": str(data.get("domain", "")),
+		"modules_n": (data.get("modules") as Array).size() if data.get("modules") is Array else 0,
+		"custom": true,
+		"template_registered": template_ok,
+	}
+
+
+func _register_custom_as_unit_template(country_tag: String, design_id: String, data: Dictionary) -> bool:
+	if typeof(GameData) == TYPE_NIL or GameData.design_data == null:
+		return false
+	var dd = GameData.design_data
+	if not dd.has_method("register_runtime_template_from_dict") and not dd.has_method("register_runtime_template"):
+		return false
+	var dom := str(data.get("domain", "land")).to_lower()
+	var base_type := "Land"
+	var visual := "medium_tank"
+	var size_cat := "Medium"
+	var prod_days := 45.0
+	match dom:
+		"naval":
+			base_type = "Naval"
+			visual = "destroyer"
+			size_cat = "Medium"
+			prod_days = 90.0
+		"air":
+			base_type = "Air"
+			visual = "fighter"
+			size_cat = "Light"
+			prod_days = 30.0
+		"space":
+			base_type = "Space"
+			visual = "satellite"
+			size_cat = "Light"
+			prod_days = 60.0
+		_:
+			base_type = "Land"
+			visual = "medium_tank"
+			size_cat = "Medium"
+			prod_days = 45.0
+	var mod_ids: Array = []
+	if data.get("modules") is Array:
+		for m in data.get("modules") as Array:
+			mod_ids.append(str(m))
+	elif data.get("modules") is Dictionary:
+		for k in (data.get("modules") as Dictionary).keys():
+			mod_ids.append(str(k))
+	var loadout: Dictionary = {}
+	for i in range(mini(mod_ids.size(), 8)):
+		loadout["slot_%d" % i] = str(mod_ids[i])
+	var tpl_dict := {
+		"id": design_id,
+		"name": str(data.get("label", data.get("name", design_id.replace("_", " ").capitalize()))),
+		"description": "Custom designer duties variant (%s)" % dom,
+		"base_type": str(data.get("base_type", base_type)),
+		"size_category": size_cat,
+		"visual_archetype": visual,
+		"design_family": "custom_%s" % dom,
+		"design_domain": dom,
+		"domain": dom,
+		"design_nation": country_tag,
+		"owner_countries": [country_tag],
+		"exportable": false,
+		"crew_required": 4 if dom == "land" else (200 if dom == "naval" else 1),
+		"base_production_days": prod_days,
+		"production_cost": 100.0 + float(mod_ids.size()) * 15.0,
+		"production_category": dom,
+		"lifecycle_role": dom,
+		"lifecycle_category": dom,
+		"base_stats": {
+			"speed": 30.0 if dom != "naval" else 28.0,
+			"reliability": 70.0,
+			"armor": 20.0 if dom == "land" else 10.0,
+			"soft_attack": 15.0,
+			"hard_attack": 12.0,
+			"fuel_consumption": 5.0,
+			"supply_need": 8.0,
+		},
+		"module_loadout": loadout,
+		"slots": {},
+		"unlock_year": get_current_year(),
+		"custom": true,
+	}
+	if dd.has_method("register_runtime_template_from_dict"):
+		var tpl = dd.register_runtime_template_from_dict(tpl_dict)
+		return tpl != null and str(tpl.id) == design_id
+	# Fallback: construct and register
+	var built: UnitTemplate = UnitTemplate.from_dict(tpl_dict)
+	if built == null:
+		return false
+	return bool(dd.register_runtime_template(built))
+
+
+func get_custom_design(country_tag: String, design_id: String) -> Dictionary:
+	var tag := _norm_tag(country_tag)
+	var did := design_id.strip_edges()
+	if tag.is_empty() or did.is_empty():
+		return {}
+	if not _custom_designs.has(tag):
+		return {}
+	var bucket: Dictionary = _custom_designs[tag] as Dictionary
+	if not bucket.has(did):
+		return {}
+	return (bucket[did] as Dictionary).duplicate(true)
+
+
+func get_custom_design_ids(country_tag: String, domain: String = DOMAIN_ALL) -> Array[String]:
+	var tag := _norm_tag(country_tag)
+	var out: Array[String] = []
+	if tag.is_empty() or not _custom_designs.has(tag):
+		return out
+	var bucket: Dictionary = _custom_designs[tag] as Dictionary
+	for did in bucket.keys():
+		var row: Dictionary = bucket[did] as Dictionary
+		var ddom := str(row.get("domain", "")).to_lower()
+		if domain != DOMAIN_ALL and not domain.is_empty() and ddom != domain.to_lower() and domain.to_lower() != "all":
+			# also allow id inference match
+			if not _matches_domain(str(did), domain):
+				continue
+		out.append(str(did))
+	_sort_design_ids(out)
+	return out
+
+
+func has_custom_design(country_tag: String, design_id: String) -> bool:
+	return not get_custom_design(country_tag, design_id).is_empty()
+
+
+func _infer_domain_from_id(design_id: String) -> String:
+	var id := design_id.to_lower()
+	if "naval" in id or "ship" in id or "destroyer" in id or "cruiser" in id or "sub" in id:
+		return DOMAIN_NAVAL
+	if "air" in id or "fighter" in id or "bomber" in id or "cas" in id:
+		return DOMAIN_AIR
+	if "space" in id or "sat" in id or "orbital" in id or "station" in id:
+		return DOMAIN_SPACE
+	if "tank" in id or "armor" in id or "land" in id or "infantry" in id:
+		return DOMAIN_LAND
+	return DOMAIN_LAND
+
 
 ## === Nation-Specific Design Support (for Map Build Eligibility + future trade/capture) ===
 
@@ -792,20 +1035,27 @@ func _buildable_design_ids(country_tag: String, factory: Factory = null) -> Arra
 
 func _catalog_design_ids(country_tag: String, factory: Factory = null) -> Array[String]:
 	## Nation-visible designs (domestic, universal, or acquired foreign) — tech not applied.
+	## Also includes player/AI custom designs from register_custom_design.
 	var tag := _norm_tag(country_tag)
 	var out: Array[String] = []
-	if GameData.design_data == null:
-		return out
-	for template_id in GameData.design_data.templates.keys():
-		var did := str(template_id)
-		var template: UnitTemplate = GameData.design_data.get_template(did)
-		if template == null or template.is_infantry_equipment():
+	if typeof(GameData) != TYPE_NIL and GameData.design_data != null:
+		for template_id in GameData.design_data.templates.keys():
+			var did := str(template_id)
+			var template: UnitTemplate = GameData.design_data.get_template(did)
+			if template == null or template.is_infantry_equipment():
+				continue
+			if not _country_may_use_design(tag, did):
+				continue
+			if factory != null and not is_design_factory_compatible(did, factory):
+				continue
+			out.append(did)
+	# Custom designer duties designs always visible to owner nation.
+	for cid in get_custom_design_ids(tag, DOMAIN_ALL):
+		if cid in out:
 			continue
-		if not _country_may_use_design(tag, did):
+		if factory != null and not is_design_factory_compatible(cid, factory):
 			continue
-		if factory != null and not is_design_factory_compatible(did, factory):
-			continue
-		out.append(did)
+		out.append(cid)
 	return out
 
 

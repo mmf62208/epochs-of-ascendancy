@@ -64,6 +64,12 @@ logs/
 # Tools / Generators cache
 tools/__pycache__/
 tools/*.pyc
+tools/map_generation/data/cache/
+
+# Board merge backups / scratch copies (live boards stay tracked)
+data/provinces_world_accurate.bak_*/
+*.bak_*
+*.bak_pre_*
 
 # Large binary files (optional but recommended)
 *.png~                # Godot import temp files

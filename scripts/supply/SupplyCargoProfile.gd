@@ -5,6 +5,10 @@ var cargo_tons: float = 0.0
 var prefers_air: bool = false
 var prefers_sea: bool = false
 var land_ok: bool = true
+## Pass 18: cargo kind for munitions-aware ammo UI (general | munitions | fuel | mixed).
+var cargo_kind: String = "general"
+## Fraction of cargo considered munitions/ammo (0–1). General supplies default ~0.35.
+var munitions_fraction: float = 0.35
 
 
 static func from_template(template: UnitTemplate, rules: SupplyRules, tonnage_override: float = -1.0) -> SupplyCargoProfile:
@@ -26,6 +30,16 @@ static func from_template(template: UnitTemplate, rules: SupplyRules, tonnage_ov
 		profile.land_ok = false
 	elif base_type == "air":
 		profile.land_ok = false
+	# Munitions-heavy archetypes.
+	if "ammo" in archetype or "munition" in archetype or "artillery" in archetype or "ordnance" in archetype:
+		profile.cargo_kind = "munitions"
+		profile.munitions_fraction = 0.85
+	elif "fuel" in archetype or "tanker" in archetype:
+		profile.cargo_kind = "fuel"
+		profile.munitions_fraction = 0.1
+	else:
+		profile.cargo_kind = "general"
+		profile.munitions_fraction = 0.35
 	return profile
 
 
@@ -33,4 +47,21 @@ static func general_supplies(tons: float) -> SupplyCargoProfile:
 	var p := SupplyCargoProfile.new()
 	p.cargo_tons = tons
 	p.land_ok = true
+	p.cargo_kind = "general"
+	p.munitions_fraction = 0.35
 	return p
+
+
+## Pass 18: dedicated munitions cargo profile for ammo-centric logistics.
+static func munitions(tons: float) -> SupplyCargoProfile:
+	var p := SupplyCargoProfile.new()
+	p.cargo_tons = tons
+	p.land_ok = true
+	p.cargo_kind = "munitions"
+	p.munitions_fraction = 0.9
+	return p
+
+
+## Effective munitions tons in this cargo shipment.
+func munitions_tons() -> float:
+	return maxf(0.0, cargo_tons * clampf(munitions_fraction, 0.0, 1.0))

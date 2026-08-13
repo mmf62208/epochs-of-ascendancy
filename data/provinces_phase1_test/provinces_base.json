@@ -3,12 +3,14 @@
     "version": 2,
     "source": "sync_phase1_base_catalog.py",
     "province_count": 472,
-    "geometry_authoritative": true
+    "geometry_authoritative": true,
+    "names_assigned": "assign_europe_province_names.py",
+    "name_assignment_unique": 507
   },
   "provinces": [
     {
       "id": 1,
-      "name": "Jerusalem",
+      "name": "Alexandria",
       "terrain": "hills",
       "core_for_tags": [
         "ISR",
@@ -47,7 +49,7 @@
     },
     {
       "id": 6,
-      "name": "Washington DC",
+      "name": "Reykjavik",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -65,7 +67,7 @@
     },
     {
       "id": 7,
-      "name": "Houston Energy Corridor",
+      "name": "Lisbon",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -83,7 +85,7 @@
     },
     {
       "id": 9,
-      "name": "Tokyo",
+      "name": "Salekhard",
       "terrain": "urban",
       "core_for_tags": [
         "JAP"
@@ -101,7 +103,7 @@
     },
     {
       "id": 10,
-      "name": "Beijing",
+      "name": "Vorkuta",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -120,7 +122,7 @@
     },
     {
       "id": 13,
-      "name": "Baku Oil Fields",
+      "name": "Baku",
       "terrain": "plains",
       "core_for_tags": [
         "AZE"
@@ -138,7 +140,7 @@
     },
     {
       "id": 15,
-      "name": "Silicon Valley",
+      "name": "Galway",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -234,7 +236,7 @@
     },
     {
       "id": 25,
-      "name": "Seoul",
+      "name": "Ufa",
       "terrain": "urban",
       "core_for_tags": [
         "KOR"
@@ -252,7 +254,7 @@
     },
     {
       "id": 27,
-      "name": "Johannesburg",
+      "name": "Sumqayit",
       "terrain": "hills",
       "core_for_tags": [
         "SAF"
@@ -272,7 +274,7 @@
     },
     {
       "id": 30,
-      "name": "Sao Paulo",
+      "name": "Casablanca",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -309,7 +311,7 @@
     },
     {
       "id": 33,
-      "name": "Hong Kong",
+      "name": "Perm",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -327,7 +329,7 @@
     },
     {
       "id": 34,
-      "name": "Singapore",
+      "name": "Derbent",
       "terrain": "urban",
       "core_for_tags": [
         "SGP"
@@ -345,7 +347,7 @@
     },
     {
       "id": 37,
-      "name": "Ottawa",
+      "name": "Limerick",
       "terrain": "urban",
       "core_for_tags": [
         "CAN"
@@ -363,7 +365,7 @@
     },
     {
       "id": 39,
-      "name": "Vancouver",
+      "name": "Cork",
       "terrain": "coastal",
       "core_for_tags": [
         "CAN"
@@ -383,7 +385,7 @@
     },
     {
       "id": 43,
-      "name": "Guangzhou",
+      "name": "Makhachkala",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -402,7 +404,7 @@
     },
     {
       "id": 85,
-      "name": "Damascus",
+      "name": "Hatay",
       "terrain": "urban",
       "core_for_tags": [
         "SYR"
@@ -421,7 +423,7 @@
     },
     {
       "id": 9000,
-      "name": "New Settlement",
+      "name": "Nakhchivan",
       "terrain": "coastal",
       "core_for_tags": [
         "MYS"
@@ -441,7 +443,7 @@
     },
     {
       "id": 9001,
-      "name": "New Settlement",
+      "name": "Ganja",
       "terrain": "coastal",
       "core_for_tags": [
         "MYS"
@@ -461,7 +463,7 @@
     },
     {
       "id": 9002,
-      "name": "New Settlement",
+      "name": "Hakkari",
       "terrain": "coastal",
       "core_for_tags": [
         "MYS"
@@ -481,7 +483,7 @@
     },
     {
       "id": 9003,
-      "name": "New Settlement",
+      "name": "Yerevan",
       "terrain": "coastal",
       "core_for_tags": [
         "MYS"
@@ -501,7 +503,7 @@
     },
     {
       "id": 9004,
-      "name": "New Settlement",
+      "name": "Van",
       "terrain": "coastal",
       "core_for_tags": [
         "MYS"
@@ -521,7 +523,7 @@
     },
     {
       "id": 9005,
-      "name": "Penang",
+      "name": "Sirnak",
       "terrain": "coastal",
       "core_for_tags": [
         "MYS"
@@ -541,7 +543,7 @@
     },
     {
       "id": 9006,
-      "name": "New Settlement",
+      "name": "Setubal",
       "terrain": "coastal",
       "core_for_tags": [
         "VEN"
@@ -561,7 +563,7 @@
     },
     {
       "id": 9007,
-      "name": "New Settlement",
+      "name": "Faro",
       "terrain": "coastal",
       "core_for_tags": [
         "VEN"
@@ -581,7 +583,7 @@
     },
     {
       "id": 9008,
-      "name": "New Settlement",
+      "name": "Rabat",
       "terrain": "coastal",
       "core_for_tags": [
         "VEN"
@@ -601,7 +603,7 @@
     },
     {
       "id": 9009,
-      "name": "New Settlement",
+      "name": "Leiria",
       "terrain": "coastal",
       "core_for_tags": [
         "VEN"
@@ -621,7 +623,7 @@
     },
     {
       "id": 9010,
-      "name": "New Settlement",
+      "name": "Beja",
       "terrain": "coastal",
       "core_for_tags": [
         "VEN"
@@ -641,7 +643,7 @@
     },
     {
       "id": 9011,
-      "name": "Caracas",
+      "name": "Evora",
       "terrain": "coastal",
       "core_for_tags": [
         "VEN"
@@ -661,7 +663,7 @@
     },
     {
       "id": 9012,
-      "name": "New Settlement",
+      "name": "Coimbra",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -681,7 +683,7 @@
     },
     {
       "id": 9013,
-      "name": "New Settlement",
+      "name": "Huelva",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -701,7 +703,7 @@
     },
     {
       "id": 9014,
-      "name": "New Settlement",
+      "name": "Aveiro",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -721,7 +723,7 @@
     },
     {
       "id": 9015,
-      "name": "New Settlement",
+      "name": "Cadiz",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -741,7 +743,7 @@
     },
     {
       "id": 9016,
-      "name": "New Settlement",
+      "name": "Tangier",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -761,7 +763,7 @@
     },
     {
       "id": 9017,
-      "name": "Anchorage",
+      "name": "Porto",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -781,7 +783,7 @@
     },
     {
       "id": 9018,
-      "name": "New Settlement",
+      "name": "Igdir",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -801,7 +803,7 @@
     },
     {
       "id": 9019,
-      "name": "New Settlement",
+      "name": "Vanadzor",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -821,7 +823,7 @@
     },
     {
       "id": 9020,
-      "name": "New Settlement",
+      "name": "Astrakhan",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -841,7 +843,7 @@
     },
     {
       "id": 9021,
-      "name": "New Settlement",
+      "name": "Tbilisi",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -861,7 +863,7 @@
     },
     {
       "id": 9022,
-      "name": "New Settlement",
+      "name": "Grozny",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -881,7 +883,7 @@
     },
     {
       "id": 9023,
-      "name": "Auckland",
+      "name": "Gyumri",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -901,7 +903,7 @@
     },
     {
       "id": 9024,
-      "name": "New Settlement",
+      "name": "Portalegre",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -921,7 +923,7 @@
     },
     {
       "id": 9025,
-      "name": "New Settlement",
+      "name": "Badajoz",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -941,7 +943,7 @@
     },
     {
       "id": 9026,
-      "name": "New Settlement",
+      "name": "Seville",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -961,7 +963,7 @@
     },
     {
       "id": 9027,
-      "name": "New Settlement",
+      "name": "Viseu",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -981,7 +983,7 @@
     },
     {
       "id": 9028,
-      "name": "New Settlement",
+      "name": "Braga",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -1001,7 +1003,7 @@
     },
     {
       "id": 9029,
-      "name": "Santiago de Cuba",
+      "name": "Vigo",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -1021,7 +1023,7 @@
     },
     {
       "id": 9030,
-      "name": "New Settlement",
+      "name": "Mardin",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -1041,7 +1043,7 @@
     },
     {
       "id": 9031,
-      "name": "New Settlement",
+      "name": "Siirt",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -1061,7 +1063,7 @@
     },
     {
       "id": 9032,
-      "name": "New Settlement",
+      "name": "Batman",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -1081,7 +1083,7 @@
     },
     {
       "id": 9033,
-      "name": "New Settlement",
+      "name": "Sanliurfa",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -1101,7 +1103,7 @@
     },
     {
       "id": 9034,
-      "name": "New Settlement",
+      "name": "Diyarbakir",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -1121,7 +1123,7 @@
     },
     {
       "id": 9035,
-      "name": "Cape Town",
+      "name": "Kilis",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -1141,7 +1143,7 @@
     },
     {
       "id": 9036,
-      "name": "New Settlement",
+      "name": "Agri",
       "terrain": "coastal",
       "core_for_tags": [
         "AUS"
@@ -1161,7 +1163,7 @@
     },
     {
       "id": 9037,
-      "name": "New Settlement",
+      "name": "Kars",
       "terrain": "coastal",
       "core_for_tags": [
         "AUS"
@@ -1181,7 +1183,7 @@
     },
     {
       "id": 9038,
-      "name": "New Settlement",
+      "name": "Vladikavkaz",
       "terrain": "coastal",
       "core_for_tags": [
         "AUS"
@@ -1201,7 +1203,7 @@
     },
     {
       "id": 9039,
-      "name": "New Settlement",
+      "name": "Ardahan",
       "terrain": "coastal",
       "core_for_tags": [
         "AUS"
@@ -1221,7 +1223,7 @@
     },
     {
       "id": 9040,
-      "name": "New Settlement",
+      "name": "Erzurum",
       "terrain": "coastal",
       "core_for_tags": [
         "AUS"
@@ -1241,7 +1243,7 @@
     },
     {
       "id": 9041,
-      "name": "Darwin",
+      "name": "Nalchik",
       "terrain": "coastal",
       "core_for_tags": [
         "AUS"
@@ -1261,7 +1263,7 @@
     },
     {
       "id": 9042,
-      "name": "New Settlement",
+      "name": "Samara",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -1281,7 +1283,7 @@
     },
     {
       "id": 9043,
-      "name": "New Settlement",
+      "name": "Kutaisi",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -1301,7 +1303,7 @@
     },
     {
       "id": 9044,
-      "name": "New Settlement",
+      "name": "Artvin",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -1321,7 +1323,7 @@
     },
     {
       "id": 9045,
-      "name": "New Settlement",
+      "name": "Artvin District",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -1341,7 +1343,7 @@
     },
     {
       "id": 9046,
-      "name": "New Settlement",
+      "name": "Batumi",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -1361,7 +1363,7 @@
     },
     {
       "id": 9047,
-      "name": "Cebu",
+      "name": "Ulyanovsk",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -1381,7 +1383,7 @@
     },
     {
       "id": 9048,
-      "name": "New Settlement",
+      "name": "Syktyvkar",
       "terrain": "hills",
       "core_for_tags": [
         "RUS"
@@ -1400,7 +1402,7 @@
     },
     {
       "id": 9049,
-      "name": "New Settlement",
+      "name": "Kirov",
       "terrain": "hills",
       "core_for_tags": [
         "RUS"
@@ -1419,7 +1421,7 @@
     },
     {
       "id": 9050,
-      "name": "New Settlement",
+      "name": "Kazan",
       "terrain": "hills",
       "core_for_tags": [
         "RUS"
@@ -1438,7 +1440,7 @@
     },
     {
       "id": 9051,
-      "name": "New Settlement",
+      "name": "Yoshkar-Ola",
       "terrain": "hills",
       "core_for_tags": [
         "RUS"
@@ -1457,7 +1459,7 @@
     },
     {
       "id": 9052,
-      "name": "New Settlement",
+      "name": "Cheboksary",
       "terrain": "hills",
       "core_for_tags": [
         "RUS"
@@ -1476,7 +1478,7 @@
     },
     {
       "id": 9053,
-      "name": "New Settlement",
+      "name": "Naryan-Mar",
       "terrain": "hills",
       "core_for_tags": [
         "RUS"
@@ -1495,7 +1497,7 @@
     },
     {
       "id": 9054,
-      "name": "New Settlement",
+      "name": "Bayburt",
       "terrain": "urban",
       "core_for_tags": [
         "IRN"
@@ -1513,7 +1515,7 @@
     },
     {
       "id": 9055,
-      "name": "New Settlement",
+      "name": "Rize",
       "terrain": "urban",
       "core_for_tags": [
         "IRN"
@@ -1531,7 +1533,7 @@
     },
     {
       "id": 9056,
-      "name": "New Settlement",
+      "name": "Rize Coast",
       "terrain": "urban",
       "core_for_tags": [
         "IRN"
@@ -1549,7 +1551,7 @@
     },
     {
       "id": 9057,
-      "name": "New Settlement",
+      "name": "Rize District",
       "terrain": "urban",
       "core_for_tags": [
         "IRN"
@@ -1567,7 +1569,7 @@
     },
     {
       "id": 9058,
-      "name": "New Settlement",
+      "name": "Erzincan",
       "terrain": "urban",
       "core_for_tags": [
         "IRN"
@@ -1585,7 +1587,7 @@
     },
     {
       "id": 9059,
-      "name": "Tehran",
+      "name": "Adiyaman",
       "terrain": "urban",
       "core_for_tags": [
         "IRN"
@@ -1603,7 +1605,7 @@
     },
     {
       "id": 9060,
-      "name": "New Settlement",
+      "name": "Saratov",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -1621,7 +1623,7 @@
     },
     {
       "id": 9061,
-      "name": "New Settlement",
+      "name": "Saransk",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -1639,7 +1641,7 @@
     },
     {
       "id": 9062,
-      "name": "New Settlement",
+      "name": "Penza",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -1657,7 +1659,7 @@
     },
     {
       "id": 9063,
-      "name": "New Settlement",
+      "name": "Nizhny Novgorod Region",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -1675,7 +1677,7 @@
     },
     {
       "id": 9064,
-      "name": "New Settlement",
+      "name": "Nizhny Novgorod",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -1711,7 +1713,7 @@
     },
     {
       "id": 9066,
-      "name": "New Settlement",
+      "name": "Oran",
       "terrain": "coastal",
       "core_for_tags": [
         "NGA"
@@ -1731,7 +1733,7 @@
     },
     {
       "id": 9067,
-      "name": "New Settlement",
+      "name": "Tripoli",
       "terrain": "coastal",
       "core_for_tags": [
         "NGA"
@@ -1751,7 +1753,7 @@
     },
     {
       "id": 9068,
-      "name": "New Settlement",
+      "name": "Algiers",
       "terrain": "coastal",
       "core_for_tags": [
         "NGA"
@@ -1771,7 +1773,7 @@
     },
     {
       "id": 9069,
-      "name": "New Settlement",
+      "name": "Benghazi",
       "terrain": "coastal",
       "core_for_tags": [
         "NGA"
@@ -1791,7 +1793,7 @@
     },
     {
       "id": 9070,
-      "name": "New Settlement",
+      "name": "Almeria",
       "terrain": "coastal",
       "core_for_tags": [
         "NGA"
@@ -1811,7 +1813,7 @@
     },
     {
       "id": 9071,
-      "name": "Lagos",
+      "name": "Malaga",
       "terrain": "coastal",
       "core_for_tags": [
         "NGA"
@@ -1831,7 +1833,7 @@
     },
     {
       "id": 9072,
-      "name": "New Settlement",
+      "name": "Guarda",
       "terrain": "coastal",
       "core_for_tags": [
         "VEN"
@@ -1851,7 +1853,7 @@
     },
     {
       "id": 9073,
-      "name": "New Settlement",
+      "name": "Pontevedra",
       "terrain": "coastal",
       "core_for_tags": [
         "VEN"
@@ -1871,7 +1873,7 @@
     },
     {
       "id": 9074,
-      "name": "New Settlement",
+      "name": "Caceres",
       "terrain": "coastal",
       "core_for_tags": [
         "VEN"
@@ -1891,7 +1893,7 @@
     },
     {
       "id": 9075,
-      "name": "New Settlement",
+      "name": "Cordoba",
       "terrain": "coastal",
       "core_for_tags": [
         "VEN"
@@ -1911,7 +1913,7 @@
     },
     {
       "id": 9076,
-      "name": "New Settlement",
+      "name": "Ourense",
       "terrain": "coastal",
       "core_for_tags": [
         "VEN"
@@ -1951,106 +1953,6 @@
     },
     {
       "id": 9078,
-      "name": "New Settlement",
-      "terrain": "coastal",
-      "core_for_tags": [
-        "NOR"
-      ],
-      "natural_resources": {
-        "resources": {
-          "oil": 99
-        },
-        "resource_score": 99,
-        "primary_resource": "oil"
-      },
-      "population_base": 1027000,
-      "special_features": [
-        "coastal_access"
-      ],
-      "special_levels": {}
-    },
-    {
-      "id": 9079,
-      "name": "New Settlement",
-      "terrain": "coastal",
-      "core_for_tags": [
-        "NOR"
-      ],
-      "natural_resources": {
-        "resources": {
-          "oil": 99
-        },
-        "resource_score": 99,
-        "primary_resource": "oil"
-      },
-      "population_base": 1027000,
-      "special_features": [
-        "coastal_access"
-      ],
-      "special_levels": {}
-    },
-    {
-      "id": 9080,
-      "name": "New Settlement",
-      "terrain": "coastal",
-      "core_for_tags": [
-        "NOR"
-      ],
-      "natural_resources": {
-        "resources": {
-          "oil": 99
-        },
-        "resource_score": 99,
-        "primary_resource": "oil"
-      },
-      "population_base": 1027000,
-      "special_features": [
-        "coastal_access"
-      ],
-      "special_levels": {}
-    },
-    {
-      "id": 9081,
-      "name": "New Settlement",
-      "terrain": "coastal",
-      "core_for_tags": [
-        "NOR"
-      ],
-      "natural_resources": {
-        "resources": {
-          "oil": 99
-        },
-        "resource_score": 99,
-        "primary_resource": "oil"
-      },
-      "population_base": 1027000,
-      "special_features": [
-        "coastal_access"
-      ],
-      "special_levels": {}
-    },
-    {
-      "id": 9082,
-      "name": "New Settlement",
-      "terrain": "coastal",
-      "core_for_tags": [
-        "NOR"
-      ],
-      "natural_resources": {
-        "resources": {
-          "oil": 99
-        },
-        "resource_score": 99,
-        "primary_resource": "oil"
-      },
-      "population_base": 1027000,
-      "special_features": [
-        "coastal_access"
-      ],
-      "special_levels": {}
-    },
-    {
-      "id": 9083,
       "name": "Oslo",
       "terrain": "coastal",
       "core_for_tags": [
@@ -2070,8 +1972,108 @@
       "special_levels": {}
     },
     {
+      "id": 9079,
+      "name": "Trondheim",
+      "terrain": "coastal",
+      "core_for_tags": [
+        "NOR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [
+        "coastal_access"
+      ],
+      "special_levels": {}
+    },
+    {
+      "id": 9080,
+      "name": "Gothenburg",
+      "terrain": "coastal",
+      "core_for_tags": [
+        "NOR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [
+        "coastal_access"
+      ],
+      "special_levels": {}
+    },
+    {
+      "id": 9081,
+      "name": "Uppsala",
+      "terrain": "coastal",
+      "core_for_tags": [
+        "NOR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [
+        "coastal_access"
+      ],
+      "special_levels": {}
+    },
+    {
+      "id": 9082,
+      "name": "Aalborg",
+      "terrain": "coastal",
+      "core_for_tags": [
+        "NOR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [
+        "coastal_access"
+      ],
+      "special_levels": {}
+    },
+    {
+      "id": 9083,
+      "name": "Aarhus",
+      "terrain": "coastal",
+      "core_for_tags": [
+        "NOR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [
+        "coastal_access"
+      ],
+      "special_levels": {}
+    },
+    {
       "id": 9084,
-      "name": "New Settlement",
+      "name": "Zhytomyr",
       "terrain": "urban",
       "core_for_tags": [
         "UKR"
@@ -2089,7 +2091,7 @@
     },
     {
       "id": 9085,
-      "name": "New Settlement",
+      "name": "Gomel",
       "terrain": "urban",
       "core_for_tags": [
         "UKR"
@@ -2107,7 +2109,7 @@
     },
     {
       "id": 9086,
-      "name": "New Settlement",
+      "name": "Chernihiv",
       "terrain": "urban",
       "core_for_tags": [
         "UKR"
@@ -2125,7 +2127,7 @@
     },
     {
       "id": 9087,
-      "name": "New Settlement",
+      "name": "Cherkasy",
       "terrain": "urban",
       "core_for_tags": [
         "UKR"
@@ -2143,7 +2145,7 @@
     },
     {
       "id": 9088,
-      "name": "New Settlement",
+      "name": "Kirovohrad",
       "terrain": "urban",
       "core_for_tags": [
         "UKR"
@@ -2179,7 +2181,7 @@
     },
     {
       "id": 9090,
-      "name": "New Settlement",
+      "name": "Malatya",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -2197,7 +2199,7 @@
     },
     {
       "id": 9091,
-      "name": "New Settlement",
+      "name": "Gaziantep",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -2215,7 +2217,7 @@
     },
     {
       "id": 9092,
-      "name": "New Settlement",
+      "name": "Gumushane",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -2233,7 +2235,7 @@
     },
     {
       "id": 9093,
-      "name": "New Settlement",
+      "name": "Trabzon",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -2251,7 +2253,7 @@
     },
     {
       "id": 9094,
-      "name": "New Settlement",
+      "name": "Kahramanmaras",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -2269,7 +2271,7 @@
     },
     {
       "id": 9095,
-      "name": "Bangalore",
+      "name": "Sukhumi",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -2287,7 +2289,7 @@
     },
     {
       "id": 9096,
-      "name": "New Settlement",
+      "name": "Stavropol",
       "terrain": "urban",
       "core_for_tags": [
         "THA"
@@ -2305,7 +2307,7 @@
     },
     {
       "id": 9097,
-      "name": "New Settlement",
+      "name": "Rize Fix",
       "terrain": "urban",
       "core_for_tags": [
         "THA"
@@ -2323,7 +2325,7 @@
     },
     {
       "id": 9098,
-      "name": "New Settlement",
+      "name": "Giresun",
       "terrain": "urban",
       "core_for_tags": [
         "THA"
@@ -2341,7 +2343,7 @@
     },
     {
       "id": 9099,
-      "name": "New Settlement",
+      "name": "Sochi",
       "terrain": "urban",
       "core_for_tags": [
         "THA"
@@ -2359,7 +2361,7 @@
     },
     {
       "id": 9100,
-      "name": "New Settlement",
+      "name": "Osmaniye",
       "terrain": "urban",
       "core_for_tags": [
         "THA"
@@ -2377,7 +2379,7 @@
     },
     {
       "id": 9101,
-      "name": "Bangkok",
+      "name": "Maikop",
       "terrain": "urban",
       "core_for_tags": [
         "THA"
@@ -2395,7 +2397,7 @@
     },
     {
       "id": 9102,
-      "name": "New Settlement",
+      "name": "Adana",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -2416,7 +2418,7 @@
     },
     {
       "id": 9103,
-      "name": "New Settlement",
+      "name": "Mersin",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -2437,7 +2439,7 @@
     },
     {
       "id": 9104,
-      "name": "New Settlement",
+      "name": "Sivas",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -2458,7 +2460,7 @@
     },
     {
       "id": 9105,
-      "name": "New Settlement",
+      "name": "Ordu",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -2479,7 +2481,7 @@
     },
     {
       "id": 9106,
-      "name": "New Settlement",
+      "name": "Kayseri",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -2500,7 +2502,7 @@
     },
     {
       "id": 9107,
-      "name": "Durban",
+      "name": "Nigde",
       "terrain": "coastal",
       "core_for_tags": [
         "SAF"
@@ -2521,7 +2523,7 @@
     },
     {
       "id": 9108,
-      "name": "New Settlement",
+      "name": "A Coruña",
       "terrain": "coastal",
       "core_for_tags": [
         "PER"
@@ -2541,7 +2543,7 @@
     },
     {
       "id": 9109,
-      "name": "New Settlement",
+      "name": "Lugo",
       "terrain": "coastal",
       "core_for_tags": [
         "PER"
@@ -2561,7 +2563,7 @@
     },
     {
       "id": 9110,
-      "name": "New Settlement",
+      "name": "Braganca",
       "terrain": "coastal",
       "core_for_tags": [
         "PER"
@@ -2581,7 +2583,7 @@
     },
     {
       "id": 9111,
-      "name": "New Settlement",
+      "name": "Granada",
       "terrain": "coastal",
       "core_for_tags": [
         "PER"
@@ -2601,7 +2603,7 @@
     },
     {
       "id": 9112,
-      "name": "New Settlement",
+      "name": "Jaen",
       "terrain": "coastal",
       "core_for_tags": [
         "PER"
@@ -2621,7 +2623,7 @@
     },
     {
       "id": 9113,
-      "name": "Lima",
+      "name": "Salamanca",
       "terrain": "coastal",
       "core_for_tags": [
         "PER"
@@ -2641,7 +2643,7 @@
     },
     {
       "id": 9114,
-      "name": "New Settlement",
+      "name": "Chisinau",
       "terrain": "coastal",
       "core_for_tags": [
         "UKR"
@@ -2661,86 +2663,6 @@
     },
     {
       "id": 9115,
-      "name": "New Settlement",
-      "terrain": "coastal",
-      "core_for_tags": [
-        "UKR"
-      ],
-      "natural_resources": {
-        "resources": {
-          "oil": 24
-        },
-        "resource_score": 24,
-        "primary_resource": "oil"
-      },
-      "population_base": 1079000,
-      "special_features": [
-        "coastal_access"
-      ],
-      "special_levels": {}
-    },
-    {
-      "id": 9116,
-      "name": "New Settlement",
-      "terrain": "coastal",
-      "core_for_tags": [
-        "UKR"
-      ],
-      "natural_resources": {
-        "resources": {
-          "oil": 24
-        },
-        "resource_score": 24,
-        "primary_resource": "oil"
-      },
-      "population_base": 1079000,
-      "special_features": [
-        "coastal_access"
-      ],
-      "special_levels": {}
-    },
-    {
-      "id": 9117,
-      "name": "New Settlement",
-      "terrain": "coastal",
-      "core_for_tags": [
-        "UKR"
-      ],
-      "natural_resources": {
-        "resources": {
-          "oil": 24
-        },
-        "resource_score": 24,
-        "primary_resource": "oil"
-      },
-      "population_base": 1079000,
-      "special_features": [
-        "coastal_access"
-      ],
-      "special_levels": {}
-    },
-    {
-      "id": 9118,
-      "name": "New Settlement",
-      "terrain": "coastal",
-      "core_for_tags": [
-        "UKR"
-      ],
-      "natural_resources": {
-        "resources": {
-          "oil": 24
-        },
-        "resource_score": 24,
-        "primary_resource": "oil"
-      },
-      "population_base": 1079000,
-      "special_features": [
-        "coastal_access"
-      ],
-      "special_levels": {}
-    },
-    {
-      "id": 9119,
       "name": "Odessa",
       "terrain": "coastal",
       "core_for_tags": [
@@ -2760,8 +2682,88 @@
       "special_levels": {}
     },
     {
+      "id": 9116,
+      "name": "Mykolaiv",
+      "terrain": "coastal",
+      "core_for_tags": [
+        "UKR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [
+        "coastal_access"
+      ],
+      "special_levels": {}
+    },
+    {
+      "id": 9117,
+      "name": "Kherson",
+      "terrain": "coastal",
+      "core_for_tags": [
+        "UKR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [
+        "coastal_access"
+      ],
+      "special_levels": {}
+    },
+    {
+      "id": 9118,
+      "name": "Constanta",
+      "terrain": "coastal",
+      "core_for_tags": [
+        "UKR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [
+        "coastal_access"
+      ],
+      "special_levels": {}
+    },
+    {
+      "id": 9119,
+      "name": "Galati",
+      "terrain": "coastal",
+      "core_for_tags": [
+        "UKR"
+      ],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [
+        "coastal_access"
+      ],
+      "special_levels": {}
+    },
+    {
       "id": 9120,
-      "name": "New Settlement",
+      "name": "Bergen",
       "terrain": "coastal",
       "core_for_tags": [
         "NOR"
@@ -2782,7 +2784,7 @@
     },
     {
       "id": 9121,
-      "name": "New Settlement",
+      "name": "Stavanger",
       "terrain": "coastal",
       "core_for_tags": [
         "NOR"
@@ -2803,7 +2805,7 @@
     },
     {
       "id": 9122,
-      "name": "New Settlement",
+      "name": "Stockholm",
       "terrain": "coastal",
       "core_for_tags": [
         "NOR"
@@ -2824,7 +2826,7 @@
     },
     {
       "id": 9123,
-      "name": "New Settlement",
+      "name": "Malmö",
       "terrain": "coastal",
       "core_for_tags": [
         "NOR"
@@ -2845,7 +2847,7 @@
     },
     {
       "id": 9124,
-      "name": "New Settlement",
+      "name": "Odense",
       "terrain": "coastal",
       "core_for_tags": [
         "NOR"
@@ -2866,7 +2868,7 @@
     },
     {
       "id": 9125,
-      "name": "Trondheim",
+      "name": "Flensburg",
       "terrain": "coastal",
       "core_for_tags": [
         "NOR"
@@ -2887,7 +2889,7 @@
     },
     {
       "id": 9126,
-      "name": "New Settlement",
+      "name": "Tuapse",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -2907,7 +2909,7 @@
     },
     {
       "id": 9127,
-      "name": "New Settlement",
+      "name": "Krasnodar Region",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -2927,7 +2929,7 @@
     },
     {
       "id": 9128,
-      "name": "New Settlement",
+      "name": "Krasnodar",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -2947,7 +2949,7 @@
     },
     {
       "id": 9129,
-      "name": "New Settlement",
+      "name": "Rostov Region",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -2967,7 +2969,7 @@
     },
     {
       "id": 9130,
-      "name": "New Settlement",
+      "name": "Rostov-on-Don",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -2987,7 +2989,7 @@
     },
     {
       "id": 9131,
-      "name": "Manila",
+      "name": "Tokat",
       "terrain": "coastal",
       "core_for_tags": [
         "PHL"
@@ -3007,7 +3009,7 @@
     },
     {
       "id": 9132,
-      "name": "New Settlement",
+      "name": "Nevsehir",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -3027,7 +3029,7 @@
     },
     {
       "id": 9133,
-      "name": "New Settlement",
+      "name": "Samsun",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -3047,7 +3049,7 @@
     },
     {
       "id": 9134,
-      "name": "New Settlement",
+      "name": "Amasya",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -3067,7 +3069,7 @@
     },
     {
       "id": 9135,
-      "name": "New Settlement",
+      "name": "Aksaray",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -3087,7 +3089,7 @@
     },
     {
       "id": 9136,
-      "name": "New Settlement",
+      "name": "Karaman",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -3107,7 +3109,7 @@
     },
     {
       "id": 9137,
-      "name": "Christchurch",
+      "name": "Gelendzhik",
       "terrain": "coastal",
       "core_for_tags": [
         "NZL"
@@ -3127,7 +3129,7 @@
     },
     {
       "id": 9138,
-      "name": "New Settlement",
+      "name": "Zamora",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -3147,7 +3149,7 @@
     },
     {
       "id": 9139,
-      "name": "New Settlement",
+      "name": "Ciudad Real",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -3167,7 +3169,7 @@
     },
     {
       "id": 9140,
-      "name": "New Settlement",
+      "name": "Avila",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -3187,7 +3189,7 @@
     },
     {
       "id": 9141,
-      "name": "New Settlement",
+      "name": "Toledo",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -3207,7 +3209,7 @@
     },
     {
       "id": 9142,
-      "name": "New Settlement",
+      "name": "Leon",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -3227,7 +3229,7 @@
     },
     {
       "id": 9143,
-      "name": "Honolulu",
+      "name": "Oviedo",
       "terrain": "coastal",
       "core_for_tags": [
         "USA"
@@ -3247,7 +3249,7 @@
     },
     {
       "id": 9144,
-      "name": "New Settlement",
+      "name": "Valladolid",
       "terrain": "coastal",
       "core_for_tags": [
         "ISL"
@@ -3267,7 +3269,7 @@
     },
     {
       "id": 9145,
-      "name": "New Settlement",
+      "name": "Segovia",
       "terrain": "coastal",
       "core_for_tags": [
         "ISL"
@@ -3287,7 +3289,7 @@
     },
     {
       "id": 9146,
-      "name": "New Settlement",
+      "name": "Palencia",
       "terrain": "coastal",
       "core_for_tags": [
         "ISL"
@@ -3307,7 +3309,7 @@
     },
     {
       "id": 9147,
-      "name": "New Settlement",
+      "name": "Guadalajara",
       "terrain": "coastal",
       "core_for_tags": [
         "ISL"
@@ -3327,7 +3329,7 @@
     },
     {
       "id": 9148,
-      "name": "New Settlement",
+      "name": "Burgos",
       "terrain": "coastal",
       "core_for_tags": [
         "ISL"
@@ -3347,7 +3349,7 @@
     },
     {
       "id": 9149,
-      "name": "Reykjavik",
+      "name": "Albacete",
       "terrain": "coastal",
       "core_for_tags": [
         "ISL"
@@ -3367,7 +3369,7 @@
     },
     {
       "id": 9150,
-      "name": "New Settlement",
+      "name": "Waterford",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -3387,7 +3389,7 @@
     },
     {
       "id": 9151,
-      "name": "New Settlement",
+      "name": "Derry",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -3407,7 +3409,7 @@
     },
     {
       "id": 9152,
-      "name": "New Settlement",
+      "name": "Dublin",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -3427,7 +3429,7 @@
     },
     {
       "id": 9153,
-      "name": "New Settlement",
+      "name": "Santander",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -3447,7 +3449,7 @@
     },
     {
       "id": 9154,
-      "name": "New Settlement",
+      "name": "Truro",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -3467,7 +3469,7 @@
     },
     {
       "id": 9155,
-      "name": "Havana",
+      "name": "Brest",
       "terrain": "coastal",
       "core_for_tags": [
         "CUB"
@@ -3487,7 +3489,7 @@
     },
     {
       "id": 9156,
-      "name": "New Settlement",
+      "name": "Cartagena",
       "terrain": "coastal",
       "core_for_tags": [
         "PAN"
@@ -3507,7 +3509,7 @@
     },
     {
       "id": 9157,
-      "name": "New Settlement",
+      "name": "Murcia",
       "terrain": "coastal",
       "core_for_tags": [
         "PAN"
@@ -3527,7 +3529,7 @@
     },
     {
       "id": 9158,
-      "name": "New Settlement",
+      "name": "Cuenca",
       "terrain": "coastal",
       "core_for_tags": [
         "PAN"
@@ -3547,7 +3549,7 @@
     },
     {
       "id": 9159,
-      "name": "New Settlement",
+      "name": "Alicante",
       "terrain": "coastal",
       "core_for_tags": [
         "PAN"
@@ -3567,7 +3569,7 @@
     },
     {
       "id": 9160,
-      "name": "New Settlement",
+      "name": "Soria",
       "terrain": "coastal",
       "core_for_tags": [
         "PAN"
@@ -3587,7 +3589,7 @@
     },
     {
       "id": 9161,
-      "name": "Colon",
+      "name": "Logrono",
       "terrain": "coastal",
       "core_for_tags": [
         "PAN"
@@ -3607,7 +3609,7 @@
     },
     {
       "id": 9162,
-      "name": "New Settlement",
+      "name": "Bilbao",
       "terrain": "coastal",
       "core_for_tags": [
         "PAN"
@@ -3621,7 +3623,7 @@
     },
     {
       "id": 9163,
-      "name": "New Settlement",
+      "name": "Vitoria",
       "terrain": "coastal",
       "core_for_tags": [
         "PAN"
@@ -3635,7 +3637,7 @@
     },
     {
       "id": 9164,
-      "name": "New Settlement",
+      "name": "Teruel",
       "terrain": "coastal",
       "core_for_tags": [
         "PAN"
@@ -3649,7 +3651,7 @@
     },
     {
       "id": 9165,
-      "name": "New Settlement",
+      "name": "San Sebastian",
       "terrain": "coastal",
       "core_for_tags": [
         "PAN"
@@ -3663,7 +3665,7 @@
     },
     {
       "id": 9166,
-      "name": "New Settlement",
+      "name": "Pamplona",
       "terrain": "coastal",
       "core_for_tags": [
         "PAN"
@@ -3691,7 +3693,7 @@
     },
     {
       "id": 9168,
-      "name": "New Settlement",
+      "name": "Tambov Region",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -3710,7 +3712,7 @@
     },
     {
       "id": 9169,
-      "name": "New Settlement",
+      "name": "Tambov",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -3729,7 +3731,7 @@
     },
     {
       "id": 9170,
-      "name": "New Settlement",
+      "name": "Novorossiysk",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -3748,7 +3750,7 @@
     },
     {
       "id": 9171,
-      "name": "New Settlement",
+      "name": "Lipetsk",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -3767,7 +3769,7 @@
     },
     {
       "id": 9172,
-      "name": "New Settlement",
+      "name": "Anapa",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -3786,7 +3788,7 @@
     },
     {
       "id": 9173,
-      "name": "Shanghai",
+      "name": "Voronezh",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -3805,7 +3807,7 @@
     },
     {
       "id": 9174,
-      "name": "New Settlement",
+      "name": "Yozgat",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -3823,7 +3825,7 @@
     },
     {
       "id": 9175,
-      "name": "New Settlement",
+      "name": "Corum",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -3841,7 +3843,7 @@
     },
     {
       "id": 9176,
-      "name": "New Settlement",
+      "name": "Mariupol",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -3859,7 +3861,7 @@
     },
     {
       "id": 9177,
-      "name": "New Settlement",
+      "name": "Sinop",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -3877,7 +3879,7 @@
     },
     {
       "id": 9178,
-      "name": "New Settlement",
+      "name": "Kerch",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -3895,7 +3897,7 @@
     },
     {
       "id": 9179,
-      "name": "New Delhi",
+      "name": "Donetsk",
       "terrain": "urban",
       "core_for_tags": [
         "IND"
@@ -3913,7 +3915,7 @@
     },
     {
       "id": 9180,
-      "name": "New Settlement",
+      "name": "Konya",
       "terrain": "desert",
       "core_for_tags": [
         "SAU"
@@ -3931,7 +3933,7 @@
     },
     {
       "id": 9181,
-      "name": "New Settlement",
+      "name": "Kirikkale",
       "terrain": "desert",
       "core_for_tags": [
         "SAU"
@@ -3949,7 +3951,7 @@
     },
     {
       "id": 9182,
-      "name": "New Settlement",
+      "name": "Antalya",
       "terrain": "desert",
       "core_for_tags": [
         "SAU"
@@ -3967,7 +3969,7 @@
     },
     {
       "id": 9183,
-      "name": "New Settlement",
+      "name": "Cankiri",
       "terrain": "desert",
       "core_for_tags": [
         "SAU"
@@ -3985,7 +3987,7 @@
     },
     {
       "id": 9184,
-      "name": "New Settlement",
+      "name": "Isparta",
       "terrain": "desert",
       "core_for_tags": [
         "SAU"
@@ -4003,7 +4005,7 @@
     },
     {
       "id": 9185,
-      "name": "New Settlement",
+      "name": "Burdur",
       "terrain": "desert",
       "core_for_tags": [
         "SAU"
@@ -4021,7 +4023,7 @@
     },
     {
       "id": 9186,
-      "name": "New Settlement",
+      "name": "Novgorod",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -4039,7 +4041,7 @@
     },
     {
       "id": 9187,
-      "name": "New Settlement",
+      "name": "Karelia",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -4057,7 +4059,7 @@
     },
     {
       "id": 9188,
-      "name": "New Settlement",
+      "name": "Petrozavodsk",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -4075,7 +4077,7 @@
     },
     {
       "id": 9189,
-      "name": "New Settlement",
+      "name": "Novgorod Region",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -4093,7 +4095,7 @@
     },
     {
       "id": 9190,
-      "name": "New Settlement",
+      "name": "Pskov Region",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -4129,7 +4131,7 @@
     },
     {
       "id": 9192,
-      "name": "New Settlement",
+      "name": "Rhodes",
       "terrain": "urban",
       "core_for_tags": [
         "EGY"
@@ -4147,7 +4149,7 @@
     },
     {
       "id": 9193,
-      "name": "New Settlement",
+      "name": "Mugla",
       "terrain": "urban",
       "core_for_tags": [
         "EGY"
@@ -4165,7 +4167,7 @@
     },
     {
       "id": 9194,
-      "name": "New Settlement",
+      "name": "Denizli",
       "terrain": "urban",
       "core_for_tags": [
         "EGY"
@@ -4183,7 +4185,7 @@
     },
     {
       "id": 9195,
-      "name": "New Settlement",
+      "name": "Heraklion",
       "terrain": "urban",
       "core_for_tags": [
         "EGY"
@@ -4201,7 +4203,7 @@
     },
     {
       "id": 9196,
-      "name": "New Settlement",
+      "name": "Aydin",
       "terrain": "urban",
       "core_for_tags": [
         "EGY"
@@ -4219,7 +4221,7 @@
     },
     {
       "id": 9197,
-      "name": "Cairo",
+      "name": "Usak",
       "terrain": "urban",
       "core_for_tags": [
         "EGY"
@@ -4237,7 +4239,7 @@
     },
     {
       "id": 9198,
-      "name": "New Settlement",
+      "name": "Kastamonu",
       "terrain": "urban",
       "core_for_tags": [
         "AUS"
@@ -4256,7 +4258,7 @@
     },
     {
       "id": 9199,
-      "name": "New Settlement",
+      "name": "Kastamonu Coast",
       "terrain": "urban",
       "core_for_tags": [
         "AUS"
@@ -4275,7 +4277,7 @@
     },
     {
       "id": 9200,
-      "name": "New Settlement",
+      "name": "Berdiansk",
       "terrain": "urban",
       "core_for_tags": [
         "AUS"
@@ -4294,7 +4296,7 @@
     },
     {
       "id": 9201,
-      "name": "New Settlement",
+      "name": "Feodosia",
       "terrain": "urban",
       "core_for_tags": [
         "AUS"
@@ -4313,7 +4315,7 @@
     },
     {
       "id": 9202,
-      "name": "New Settlement",
+      "name": "Karabuk",
       "terrain": "urban",
       "core_for_tags": [
         "AUS"
@@ -4332,7 +4334,7 @@
     },
     {
       "id": 9203,
-      "name": "Sydney",
+      "name": "Afyon",
       "terrain": "urban",
       "core_for_tags": [
         "AUS"
@@ -4351,7 +4353,7 @@
     },
     {
       "id": 9204,
-      "name": "New Settlement",
+      "name": "Valencia",
       "terrain": "urban",
       "core_for_tags": [
         "ARG"
@@ -4369,7 +4371,7 @@
     },
     {
       "id": 9205,
-      "name": "New Settlement",
+      "name": "Castellon",
       "terrain": "urban",
       "core_for_tags": [
         "ARG"
@@ -4387,7 +4389,7 @@
     },
     {
       "id": 9206,
-      "name": "New Settlement",
+      "name": "Zaragoza",
       "terrain": "urban",
       "core_for_tags": [
         "ARG"
@@ -4405,7 +4407,7 @@
     },
     {
       "id": 9207,
-      "name": "New Settlement",
+      "name": "Huesca",
       "terrain": "urban",
       "core_for_tags": [
         "ARG"
@@ -4423,7 +4425,7 @@
     },
     {
       "id": 9208,
-      "name": "New Settlement",
+      "name": "Lleida",
       "terrain": "urban",
       "core_for_tags": [
         "ARG"
@@ -4441,7 +4443,7 @@
     },
     {
       "id": 9209,
-      "name": "Buenos Aires",
+      "name": "Tarragona",
       "terrain": "urban",
       "core_for_tags": [
         "ARG"
@@ -4459,7 +4461,7 @@
     },
     {
       "id": 9210,
-      "name": "New Settlement",
+      "name": "Bayonne",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -4477,7 +4479,7 @@
     },
     {
       "id": 9211,
-      "name": "New Settlement",
+      "name": "Barcelona",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -4495,7 +4497,7 @@
     },
     {
       "id": 9212,
-      "name": "New Settlement",
+      "name": "Girona",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -4513,7 +4515,7 @@
     },
     {
       "id": 9213,
-      "name": "New Settlement",
+      "name": "Bordeaux",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -4531,7 +4533,7 @@
     },
     {
       "id": 9214,
-      "name": "New Settlement",
+      "name": "Toulouse",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -4549,7 +4551,7 @@
     },
     {
       "id": 9215,
-      "name": "Rio de Janeiro",
+      "name": "Perpignan",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -4567,7 +4569,7 @@
     },
     {
       "id": 9216,
-      "name": "New Settlement",
+      "name": "Hebrides",
       "terrain": "urban",
       "core_for_tags": [
         "MEX"
@@ -4585,7 +4587,7 @@
     },
     {
       "id": 9217,
-      "name": "New Settlement",
+      "name": "Belfast",
       "terrain": "urban",
       "core_for_tags": [
         "MEX"
@@ -4603,7 +4605,7 @@
     },
     {
       "id": 9218,
-      "name": "New Settlement",
+      "name": "Pembrokeshire",
       "terrain": "urban",
       "core_for_tags": [
         "MEX"
@@ -4621,7 +4623,7 @@
     },
     {
       "id": 9219,
-      "name": "New Settlement",
+      "name": "Campbeltown",
       "terrain": "urban",
       "core_for_tags": [
         "MEX"
@@ -4639,7 +4641,7 @@
     },
     {
       "id": 9220,
-      "name": "New Settlement",
+      "name": "Plymouth",
       "terrain": "urban",
       "core_for_tags": [
         "MEX"
@@ -4675,7 +4677,7 @@
     },
     {
       "id": 9222,
-      "name": "New Settlement",
+      "name": "Stornoway",
       "terrain": "urban",
       "core_for_tags": [
         "CAN"
@@ -4693,7 +4695,7 @@
     },
     {
       "id": 9223,
-      "name": "New Settlement",
+      "name": "Argyll",
       "terrain": "urban",
       "core_for_tags": [
         "CAN"
@@ -4711,7 +4713,7 @@
     },
     {
       "id": 9224,
-      "name": "New Settlement",
+      "name": "Oban",
       "terrain": "urban",
       "core_for_tags": [
         "CAN"
@@ -4729,7 +4731,7 @@
     },
     {
       "id": 9225,
-      "name": "New Settlement",
+      "name": "Stranraer",
       "terrain": "urban",
       "core_for_tags": [
         "CAN"
@@ -4747,7 +4749,7 @@
     },
     {
       "id": 9226,
-      "name": "New Settlement",
+      "name": "Fort William",
       "terrain": "urban",
       "core_for_tags": [
         "CAN"
@@ -4783,7 +4785,7 @@
     },
     {
       "id": 9228,
-      "name": "New Settlement",
+      "name": "Tampere",
       "terrain": "urban",
       "core_for_tags": [
         "FIN"
@@ -4801,7 +4803,7 @@
     },
     {
       "id": 9229,
-      "name": "New Settlement",
+      "name": "Tallinn",
       "terrain": "urban",
       "core_for_tags": [
         "FIN"
@@ -4819,7 +4821,7 @@
     },
     {
       "id": 9230,
-      "name": "New Settlement",
+      "name": "Tartu",
       "terrain": "urban",
       "core_for_tags": [
         "FIN"
@@ -4837,7 +4839,7 @@
     },
     {
       "id": 9231,
-      "name": "New Settlement",
+      "name": "Pskov",
       "terrain": "urban",
       "core_for_tags": [
         "FIN"
@@ -4855,7 +4857,7 @@
     },
     {
       "id": 9232,
-      "name": "New Settlement",
+      "name": "Riga",
       "terrain": "urban",
       "core_for_tags": [
         "FIN"
@@ -4891,7 +4893,7 @@
     },
     {
       "id": 9234,
-      "name": "New Settlement",
+      "name": "Ullapool",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -4909,7 +4911,7 @@
     },
     {
       "id": 9235,
-      "name": "New Settlement",
+      "name": "Inverclyde",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -4927,7 +4929,7 @@
     },
     {
       "id": 9236,
-      "name": "New Settlement",
+      "name": "Ayr",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -4945,7 +4947,7 @@
     },
     {
       "id": 9237,
-      "name": "New Settlement",
+      "name": "Isle of Man",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -4963,7 +4965,7 @@
     },
     {
       "id": 9238,
-      "name": "New Settlement",
+      "name": "Galloway",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -4981,7 +4983,7 @@
     },
     {
       "id": 9239,
-      "name": "Chicago",
+      "name": "Kilmarnock",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -4999,7 +5001,7 @@
     },
     {
       "id": 9240,
-      "name": "New Settlement",
+      "name": "Wigtown",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -5017,7 +5019,7 @@
     },
     {
       "id": 9241,
-      "name": "New Settlement",
+      "name": "Anglesey",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -5035,7 +5037,7 @@
     },
     {
       "id": 9242,
-      "name": "New Settlement",
+      "name": "Paisley",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -5053,7 +5055,7 @@
     },
     {
       "id": 9243,
-      "name": "New Settlement",
+      "name": "Swansea",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -5071,7 +5073,7 @@
     },
     {
       "id": 9244,
-      "name": "New Settlement",
+      "name": "Glasgow",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -5089,7 +5091,7 @@
     },
     {
       "id": 9245,
-      "name": "Detroit",
+      "name": "Snowdonia",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -5233,7 +5235,7 @@
     },
     {
       "id": 9252,
-      "name": "New Settlement",
+      "name": "Lorient",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -5252,7 +5254,7 @@
     },
     {
       "id": 9253,
-      "name": "New Settlement",
+      "name": "Nantes",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -5271,7 +5273,7 @@
     },
     {
       "id": 9254,
-      "name": "New Settlement",
+      "name": "Tunis",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -5290,7 +5292,7 @@
     },
     {
       "id": 9255,
-      "name": "New Settlement",
+      "name": "Montpellier",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -5309,7 +5311,7 @@
     },
     {
       "id": 9256,
-      "name": "New Settlement",
+      "name": "Limoges",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -5328,7 +5330,7 @@
     },
     {
       "id": 9257,
-      "name": "Sao Paulo",
+      "name": "Poitiers",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -5347,7 +5349,7 @@
     },
     {
       "id": 9258,
-      "name": "New Settlement",
+      "name": "Bartin",
       "terrain": "urban",
       "core_for_tags": [
         "IRQ"
@@ -5365,7 +5367,7 @@
     },
     {
       "id": 9259,
-      "name": "New Settlement",
+      "name": "Bolu",
       "terrain": "urban",
       "core_for_tags": [
         "IRQ"
@@ -5383,7 +5385,7 @@
     },
     {
       "id": 9260,
-      "name": "New Settlement",
+      "name": "Yalta",
       "terrain": "urban",
       "core_for_tags": [
         "IRQ"
@@ -5401,7 +5403,7 @@
     },
     {
       "id": 9261,
-      "name": "New Settlement",
+      "name": "Zonguldak",
       "terrain": "urban",
       "core_for_tags": [
         "IRQ"
@@ -5419,7 +5421,7 @@
     },
     {
       "id": 9262,
-      "name": "New Settlement",
+      "name": "Eskisehir",
       "terrain": "urban",
       "core_for_tags": [
         "IRQ"
@@ -5437,7 +5439,7 @@
     },
     {
       "id": 9263,
-      "name": "Baghdad",
+      "name": "Duzce",
       "terrain": "urban",
       "core_for_tags": [
         "IRQ"
@@ -5455,7 +5457,7 @@
     },
     {
       "id": 9264,
-      "name": "New Settlement",
+      "name": "Tver",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -5474,7 +5476,7 @@
     },
     {
       "id": 9265,
-      "name": "New Settlement",
+      "name": "Yaroslavl Region",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -5493,7 +5495,7 @@
     },
     {
       "id": 9266,
-      "name": "New Settlement",
+      "name": "Vladimir",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -5512,7 +5514,7 @@
     },
     {
       "id": 9267,
-      "name": "New Settlement",
+      "name": "Ryazan",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -5531,7 +5533,7 @@
     },
     {
       "id": 9268,
-      "name": "New Settlement",
+      "name": "Tula",
       "terrain": "urban",
       "core_for_tags": [
         "RUS"
@@ -5739,7 +5741,7 @@
     },
     {
       "id": 9278,
-      "name": "Nantes",
+      "name": "Cagliari",
       "terrain": "urban",
       "core_for_tags": [
         "FRA"
@@ -5761,7 +5763,7 @@
     },
     {
       "id": 9279,
-      "name": "Bordeaux",
+      "name": "Oristano",
       "terrain": "urban",
       "core_for_tags": [
         "FRA"
@@ -5783,7 +5785,7 @@
     },
     {
       "id": 9280,
-      "name": "Toulouse",
+      "name": "Agrigento",
       "terrain": "urban",
       "core_for_tags": [
         "FRA"
@@ -5827,7 +5829,7 @@
     },
     {
       "id": 9282,
-      "name": "New Settlement",
+      "name": "Rostock",
       "terrain": "urban",
       "core_for_tags": [
         "GER"
@@ -5847,7 +5849,7 @@
     },
     {
       "id": 9283,
-      "name": "New Settlement",
+      "name": "Greifswald",
       "terrain": "urban",
       "core_for_tags": [
         "GER"
@@ -5867,7 +5869,7 @@
     },
     {
       "id": 9284,
-      "name": "New Settlement",
+      "name": "Koszalin",
       "terrain": "urban",
       "core_for_tags": [
         "GER"
@@ -5887,7 +5889,7 @@
     },
     {
       "id": 9285,
-      "name": "New Settlement",
+      "name": "Zielona Gora",
       "terrain": "urban",
       "core_for_tags": [
         "GER"
@@ -5907,7 +5909,7 @@
     },
     {
       "id": 9286,
-      "name": "New Settlement",
+      "name": "Cottbus",
       "terrain": "urban",
       "core_for_tags": [
         "GER"
@@ -6037,7 +6039,7 @@
     },
     {
       "id": 9293,
-      "name": "Jakarta",
+      "name": "Simferopol",
       "terrain": "urban",
       "core_for_tags": [
         "IDN"
@@ -6145,7 +6147,7 @@
     },
     {
       "id": 9299,
-      "name": "Kuala Lumpur",
+      "name": "Voronezh Region",
       "terrain": "urban",
       "core_for_tags": [
         "MYS"
@@ -6258,7 +6260,7 @@
     },
     {
       "id": 9305,
-      "name": "Ho Chi Minh City",
+      "name": "Lipetsk Region",
       "terrain": "urban",
       "core_for_tags": [
         "VIE"
@@ -6367,7 +6369,7 @@
     },
     {
       "id": 9311,
-      "name": "Abuja",
+      "name": "Ragusa",
       "terrain": "urban",
       "core_for_tags": [
         "NGA"
@@ -6588,7 +6590,7 @@
     },
     {
       "id": 9323,
-      "name": "New Settlement",
+      "name": "Rennes",
       "terrain": "hills",
       "core_for_tags": [
         "COL"
@@ -6810,7 +6812,7 @@
     },
     {
       "id": 9335,
-      "name": "Adelaide",
+      "name": "Kutahya",
       "terrain": "urban",
       "core_for_tags": [
         "AUS"
@@ -6919,7 +6921,7 @@
     },
     {
       "id": 9341,
-      "name": "Isfahan",
+      "name": "Sevastopol",
       "terrain": "urban",
       "core_for_tags": [
         "IRN"
@@ -7027,7 +7029,7 @@
     },
     {
       "id": 9347,
-      "name": "Cordoba",
+      "name": "Angers",
       "terrain": "urban",
       "core_for_tags": [
         "ARG"
@@ -7135,7 +7137,7 @@
     },
     {
       "id": 9353,
-      "name": "Cali",
+      "name": "Exeter",
       "terrain": "urban",
       "core_for_tags": [
         "COL"
@@ -7225,7 +7227,7 @@
     },
     {
       "id": 9358,
-      "name": "New Settlement",
+      "name": "Ryazan Region",
       "terrain": "hills",
       "core_for_tags": [
         "CHN"
@@ -7590,7 +7592,7 @@
     },
     {
       "id": 9378,
-      "name": "Baghdad",
+      "name": "Sakarya",
       "terrain": "urban",
       "core_for_tags": [
         "IRQ"
@@ -7680,7 +7682,7 @@
     },
     {
       "id": 9383,
-      "name": "New Settlement",
+      "name": "Bilecik",
       "terrain": "desert",
       "core_for_tags": [
         "IRN"
@@ -7954,7 +7956,7 @@
     },
     {
       "id": 9398,
-      "name": "Hanoi",
+      "name": "Vladimir Region",
       "terrain": "urban",
       "core_for_tags": [
         "VIE"
@@ -8045,7 +8047,7 @@
     },
     {
       "id": 9403,
-      "name": "Stockholm",
+      "name": "Turku",
       "terrain": "urban",
       "core_for_tags": [
         "SWE"
@@ -8233,7 +8235,7 @@
     },
     {
       "id": 9413,
-      "name": "New Settlement",
+      "name": "Kocaeli",
       "terrain": "hills",
       "core_for_tags": [
         "SAF"
@@ -8325,7 +8327,7 @@
     },
     {
       "id": 9418,
-      "name": "Buenos Aires",
+      "name": "Marseille",
       "terrain": "urban",
       "core_for_tags": [
         "ARG"
@@ -8415,7 +8417,7 @@
     },
     {
       "id": 9423,
-      "name": "Rio de Janeiro",
+      "name": "Sassari",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -8505,7 +8507,7 @@
     },
     {
       "id": 9428,
-      "name": "New Settlement",
+      "name": "Cardiff",
       "terrain": "hills",
       "core_for_tags": [
         "COL"
@@ -8595,7 +8597,7 @@
     },
     {
       "id": 9433,
-      "name": "New Settlement",
+      "name": "Melitopol",
       "terrain": "hills",
       "core_for_tags": [
         "THA"
@@ -8775,7 +8777,7 @@
     },
     {
       "id": 9443,
-      "name": "New Settlement",
+      "name": "Bristol",
       "terrain": "tundra",
       "core_for_tags": [
         "GRL"
@@ -8865,7 +8867,7 @@
     },
     {
       "id": 9448,
-      "name": "New Settlement",
+      "name": "Cherbourg",
       "terrain": "plains",
       "core_for_tags": [
         "CAN"
@@ -8883,7 +8885,7 @@
     },
     {
       "id": 9500,
-      "name": "Province 9500",
+      "name": "Liege",
       "terrain": "sea",
       "core_for_tags": [],
       "natural_resources": {},
@@ -8936,7 +8938,7 @@
     },
     {
       "id": 9512,
-      "name": "Cardiff",
+      "name": "Tours",
       "terrain": "plains",
       "core_for_tags": [
         "WLS"
@@ -8957,7 +8959,7 @@
     },
     {
       "id": 9513,
-      "name": "Dublin",
+      "name": "Hereford",
       "terrain": "urban",
       "core_for_tags": [
         "IRL"
@@ -8978,7 +8980,7 @@
     },
     {
       "id": 9514,
-      "name": "Cork",
+      "name": "Bath",
       "terrain": "plains",
       "core_for_tags": [
         "IRL"
@@ -9086,7 +9088,7 @@
     },
     {
       "id": 9524,
-      "name": "Heraklion",
+      "name": "Bursa Region",
       "terrain": "urban",
       "core_for_tags": [
         "CRE",
@@ -9152,7 +9154,7 @@
     },
     {
       "id": 9527,
-      "name": "Cagliari",
+      "name": "Athens",
       "terrain": "plains",
       "core_for_tags": [
         "SAR",
@@ -9174,7 +9176,7 @@
     },
     {
       "id": 9528,
-      "name": "Sassari",
+      "name": "Izmir",
       "terrain": "plains",
       "core_for_tags": [
         "SAR",
@@ -9262,7 +9264,7 @@
     },
     {
       "id": 9532,
-      "name": "Barcelona",
+      "name": "Trapani",
       "terrain": "urban",
       "core_for_tags": [
         "SPA"
@@ -9283,7 +9285,7 @@
     },
     {
       "id": 9533,
-      "name": "Valencia",
+      "name": "Caltanissetta",
       "terrain": "plains",
       "core_for_tags": [
         "SPA"
@@ -9304,7 +9306,7 @@
     },
     {
       "id": 9534,
-      "name": "Seville",
+      "name": "Avignon",
       "terrain": "plains",
       "core_for_tags": [
         "SPA"
@@ -9325,7 +9327,7 @@
     },
     {
       "id": 9535,
-      "name": "Lisbon",
+      "name": "Le Mans",
       "terrain": "urban",
       "core_for_tags": [
         "POR"
@@ -9410,7 +9412,7 @@
     },
     {
       "id": 9539,
-      "name": "Marseille",
+      "name": "Syracuse",
       "terrain": "urban",
       "core_for_tags": [
         "FRA"
@@ -9476,7 +9478,7 @@
     },
     {
       "id": 9542,
-      "name": "Rennes",
+      "name": "Toulon",
       "terrain": "plains",
       "core_for_tags": [
         "FRA"
@@ -9584,7 +9586,7 @@
     },
     {
       "id": 9548,
-      "name": "Montpellier",
+      "name": "Enna",
       "terrain": "plains",
       "core_for_tags": [
         "FRA"

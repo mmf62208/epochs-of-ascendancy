@@ -1,0 +1,295 @@
+{
+  "version": 1,
+  "super_region_catalog": [
+    {
+      "id": 1,
+      "name": "Europe",
+      "theaters": [
+        "europe_core"
+      ],
+      "slug": "europe"
+    },
+    {
+      "id": 2,
+      "name": "MENA",
+      "theaters": [
+        "mena_africa"
+      ],
+      "slug": "mena"
+    },
+    {
+      "id": 3,
+      "name": "Africa",
+      "theaters": [
+        "africa"
+      ],
+      "slug": "africa"
+    },
+    {
+      "id": 4,
+      "name": "South Asia",
+      "theaters": [
+        "south_asia"
+      ],
+      "slug": "south_asia"
+    },
+    {
+      "id": 5,
+      "name": "East Asia",
+      "theaters": [
+        "far_east"
+      ],
+      "slug": "east_asia"
+    },
+    {
+      "id": 6,
+      "name": "SE Asia\u2013Pacific",
+      "theaters": [
+        "pacific",
+        "se_asia"
+      ],
+      "slug": "se_asia_pacific"
+    },
+    {
+      "id": 7,
+      "name": "North America",
+      "theaters": [
+        "north_america"
+      ],
+      "slug": "north_america"
+    },
+    {
+      "id": 8,
+      "name": "Latin America",
+      "theaters": [
+        "south_america",
+        "central_america"
+      ],
+      "slug": "latin_america"
+    },
+    {
+      "id": 9,
+      "name": "Central Asia\u2013Siberia",
+      "theaters": [
+        "central_asia"
+      ],
+      "slug": "central_asia_siberia"
+    },
+    {
+      "id": 10,
+      "name": "Oceania",
+      "theaters": [
+        "oceania"
+      ],
+      "slug": "oceania"
+    },
+    {
+      "id": 11,
+      "name": "Global Seas",
+      "theaters": [
+        "sea"
+      ],
+      "slug": "global_seas"
+    },
+    {
+      "id": 12,
+      "name": "Arctic",
+      "theaters": [
+        "arctic"
+      ],
+      "slug": "arctic"
+    }
+  ],
+  "us_regions": [
+    {
+      "id": 701,
+      "name": "Northeast",
+      "states": [
+        "ME",
+        "NH",
+        "VT",
+        "MA",
+        "RI",
+        "CT",
+        "NY"
+      ]
+    },
+    {
+      "id": 702,
+      "name": "Mid-Atlantic",
+      "states": [
+        "PA",
+        "NJ",
+        "DE",
+        "MD",
+        "DC",
+        "VA",
+        "WV"
+      ]
+    },
+    {
+      "id": 703,
+      "name": "Southeast",
+      "states": [
+        "NC",
+        "SC",
+        "GA",
+        "FL",
+        "AL",
+        "MS",
+        "TN",
+        "KY"
+      ]
+    },
+    {
+      "id": 704,
+      "name": "Midwest",
+      "states": [
+        "OH",
+        "IN",
+        "IL",
+        "MI",
+        "WI",
+        "MN",
+        "IA",
+        "MO"
+      ]
+    },
+    {
+      "id": 705,
+      "name": "Great Plains",
+      "states": [
+        "ND",
+        "SD",
+        "NE",
+        "KS",
+        "OK"
+      ]
+    },
+    {
+      "id": 706,
+      "name": "Southwest",
+      "states": [
+        "TX",
+        "NM",
+        "AZ"
+      ]
+    },
+    {
+      "id": 707,
+      "name": "Mountain West",
+      "states": [
+        "MT",
+        "ID",
+        "WY",
+        "CO",
+        "UT",
+        "NV"
+      ]
+    },
+    {
+      "id": 708,
+      "name": "Pacific",
+      "states": [
+        "CA",
+        "OR",
+        "WA",
+        "AK",
+        "HI"
+      ]
+    }
+  ],
+  "europe_regions": [
+    {
+      "id": 101,
+      "name": "British Isles"
+    },
+    {
+      "id": 102,
+      "name": "Iberia"
+    },
+    {
+      "id": 103,
+      "name": "France"
+    },
+    {
+      "id": 104,
+      "name": "Low Countries"
+    },
+    {
+      "id": 105,
+      "name": "Germany"
+    },
+    {
+      "id": 106,
+      "name": "Italy"
+    },
+    {
+      "id": 107,
+      "name": "Nordic"
+    },
+    {
+      "id": 108,
+      "name": "Balkans"
+    },
+    {
+      "id": 109,
+      "name": "Central Europe"
+    },
+    {
+      "id": 110,
+      "name": "Eastern Frontiers"
+    },
+    {
+      "id": 111,
+      "name": "Western Mediterranean"
+    }
+  ],
+  "state_size_soft": [
+    5,
+    20
+  ],
+  "state_size_hard": [
+    3,
+    30
+  ],
+  "global_province_target": {
+    "v1": [
+      4000,
+      7000
+    ],
+    "stretch": [
+      8000,
+      12000
+    ]
+  },
+  "decisions": {
+    "us_region_set": "8_band",
+    "us_regions": [
+      "Northeast",
+      "Mid-Atlantic",
+      "Southeast",
+      "Midwest",
+      "Great Plains",
+      "Southwest",
+      "Mountain West",
+      "Pacific"
+    ],
+    "global_province_target_v1": 6000,
+    "global_province_band": [
+      5000,
+      7000
+    ],
+    "fps_gate_first": 60,
+    "membership_primary_eras": [
+      1910,
+      1918,
+      1936,
+      2026
+    ],
+    "membership_primary_mode": "full",
+    "membership_secondary_eras": [
+      1945
+    ]
+  }
+}

@@ -1,0 +1,8394 @@
+{
+  "provinces": {
+    "710000": {
+      "city_name": "Dibër",
+      "tier": 2
+    },
+    "710001": {
+      "city_name": "Durrës",
+      "tier": 2
+    },
+    "710002": {
+      "city_name": "Kukës",
+      "tier": 2
+    },
+    "710003": {
+      "city_name": "Lezhë",
+      "tier": 2
+    },
+    "710004": {
+      "city_name": "Shkodër",
+      "tier": 2
+    },
+    "710005": {
+      "city_name": "Elbasan",
+      "tier": 2
+    },
+    "710006": {
+      "city_name": "Tiranë",
+      "tier": 2
+    },
+    "710007": {
+      "city_name": "Berat",
+      "tier": 2
+    },
+    "710008": {
+      "city_name": "Fier",
+      "tier": 2
+    },
+    "710009": {
+      "city_name": "Gjirokastër",
+      "tier": 2
+    },
+    "710010": {
+      "city_name": "Korcë",
+      "tier": 2
+    },
+    "710011": {
+      "city_name": "Vlorë",
+      "tier": 2
+    },
+    "710012": {
+      "city_name": "Mittelburgenland",
+      "tier": 2
+    },
+    "710013": {
+      "city_name": "Nordburgenland",
+      "tier": 2
+    },
+    "710014": {
+      "city_name": "Südburgenland",
+      "tier": 2
+    },
+    "710015": {
+      "city_name": "Mostviertel-Eisenwurzen",
+      "tier": 2
+    },
+    "710016": {
+      "city_name": "Niederösterreich-Süd",
+      "tier": 2
+    },
+    "710017": {
+      "city_name": "Sankt Pölten",
+      "tier": 2
+    },
+    "710018": {
+      "city_name": "Waldviertel",
+      "tier": 2
+    },
+    "710019": {
+      "city_name": "Weinviertel",
+      "tier": 2
+    },
+    "710020": {
+      "city_name": "Vienna",
+      "tier": 2
+    },
+    "710021": {
+      "city_name": "Vienna",
+      "tier": 2
+    },
+    "710022": {
+      "city_name": "Vienna",
+      "tier": 2
+    },
+    "710023": {
+      "city_name": "Klagenfurt-Villach",
+      "tier": 2
+    },
+    "710024": {
+      "city_name": "Oberkärnten",
+      "tier": 2
+    },
+    "710025": {
+      "city_name": "Unterkärnten",
+      "tier": 2
+    },
+    "710026": {
+      "city_name": "Graz",
+      "tier": 2
+    },
+    "710027": {
+      "city_name": "Liezen",
+      "tier": 2
+    },
+    "710028": {
+      "city_name": "Östliche Obersteiermark",
+      "tier": 2
+    },
+    "710029": {
+      "city_name": "Oststeiermark",
+      "tier": 2
+    },
+    "710030": {
+      "city_name": "West- und Südsteiermark",
+      "tier": 2
+    },
+    "710031": {
+      "city_name": "Westliche Obersteiermark",
+      "tier": 2
+    },
+    "710032": {
+      "city_name": "Innviertel",
+      "tier": 2
+    },
+    "710033": {
+      "city_name": "Linz-Wels",
+      "tier": 2
+    },
+    "710034": {
+      "city_name": "Mühlviertel",
+      "tier": 2
+    },
+    "710035": {
+      "city_name": "Steyr-Kirchdorf",
+      "tier": 2
+    },
+    "710036": {
+      "city_name": "Traunviertel",
+      "tier": 2
+    },
+    "710037": {
+      "city_name": "Lungau",
+      "tier": 2
+    },
+    "710038": {
+      "city_name": "Pinzgau-Pongau",
+      "tier": 2
+    },
+    "710039": {
+      "city_name": "Salzburg und Umgebung",
+      "tier": 2
+    },
+    "710040": {
+      "city_name": "Außerfern",
+      "tier": 2
+    },
+    "710041": {
+      "city_name": "Innsbruck",
+      "tier": 2
+    },
+    "710042": {
+      "city_name": "Osttirol",
+      "tier": 2
+    },
+    "710043": {
+      "city_name": "Tiroler Oberland",
+      "tier": 2
+    },
+    "710044": {
+      "city_name": "Tiroler Unterland",
+      "tier": 2
+    },
+    "710045": {
+      "city_name": "Bludenz-Bregenzer Wald",
+      "tier": 2
+    },
+    "710046": {
+      "city_name": "Rheintal-Bodenseegebiet",
+      "tier": 2
+    },
+    "710047": {
+      "city_name": "Brussels",
+      "tier": 2
+    },
+    "710048": {
+      "city_name": "Arr. Antwerpen",
+      "tier": 2
+    },
+    "710049": {
+      "city_name": "Arr. Mechelen",
+      "tier": 2
+    },
+    "710050": {
+      "city_name": "Arr. Turnhout",
+      "tier": 2
+    },
+    "710051": {
+      "city_name": "Arr. Tongeren",
+      "tier": 2
+    },
+    "710052": {
+      "city_name": "Arr. Hasselt",
+      "tier": 2
+    },
+    "710053": {
+      "city_name": "Arr. Maaseik",
+      "tier": 2
+    },
+    "710054": {
+      "city_name": "Arr. Aalst",
+      "tier": 2
+    },
+    "710055": {
+      "city_name": "Arr. Dendermonde",
+      "tier": 2
+    },
+    "710056": {
+      "city_name": "Arr. Eeklo",
+      "tier": 2
+    },
+    "710057": {
+      "city_name": "Arr. Gent",
+      "tier": 2
+    },
+    "710058": {
+      "city_name": "Arr. Oudenaarde",
+      "tier": 2
+    },
+    "710059": {
+      "city_name": "Arr. Sint-Niklaas",
+      "tier": 2
+    },
+    "710060": {
+      "city_name": "Arr. Halle-Vilvoorde",
+      "tier": 2
+    },
+    "710061": {
+      "city_name": "Arr. Leuven",
+      "tier": 2
+    },
+    "710062": {
+      "city_name": "Arr. Brugge",
+      "tier": 2
+    },
+    "710063": {
+      "city_name": "Arr. Diksmuide",
+      "tier": 2
+    },
+    "710064": {
+      "city_name": "Arr. Ieper",
+      "tier": 2
+    },
+    "710065": {
+      "city_name": "Arr. Kortrijk",
+      "tier": 2
+    },
+    "710066": {
+      "city_name": "Arr. Oostende",
+      "tier": 2
+    },
+    "710067": {
+      "city_name": "Arr. Roeselare",
+      "tier": 2
+    },
+    "710068": {
+      "city_name": "Arr. Tielt",
+      "tier": 2
+    },
+    "710069": {
+      "city_name": "Arr. Veurne",
+      "tier": 2
+    },
+    "710070": {
+      "city_name": "Arr. Nivelles",
+      "tier": 2
+    },
+    "710071": {
+      "city_name": "Arr. Mons",
+      "tier": 2
+    },
+    "710072": {
+      "city_name": "Arr. Tournai-Mouscron",
+      "tier": 2
+    },
+    "710073": {
+      "city_name": "Arr. La Louvière",
+      "tier": 2
+    },
+    "710074": {
+      "city_name": "Arr. Ath",
+      "tier": 2
+    },
+    "710075": {
+      "city_name": "Arr. Charleroi",
+      "tier": 2
+    },
+    "710076": {
+      "city_name": "Arr. Soignies",
+      "tier": 2
+    },
+    "710077": {
+      "city_name": "Arr. Thuin",
+      "tier": 2
+    },
+    "710078": {
+      "city_name": "Arr. Huy",
+      "tier": 2
+    },
+    "710079": {
+      "city_name": "Arr. Liège",
+      "tier": 2
+    },
+    "710080": {
+      "city_name": "Arr. Waremme",
+      "tier": 2
+    },
+    "710081": {
+      "city_name": "Arr. Verviers — communes francophones",
+      "tier": 2
+    },
+    "710082": {
+      "city_name": "Bezirk Verviers — Deutschsprachige Gemei",
+      "tier": 2
+    },
+    "710083": {
+      "city_name": "Arr. Arlon",
+      "tier": 2
+    },
+    "710084": {
+      "city_name": "Arr. Bastogne",
+      "tier": 2
+    },
+    "710085": {
+      "city_name": "Arr. Marche-en-Famenne",
+      "tier": 2
+    },
+    "710086": {
+      "city_name": "Arr. Neufchâteau",
+      "tier": 2
+    },
+    "710087": {
+      "city_name": "Arr. Virton",
+      "tier": 2
+    },
+    "710088": {
+      "city_name": "Arr. Dinant",
+      "tier": 2
+    },
+    "710089": {
+      "city_name": "Arr. Namur",
+      "tier": 2
+    },
+    "710090": {
+      "city_name": "Arr. Philippeville",
+      "tier": 2
+    },
+    "710091": {
+      "city_name": "Видин",
+      "tier": 2
+    },
+    "710092": {
+      "city_name": "Монтана",
+      "tier": 2
+    },
+    "710093": {
+      "city_name": "Враца",
+      "tier": 2
+    },
+    "710094": {
+      "city_name": "Плевен",
+      "tier": 2
+    },
+    "710095": {
+      "city_name": "Ловеч",
+      "tier": 2
+    },
+    "710096": {
+      "city_name": "Велико Търново",
+      "tier": 2
+    },
+    "710097": {
+      "city_name": "Габрово",
+      "tier": 2
+    },
+    "710098": {
+      "city_name": "Русе",
+      "tier": 2
+    },
+    "710099": {
+      "city_name": "Разград",
+      "tier": 2
+    },
+    "710100": {
+      "city_name": "Силистра",
+      "tier": 2
+    },
+    "710101": {
+      "city_name": "Варна",
+      "tier": 2
+    },
+    "710102": {
+      "city_name": "Добрич",
+      "tier": 2
+    },
+    "710103": {
+      "city_name": "Шумен",
+      "tier": 2
+    },
+    "710104": {
+      "city_name": "Търговище",
+      "tier": 2
+    },
+    "710105": {
+      "city_name": "Бургас",
+      "tier": 2
+    },
+    "710106": {
+      "city_name": "Сливен",
+      "tier": 2
+    },
+    "710107": {
+      "city_name": "Ямбол",
+      "tier": 2
+    },
+    "710108": {
+      "city_name": "Стара Загора",
+      "tier": 2
+    },
+    "710109": {
+      "city_name": "София (столица)",
+      "tier": 2
+    },
+    "710110": {
+      "city_name": "София",
+      "tier": 2
+    },
+    "710111": {
+      "city_name": "Благоевград",
+      "tier": 2
+    },
+    "710112": {
+      "city_name": "Перник",
+      "tier": 2
+    },
+    "710113": {
+      "city_name": "Кюстендил",
+      "tier": 2
+    },
+    "710114": {
+      "city_name": "Пловдив",
+      "tier": 2
+    },
+    "710115": {
+      "city_name": "Хасково",
+      "tier": 2
+    },
+    "710116": {
+      "city_name": "Пазарджик",
+      "tier": 2
+    },
+    "710117": {
+      "city_name": "Смолян",
+      "tier": 2
+    },
+    "710118": {
+      "city_name": "Кърджали",
+      "tier": 2
+    },
+    "710119": {
+      "city_name": "Vaud",
+      "tier": 2
+    },
+    "710120": {
+      "city_name": "Valais",
+      "tier": 2
+    },
+    "710121": {
+      "city_name": "Genève",
+      "tier": 2
+    },
+    "710122": {
+      "city_name": "Bern",
+      "tier": 2
+    },
+    "710123": {
+      "city_name": "Freiburg",
+      "tier": 2
+    },
+    "710124": {
+      "city_name": "Solothurn",
+      "tier": 2
+    },
+    "710125": {
+      "city_name": "Neuchâtel",
+      "tier": 2
+    },
+    "710126": {
+      "city_name": "Jura",
+      "tier": 2
+    },
+    "710127": {
+      "city_name": "Basel-Stadt",
+      "tier": 2
+    },
+    "710128": {
+      "city_name": "Basel-Landschaft",
+      "tier": 2
+    },
+    "710129": {
+      "city_name": "Aargau",
+      "tier": 2
+    },
+    "710130": {
+      "city_name": "Zürich",
+      "tier": 2
+    },
+    "710131": {
+      "city_name": "Glarus",
+      "tier": 2
+    },
+    "710132": {
+      "city_name": "Schaffhausen",
+      "tier": 2
+    },
+    "710133": {
+      "city_name": "Appenzell Ausserrhoden",
+      "tier": 2
+    },
+    "710134": {
+      "city_name": "Appenzell Innerrhoden",
+      "tier": 2
+    },
+    "710135": {
+      "city_name": "St. Gallen",
+      "tier": 2
+    },
+    "710136": {
+      "city_name": "Graubünden",
+      "tier": 2
+    },
+    "710137": {
+      "city_name": "Thurgau",
+      "tier": 2
+    },
+    "710138": {
+      "city_name": "Luzern",
+      "tier": 2
+    },
+    "710139": {
+      "city_name": "Uri",
+      "tier": 2
+    },
+    "710140": {
+      "city_name": "Schwyz",
+      "tier": 2
+    },
+    "710141": {
+      "city_name": "Obwalden",
+      "tier": 2
+    },
+    "710142": {
+      "city_name": "Nidwalden",
+      "tier": 2
+    },
+    "710143": {
+      "city_name": "Zug",
+      "tier": 2
+    },
+    "710144": {
+      "city_name": "Ticino",
+      "tier": 2
+    },
+    "710145": {
+      "city_name": "Κύπρος",
+      "tier": 2
+    },
+    "710146": {
+      "city_name": "Prague",
+      "tier": 2
+    },
+    "710147": {
+      "city_name": "Středočeský kraj",
+      "tier": 2
+    },
+    "710148": {
+      "city_name": "Jihočeský kraj",
+      "tier": 2
+    },
+    "710149": {
+      "city_name": "Plzeňský kraj",
+      "tier": 2
+    },
+    "710150": {
+      "city_name": "Karlovarský kraj",
+      "tier": 2
+    },
+    "710151": {
+      "city_name": "Ústecký kraj",
+      "tier": 2
+    },
+    "710152": {
+      "city_name": "Liberecký kraj",
+      "tier": 2
+    },
+    "710153": {
+      "city_name": "Královéhradecký kraj",
+      "tier": 2
+    },
+    "710154": {
+      "city_name": "Pardubický kraj",
+      "tier": 2
+    },
+    "710155": {
+      "city_name": "Kraj Vysočina",
+      "tier": 2
+    },
+    "710156": {
+      "city_name": "Jihomoravský kraj",
+      "tier": 2
+    },
+    "710157": {
+      "city_name": "Olomoucký kraj",
+      "tier": 2
+    },
+    "710158": {
+      "city_name": "Zlínský kraj",
+      "tier": 2
+    },
+    "710159": {
+      "city_name": "Moravskoslezský kraj",
+      "tier": 2
+    },
+    "710160": {
+      "city_name": "Stuttgart",
+      "tier": 2
+    },
+    "710161": {
+      "city_name": "Böblingen",
+      "tier": 2
+    },
+    "710162": {
+      "city_name": "Esslingen",
+      "tier": 2
+    },
+    "710163": {
+      "city_name": "Göppingen",
+      "tier": 2
+    },
+    "710164": {
+      "city_name": "Ludwigsburg",
+      "tier": 2
+    },
+    "710165": {
+      "city_name": "Rems-Murr-Kreis",
+      "tier": 2
+    },
+    "710166": {
+      "city_name": "Heilbronn",
+      "tier": 2
+    },
+    "710167": {
+      "city_name": "Heilbronn",
+      "tier": 2
+    },
+    "710168": {
+      "city_name": "Hohenlohekreis",
+      "tier": 2
+    },
+    "710169": {
+      "city_name": "Schwäbisch Hall",
+      "tier": 2
+    },
+    "710170": {
+      "city_name": "Main-Tauber-Kreis",
+      "tier": 2
+    },
+    "710171": {
+      "city_name": "Heidenheim",
+      "tier": 2
+    },
+    "710172": {
+      "city_name": "Ostalbkreis",
+      "tier": 2
+    },
+    "710173": {
+      "city_name": "Baden-Baden",
+      "tier": 2
+    },
+    "710174": {
+      "city_name": "Karlsruhe",
+      "tier": 2
+    },
+    "710175": {
+      "city_name": "Karlsruhe",
+      "tier": 2
+    },
+    "710176": {
+      "city_name": "Rastatt",
+      "tier": 2
+    },
+    "710177": {
+      "city_name": "Heidelberg",
+      "tier": 2
+    },
+    "710178": {
+      "city_name": "Mannheim",
+      "tier": 2
+    },
+    "710179": {
+      "city_name": "Neckar-Odenwald-Kreis",
+      "tier": 2
+    },
+    "710180": {
+      "city_name": "Rhein-Neckar-Kreis",
+      "tier": 2
+    },
+    "710181": {
+      "city_name": "Pforzheim",
+      "tier": 2
+    },
+    "710182": {
+      "city_name": "Calw",
+      "tier": 2
+    },
+    "710183": {
+      "city_name": "Enzkreis",
+      "tier": 2
+    },
+    "710184": {
+      "city_name": "Freudenstadt",
+      "tier": 2
+    },
+    "710185": {
+      "city_name": "Freiburg im Breisgau",
+      "tier": 2
+    },
+    "710186": {
+      "city_name": "Breisgau-Hochschwarzwald",
+      "tier": 2
+    },
+    "710187": {
+      "city_name": "Emmendingen",
+      "tier": 2
+    },
+    "710188": {
+      "city_name": "Ortenaukreis",
+      "tier": 2
+    },
+    "710189": {
+      "city_name": "Rottweil",
+      "tier": 2
+    },
+    "710190": {
+      "city_name": "Schwarzwald-Baar-Kreis",
+      "tier": 2
+    },
+    "710191": {
+      "city_name": "Tuttlingen",
+      "tier": 2
+    },
+    "710192": {
+      "city_name": "Konstanz",
+      "tier": 2
+    },
+    "710193": {
+      "city_name": "Lörrach",
+      "tier": 2
+    },
+    "710194": {
+      "city_name": "Waldshut",
+      "tier": 2
+    },
+    "710195": {
+      "city_name": "Reutlingen",
+      "tier": 2
+    },
+    "710196": {
+      "city_name": "Tübingen",
+      "tier": 2
+    },
+    "710197": {
+      "city_name": "Zollernalbkreis",
+      "tier": 2
+    },
+    "710198": {
+      "city_name": "Ulm",
+      "tier": 2
+    },
+    "710199": {
+      "city_name": "Alb-Donau-Kreis",
+      "tier": 2
+    },
+    "710200": {
+      "city_name": "Biberach",
+      "tier": 2
+    },
+    "710201": {
+      "city_name": "Bodenseekreis",
+      "tier": 2
+    },
+    "710202": {
+      "city_name": "Ravensburg",
+      "tier": 2
+    },
+    "710203": {
+      "city_name": "Sigmaringen",
+      "tier": 2
+    },
+    "710204": {
+      "city_name": "Ingolstadt",
+      "tier": 2
+    },
+    "710205": {
+      "city_name": "Munich",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "GER",
+      "hub": true
+    },
+    "710206": {
+      "city_name": "Rosenheim",
+      "tier": 2
+    },
+    "710207": {
+      "city_name": "Altötting",
+      "tier": 2
+    },
+    "710208": {
+      "city_name": "Berchtesgadener Land",
+      "tier": 2
+    },
+    "710209": {
+      "city_name": "Bad Tölz-Wolfratshausen",
+      "tier": 2
+    },
+    "710210": {
+      "city_name": "Dachau",
+      "tier": 2
+    },
+    "710211": {
+      "city_name": "Ebersberg",
+      "tier": 2
+    },
+    "710212": {
+      "city_name": "Eichstätt",
+      "tier": 2
+    },
+    "710213": {
+      "city_name": "Erding",
+      "tier": 2
+    },
+    "710214": {
+      "city_name": "Freising",
+      "tier": 2
+    },
+    "710215": {
+      "city_name": "Fürstenfeldbruck",
+      "tier": 2
+    },
+    "710216": {
+      "city_name": "Garmisch-Partenkirchen",
+      "tier": 2
+    },
+    "710217": {
+      "city_name": "Landsberg am Lech",
+      "tier": 2
+    },
+    "710218": {
+      "city_name": "Miesbach",
+      "tier": 2
+    },
+    "710219": {
+      "city_name": "Mühldorf a. Inn",
+      "tier": 2
+    },
+    "710220": {
+      "city_name": "Munich",
+      "tier": 2
+    },
+    "710221": {
+      "city_name": "Neuburg-Schrobenhausen",
+      "tier": 2
+    },
+    "710222": {
+      "city_name": "Pfaffenhofen a. d. Ilm",
+      "tier": 2
+    },
+    "710223": {
+      "city_name": "Rosenheim",
+      "tier": 2
+    },
+    "710224": {
+      "city_name": "Starnberg",
+      "tier": 2
+    },
+    "710225": {
+      "city_name": "Traunstein",
+      "tier": 2
+    },
+    "710226": {
+      "city_name": "Weilheim-Schongau",
+      "tier": 2
+    },
+    "710227": {
+      "city_name": "Landshut",
+      "tier": 2
+    },
+    "710228": {
+      "city_name": "Passau",
+      "tier": 2
+    },
+    "710229": {
+      "city_name": "Straubing",
+      "tier": 2
+    },
+    "710230": {
+      "city_name": "Deggendorf",
+      "tier": 2
+    },
+    "710231": {
+      "city_name": "Freyung-Grafenau",
+      "tier": 2
+    },
+    "710232": {
+      "city_name": "Kelheim",
+      "tier": 2
+    },
+    "710233": {
+      "city_name": "Landshut",
+      "tier": 2
+    },
+    "710234": {
+      "city_name": "Passau",
+      "tier": 2
+    },
+    "710235": {
+      "city_name": "Regen",
+      "tier": 2
+    },
+    "710236": {
+      "city_name": "Rottal-Inn",
+      "tier": 2
+    },
+    "710237": {
+      "city_name": "Straubing-Bogen",
+      "tier": 2
+    },
+    "710238": {
+      "city_name": "Dingolfing-Landau",
+      "tier": 2
+    },
+    "710239": {
+      "city_name": "Amberg",
+      "tier": 2
+    },
+    "710240": {
+      "city_name": "Regensburg",
+      "tier": 2
+    },
+    "710241": {
+      "city_name": "Weiden i. d. Opf",
+      "tier": 2
+    },
+    "710242": {
+      "city_name": "Amberg-Sulzbach",
+      "tier": 2
+    },
+    "710243": {
+      "city_name": "Cham",
+      "tier": 2
+    },
+    "710244": {
+      "city_name": "Neumarkt i. d. OPf.",
+      "tier": 2
+    },
+    "710245": {
+      "city_name": "Neustadt a. d. Waldnaab",
+      "tier": 2
+    },
+    "710246": {
+      "city_name": "Regensburg",
+      "tier": 2
+    },
+    "710247": {
+      "city_name": "Schwandorf",
+      "tier": 2
+    },
+    "710248": {
+      "city_name": "Tirschenreuth",
+      "tier": 2
+    },
+    "710249": {
+      "city_name": "Bamberg",
+      "tier": 2
+    },
+    "710250": {
+      "city_name": "Bayreuth",
+      "tier": 2
+    },
+    "710251": {
+      "city_name": "Coburg",
+      "tier": 2
+    },
+    "710252": {
+      "city_name": "Hof",
+      "tier": 2
+    },
+    "710253": {
+      "city_name": "Bamberg",
+      "tier": 2
+    },
+    "710254": {
+      "city_name": "Bayreuth",
+      "tier": 2
+    },
+    "710255": {
+      "city_name": "Coburg",
+      "tier": 2
+    },
+    "710256": {
+      "city_name": "Forchheim",
+      "tier": 2
+    },
+    "710257": {
+      "city_name": "Hof",
+      "tier": 2
+    },
+    "710258": {
+      "city_name": "Kronach",
+      "tier": 2
+    },
+    "710259": {
+      "city_name": "Kulmbach",
+      "tier": 2
+    },
+    "710260": {
+      "city_name": "Lichtenfels",
+      "tier": 2
+    },
+    "710261": {
+      "city_name": "Wunsiedel i. Fichtelgebirge",
+      "tier": 2
+    },
+    "710262": {
+      "city_name": "Ansbach",
+      "tier": 2
+    },
+    "710263": {
+      "city_name": "Erlangen",
+      "tier": 2
+    },
+    "710264": {
+      "city_name": "Fürth",
+      "tier": 2
+    },
+    "710265": {
+      "city_name": "Nürnberg",
+      "tier": 2
+    },
+    "710266": {
+      "city_name": "Schwabach",
+      "tier": 2
+    },
+    "710267": {
+      "city_name": "Ansbach",
+      "tier": 2
+    },
+    "710268": {
+      "city_name": "Erlangen-Höchstadt",
+      "tier": 2
+    },
+    "710269": {
+      "city_name": "Fürth",
+      "tier": 2
+    },
+    "710270": {
+      "city_name": "Nürnberger Land",
+      "tier": 2
+    },
+    "710271": {
+      "city_name": "Neustadt a. d. Aisch-Bad Windsheim",
+      "tier": 2
+    },
+    "710272": {
+      "city_name": "Roth",
+      "tier": 2
+    },
+    "710273": {
+      "city_name": "Weißenburg-Gunzenhausen",
+      "tier": 2
+    },
+    "710274": {
+      "city_name": "Aschaffenburg",
+      "tier": 2
+    },
+    "710275": {
+      "city_name": "Schweinfurt",
+      "tier": 2
+    },
+    "710276": {
+      "city_name": "Würzburg",
+      "tier": 2
+    },
+    "710277": {
+      "city_name": "Aschaffenburg",
+      "tier": 2
+    },
+    "710278": {
+      "city_name": "Bad Kissingen",
+      "tier": 2
+    },
+    "710279": {
+      "city_name": "Rhön-Grabfeld",
+      "tier": 2
+    },
+    "710280": {
+      "city_name": "Haßberge",
+      "tier": 2
+    },
+    "710281": {
+      "city_name": "Kitzingen",
+      "tier": 2
+    },
+    "710282": {
+      "city_name": "Miltenberg",
+      "tier": 2
+    },
+    "710283": {
+      "city_name": "Main-Spessart",
+      "tier": 2
+    },
+    "710284": {
+      "city_name": "Schweinfurt",
+      "tier": 2
+    },
+    "710285": {
+      "city_name": "Würzburg",
+      "tier": 2
+    },
+    "710286": {
+      "city_name": "Augsburg",
+      "tier": 2
+    },
+    "710287": {
+      "city_name": "Kaufbeuren",
+      "tier": 2
+    },
+    "710288": {
+      "city_name": "Kempten (Allgäu)",
+      "tier": 2
+    },
+    "710289": {
+      "city_name": "Memmingen",
+      "tier": 2
+    },
+    "710290": {
+      "city_name": "Aichach-Friedberg",
+      "tier": 2
+    },
+    "710291": {
+      "city_name": "Augsburg",
+      "tier": 2
+    },
+    "710292": {
+      "city_name": "Dillingen a.d. Donau",
+      "tier": 2
+    },
+    "710293": {
+      "city_name": "Günzburg",
+      "tier": 2
+    },
+    "710294": {
+      "city_name": "Neu-Ulm",
+      "tier": 2
+    },
+    "710295": {
+      "city_name": "Lindau (Bodensee)",
+      "tier": 2
+    },
+    "710296": {
+      "city_name": "Ostallgäu",
+      "tier": 2
+    },
+    "710297": {
+      "city_name": "Unterallgäu",
+      "tier": 2
+    },
+    "710298": {
+      "city_name": "Donau-Ries",
+      "tier": 2
+    },
+    "710299": {
+      "city_name": "Oberallgäu",
+      "tier": 2
+    },
+    "710300": {
+      "city_name": "Berlin",
+      "tier": 4,
+      "capital": true,
+      "tag": "GER",
+      "is_capital": true,
+      "country_tag": "GER",
+      "hub": true
+    },
+    "710301": {
+      "city_name": "Brandenburg an der Havel",
+      "tier": 2
+    },
+    "710302": {
+      "city_name": "Cottbus",
+      "tier": 2
+    },
+    "710303": {
+      "city_name": "Frankfurt (Oder)",
+      "tier": 2
+    },
+    "710304": {
+      "city_name": "Potsdam",
+      "tier": 2
+    },
+    "710305": {
+      "city_name": "Barnim",
+      "tier": 2
+    },
+    "710306": {
+      "city_name": "Dahme-Spreewald",
+      "tier": 2
+    },
+    "710307": {
+      "city_name": "Elbe-Elster",
+      "tier": 2
+    },
+    "710308": {
+      "city_name": "Havelland",
+      "tier": 2
+    },
+    "710309": {
+      "city_name": "Märkisch-Oderland",
+      "tier": 2
+    },
+    "710310": {
+      "city_name": "Oberhavel",
+      "tier": 2
+    },
+    "710311": {
+      "city_name": "Oberspreewald-Lausitz",
+      "tier": 2
+    },
+    "710312": {
+      "city_name": "Oder-Spree",
+      "tier": 2
+    },
+    "710313": {
+      "city_name": "Ostprignitz-Ruppin",
+      "tier": 2
+    },
+    "710314": {
+      "city_name": "Potsdam-Mittelmark",
+      "tier": 2
+    },
+    "710315": {
+      "city_name": "Prignitz",
+      "tier": 2
+    },
+    "710316": {
+      "city_name": "Spree-Neiße",
+      "tier": 2
+    },
+    "710317": {
+      "city_name": "Teltow-Fläming",
+      "tier": 2
+    },
+    "710318": {
+      "city_name": "Uckermark",
+      "tier": 2
+    },
+    "710319": {
+      "city_name": "Bremen",
+      "tier": 2
+    },
+    "710320": {
+      "city_name": "Bremerhaven",
+      "tier": 2
+    },
+    "710321": {
+      "city_name": "Hamburg",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "GER",
+      "hub": true
+    },
+    "710322": {
+      "city_name": "Darmstadt",
+      "tier": 2
+    },
+    "710323": {
+      "city_name": "Frankfurt",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "GER",
+      "hub": true
+    },
+    "710324": {
+      "city_name": "Offenbach am Main",
+      "tier": 2
+    },
+    "710325": {
+      "city_name": "Wiesbaden",
+      "tier": 2
+    },
+    "710326": {
+      "city_name": "Bergstraße",
+      "tier": 2
+    },
+    "710327": {
+      "city_name": "Darmstadt-Dieburg",
+      "tier": 2
+    },
+    "710328": {
+      "city_name": "Groß-Gerau",
+      "tier": 2
+    },
+    "710329": {
+      "city_name": "Hochtaunuskreis",
+      "tier": 2
+    },
+    "710330": {
+      "city_name": "Main-Kinzig-Kreis",
+      "tier": 2
+    },
+    "710331": {
+      "city_name": "Main-Taunus-Kreis",
+      "tier": 2
+    },
+    "710332": {
+      "city_name": "Odenwaldkreis",
+      "tier": 2
+    },
+    "710333": {
+      "city_name": "Offenbach",
+      "tier": 2
+    },
+    "710334": {
+      "city_name": "Rheingau-Taunus-Kreis",
+      "tier": 2
+    },
+    "710335": {
+      "city_name": "Wetteraukreis",
+      "tier": 2
+    },
+    "710336": {
+      "city_name": "Gießen",
+      "tier": 2
+    },
+    "710337": {
+      "city_name": "Lahn-Dill-Kreis",
+      "tier": 2
+    },
+    "710338": {
+      "city_name": "Limburg-Weilburg",
+      "tier": 2
+    },
+    "710339": {
+      "city_name": "Marburg-Biedenkopf",
+      "tier": 2
+    },
+    "710340": {
+      "city_name": "Vogelsbergkreis",
+      "tier": 2
+    },
+    "710341": {
+      "city_name": "Kassel",
+      "tier": 2
+    },
+    "710342": {
+      "city_name": "Fulda",
+      "tier": 2
+    },
+    "710343": {
+      "city_name": "Hersfeld-Rotenburg",
+      "tier": 2
+    },
+    "710344": {
+      "city_name": "Kassel",
+      "tier": 2
+    },
+    "710345": {
+      "city_name": "Schwalm-Eder-Kreis",
+      "tier": 2
+    },
+    "710346": {
+      "city_name": "Waldeck-Frankenberg",
+      "tier": 2
+    },
+    "710347": {
+      "city_name": "Werra-Meißner-Kreis",
+      "tier": 2
+    },
+    "710348": {
+      "city_name": "Rostock",
+      "tier": 2
+    },
+    "710349": {
+      "city_name": "Schwerin",
+      "tier": 2
+    },
+    "710350": {
+      "city_name": "Mecklenburgische Seenplatte",
+      "tier": 2
+    },
+    "710351": {
+      "city_name": "Landkreis Rostock",
+      "tier": 2
+    },
+    "710352": {
+      "city_name": "Vorpommern-Rügen",
+      "tier": 2
+    },
+    "710353": {
+      "city_name": "Nordwestmecklenburg",
+      "tier": 2
+    },
+    "710354": {
+      "city_name": "Vorpommern-Greifswald",
+      "tier": 2
+    },
+    "710355": {
+      "city_name": "Ludwigslust-Parchim",
+      "tier": 2
+    },
+    "710356": {
+      "city_name": "Braunschweig",
+      "tier": 2
+    },
+    "710357": {
+      "city_name": "Salzgitter",
+      "tier": 2
+    },
+    "710358": {
+      "city_name": "Wolfsburg",
+      "tier": 2
+    },
+    "710359": {
+      "city_name": "Gifhorn",
+      "tier": 2
+    },
+    "710360": {
+      "city_name": "Goslar",
+      "tier": 2
+    },
+    "710361": {
+      "city_name": "Helmstedt",
+      "tier": 2
+    },
+    "710362": {
+      "city_name": "Northeim",
+      "tier": 2
+    },
+    "710363": {
+      "city_name": "Peine",
+      "tier": 2
+    },
+    "710364": {
+      "city_name": "Wolfenbüttel",
+      "tier": 2
+    },
+    "710365": {
+      "city_name": "Göttingen",
+      "tier": 2
+    },
+    "710366": {
+      "city_name": "Diepholz",
+      "tier": 2
+    },
+    "710367": {
+      "city_name": "Hameln-Pyrmont",
+      "tier": 2
+    },
+    "710368": {
+      "city_name": "Hildesheim",
+      "tier": 2
+    },
+    "710369": {
+      "city_name": "Holzminden",
+      "tier": 2
+    },
+    "710370": {
+      "city_name": "Nienburg (Weser)",
+      "tier": 2
+    },
+    "710371": {
+      "city_name": "Schaumburg",
+      "tier": 2
+    },
+    "710372": {
+      "city_name": "Region Hannover",
+      "tier": 2
+    },
+    "710373": {
+      "city_name": "Celle",
+      "tier": 2
+    },
+    "710374": {
+      "city_name": "Cuxhaven",
+      "tier": 2
+    },
+    "710375": {
+      "city_name": "Harburg",
+      "tier": 2
+    },
+    "710376": {
+      "city_name": "Lüchow-Dannenberg",
+      "tier": 2
+    },
+    "710377": {
+      "city_name": "Lüneburg",
+      "tier": 2
+    },
+    "710378": {
+      "city_name": "Osterholz",
+      "tier": 2
+    },
+    "710379": {
+      "city_name": "Rotenburg (Wümme)",
+      "tier": 2
+    },
+    "710380": {
+      "city_name": "Heidekreis",
+      "tier": 2
+    },
+    "710381": {
+      "city_name": "Stade",
+      "tier": 2
+    },
+    "710382": {
+      "city_name": "Uelzen",
+      "tier": 2
+    },
+    "710383": {
+      "city_name": "Verden",
+      "tier": 2
+    },
+    "710384": {
+      "city_name": "Delmenhorst",
+      "tier": 2
+    },
+    "710385": {
+      "city_name": "Emden",
+      "tier": 2
+    },
+    "710386": {
+      "city_name": "Oldenburg (Oldenburg)",
+      "tier": 2
+    },
+    "710387": {
+      "city_name": "Osnabrück",
+      "tier": 2
+    },
+    "710388": {
+      "city_name": "Wilhelmshaven",
+      "tier": 2
+    },
+    "710389": {
+      "city_name": "Ammerland",
+      "tier": 2
+    },
+    "710390": {
+      "city_name": "Aurich",
+      "tier": 2
+    },
+    "710391": {
+      "city_name": "Cloppenburg",
+      "tier": 2
+    },
+    "710392": {
+      "city_name": "Emsland",
+      "tier": 2
+    },
+    "710393": {
+      "city_name": "Friesland (DE)",
+      "tier": 2
+    },
+    "710394": {
+      "city_name": "Grafschaft Bentheim",
+      "tier": 2
+    },
+    "710395": {
+      "city_name": "Leer",
+      "tier": 2
+    },
+    "710396": {
+      "city_name": "Oldenburg",
+      "tier": 2
+    },
+    "710397": {
+      "city_name": "Osnabrück",
+      "tier": 2
+    },
+    "710398": {
+      "city_name": "Vechta",
+      "tier": 2
+    },
+    "710399": {
+      "city_name": "Wesermarsch",
+      "tier": 2
+    },
+    "710400": {
+      "city_name": "Wittmund",
+      "tier": 2
+    },
+    "710401": {
+      "city_name": "Düsseldorf",
+      "tier": 2
+    },
+    "710402": {
+      "city_name": "Duisburg",
+      "tier": 2
+    },
+    "710403": {
+      "city_name": "Essen",
+      "tier": 2
+    },
+    "710404": {
+      "city_name": "Krefeld",
+      "tier": 2
+    },
+    "710405": {
+      "city_name": "Mönchengladbach",
+      "tier": 2
+    },
+    "710406": {
+      "city_name": "Mülheim an der Ruhr",
+      "tier": 2
+    },
+    "710407": {
+      "city_name": "Oberhausen",
+      "tier": 2
+    },
+    "710408": {
+      "city_name": "Remscheid",
+      "tier": 2
+    },
+    "710409": {
+      "city_name": "Solingen",
+      "tier": 2
+    },
+    "710410": {
+      "city_name": "Wuppertal",
+      "tier": 2
+    },
+    "710411": {
+      "city_name": "Kleve",
+      "tier": 2
+    },
+    "710412": {
+      "city_name": "Mettmann",
+      "tier": 2
+    },
+    "710413": {
+      "city_name": "Rhein-Kreis Neuss",
+      "tier": 2
+    },
+    "710414": {
+      "city_name": "Viersen",
+      "tier": 2
+    },
+    "710415": {
+      "city_name": "Wesel",
+      "tier": 2
+    },
+    "710416": {
+      "city_name": "Bonn",
+      "tier": 2
+    },
+    "710417": {
+      "city_name": "Cologne",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "GER",
+      "hub": true
+    },
+    "710418": {
+      "city_name": "Leverkusen",
+      "tier": 2
+    },
+    "710419": {
+      "city_name": "Düren",
+      "tier": 2
+    },
+    "710420": {
+      "city_name": "Rhein-Erft-Kreis",
+      "tier": 2
+    },
+    "710421": {
+      "city_name": "Euskirchen",
+      "tier": 2
+    },
+    "710422": {
+      "city_name": "Heinsberg",
+      "tier": 2
+    },
+    "710423": {
+      "city_name": "Oberbergischer Kreis",
+      "tier": 2
+    },
+    "710424": {
+      "city_name": "Rheinisch-Bergischer Kreis",
+      "tier": 2
+    },
+    "710425": {
+      "city_name": "Rhein-Sieg-Kreis",
+      "tier": 2
+    },
+    "710426": {
+      "city_name": "Städteregion Aachen",
+      "tier": 2
+    },
+    "710427": {
+      "city_name": "Bottrop",
+      "tier": 2
+    },
+    "710428": {
+      "city_name": "Gelsenkirchen",
+      "tier": 2
+    },
+    "710429": {
+      "city_name": "Münster",
+      "tier": 2
+    },
+    "710430": {
+      "city_name": "Borken",
+      "tier": 2
+    },
+    "710431": {
+      "city_name": "Coesfeld",
+      "tier": 2
+    },
+    "710432": {
+      "city_name": "Recklinghausen",
+      "tier": 2
+    },
+    "710433": {
+      "city_name": "Steinfurt",
+      "tier": 2
+    },
+    "710434": {
+      "city_name": "Warendorf",
+      "tier": 2
+    },
+    "710435": {
+      "city_name": "Bielefeld",
+      "tier": 2
+    },
+    "710436": {
+      "city_name": "Gütersloh",
+      "tier": 2
+    },
+    "710437": {
+      "city_name": "Herford",
+      "tier": 2
+    },
+    "710438": {
+      "city_name": "Höxter",
+      "tier": 2
+    },
+    "710439": {
+      "city_name": "Lippe",
+      "tier": 2
+    },
+    "710440": {
+      "city_name": "Minden-Lübbecke",
+      "tier": 2
+    },
+    "710441": {
+      "city_name": "Paderborn",
+      "tier": 2
+    },
+    "710442": {
+      "city_name": "Bochum",
+      "tier": 2
+    },
+    "710443": {
+      "city_name": "Dortmund",
+      "tier": 2
+    },
+    "710444": {
+      "city_name": "Hagen",
+      "tier": 2
+    },
+    "710445": {
+      "city_name": "Hamm",
+      "tier": 2
+    },
+    "710446": {
+      "city_name": "Herne",
+      "tier": 2
+    },
+    "710447": {
+      "city_name": "Ennepe-Ruhr-Kreis",
+      "tier": 2
+    },
+    "710448": {
+      "city_name": "Hochsauerlandkreis",
+      "tier": 2
+    },
+    "710449": {
+      "city_name": "Märkischer Kreis",
+      "tier": 2
+    },
+    "710450": {
+      "city_name": "Olpe",
+      "tier": 2
+    },
+    "710451": {
+      "city_name": "Siegen-Wittgenstein",
+      "tier": 2
+    },
+    "710452": {
+      "city_name": "Soest",
+      "tier": 2
+    },
+    "710453": {
+      "city_name": "Unna",
+      "tier": 2
+    },
+    "710454": {
+      "city_name": "Koblenz",
+      "tier": 2
+    },
+    "710455": {
+      "city_name": "Ahrweiler",
+      "tier": 2
+    },
+    "710456": {
+      "city_name": "Altenkirchen (Westerwald)",
+      "tier": 2
+    },
+    "710457": {
+      "city_name": "Bad Kreuznach",
+      "tier": 2
+    },
+    "710458": {
+      "city_name": "Birkenfeld",
+      "tier": 2
+    },
+    "710459": {
+      "city_name": "Mayen-Koblenz",
+      "tier": 2
+    },
+    "710460": {
+      "city_name": "Neuwied",
+      "tier": 2
+    },
+    "710461": {
+      "city_name": "Rhein-Lahn-Kreis",
+      "tier": 2
+    },
+    "710462": {
+      "city_name": "Westerwaldkreis",
+      "tier": 2
+    },
+    "710463": {
+      "city_name": "Cochem-Zell",
+      "tier": 2
+    },
+    "710464": {
+      "city_name": "Rhein-Hunsrück-Kreis",
+      "tier": 2
+    },
+    "710465": {
+      "city_name": "Trier",
+      "tier": 2
+    },
+    "710466": {
+      "city_name": "Bernkastel-Wittlich",
+      "tier": 2
+    },
+    "710467": {
+      "city_name": "Eifelkreis Bitburg-Prüm",
+      "tier": 2
+    },
+    "710468": {
+      "city_name": "Vulkaneifel",
+      "tier": 2
+    },
+    "710469": {
+      "city_name": "Trier-Saarburg",
+      "tier": 2
+    },
+    "710470": {
+      "city_name": "Frankenthal (Pfalz)",
+      "tier": 2
+    },
+    "710471": {
+      "city_name": "Kaiserslautern",
+      "tier": 2
+    },
+    "710472": {
+      "city_name": "Landau in der Pfalz",
+      "tier": 2
+    },
+    "710473": {
+      "city_name": "Ludwigshafen am Rhein",
+      "tier": 2
+    },
+    "710474": {
+      "city_name": "Mainz",
+      "tier": 2
+    },
+    "710475": {
+      "city_name": "Neustadt an der Weinstraße",
+      "tier": 2
+    },
+    "710476": {
+      "city_name": "Pirmasens",
+      "tier": 2
+    },
+    "710477": {
+      "city_name": "Speyer",
+      "tier": 2
+    },
+    "710478": {
+      "city_name": "Worms",
+      "tier": 2
+    },
+    "710479": {
+      "city_name": "Zweibrücken",
+      "tier": 2
+    },
+    "710480": {
+      "city_name": "Alzey-Worms",
+      "tier": 2
+    },
+    "710481": {
+      "city_name": "Bad Dürkheim",
+      "tier": 2
+    },
+    "710482": {
+      "city_name": "Donnersbergkreis",
+      "tier": 2
+    },
+    "710483": {
+      "city_name": "Germersheim",
+      "tier": 2
+    },
+    "710484": {
+      "city_name": "Kaiserslautern",
+      "tier": 2
+    },
+    "710485": {
+      "city_name": "Kusel",
+      "tier": 2
+    },
+    "710486": {
+      "city_name": "Südliche Weinstraße",
+      "tier": 2
+    },
+    "710487": {
+      "city_name": "Rhein-Pfalz-Kreis",
+      "tier": 2
+    },
+    "710488": {
+      "city_name": "Mainz-Bingen",
+      "tier": 2
+    },
+    "710489": {
+      "city_name": "Südwestpfalz",
+      "tier": 2
+    },
+    "710490": {
+      "city_name": "Regionalverband Saarbrücken",
+      "tier": 2
+    },
+    "710491": {
+      "city_name": "Merzig-Wadern",
+      "tier": 2
+    },
+    "710492": {
+      "city_name": "Neunkirchen",
+      "tier": 2
+    },
+    "710493": {
+      "city_name": "Saarlouis",
+      "tier": 2
+    },
+    "710494": {
+      "city_name": "Saarpfalz-Kreis",
+      "tier": 2
+    },
+    "710495": {
+      "city_name": "St. Wendel",
+      "tier": 2
+    },
+    "710496": {
+      "city_name": "Dresden",
+      "tier": 2
+    },
+    "710497": {
+      "city_name": "Bautzen",
+      "tier": 2
+    },
+    "710498": {
+      "city_name": "Görlitz",
+      "tier": 2
+    },
+    "710499": {
+      "city_name": "Meißen",
+      "tier": 2
+    },
+    "710500": {
+      "city_name": "Sächsische Schweiz-Osterzgebirge",
+      "tier": 2
+    },
+    "710501": {
+      "city_name": "Chemnitz",
+      "tier": 2
+    },
+    "710502": {
+      "city_name": "Erzgebirgskreis",
+      "tier": 2
+    },
+    "710503": {
+      "city_name": "Mittelsachsen",
+      "tier": 2
+    },
+    "710504": {
+      "city_name": "Vogtlandkreis",
+      "tier": 2
+    },
+    "710505": {
+      "city_name": "Zwickau",
+      "tier": 2
+    },
+    "710506": {
+      "city_name": "Leipzig",
+      "tier": 2
+    },
+    "710507": {
+      "city_name": "Leipzig",
+      "tier": 2
+    },
+    "710508": {
+      "city_name": "Nordsachsen",
+      "tier": 2
+    },
+    "710509": {
+      "city_name": "Dessau-Roßlau",
+      "tier": 2
+    },
+    "710510": {
+      "city_name": "Halle (Saale)",
+      "tier": 2
+    },
+    "710511": {
+      "city_name": "Magdeburg",
+      "tier": 2
+    },
+    "710512": {
+      "city_name": "Altmarkkreis Salzwedel",
+      "tier": 2
+    },
+    "710513": {
+      "city_name": "Anhalt-Bitterfeld",
+      "tier": 2
+    },
+    "710514": {
+      "city_name": "Jerichower Land",
+      "tier": 2
+    },
+    "710515": {
+      "city_name": "Börde",
+      "tier": 2
+    },
+    "710516": {
+      "city_name": "Burgenlandkreis",
+      "tier": 2
+    },
+    "710517": {
+      "city_name": "Harz",
+      "tier": 2
+    },
+    "710518": {
+      "city_name": "Mansfeld-Südharz",
+      "tier": 2
+    },
+    "710519": {
+      "city_name": "Saalekreis",
+      "tier": 2
+    },
+    "710520": {
+      "city_name": "Salzlandkreis",
+      "tier": 2
+    },
+    "710521": {
+      "city_name": "Stendal",
+      "tier": 2
+    },
+    "710522": {
+      "city_name": "Wittenberg",
+      "tier": 2
+    },
+    "710523": {
+      "city_name": "Flensburg",
+      "tier": 2
+    },
+    "710524": {
+      "city_name": "Kiel",
+      "tier": 2
+    },
+    "710525": {
+      "city_name": "Lübeck",
+      "tier": 2
+    },
+    "710526": {
+      "city_name": "Neumünster",
+      "tier": 2
+    },
+    "710527": {
+      "city_name": "Dithmarschen",
+      "tier": 2
+    },
+    "710528": {
+      "city_name": "Herzogtum Lauenburg",
+      "tier": 2
+    },
+    "710529": {
+      "city_name": "Nordfriesland",
+      "tier": 2
+    },
+    "710530": {
+      "city_name": "Ostholstein",
+      "tier": 2
+    },
+    "710531": {
+      "city_name": "Pinneberg",
+      "tier": 2
+    },
+    "710532": {
+      "city_name": "Plön",
+      "tier": 2
+    },
+    "710533": {
+      "city_name": "Rendsburg-Eckernförde",
+      "tier": 2
+    },
+    "710534": {
+      "city_name": "Schleswig-Flensburg",
+      "tier": 2
+    },
+    "710535": {
+      "city_name": "Segeberg",
+      "tier": 2
+    },
+    "710536": {
+      "city_name": "Steinburg",
+      "tier": 2
+    },
+    "710537": {
+      "city_name": "Stormarn",
+      "tier": 2
+    },
+    "710538": {
+      "city_name": "Erfurt",
+      "tier": 2
+    },
+    "710539": {
+      "city_name": "Gera",
+      "tier": 2
+    },
+    "710540": {
+      "city_name": "Jena",
+      "tier": 2
+    },
+    "710541": {
+      "city_name": "Suhl",
+      "tier": 2
+    },
+    "710542": {
+      "city_name": "Weimar",
+      "tier": 2
+    },
+    "710543": {
+      "city_name": "Eichsfeld",
+      "tier": 2
+    },
+    "710544": {
+      "city_name": "Nordhausen",
+      "tier": 2
+    },
+    "710545": {
+      "city_name": "Unstrut-Hainich-Kreis",
+      "tier": 2
+    },
+    "710546": {
+      "city_name": "Kyffhäuserkreis",
+      "tier": 2
+    },
+    "710547": {
+      "city_name": "Schmalkalden-Meiningen",
+      "tier": 2
+    },
+    "710548": {
+      "city_name": "Gotha",
+      "tier": 2
+    },
+    "710549": {
+      "city_name": "Sömmerda",
+      "tier": 2
+    },
+    "710550": {
+      "city_name": "Hildburghausen",
+      "tier": 2
+    },
+    "710551": {
+      "city_name": "Ilm-Kreis",
+      "tier": 2
+    },
+    "710552": {
+      "city_name": "Weimarer Land",
+      "tier": 2
+    },
+    "710553": {
+      "city_name": "Sonneberg",
+      "tier": 2
+    },
+    "710554": {
+      "city_name": "Saalfeld-Rudolstadt",
+      "tier": 2
+    },
+    "710555": {
+      "city_name": "Saale-Holzland-Kreis",
+      "tier": 2
+    },
+    "710556": {
+      "city_name": "Saale-Orla-Kreis",
+      "tier": 2
+    },
+    "710557": {
+      "city_name": "Greiz",
+      "tier": 2
+    },
+    "710558": {
+      "city_name": "Altenburger Land",
+      "tier": 2
+    },
+    "710559": {
+      "city_name": "Eisenach",
+      "tier": 2
+    },
+    "710560": {
+      "city_name": "Wartburgkreis",
+      "tier": 2
+    },
+    "710561": {
+      "city_name": "Copenhagen",
+      "tier": 2
+    },
+    "710562": {
+      "city_name": "Copenhagen",
+      "tier": 2
+    },
+    "710563": {
+      "city_name": "Nordsjælland",
+      "tier": 2
+    },
+    "710564": {
+      "city_name": "Bornholm",
+      "tier": 2
+    },
+    "710565": {
+      "city_name": "Østsjælland",
+      "tier": 2
+    },
+    "710566": {
+      "city_name": "Vest- og Sydsjælland",
+      "tier": 2
+    },
+    "710567": {
+      "city_name": "Fyn",
+      "tier": 2
+    },
+    "710568": {
+      "city_name": "Sydjylland",
+      "tier": 2
+    },
+    "710569": {
+      "city_name": "Vestjylland",
+      "tier": 2
+    },
+    "710570": {
+      "city_name": "Østjylland",
+      "tier": 2
+    },
+    "710571": {
+      "city_name": "Nordjylland",
+      "tier": 2
+    },
+    "710572": {
+      "city_name": "Põhja-Eesti",
+      "tier": 2
+    },
+    "710573": {
+      "city_name": "Lääne-Eesti",
+      "tier": 2
+    },
+    "710574": {
+      "city_name": "Lõuna-Eesti",
+      "tier": 2
+    },
+    "710575": {
+      "city_name": "Kesk-Eesti",
+      "tier": 2
+    },
+    "710576": {
+      "city_name": "Kirde-Eesti",
+      "tier": 2
+    },
+    "710577": {
+      "city_name": "Βόρειος Τομέας Αθηνών",
+      "tier": 2
+    },
+    "710578": {
+      "city_name": "Δυτικός Τομέας Αθηνών",
+      "tier": 2
+    },
+    "710579": {
+      "city_name": "Κεντρικός Τομέας Αθηνών",
+      "tier": 2
+    },
+    "710580": {
+      "city_name": "Νότιος Τομέας Αθηνών",
+      "tier": 2
+    },
+    "710581": {
+      "city_name": "Ανατολική Αττική",
+      "tier": 2
+    },
+    "710582": {
+      "city_name": "Δυτική Αττική",
+      "tier": 2
+    },
+    "710583": {
+      "city_name": "Πειραιάς",
+      "tier": 2
+    },
+    "710584": {
+      "city_name": "Λέσβος",
+      "tier": 2
+    },
+    "710585": {
+      "city_name": "Ικαρία",
+      "tier": 2
+    },
+    "710586": {
+      "city_name": "Χίος",
+      "tier": 2
+    },
+    "710587": {
+      "city_name": "Κάλυμνος",
+      "tier": 2
+    },
+    "710588": {
+      "city_name": "Άνδρος",
+      "tier": 2
+    },
+    "710589": {
+      "city_name": "Ηράκλειο",
+      "tier": 2
+    },
+    "710590": {
+      "city_name": "Λασίθι",
+      "tier": 2
+    },
+    "710591": {
+      "city_name": "Ρέθυμνο",
+      "tier": 2
+    },
+    "710592": {
+      "city_name": "Χανιά",
+      "tier": 2
+    },
+    "710593": {
+      "city_name": "Έβρος",
+      "tier": 2
+    },
+    "710594": {
+      "city_name": "Ξάνθη",
+      "tier": 2
+    },
+    "710595": {
+      "city_name": "Ροδόπη",
+      "tier": 2
+    },
+    "710596": {
+      "city_name": "Δράμα",
+      "tier": 2
+    },
+    "710597": {
+      "city_name": "Θάσος",
+      "tier": 2
+    },
+    "710598": {
+      "city_name": "Ημαθία",
+      "tier": 2
+    },
+    "710599": {
+      "city_name": "Θεσσαλονίκη",
+      "tier": 2
+    },
+    "710600": {
+      "city_name": "Κιλκίς",
+      "tier": 2
+    },
+    "710601": {
+      "city_name": "Πέλλα",
+      "tier": 2
+    },
+    "710602": {
+      "city_name": "Πιερία",
+      "tier": 2
+    },
+    "710603": {
+      "city_name": "Σέρρες",
+      "tier": 2
+    },
+    "710604": {
+      "city_name": "Χαλκιδική",
+      "tier": 2
+    },
+    "710605": {
+      "city_name": "Γρεβενά",
+      "tier": 2
+    },
+    "710606": {
+      "city_name": "Καστοριά",
+      "tier": 2
+    },
+    "710607": {
+      "city_name": "Φλώρινα",
+      "tier": 2
+    },
+    "710608": {
+      "city_name": "Άρτα",
+      "tier": 2
+    },
+    "710609": {
+      "city_name": "Θεσπρωτία",
+      "tier": 2
+    },
+    "710610": {
+      "city_name": "Ιωάννινα",
+      "tier": 2
+    },
+    "710611": {
+      "city_name": "Καρδίτσα",
+      "tier": 2
+    },
+    "710612": {
+      "city_name": "Λάρισα",
+      "tier": 2
+    },
+    "710613": {
+      "city_name": "Μαγνησία",
+      "tier": 2
+    },
+    "710614": {
+      "city_name": "Ζάκυνθος",
+      "tier": 2
+    },
+    "710615": {
+      "city_name": "Κέρκυρα",
+      "tier": 2
+    },
+    "710616": {
+      "city_name": "Ιθάκη",
+      "tier": 2
+    },
+    "710617": {
+      "city_name": "Λευκάδα",
+      "tier": 2
+    },
+    "710618": {
+      "city_name": "Αιτωλοακαρνανία",
+      "tier": 2
+    },
+    "710619": {
+      "city_name": "Αχαΐα",
+      "tier": 2
+    },
+    "710620": {
+      "city_name": "Ηλεία",
+      "tier": 2
+    },
+    "710621": {
+      "city_name": "Βοιωτία",
+      "tier": 2
+    },
+    "710622": {
+      "city_name": "Εύβοια",
+      "tier": 2
+    },
+    "710623": {
+      "city_name": "Ευρυτανία",
+      "tier": 2
+    },
+    "710624": {
+      "city_name": "Φθιώτιδα",
+      "tier": 2
+    },
+    "710625": {
+      "city_name": "Φωκίδα",
+      "tier": 2
+    },
+    "710626": {
+      "city_name": "Αργολίδα",
+      "tier": 2
+    },
+    "710627": {
+      "city_name": "Κορινθία",
+      "tier": 2
+    },
+    "710628": {
+      "city_name": "Λακωνία",
+      "tier": 2
+    },
+    "710629": {
+      "city_name": "A Coruña",
+      "tier": 2
+    },
+    "710630": {
+      "city_name": "Lugo",
+      "tier": 2
+    },
+    "710631": {
+      "city_name": "Ourense",
+      "tier": 2
+    },
+    "710632": {
+      "city_name": "Pontevedra",
+      "tier": 2
+    },
+    "710633": {
+      "city_name": "Asturias",
+      "tier": 2
+    },
+    "710634": {
+      "city_name": "Cantabria",
+      "tier": 2
+    },
+    "710635": {
+      "city_name": "Araba/Álava",
+      "tier": 2
+    },
+    "710636": {
+      "city_name": "Gipuzkoa",
+      "tier": 2
+    },
+    "710637": {
+      "city_name": "Bizkaia",
+      "tier": 2
+    },
+    "710638": {
+      "city_name": "Navarra",
+      "tier": 2
+    },
+    "710639": {
+      "city_name": "La Rioja",
+      "tier": 2
+    },
+    "710640": {
+      "city_name": "Huesca",
+      "tier": 2
+    },
+    "710641": {
+      "city_name": "Teruel",
+      "tier": 2
+    },
+    "710642": {
+      "city_name": "Zaragoza",
+      "tier": 2
+    },
+    "710643": {
+      "city_name": "Madrid",
+      "tier": 2
+    },
+    "710644": {
+      "city_name": "Ávila",
+      "tier": 2
+    },
+    "710645": {
+      "city_name": "Burgos",
+      "tier": 2
+    },
+    "710646": {
+      "city_name": "León",
+      "tier": 2
+    },
+    "710647": {
+      "city_name": "Palencia",
+      "tier": 2
+    },
+    "710648": {
+      "city_name": "Salamanca",
+      "tier": 2
+    },
+    "710649": {
+      "city_name": "Segovia",
+      "tier": 2
+    },
+    "710650": {
+      "city_name": "Soria",
+      "tier": 2
+    },
+    "710651": {
+      "city_name": "Valladolid",
+      "tier": 2
+    },
+    "710652": {
+      "city_name": "Zamora",
+      "tier": 2
+    },
+    "710653": {
+      "city_name": "Albacete",
+      "tier": 2
+    },
+    "710654": {
+      "city_name": "Ciudad Real",
+      "tier": 2
+    },
+    "710655": {
+      "city_name": "Cuenca",
+      "tier": 2
+    },
+    "710656": {
+      "city_name": "Guadalajara",
+      "tier": 2
+    },
+    "710657": {
+      "city_name": "Toledo",
+      "tier": 2
+    },
+    "710658": {
+      "city_name": "Badajoz",
+      "tier": 2
+    },
+    "710659": {
+      "city_name": "Cáceres",
+      "tier": 2
+    },
+    "710660": {
+      "city_name": "Barcelona",
+      "tier": 2
+    },
+    "710661": {
+      "city_name": "Girona",
+      "tier": 2
+    },
+    "710662": {
+      "city_name": "Lleida",
+      "tier": 2
+    },
+    "710663": {
+      "city_name": "Tarragona",
+      "tier": 2
+    },
+    "710664": {
+      "city_name": "Alicante/Alacant",
+      "tier": 2
+    },
+    "710665": {
+      "city_name": "Castellón/Castelló",
+      "tier": 2
+    },
+    "710666": {
+      "city_name": "Valencia/València",
+      "tier": 2
+    },
+    "710667": {
+      "city_name": "Eivissa y Formentera",
+      "tier": 2
+    },
+    "710668": {
+      "city_name": "Mallorca",
+      "tier": 2
+    },
+    "710669": {
+      "city_name": "Menorca",
+      "tier": 2
+    },
+    "710670": {
+      "city_name": "Almería",
+      "tier": 2
+    },
+    "710671": {
+      "city_name": "Cádiz",
+      "tier": 2
+    },
+    "710672": {
+      "city_name": "Córdoba",
+      "tier": 2
+    },
+    "710673": {
+      "city_name": "Granada",
+      "tier": 2
+    },
+    "710674": {
+      "city_name": "Huelva",
+      "tier": 2
+    },
+    "710675": {
+      "city_name": "Jaén",
+      "tier": 2
+    },
+    "710676": {
+      "city_name": "Málaga",
+      "tier": 2
+    },
+    "710677": {
+      "city_name": "Sevilla",
+      "tier": 2
+    },
+    "710678": {
+      "city_name": "Murcia",
+      "tier": 2
+    },
+    "710679": {
+      "city_name": "Ceuta",
+      "tier": 2
+    },
+    "710680": {
+      "city_name": "Melilla",
+      "tier": 2
+    },
+    "710681": {
+      "city_name": "El Hierro",
+      "tier": 2
+    },
+    "710682": {
+      "city_name": "Fuerteventura",
+      "tier": 2
+    },
+    "710683": {
+      "city_name": "Gran Canaria",
+      "tier": 2
+    },
+    "710684": {
+      "city_name": "La Gomera",
+      "tier": 2
+    },
+    "710685": {
+      "city_name": "La Palma",
+      "tier": 2
+    },
+    "710686": {
+      "city_name": "Lanzarote",
+      "tier": 2
+    },
+    "710687": {
+      "city_name": "Tenerife",
+      "tier": 2
+    },
+    "710688": {
+      "city_name": "Keski-Suomi",
+      "tier": 2
+    },
+    "710689": {
+      "city_name": "Etelä-Pohjanmaa",
+      "tier": 2
+    },
+    "710690": {
+      "city_name": "Pohjanmaa",
+      "tier": 2
+    },
+    "710691": {
+      "city_name": "Satakunta",
+      "tier": 2
+    },
+    "710692": {
+      "city_name": "Pirkanmaa",
+      "tier": 2
+    },
+    "710693": {
+      "city_name": "Helsinki",
+      "tier": 2
+    },
+    "710694": {
+      "city_name": "Varsinais-Suomi",
+      "tier": 2
+    },
+    "710695": {
+      "city_name": "Kanta-Häme",
+      "tier": 2
+    },
+    "710696": {
+      "city_name": "Päijät-Häme",
+      "tier": 2
+    },
+    "710697": {
+      "city_name": "Kymenlaakso",
+      "tier": 2
+    },
+    "710698": {
+      "city_name": "Etelä-Karjala",
+      "tier": 2
+    },
+    "710699": {
+      "city_name": "Etelä-Savo",
+      "tier": 2
+    },
+    "710700": {
+      "city_name": "Pohjois-Savo",
+      "tier": 2
+    },
+    "710701": {
+      "city_name": "Pohjois-Karjala",
+      "tier": 2
+    },
+    "710702": {
+      "city_name": "Keski-Pohjanmaa",
+      "tier": 2
+    },
+    "710703": {
+      "city_name": "Lappi",
+      "tier": 2
+    },
+    "710704": {
+      "city_name": "Kainuu",
+      "tier": 2
+    },
+    "710705": {
+      "city_name": "Pohjois-Pohjanmaa",
+      "tier": 2
+    },
+    "710706": {
+      "city_name": "Åland",
+      "tier": 2
+    },
+    "710707": {
+      "city_name": "Paris",
+      "tier": 4,
+      "capital": true,
+      "tag": "FRA",
+      "is_capital": true,
+      "country_tag": "FRA",
+      "hub": true
+    },
+    "710708": {
+      "city_name": "Seine-et-Marne",
+      "tier": 2
+    },
+    "710709": {
+      "city_name": "Yvelines",
+      "tier": 2
+    },
+    "710710": {
+      "city_name": "Essonne",
+      "tier": 2
+    },
+    "710711": {
+      "city_name": "Hauts-de-Seine",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "FRA",
+      "hub": true
+    },
+    "710712": {
+      "city_name": "Seine-Saint-Denis",
+      "tier": 2
+    },
+    "710713": {
+      "city_name": "Val-de-Marne",
+      "tier": 2
+    },
+    "710714": {
+      "city_name": "Val-d’Oise",
+      "tier": 2
+    },
+    "710715": {
+      "city_name": "Cher",
+      "tier": 2
+    },
+    "710716": {
+      "city_name": "Eure-et-Loir",
+      "tier": 2
+    },
+    "710717": {
+      "city_name": "Indre",
+      "tier": 2
+    },
+    "710718": {
+      "city_name": "Indre-et-Loire",
+      "tier": 2
+    },
+    "710719": {
+      "city_name": "Loir-et-Cher",
+      "tier": 2
+    },
+    "710720": {
+      "city_name": "Loiret",
+      "tier": 2
+    },
+    "710721": {
+      "city_name": "Côte-d’Or",
+      "tier": 2
+    },
+    "710722": {
+      "city_name": "Nièvre",
+      "tier": 2
+    },
+    "710723": {
+      "city_name": "Saône-et-Loire",
+      "tier": 2
+    },
+    "710724": {
+      "city_name": "Yonne",
+      "tier": 2
+    },
+    "710725": {
+      "city_name": "Doubs",
+      "tier": 2
+    },
+    "710726": {
+      "city_name": "Jura (FRC22)",
+      "tier": 2
+    },
+    "710727": {
+      "city_name": "Haute-Saône",
+      "tier": 2
+    },
+    "710728": {
+      "city_name": "Territoire de Belfort",
+      "tier": 2
+    },
+    "710729": {
+      "city_name": "Calvados",
+      "tier": 2
+    },
+    "710730": {
+      "city_name": "Manche",
+      "tier": 2
+    },
+    "710731": {
+      "city_name": "Orne",
+      "tier": 2
+    },
+    "710732": {
+      "city_name": "Eure",
+      "tier": 2
+    },
+    "710733": {
+      "city_name": "Seine-Maritime",
+      "tier": 2
+    },
+    "710734": {
+      "city_name": "Lille",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "FRA",
+      "hub": true
+    },
+    "710735": {
+      "city_name": "Pas-de-Calais",
+      "tier": 2
+    },
+    "710736": {
+      "city_name": "Aisne",
+      "tier": 2
+    },
+    "710737": {
+      "city_name": "Oise",
+      "tier": 2
+    },
+    "710738": {
+      "city_name": "Somme",
+      "tier": 2
+    },
+    "710739": {
+      "city_name": "Bas-Rhin",
+      "tier": 2
+    },
+    "710740": {
+      "city_name": "Haut-Rhin",
+      "tier": 2
+    },
+    "710741": {
+      "city_name": "Ardennes",
+      "tier": 2
+    },
+    "710742": {
+      "city_name": "Aube",
+      "tier": 2
+    },
+    "710743": {
+      "city_name": "Marne",
+      "tier": 2
+    },
+    "710744": {
+      "city_name": "Haute-Marne",
+      "tier": 2
+    },
+    "710745": {
+      "city_name": "Meurthe-et-Moselle",
+      "tier": 2
+    },
+    "710746": {
+      "city_name": "Meuse",
+      "tier": 2
+    },
+    "710747": {
+      "city_name": "Moselle",
+      "tier": 2
+    },
+    "710748": {
+      "city_name": "Vosges",
+      "tier": 2
+    },
+    "710749": {
+      "city_name": "Loire-Atlantique",
+      "tier": 2
+    },
+    "710750": {
+      "city_name": "Maine-et-Loire",
+      "tier": 2
+    },
+    "710751": {
+      "city_name": "Mayenne",
+      "tier": 2
+    },
+    "710752": {
+      "city_name": "Sarthe",
+      "tier": 2
+    },
+    "710753": {
+      "city_name": "Vendée",
+      "tier": 2
+    },
+    "710754": {
+      "city_name": "Côtes-d’Armor",
+      "tier": 2
+    },
+    "710755": {
+      "city_name": "Finistère",
+      "tier": 2
+    },
+    "710756": {
+      "city_name": "Ille-et-Vilaine",
+      "tier": 2
+    },
+    "710757": {
+      "city_name": "Morbihan",
+      "tier": 2
+    },
+    "710758": {
+      "city_name": "Dordogne",
+      "tier": 2
+    },
+    "710759": {
+      "city_name": "Gironde",
+      "tier": 2
+    },
+    "710760": {
+      "city_name": "Landes",
+      "tier": 2
+    },
+    "710761": {
+      "city_name": "Lot-et-Garonne",
+      "tier": 2
+    },
+    "710762": {
+      "city_name": "Pyrénées-Atlantiques",
+      "tier": 2
+    },
+    "710763": {
+      "city_name": "Corrèze",
+      "tier": 2
+    },
+    "710764": {
+      "city_name": "Creuse",
+      "tier": 2
+    },
+    "710765": {
+      "city_name": "Haute-Vienne",
+      "tier": 2
+    },
+    "710766": {
+      "city_name": "Charente",
+      "tier": 2
+    },
+    "710767": {
+      "city_name": "Charente-Maritime",
+      "tier": 2
+    },
+    "710768": {
+      "city_name": "Deux-Sèvres",
+      "tier": 2
+    },
+    "710769": {
+      "city_name": "Vienne",
+      "tier": 2
+    },
+    "710770": {
+      "city_name": "Aude",
+      "tier": 2
+    },
+    "710771": {
+      "city_name": "Gard",
+      "tier": 2
+    },
+    "710772": {
+      "city_name": "Hérault",
+      "tier": 2
+    },
+    "710773": {
+      "city_name": "Lozère",
+      "tier": 2
+    },
+    "710774": {
+      "city_name": "Pyrénées-Orientales",
+      "tier": 2
+    },
+    "710775": {
+      "city_name": "Ariège",
+      "tier": 2
+    },
+    "710776": {
+      "city_name": "Aveyron",
+      "tier": 2
+    },
+    "710777": {
+      "city_name": "Haute-Garonne",
+      "tier": 2
+    },
+    "710778": {
+      "city_name": "Gers",
+      "tier": 2
+    },
+    "710779": {
+      "city_name": "Lot",
+      "tier": 2
+    },
+    "710780": {
+      "city_name": "Hautes-Pyrénées",
+      "tier": 2
+    },
+    "710781": {
+      "city_name": "Tarn",
+      "tier": 2
+    },
+    "710782": {
+      "city_name": "Tarn-et-Garonne",
+      "tier": 2
+    },
+    "710783": {
+      "city_name": "Allier",
+      "tier": 2
+    },
+    "710784": {
+      "city_name": "Cantal",
+      "tier": 2
+    },
+    "710785": {
+      "city_name": "Haute-Loire",
+      "tier": 2
+    },
+    "710786": {
+      "city_name": "Puy-de-Dôme",
+      "tier": 2
+    },
+    "710787": {
+      "city_name": "Ain",
+      "tier": 2
+    },
+    "710788": {
+      "city_name": "Ardèche",
+      "tier": 2
+    },
+    "710789": {
+      "city_name": "Drôme",
+      "tier": 2
+    },
+    "710790": {
+      "city_name": "Isère",
+      "tier": 2
+    },
+    "710791": {
+      "city_name": "Loire",
+      "tier": 2
+    },
+    "710792": {
+      "city_name": "Lyon",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "FRA",
+      "hub": true
+    },
+    "710793": {
+      "city_name": "Savoie",
+      "tier": 2
+    },
+    "710794": {
+      "city_name": "Haute-Savoie",
+      "tier": 2
+    },
+    "710795": {
+      "city_name": "Alpes-de-Haute-Provence",
+      "tier": 2
+    },
+    "710796": {
+      "city_name": "Hautes-Alpes",
+      "tier": 2
+    },
+    "710797": {
+      "city_name": "Alpes-Maritimes",
+      "tier": 2
+    },
+    "710798": {
+      "city_name": "Marseille",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "FRA",
+      "hub": true
+    },
+    "710799": {
+      "city_name": "Var",
+      "tier": 2
+    },
+    "710800": {
+      "city_name": "Vaucluse",
+      "tier": 2
+    },
+    "710801": {
+      "city_name": "Corse-du-Sud",
+      "tier": 2
+    },
+    "710802": {
+      "city_name": "Haute-Corse",
+      "tier": 2
+    },
+    "710803": {
+      "city_name": "Guadeloupe",
+      "tier": 2
+    },
+    "710804": {
+      "city_name": "Martinique",
+      "tier": 2
+    },
+    "710805": {
+      "city_name": "Guyane",
+      "tier": 2
+    },
+    "710806": {
+      "city_name": "La Réunion",
+      "tier": 2
+    },
+    "710807": {
+      "city_name": "Mayotte",
+      "tier": 2
+    },
+    "710808": {
+      "city_name": "Bjelovarsko-bilogorska županija",
+      "tier": 2
+    },
+    "710809": {
+      "city_name": "Virovitičko-podravska županija",
+      "tier": 2
+    },
+    "710810": {
+      "city_name": "Požeško-slavonska županija",
+      "tier": 2
+    },
+    "710811": {
+      "city_name": "Brodsko-posavska županija",
+      "tier": 2
+    },
+    "710812": {
+      "city_name": "Osječko-baranjska županija",
+      "tier": 2
+    },
+    "710813": {
+      "city_name": "Vukovarsko-srijemska županija",
+      "tier": 2
+    },
+    "710814": {
+      "city_name": "Karlovačka županija",
+      "tier": 2
+    },
+    "710815": {
+      "city_name": "Sisačko-moslavačka županija",
+      "tier": 2
+    },
+    "710816": {
+      "city_name": "Primorsko-goranska županija",
+      "tier": 2
+    },
+    "710817": {
+      "city_name": "Ličko-senjska županija",
+      "tier": 2
+    },
+    "710818": {
+      "city_name": "Zadarska županija",
+      "tier": 2
+    },
+    "710819": {
+      "city_name": "Šibensko-kninska županija",
+      "tier": 2
+    },
+    "710820": {
+      "city_name": "Splitsko-dalmatinska županija",
+      "tier": 2
+    },
+    "710821": {
+      "city_name": "Istarska županija",
+      "tier": 2
+    },
+    "710822": {
+      "city_name": "Dubrovačko-neretvanska županija",
+      "tier": 2
+    },
+    "710823": {
+      "city_name": "Grad Zagreb",
+      "tier": 2
+    },
+    "710824": {
+      "city_name": "Međimurska županija",
+      "tier": 2
+    },
+    "710825": {
+      "city_name": "Varaždinska županija",
+      "tier": 2
+    },
+    "710826": {
+      "city_name": "Koprivničko-križevačka županija",
+      "tier": 2
+    },
+    "710827": {
+      "city_name": "Krapinsko-zagorska županija",
+      "tier": 2
+    },
+    "710828": {
+      "city_name": "Zagrebačka županija",
+      "tier": 2
+    },
+    "710829": {
+      "city_name": "Budapest",
+      "tier": 2
+    },
+    "710830": {
+      "city_name": "Pest",
+      "tier": 2
+    },
+    "710831": {
+      "city_name": "Fejér",
+      "tier": 2
+    },
+    "710832": {
+      "city_name": "Komárom-Esztergom",
+      "tier": 2
+    },
+    "710833": {
+      "city_name": "Veszprém",
+      "tier": 2
+    },
+    "710834": {
+      "city_name": "Győr-Moson-Sopron",
+      "tier": 2
+    },
+    "710835": {
+      "city_name": "Vas",
+      "tier": 2
+    },
+    "710836": {
+      "city_name": "Zala",
+      "tier": 2
+    },
+    "710837": {
+      "city_name": "Baranya",
+      "tier": 2
+    },
+    "710838": {
+      "city_name": "Somogy",
+      "tier": 2
+    },
+    "710839": {
+      "city_name": "Tolna",
+      "tier": 2
+    },
+    "710840": {
+      "city_name": "Borsod-Abaúj-Zemplén",
+      "tier": 2
+    },
+    "710841": {
+      "city_name": "Heves",
+      "tier": 2
+    },
+    "710842": {
+      "city_name": "Nógrád",
+      "tier": 2
+    },
+    "710843": {
+      "city_name": "Hajdú-Bihar",
+      "tier": 2
+    },
+    "710844": {
+      "city_name": "Jász-Nagykun-Szolnok",
+      "tier": 2
+    },
+    "710845": {
+      "city_name": "Szabolcs-Szatmár-Bereg",
+      "tier": 2
+    },
+    "710846": {
+      "city_name": "Bács-Kiskun",
+      "tier": 2
+    },
+    "710847": {
+      "city_name": "Békés",
+      "tier": 2
+    },
+    "710848": {
+      "city_name": "Csongrád",
+      "tier": 2
+    },
+    "710849": {
+      "city_name": "Border",
+      "tier": 2
+    },
+    "710850": {
+      "city_name": "West",
+      "tier": 2
+    },
+    "710851": {
+      "city_name": "Mid-West",
+      "tier": 2
+    },
+    "710852": {
+      "city_name": "South-East",
+      "tier": 2
+    },
+    "710853": {
+      "city_name": "South-West",
+      "tier": 2
+    },
+    "710854": {
+      "city_name": "Dublin",
+      "tier": 2
+    },
+    "710855": {
+      "city_name": "Mid-East",
+      "tier": 2
+    },
+    "710856": {
+      "city_name": "Midland",
+      "tier": 2
+    },
+    "710857": {
+      "city_name": "Höfuðborgarsvæði",
+      "tier": 2
+    },
+    "710858": {
+      "city_name": "Landsbyggð",
+      "tier": 2
+    },
+    "710859": {
+      "city_name": "Torino",
+      "tier": 2
+    },
+    "710860": {
+      "city_name": "Vercelli",
+      "tier": 2
+    },
+    "710861": {
+      "city_name": "Biella",
+      "tier": 2
+    },
+    "710862": {
+      "city_name": "Verbano-Cusio-Ossola",
+      "tier": 2
+    },
+    "710863": {
+      "city_name": "Novara",
+      "tier": 2
+    },
+    "710864": {
+      "city_name": "Cuneo",
+      "tier": 2
+    },
+    "710865": {
+      "city_name": "Asti",
+      "tier": 2
+    },
+    "710866": {
+      "city_name": "Alessandria",
+      "tier": 2
+    },
+    "710867": {
+      "city_name": "Valle d’Aosta/Vallée d’Aoste",
+      "tier": 2
+    },
+    "710868": {
+      "city_name": "Imperia",
+      "tier": 2
+    },
+    "710869": {
+      "city_name": "Savona",
+      "tier": 2
+    },
+    "710870": {
+      "city_name": "Genova",
+      "tier": 2
+    },
+    "710871": {
+      "city_name": "La Spezia",
+      "tier": 2
+    },
+    "710872": {
+      "city_name": "Varese",
+      "tier": 2
+    },
+    "710873": {
+      "city_name": "Como",
+      "tier": 2
+    },
+    "710874": {
+      "city_name": "Lecco",
+      "tier": 2
+    },
+    "710875": {
+      "city_name": "Sondrio",
+      "tier": 2
+    },
+    "710876": {
+      "city_name": "Bergamo",
+      "tier": 2
+    },
+    "710877": {
+      "city_name": "Brescia",
+      "tier": 2
+    },
+    "710878": {
+      "city_name": "Pavia",
+      "tier": 2
+    },
+    "710879": {
+      "city_name": "Lodi",
+      "tier": 2
+    },
+    "710880": {
+      "city_name": "Cremona",
+      "tier": 2
+    },
+    "710881": {
+      "city_name": "Mantova",
+      "tier": 2
+    },
+    "710882": {
+      "city_name": "Milan",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "ITA",
+      "hub": true
+    },
+    "710883": {
+      "city_name": "Monza e della Brianza",
+      "tier": 2
+    },
+    "710884": {
+      "city_name": "L’Aquila",
+      "tier": 2
+    },
+    "710885": {
+      "city_name": "Teramo",
+      "tier": 2
+    },
+    "710886": {
+      "city_name": "Pescara",
+      "tier": 2
+    },
+    "710887": {
+      "city_name": "Chieti",
+      "tier": 2
+    },
+    "710888": {
+      "city_name": "Isernia",
+      "tier": 2
+    },
+    "710889": {
+      "city_name": "Campobasso",
+      "tier": 2
+    },
+    "710890": {
+      "city_name": "Caserta",
+      "tier": 2
+    },
+    "710891": {
+      "city_name": "Benevento",
+      "tier": 2
+    },
+    "710892": {
+      "city_name": "Naples",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "ITA",
+      "hub": true
+    },
+    "710893": {
+      "city_name": "Avellino",
+      "tier": 2
+    },
+    "710894": {
+      "city_name": "Salerno",
+      "tier": 2
+    },
+    "710895": {
+      "city_name": "Taranto",
+      "tier": 2
+    },
+    "710896": {
+      "city_name": "Brindisi",
+      "tier": 2
+    },
+    "710897": {
+      "city_name": "Lecce",
+      "tier": 2
+    },
+    "710898": {
+      "city_name": "Foggia",
+      "tier": 2
+    },
+    "710899": {
+      "city_name": "Bari",
+      "tier": 2
+    },
+    "710900": {
+      "city_name": "Barletta-Andria-Trani",
+      "tier": 2
+    },
+    "710901": {
+      "city_name": "Potenza",
+      "tier": 2
+    },
+    "710902": {
+      "city_name": "Matera",
+      "tier": 2
+    },
+    "710903": {
+      "city_name": "Cosenza",
+      "tier": 2
+    },
+    "710904": {
+      "city_name": "Crotone",
+      "tier": 2
+    },
+    "710905": {
+      "city_name": "Catanzaro",
+      "tier": 2
+    },
+    "710906": {
+      "city_name": "Vibo Valentia",
+      "tier": 2
+    },
+    "710907": {
+      "city_name": "Reggio di Calabria",
+      "tier": 2
+    },
+    "710908": {
+      "city_name": "Trapani",
+      "tier": 2
+    },
+    "710909": {
+      "city_name": "Palermo",
+      "tier": 2
+    },
+    "710910": {
+      "city_name": "Messina",
+      "tier": 2
+    },
+    "710911": {
+      "city_name": "Agrigento",
+      "tier": 2
+    },
+    "710912": {
+      "city_name": "Caltanissetta",
+      "tier": 2
+    },
+    "710913": {
+      "city_name": "Enna",
+      "tier": 2
+    },
+    "710914": {
+      "city_name": "Catania",
+      "tier": 2
+    },
+    "710915": {
+      "city_name": "Ragusa",
+      "tier": 2
+    },
+    "710916": {
+      "city_name": "Siracusa",
+      "tier": 2
+    },
+    "710917": {
+      "city_name": "Sassari",
+      "tier": 2
+    },
+    "710918": {
+      "city_name": "Nuoro",
+      "tier": 2
+    },
+    "710919": {
+      "city_name": "Cagliari",
+      "tier": 2
+    },
+    "710920": {
+      "city_name": "Oristano",
+      "tier": 2
+    },
+    "710921": {
+      "city_name": "Sud Sardegna",
+      "tier": 2
+    },
+    "710922": {
+      "city_name": "Bolzano-Bozen",
+      "tier": 2
+    },
+    "710923": {
+      "city_name": "Trento",
+      "tier": 2
+    },
+    "710924": {
+      "city_name": "Verona",
+      "tier": 2
+    },
+    "710925": {
+      "city_name": "Vicenza",
+      "tier": 2
+    },
+    "710926": {
+      "city_name": "Belluno",
+      "tier": 2
+    },
+    "710927": {
+      "city_name": "Treviso",
+      "tier": 2
+    },
+    "710928": {
+      "city_name": "Venezia",
+      "tier": 2
+    },
+    "710929": {
+      "city_name": "Padova",
+      "tier": 2
+    },
+    "710930": {
+      "city_name": "Rovigo",
+      "tier": 2
+    },
+    "710931": {
+      "city_name": "Pordenone",
+      "tier": 2
+    },
+    "710932": {
+      "city_name": "Udine",
+      "tier": 2
+    },
+    "710933": {
+      "city_name": "Gorizia",
+      "tier": 2
+    },
+    "710934": {
+      "city_name": "Trieste",
+      "tier": 2
+    },
+    "710935": {
+      "city_name": "Piacenza",
+      "tier": 2
+    },
+    "710936": {
+      "city_name": "Parma",
+      "tier": 2
+    },
+    "710937": {
+      "city_name": "Reggio nell’Emilia",
+      "tier": 2
+    },
+    "710938": {
+      "city_name": "Modena",
+      "tier": 2
+    },
+    "710939": {
+      "city_name": "Bologna",
+      "tier": 2
+    },
+    "710940": {
+      "city_name": "Ferrara",
+      "tier": 2
+    },
+    "710941": {
+      "city_name": "Ravenna",
+      "tier": 2
+    },
+    "710942": {
+      "city_name": "Forlì-Cesena",
+      "tier": 2
+    },
+    "710943": {
+      "city_name": "Rimini",
+      "tier": 2
+    },
+    "710944": {
+      "city_name": "Massa-Carrara",
+      "tier": 2
+    },
+    "710945": {
+      "city_name": "Lucca",
+      "tier": 2
+    },
+    "710946": {
+      "city_name": "Pistoia",
+      "tier": 2
+    },
+    "710947": {
+      "city_name": "Firenze",
+      "tier": 2
+    },
+    "710948": {
+      "city_name": "Prato",
+      "tier": 2
+    },
+    "710949": {
+      "city_name": "Livorno",
+      "tier": 2
+    },
+    "710950": {
+      "city_name": "Pisa",
+      "tier": 2
+    },
+    "710951": {
+      "city_name": "Arezzo",
+      "tier": 2
+    },
+    "710952": {
+      "city_name": "Siena",
+      "tier": 2
+    },
+    "710953": {
+      "city_name": "Grosseto",
+      "tier": 2
+    },
+    "710954": {
+      "city_name": "Perugia",
+      "tier": 2
+    },
+    "710955": {
+      "city_name": "Terni",
+      "tier": 2
+    },
+    "710956": {
+      "city_name": "Pesaro e Urbino",
+      "tier": 2
+    },
+    "710957": {
+      "city_name": "Ancona",
+      "tier": 2
+    },
+    "710958": {
+      "city_name": "Macerata",
+      "tier": 2
+    },
+    "710959": {
+      "city_name": "Ascoli Piceno",
+      "tier": 2
+    },
+    "710960": {
+      "city_name": "Fermo",
+      "tier": 2
+    },
+    "710961": {
+      "city_name": "Viterbo",
+      "tier": 2
+    },
+    "710962": {
+      "city_name": "Rieti",
+      "tier": 2
+    },
+    "710963": {
+      "city_name": "Rome",
+      "tier": 4,
+      "capital": true,
+      "tag": "ITA",
+      "is_capital": true,
+      "country_tag": "ITA",
+      "hub": true
+    },
+    "710964": {
+      "city_name": "Latina",
+      "tier": 2
+    },
+    "710965": {
+      "city_name": "Frosinone",
+      "tier": 2
+    },
+    "710966": {
+      "city_name": "Liechtenstein",
+      "tier": 2
+    },
+    "710967": {
+      "city_name": "Vilniaus apskritis",
+      "tier": 2
+    },
+    "710968": {
+      "city_name": "Alytaus apskritis",
+      "tier": 2
+    },
+    "710969": {
+      "city_name": "Kauno apskritis",
+      "tier": 2
+    },
+    "710970": {
+      "city_name": "Klaipėdos apskritis",
+      "tier": 2
+    },
+    "710971": {
+      "city_name": "Marijampolės apskritis",
+      "tier": 2
+    },
+    "710972": {
+      "city_name": "Panevėžio apskritis",
+      "tier": 2
+    },
+    "710973": {
+      "city_name": "Šiaulių apskritis",
+      "tier": 2
+    },
+    "710974": {
+      "city_name": "Tauragės apskritis",
+      "tier": 2
+    },
+    "710975": {
+      "city_name": "Telšių apskritis",
+      "tier": 2
+    },
+    "710976": {
+      "city_name": "Utenos apskritis",
+      "tier": 2
+    },
+    "710977": {
+      "city_name": "Luxembourg",
+      "tier": 2
+    },
+    "710978": {
+      "city_name": "Kurzeme",
+      "tier": 2
+    },
+    "710979": {
+      "city_name": "Latgale",
+      "tier": 2
+    },
+    "710980": {
+      "city_name": "Rīga",
+      "tier": 2
+    },
+    "710981": {
+      "city_name": "Pierīga",
+      "tier": 2
+    },
+    "710982": {
+      "city_name": "Vidzeme",
+      "tier": 2
+    },
+    "710983": {
+      "city_name": "Zemgale",
+      "tier": 2
+    },
+    "710984": {
+      "city_name": "Црна Гора",
+      "tier": 2
+    },
+    "710985": {
+      "city_name": "Вардарски",
+      "tier": 2
+    },
+    "710986": {
+      "city_name": "Источен",
+      "tier": 2
+    },
+    "710987": {
+      "city_name": "Југозападен",
+      "tier": 2
+    },
+    "710988": {
+      "city_name": "Југоисточен",
+      "tier": 2
+    },
+    "710989": {
+      "city_name": "Пелагониски",
+      "tier": 2
+    },
+    "710990": {
+      "city_name": "Полошки",
+      "tier": 2
+    },
+    "710991": {
+      "city_name": "Североисточен",
+      "tier": 2
+    },
+    "710992": {
+      "city_name": "Скопски",
+      "tier": 2
+    },
+    "710993": {
+      "city_name": "Malta",
+      "tier": 2
+    },
+    "710994": {
+      "city_name": "Gozo and Comino/Għawdex u Kemmuna",
+      "tier": 2
+    },
+    "710995": {
+      "city_name": "Oost-Groningen",
+      "tier": 2
+    },
+    "710996": {
+      "city_name": "Delfzijl en omgeving",
+      "tier": 2
+    },
+    "710997": {
+      "city_name": "Overig Groningen",
+      "tier": 2
+    },
+    "710998": {
+      "city_name": "Noord-Friesland",
+      "tier": 2
+    },
+    "710999": {
+      "city_name": "Zuidwest-Friesland",
+      "tier": 2
+    },
+    "711000": {
+      "city_name": "Zuidoost-Friesland",
+      "tier": 2
+    },
+    "711001": {
+      "city_name": "Noord-Drenthe",
+      "tier": 2
+    },
+    "711002": {
+      "city_name": "Zuidoost-Drenthe",
+      "tier": 2
+    },
+    "711003": {
+      "city_name": "Zuidwest-Drenthe",
+      "tier": 2
+    },
+    "711004": {
+      "city_name": "Noord-Overijssel",
+      "tier": 2
+    },
+    "711005": {
+      "city_name": "Zuidwest-Overijssel",
+      "tier": 2
+    },
+    "711006": {
+      "city_name": "Twente",
+      "tier": 2
+    },
+    "711007": {
+      "city_name": "Veluwe",
+      "tier": 2
+    },
+    "711008": {
+      "city_name": "Zuidwest-Gelderland",
+      "tier": 2
+    },
+    "711009": {
+      "city_name": "Achterhoek",
+      "tier": 2
+    },
+    "711010": {
+      "city_name": "Arnhem/Nijmegen",
+      "tier": 2
+    },
+    "711011": {
+      "city_name": "Flevoland",
+      "tier": 2
+    },
+    "711012": {
+      "city_name": "Utrecht",
+      "tier": 2
+    },
+    "711013": {
+      "city_name": "Kop van Noord-Holland",
+      "tier": 2
+    },
+    "711014": {
+      "city_name": "IJmond",
+      "tier": 2
+    },
+    "711015": {
+      "city_name": "Agglomeratie Haarlem",
+      "tier": 2
+    },
+    "711016": {
+      "city_name": "Zaanstreek",
+      "tier": 2
+    },
+    "711017": {
+      "city_name": "Het Gooi en Vechtstreek",
+      "tier": 2
+    },
+    "711018": {
+      "city_name": "Alkmaar en omgeving",
+      "tier": 2
+    },
+    "711019": {
+      "city_name": "Amsterdam",
+      "tier": 2
+    },
+    "711020": {
+      "city_name": "Agglomeratie ’s-Gravenhage",
+      "tier": 2
+    },
+    "711021": {
+      "city_name": "Delft en Westland",
+      "tier": 2
+    },
+    "711022": {
+      "city_name": "Agglomeratie Leiden en Bollenstreek",
+      "tier": 2
+    },
+    "711023": {
+      "city_name": "Zuidoost-Zuid-Holland",
+      "tier": 2
+    },
+    "711024": {
+      "city_name": "Oost-Zuid-Holland",
+      "tier": 2
+    },
+    "711025": {
+      "city_name": "Groot-Rijnmond",
+      "tier": 2
+    },
+    "711026": {
+      "city_name": "Zeeuwsch-Vlaanderen",
+      "tier": 2
+    },
+    "711027": {
+      "city_name": "Overig Zeeland",
+      "tier": 2
+    },
+    "711028": {
+      "city_name": "West-Noord-Brabant",
+      "tier": 2
+    },
+    "711029": {
+      "city_name": "Midden-Noord-Brabant",
+      "tier": 2
+    },
+    "711030": {
+      "city_name": "Noordoost-Noord-Brabant",
+      "tier": 2
+    },
+    "711031": {
+      "city_name": "Zuidoost-Noord-Brabant",
+      "tier": 2
+    },
+    "711032": {
+      "city_name": "Noord-Limburg",
+      "tier": 2
+    },
+    "711033": {
+      "city_name": "Midden-Limburg",
+      "tier": 2
+    },
+    "711034": {
+      "city_name": "Zuid-Limburg",
+      "tier": 2
+    },
+    "711035": {
+      "city_name": "Innlandet",
+      "tier": 2
+    },
+    "711036": {
+      "city_name": "Trøndelag",
+      "tier": 2
+    },
+    "711037": {
+      "city_name": "Nordland",
+      "tier": 2
+    },
+    "711038": {
+      "city_name": "Troms og Finnmark",
+      "tier": 2
+    },
+    "711039": {
+      "city_name": "Oslo",
+      "tier": 2
+    },
+    "711040": {
+      "city_name": "Viken",
+      "tier": 2
+    },
+    "711041": {
+      "city_name": "Vestfold og Telemark",
+      "tier": 2
+    },
+    "711042": {
+      "city_name": "Agder",
+      "tier": 2
+    },
+    "711043": {
+      "city_name": "Rogaland",
+      "tier": 2
+    },
+    "711044": {
+      "city_name": "Vestland",
+      "tier": 2
+    },
+    "711045": {
+      "city_name": "Møre og Romsdal",
+      "tier": 2
+    },
+    "711046": {
+      "city_name": "Jan Mayen",
+      "tier": 2
+    },
+    "711047": {
+      "city_name": "Svalbard",
+      "tier": 2
+    },
+    "711048": {
+      "city_name": "Krakow",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "POL",
+      "hub": true
+    },
+    "711049": {
+      "city_name": "Krakowski",
+      "tier": 2
+    },
+    "711050": {
+      "city_name": "Tarnowski",
+      "tier": 2
+    },
+    "711051": {
+      "city_name": "Nowosądecki",
+      "tier": 2
+    },
+    "711052": {
+      "city_name": "Nowotarski",
+      "tier": 2
+    },
+    "711053": {
+      "city_name": "Oświęcimski",
+      "tier": 2
+    },
+    "711054": {
+      "city_name": "Częstochowski",
+      "tier": 2
+    },
+    "711055": {
+      "city_name": "Bielski",
+      "tier": 2
+    },
+    "711056": {
+      "city_name": "Rybnicki",
+      "tier": 2
+    },
+    "711057": {
+      "city_name": "Bytomski",
+      "tier": 2
+    },
+    "711058": {
+      "city_name": "Gliwicki",
+      "tier": 2
+    },
+    "711059": {
+      "city_name": "Katowicki",
+      "tier": 2
+    },
+    "711060": {
+      "city_name": "Sosnowiecki",
+      "tier": 2
+    },
+    "711061": {
+      "city_name": "Tyski",
+      "tier": 2
+    },
+    "711062": {
+      "city_name": "Pilski",
+      "tier": 2
+    },
+    "711063": {
+      "city_name": "Koniński",
+      "tier": 2
+    },
+    "711064": {
+      "city_name": "Miasto Poznań",
+      "tier": 2
+    },
+    "711065": {
+      "city_name": "Kaliski",
+      "tier": 2
+    },
+    "711066": {
+      "city_name": "Leszczyński",
+      "tier": 2
+    },
+    "711067": {
+      "city_name": "Poznański",
+      "tier": 2
+    },
+    "711068": {
+      "city_name": "Miasto Szczecin",
+      "tier": 2
+    },
+    "711069": {
+      "city_name": "Koszaliński",
+      "tier": 2
+    },
+    "711070": {
+      "city_name": "Szczecinecko-pyrzycki",
+      "tier": 2
+    },
+    "711071": {
+      "city_name": "Szczeciński",
+      "tier": 2
+    },
+    "711072": {
+      "city_name": "Gorzowski",
+      "tier": 2
+    },
+    "711073": {
+      "city_name": "Zielonogórski",
+      "tier": 2
+    },
+    "711074": {
+      "city_name": "Wroclaw",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "POL",
+      "hub": true
+    },
+    "711075": {
+      "city_name": "Jeleniogórski",
+      "tier": 2
+    },
+    "711076": {
+      "city_name": "Legnicko-głogowski",
+      "tier": 2
+    },
+    "711077": {
+      "city_name": "Wałbrzyski",
+      "tier": 2
+    },
+    "711078": {
+      "city_name": "Wrocławski",
+      "tier": 2
+    },
+    "711079": {
+      "city_name": "Nyski",
+      "tier": 2
+    },
+    "711080": {
+      "city_name": "Opolski",
+      "tier": 2
+    },
+    "711081": {
+      "city_name": "Bydgosko-toruński",
+      "tier": 2
+    },
+    "711082": {
+      "city_name": "Grudziądzki",
+      "tier": 2
+    },
+    "711083": {
+      "city_name": "Inowrocławski",
+      "tier": 2
+    },
+    "711084": {
+      "city_name": "Świecki",
+      "tier": 2
+    },
+    "711085": {
+      "city_name": "Włocławski",
+      "tier": 2
+    },
+    "711086": {
+      "city_name": "Elbląski",
+      "tier": 2
+    },
+    "711087": {
+      "city_name": "Olsztyński",
+      "tier": 2
+    },
+    "711088": {
+      "city_name": "Ełcki",
+      "tier": 2
+    },
+    "711089": {
+      "city_name": "Trójmiejski",
+      "tier": 2
+    },
+    "711090": {
+      "city_name": "Gdansk",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "POL",
+      "hub": true
+    },
+    "711091": {
+      "city_name": "Słupski",
+      "tier": 2
+    },
+    "711092": {
+      "city_name": "Chojnicki",
+      "tier": 2
+    },
+    "711093": {
+      "city_name": "Starogardzki",
+      "tier": 2
+    },
+    "711094": {
+      "city_name": "Miasto Łódź",
+      "tier": 2
+    },
+    "711095": {
+      "city_name": "Łódzki",
+      "tier": 2
+    },
+    "711096": {
+      "city_name": "Piotrkowski",
+      "tier": 2
+    },
+    "711097": {
+      "city_name": "Sieradzki",
+      "tier": 2
+    },
+    "711098": {
+      "city_name": "Skierniewicki",
+      "tier": 2
+    },
+    "711099": {
+      "city_name": "Kielecki",
+      "tier": 2
+    },
+    "711100": {
+      "city_name": "Sandomiersko-jędrzejowski",
+      "tier": 2
+    },
+    "711101": {
+      "city_name": "Bialski",
+      "tier": 2
+    },
+    "711102": {
+      "city_name": "Chełmsko-zamojski",
+      "tier": 2
+    },
+    "711103": {
+      "city_name": "Lubelski",
+      "tier": 2
+    },
+    "711104": {
+      "city_name": "Puławski",
+      "tier": 2
+    },
+    "711105": {
+      "city_name": "Krośnieński",
+      "tier": 2
+    },
+    "711106": {
+      "city_name": "Przemyski",
+      "tier": 2
+    },
+    "711107": {
+      "city_name": "Rzeszowski",
+      "tier": 2
+    },
+    "711108": {
+      "city_name": "Tarnobrzeski",
+      "tier": 2
+    },
+    "711109": {
+      "city_name": "Białostocki",
+      "tier": 2
+    },
+    "711110": {
+      "city_name": "Łomżyński",
+      "tier": 2
+    },
+    "711111": {
+      "city_name": "Suwalski",
+      "tier": 2
+    },
+    "711112": {
+      "city_name": "Warsaw",
+      "tier": 4,
+      "capital": true,
+      "tag": "POL",
+      "is_capital": true,
+      "country_tag": "POL",
+      "hub": true
+    },
+    "711113": {
+      "city_name": "Warszawski wschodni",
+      "tier": 2
+    },
+    "711114": {
+      "city_name": "Warszawski zachodni",
+      "tier": 2
+    },
+    "711115": {
+      "city_name": "Radomski",
+      "tier": 2
+    },
+    "711116": {
+      "city_name": "Ciechanowski",
+      "tier": 2
+    },
+    "711117": {
+      "city_name": "Płocki",
+      "tier": 2
+    },
+    "711118": {
+      "city_name": "Ostrołęcki",
+      "tier": 2
+    },
+    "711119": {
+      "city_name": "Siedlecki",
+      "tier": 2
+    },
+    "711120": {
+      "city_name": "Żyrardowski",
+      "tier": 2
+    },
+    "711121": {
+      "city_name": "Alto Minho",
+      "tier": 2
+    },
+    "711122": {
+      "city_name": "Cávado",
+      "tier": 2
+    },
+    "711123": {
+      "city_name": "Ave",
+      "tier": 2
+    },
+    "711124": {
+      "city_name": "Área Metropolitana do Porto",
+      "tier": 2
+    },
+    "711125": {
+      "city_name": "Alto Tâmega",
+      "tier": 2
+    },
+    "711126": {
+      "city_name": "Tâmega e Sousa",
+      "tier": 2
+    },
+    "711127": {
+      "city_name": "Douro",
+      "tier": 2
+    },
+    "711128": {
+      "city_name": "Terras de Trás-os-Montes",
+      "tier": 2
+    },
+    "711129": {
+      "city_name": "Algarve",
+      "tier": 2
+    },
+    "711130": {
+      "city_name": "Oeste",
+      "tier": 2
+    },
+    "711131": {
+      "city_name": "Região de Aveiro",
+      "tier": 2
+    },
+    "711132": {
+      "city_name": "Região de Coimbra",
+      "tier": 2
+    },
+    "711133": {
+      "city_name": "Região de Leiria",
+      "tier": 2
+    },
+    "711134": {
+      "city_name": "Viseu Dão Lafões",
+      "tier": 2
+    },
+    "711135": {
+      "city_name": "Beira Baixa",
+      "tier": 2
+    },
+    "711136": {
+      "city_name": "Médio Tejo",
+      "tier": 2
+    },
+    "711137": {
+      "city_name": "Beiras e Serra da Estrela",
+      "tier": 2
+    },
+    "711138": {
+      "city_name": "Lisbon",
+      "tier": 2
+    },
+    "711139": {
+      "city_name": "Alentejo Litoral",
+      "tier": 2
+    },
+    "711140": {
+      "city_name": "Baixo Alentejo",
+      "tier": 2
+    },
+    "711141": {
+      "city_name": "Lezíria do Tejo",
+      "tier": 2
+    },
+    "711142": {
+      "city_name": "Alto Alentejo",
+      "tier": 2
+    },
+    "711143": {
+      "city_name": "Alentejo Central",
+      "tier": 2
+    },
+    "711144": {
+      "city_name": "Região Autónoma dos Açores",
+      "tier": 2
+    },
+    "711145": {
+      "city_name": "Região Autónoma da Madeira",
+      "tier": 2
+    },
+    "711146": {
+      "city_name": "Bihor",
+      "tier": 2
+    },
+    "711147": {
+      "city_name": "Bistriţa-Năsăud",
+      "tier": 2
+    },
+    "711148": {
+      "city_name": "Cluj",
+      "tier": 2
+    },
+    "711149": {
+      "city_name": "Maramureş",
+      "tier": 2
+    },
+    "711150": {
+      "city_name": "Satu Mare",
+      "tier": 2
+    },
+    "711151": {
+      "city_name": "Sălaj",
+      "tier": 2
+    },
+    "711152": {
+      "city_name": "Alba",
+      "tier": 2
+    },
+    "711153": {
+      "city_name": "Braşov",
+      "tier": 2
+    },
+    "711154": {
+      "city_name": "Covasna",
+      "tier": 2
+    },
+    "711155": {
+      "city_name": "Harghita",
+      "tier": 2
+    },
+    "711156": {
+      "city_name": "Mureş",
+      "tier": 2
+    },
+    "711157": {
+      "city_name": "Sibiu",
+      "tier": 2
+    },
+    "711158": {
+      "city_name": "Bacău",
+      "tier": 2
+    },
+    "711159": {
+      "city_name": "Botoşani",
+      "tier": 2
+    },
+    "711160": {
+      "city_name": "Iaşi",
+      "tier": 2
+    },
+    "711161": {
+      "city_name": "Neamţ",
+      "tier": 2
+    },
+    "711162": {
+      "city_name": "Suceava",
+      "tier": 2
+    },
+    "711163": {
+      "city_name": "Vaslui",
+      "tier": 2
+    },
+    "711164": {
+      "city_name": "Brăila",
+      "tier": 2
+    },
+    "711165": {
+      "city_name": "Buzău",
+      "tier": 2
+    },
+    "711166": {
+      "city_name": "Constanţa",
+      "tier": 2
+    },
+    "711167": {
+      "city_name": "Galaţi",
+      "tier": 2
+    },
+    "711168": {
+      "city_name": "Tulcea",
+      "tier": 2
+    },
+    "711169": {
+      "city_name": "Vrancea",
+      "tier": 2
+    },
+    "711170": {
+      "city_name": "Argeş",
+      "tier": 2
+    },
+    "711171": {
+      "city_name": "Călăraşi",
+      "tier": 2
+    },
+    "711172": {
+      "city_name": "Dâmboviţa",
+      "tier": 2
+    },
+    "711173": {
+      "city_name": "Giurgiu",
+      "tier": 2
+    },
+    "711174": {
+      "city_name": "Ialomiţa",
+      "tier": 2
+    },
+    "711175": {
+      "city_name": "Prahova",
+      "tier": 2
+    },
+    "711176": {
+      "city_name": "Teleorman",
+      "tier": 2
+    },
+    "711177": {
+      "city_name": "Bucharest",
+      "tier": 2
+    },
+    "711178": {
+      "city_name": "Ilfov",
+      "tier": 2
+    },
+    "711179": {
+      "city_name": "Dolj",
+      "tier": 2
+    },
+    "711180": {
+      "city_name": "Gorj",
+      "tier": 2
+    },
+    "711181": {
+      "city_name": "Mehedinţi",
+      "tier": 2
+    },
+    "711182": {
+      "city_name": "Olt",
+      "tier": 2
+    },
+    "711183": {
+      "city_name": "Vâlcea",
+      "tier": 2
+    },
+    "711184": {
+      "city_name": "Arad",
+      "tier": 2
+    },
+    "711185": {
+      "city_name": "Caraş-Severin",
+      "tier": 2
+    },
+    "711186": {
+      "city_name": "Hunedoara",
+      "tier": 2
+    },
+    "711187": {
+      "city_name": "Timiş",
+      "tier": 2
+    },
+    "711188": {
+      "city_name": "Београдска област",
+      "tier": 2
+    },
+    "711189": {
+      "city_name": "Западнобачка област",
+      "tier": 2
+    },
+    "711190": {
+      "city_name": "Јужнобанатска област",
+      "tier": 2
+    },
+    "711191": {
+      "city_name": "Јужнобачка област",
+      "tier": 2
+    },
+    "711192": {
+      "city_name": "Севернобанатска област",
+      "tier": 2
+    },
+    "711193": {
+      "city_name": "Севернобачка област",
+      "tier": 2
+    },
+    "711194": {
+      "city_name": "Средњобанатска област",
+      "tier": 2
+    },
+    "711195": {
+      "city_name": "Сремска област",
+      "tier": 2
+    },
+    "711196": {
+      "city_name": "Златиборска област",
+      "tier": 2
+    },
+    "711197": {
+      "city_name": "Колубарска област",
+      "tier": 2
+    },
+    "711198": {
+      "city_name": "Мачванска област",
+      "tier": 2
+    },
+    "711199": {
+      "city_name": "Моравичка област",
+      "tier": 2
+    },
+    "711200": {
+      "city_name": "Поморавска област",
+      "tier": 2
+    },
+    "711201": {
+      "city_name": "Расинска област",
+      "tier": 2
+    },
+    "711202": {
+      "city_name": "Рашка област",
+      "tier": 2
+    },
+    "711203": {
+      "city_name": "Шумадијска област",
+      "tier": 2
+    },
+    "711204": {
+      "city_name": "Борска област",
+      "tier": 2
+    },
+    "711205": {
+      "city_name": "Браничевска област",
+      "tier": 2
+    },
+    "711206": {
+      "city_name": "Зајечарска област",
+      "tier": 2
+    },
+    "711207": {
+      "city_name": "Јабланичка област",
+      "tier": 2
+    },
+    "711208": {
+      "city_name": "Нишавска област",
+      "tier": 2
+    },
+    "711209": {
+      "city_name": "Пиротска област",
+      "tier": 2
+    },
+    "711210": {
+      "city_name": "Подунавска област",
+      "tier": 2
+    },
+    "711211": {
+      "city_name": "Пчињска област",
+      "tier": 2
+    },
+    "711212": {
+      "city_name": "Топличка област",
+      "tier": 2
+    },
+    "711213": {
+      "city_name": "Stockholm",
+      "tier": 2
+    },
+    "711214": {
+      "city_name": "Uppsala län",
+      "tier": 2
+    },
+    "711215": {
+      "city_name": "Södermanlands län",
+      "tier": 2
+    },
+    "711216": {
+      "city_name": "Östergötlands län",
+      "tier": 2
+    },
+    "711217": {
+      "city_name": "Örebro län",
+      "tier": 2
+    },
+    "711218": {
+      "city_name": "Västmanlands län",
+      "tier": 2
+    },
+    "711219": {
+      "city_name": "Jönköpings län",
+      "tier": 2
+    },
+    "711220": {
+      "city_name": "Kronobergs län",
+      "tier": 2
+    },
+    "711221": {
+      "city_name": "Kalmar län",
+      "tier": 2
+    },
+    "711222": {
+      "city_name": "Gotlands län",
+      "tier": 2
+    },
+    "711223": {
+      "city_name": "Blekinge län",
+      "tier": 2
+    },
+    "711224": {
+      "city_name": "Skåne län",
+      "tier": 2
+    },
+    "711225": {
+      "city_name": "Hallands län",
+      "tier": 2
+    },
+    "711226": {
+      "city_name": "Västra Götalands län",
+      "tier": 2
+    },
+    "711227": {
+      "city_name": "Värmlands län",
+      "tier": 2
+    },
+    "711228": {
+      "city_name": "Dalarnas län",
+      "tier": 2
+    },
+    "711229": {
+      "city_name": "Gävleborgs län",
+      "tier": 2
+    },
+    "711230": {
+      "city_name": "Västernorrlands län",
+      "tier": 2
+    },
+    "711231": {
+      "city_name": "Jämtlands län",
+      "tier": 2
+    },
+    "711232": {
+      "city_name": "Västerbottens län",
+      "tier": 2
+    },
+    "711233": {
+      "city_name": "Norrbottens län",
+      "tier": 2
+    },
+    "711234": {
+      "city_name": "Pomurska",
+      "tier": 2
+    },
+    "711235": {
+      "city_name": "Podravska",
+      "tier": 2
+    },
+    "711236": {
+      "city_name": "Koroška",
+      "tier": 2
+    },
+    "711237": {
+      "city_name": "Savinjska",
+      "tier": 2
+    },
+    "711238": {
+      "city_name": "Zasavska",
+      "tier": 2
+    },
+    "711239": {
+      "city_name": "Posavska",
+      "tier": 2
+    },
+    "711240": {
+      "city_name": "Jugovzhodna Slovenija",
+      "tier": 2
+    },
+    "711241": {
+      "city_name": "Primorsko-notranjska",
+      "tier": 2
+    },
+    "711242": {
+      "city_name": "Osrednjeslovenska",
+      "tier": 2
+    },
+    "711243": {
+      "city_name": "Gorenjska",
+      "tier": 2
+    },
+    "711244": {
+      "city_name": "Goriška",
+      "tier": 2
+    },
+    "711245": {
+      "city_name": "Obalno-kraška",
+      "tier": 2
+    },
+    "711246": {
+      "city_name": "Bratislavský kraj",
+      "tier": 2
+    },
+    "711247": {
+      "city_name": "Trnavský kraj",
+      "tier": 2
+    },
+    "711248": {
+      "city_name": "Trenčiansky kraj",
+      "tier": 2
+    },
+    "711249": {
+      "city_name": "Nitriansky kraj",
+      "tier": 2
+    },
+    "711250": {
+      "city_name": "Žilinský kraj",
+      "tier": 2
+    },
+    "711251": {
+      "city_name": "Banskobystrický kraj",
+      "tier": 2
+    },
+    "711252": {
+      "city_name": "Prešovský kraj",
+      "tier": 2
+    },
+    "711253": {
+      "city_name": "Košický kraj",
+      "tier": 2
+    },
+    "711254": {
+      "city_name": "İstanbul",
+      "tier": 2
+    },
+    "711255": {
+      "city_name": "Tekirdağ",
+      "tier": 2
+    },
+    "711256": {
+      "city_name": "Edirne",
+      "tier": 2
+    },
+    "711257": {
+      "city_name": "Kırklareli",
+      "tier": 2
+    },
+    "711258": {
+      "city_name": "Balıkesir",
+      "tier": 2
+    },
+    "711259": {
+      "city_name": "Çanakkale",
+      "tier": 2
+    },
+    "711260": {
+      "city_name": "İzmir",
+      "tier": 2
+    },
+    "711261": {
+      "city_name": "Aydın",
+      "tier": 2
+    },
+    "711262": {
+      "city_name": "Denizli",
+      "tier": 2
+    },
+    "711263": {
+      "city_name": "Muğla",
+      "tier": 2
+    },
+    "711264": {
+      "city_name": "Manisa",
+      "tier": 2
+    },
+    "711265": {
+      "city_name": "Afyonkarahisar",
+      "tier": 2
+    },
+    "711266": {
+      "city_name": "Kütahya",
+      "tier": 2
+    },
+    "711267": {
+      "city_name": "Uşak",
+      "tier": 2
+    },
+    "711268": {
+      "city_name": "Bursa",
+      "tier": 2
+    },
+    "711269": {
+      "city_name": "Eskişehir",
+      "tier": 2
+    },
+    "711270": {
+      "city_name": "Bilecik",
+      "tier": 2
+    },
+    "711271": {
+      "city_name": "Kocaeli",
+      "tier": 2
+    },
+    "711272": {
+      "city_name": "Sakarya",
+      "tier": 2
+    },
+    "711273": {
+      "city_name": "Düzce",
+      "tier": 2
+    },
+    "711274": {
+      "city_name": "Bolu",
+      "tier": 2
+    },
+    "711275": {
+      "city_name": "Yalova",
+      "tier": 2
+    },
+    "711276": {
+      "city_name": "Ankara",
+      "tier": 2
+    },
+    "711277": {
+      "city_name": "Konya",
+      "tier": 2
+    },
+    "711278": {
+      "city_name": "Karaman",
+      "tier": 2
+    },
+    "711279": {
+      "city_name": "Antalya",
+      "tier": 2
+    },
+    "711280": {
+      "city_name": "Isparta",
+      "tier": 2
+    },
+    "711281": {
+      "city_name": "Burdur",
+      "tier": 2
+    },
+    "711282": {
+      "city_name": "Adana",
+      "tier": 2
+    },
+    "711283": {
+      "city_name": "Mersin",
+      "tier": 2
+    },
+    "711284": {
+      "city_name": "Hatay",
+      "tier": 2
+    },
+    "711285": {
+      "city_name": "Kahramanmaraş",
+      "tier": 2
+    },
+    "711286": {
+      "city_name": "Osmaniye",
+      "tier": 2
+    },
+    "711287": {
+      "city_name": "Kırıkkale",
+      "tier": 2
+    },
+    "711288": {
+      "city_name": "Aksaray",
+      "tier": 2
+    },
+    "711289": {
+      "city_name": "Niğde",
+      "tier": 2
+    },
+    "711290": {
+      "city_name": "Nevşehir",
+      "tier": 2
+    },
+    "711291": {
+      "city_name": "Kırşehir",
+      "tier": 2
+    },
+    "711292": {
+      "city_name": "Kayseri",
+      "tier": 2
+    },
+    "711293": {
+      "city_name": "Sivas",
+      "tier": 2
+    },
+    "711294": {
+      "city_name": "Yozgat",
+      "tier": 2
+    },
+    "711295": {
+      "city_name": "Zonguldak",
+      "tier": 2
+    },
+    "711296": {
+      "city_name": "Karabük",
+      "tier": 2
+    },
+    "711297": {
+      "city_name": "Bartın",
+      "tier": 2
+    },
+    "711298": {
+      "city_name": "Kastamonu",
+      "tier": 2
+    },
+    "711299": {
+      "city_name": "Çankırı",
+      "tier": 2
+    },
+    "711300": {
+      "city_name": "Sinop",
+      "tier": 2
+    },
+    "711301": {
+      "city_name": "Samsun",
+      "tier": 2
+    },
+    "711302": {
+      "city_name": "Tokat",
+      "tier": 2
+    },
+    "711303": {
+      "city_name": "Çorum",
+      "tier": 2
+    },
+    "711304": {
+      "city_name": "Amasya",
+      "tier": 2
+    },
+    "711305": {
+      "city_name": "Trabzon",
+      "tier": 2
+    },
+    "711306": {
+      "city_name": "Ordu",
+      "tier": 2
+    },
+    "711307": {
+      "city_name": "Giresun",
+      "tier": 2
+    },
+    "711308": {
+      "city_name": "Rize",
+      "tier": 2
+    },
+    "711309": {
+      "city_name": "Artvin",
+      "tier": 2
+    },
+    "711310": {
+      "city_name": "Gümüşhane",
+      "tier": 2
+    },
+    "711311": {
+      "city_name": "Erzurum",
+      "tier": 2
+    },
+    "711312": {
+      "city_name": "Erzincan",
+      "tier": 2
+    },
+    "711313": {
+      "city_name": "Bayburt",
+      "tier": 2
+    },
+    "711314": {
+      "city_name": "Ağrı",
+      "tier": 2
+    },
+    "711315": {
+      "city_name": "Kars",
+      "tier": 2
+    },
+    "711316": {
+      "city_name": "Iğdır",
+      "tier": 2
+    },
+    "711317": {
+      "city_name": "Ardahan",
+      "tier": 2
+    },
+    "711318": {
+      "city_name": "Malatya",
+      "tier": 2
+    },
+    "711319": {
+      "city_name": "Elazığ",
+      "tier": 2
+    },
+    "711320": {
+      "city_name": "Bingöl",
+      "tier": 2
+    },
+    "711321": {
+      "city_name": "Tunceli",
+      "tier": 2
+    },
+    "711322": {
+      "city_name": "Van",
+      "tier": 2
+    },
+    "711323": {
+      "city_name": "Muş",
+      "tier": 2
+    },
+    "711324": {
+      "city_name": "Bitlis",
+      "tier": 2
+    },
+    "711325": {
+      "city_name": "Hakkari",
+      "tier": 2
+    },
+    "711326": {
+      "city_name": "Gaziantep",
+      "tier": 2
+    },
+    "711327": {
+      "city_name": "Adıyaman",
+      "tier": 2
+    },
+    "711328": {
+      "city_name": "Kilis",
+      "tier": 2
+    },
+    "711329": {
+      "city_name": "Şanlıurfa",
+      "tier": 2
+    },
+    "711330": {
+      "city_name": "Diyarbakır",
+      "tier": 2
+    },
+    "711331": {
+      "city_name": "Mardin",
+      "tier": 2
+    },
+    "711332": {
+      "city_name": "Batman",
+      "tier": 2
+    },
+    "711333": {
+      "city_name": "Şırnak",
+      "tier": 2
+    },
+    "711334": {
+      "city_name": "Siirt",
+      "tier": 2
+    },
+    "711335": {
+      "city_name": "Hartlepool and Stockton-on-Tees",
+      "tier": 2
+    },
+    "711336": {
+      "city_name": "South Teesside",
+      "tier": 2
+    },
+    "711337": {
+      "city_name": "Darlington",
+      "tier": 2
+    },
+    "711338": {
+      "city_name": "Durham CC",
+      "tier": 2
+    },
+    "711339": {
+      "city_name": "Northumberland",
+      "tier": 2
+    },
+    "711340": {
+      "city_name": "Tyneside",
+      "tier": 2
+    },
+    "711341": {
+      "city_name": "Sunderland",
+      "tier": 2
+    },
+    "711342": {
+      "city_name": "West Cumbria",
+      "tier": 2
+    },
+    "711343": {
+      "city_name": "East Cumbria",
+      "tier": 2
+    },
+    "711344": {
+      "city_name": "Manchester",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "ENG",
+      "hub": true
+    },
+    "711345": {
+      "city_name": "Manchester",
+      "tier": 2
+    },
+    "711346": {
+      "city_name": "Manchester",
+      "tier": 2
+    },
+    "711347": {
+      "city_name": "Manchester",
+      "tier": 2
+    },
+    "711348": {
+      "city_name": "Manchester",
+      "tier": 2
+    },
+    "711349": {
+      "city_name": "Blackburn with Darwen",
+      "tier": 2
+    },
+    "711350": {
+      "city_name": "Blackpool",
+      "tier": 2
+    },
+    "711351": {
+      "city_name": "Lancaster and Wyre",
+      "tier": 2
+    },
+    "711352": {
+      "city_name": "Mid Lancashire",
+      "tier": 2
+    },
+    "711353": {
+      "city_name": "East Lancashire",
+      "tier": 2
+    },
+    "711354": {
+      "city_name": "Chorley and West Lancashire",
+      "tier": 2
+    },
+    "711355": {
+      "city_name": "Warrington",
+      "tier": 2
+    },
+    "711356": {
+      "city_name": "Cheshire East",
+      "tier": 2
+    },
+    "711357": {
+      "city_name": "Cheshire West and Chester",
+      "tier": 2
+    },
+    "711358": {
+      "city_name": "East Merseyside",
+      "tier": 2
+    },
+    "711359": {
+      "city_name": "Liverpool",
+      "tier": 2
+    },
+    "711360": {
+      "city_name": "Sefton",
+      "tier": 2
+    },
+    "711361": {
+      "city_name": "Wirral",
+      "tier": 2
+    },
+    "711362": {
+      "city_name": "Kingston upon Hull",
+      "tier": 2
+    },
+    "711363": {
+      "city_name": "East Riding of Yorkshire",
+      "tier": 2
+    },
+    "711364": {
+      "city_name": "North and North East Lincolnshire",
+      "tier": 2
+    },
+    "711365": {
+      "city_name": "York",
+      "tier": 2
+    },
+    "711366": {
+      "city_name": "North Yorkshire CC",
+      "tier": 2
+    },
+    "711367": {
+      "city_name": "Barnsley",
+      "tier": 2
+    },
+    "711368": {
+      "city_name": "Sheffield",
+      "tier": 2
+    },
+    "711369": {
+      "city_name": "Bradford",
+      "tier": 2
+    },
+    "711370": {
+      "city_name": "Leeds",
+      "tier": 2
+    },
+    "711371": {
+      "city_name": "Calderdale and Kirklees",
+      "tier": 2
+    },
+    "711372": {
+      "city_name": "Wakefield",
+      "tier": 2
+    },
+    "711373": {
+      "city_name": "Derby",
+      "tier": 2
+    },
+    "711374": {
+      "city_name": "East Derbyshire",
+      "tier": 2
+    },
+    "711375": {
+      "city_name": "South and West Derbyshire",
+      "tier": 2
+    },
+    "711376": {
+      "city_name": "Nottingham",
+      "tier": 2
+    },
+    "711377": {
+      "city_name": "North Nottinghamshire",
+      "tier": 2
+    },
+    "711378": {
+      "city_name": "South Nottinghamshire",
+      "tier": 2
+    },
+    "711379": {
+      "city_name": "Leicester",
+      "tier": 2
+    },
+    "711380": {
+      "city_name": "Leicestershire CC and Rutland",
+      "tier": 2
+    },
+    "711381": {
+      "city_name": "West Northamptonshire",
+      "tier": 2
+    },
+    "711382": {
+      "city_name": "North Northamptonshire",
+      "tier": 2
+    },
+    "711383": {
+      "city_name": "Lincolnshire",
+      "tier": 2
+    },
+    "711384": {
+      "city_name": "Herefordshire",
+      "tier": 2
+    },
+    "711385": {
+      "city_name": "Worcestershire",
+      "tier": 2
+    },
+    "711386": {
+      "city_name": "Warwickshire",
+      "tier": 2
+    },
+    "711387": {
+      "city_name": "Telford and Wrekin",
+      "tier": 2
+    },
+    "711388": {
+      "city_name": "Shropshire CC",
+      "tier": 2
+    },
+    "711389": {
+      "city_name": "Stoke-on-Trent",
+      "tier": 2
+    },
+    "711390": {
+      "city_name": "Staffordshire CC",
+      "tier": 2
+    },
+    "711391": {
+      "city_name": "Birmingham",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "ENG",
+      "hub": true
+    },
+    "711392": {
+      "city_name": "Solihull",
+      "tier": 2
+    },
+    "711393": {
+      "city_name": "Coventry",
+      "tier": 2
+    },
+    "711394": {
+      "city_name": "Dudley",
+      "tier": 2
+    },
+    "711395": {
+      "city_name": "Sandwell",
+      "tier": 2
+    },
+    "711396": {
+      "city_name": "Walsall",
+      "tier": 2
+    },
+    "711397": {
+      "city_name": "Wolverhampton",
+      "tier": 2
+    },
+    "711398": {
+      "city_name": "Peterborough",
+      "tier": 2
+    },
+    "711399": {
+      "city_name": "Cambridgeshire CC",
+      "tier": 2
+    },
+    "711400": {
+      "city_name": "Suffolk",
+      "tier": 2
+    },
+    "711401": {
+      "city_name": "Norwich and East Norfolk",
+      "tier": 2
+    },
+    "711402": {
+      "city_name": "North and West Norfolk",
+      "tier": 2
+    },
+    "711403": {
+      "city_name": "Breckland and South Norfolk",
+      "tier": 2
+    },
+    "711404": {
+      "city_name": "Luton",
+      "tier": 2
+    },
+    "711405": {
+      "city_name": "Hertfordshire",
+      "tier": 2
+    },
+    "711406": {
+      "city_name": "Bedford",
+      "tier": 2
+    },
+    "711407": {
+      "city_name": "Central Bedfordshire",
+      "tier": 2
+    },
+    "711408": {
+      "city_name": "Southend-on-Sea",
+      "tier": 2
+    },
+    "711409": {
+      "city_name": "Thurrock",
+      "tier": 2
+    },
+    "711410": {
+      "city_name": "Essex Haven Gateway",
+      "tier": 2
+    },
+    "711411": {
+      "city_name": "West Essex",
+      "tier": 2
+    },
+    "711412": {
+      "city_name": "Heart of Essex",
+      "tier": 2
+    },
+    "711413": {
+      "city_name": "Essex Thames Gateway",
+      "tier": 2
+    },
+    "711414": {
+      "city_name": "London",
+      "tier": 4,
+      "capital": true,
+      "tag": "ENG",
+      "is_capital": true,
+      "country_tag": "ENG",
+      "hub": true
+    },
+    "711415": {
+      "city_name": "Westminster",
+      "tier": 2
+    },
+    "711416": {
+      "city_name": "Kensington & Chelsea and Hammersmith & F",
+      "tier": 2
+    },
+    "711417": {
+      "city_name": "Wandsworth",
+      "tier": 2
+    },
+    "711418": {
+      "city_name": "Hackney and Newham",
+      "tier": 2
+    },
+    "711419": {
+      "city_name": "Tower Hamlets",
+      "tier": 2
+    },
+    "711420": {
+      "city_name": "Haringey and Islington",
+      "tier": 2
+    },
+    "711421": {
+      "city_name": "Lewisham and Southwark",
+      "tier": 2
+    },
+    "711422": {
+      "city_name": "Lambeth",
+      "tier": 2
+    },
+    "711423": {
+      "city_name": "Bexley and Greenwich",
+      "tier": 2
+    },
+    "711424": {
+      "city_name": "Barking & Dagenham and Havering",
+      "tier": 2
+    },
+    "711425": {
+      "city_name": "Redbridge and Waltham Forest",
+      "tier": 2
+    },
+    "711426": {
+      "city_name": "Enfield",
+      "tier": 2
+    },
+    "711427": {
+      "city_name": "Bromley",
+      "tier": 2
+    },
+    "711428": {
+      "city_name": "Croydon",
+      "tier": 2
+    },
+    "711429": {
+      "city_name": "Merton",
+      "tier": 2
+    },
+    "711430": {
+      "city_name": "Barnet",
+      "tier": 2
+    },
+    "711431": {
+      "city_name": "Brent",
+      "tier": 2
+    },
+    "711432": {
+      "city_name": "Ealing",
+      "tier": 2
+    },
+    "711433": {
+      "city_name": "Harrow and Hillingdon",
+      "tier": 2
+    },
+    "711434": {
+      "city_name": "Hounslow and Richmond upon Thames",
+      "tier": 2
+    },
+    "711435": {
+      "city_name": "Berkshire",
+      "tier": 2
+    },
+    "711436": {
+      "city_name": "Milton Keynes",
+      "tier": 2
+    },
+    "711437": {
+      "city_name": "Buckinghamshire CC",
+      "tier": 2
+    },
+    "711438": {
+      "city_name": "Oxfordshire",
+      "tier": 2
+    },
+    "711439": {
+      "city_name": "Brighton and Hove",
+      "tier": 2
+    },
+    "711440": {
+      "city_name": "East Sussex CC",
+      "tier": 2
+    },
+    "711441": {
+      "city_name": "West Surrey",
+      "tier": 2
+    },
+    "711442": {
+      "city_name": "East Surrey",
+      "tier": 2
+    },
+    "711443": {
+      "city_name": "West Sussex (South West)",
+      "tier": 2
+    },
+    "711444": {
+      "city_name": "West Sussex (North East)",
+      "tier": 2
+    },
+    "711445": {
+      "city_name": "Portsmouth",
+      "tier": 2
+    },
+    "711446": {
+      "city_name": "Southampton",
+      "tier": 2
+    },
+    "711447": {
+      "city_name": "Isle of Wight",
+      "tier": 2
+    },
+    "711448": {
+      "city_name": "South Hampshire",
+      "tier": 2
+    },
+    "711449": {
+      "city_name": "Central Hampshire",
+      "tier": 2
+    },
+    "711450": {
+      "city_name": "North Hampshire",
+      "tier": 2
+    },
+    "711451": {
+      "city_name": "Medway",
+      "tier": 2
+    },
+    "711452": {
+      "city_name": "Kent Thames Gateway",
+      "tier": 2
+    },
+    "711453": {
+      "city_name": "East Kent",
+      "tier": 2
+    },
+    "711454": {
+      "city_name": "Mid Kent",
+      "tier": 2
+    },
+    "711455": {
+      "city_name": "West Kent",
+      "tier": 2
+    },
+    "711456": {
+      "city_name": "Bristol",
+      "tier": 2
+    },
+    "711457": {
+      "city_name": "Bath and North East Somerset",
+      "tier": 2
+    },
+    "711458": {
+      "city_name": "Gloucestershire",
+      "tier": 2
+    },
+    "711459": {
+      "city_name": "Swindon",
+      "tier": 2
+    },
+    "711460": {
+      "city_name": "Wiltshire CC",
+      "tier": 2
+    },
+    "711461": {
+      "city_name": "Somerset",
+      "tier": 2
+    },
+    "711462": {
+      "city_name": "Bournemouth",
+      "tier": 2
+    },
+    "711463": {
+      "city_name": "Dorset",
+      "tier": 2
+    },
+    "711464": {
+      "city_name": "Cornwall and Isles of Scilly",
+      "tier": 2
+    },
+    "711465": {
+      "city_name": "Plymouth",
+      "tier": 2
+    },
+    "711466": {
+      "city_name": "Torbay",
+      "tier": 2
+    },
+    "711467": {
+      "city_name": "Devon CC",
+      "tier": 2
+    },
+    "711468": {
+      "city_name": "Isle of Anglesey",
+      "tier": 2
+    },
+    "711469": {
+      "city_name": "Gwynedd",
+      "tier": 2
+    },
+    "711470": {
+      "city_name": "Conwy and Denbighshire",
+      "tier": 2
+    },
+    "711471": {
+      "city_name": "South West Wales",
+      "tier": 2
+    },
+    "711472": {
+      "city_name": "Central Valleys",
+      "tier": 2
+    },
+    "711473": {
+      "city_name": "Gwent Valleys",
+      "tier": 2
+    },
+    "711474": {
+      "city_name": "Bridgend and Neath Port Talbot",
+      "tier": 2
+    },
+    "711475": {
+      "city_name": "Swansea",
+      "tier": 2
+    },
+    "711476": {
+      "city_name": "Monmouthshire and Newport",
+      "tier": 2
+    },
+    "711477": {
+      "city_name": "Cardiff and Vale of Glamorgan",
+      "tier": 2
+    },
+    "711478": {
+      "city_name": "Flintshire and Wrexham",
+      "tier": 2
+    },
+    "711479": {
+      "city_name": "Powys",
+      "tier": 2
+    },
+    "711480": {
+      "city_name": "Aberdeen City and Aberdeenshire",
+      "tier": 2
+    },
+    "711481": {
+      "city_name": "Caithness & Sutherland and Ross & Cromar",
+      "tier": 2
+    },
+    "711482": {
+      "city_name": "Inverness & Nairn and Moray",
+      "tier": 2
+    },
+    "711483": {
+      "city_name": "Lochaber",
+      "tier": 2
+    },
+    "711484": {
+      "city_name": "Na h-Eileanan Siar (Western Isles)",
+      "tier": 2
+    },
+    "711485": {
+      "city_name": "Orkney Islands",
+      "tier": 2
+    },
+    "711486": {
+      "city_name": "Shetland Islands",
+      "tier": 2
+    },
+    "711487": {
+      "city_name": "Angus and Dundee City",
+      "tier": 2
+    },
+    "711488": {
+      "city_name": "Clackmannanshire and Fife",
+      "tier": 2
+    },
+    "711489": {
+      "city_name": "East Lothian and Midlothian",
+      "tier": 2
+    },
+    "711490": {
+      "city_name": "Edinburgh",
+      "tier": 2
+    },
+    "711491": {
+      "city_name": "Falkirk",
+      "tier": 2
+    },
+    "711492": {
+      "city_name": "Perth & Kinross and Stirling",
+      "tier": 2
+    },
+    "711493": {
+      "city_name": "West Lothian",
+      "tier": 2
+    },
+    "711494": {
+      "city_name": "East Dunbartonshire",
+      "tier": 2
+    },
+    "711495": {
+      "city_name": "Glasgow",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "ENG",
+      "hub": true
+    },
+    "711496": {
+      "city_name": "Inverclyde",
+      "tier": 2
+    },
+    "711497": {
+      "city_name": "North Lanarkshire",
+      "tier": 2
+    },
+    "711498": {
+      "city_name": "Scottish Borders",
+      "tier": 2
+    },
+    "711499": {
+      "city_name": "Dumfries & Galloway",
+      "tier": 2
+    },
+    "711500": {
+      "city_name": "East Ayrshire and North Ayrshire mainlan",
+      "tier": 2
+    },
+    "711501": {
+      "city_name": "South Ayrshire",
+      "tier": 2
+    },
+    "711502": {
+      "city_name": "South Lanarkshire",
+      "tier": 2
+    },
+    "711503": {
+      "city_name": "Belfast",
+      "tier": 2
+    },
+    "711504": {
+      "city_name": "Armagh City",
+      "tier": 2
+    },
+    "711505": {
+      "city_name": "Newry",
+      "tier": 2
+    },
+    "711506": {
+      "city_name": "Ards and North Down",
+      "tier": 2
+    },
+    "711507": {
+      "city_name": "Derry City and Strabane",
+      "tier": 2
+    },
+    "711508": {
+      "city_name": "Mid Ulster",
+      "tier": 2
+    },
+    "711509": {
+      "city_name": "Causeway Coast and Glens",
+      "tier": 2
+    },
+    "711510": {
+      "city_name": "Antrim and Newtownabbey",
+      "tier": 2
+    },
+    "711511": {
+      "city_name": "Lisburn and Castlereagh",
+      "tier": 2
+    },
+    "711512": {
+      "city_name": "Mid and East Antrim",
+      "tier": 2
+    },
+    "711513": {
+      "city_name": "Fermanagh and Omagh",
+      "tier": 2
+    },
+    "800000": {
+      "city_name": "Autauga",
+      "tier": 1
+    },
+    "800001": {
+      "city_name": "Bibb",
+      "tier": 1
+    },
+    "800013": {
+      "city_name": "Aleutians East",
+      "tier": 1
+    },
+    "800014": {
+      "city_name": "Haines",
+      "tier": 1
+    },
+    "800015": {
+      "city_name": "Anchorage",
+      "tier": 1
+    },
+    "800021": {
+      "city_name": "Baxter",
+      "tier": 1
+    },
+    "800023": {
+      "city_name": "Alameda",
+      "tier": 1
+    },
+    "800024": {
+      "city_name": "Butte",
+      "tier": 1
+    },
+    "800031": {
+      "city_name": "Alamosa",
+      "tier": 1
+    },
+    "800032": {
+      "city_name": "Adams",
+      "tier": 1
+    },
+    "800034": {
+      "city_name": "Baca",
+      "tier": 1
+    },
+    "800038": {
+      "city_name": "Alachua",
+      "tier": 1
+    },
+    "800039": {
+      "city_name": "Brevard",
+      "tier": 1
+    },
+    "800045": {
+      "city_name": "Banks",
+      "tier": 1
+    },
+    "800047": {
+      "city_name": "Baldwin",
+      "tier": 1
+    },
+    "800065": {
+      "city_name": "Fairfield",
+      "tier": 1
+    },
+    "800075": {
+      "city_name": "Cochise",
+      "tier": 1
+    },
+    "800077": {
+      "city_name": "Arkansas",
+      "tier": 1
+    },
+    "800094": {
+      "city_name": "Hawaii",
+      "tier": 1
+    },
+    "800095": {
+      "city_name": "Ada",
+      "tier": 1
+    },
+    "800096": {
+      "city_name": "Benewah",
+      "tier": 1
+    },
+    "800098": {
+      "city_name": "Bannock",
+      "tier": 1
+    },
+    "800102": {
+      "city_name": "Alexander",
+      "tier": 1
+    },
+    "800103": {
+      "city_name": "Adams",
+      "tier": 1
+    },
+    "800110": {
+      "city_name": "Clay",
+      "tier": 1
+    },
+    "800111": {
+      "city_name": "Bartholomew",
+      "tier": 1
+    },
+    "800112": {
+      "city_name": "Adams",
+      "tier": 1
+    },
+    "800125": {
+      "city_name": "Adair",
+      "tier": 1
+    },
+    "800126": {
+      "city_name": "Allamakee",
+      "tier": 1
+    },
+    "800127": {
+      "city_name": "Lyon",
+      "tier": 2
+    },
+    "800130": {
+      "city_name": "Boone",
+      "tier": 1
+    },
+    "800170": {
+      "city_name": "Lyon",
+      "tier": 2
+    },
+    "800171": {
+      "city_name": "Barber",
+      "tier": 1
+    },
+    "800172": {
+      "city_name": "Cheyenne",
+      "tier": 1
+    },
+    "800190": {
+      "city_name": "Lyon",
+      "tier": 2
+    },
+    "800191": {
+      "city_name": "Adair",
+      "tier": 1
+    },
+    "800192": {
+      "city_name": "Bath",
+      "tier": 1
+    },
+    "800197": {
+      "city_name": "Acadia",
+      "tier": 1
+    },
+    "800198": {
+      "city_name": "Avoyelles",
+      "tier": 1
+    },
+    "800248": {
+      "city_name": "Lyon",
+      "tier": 2
+    },
+    "800253": {
+      "city_name": "Becker",
+      "tier": 1
+    },
+    "800259": {
+      "city_name": "Alcorn",
+      "tier": 1
+    },
+    "800262": {
+      "city_name": "Attala",
+      "tier": 1
+    },
+    "800263": {
+      "city_name": "Adams",
+      "tier": 1
+    },
+    "800270": {
+      "city_name": "Androscoggin",
+      "tier": 1
+    },
+    "800272": {
+      "city_name": "Allegany",
+      "tier": 1
+    },
+    "800273": {
+      "city_name": "Anne Arundel",
+      "tier": 1
+    },
+    "800282": {
+      "city_name": "Barnstable",
+      "tier": 1
+    },
+    "800283": {
+      "city_name": "Alcona",
+      "tier": 1
+    },
+    "800284": {
+      "city_name": "Allegan",
+      "tier": 1
+    },
+    "800290": {
+      "city_name": "Alger",
+      "tier": 1
+    },
+    "800307": {
+      "city_name": "Aitkin",
+      "tier": 1
+    },
+    "800314": {
+      "city_name": "Barry",
+      "tier": 1
+    },
+    "800315": {
+      "city_name": "Adair",
+      "tier": 1
+    },
+    "800320": {
+      "city_name": "Madrid",
+      "tier": 2
+    },
+    "800329": {
+      "city_name": "Cascade",
+      "tier": 1
+    },
+    "800330": {
+      "city_name": "Big Horn",
+      "tier": 1
+    },
+    "800331": {
+      "city_name": "Beaverhead",
+      "tier": 1
+    },
+    "800332": {
+      "city_name": "Burt",
+      "tier": 1
+    },
+    "800334": {
+      "city_name": "Arthur",
+      "tier": 1
+    },
+    "800335": {
+      "city_name": "Adams",
+      "tier": 1
+    },
+    "800341": {
+      "city_name": "Lyon",
+      "tier": 2
+    },
+    "800343": {
+      "city_name": "Elko",
+      "tier": 1
+    },
+    "800344": {
+      "city_name": "Atlantic",
+      "tier": 1
+    },
+    "800346": {
+      "city_name": "Bergen",
+      "tier": 1
+    },
+    "800347": {
+      "city_name": "Bernalillo",
+      "tier": 1
+    },
+    "800387": {
+      "city_name": "Alamance",
+      "tier": 1
+    },
+    "800389": {
+      "city_name": "Beaufort",
+      "tier": 1
+    },
+    "800390": {
+      "city_name": "Ashe",
+      "tier": 1
+    },
+    "800404": {
+      "city_name": "Ashland",
+      "tier": 1
+    },
+    "800405": {
+      "city_name": "Allen",
+      "tier": 1
+    },
+    "800409": {
+      "city_name": "Athens",
+      "tier": 2
+    },
+    "800418": {
+      "city_name": "Alfalfa",
+      "tier": 1
+    },
+    "800419": {
+      "city_name": "Bryan",
+      "tier": 1
+    },
+    "800426": {
+      "city_name": "Adams",
+      "tier": 1
+    },
+    "800427": {
+      "city_name": "Barnes",
+      "tier": 1
+    },
+    "800433": {
+      "city_name": "Bottineau",
+      "tier": 1
+    },
+    "800441": {
+      "city_name": "Chaves",
+      "tier": 1
+    },
+    "800446": {
+      "city_name": "Allegany",
+      "tier": 1
+    },
+    "800457": {
+      "city_name": "Allegheny",
+      "tier": 1
+    },
+    "800469": {
+      "city_name": "Allendale",
+      "tier": 1
+    },
+    "800472": {
+      "city_name": "Abbeville",
+      "tier": 1
+    },
+    "800473": {
+      "city_name": "Benton",
+      "tier": 1
+    },
+    "800474": {
+      "city_name": "Bedford",
+      "tier": 1
+    },
+    "800475": {
+      "city_name": "Anderson",
+      "tier": 1
+    },
+    "800494": {
+      "city_name": "Aurora",
+      "tier": 1
+    },
+    "800495": {
+      "city_name": "Bennett",
+      "tier": 1
+    },
+    "800496": {
+      "city_name": "Brule",
+      "tier": 1
+    },
+    "800509": {
+      "city_name": "Adair",
+      "tier": 1
+    },
+    "800519": {
+      "city_name": "Coos",
+      "tier": 1
+    },
+    "800520": {
+      "city_name": "Benton",
+      "tier": 1
+    },
+    "800523": {
+      "city_name": "Baker",
+      "tier": 1
+    },
+    "800525": {
+      "city_name": "Archer",
+      "tier": 1
+    },
+    "800527": {
+      "city_name": "Anderson",
+      "tier": 1
+    },
+    "800536": {
+      "city_name": "Andrews",
+      "tier": 1
+    },
+    "800539": {
+      "city_name": "Aransas",
+      "tier": 1
+    },
+    "800544": {
+      "city_name": "Box Elder",
+      "tier": 1
+    },
+    "800588": {
+      "city_name": "Alleghany",
+      "tier": 1
+    },
+    "800589": {
+      "city_name": "Albemarle",
+      "tier": 1
+    },
+    "800600": {
+      "city_name": "Accomack",
+      "tier": 1
+    },
+    "800606": {
+      "city_name": "Adams",
+      "tier": 1
+    },
+    "800608": {
+      "city_name": "Adams",
+      "tier": 1
+    },
+    "800609": {
+      "city_name": "Ashland",
+      "tier": 1
+    },
+    "800621": {
+      "city_name": "Big Horn",
+      "tier": 1
+    },
+    "800622": {
+      "city_name": "Albany",
+      "tier": 1
+    },
+    "800625": {
+      "city_name": "Adjuntas",
+      "tier": 1
+    },
+    "800626": {
+      "city_name": "Clark",
+      "tier": 1
+    },
+    "800627": {
+      "city_name": "Clallam",
+      "tier": 1
+    },
+    "800629": {
+      "city_name": "Barbour",
+      "tier": 1
+    },
+    "800630": {
+      "city_name": "Boone",
+      "tier": 1
+    },
+    "800645": {
+      "city_name": "Beaver",
+      "tier": 1
+    },
+    "800648": {
+      "city_name": "Addison",
+      "tier": 1
+    },
+    "800678": {
+      "city_name": "Denali",
+      "tier": 1
+    },
+    "800696": {
+      "city_name": "Aguas Buenas",
+      "tier": 1
+    },
+    "800791": {
+      "city_name": "Kent",
+      "tier": 1
+    },
+    "800792": {
+      "city_name": "Washington",
+      "tier": 4,
+      "capital": true,
+      "tag": "USA",
+      "is_capital": true,
+      "country_tag": "USA",
+      "hub": true
+    },
+    "800860": {
+      "city_name": "Apache",
+      "tier": 1
+    },
+    "800863": {
+      "city_name": "La Paz",
+      "tier": 1
+    },
+    "801082": {
+      "city_name": "Clark",
+      "tier": 1
+    },
+    "801123": {
+      "city_name": "Belknap",
+      "tier": 1
+    },
+    "801171": {
+      "city_name": "Carter",
+      "tier": 1
+    },
+    "801515": {
+      "city_name": "Philadelphia",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "USA",
+      "hub": true
+    },
+    "801525": {
+      "city_name": "Emery",
+      "tier": 1
+    },
+    "801563": {
+      "city_name": "Bristol",
+      "tier": 1
+    },
+    "801799": {
+      "city_name": "Fremont",
+      "tier": 1
+    },
+    "801938": {
+      "city_name": "Catron",
+      "tier": 1
+    },
+    "802018": {
+      "city_name": "Chicago",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "USA",
+      "hub": true
+    },
+    "802049": {
+      "city_name": "Los Angeles",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "USA",
+      "hub": true
+    },
+    "802629": {
+      "city_name": "Aroostook",
+      "tier": 1
+    },
+    "802754": {
+      "city_name": "New York",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "USA",
+      "hub": true
+    },
+    "903050": {
+      "city_name": "London",
+      "tier": 1
+    },
+    "903995": {
+      "city_name": "Tokyo",
+      "tier": 4,
+      "capital": true,
+      "tag": "JAP",
+      "is_capital": true,
+      "country_tag": "JAP",
+      "hub": true
+    },
+    "903534": {
+      "city_name": "Moscow",
+      "tier": 4,
+      "capital": true,
+      "tag": "SOV",
+      "is_capital": true,
+      "country_tag": "SOV",
+      "hub": true
+    },
+    "903019": {
+      "city_name": "Naples",
+      "tier": 2
+    },
+    "903532": {
+      "city_name": "Leningrad",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "SOV",
+      "hub": true
+    },
+    "903986": {
+      "city_name": "Osaka",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "JAP",
+      "hub": true
+    },
+    "904007": {
+      "city_name": "Kyoto",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "JAP",
+      "hub": true
+    },
+    "900260": {
+      "city_name": "Malawi North",
+      "tier": 2
+    },
+    "900265": {
+      "city_name": "Malawi North",
+      "tier": 2
+    },
+    "900269": {
+      "city_name": "Malawi South",
+      "tier": 2
+    },
+    "900939": {
+      "city_name": "Sierra Leone",
+      "tier": 2
+    },
+    "900976": {
+      "city_name": "Liberia North",
+      "tier": 2
+    },
+    "900979": {
+      "city_name": "Liberia East",
+      "tier": 2
+    },
+    "900981": {
+      "city_name": "Liberia South",
+      "tier": 2
+    },
+    "901024": {
+      "city_name": "Djibouti South",
+      "tier": 2
+    },
+    "901026": {
+      "city_name": "Djibouti North",
+      "tier": 2
+    },
+    "901031": {
+      "city_name": "Eritrea West",
+      "tier": 2
+    },
+    "901474": {
+      "city_name": "Swaziland",
+      "tier": 2
+    },
+    "901845": {
+      "city_name": "Lesotho North",
+      "tier": 2
+    },
+    "901848": {
+      "city_name": "Lesotho South",
+      "tier": 2
+    },
+    "901942": {
+      "city_name": "Guinea Bissau North",
+      "tier": 2
+    },
+    "902105": {
+      "city_name": "Mauritania North",
+      "tier": 2
+    },
+    "902106": {
+      "city_name": "Mauritania West",
+      "tier": 2
+    },
+    "902108": {
+      "city_name": "Mauritania South",
+      "tier": 2
+    },
+    "902118": {
+      "city_name": "Equatorial Guinea South",
+      "tier": 2
+    },
+    "902122": {
+      "city_name": "Equatorial Guinea North",
+      "tier": 2
+    },
+    "902124": {
+      "city_name": "Gambia East",
+      "tier": 2
+    },
+    "902125": {
+      "city_name": "Gambia West",
+      "tier": 2
+    },
+    "902155": {
+      "city_name": "New Caledonia East",
+      "tier": 2
+    },
+    "902426": {
+      "city_name": "Mauritius North",
+      "tier": 2
+    },
+    "902428": {
+      "city_name": "Mauritius South",
+      "tier": 2
+    },
+    "902434": {
+      "city_name": "Comoros",
+      "tier": 2
+    },
+    "902438": {
+      "city_name": "Cape Verde South",
+      "tier": 2
+    },
+    "902442": {
+      "city_name": "Cape Verde North",
+      "tier": 2
+    },
+    "902458": {
+      "city_name": "Samoa West",
+      "tier": 2
+    },
+    "902463": {
+      "city_name": "Samoa East",
+      "tier": 2
+    },
+    "902465": {
+      "city_name": "Solomon Islands South",
+      "tier": 2
+    },
+    "902471": {
+      "city_name": "Solomon Islands West",
+      "tier": 2
+    },
+    "902478": {
+      "city_name": "Vanuatu South",
+      "tier": 2
+    },
+    "902480": {
+      "city_name": "Vanuatu North",
+      "tier": 2
+    },
+    "903088": {
+      "city_name": "AUS South",
+      "tier": 2
+    },
+    "903089": {
+      "city_name": "AUS East",
+      "tier": 2
+    },
+    "903103": {
+      "city_name": "AUS North",
+      "tier": 2
+    },
+    "903104": {
+      "city_name": "AUS East",
+      "tier": 2
+    },
+    "903107": {
+      "city_name": "AUS East",
+      "tier": 2
+    },
+    "903113": {
+      "city_name": "AUS North",
+      "tier": 2
+    },
+    "903122": {
+      "city_name": "AUS South",
+      "tier": 2
+    },
+    "903123": {
+      "city_name": "AUS West",
+      "tier": 2
+    },
+    "903130": {
+      "city_name": "AUS West",
+      "tier": 2
+    },
+    "903132": {
+      "city_name": "AUS West",
+      "tier": 2
+    },
+    "903134": {
+      "city_name": "AUS North",
+      "tier": 2
+    },
+    "903135": {
+      "city_name": "AUS West",
+      "tier": 2
+    },
+    "903138": {
+      "city_name": "AUS West",
+      "tier": 2
+    },
+    "903142": {
+      "city_name": "AUS West",
+      "tier": 2
+    },
+    "903153": {
+      "city_name": "AUS South",
+      "tier": 2
+    },
+    "903155": {
+      "city_name": "AUS North",
+      "tier": 2
+    },
+    "903157": {
+      "city_name": "AUS North",
+      "tier": 2
+    },
+    "903242": {
+      "city_name": "ZAF East",
+      "tier": 2
+    },
+    "903244": {
+      "city_name": "ZAF South",
+      "tier": 2
+    },
+    "903245": {
+      "city_name": "ZAF North",
+      "tier": 2
+    },
+    "903248": {
+      "city_name": "ZAF West",
+      "tier": 2
+    },
+    "903255": {
+      "city_name": "ZAF West",
+      "tier": 2
+    },
+    "903360": {
+      "city_name": "EGY North",
+      "tier": 2
+    },
+    "903361": {
+      "city_name": "EGY West",
+      "tier": 2
+    },
+    "903364": {
+      "city_name": "EGY North",
+      "tier": 2
+    },
+    "903367": {
+      "city_name": "Paris Paris",
+      "tier": 1
+    },
+    "903391": {
+      "city_name": "EGY South",
+      "tier": 2
+    },
+    "903627": {
+      "city_name": "NGA South",
+      "tier": 2
+    },
+    "903633": {
+      "city_name": "NGA South",
+      "tier": 2
+    },
+    "903634": {
+      "city_name": "NGA East",
+      "tier": 2
+    },
+    "903641": {
+      "city_name": "NGA West",
+      "tier": 2
+    },
+    "904033": {
+      "city_name": "NZL East",
+      "tier": 2
+    },
+    "904037": {
+      "city_name": "NZL East",
+      "tier": 2
+    },
+    "904046": {
+      "city_name": "PNG South",
+      "tier": 2
+    },
+    "904047": {
+      "city_name": "PNG West",
+      "tier": 2
+    },
+    "904049": {
+      "city_name": "PNG West",
+      "tier": 2
+    },
+    "904053": {
+      "city_name": "PNG East",
+      "tier": 2
+    },
+    "904064": {
+      "city_name": "PNG East",
+      "tier": 2
+    },
+    "904124": {
+      "city_name": "DZA South",
+      "tier": 2
+    },
+    "904128": {
+      "city_name": "DZA South",
+      "tier": 2
+    },
+    "904130": {
+      "city_name": "DZA West",
+      "tier": 2
+    },
+    "904135": {
+      "city_name": "DZA East",
+      "tier": 2
+    },
+    "904172": {
+      "city_name": "MAR North",
+      "tier": 2
+    },
+    "904173": {
+      "city_name": "MAR North",
+      "tier": 2
+    },
+    "904177": {
+      "city_name": "MAR South",
+      "tier": 2
+    },
+    "904179": {
+      "city_name": "MAR South",
+      "tier": 2
+    },
+    "904202": {
+      "city_name": "LBY West",
+      "tier": 2
+    },
+    "904205": {
+      "city_name": "LBY South",
+      "tier": 2
+    },
+    "904206": {
+      "city_name": "LBY East",
+      "tier": 2
+    },
+    "904224": {
+      "city_name": "COD North",
+      "tier": 2
+    },
+    "904228": {
+      "city_name": "COD West",
+      "tier": 2
+    },
+    "904230": {
+      "city_name": "COD West",
+      "tier": 2
+    },
+    "904237": {
+      "city_name": "COD South",
+      "tier": 2
+    },
+    "904238": {
+      "city_name": "COD East",
+      "tier": 2
+    },
+    "904261": {
+      "city_name": "KEN West",
+      "tier": 2
+    },
+    "904264": {
+      "city_name": "KEN North",
+      "tier": 2
+    },
+    "904267": {
+      "city_name": "KEN South",
+      "tier": 2
+    },
+    "904275": {
+      "city_name": "KEN North",
+      "tier": 2
+    },
+    "904287": {
+      "city_name": "ETH South",
+      "tier": 2
+    },
+    "904288": {
+      "city_name": "ETH West",
+      "tier": 2
+    },
+    "904290": {
+      "city_name": "ETH East",
+      "tier": 2
+    },
+    "904292": {
+      "city_name": "ETH North",
+      "tier": 2
+    },
+    "904315": {
+      "city_name": "SDN South",
+      "tier": 2
+    },
+    "904316": {
+      "city_name": "SDN North",
+      "tier": 2
+    },
+    "904318": {
+      "city_name": "SDN West",
+      "tier": 2
+    },
+    "904323": {
+      "city_name": "SDN North",
+      "tier": 2
+    },
+    "904430": {
+      "city_name": "GHA North",
+      "tier": 2
+    },
+    "904437": {
+      "city_name": "GHA South",
+      "tier": 2
+    },
+    "904442": {
+      "city_name": "GHA South",
+      "tier": 2
+    },
+    "904455": {
+      "city_name": "AGO North",
+      "tier": 2
+    },
+    "904457": {
+      "city_name": "AGO West",
+      "tier": 2
+    },
+    "904460": {
+      "city_name": "AGO East",
+      "tier": 2
+    },
+    "904461": {
+      "city_name": "AGO South",
+      "tier": 2
+    },
+    "904720": {
+      "city_name": "Athens",
+      "tier": 2
+    },
+    "904721": {
+      "city_name": "UGA North",
+      "tier": 2
+    },
+    "904728": {
+      "city_name": "UGA East",
+      "tier": 2
+    },
+    "904748": {
+      "city_name": "UGA South",
+      "tier": 2
+    },
+    "904762": {
+      "city_name": "TZA North",
+      "tier": 2
+    },
+    "904764": {
+      "city_name": "TZA East",
+      "tier": 2
+    },
+    "904768": {
+      "city_name": "TZA West",
+      "tier": 2
+    },
+    "904769": {
+      "city_name": "TZA West",
+      "tier": 2
+    },
+    "904770": {
+      "city_name": "TZA South",
+      "tier": 2
+    },
+    "904852": {
+      "city_name": "BFA West",
+      "tier": 2
+    },
+    "904857": {
+      "city_name": "BFA East",
+      "tier": 2
+    },
+    "904862": {
+      "city_name": "BFA North",
+      "tier": 2
+    },
+    "904874": {
+      "city_name": "GIN South",
+      "tier": 2
+    },
+    "904875": {
+      "city_name": "GIN West",
+      "tier": 2
+    },
+    "904879": {
+      "city_name": "GIN North",
+      "tier": 2
+    },
+    "904883": {
+      "city_name": "GIN East",
+      "tier": 2
+    },
+    "904974": {
+      "city_name": "TUN North",
+      "tier": 2
+    },
+    "904975": {
+      "city_name": "TUN South",
+      "tier": 2
+    },
+    "904982": {
+      "city_name": "TUN South",
+      "tier": 2
+    },
+    "905019": {
+      "city_name": "MDG South",
+      "tier": 2
+    },
+    "905020": {
+      "city_name": "MDG North",
+      "tier": 2
+    },
+    "905025": {
+      "city_name": "MDG South",
+      "tier": 2
+    },
+    "905030": {
+      "city_name": "MDG North",
+      "tier": 2
+    },
+    "905044": {
+      "city_name": "TCD East",
+      "tier": 2
+    },
+    "905046": {
+      "city_name": "TCD West",
+      "tier": 2
+    },
+    "905047": {
+      "city_name": "TCD North",
+      "tier": 2
+    },
+    "905048": {
+      "city_name": "TCD South",
+      "tier": 2
+    },
+    "905110": {
+      "city_name": "CIV East",
+      "tier": 2
+    },
+    "905111": {
+      "city_name": "CIV West",
+      "tier": 2
+    },
+    "905115": {
+      "city_name": "CIV North",
+      "tier": 2
+    },
+    "905116": {
+      "city_name": "CIV South",
+      "tier": 2
+    },
+    "905223": {
+      "city_name": "BDI South",
+      "tier": 2
+    },
+    "905224": {
+      "city_name": "BDI West",
+      "tier": 2
+    },
+    "905233": {
+      "city_name": "BDI North",
+      "tier": 2
+    },
+    "905241": {
+      "city_name": "CAF East",
+      "tier": 2
+    },
+    "905246": {
+      "city_name": "CAF North",
+      "tier": 2
+    },
+    "905247": {
+      "city_name": "CAF West",
+      "tier": 2
+    },
+    "905253": {
+      "city_name": "CAF West",
+      "tier": 2
+    },
+    "905284": {
+      "city_name": "SEN East",
+      "tier": 2
+    },
+    "905285": {
+      "city_name": "SEN West",
+      "tier": 2
+    },
+    "905288": {
+      "city_name": "SEN North",
+      "tier": 2
+    },
+    "905330": {
+      "city_name": "SOM North",
+      "tier": 2
+    },
+    "905333": {
+      "city_name": "SOM East",
+      "tier": 2
+    },
+    "905339": {
+      "city_name": "SOM East",
+      "tier": 2
+    },
+    "905340": {
+      "city_name": "SOM South",
+      "tier": 2
+    },
+    "905349": {
+      "city_name": "NAM North",
+      "tier": 2
+    },
+    "905351": {
+      "city_name": "NAM South",
+      "tier": 2
+    },
+    "905352": {
+      "city_name": "NAM South",
+      "tier": 2
+    },
+    "905358": {
+      "city_name": "NAM West",
+      "tier": 2
+    },
+    "905456": {
+      "city_name": "RWA East",
+      "tier": 2
+    },
+    "905457": {
+      "city_name": "RWA North",
+      "tier": 2
+    },
+    "905458": {
+      "city_name": "RWA South",
+      "tier": 2
+    },
+    "905469": {
+      "city_name": "MOZ East",
+      "tier": 2
+    },
+    "905470": {
+      "city_name": "MOZ North",
+      "tier": 2
+    },
+    "905472": {
+      "city_name": "MOZ West",
+      "tier": 2
+    },
+    "905475": {
+      "city_name": "MOZ South",
+      "tier": 2
+    },
+    "905489": {
+      "city_name": "ZMB East",
+      "tier": 2
+    },
+    "905491": {
+      "city_name": "ZMB West",
+      "tier": 2
+    },
+    "905495": {
+      "city_name": "ZMB South",
+      "tier": 2
+    },
+    "905505": {
+      "city_name": "ZWE South",
+      "tier": 2
+    },
+    "905507": {
+      "city_name": "ZWE North",
+      "tier": 2
+    },
+    "905509": {
+      "city_name": "ZWE West",
+      "tier": 2
+    },
+    "905523": {
+      "city_name": "BWA South",
+      "tier": 2
+    },
+    "905526": {
+      "city_name": "BWA North",
+      "tier": 2
+    },
+    "905534": {
+      "city_name": "CMR West",
+      "tier": 2
+    },
+    "905537": {
+      "city_name": "CMR South",
+      "tier": 2
+    },
+    "905541": {
+      "city_name": "CMR South",
+      "tier": 2
+    },
+    "905545": {
+      "city_name": "CMR North",
+      "tier": 2
+    },
+    "905554": {
+      "city_name": "GAB North",
+      "tier": 2
+    },
+    "905555": {
+      "city_name": "GAB South",
+      "tier": 2
+    },
+    "905557": {
+      "city_name": "GAB West",
+      "tier": 2
+    },
+    "905569": {
+      "city_name": "COG North",
+      "tier": 2
+    },
+    "905572": {
+      "city_name": "COG South",
+      "tier": 2
+    },
+    "905582": {
+      "city_name": "BEN South",
+      "tier": 2
+    },
+    "905585": {
+      "city_name": "BEN North",
+      "tier": 2
+    },
+    "905587": {
+      "city_name": "BEN North",
+      "tier": 2
+    },
+    "905596": {
+      "city_name": "TGO North",
+      "tier": 2
+    },
+    "905598": {
+      "city_name": "TGO North",
+      "tier": 2
+    },
+    "905599": {
+      "city_name": "TGO South",
+      "tier": 2
+    },
+    "905609": {
+      "city_name": "MLI West",
+      "tier": 2
+    },
+    "905610": {
+      "city_name": "MLI East",
+      "tier": 2
+    },
+    "905618": {
+      "city_name": "MLI South",
+      "tier": 2
+    },
+    "905620": {
+      "city_name": "MLI North",
+      "tier": 2
+    },
+    "905629": {
+      "city_name": "NER West",
+      "tier": 2
+    },
+    "905633": {
+      "city_name": "NER North",
+      "tier": 2
+    },
+    "905635": {
+      "city_name": "NER East",
+      "tier": 2
+    },
+    "905786": {
+      "city_name": "FJI East",
+      "tier": 2
+    },
+    "900318": {
+      "city_name": "Suriname West",
+      "tier": 2
+    },
+    "900319": {
+      "city_name": "Suriname North",
+      "tier": 2
+    },
+    "900327": {
+      "city_name": "Guyana South",
+      "tier": 2
+    },
+    "900328": {
+      "city_name": "Guyana North",
+      "tier": 2
+    },
+    "900332": {
+      "city_name": "Guyana North",
+      "tier": 2
+    },
+    "900426": {
+      "city_name": "Bhutan East",
+      "tier": 2
+    },
+    "900429": {
+      "city_name": "Bhutan West",
+      "tier": 2
+    },
+    "900432": {
+      "city_name": "Bhutan South",
+      "tier": 2
+    },
+    "900434": {
+      "city_name": "Bhutan East",
+      "tier": 2
+    },
+    "900436": {
+      "city_name": "Bhutan North",
+      "tier": 2
+    },
+    "901995": {
+      "city_name": "Belize South",
+      "tier": 2
+    },
+    "901996": {
+      "city_name": "Belize North",
+      "tier": 2
+    },
+    "902303": {
+      "city_name": "The Bahamas South",
+      "tier": 2
+    },
+    "902307": {
+      "city_name": "The Bahamas East",
+      "tier": 2
+    },
+    "902310": {
+      "city_name": "The Bahamas North",
+      "tier": 2
+    },
+    "902398": {
+      "city_name": "Trinidad and Tobago South",
+      "tier": 2
+    },
+    "902409": {
+      "city_name": "Manchester",
+      "tier": 2
+    },
+    "902411": {
+      "city_name": "Jamaica West",
+      "tier": 2
+    },
+    "902417": {
+      "city_name": "Jamaica East",
+      "tier": 2
+    },
+    "902487": {
+      "city_name": "CHN North",
+      "tier": 2
+    },
+    "902491": {
+      "city_name": "CHN East",
+      "tier": 2
+    },
+    "902493": {
+      "city_name": "CHN West",
+      "tier": 2
+    },
+    "902496": {
+      "city_name": "CHN North",
+      "tier": 2
+    },
+    "902504": {
+      "city_name": "CHN West",
+      "tier": 2
+    },
+    "902505": {
+      "city_name": "CHN East",
+      "tier": 2
+    },
+    "902514": {
+      "city_name": "CHN West",
+      "tier": 2
+    },
+    "902521": {
+      "city_name": "CHN East",
+      "tier": 2
+    },
+    "902523": {
+      "city_name": "CHN West",
+      "tier": 2
+    },
+    "902526": {
+      "city_name": "CHN West",
+      "tier": 2
+    },
+    "902534": {
+      "city_name": "CHN West",
+      "tier": 2
+    },
+    "902544": {
+      "city_name": "CHN North",
+      "tier": 2
+    },
+    "902564": {
+      "city_name": "CHN East",
+      "tier": 2
+    },
+    "902566": {
+      "city_name": "CHN South",
+      "tier": 2
+    },
+    "902568": {
+      "city_name": "CHN West",
+      "tier": 2
+    },
+    "902569": {
+      "city_name": "CHN West",
+      "tier": 2
+    },
+    "902590": {
+      "city_name": "Shanghai",
+      "tier": 2
+    },
+    "902598": {
+      "city_name": "CHN South",
+      "tier": 2
+    },
+    "902601": {
+      "city_name": "CHN South",
+      "tier": 2
+    },
+    "902633": {
+      "city_name": "CHN South",
+      "tier": 2
+    },
+    "902634": {
+      "city_name": "CHN South",
+      "tier": 2
+    },
+    "902646": {
+      "city_name": "CHN South",
+      "tier": 2
+    },
+    "902660": {
+      "city_name": "IND West",
+      "tier": 2
+    },
+    "902663": {
+      "city_name": "IND North",
+      "tier": 2
+    },
+    "902669": {
+      "city_name": "IND West",
+      "tier": 2
+    },
+    "902670": {
+      "city_name": "IND North",
+      "tier": 2
+    },
+    "902674": {
+      "city_name": "IND West",
+      "tier": 2
+    },
+    "902675": {
+      "city_name": "IND East",
+      "tier": 2
+    },
+    "902676": {
+      "city_name": "IND North",
+      "tier": 2
+    },
+    "902692": {
+      "city_name": "IND South",
+      "tier": 2
+    },
+    "902697": {
+      "city_name": "IND South",
+      "tier": 2
+    },
+    "902700": {
+      "city_name": "IND East",
+      "tier": 2
+    },
+    "902716": {
+      "city_name": "IND South",
+      "tier": 2
+    },
+    "902719": {
+      "city_name": "IND East",
+      "tier": 2
+    },
+    "902727": {
+      "city_name": "IND East",
+      "tier": 2
+    },
+    "902730": {
+      "city_name": "IND South",
+      "tier": 2
+    },
+    "902885": {
+      "city_name": "BRA West",
+      "tier": 2
+    },
+    "902889": {
+      "city_name": "BRA North",
+      "tier": 2
+    },
+    "902890": {
+      "city_name": "BRA West",
+      "tier": 2
+    },
+    "902901": {
+      "city_name": "BRA North",
+      "tier": 2
+    },
+    "902918": {
+      "city_name": "BRA North",
+      "tier": 2
+    },
+    "902919": {
+      "city_name": "BRA North",
+      "tier": 2
+    },
+    "902921": {
+      "city_name": "BRA North",
+      "tier": 2
+    },
+    "902936": {
+      "city_name": "BRA East",
+      "tier": 2
+    },
+    "902941": {
+      "city_name": "BRA East",
+      "tier": 2
+    },
+    "902947": {
+      "city_name": "BRA East",
+      "tier": 2
+    },
+    "902959": {
+      "city_name": "BRA East",
+      "tier": 2
+    },
+    "902966": {
+      "city_name": "BRA South",
+      "tier": 2
+    },
+    "902969": {
+      "city_name": "BRA South",
+      "tier": 2
+    },
+    "902972": {
+      "city_name": "BRA South",
+      "tier": 2
+    },
+    "902979": {
+      "city_name": "BRA South",
+      "tier": 2
+    },
+    "902989": {
+      "city_name": "BRA South",
+      "tier": 2
+    },
+    "903161": {
+      "city_name": "MEX South",
+      "tier": 2
+    },
+    "903166": {
+      "city_name": "MEX West",
+      "tier": 2
+    },
+    "903168": {
+      "city_name": "MEX West",
+      "tier": 2
+    },
+    "903172": {
+      "city_name": "MEX East",
+      "tier": 2
+    },
+    "903175": {
+      "city_name": "MEX North",
+      "tier": 2
+    },
+    "903190": {
+      "city_name": "MEX North",
+      "tier": 2
+    },
+    "903415": {
+      "city_name": "ARG North",
+      "tier": 2
+    },
+    "903416": {
+      "city_name": "ARG South",
+      "tier": 2
+    },
+    "903417": {
+      "city_name": "ARG North",
+      "tier": 2
+    },
+    "903418": {
+      "city_name": "ARG East",
+      "tier": 2
+    },
+    "903420": {
+      "city_name": "ARG North",
+      "tier": 2
+    },
+    "903433": {
+      "city_name": "ARG North",
+      "tier": 2
+    },
+    "903442": {
+      "city_name": "ARG South",
+      "tier": 2
+    },
+    "903444": {
+      "city_name": "ARG South",
+      "tier": 2
+    },
+    "903446": {
+      "city_name": "Moscow",
+      "tier": 3,
+      "capital": true
+    },
+    "903447": {
+      "city_name": "ARG South",
+      "tier": 2
+    },
+    "903478": {
+      "city_name": "ARG South",
+      "tier": 2
+    },
+    "903491": {
+      "city_name": "RUS East",
+      "tier": 2
+    },
+    "903492": {
+      "city_name": "RUS West",
+      "tier": 2
+    },
+    "903493": {
+      "city_name": "RUS West",
+      "tier": 2
+    },
+    "903494": {
+      "city_name": "RUS North",
+      "tier": 2
+    },
+    "903498": {
+      "city_name": "RUS North",
+      "tier": 2
+    },
+    "903500": {
+      "city_name": "RUS East",
+      "tier": 2
+    },
+    "903528": {
+      "city_name": "RUS East",
+      "tier": 2
+    },
+    "903553": {
+      "city_name": "RUS East",
+      "tier": 2
+    },
+    "903574": {
+      "city_name": "PAK West",
+      "tier": 2
+    },
+    "903575": {
+      "city_name": "PAK South",
+      "tier": 2
+    },
+    "903576": {
+      "city_name": "PAK North",
+      "tier": 2
+    },
+    "903577": {
+      "city_name": "PAK North",
+      "tier": 2
+    },
+    "903579": {
+      "city_name": "PAK East",
+      "tier": 2
+    },
+    "903582": {
+      "city_name": "PAK West",
+      "tier": 2
+    },
+    "903586": {
+      "city_name": "PAK West",
+      "tier": 2
+    },
+    "903592": {
+      "city_name": "PAK South",
+      "tier": 2
+    },
+    "903680": {
+      "city_name": "COL North",
+      "tier": 2
+    },
+    "903681": {
+      "city_name": "COL West",
+      "tier": 2
+    },
+    "903684": {
+      "city_name": "COL North",
+      "tier": 2
+    },
+    "903687": {
+      "city_name": "COL East",
+      "tier": 2
+    },
+    "903690": {
+      "city_name": "COL West",
+      "tier": 2
+    },
+    "903691": {
+      "city_name": "COL South",
+      "tier": 2
+    },
+    "903700": {
+      "city_name": "COL East",
+      "tier": 2
+    },
+    "903708": {
+      "city_name": "COL South",
+      "tier": 2
+    },
+    "903722": {
+      "city_name": "PER South",
+      "tier": 2
+    },
+    "903724": {
+      "city_name": "PER South",
+      "tier": 2
+    },
+    "903725": {
+      "city_name": "PER West",
+      "tier": 2
+    },
+    "903726": {
+      "city_name": "PER North",
+      "tier": 2
+    },
+    "903728": {
+      "city_name": "PER South",
+      "tier": 2
+    },
+    "903730": {
+      "city_name": "PER South",
+      "tier": 2
+    },
+    "903731": {
+      "city_name": "PER North",
+      "tier": 2
+    },
+    "903751": {
+      "city_name": "PER North",
+      "tier": 2
+    },
+    "903763": {
+      "city_name": "CHL North",
+      "tier": 2
+    },
+    "903764": {
+      "city_name": "CHL South",
+      "tier": 2
+    },
+    "903765": {
+      "city_name": "CHL East",
+      "tier": 2
+    },
+    "903770": {
+      "city_name": "CHL North",
+      "tier": 2
+    },
+    "903773": {
+      "city_name": "CHL South",
+      "tier": 2
+    },
+    "903792": {
+      "city_name": "VEN North",
+      "tier": 2
+    },
+    "903793": {
+      "city_name": "VEN West",
+      "tier": 2
+    },
+    "903794": {
+      "city_name": "VEN West",
+      "tier": 2
+    },
+    "903797": {
+      "city_name": "VEN East",
+      "tier": 2
+    },
+    "903803": {
+      "city_name": "VEN South",
+      "tier": 2
+    },
+    "903820": {
+      "city_name": "BOL South",
+      "tier": 2
+    },
+    "903821": {
+      "city_name": "BOL North",
+      "tier": 2
+    },
+    "903824": {
+      "city_name": "BOL East",
+      "tier": 2
+    },
+    "903825": {
+      "city_name": "BOL South",
+      "tier": 2
+    },
+    "903827": {
+      "city_name": "BOL West",
+      "tier": 2
+    },
+    "903828": {
+      "city_name": "BOL North",
+      "tier": 2
+    },
+    "904069": {
+      "city_name": "KAZ East",
+      "tier": 2
+    },
+    "904070": {
+      "city_name": "KAZ East",
+      "tier": 2
+    },
+    "904073": {
+      "city_name": "KAZ East",
+      "tier": 2
+    },
+    "904075": {
+      "city_name": "KAZ North",
+      "tier": 2
+    },
+    "904078": {
+      "city_name": "KAZ South",
+      "tier": 2
+    },
+    "904079": {
+      "city_name": "KAZ West",
+      "tier": 2
+    },
+    "904082": {
+      "city_name": "KAZ West",
+      "tier": 2
+    },
+    "904083": {
+      "city_name": "KAZ West",
+      "tier": 2
+    },
+    "904102": {
+      "city_name": "MNG South",
+      "tier": 2
+    },
+    "904104": {
+      "city_name": "MNG North",
+      "tier": 2
+    },
+    "904106": {
+      "city_name": "MNG West",
+      "tier": 2
+    },
+    "904108": {
+      "city_name": "MNG East",
+      "tier": 2
+    },
+    "904111": {
+      "city_name": "MNG East",
+      "tier": 2
+    },
+    "904112": {
+      "city_name": "MNG West",
+      "tier": 2
+    },
+    "904405": {
+      "city_name": "LKA North",
+      "tier": 2
+    },
+    "904407": {
+      "city_name": "LKA North",
+      "tier": 2
+    },
+    "904410": {
+      "city_name": "LKA South",
+      "tier": 2
+    },
+    "904413": {
+      "city_name": "LKA East",
+      "tier": 2
+    },
+    "904419": {
+      "city_name": "LKA South",
+      "tier": 2
+    },
+    "904482": {
+      "city_name": "CUB East",
+      "tier": 2
+    },
+    "904487": {
+      "city_name": "CUB West",
+      "tier": 2
+    },
+    "904488": {
+      "city_name": "CUB West",
+      "tier": 2
+    },
+    "904898": {
+      "city_name": "DOM South",
+      "tier": 2
+    },
+    "904899": {
+      "city_name": "DOM North",
+      "tier": 2
+    },
+    "904907": {
+      "city_name": "DOM East",
+      "tier": 2
+    },
+    "904923": {
+      "city_name": "ECU West",
+      "tier": 2
+    },
+    "904924": {
+      "city_name": "ECU East",
+      "tier": 2
+    },
+    "904925": {
+      "city_name": "ECU South",
+      "tier": 2
+    },
+    "904928": {
+      "city_name": "ECU North",
+      "tier": 2
+    },
+    "904940": {
+      "city_name": "ECU West",
+      "tier": 2
+    },
+    "904998": {
+      "city_name": "GTM West",
+      "tier": 2
+    },
+    "904999": {
+      "city_name": "GTM South",
+      "tier": 2
+    },
+    "905011": {
+      "city_name": "GTM North",
+      "tier": 2
+    },
+    "905087": {
+      "city_name": "URY North",
+      "tier": 2
+    },
+    "905089": {
+      "city_name": "URY South",
+      "tier": 2
+    },
+    "905090": {
+      "city_name": "URY South",
+      "tier": 2
+    },
+    "905091": {
+      "city_name": "URY East",
+      "tier": 2
+    },
+    "905101": {
+      "city_name": "URY West",
+      "tier": 2
+    },
+    "905135": {
+      "city_name": "HND West",
+      "tier": 2
+    },
+    "905138": {
+      "city_name": "HND East",
+      "tier": 2
+    },
+    "905145": {
+      "city_name": "HND South",
+      "tier": 2
+    },
+    "905156": {
+      "city_name": "PRY East",
+      "tier": 2
+    },
+    "905158": {
+      "city_name": "PRY South",
+      "tier": 2
+    },
+    "905163": {
+      "city_name": "PRY North",
+      "tier": 2
+    },
+    "905164": {
+      "city_name": "PRY North",
+      "tier": 2
+    },
+    "905167": {
+      "city_name": "PRY West",
+      "tier": 2
+    },
+    "905172": {
+      "city_name": "PRY West",
+      "tier": 2
+    },
+    "905180": {
+      "city_name": "NIC South",
+      "tier": 2
+    },
+    "905181": {
+      "city_name": "NIC West",
+      "tier": 2
+    },
+    "905186": {
+      "city_name": "NIC North",
+      "tier": 2
+    },
+    "905261": {
+      "city_name": "UZB South",
+      "tier": 2
+    },
+    "905263": {
+      "city_name": "UZB North",
+      "tier": 2
+    },
+    "905264": {
+      "city_name": "UZB West",
+      "tier": 2
+    },
+    "905268": {
+      "city_name": "UZB East",
+      "tier": 2
+    },
+    "905270": {
+      "city_name": "UZB West",
+      "tier": 2
+    },
+    "905276": {
+      "city_name": "UZB East",
+      "tier": 2
+    },
+    "905305": {
+      "city_name": "NPL East",
+      "tier": 2
+    },
+    "905306": {
+      "city_name": "NPL East",
+      "tier": 2
+    },
+    "905310": {
+      "city_name": "NPL West",
+      "tier": 2
+    },
+    "905311": {
+      "city_name": "NPL North",
+      "tier": 2
+    },
+    "905319": {
+      "city_name": "NPL West",
+      "tier": 2
+    },
+    "905396": {
+      "city_name": "PAN West",
+      "tier": 2
+    },
+    "905398": {
+      "city_name": "PAN South",
+      "tier": 2
+    },
+    "905404": {
+      "city_name": "PAN East",
+      "tier": 2
+    },
+    "905412": {
+      "city_name": "HTI East",
+      "tier": 2
+    },
+    "905415": {
+      "city_name": "HTI North",
+      "tier": 2
+    },
+    "905419": {
+      "city_name": "HTI West",
+      "tier": 2
+    },
+    "905426": {
+      "city_name": "SLV West",
+      "tier": 2
+    },
+    "905427": {
+      "city_name": "SLV East",
+      "tier": 2
+    },
+    "905441": {
+      "city_name": "SLV East",
+      "tier": 2
+    },
+    "905445": {
+      "city_name": "CRI South",
+      "tier": 2
+    },
+    "905448": {
+      "city_name": "CRI North",
+      "tier": 2
+    },
+    "905453": {
+      "city_name": "CRI West",
+      "tier": 2
+    },
+    "905645": {
+      "city_name": "TKM East",
+      "tier": 2
+    },
+    "905646": {
+      "city_name": "TKM West",
+      "tier": 2
+    },
+    "905650": {
+      "city_name": "TKM West",
+      "tier": 2
+    },
+    "905654": {
+      "city_name": "TKM East",
+      "tier": 2
+    },
+    "905657": {
+      "city_name": "KGZ East",
+      "tier": 2
+    },
+    "905658": {
+      "city_name": "KGZ West",
+      "tier": 2
+    },
+    "905660": {
+      "city_name": "KGZ West",
+      "tier": 2
+    },
+    "905665": {
+      "city_name": "KGZ East",
+      "tier": 2
+    },
+    "905666": {
+      "city_name": "KGZ East",
+      "tier": 2
+    },
+    "905672": {
+      "city_name": "TJK North",
+      "tier": 2
+    },
+    "905674": {
+      "city_name": "TJK West",
+      "tier": 2
+    },
+    "905677": {
+      "city_name": "TJK East",
+      "tier": 2
+    },
+    "905757": {
+      "city_name": "BGD South",
+      "tier": 2
+    },
+    "905761": {
+      "city_name": "BGD North",
+      "tier": 2
+    },
+    "905762": {
+      "city_name": "BGD East",
+      "tier": 2
+    },
+    "905771": {
+      "city_name": "BGD North",
+      "tier": 2
+    }
+  },
+  "meta": {
+    "source": "polish_capital_layers_v1_4",
+    "key_hubs_d5": 31
+  }
+}

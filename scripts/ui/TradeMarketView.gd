@@ -41,6 +41,7 @@ var _pending_bilateral_filter: String = ""   # Used for strong handoff from Dipl
 var public_button: Button
 var black_button: Button
 var my_offers_button: Button
+var desk_button: Button
 @onready var list_scroll: ScrollContainer = $Margin/MainVBox/ListScroll
 @onready var list_vbox: VBoxContainer = $Margin/MainVBox/ListScroll/ListVBox
 @onready var button_hbox: HBoxContainer = $Margin/MainVBox/ButtonHBox
@@ -49,6 +50,8 @@ var my_offers_button: Button
 
 # Persistent convoys section for active protected trade flows (high-value: shows regional convoy protection from full naval regions)
 var convoys_vbox: VBoxContainer = null
+## Bilateral desk partner (from Diplomacy handoff or default ENG)
+var _desk_partner: String = "ENG"
 
 func _ready() -> void:
 	# Try to get the real player country
@@ -73,12 +76,18 @@ func _ready() -> void:
 	my_offers_button.pressed.connect(_on_my_offers_pressed)
 	mode_hbox.add_child(my_offers_button)
 
+	desk_button = Button.new()
+	desk_button.text = "Trade Desk"
+	desk_button.pressed.connect(_on_desk_pressed)
+	mode_hbox.add_child(desk_button)
+
 	# Styling (after buttons exist)
 	RetrowaveTheme.style_popup_root(self)
 	RetrowaveTheme.style_title(title_label)
 	RetrowaveTheme.style_secondary_button(public_button)
 	RetrowaveTheme.style_secondary_button(black_button)
 	RetrowaveTheme.style_secondary_button(my_offers_button)
+	RetrowaveTheme.style_secondary_button(desk_button)
 	RetrowaveTheme.style_primary_button(refresh_button)
 	RetrowaveTheme.style_secondary_button(close_button)
 
@@ -129,11 +138,16 @@ func _set_mode(new_mode: String) -> void:
 	RetrowaveTheme.style_secondary_button(public_button)
 	RetrowaveTheme.style_secondary_button(black_button)
 	RetrowaveTheme.style_secondary_button(my_offers_button)
+	if desk_button:
+		RetrowaveTheme.style_secondary_button(desk_button)
 
 	if new_mode == "PUBLIC":
 		RetrowaveTheme.style_primary_button(public_button)
 	elif new_mode == "BLACK":
 		RetrowaveTheme.style_primary_button(black_button)
+	elif new_mode == "DESK":
+		if desk_button:
+			RetrowaveTheme.style_primary_button(desk_button)
 	else:  # MY_OFFERS
 		RetrowaveTheme.style_primary_button(my_offers_button)
 
@@ -148,8 +162,16 @@ func _on_black_pressed() -> void:
 func _on_my_offers_pressed() -> void:
 	_set_mode("MY_OFFERS")
 
+func _on_desk_pressed() -> void:
+	_set_mode("DESK")
+
 func _refresh_current_mode() -> void:
 	_clear_list()
+
+	if _current_mode == "DESK":
+		_refresh_trade_desk()
+		_update_convoys_section()
+		return
 
 	var visibility_filter = null
 	if _current_mode == "PUBLIC":
@@ -429,6 +451,85 @@ func _on_reject_pressed(offer_id: String) -> void:
 func _on_close_pressed() -> void:
 	hide()
 
+func _refresh_trade_desk() -> void:
+	title_label.text = "Trade Desk — %s ↔ %s" % [_player_country, _desk_partner]
+	if typeof(TradeManager) == TYPE_NIL or not TradeManager.has_method("build_trade_desk_board"):
+		var err := Label.new()
+		err.text = "Trade Desk API unavailable."
+		RetrowaveTheme.style_body_label(err)
+		list_vbox.add_child(err)
+		return
+	var board: Dictionary = TradeManager.build_trade_desk_board(_player_country, _desk_partner)
+	var hdr := Label.new()
+	hdr.text = "Strategic Compact Ledger · CRS %.0f · %s" % [
+		float(board.get("crs", 0.0)),
+		str((board.get("band", {}) as Dictionary).get("label", "Neutral")) if board.get("band") is Dictionary else "Neutral",
+	]
+	RetrowaveTheme.style_title(hdr)
+	list_vbox.add_child(hdr)
+	for w in board.get("warnings", []):
+		var wl := Label.new()
+		wl.text = "⚠ %s" % str(w)
+		wl.modulate = Color(1.0, 0.75, 0.4)
+		RetrowaveTheme.style_body_label(wl)
+		list_vbox.add_child(wl)
+	var power: Dictionary = board.get("power", {}) as Dictionary if board.get("power") is Dictionary else {}
+	var mu: Dictionary = power.get("matchup", {}) as Dictionary if power.get("matchup") is Dictionary else {}
+	var pl := Label.new()
+	pl.text = "Power: %s (ratio %.2f)%s" % [
+		str(mu.get("label", "peer")),
+		float(mu.get("ratio", 1.0)),
+		" · NUCLEAR ASYMMETRY" if bool(mu.get("nuclear_asymmetry", false)) else "",
+	]
+	RetrowaveTheme.style_body_label(pl)
+	list_vbox.add_child(pl)
+	var tr := Label.new()
+	tr.text = "Transit: %s" % str(board.get("transit_plain", ""))
+	RetrowaveTheme.style_body_label(tr)
+	list_vbox.add_child(tr)
+	var disc: Dictionary = board.get("discounts", {}) as Dictionary if board.get("discounts") is Dictionary else {}
+	var dl := Label.new()
+	dl.text = "Discounts: trade ×%.2f · tech ×%.2f%s · tariff treasury %.0f SUU" % [
+		float(disc.get("trade_suu_mult", 1.0)),
+		float(disc.get("tech_share_suu_mult", 1.0)),
+		" · long-term" if bool(disc.get("long_term", false)) else "",
+		float(board.get("tariff_treasury", 0.0)),
+	]
+	RetrowaveTheme.style_body_label(dl)
+	list_vbox.add_child(dl)
+	var pol: Dictionary = board.get("policy", {}) as Dictionary if board.get("policy") is Dictionary else {}
+	var pol_l := Label.new()
+	pol_l.text = "Policy: import tariff %.0f%% · export tariff %.0f%% · embargo %s · MFN %s" % [
+		float(pol.get("import_tariff", 0.0)) * 100.0,
+		float(pol.get("export_tariff", 0.0)) * 100.0,
+		str(bool(pol.get("embargo", false))),
+		str(bool(pol.get("mfn", false))),
+	]
+	RetrowaveTheme.style_body_label(pol_l)
+	list_vbox.add_child(pol_l)
+	var flags: Array = board.get("flags", []) as Array if board.get("flags") is Array else []
+	if not flags.is_empty():
+		var fl := Label.new()
+		fl.text = "Concern flags: %s" % ", ".join(PackedStringArray(flags))
+		RetrowaveTheme.style_body_label(fl)
+		list_vbox.add_child(fl)
+	# Quick partner chips for common majors
+	var chip_row := HBoxContainer.new()
+	for tag in ["ENG", "GER", "FRA", "SOV", "JAP", "ITA"]:
+		if tag == _player_country:
+			continue
+		var b := Button.new()
+		b.text = tag
+		var tcopy: String = str(tag)
+		b.pressed.connect(func():
+			_desk_partner = tcopy
+			_refresh_trade_desk()
+		)
+		RetrowaveTheme.style_secondary_button(b)
+		chip_row.add_child(b)
+	list_vbox.add_child(chip_row)
+
+
 func _update_convoys_section() -> void:
 	if convoys_vbox == null:
 		return
@@ -444,35 +545,46 @@ func _update_convoys_section() -> void:
 		convoys_vbox.add_child(lbl)
 		return
 	var header := Label.new()
-	header.text = "Active Protected Convoys (%d) - regional bonuses reduce interdiction loss" % active_flows.size()
+	header.text = "Active Convoys (%d) — delivery %% & attack reasons" % active_flows.size()
 	RetrowaveTheme.style_title(header)
 	convoys_vbox.add_child(header)
 	for f in active_flows:
 		if not (f is TradeFlow):
 			continue
 		var prot := float(f.metadata.get("regional_convoy_protection", 0.0))
-		var lost := f.total_lost_to_interdiction
-		var attr := float(f.metadata.get("last_route_attrition", 0.0))
+		var lost: float = float(f.total_lost_to_interdiction)
+		var ratio := float(f.metadata.get("last_delivery_ratio", 1.0))
+		if ratio <= 0.0 and f.metadata.has("baseline_quantity_per_turn"):
+			var base := float(f.metadata.get("baseline_quantity_per_turn", 0.0))
+			if base > 0.001:
+				ratio = clampf(f.quantity_per_turn / base, 0.0, 1.0)
+		var reason := str(f.metadata.get("last_interdiction_plain", ""))
 		var line := Label.new()
-		line.text = "  %s→%s: %.1f %s/turn (prot %.0f%%, lost %.1f%s)" % [f.from_tag, f.to_tag, f.quantity_per_turn, f.item_id, prot*100, lost, (", attr %.1f%%" % (attr*100)) if attr > 0.001 else ""]
+		if reason.is_empty():
+			line.text = "  %s→%s: %.1f %s/turn · delivery %d%% · lost %.1f · prot %.0f%%" % [
+				f.from_tag, f.to_tag, f.quantity_per_turn, f.item_id, int(ratio * 100.0), lost, prot * 100.0,
+			]
+		else:
+			line.text = "  %s→%s: %d%% through — %s" % [f.from_tag, f.to_tag, int(ratio * 100.0), reason]
+			line.modulate = Color(1.0, 0.7, 0.55)
 		RetrowaveTheme.style_body_label(line)
 		convoys_vbox.add_child(line)
-	# Add demo interdict button for harness (non-AI)
+	# Demo interdict with province attribution (harness)
 	var demo_btn := Button.new()
-	demo_btn.text = "Demo Interdict Convoy (harness)"
+	demo_btn.text = "Demo: Sub attack (prov attribution)"
 	demo_btn.pressed.connect(func():
 		if active_flows.size() > 0:
 			var tf: TradeFlow = active_flows[0]
 			if typeof(TradeManager) != TYPE_NIL:
-				TradeManager.interdict_trade_flow(tf.flow_id, "demo_sub", 0.3)
-				_update_convoys_section()  # refresh
+				TradeManager.interdict_trade_flow(tf.flow_id, "submarine", 0.5, {
+					"province_id": 42, "attacker_tag": "GER",
+				})
+				_update_convoys_section()
 				if typeof(LeaderEventUI) != TYPE_NIL:
-					LeaderEventUI.show_toast("Demo interdict on %s (loss reduced by protection)" % tf.flow_id)
+					LeaderEventUI.show_toast(TradeManager.format_transit_issue_plain(tf.from_tag, tf.to_tag), 4.0)
 	)
 	RetrowaveTheme.style_secondary_button(demo_btn)
 	convoys_vbox.add_child(demo_btn)
-
-	queue_free()
 
 func show_market(initial_mode: String = "PUBLIC", filter_country: String = "") -> void:
 	_set_mode(initial_mode)
@@ -483,9 +595,10 @@ func show_market(initial_mode: String = "PUBLIC", filter_country: String = "") -
 	# Strong pre-filtering support for DiplomacyView handoff
 	if not filter_country.is_empty():
 		_pending_bilateral_filter = filter_country
+		_desk_partner = filter_country.strip_edges().to_upper()
 		# The actual filter will be applied on first refresh via _refresh_current_mode
 		if typeof(LeaderEventUI) != TYPE_NIL:
-			LeaderEventUI.show_toast("Bilateral view: deals with " + filter_country + ". Use filters or search to refine.", 3.5)
+			LeaderEventUI.show_toast("Bilateral view: deals with " + filter_country + ". Open Trade Desk for power/transit/CRS.", 3.5)
 
 # Optional: Call this from outside to show as a proper popup
 func open_as_popup() -> void:

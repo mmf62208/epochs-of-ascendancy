@@ -18,6 +18,11 @@
 class_name InfrastructureOverlayLayer
 extends Node2D
 
+const ProvincePolygonUtil = preload("res://scripts/map/ProvincePolygonUtil.gd")
+
+const _MapPolishFormatters := preload("res://scripts/map/MapPolishFormatters.gd")
+const _MapNextListHelpers := preload("res://scripts/map/MapNextListHelpers.gd")
+
 @export var infra_icon_size: float = 16.0
 @export var site_icon_size: float = 20.0
 @export var construction_ring_radius: float = 24.0
@@ -29,10 +34,13 @@ extends Node2D
 ## These can be toggled in game/UI/Debug to focus on different map aspects.
 ## "Editable" via projects in InfrastructureDevelopmentManager which upgrade infra/dev/special sites,
 ## triggering redraws and visual updates (roads thicken, cities grow, new sites appear with rings).
-var show_roads: bool = true
-var show_rails: bool = true
+## Default OFF for clean political readability (HOI-style). Toggle R/T or Infra mapmode.
+var show_roads: bool = false
+## Edge keys "min_max" on the active supply corridor (bright yellow when G is on).
+var _supply_corridor_edges: Dictionary = {}
+var show_rails: bool = false
 var show_cities: bool = false  # Off by default — toggle C or F10; draw fallback was grey-box spam at playtest zoom.
-var show_sites: bool = true  # airfields/ports/shipyards etc. vector elements (runways, docks) on the SitesLayer
+var show_sites: bool = false  # Off by default on political; enable via Y / Infra mapmode / F10
 var proposed_children: Array = []
 var proposed_data_loaded: bool = false
 const PROPOSED_SPLIT_PATH := "res://tools/map_generation/output/phase1_europe/proposed_children_geometry.json"
@@ -86,7 +94,8 @@ func _ready():
             TimeManager.game_year_advanced.connect(_on_game_year_advanced)
 
     call_deferred("refresh_all")
-    call_deferred("_try_load_proposed_splits")
+    # Do NOT auto-load proposed Phase1 split JSON on F5 — that data is map-gen debug only.
+    # Load on demand when show_proposed_splits is toggled (F10 / Debug).
     call_deferred("rebuild_all_infra_layers")  # initial build of road/rail/city nodes
 
     # Apply initial visibility to sub-layers (node children handle drawing when visible)
@@ -128,6 +137,9 @@ func _apply_layer_visibilities():
     _update_sub_layer_visibilities()
 
 func _process(_delta: float) -> void:
+    # Only recompute sub-layer visibility every few frames (was every frame on world_full).
+    if Engine.get_process_frames() % 8 != 0:
+        return
     _update_sub_layer_visibilities()
 
 func _update_sub_layer_visibilities() -> void:
@@ -135,13 +147,25 @@ func _update_sub_layer_visibilities() -> void:
     # Zoom thresholds so that at the test's initial auto-frame (~0.40) the layers are visible,
     # but they hide when zoomed far out (you zoom in to province to see fine roads/buildings/sites).
     # User toggles still control the "enabled" state.
+    # Operational zoom: roads appear earlier so arteries are readable without deep zoom.
+    # World-class pass: slightly earlier road/rail visibility for theater-scale reading.
     if road_layer:
-        road_layer.visible = show_roads and z > 0.18
+        road_layer.visible = show_roads and z > 0.10
     if rail_layer:
-        rail_layer.visible = show_rails and z > 0.22
-    if city_layer:
-        city_layer.visible = show_cities and z > 0.28
-    if sites_layer:
+        rail_layer.visible = show_rails and z > 0.14
+    if city_layer or sites_layer:
+        # Dense GIS boards: cities/factories only at operational zoom (plan A3 LOD).
+        var board_n := 0
+        if map_manager and map_manager.has_method("get_province_count"):
+            board_n = int(map_manager.get_province_count())
+        const MapZoomLODScript = preload("res://scripts/map/MapZoomLOD.gd")
+        if city_layer:
+            var city_z := float(MapZoomLODScript.city_marker_min_zoom_for_board(board_n))
+            city_layer.visible = show_cities and z > city_z
+        if sites_layer:
+            var site_z := float(MapZoomLODScript.site_marker_min_zoom_for_board(board_n))
+            sites_layer.visible = show_sites and z > site_z
+    elif sites_layer:
         sites_layer.visible = show_sites and z > 0.32
     _maybe_rebuild_for_era_change()
 
@@ -202,13 +226,13 @@ func _get_era_infra_profile() -> Dictionary:
                 "road_infra_min": 3.0,
                 "rail_infra_min": 6.0,
                 "city_dev_min": 3.0,
-                "road_width_explicit": 3.0,
-                "road_width_implicit": 1.5,
-                "road_color_explicit": Color(0.4, 0.38, 0.35, 0.85),
-                "road_color_implicit": Color(0.42, 0.40, 0.37, 0.6),
-                "rail_color": Color(0.2, 0.2, 0.25, 0.9),
-                "rail_width": 2.5,
-                "rail_tie_step": 30.0,
+                "road_width_explicit": 3.6,
+                "road_width_implicit": 2.0,
+                "road_color_explicit": Color(0.42, 0.36, 0.28, 0.92),
+                "road_color_implicit": Color(0.45, 0.40, 0.32, 0.72),
+                "rail_color": Color(0.18, 0.20, 0.28, 0.95),
+                "rail_width": 2.9,
+                "rail_tie_step": 28.0,
             }
 
 
@@ -227,6 +251,60 @@ func _on_game_year_advanced(_year: int) -> void:
 ## Public readout for harness / inspector (1918 sparse vs 1936 vs 2026 dense).
 func get_era_infra_profile() -> Dictionary:
     return _get_era_infra_profile()
+
+
+## Pure year→band helper (testable without TimeManager).
+static func era_band_for_year(year: int) -> int:
+    if year <= 1924:
+        return 0
+    if year >= 2000:
+        return 2
+    return 1
+
+
+## Pure year→profile (mirrors match in _get_era_infra_profile; no TimeManager).
+static func era_infra_profile_for_year(year: int) -> Dictionary:
+    var band := era_band_for_year(year)
+    match band:
+        0:
+            return {
+                "label": "sparse_1918",
+                "year": year,
+                "band": 0,
+                "road_infra_min": 5.0,
+                "rail_infra_min": 9.0,
+                "city_dev_min": 5.0,
+                "road_width_explicit": 2.0,
+                "road_width_implicit": 1.0,
+                "rail_width": 1.8,
+                "rail_tie_step": 45.0,
+            }
+        2:
+            return {
+                "label": "dense_2026",
+                "year": year,
+                "band": 2,
+                "road_infra_min": 2.0,
+                "rail_infra_min": 4.0,
+                "city_dev_min": 2.0,
+                "road_width_explicit": 4.0,
+                "road_width_implicit": 2.5,
+                "rail_width": 3.0,
+                "rail_tie_step": 22.0,
+            }
+        _:
+            return {
+                "label": "standard_1936",
+                "year": year,
+                "band": 1,
+                "road_infra_min": 3.0,
+                "rail_infra_min": 6.0,
+                "city_dev_min": 3.0,
+                "road_width_explicit": 3.6,
+                "road_width_implicit": 2.0,
+                "rail_width": 2.9,
+                "rail_tie_step": 28.0,
+            }
 
 # Simple view culling helper: only consider provinces near the current camera for node population.
 # Enhanced for perf/scale: also force-include "active" provinces (player/major owned, border-ish via adj, high pop/econ if data, + crucially GameData active_riots / pending research ethics pids).
@@ -363,18 +441,67 @@ func rebuild_road_layer():
             if not has_explicit and avg_infra < road_min:
                 continue
             var c2 = map_manager.get_province_centroid(nid)
+            # Art-team road palette (F5/G spiderweb fix):
+            # Supply mode draws ONLY corridor edges (bright). No adjacency mesh, no spines.
+            # Empty corridor set → draw nothing (SupplyMapLayer highlight owns the path).
+            var supply_on := false
+            var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+            if mr != null and bool(mr.get("supply_mode")):
+                supply_on = true
+            # Also treat map_mode supply/munitions as "supply styling" if property lags rebuild.
+            if mr != null and str(mr.get("current_map_mode")) in ["supply", "munitions"]:
+                supply_on = true
+            var on_corridor := _edge_on_supply_corridor(pid, nid, mr)
+            var tier := 0  # 0 low, 1 mid, 2 high
+            if has_explicit or avg_infra >= road_min + 3.0:
+                tier = 2 if avg_infra >= road_min + 6.0 or has_explicit else 1
+            elif avg_infra >= road_min:
+                tier = 1
+            # Supply / F5 / G: corridor-only. Skip every non-corridor edge (kills spiderweb).
+            if supply_on and not on_corridor:
+                continue
+            if supply_on and on_corridor:
+                var glow := Line2D.new()
+                glow.points = [c1, c2]
+                glow.antialiased = true
+                glow.begin_cap_mode = Line2D.LINE_CAP_ROUND
+                glow.end_cap_mode = Line2D.LINE_CAP_ROUND
+                glow.default_color = Color(1.00, 0.78, 0.12, 0.28)
+                glow.width = 5.0
+                glow.z_index = 3
+                glow.set_meta("p1", pid)
+                glow.set_meta("p2", nid)
+                glow.set_meta("glow", true)
+                road_layer.add_child(glow)
             var line := Line2D.new()
             line.points = [c1, c2]
-            if has_explicit or avg_infra >= road_min + 3.0:
-                line.width = float(era.get("road_width_explicit", 3.0))
-                line.default_color = era.get("road_color_explicit", Color(0.4, 0.38, 0.35, 0.85))
+            line.antialiased = true
+            if supply_on:
+                # Corridor only (non-corridor already continue'd).
+                line.default_color = Color(1.00, 0.92, 0.28, 0.88)
+                line.width = 2.8
+                line.z_index = 4
+                line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+                line.end_cap_mode = Line2D.LINE_CAP_ROUND
             else:
-                line.width = float(era.get("road_width_implicit", 1.5))
-                line.default_color = era.get("road_color_implicit", Color(0.42, 0.40, 0.37, 0.6))
-            line.z_index = 1
+                # Infra mapmode only (political never rebuilds roads): dust roads, never neon.
+                if tier >= 2:
+                    line.default_color = Color(0.40, 0.34, 0.22, 0.38)
+                    line.width = 2.0
+                    line.z_index = 2
+                elif tier >= 1:
+                    line.default_color = Color(0.36, 0.32, 0.24, 0.26)
+                    line.width = 1.5
+                    line.z_index = 1
+                else:
+                    line.default_color = Color(0.32, 0.30, 0.26, 0.16)
+                    line.width = 1.1
+                    line.z_index = 0
             line.set_meta("p1", pid)
             line.set_meta("p2", nid)
             line.set_meta("explicit", has_explicit)
+            line.set_meta("tier", tier)
+            line.set_meta("corridor", on_corridor)
             road_layer.add_child(line)
 
 ## Similar for rails - higher threshold, distinct style (e.g. dashed via multiple segments or color)
@@ -803,7 +930,54 @@ func set_show_roads(enabled: bool):
         road_layer.visible = show_roads
     if show_roads and not was_on:
         rebuild_road_layer()
+    elif not show_roads:
+        # Political F1 / hide: wipe Line2D children so faint roads cannot linger.
+        _clear_road_layer_children()
     queue_redraw()
+
+
+func _clear_road_layer_children() -> void:
+    if road_layer == null:
+        return
+    var kids = road_layer.get_children()
+    for k in kids:
+        road_layer.remove_child(k)
+        k.queue_free()
+
+
+## Mark capital→front path edges for bright yellow corridor styling (supply mode).
+func set_supply_corridor_path(province_path: Array) -> void:
+    _supply_corridor_edges.clear()
+    if province_path.size() < 2:
+        if show_roads:
+            rebuild_road_layer()
+        return
+    for i in range(province_path.size() - 1):
+        var a := int(province_path[i])
+        var b := int(province_path[i + 1])
+        if a <= 0 or b <= 0:
+            continue
+        var key := "%d_%d" % [mini(a, b), maxi(a, b)]
+        _supply_corridor_edges[key] = true
+    if show_roads:
+        rebuild_road_layer()
+    queue_redraw()
+
+
+func clear_supply_corridor_path() -> void:
+    if _supply_corridor_edges.is_empty():
+        return
+    _supply_corridor_edges.clear()
+    if show_roads:
+        rebuild_road_layer()
+    queue_redraw()
+
+
+func _edge_on_supply_corridor(pid: int, nid: int, _mr: Variant = null) -> bool:
+    if _supply_corridor_edges.is_empty():
+        return false
+    var key := "%d_%d" % [mini(pid, nid), maxi(pid, nid)]
+    return _supply_corridor_edges.has(key)
 
 func set_show_rails(enabled: bool):
     var was_on = show_rails
@@ -886,6 +1060,19 @@ func _draw():
     if show_proposed_splits and OS.is_debug_build():
         _draw_proposed_splits(zoom)
 
+    # Infra level numbers ("4" circle spam) only on infra mapmode or when roads layer is on.
+    # Political default stays clean solid fills (player playtest 2026-07-28).
+    var show_infra_nums := false
+    if show_roads or show_rails:
+        show_infra_nums = zoom >= 0.85
+    if typeof(MapManager) != TYPE_NIL:
+        pass
+    # MapRenderer may set meta when current_map_mode == infra
+    var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+    if mr != null and str(mr.get("current_map_mode")) == "infra":
+        show_infra_nums = zoom >= 0.45
+
+    var drawn_chokes: Dictionary = {}
     for province_id in draw_provs:
         var province: Province = draw_provs[province_id]
         if province == null:
@@ -894,7 +1081,7 @@ func _draw():
         var center = map_manager.get_province_centroid(province_id)
 
         var infra_level = province.infrastructure
-        if infra_level >= 1:
+        if show_infra_nums and infra_level >= 1 and not province.is_sea:
             _draw_infrastructure_marker(center, infra_level)
 
         if infrastructure_manager and infrastructure_manager.has_method("has_active_project") and infrastructure_manager.has_active_project(province_id):
@@ -906,12 +1093,89 @@ func _draw():
                 sabotaged = infrastructure_manager.is_project_sabotaged(province_id)
             _draw_active_project_marker(center, proj_prog, sabotaged, infra_level)
 
+        # Damage/sabotage marker from live state (infra sabo, depot, site damage, project sabo).
+        if zoom > 0.10:
+            var dmg: Dictionary = ProvinceInsight.classify_province_map_damage(province)
+            if bool(dmg.get("is_damaged", false)):
+                _draw_damage_sabotage_marker(center, dmg)
+
+        # Naval chokepoint marker: contest-aware color (cyan controlled, amber contested, dim unowned).
+        if map_manager and map_manager.has_method("has_strategic_chokepoint") and map_manager.has_strategic_chokepoint(province_id):
+            if zoom > 0.10:
+                _draw_chokepoint_for_pid(province_id, province, center)
+                drawn_chokes[int(province_id)] = true
+
+        # HH monthly map signal marker on targeted province (+ secondary concurrent pulse).
+        if zoom > 0.08 and typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
+            var ps: Dictionary = GameData.get_peace_state()
+            var sig: Dictionary = ps.get("hh_last_map_signal", {}) if ps is Dictionary else {}
+            if bool(sig.get("active", false)) and int(sig.get("province_id", -1)) == province_id:
+                _draw_hh_map_signal_marker(center, sig)
+            var sig2: Dictionary = ps.get("hh_secondary_map_signal", {}) if ps is Dictionary else {}
+            if bool(sig2.get("active", false)) and int(sig2.get("province_id", -1)) == province_id:
+                # Offset so primary + secondary don't fully stack when same province (rare).
+                var off := Vector2(10, -10) if int(sig.get("province_id", -2)) == province_id else Vector2.ZERO
+                _draw_hh_map_signal_marker(center + off, sig2)
+
         for i in range(province.special_sites.size()):
             var site: SpecialSite = province.special_sites[i]
             if site == null:
                 continue
             var offset = Vector2(0, -28 - (i * 22))
             _draw_special_site(center + offset, site)
+
+    # Always draw every data-driven choke (Danish Straits, English Channel, …) even if
+    # viewport cull omitted that sea zone from draw_provs — diamonds must sit on correct seas.
+    if zoom > 0.08 and map_manager and map_manager.has_method("get_naval_chokepoint_provinces"):
+        var all_chokes: Array = map_manager.get_naval_chokepoint_provinces()
+        for cid_v in all_chokes:
+            var cid := int(cid_v)
+            if drawn_chokes.has(cid):
+                continue
+            var ccent: Vector2 = map_manager.get_province_centroid(cid) if map_manager.has_method("get_province_centroid") else Vector2.ZERO
+            if ccent == Vector2.ZERO:
+                continue
+            var cp: Province = map_manager.get_province(cid) if map_manager.has_method("get_province") else null
+            _draw_chokepoint_for_pid(cid, cp, ccent)
+            drawn_chokes[cid] = true
+
+
+func _draw_chokepoint_for_pid(province_id: int, province: Province, center: Vector2) -> void:
+    var choke_col := Color(0.35, 0.82, 1.0, 0.92)
+    var contest: Dictionary = {}
+    if map_manager and map_manager.has_method("get_chokepoint_contest_state"):
+        contest = map_manager.get_chokepoint_contest_state(province_id)
+    if bool(contest.get("contested", false)):
+        choke_col = Color(1.0, 0.62, 0.22, 0.95)
+    elif bool(contest.get("unowned", false)):
+        choke_col = Color(0.45, 0.55, 0.62, 0.88)
+    else:
+        var ctrl_tag := str(contest.get("controller", "")).strip_edges()
+        if ctrl_tag.is_empty() and map_manager and map_manager.has_method("get_province_controller"):
+            ctrl_tag = str(map_manager.get_province_controller(province_id)).strip_edges()
+        if ctrl_tag.is_empty() and province != null:
+            ctrl_tag = str(province.owner_tag).strip_edges()
+        if not ctrl_tag.is_empty() and map_manager and map_manager.has_method("get_country_color"):
+            var gc: Color = map_manager.get_country_color(ctrl_tag)
+            choke_col = gc.lerp(Color(0.35, 0.82, 1.0, 1.0), 0.35)
+            choke_col.a = 0.95
+    if map_manager and map_manager.has_method("sealane_contest_visual_for_province"):
+        var svis: Dictionary = map_manager.sealane_contest_visual_for_province(province_id)
+        if svis is Dictionary and not bool(svis.get("empty", false)):
+            var tk := str(svis.get("tint_key", ""))
+            var strength := clampf(float(svis.get("strength", 0.5)), 0.15, 1.0)
+            match tk:
+                "hostile_sealane":
+                    choke_col = Color(0.91, 0.36, 0.36, 0.55 + 0.4 * strength)
+                "contested_sealane":
+                    choke_col = Color(0.91, 0.75, 0.38, 0.55 + 0.4 * strength)
+                "friendly_sealane":
+                    choke_col = Color(0.37, 0.78, 1.0, 0.55 + 0.4 * strength)
+                "neutral_sealane":
+                    choke_col = Color(0.53, 0.6, 0.67, 0.55 + 0.35 * strength)
+                _:
+                    pass
+    _draw_naval_chokepoint_marker(center, choke_col)
 
 
 func _draw_infrastructure_marker(center: Vector2, level: int):
@@ -946,6 +1210,59 @@ func _draw_active_project_marker(center: Vector2, progress: float, sabotaged: bo
     draw_string(font, base_pos + Vector2(10, -4), str(pct) + "%", HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(col, 0.9))
 
 
+func _draw_naval_chokepoint_marker(center: Vector2, col: Color = Color(0.35, 0.82, 1.0, 0.92)) -> void:
+    ## Soft diamond + anchor glyph for data-driven naval straits (MapManager chokepoint IDs).
+    ## Draw ON the sea centroid — no +Y offset (was sliding English Channel onto Pas-de-Calais).
+    var pos := center
+    var pulse := 0.85 + sin(Time.get_ticks_msec() / 520.0) * 0.12
+    draw_circle(pos, 11.0 * pulse, Color(col.r, col.g, col.b, 0.12 * pulse))
+    # Diamond outline
+    var d := 9.0
+    var pts := PackedVector2Array([
+        pos + Vector2(0, -d),
+        pos + Vector2(d, 0),
+        pos + Vector2(0, d),
+        pos + Vector2(-d, 0),
+        pos + Vector2(0, -d),
+    ])
+    draw_polyline(pts, col, 1.85, true)
+    # Inner fill hint (control readability at strategic zoom)
+    draw_circle(pos, 3.2, Color(col.r, col.g, col.b, 0.55))
+    var font := ThemeDB.fallback_font
+    draw_string(font, pos - Vector2(6, 6), "⚓", HORIZONTAL_ALIGNMENT_CENTER, -1, 13, col)
+
+
+func _draw_damage_sabotage_marker(center: Vector2, dmg: Dictionary) -> void:
+    ## Distinct map marker for live sabotage/depot/site damage (classify_map_damage).
+    var pos := center + Vector2(-16, -8)
+    var key := str(dmg.get("tint_key", ""))
+    var col := Color(1.0, 0.35, 0.28, 0.95)
+    if key in ["depot_sabotage", "supply_pressure"]:
+        col = Color(1.0, 0.55, 0.18, 0.95)
+    elif key == "site_damage":
+        col = Color(1.0, 0.48, 0.35, 0.95)
+    var pulse := 0.8 + sin(Time.get_ticks_msec() / 380.0) * 0.15
+    draw_circle(pos, 10.0 * pulse, Color(col.r, col.g, col.b, 0.14 * pulse))
+    var font := ThemeDB.fallback_font
+    var marker := str(dmg.get("marker", "⚠"))
+    if marker.is_empty():
+        marker = "⚠"
+    draw_string(font, pos - Vector2(6, 6), marker, HORIZONTAL_ALIGNMENT_CENTER, -1, 14, col)
+
+
+func _draw_hh_map_signal_marker(center: Vector2, sig: Dictionary) -> void:
+    ## Monthly Hidden Hand background action marker on the targeted province.
+    var pos := center + Vector2(16, -10)
+    var col := Color(0.72, 0.42, 1.0, 0.95)
+    if str(sig.get("tint_key", "")) == "infra_sabotage":
+        col = Color(1.0, 0.4, 0.55, 0.95)
+    var pulse := 0.82 + sin(Time.get_ticks_msec() / 450.0) * 0.14
+    draw_circle(pos, 11.0 * pulse, Color(col.r, col.g, col.b, 0.12 * pulse))
+    var font := ThemeDB.fallback_font
+    var marker := str(sig.get("marker", "👁"))
+    draw_string(font, pos - Vector2(6, 6), marker, HORIZONTAL_ALIGNMENT_CENTER, -1, 14, col)
+
+
 func _draw_special_site(pos: Vector2, site: SpecialSite):
     if not site or site.construction_state == SpecialSite.ConstructionState.NOT_BUILT:
         return
@@ -971,17 +1288,45 @@ func _draw_special_site(pos: Vector2, site: SpecialSite):
             icon = "📡"
         SpecialSite.SiteType.SPECIAL_PROJECT:
             icon = "⚗"
+        SpecialSite.SiteType.FORTIFICATION:
+            icon = "🏰"
         _:
             icon = "◆"
 
-    # State-based coloring and effects
-    if site.construction_state == SpecialSite.ConstructionState.UNDER_CONSTRUCTION:
+    # State-based coloring and effects via pure visual contract (distinct UC / complete / damaged).
+    var vis: Dictionary = _MapPolishFormatters.special_site_map_visual(
+        site.is_completed(),
+        site.construction_state == SpecialSite.ConstructionState.UNDER_CONSTRUCTION,
+        site.is_damaged(),
+        float(site.construction_progress),
+    )
+    var tint_key := str(vis.get("tint_key", ""))
+    if tint_key == "under_construction":
         color = Color(0.35, 0.75, 1.0, 0.95)
-        _draw_construction_ring(pos, color)
-    elif site.is_damaged():
+        if bool(vis.get("progress_ring", false)):
+            var prog := clampf(float(vis.get("ring_progress", 0.05)), 0.05, 1.0)
+            _draw_dashed_circle(pos, construction_ring_radius, color, 2.2, 12, prog)
+        if bool(vis.get("pulse", false)):
+            var pulse_uc = sin(Time.get_ticks_msec() / 300.0) * 0.18 + 0.82
+            draw_circle(pos, construction_ring_radius * 0.5, Color(color, 0.12 * pulse_uc))
+    elif tint_key == "damaged":
         color = Color(1.0, 0.45, 0.3, 0.95)
+        # Soft damage halo (distinct from completion pulse)
+        var pulse_dmg = sin(Time.get_ticks_msec() / 260.0) * 0.10 + 0.75
+        draw_circle(pos, construction_ring_radius * 0.55, Color(1.0, 0.28, 0.18, 0.14 * pulse_dmg))
+    elif tint_key == "complete":
+        if site.tier >= 3:
+            color = Color(1.0, 0.92, 0.5, 1.0)  # Gold for Tier 3
+        elif site.tier == 2:
+            color = Color(0.7, 0.95, 0.7, 1.0)
+        else:
+            color = Color(0.85, 0.95, 0.88, 1.0)
+        # Completion pulse — healthy complete sites breathe (sabotaged never reach here)
+        if bool(vis.get("completion_pulse", false)):
+            var pulse_done = sin(Time.get_ticks_msec() / 520.0) * 0.12 + 0.88
+            draw_circle(pos, construction_ring_radius * 0.42, Color(color, 0.10 * pulse_done))
     elif site.tier >= 3:
-        color = Color(1.0, 0.92, 0.5, 1.0)  # Gold for Tier 3
+        color = Color(1.0, 0.92, 0.5, 1.0)
     elif site.tier == 2:
         color = Color(0.7, 0.95, 0.7, 1.0)
 
@@ -992,8 +1337,16 @@ func _draw_special_site(pos: Vector2, site: SpecialSite):
     if site.tier >= 2:
         draw_string(font, pos + Vector2(11, -7), str(site.tier), HORIZONTAL_ALIGNMENT_CENTER, -1, 9, color)
 
-    # Damage cracks (visual feedback for sabotage/attack)
-    if site.is_damaged():
+    # Compact effect chip (supply / trade) via MapPolishFormatters pure helper.
+    if bool(vis.get("show_effect_chip", false)):
+        var chip: String = _MapPolishFormatters.format_overlay_effect_chip(
+            float(site.supply_bonus), float(site.trade_capacity)
+        )
+        if not chip.is_empty():
+            draw_string(font, pos + Vector2(-10, 14), chip, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(color, 0.85))
+
+    # Damage cracks (visual feedback for sabotage/attack) — only when contract says so
+    if bool(vis.get("show_damage_cracks", false)) and site.is_damaged():
         var dmg = site.damage_level
         for i in range(dmg):
             var crack_angle = -TAU * 0.3 + i * 0.45
@@ -1073,30 +1426,73 @@ func _draw_resource_icons(zoom: float = 1.0) -> void:
     _draw_resource_icons_culled(zoom, _get_provinces_for_layers())
 
 
+## Zoom gates for resource glyphs (strategic earlier, bulk later).
+const RESOURCE_ZOOM_STRATEGIC := 0.38  ## oil/coal/uranium/rare_earths - earlier for ops
+const RESOURCE_ZOOM_BULK := 0.48       ## food/grain and generic commodities
+
+
+func resource_icon_min_zoom_for(primary: String) -> float:
+    ## Pure helper for tests + draw path: when a resource type becomes visible.
+    var key := primary.strip_edges().to_lower()
+    match key:
+        "oil", "fuel", "coal", "uranium", "rare_earths", "semiconductors", "rubber":
+            return RESOURCE_ZOOM_STRATEGIC
+        "iron", "steel", "aluminum", "aluminium", "fissiles", "helium3", "antimatter", "energy":
+            return RESOURCE_ZOOM_STRATEGIC
+        _:
+            return RESOURCE_ZOOM_BULK
+
+
 func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
     if not map_manager:
         return
 
-    if zoom < 0.75:
+    # Earliest strategic glyph zoom; bulk food/generic gated higher inside loop.
+    if zoom < RESOURCE_ZOOM_STRATEGIC:
         return
 
+    var board_n := provinces.size()
+    if map_manager.has_method("get_province_count"):
+        board_n = maxi(board_n, int(map_manager.get_province_count()))
+    # Cap glyph count on world_full boards (MapZoomLOD pure helper).
+    const MapZoomLODScript = preload("res://scripts/map/MapZoomLOD.gd")
+    var icon_budget := int(MapZoomLODScript.max_resource_icons_for_board(board_n))
+    var drawn := 0
+
     for province_id in provinces:
+        if drawn >= icon_budget:
+            break
         var province: Province = provinces[province_id]
-        if province == null or province.is_sea or province.resources.is_empty():
+        if province == null or province.is_sea:
+            continue
+        if province.resources.is_empty():
             continue
 
         var center = map_manager.get_province_centroid(province_id)
-        var primary = province.get("primary_resource") if province else ""
-        if primary == null or str(primary) == "":
-            for k in province.resources:
-                primary = k
-                break
+        var primary := ""
+        if "primary_resource" in province and str(province.primary_resource) != "":
+            primary = str(province.primary_resource)
+        else:
+            # Prefer strategic resources when present.
+            for key in ["oil", "coal", "iron", "steel", "uranium", "rare_earths", "rubber", "aluminum"]:
+                if province.resources.has(key) and float(province.resources[key]) > 0.0:
+                    primary = key
+                    break
+            if primary == "":
+                for k in province.resources:
+                    if float(province.resources[k]) > 0.0:
+                        primary = str(k)
+                        break
 
         if primary == "":
             continue
+        if zoom < resource_icon_min_zoom_for(primary):
+            continue
 
+        drawn += 1
         var symbol = "●"
         var col = Color(0.8, 0.8, 0.6, 0.9)
+        var ring := Color(0.05, 0.05, 0.08, 0.55)
 
         match primary.to_lower():
             "iron", "steel":
@@ -1104,21 +1500,36 @@ func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
                 col = Color(0.55, 0.6, 0.68, 0.95)
             "coal":
                 symbol = "⬛"
-                col = Color(0.25, 0.25, 0.27, 0.9)
+                col = Color(0.22, 0.22, 0.24, 0.95)
             "oil", "fuel":
                 symbol = "🛢"
-                col = Color(0.15, 0.15, 0.15, 0.9)
+                col = Color(0.12, 0.12, 0.14, 0.95)
+            "uranium":
+                symbol = "☢"
+                col = Color(0.45, 0.85, 0.35, 0.95)
+            "rubber":
+                symbol = "●"
+                col = Color(0.35, 0.28, 0.22, 0.95)
+            "aluminum", "aluminium":
+                symbol = "◇"
+                col = Color(0.75, 0.78, 0.85, 0.95)
             "rare_earths", "semiconductors":
                 symbol = "◆"
                 col = Color(0.35, 0.85, 0.65, 0.95)
+            "food", "grain", "agriculture":
+                symbol = "🌾"
+                col = Color(0.75, 0.7, 0.25, 0.9)
             _:
                 symbol = "●"
                 col = Color(0.7, 0.65, 0.5, 0.85)
 
-        var icon_pos = center + Vector2(11, 11)
-        draw_circle(icon_pos, 4.5, col)
-        var font = ThemeDB.fallback_font
-        draw_string(font, icon_pos - Vector2(3.5, -2.5), symbol, HORIZONTAL_ALIGNMENT_CENTER, -1, 9, Color.WHITE)
+        var icon_pos = center + Vector2(12, 12)
+        # Halo for contrast on light parchment underlay.
+        draw_circle(icon_pos, 6.0, ring)
+        draw_circle(icon_pos, 4.8, col)
+        var font := ThemeDB.fallback_font
+        if font:
+            draw_string(font, icon_pos + Vector2(-5, 4), symbol, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color(1, 1, 1, 0.92))
 
 
 func _get_current_zoom() -> float:
@@ -1163,18 +1574,15 @@ func _draw_proposed_splits(zoom: float = 1.0):
         if pts_raw.size() < 3:
             continue
 
-        var poly: PackedVector2Array = []
-        for p in pts_raw:
-            if p is Array and p.size() >= 2:
-                poly.append(Vector2(p[0], p[1]))
-
+        var poly: PackedVector2Array = ProvincePolygonUtil.from_variant_points(pts_raw)
+        poly = ProvincePolygonUtil.make_drawable(poly)
         if poly.size() < 3:
             continue
 
         var naval_imp: float = float(child.get("naval_importance", 0.0))
         var use_color := high_naval_color if naval_imp > 1.2 else base_color
 
-        draw_polygon(poly, [fill_color])
+        ProvincePolygonUtil.draw_fill(self, poly, fill_color)
         draw_polyline(poly, use_color, 2.4, true)
         draw_polyline(poly, Color(use_color, 0.35), 1.0, true)
 

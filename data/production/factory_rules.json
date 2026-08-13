@@ -27,7 +27,21 @@
     "standard": { "max_production_lines": 1 },
     "shipyard": { "max_production_lines": 4 },
     "aircraft_factory": { "max_production_lines": 3 },
-    "tank_plant": { "max_production_lines": 2 }
+    "tank_plant": { "max_production_lines": 2 },
+    "coal_plant": { "max_production_lines": 0, "resource_plant": true, "plant_class": "energy" },
+    "oil_power_plant": { "max_production_lines": 0, "resource_plant": true, "plant_class": "energy" },
+    "gas_plant": { "max_production_lines": 0, "resource_plant": true, "plant_class": "energy" },
+    "hydro_plant": { "max_production_lines": 0, "resource_plant": true, "plant_class": "energy" },
+    "biomass_plant": { "max_production_lines": 0, "resource_plant": true, "plant_class": "energy" },
+    "nuclear_plant": { "max_production_lines": 0, "resource_plant": true, "plant_class": "energy", "requires_unlock": "nuclear_fuel" },
+    "fusion_plant": { "max_production_lines": 0, "resource_plant": true, "plant_class": "energy", "requires_unlock": "fusion_power_industry" },
+    "steel_mill": { "max_production_lines": 0, "resource_plant": true, "plant_class": "resource" },
+    "aluminum_smelter": { "max_production_lines": 0, "resource_plant": true, "plant_class": "resource" },
+    "refinery": { "max_production_lines": 0, "resource_plant": true, "plant_class": "resource" },
+    "rubber_works": { "max_production_lines": 0, "resource_plant": true, "plant_class": "resource" },
+    "electronics_fab": { "max_production_lines": 0, "resource_plant": true, "plant_class": "resource" },
+    "specials_refinery": { "max_production_lines": 0, "resource_plant": true, "plant_class": "resource" },
+    "enrichment_plant": { "max_production_lines": 0, "resource_plant": true, "plant_class": "resource", "requires_unlock": "nuclear_fuel" }
   },
   "slot_concentration": {
     "bonus_per_extra_line": 0.12,

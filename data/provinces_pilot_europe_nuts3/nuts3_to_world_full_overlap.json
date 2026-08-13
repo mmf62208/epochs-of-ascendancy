@@ -1,0 +1,1008 @@
+{
+  "method": "nearest_centroid",
+  "renumber_world_full": false,
+  "pair_count": 250,
+  "pairs": [
+    {
+      "nuts3_id": 710000,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710001,
+      "world_full_id": 9200
+    },
+    {
+      "nuts3_id": 710002,
+      "world_full_id": 9200
+    },
+    {
+      "nuts3_id": 710003,
+      "world_full_id": 9200
+    },
+    {
+      "nuts3_id": 710004,
+      "world_full_id": 9200
+    },
+    {
+      "nuts3_id": 710005,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710006,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710007,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710008,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710009,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710010,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710011,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710012,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710013,
+      "world_full_id": 9199
+    },
+    {
+      "nuts3_id": 710014,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710015,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710016,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710017,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710018,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710019,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710020,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710021,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710022,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710023,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710024,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710025,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710026,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710027,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710028,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710029,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710030,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710031,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710032,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710033,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710034,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710035,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710036,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710037,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710038,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710039,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710040,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710041,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710042,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710043,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710044,
+      "world_full_id": 9157
+    },
+    {
+      "nuts3_id": 710045,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710046,
+      "world_full_id": 9075
+    },
+    {
+      "nuts3_id": 710047,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710048,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710049,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710050,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710051,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710052,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710053,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710054,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710055,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710056,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710057,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710058,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710059,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710060,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710061,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710062,
+      "world_full_id": 9072
+    },
+    {
+      "nuts3_id": 710063,
+      "world_full_id": 9072
+    },
+    {
+      "nuts3_id": 710064,
+      "world_full_id": 9072
+    },
+    {
+      "nuts3_id": 710065,
+      "world_full_id": 9072
+    },
+    {
+      "nuts3_id": 710066,
+      "world_full_id": 9072
+    },
+    {
+      "nuts3_id": 710067,
+      "world_full_id": 9072
+    },
+    {
+      "nuts3_id": 710068,
+      "world_full_id": 9072
+    },
+    {
+      "nuts3_id": 710069,
+      "world_full_id": 9072
+    },
+    {
+      "nuts3_id": 710070,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710071,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710072,
+      "world_full_id": 9072
+    },
+    {
+      "nuts3_id": 710073,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710074,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710075,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710076,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710077,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710078,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710079,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710080,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710081,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710082,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710083,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710084,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710085,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710086,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710087,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710088,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710089,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710090,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710091,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710092,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710093,
+      "world_full_id": 20621
+    },
+    {
+      "nuts3_id": 710094,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710095,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710096,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710097,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710098,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710099,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710100,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710101,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710102,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710103,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710104,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710105,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710106,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710107,
+      "world_full_id": 50880
+    },
+    {
+      "nuts3_id": 710108,
+      "world_full_id": 20623
+    },
+    {
+      "nuts3_id": 710109,
+      "world_full_id": 20621
+    },
+    {
+      "nuts3_id": 710110,
+      "world_full_id": 20621
+    },
+    {
+      "nuts3_id": 710111,
+      "world_full_id": 20621
+    },
+    {
+      "nuts3_id": 710112,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710113,
+      "world_full_id": 50920
+    },
+    {
+      "nuts3_id": 710114,
+      "world_full_id": 20623
+    },
+    {
+      "nuts3_id": 710115,
+      "world_full_id": 20623
+    },
+    {
+      "nuts3_id": 710116,
+      "world_full_id": 20621
+    },
+    {
+      "nuts3_id": 710117,
+      "world_full_id": 20623
+    },
+    {
+      "nuts3_id": 710118,
+      "world_full_id": 20623
+    },
+    {
+      "nuts3_id": 710119,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710120,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710121,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710122,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710123,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710124,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710125,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710126,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710127,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710128,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710129,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710130,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710131,
+      "world_full_id": 9074
+    },
+    {
+      "nuts3_id": 710132,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710133,
+      "world_full_id": 9074
+    },
+    {
+      "nuts3_id": 710134,
+      "world_full_id": 9074
+    },
+    {
+      "nuts3_id": 710135,
+      "world_full_id": 9074
+    },
+    {
+      "nuts3_id": 710136,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710137,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710138,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710139,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710140,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710141,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710142,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710143,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710144,
+      "world_full_id": 9075
+    },
+    {
+      "nuts3_id": 710145,
+      "world_full_id": 20151
+    },
+    {
+      "nuts3_id": 710146,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710147,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710148,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710149,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710150,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710151,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710152,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710153,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710154,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710155,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710156,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710157,
+      "world_full_id": 9199
+    },
+    {
+      "nuts3_id": 710158,
+      "world_full_id": 9199
+    },
+    {
+      "nuts3_id": 710159,
+      "world_full_id": 9199
+    },
+    {
+      "nuts3_id": 710160,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710161,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710162,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710163,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710164,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710165,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710166,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710167,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710168,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710169,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710170,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710171,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710172,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710173,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710174,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710175,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710176,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710177,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710178,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710179,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710180,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710181,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710182,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710183,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710184,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710185,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710186,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710187,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710188,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710189,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710190,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710191,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710192,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710193,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710194,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710195,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710196,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710197,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710198,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710199,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710200,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710201,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710202,
+      "world_full_id": 9074
+    },
+    {
+      "nuts3_id": 710203,
+      "world_full_id": 9073
+    },
+    {
+      "nuts3_id": 710204,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710205,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710206,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710207,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710208,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710209,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710210,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710211,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710212,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710213,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710214,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710215,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710216,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710217,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710218,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710219,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710220,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710221,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710222,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710223,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710224,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710225,
+      "world_full_id": 9157
+    },
+    {
+      "nuts3_id": 710226,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710227,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710228,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710229,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710230,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710231,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710232,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710233,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710234,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710235,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710236,
+      "world_full_id": 9151
+    },
+    {
+      "nuts3_id": 710237,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710238,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710239,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710240,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710241,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710242,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710243,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710244,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710245,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710246,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710247,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710248,
+      "world_full_id": 9217
+    },
+    {
+      "nuts3_id": 710249,
+      "world_full_id": 9073
+    }
+  ],
+  "summary": "NUTS3 promote remap \u00b7 pairs 250 \u00b7 world touched 14 \u00b7 PASS"
+}

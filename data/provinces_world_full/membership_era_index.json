@@ -1,0 +1,74 @@
+{
+  "version": 1,
+  "policy": {
+    "seed_on_scenario_load": true,
+    "reapply_on_year_tick": false,
+    "reapply_on_daily_tick": false,
+    "player_membership_edits_preserved": true,
+    "primary_eras_mode": "full",
+    "primary_eras": [
+      1910,
+      1918,
+      1936,
+      2026
+    ],
+    "secondary_eras": [
+      1945
+    ],
+    "global_province_target_v1": 6000,
+    "global_province_band": [
+      5000,
+      7000
+    ],
+    "fps_gate": 60,
+    "us_region_set": "8_band"
+  },
+  "eras": [
+    {
+      "year": 1910,
+      "path": "hierarchy_membership_1910.json",
+      "mode": "full",
+      "province_n": 2325,
+      "state_n": 256,
+      "primary": true,
+      "ok": true
+    },
+    {
+      "year": 1918,
+      "path": "hierarchy_membership_1918.json",
+      "mode": "full",
+      "province_n": 2325,
+      "state_n": 259,
+      "primary": true,
+      "ok": true
+    },
+    {
+      "year": 1936,
+      "path": "hierarchy_membership_1936.json",
+      "mode": "full",
+      "province_n": 2325,
+      "state_n": 260,
+      "primary": true,
+      "ok": true
+    },
+    {
+      "year": 2026,
+      "path": "hierarchy_membership_2026.json",
+      "mode": "full",
+      "province_n": 2325,
+      "state_n": 256,
+      "primary": true,
+      "ok": true
+    }
+  ],
+  "primary_eras": [
+    1910,
+    1918,
+    1936,
+    2026
+  ],
+  "secondary_eras": [
+    1945
+  ],
+  "source": "membership_era_product"
+}

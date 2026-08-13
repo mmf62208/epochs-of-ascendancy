@@ -164,6 +164,8 @@ func get_national_special_site_trade_capacity_bonus(country_tag: String) -> floa
 ## DOCKING_RIGHTS:
 ##   - Applies a temporary national effect (via NationalModifierManager) granting supply
 ##     or naval/air access bonuses (e.g. {"supply_throughput": +0.2, "port_access": 1.0}).
+##   - **R7 basing graph:** accept also writes host→guest edges via grant_basing_rights
+##     (province_id / duration_months from metadata; monthly process_monthly_basing_rights expires).
 ##   - Duration and exact modifiers come from item.metadata (defaults provided).
 ##   - Strategic for island or landlocked nations needing port access.
 ##
@@ -677,16 +679,26 @@ var _offers_by_to: Dictionary = {}              # country_tag -> Array[offer_id]
 var _trade_flows: Dictionary = {}               # flow_id -> TradeFlow
 
 var _current_year: int = 1936
+## country_tag -> cumulative tariff SUU income (import duty abstract)
+var _tariff_treasury: Dictionary = {}
+## grant_id -> basing edge {host_tag, guest_tag, province_id, remaining_months, ...}
+var _basing_grants: Dictionary = {}
 
 # Simple value baselines (easy to move to a data file or rules json later)
 const DESIGN_BASE_VALUE_MULTIPLIER := 1.0
 const RESOURCE_BASE_RATES := {
 	"steel": 1.0,
+	"aluminum": 1.5,
+	"energy": 1.2,
 	"fuel": 1.8,
 	"rubber": 2.2,
-	"aluminum": 1.5,
-	"oil": 2.5,
-	# ... extend as needed
+	"electronics": 3.0,
+	"specials": 2.8,
+	"fissiles": 4.5,
+	"oil": 2.5,  # alias feedstock → fuel major
+	"supplies": 0.8,
+	"coal": 0.6,
+	"iron": 0.7,
 }
 
 func _ready() -> void:
@@ -703,7 +715,25 @@ func _on_game_year_advanced(year: int) -> void:
 	_expire_offers_past_deadline()
 
 func _on_game_month_advanced(year: int, month: int) -> void:
-	advance_trade_flows(_current_year)  # Use year as a simple turn proxy for now; can refine later
+	var light := (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_interactive_light_sim")
+		and bool(TimeManager.is_interactive_light_sim())
+	)
+	# Interactive F5: skip AI propose/risk storms on month rollover (Feb→Mar was freezing the clock).
+	# Deliveries + basing decay still run; full AI trade on headless / heavy daily.
+	if light:
+		advance_trade_flows(_current_year)
+		process_monthly_basing_rights(year, month)
+		return
+	# 1) Auto interdiction from route risk / presence (before delivery)
+	process_monthly_trade_risks(year, month)
+	# 2) Deliver remaining cargo (tariffs apply on landing)
+	advance_trade_flows(_current_year)
+	# 3) AI propose/accept
+	process_monthly_ai_trade(year, month)
+	# 4) Decay foreign basing / docking rights graph
+	process_monthly_basing_rights(year, month)
 
 ## =============================================================================
 ## PUBLIC API — OFFER LIFECYCLE
@@ -712,6 +742,104 @@ func _on_game_month_advanced(year: int, month: int) -> void:
 ## Creates a new trade offer. Returns the offer_id (UUID-style string for simplicity).
 ## Callers (future UI, AI, events, agents) are responsible for validating that the offering
 ## country actually possesses the items (we do not enforce it in v1).
+## Player-visible strategic majors for trade UI (era/tech gated; oil aliases to fuel).
+func get_tradeable_major_resources(country_tag: String = "") -> PackedStringArray:
+	var unlocks := {"rule_flags": [], "unlocked_resources": []}
+	var tag := _norm_tag(country_tag)
+	if not tag.is_empty() and typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("get_country_state"):
+		var st: Dictionary = TechnologyManager.get_country_state(tag)
+		if st.get("rule_flags") is Array:
+			unlocks["rule_flags"] = st["rule_flags"]
+		if st.get("unlocked_resources") is Array:
+			unlocks["unlocked_resources"] = st["unlocked_resources"]
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	if rhc != null and rhc.has_method("get_visible_majors"):
+		return rhc.get_visible_majors(unlocks)
+	return PackedStringArray(["steel", "aluminum", "energy", "fuel", "rubber", "electronics", "specials"])
+
+
+## Unit value for a major (shortage pressure via national stockpile when available).
+func get_major_resource_unit_value(resource_id: String, country_tag: String = "") -> float:
+	var rid := resource_id.strip_edges().to_lower()
+	# Fold common aliases into majors
+	if rid in ["oil", "petroleum"]:
+		rid = "fuel"
+	if rid in ["coal", "gas", "natural_gas"]:
+		rid = "energy"
+	var stock: Dictionary = {}
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.national_stockpile is Dictionary:
+		stock = ProductionManager.national_stockpile
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	if rhc != null and rhc.has_method("major_trade_unit_value"):
+		return float(rhc.major_trade_unit_value(rid, stock, RESOURCE_BASE_RATES))
+	return float(RESOURCE_BASE_RATES.get(rid, 1.0))
+
+
+## Convenience: offer major RESOURCE for major RESOURCE (trade UI one-click path).
+## Returns offer_id or "" on failure. Does not auto-accept.
+func create_major_resource_trade(
+	from_tag: String,
+	to_tag: String,
+	offer_resource: String,
+	offer_qty: float,
+	request_resource: String,
+	request_qty: float,
+	expires_in_years: int = 2,
+) -> String:
+	var offer_id_res := offer_resource.strip_edges().to_lower()
+	var req_id := request_resource.strip_edges().to_lower()
+	if offer_id_res in ["oil", "petroleum"]:
+		offer_id_res = "fuel"
+	if req_id in ["oil", "petroleum"]:
+		req_id = "fuel"
+	var tradeable: PackedStringArray = get_tradeable_major_resources(from_tag)
+	# Allow trade if either side can see the major (importer may lack fissiles unlock)
+	if offer_id_res not in tradeable and offer_id_res != "supplies":
+		# Still allow if always-visible default set
+		var defaults := ["steel", "aluminum", "energy", "fuel", "rubber", "electronics", "specials"]
+		if offer_id_res not in defaults and offer_id_res != "fissiles":
+			push_warning("TradeManager: %s not a tradeable major for %s" % [offer_id_res, from_tag])
+			return ""
+	var offered: Array = [{
+		"type": TradeItemType.RESOURCE,
+		"id": offer_id_res,
+		"quantity": maxf(offer_qty, 0.0),
+		"quality_modifier": 1.0,
+		"metadata": {"kind": "major_resource"},
+	}]
+	var requested: Array = [{
+		"type": TradeItemType.RESOURCE,
+		"id": req_id,
+		"quantity": maxf(request_qty, 0.0),
+		"quality_modifier": 1.0,
+		"metadata": {"kind": "major_resource"},
+	}]
+	return create_offer(from_tag, to_tag, offered, requested, TradeVisibility.PUBLIC, expires_in_years)
+
+
+## Snapshot for trade UI: majors + unit values + stockpile amounts.
+func build_major_resource_trade_board(country_tag: String = "") -> Dictionary:
+	var tag := _norm_tag(country_tag)
+	var majors: PackedStringArray = get_tradeable_major_resources(tag)
+	var stock: Dictionary = {}
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.national_stockpile is Dictionary:
+		stock = ProductionManager.national_stockpile
+	var rows: Array = []
+	for m in majors:
+		var mid := str(m)
+		rows.append({
+			"id": mid,
+			"stock": float(stock.get(mid, 0.0)),
+			"unit_value": get_major_resource_unit_value(mid, tag),
+		})
+	return {
+		"country_tag": tag,
+		"majors": rows,
+		"major_n": rows.size(),
+		"year": _current_year,
+	}
+
+
 func create_offer(
 	from_tag: String,
 	to_tag: String,
@@ -789,6 +917,68 @@ func evaluate_fairness(offer_id: String, for_country: String) -> Dictionary:
 	if trade_cap_bonus > 0.0:
 		score *= (1.0 + minf(trade_cap_bonus / 200.0, 0.15))  # up to +15% fairness boost
 
+	# === Strategic Compact Ledger — CRS + concern flags ===
+	var partner: String = str(offer.get("to_tag", "")) if is_from else str(offer.get("from_tag", ""))
+	var rel_snap: Dictionary = {}
+	var concerns: Dictionary = {}
+	var band_id: String = "neutral"
+	var rm: Object = _relations_manager() as Object
+	if rm != null:
+		if rm.has_method("get_snapshot"):
+			var snap_v: Variant = rm.call("get_snapshot", tag, partner)
+			if snap_v is Dictionary:
+				rel_snap = snap_v as Dictionary
+		band_id = str((rel_snap.get("band", {}) as Dictionary).get("id", "neutral")) if rel_snap.get("band") is Dictionary else "neutral"
+		var svc: Variant = load("res://scripts/national/StrategicValueCalculator.gd")
+		if svc != null and svc.has_method("relation_accept_multiplier"):
+			score *= float(svc.relation_accept_multiplier(band_id))
+		var item_types: Array = []
+		for it in offer.get("offered", []) + offer.get("requested", []):
+			if typeof(it) == TYPE_DICTIONARY:
+				item_types.append(_item_type_name(int((it as Dictionary).get("type", TradeItemType.RESOURCE))))
+		var vis_s: String = "black" if int(offer.get("visibility", TradeVisibility.PUBLIC)) == TradeVisibility.BLACK else "public"
+		if rm.has_method("evaluate_deal_concerns"):
+			var conc_v: Variant = rm.call("evaluate_deal_concerns", tag, partner, item_types, vis_s, 0.0)
+			if conc_v is Dictionary:
+				concerns = conc_v as Dictionary
+		if bool(concerns.get("hard_block", false)):
+			score *= 0.35
+		# Long-term / partner discounts (powerful economic & tech relationships)
+		if rm.has_method("get_relationship_discounts"):
+			var disc_v: Variant = rm.call("get_relationship_discounts", tag, partner)
+			if disc_v is Dictionary:
+				var disc: Dictionary = disc_v as Dictionary
+				# Better relations → easier acceptance (lower SUU needed from partner POV)
+				# Apply as score boost when we receive value (incoming side benefits from discounts on their cost)
+				score *= (2.0 - float(disc.get("trade_suu_mult", 1.0)))  # 0.82 mult → ~1.18 score boost
+				breakdown["relation_trade_mult"] = float(disc.get("trade_suu_mult", 1.0))
+				breakdown["relation_tech_mult"] = float(disc.get("tech_share_suu_mult", 1.0))
+				breakdown["long_term_relationship"] = bool(disc.get("long_term", false))
+		# Nuclear / power asymmetry placate (weaker evaluator bends)
+		if rm.has_method("get_power_matchup_report"):
+			# Lightweight inputs from stockpile when available
+			var self_in := _power_inputs_for_tag(tag)
+			var other_in := _power_inputs_for_tag(partner)
+			var mu_v: Variant = rm.call("get_power_matchup_report", tag, partner, self_in, other_in)
+			if mu_v is Dictionary:
+				var mu: Dictionary = mu_v as Dictionary
+				var matchup: Dictionary = mu.get("matchup", {}) as Dictionary if mu.get("matchup") is Dictionary else {}
+				breakdown["power_matchup"] = matchup
+				breakdown["accept_floor_adjusted"] = float(mu.get("accept_floor_adjusted", 0.95))
+				if bool(matchup.get("hopeless", false)) or bool(matchup.get("nuclear_asymmetry", false)):
+					# Weaker side treats opponent offers as more acceptable (placate)
+					if not is_from:
+						score *= 1.12
+					breakdown["placate"] = true
+	if int(offer.get("visibility", TradeVisibility.PUBLIC)) == TradeVisibility.BLACK:
+		var svc2: Variant = load("res://scripts/national/StrategicValueCalculator.gd")
+		if svc2 != null and svc2.has_method("get_rules"):
+			var gr: Variant = svc2.get_rules()
+			var premium: float = 1.2
+			if gr is Dictionary:
+				premium = float((gr as Dictionary).get("black_risk_premium", 1.2))
+			score /= premium
+
 	var reason := "Fair deal"
 	var recommendation := "Fair"
 	if score > 1.15:
@@ -797,6 +987,9 @@ func evaluate_fairness(offer_id: String, for_country: String) -> Dictionary:
 	elif score < 0.85:
 		reason = "Poor deal for %s — you are overpaying" % tag
 		recommendation = "Reject or counter"
+	if bool(concerns.get("hard_block", false)):
+		reason = "Blocked by relation/concern flags: %s" % str(concerns.get("reasons", []))
+		recommendation = "Refuse — sovereignty/tech/embargo hard block"
 
 	# Polish recommendations for high-value items (PROVINCE, INTEL) with richer, context-aware text
 	# immediately useful for future Trade UI tooltips and decision panels.
@@ -836,6 +1029,10 @@ func evaluate_fairness(offer_id: String, for_country: String) -> Dictionary:
 				breakdown["intel_enemy_threat"] = "high" if score > 1.1 else "moderate"
 				break
 
+	var accept_class: String = "fair"
+	var svc3: Variant = load("res://scripts/national/StrategicValueCalculator.gd")
+	if svc3 != null and svc3.has_method("classify_acceptance"):
+		accept_class = str(svc3.classify_acceptance(score))
 	return {
 		"score": score,
 		"value_offered": my_outgoing,
@@ -844,7 +1041,14 @@ func evaluate_fairness(offer_id: String, for_country: String) -> Dictionary:
 		"recommendation": recommendation,
 		"breakdown": breakdown,
 		"visibility": offer.get("visibility", TradeVisibility.PUBLIC),
-		"is_from": is_from
+		"is_from": is_from,
+		"suu_incoming": my_incoming,
+		"suu_outgoing": my_outgoing,
+		"acceptance_class": accept_class,
+		"relations": rel_snap,
+		"concerns": concerns,
+		"hard_block": bool(concerns.get("hard_block", false)),
+		"model": "strategic_compact_ledger",
 	}
 
 ## Accepts the offer after validating that the offering country actually possesses
@@ -865,6 +1069,19 @@ func accept_offer(offer_id: String) -> bool:
 	if not _country_can_supply_items(to, offer.get("requested", [])):
 		return false
 
+	# Relations hard blocks (embargo, basing sovereignty, tech leak, etc.)
+	var item_types_acc: Array = []
+	for it in offer.get("offered", []) + offer.get("requested", []):
+		if typeof(it) == TYPE_DICTIONARY:
+			item_types_acc.append(_item_type_name(int((it as Dictionary).get("type", TradeItemType.RESOURCE))))
+	var vis_acc: String = "black" if int(offer.get("visibility", TradeVisibility.PUBLIC)) == TradeVisibility.BLACK else "public"
+	var rm_acc: Object = _relations_manager() as Object
+	if rm_acc != null and rm_acc.has_method("evaluate_deal_concerns"):
+		var conc_v: Variant = rm_acc.call("evaluate_deal_concerns", to, from, item_types_acc, vis_acc, 0.0)
+		var conc: Dictionary = conc_v as Dictionary if conc_v is Dictionary else {}
+		if bool(conc.get("hard_block", false)):
+			return false
+
 	# Accepter (to) receives offered; pays requested. Offerer (from) gives offered; receives requested.
 	for item in offer.get("offered", []):
 		_execute_transfer(to, item)
@@ -877,6 +1094,12 @@ func accept_offer(offer_id: String) -> bool:
 	offer["status"] = TradeStatus.ACCEPTED
 	_offers[offer_id] = offer
 	_clean_indexes(offer_id)
+
+	# Apply bilateral relation deltas from deal class
+	_apply_relations_for_accepted_deal(from, to, offer, item_types_acc, vis_acc)
+
+	# R7: write basing graph edges for DOCKING_RIGHTS in this deal
+	_write_basing_graph_for_accepted_offer(from, to, offer)
 
 	deal_accepted.emit(offer_id, from, to)
 
@@ -963,7 +1186,9 @@ func _create_trade_flows_for_accepted_offer(offer: Dictionary) -> void:
 		flow.active = true
 		flow.metadata = {
 			"original_offer_quantity": qty,
-			"source_offer_visibility": offer.get("visibility", "")
+			"source_offer_visibility": offer.get("visibility", ""),
+			"baseline_quantity_per_turn": quantity_per_turn,
+			"last_delivery_ratio": 1.0,
 		}
 
 		_trade_flows[flow.flow_id] = flow
@@ -1025,6 +1250,83 @@ func _try_assign_supply_route_to_flow(flow: TradeFlow) -> void:
 ## TRADEFLOW LIFECYCLE & MOVEMENT
 ## =============================================================================
 
+## Monthly auto-interdiction: route risk + random presence hits (subs/air).
+## Call before advance_trade_flows so damaged rate delivers less.
+## opts (dual/tests): force_hit, include_demo, force_loss, force_cause, force_province, silent
+func process_monthly_trade_risks(year: int = 0, month: int = 0, opts: Dictionary = {}) -> Dictionary:
+	var report := {"checked": 0, "interdicted": 0, "events": []}
+	var force_hit := bool(opts.get("force_hit", false))
+	var include_demo := bool(opts.get("include_demo", false)) or force_hit
+	var force_loss := float(opts.get("force_loss", -1.0))
+	var force_cause := str(opts.get("force_cause", ""))
+	var force_province := int(opts.get("force_province", 0))
+	var force_silent := bool(opts.get("silent", true)) if force_hit else false
+	var rng := RandomNumberGenerator.new()
+	rng.randomize()
+	for flow_id in _trade_flows.keys():
+		var flow: TradeFlow = _trade_flows[flow_id] as TradeFlow
+		if flow == null or not flow.is_ongoing():
+			continue
+		if bool(flow.metadata.get("demo", false)) and not include_demo:
+			continue  # never auto-hit dual seeds unless forced
+		report["checked"] = int(report["checked"]) + 1
+		var risk := 0.05
+		var province_hit := force_province
+		var cause := "surface_raider"
+		if not flow.route_plan_id.is_empty() and typeof(SupplyManager) != TYPE_NIL:
+			var plan: SupplyRoutePlan = SupplyManager.get_route(flow.route_plan_id)
+			if plan:
+				risk = maxf(float(plan.interdiction_chance), risk)
+				# Pick a province along the path for attribution
+				if province_hit <= 0:
+					if "province_path" in plan and plan.province_path is Array and (plan.province_path as Array).size() > 0:
+						var path: Array = plan.province_path as Array
+						province_hit = int(path[rng.randi() % path.size()])
+					elif "path_province_ids" in plan and plan.path_province_ids is Array and (plan.path_province_ids as Array).size() > 0:
+						var path2: Array = plan.path_province_ids as Array
+						province_hit = int(path2[rng.randi() % path2.size()])
+		# Mode bias from risk: high sea risk → sub more likely
+		if not force_cause.is_empty():
+			cause = force_cause
+		else:
+			var roll_cause := rng.randf()
+			if risk > 0.25 and roll_cause < 0.55:
+				cause = "submarine"
+			elif roll_cause < 0.75:
+				cause = "air_attack"
+			else:
+				cause = "surface_raider"
+		# Trigger probability scales with route risk (cap so not every flow hits every month)
+		if not force_hit:
+			var hit_chance := clampf(risk * 0.55, 0.02, 0.45)
+			if rng.randf() > hit_chance:
+				continue
+		var loss: float
+		if force_loss >= 0.0:
+			loss = clampf(force_loss, 0.05, 0.9)
+		else:
+			loss = clampf(risk * rng.randf_range(0.35, 0.85), 0.08, 0.65)
+		var meta := {
+			"province_id": province_hit if province_hit > 0 else int(opts.get("force_province", 42)),
+			"attacker_tag": str(opts.get("attacker_tag", "")),
+			"auto_monthly": true,
+			"year": year,
+			"month": month,
+			"silent": force_silent or loss < 0.2,
+		}
+		if interdict_trade_flow(str(flow_id), cause, loss, meta):
+			report["interdicted"] = int(report["interdicted"]) + 1
+			(report["events"] as Array).append({
+				"flow_id": str(flow_id),
+				"cause": cause,
+				"loss": loss,
+				"province_id": int(meta.get("province_id", 0)),
+				"from": flow.from_tag,
+				"to": flow.to_tag,
+			})
+	return report
+
+
 ## Called periodically (currently on monthly ticks) to advance all active TradeFlows.
 ## This is the core "movement" simulation for trade goods.
 func advance_trade_flows(current_turn: int) -> void:
@@ -1042,52 +1344,109 @@ func advance_trade_flows(current_turn: int) -> void:
 		flow.total_delivered += flow.quantity_per_turn
 		flow.last_delivery_turn = current_turn
 
-		# === Basic Cargo Delivery (lightweight but real) ===
-		# Deliver into the recipient's national stockpile when possible.
-		# Only perform actual delivery for the player country for now (AI countries remain abstract).
-		if flow.to_tag == _get_player_country_tag():
-			var amount := flow.quantity_per_turn
+		# === Cargo delivery + bilateral import tariff (all recipients get tariff treasury) ===
+		var amount := flow.quantity_per_turn
 
-			# Apply regional convoy protection bonus to delivered amount (full control boosts effective trade throughput)
-			if flow.metadata.has("regional_convoy_protection"):
-				amount *= (1.0 + float(flow.metadata["regional_convoy_protection"]))
+		# Apply regional convoy protection bonus to delivered amount
+		if flow.metadata.has("regional_convoy_protection"):
+			amount *= (1.0 + float(flow.metadata["regional_convoy_protection"]))
 
-			# Basic route attrition simulation for cargo loss (future full sim): small loss based on route risk, mitigated by protection
-			if not flow.route_plan_id.is_empty() and typeof(SupplyManager) != TYPE_NIL:
-				var plan: SupplyRoutePlan = SupplyManager.get_route(flow.route_plan_id)
-				if plan:
-					var risk := float(plan.interdiction_chance)
-					var prot := float(flow.metadata.get("regional_convoy_protection", 0.0))
-					if risk > 0.01:
-						var attrition := risk * 0.05 * (1.0 - prot * 0.8)  # mitigated by protection
-						amount *= (1.0 - attrition)
-						flow.metadata["last_route_attrition"] = attrition
+		# Route attrition / sea / weather (when a SupplyRoutePlan is bound)
+		if not flow.route_plan_id.is_empty() and typeof(SupplyManager) != TYPE_NIL:
+			var plan: SupplyRoutePlan = SupplyManager.get_route(flow.route_plan_id)
+			if plan:
+				var risk := float(plan.interdiction_chance)
+				var prot := float(flow.metadata.get("regional_convoy_protection", 0.0))
+				if risk > 0.01:
+					var attrition := risk * 0.05 * (1.0 - prot * 0.8)
+					amount *= (1.0 - attrition)
+					flow.metadata["last_route_attrition"] = attrition
+				var sea_trade := 1.0
+				if SupplyManager.has_method("get_sea_zone_trade_multiplier_for_path"):
+					sea_trade = float(
+						SupplyManager.get_sea_zone_trade_multiplier_for_path(
+							plan.province_path, flow.to_tag
+						)
+					)
+					flow.metadata["last_sea_zone_trade_mult"] = sea_trade
+				var wx_trade := 1.0
+				if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_trade_weather_multiplier"):
+					var wsum := 0.0
+					var wn := 0
+					for pidv in plan.province_path:
+						wsum += float(WeatherManager.get_trade_weather_multiplier(int(pidv)))
+						wn += 1
+					if wn > 0:
+						wx_trade = wsum / float(wn)
+						flow.metadata["last_trade_weather_mult"] = wx_trade
+				var chain: Dictionary = MapPolishFormatters.trade_supply_weather_chain(
+					sea_trade, "dry", clampf(1.0 - wx_trade, 0.0, 1.0), 0.0
+				)
+				amount *= float(chain.get("health", 1.0))
+				flow.metadata["last_trade_chain_health"] = float(chain.get("health", 1.0))
 
+		# Bilateral import tariff: skim fraction of landed goods as customs duty (treasury abstract)
+		var tariff_report: Dictionary = _apply_import_tariff_skim(flow, amount)
+		amount = float(tariff_report.get("net_amount", amount))
+		if not tariff_report.is_empty():
+			flow.metadata["last_tariff"] = tariff_report
+
+		# Stockpile mutation: player country only for now (AI remains abstract stock)
+		if flow.to_tag == _get_player_country_tag() and typeof(ProductionManager) != TYPE_NIL:
 			if flow.item_type == TradeItemType.RESOURCE:
-				# Direct access is the established pattern in TradeManager for resources
 				var stock := ProductionManager.national_stockpile
 				stock[flow.item_id] = stock.get(flow.item_id, 0.0) + amount
-
 			elif flow.item_type == TradeItemType.EQUIPMENT:
-				# Use the helper for equipment
 				ProductionManager.add_to_national_stockpile(flow.item_id, int(amount))
 
-			# Record that this delivery actually landed
-			flow.metadata["last_delivered_amount"] = amount
-			flow.metadata["last_delivery_recipient"] = flow.to_tag
+		flow.metadata["last_delivered_amount"] = amount
+		flow.metadata["last_delivery_recipient"] = flow.to_tag
 
 		# Basic cargo movement concept: record that goods have conceptually traveled the assigned route.
 		if not flow.route_plan_id.is_empty():
 			flow.metadata["last_route_used"] = flow.route_plan_id
 
-		# Clear lightweight stub for future depot-level delivery (ProvinceDepotState)
-		# Example future path:
-		#   var depot_state = _get_depot_state_for_country(flow.to_tag, some_province_id)
-		#   if depot_state: depot_state.add_to_stockpile(flow.item_type, flow.item_id, amount)
-
 		# Very lightweight auto-suspension if quantity drops to zero (e.g. from interdiction)
 		if flow.quantity_per_turn <= 0.0:
 			suspend_trade_flow(flow_id, "quantity_depleted")
+
+
+func _apply_import_tariff_skim(flow: TradeFlow, amount: float) -> Dictionary:
+	## Import tariff on recipient side skims landed cargo (treasury abstract in metadata).
+	if flow == null or amount <= 0.0:
+		return {}
+	var pol: Dictionary = get_bilateral_trade_policy(flow.from_tag, flow.to_tag)
+	if pol.is_empty():
+		return {}
+	if bool(pol.get("embargo", false)):
+		# Embargo: divert almost all delivery
+		flow.metadata["embargo_blocked"] = true
+		return {"net_amount": 0.0, "tariff_rate": 1.0, "skimmed": amount, "embargo": true}
+	var rate := clampf(float(pol.get("import_tariff", 0.0)), 0.0, 0.5)
+	# Import subsidy reduces effective tariff / increases net
+	var sub := clampf(float(pol.get("import_subsidy", 0.0)), 0.0, 0.5)
+	var effective := clampf(rate - sub * 0.5, 0.0, 0.5)
+	if effective <= 0.001:
+		return {"net_amount": amount, "tariff_rate": 0.0, "skimmed": 0.0}
+	var skim := amount * effective
+	var net := amount - skim
+	# Abstract treasury credit for recipient government (policy income)
+	if not _tariff_treasury.has(flow.to_tag):
+		_tariff_treasury[flow.to_tag] = 0.0
+	_tariff_treasury[flow.to_tag] = float(_tariff_treasury[flow.to_tag]) + skim * get_major_resource_unit_value(flow.item_id, flow.to_tag)
+	return {
+		"net_amount": net,
+		"tariff_rate": effective,
+		"skimmed": skim,
+		"treasury_credit": float(_tariff_treasury.get(flow.to_tag, 0.0)),
+	}
+
+
+func get_tariff_treasury(country_tag: String = "") -> float:
+	var t := _norm_tag(country_tag)
+	if t.is_empty():
+		t = _get_player_country_tag()
+	return float(_tariff_treasury.get(t, 0.0))
 
 ## Suspend an active TradeFlow (e.g. due to interdiction, diplomatic crisis, etc.)
 func suspend_trade_flow(flow_id: String, reason: String = "") -> bool:
@@ -1201,6 +1560,9 @@ func interdict_trade_flow(flow_id: String, interdictor_type: String, loss_fracti
 	if not flow.metadata.has("interdiction_history"):
 		flow.metadata["interdiction_history"] = []
 
+	# Attribution: who/where hit the route (subs in province X, air attack, etc.)
+	var attr: Dictionary = _build_interdiction_attribution(interdictor_type, metadata, flow)
+
 	var history_entry := {
 		"turn": _current_year,
 		"interdictor": interdictor_type,
@@ -1210,7 +1572,10 @@ func interdict_trade_flow(flow_id: String, interdictor_type: String, loss_fracti
 		"new_rate": flow.quantity_per_turn,
 		"had_route": not flow.route_plan_id.is_empty(),
 		"lost_this_turn": lost_this,
-		"cumulative_lost": flow.total_lost_to_interdiction
+		"cumulative_lost": flow.total_lost_to_interdiction,
+		"delivery_ratio_after": _flow_delivery_ratio(flow),
+		"attribution": attr,
+		"plain_reason": str(attr.get("plain", "")),
 	}
 	if flow.metadata.has("regional_convoy_protection"):
 		history_entry["regional_protection"] = flow.metadata["regional_convoy_protection"]
@@ -1222,29 +1587,182 @@ func interdict_trade_flow(flow_id: String, interdictor_type: String, loss_fracti
 			if plan:
 				history_entry["route_risk"] = plan.interdiction_chance
 				history_entry["route_modes"] = plan.segment_modes
+				if "path_province_ids" in plan:
+					history_entry["route_provinces"] = plan.path_province_ids
 
-	flow.metadata["interdiction_history"].append(history_entry.merged(metadata))
+	var hist_merged: Dictionary = history_entry.merged(metadata)
+	flow.metadata["interdiction_history"].append(hist_merged)
+	flow.metadata["last_interdiction_plain"] = str(attr.get("plain", ""))
+	if not flow.metadata.has("baseline_quantity_per_turn"):
+		flow.metadata["baseline_quantity_per_turn"] = previous_rate
+	flow.metadata["last_delivery_ratio"] = _flow_delivery_ratio(flow)
+
+	# Relations: convoy hostility + transit crisis (skip when silent dual/demo)
+	var silent: bool = bool(metadata.get("silent", false)) or bool(flow.metadata.get("demo", false))
+	if not silent:
+		var rm_i: Object = _relations_manager()
+		if rm_i != null:
+			var attacker_tag: String = str(metadata.get("attacker_tag", "")).to_upper()
+			if not attacker_tag.is_empty() and rm_i.has_method("apply_deal_outcome"):
+				rm_i.call("apply_deal_outcome", flow.from_tag, attacker_tag, "interdict_their_convoy")
+			if rm_i.has_method("raise_flag") and effective_loss >= 0.25:
+				rm_i.call("raise_flag", flow.from_tag, flow.to_tag, "transit_interdiction_crisis")
 
 	# Emit the core interdiction signal
 	trade_flow_interdicted.emit(flow_id, interdictor_type, loss_fraction, flow.metadata.duplicate(true))
 
 	# Player-facing feedback for significant interdiction events
-	if typeof(LeaderEventUI) != TYPE_NIL:
+	if not silent and typeof(LeaderEventUI) != TYPE_NIL:
 		var loss_pct := int(effective_loss * 100)
 		if loss_pct >= 20 or not flow.active:
-			var msg := "Trade flow interdicted (%s): %d%% loss on %s → %s" % [
-				interdictor_type.capitalize(),
-				loss_pct,
-				flow.from_tag,
-				flow.to_tag
-			]
-			LeaderEventUI.show_toast(msg, 4.0, loss_pct >= 50)
+			var msg := str(attr.get("plain", ""))
+			if msg.is_empty():
+				msg = "Trade flow interdicted (%s): %d%% loss on %s → %s" % [
+					interdictor_type.capitalize(), loss_pct, flow.from_tag, flow.to_tag
+				]
+			else:
+				msg = "%s (%d%% of shipment lost)" % [msg, loss_pct]
+			LeaderEventUI.show_toast(msg, 4.5, loss_pct >= 50)
 
 	# If the flow has been completely stopped, suspend it
 	if flow.quantity_per_turn <= 0.001:
 		suspend_trade_flow(flow_id, "interdicted_" + interdictor_type)
 
 	return true
+
+func _flow_delivery_ratio(flow: TradeFlow) -> float:
+	if flow == null:
+		return 1.0
+	var base := float(flow.metadata.get("baseline_quantity_per_turn", 0.0))
+	if base <= 0.001:
+		# Reconstruct from delivered + lost heuristic
+		var delivered := float(flow.total_delivered)
+		var lost := float(flow.total_lost_to_interdiction)
+		if delivered + lost <= 0.001:
+			return 1.0
+		return clampf(delivered / (delivered + lost), 0.0, 1.0)
+	return clampf(float(flow.quantity_per_turn) / base, 0.0, 1.0)
+
+
+func _build_interdiction_attribution(interdictor_type: String, metadata: Dictionary, flow: TradeFlow) -> Dictionary:
+	var itype := interdictor_type.strip_edges().to_lower()
+	var province_id := int(metadata.get("province_id", metadata.get("attack_province_id", 0)))
+	var attacker := str(metadata.get("attacker_tag", metadata.get("by_tag", ""))).to_upper()
+	var cause := "raid"
+	if "sub" in itype:
+		cause = "submarine"
+	elif "air" in itype or "plane" in itype or "bomber" in itype:
+		cause = "air_attack"
+	elif "surface" in itype or "raider" in itype:
+		cause = "surface_raider"
+	elif "agent" in itype or "sabotage" in itype:
+		cause = "sabotage"
+	elif "blockade" in itype:
+		cause = "blockade"
+	var plain := ""
+	match cause:
+		"submarine":
+			if province_id > 0:
+				plain = "Submarines in province %d sank transports on the %s → %s convoy" % [province_id, flow.from_tag, flow.to_tag]
+			else:
+				plain = "Enemy submarines attacked the %s → %s trade route" % [flow.from_tag, flow.to_tag]
+		"air_attack":
+			if province_id > 0:
+				plain = "Aircraft struck the trade corridor near province %d (%s → %s)" % [province_id, flow.from_tag, flow.to_tag]
+			else:
+				plain = "Air attack damaged the %s → %s trade route" % [flow.from_tag, flow.to_tag]
+		"surface_raider":
+			plain = "Surface raiders hit the %s → %s convoy" % [flow.from_tag, flow.to_tag]
+		"sabotage":
+			plain = "Sabotage disrupted %s → %s shipments" % [flow.from_tag, flow.to_tag]
+		"blockade":
+			plain = "Blockade throttled %s → %s trade" % [flow.from_tag, flow.to_tag]
+		_:
+			plain = "Interdiction (%s) hit %s → %s" % [interdictor_type, flow.from_tag, flow.to_tag]
+	if not attacker.is_empty() and attacker != "UNKNOWN":
+		plain += " [by %s]" % attacker
+	return {
+		"cause": cause,
+		"interdictor_type": interdictor_type,
+		"province_id": province_id,
+		"attacker_tag": attacker,
+		"plain": plain,
+	}
+
+
+## Trade Desk: health of a bilateral trade relationship (lend-lease / majors / equipment).
+func get_bilateral_transit_health(from_tag: String, to_tag: String) -> Dictionary:
+	var a := _norm_tag(from_tag)
+	var b := _norm_tag(to_tag)
+	var issues: Array = []
+	var flows_out: Array = []
+	var total_base := 0.0
+	var total_now := 0.0
+	var total_lost := 0.0
+	for fid in _trade_flows:
+		var flow: TradeFlow = _trade_flows[fid] as TradeFlow
+		if flow == null:
+			continue
+		var fa := _norm_tag(flow.from_tag)
+		var fb := _norm_tag(flow.to_tag)
+		if not ((fa == a and fb == b) or (fa == b and fb == a)):
+			continue
+		var ratio := _flow_delivery_ratio(flow)
+		var base_q := float(flow.metadata.get("baseline_quantity_per_turn", flow.quantity_per_turn))
+		total_base += base_q
+		total_now += float(flow.quantity_per_turn)
+		total_lost += float(flow.total_lost_to_interdiction)
+		var last_plain := str(flow.metadata.get("last_interdiction_plain", ""))
+		var hist: Array = flow.metadata.get("interdiction_history", []) as Array if flow.metadata.get("interdiction_history") is Array else []
+		var last_hit: Dictionary = hist.back() as Dictionary if hist.size() > 0 and hist.back() is Dictionary else {}
+		var row := {
+			"flow_id": flow.flow_id,
+			"item_id": flow.item_id,
+			"from_tag": flow.from_tag,
+			"to_tag": flow.to_tag,
+			"quantity_per_turn": flow.quantity_per_turn,
+			"baseline_quantity": base_q,
+			"delivery_ratio": snappedf(ratio, 0.01),
+			"delivery_pct": int(ratio * 100.0),
+			"total_lost": flow.total_lost_to_interdiction,
+			"active": flow.active,
+			"suspended_reason": flow.suspended_reason,
+			"last_reason": last_plain,
+			"last_hit": last_hit,
+			"has_issues": ratio < 0.95 or not flow.active or flow.total_lost_to_interdiction > 0.01,
+		}
+		flows_out.append(row)
+		if bool(row["has_issues"]):
+			issues.append(row)
+	var overall := 1.0 if total_base <= 0.001 else clampf(total_now / total_base, 0.0, 1.0)
+	return {
+		"from_tag": a,
+		"to_tag": b,
+		"flows": flows_out,
+		"issues": issues,
+		"issue_n": issues.size(),
+		"overall_delivery_ratio": snappedf(overall, 0.01),
+		"overall_delivery_pct": int(overall * 100.0),
+		"total_lost_to_interdiction": total_lost,
+		"healthy": issues.is_empty() and overall >= 0.95,
+		"model": "strategic_compact_ledger",
+	}
+
+
+## Lend-lease style summary line for Trade Desk UI.
+func format_transit_issue_plain(from_tag: String, to_tag: String) -> String:
+	var h: Dictionary = get_bilateral_transit_health(from_tag, to_tag)
+	if bool(h.get("healthy", true)):
+		return "Trade with %s is flowing normally." % _norm_tag(to_tag)
+	var pct := int(h.get("overall_delivery_pct", 100))
+	var issues: Array = h.get("issues", []) as Array
+	var reason := ""
+	if issues.size() > 0 and issues[0] is Dictionary:
+		reason = str((issues[0] as Dictionary).get("last_reason", ""))
+	if reason.is_empty():
+		return "Only %d%% of shipments to %s are getting through." % [pct, _norm_tag(to_tag)]
+	return "Only %d%% of shipments to %s are getting through — %s." % [pct, _norm_tag(to_tag), reason]
+
 
 ## Convenience helper for external systems that want to apply a full suspension (100% interdiction).
 func fully_interdict_trade_flow(flow_id: String, interdictor_type: String, metadata: Dictionary = {}) -> bool:
@@ -2030,12 +2548,820 @@ func get_diplomatic_summary_with(country_tag: String, other_party_tag: String) -
 		else:
 			received += 1
 
+	var rel: Dictionary = {}
+	var rm: Object = _relations_manager() as Object
+	if rm != null and rm.has_method("get_snapshot"):
+		var rel_v: Variant = rm.call("get_snapshot", country_tag, other_party_tag)
+		if rel_v is Dictionary:
+			rel = rel_v as Dictionary
+	var flows_n: int = 0
+	for fid in _trade_flows:
+		var flow: Variant = _trade_flows[fid]
+		if flow == null:
+			continue
+		var fa: String = str(flow.from_tag).to_upper() if "from_tag" in flow else ""
+		var fb: String = str(flow.to_tag).to_upper() if "to_tag" in flow else ""
+		var c1: String = _norm_tag(country_tag)
+		var c2: String = _norm_tag(other_party_tag)
+		if (fa == c1 and fb == c2) or (fa == c2 and fb == c1):
+			flows_n += 1
+
 	return {
 		"active_offers": deals.size(),
 		"sent_by_player": sent,
 		"received_by_player": received,
-		"has_active_deals": not deals.is_empty()
+		"has_active_deals": not deals.is_empty(),
+		"relations": rel,
+		"crs": float(rel.get("crs", 0.0)) if not rel.is_empty() else 0.0,
+		"band": rel.get("band", {}) if not rel.is_empty() else {},
+		"flags": rel.get("flags", []) if not rel.is_empty() else [],
+		"policy": rel.get("policy", {}) if not rel.is_empty() else {},
+		"active_trade_flows": flows_n,
+		"model": "strategic_compact_ledger",
 	}
+
+
+func _relations_manager() -> Object:
+	if typeof(RelationsManager) != TYPE_NIL:
+		return RelationsManager as Object
+	return null
+
+
+func _item_type_name(t: int) -> String:
+	match t:
+		TradeItemType.DESIGN:
+			return "design"
+		TradeItemType.EQUIPMENT:
+			return "equipment"
+		TradeItemType.RESOURCE:
+			return "resource"
+		TradeItemType.SUPPLY:
+			return "supply"
+		TradeItemType.TECH_SHARE:
+			return "tech_share"
+		TradeItemType.INTEL:
+			return "intel"
+		TradeItemType.PROVINCE:
+			return "province"
+		TradeItemType.DOCKING_RIGHTS:
+			return "docking_rights"
+		_:
+			return "resource"
+
+
+func _apply_relations_for_accepted_deal(from: String, to: String, offer: Dictionary, item_types: Array, vis: String) -> void:
+	var rm: Object = _relations_manager()
+	if rm == null or not rm.has_method("apply_deal_outcome"):
+		return
+	var fair: Dictionary = evaluate_fairness(str(offer.get("id", "")), to)
+	# Note: offer already ACCEPTED so re-eval still works for score
+	var score: float = float(fair.get("score", 1.0))
+	var outcome: String = "accept_fair_public"
+	if vis == "black":
+		outcome = "accept_black"
+		if rm.has_method("raise_flag"):
+			rm.call("raise_flag", from, to, "black_market_scandal")
+	elif score >= 1.05:
+		outcome = "accept_generous_public"
+	if "province" in item_types:
+		outcome = "province_cession"
+		if rm.has_method("raise_flag"):
+			rm.call("raise_flag", from, to, "territory_humiliation")
+	elif "docking_rights" in item_types:
+		outcome = "basing_grant"
+	elif "tech_share" in item_types or "design" in item_types:
+		outcome = "tech_share"
+	elif "equipment" in item_types:
+		outcome = "arms_deal"
+	rm.call("apply_deal_outcome", from, to, outcome)
+	var concerns_d: Dictionary = fair.get("concerns", {}) as Dictionary if fair.get("concerns") is Dictionary else {}
+	var flag_list: Array = concerns_d.get("flags", []) as Array if concerns_d.get("flags") is Array else []
+	for f in flag_list:
+		if rm.has_method("raise_flag"):
+			rm.call("raise_flag", from, to, str(f))
+
+
+## Bilateral policy (tariffs/subsidies/embargo) — desk UI entry point.
+func set_bilateral_trade_policy(a: String, b: String, policy_patch: Dictionary) -> Dictionary:
+	var rm: Object = _relations_manager()
+	if rm != null and rm.has_method("set_policy"):
+		var pv: Variant = rm.call("set_policy", a, b, policy_patch)
+		return pv as Dictionary if pv is Dictionary else {}
+	return {}
+
+
+func get_bilateral_trade_policy(a: String, b: String) -> Dictionary:
+	var rm: Object = _relations_manager()
+	if rm != null and rm.has_method("get_policy"):
+		var pv: Variant = rm.call("get_policy", a, b)
+		return pv as Dictionary if pv is Dictionary else {}
+	return {}
+
+
+## Impact preview for Trade Desk before accept (SUU + CRS + flags).
+func preview_deal_impact(offer_id: String, for_country: String) -> Dictionary:
+	var fair: Dictionary = evaluate_fairness(offer_id, for_country)
+	var offer: Dictionary = _offers.get(offer_id, {})
+	var partner: String = str(offer.get("to_tag", "")) if _norm_tag(for_country) == str(offer.get("from_tag", "")) else str(offer.get("from_tag", ""))
+	var rm: Object = _relations_manager()
+	var before: Dictionary = {}
+	if rm != null and rm.has_method("get_snapshot"):
+		var bv: Variant = rm.call("get_snapshot", for_country, partner)
+		if bv is Dictionary:
+			before = bv as Dictionary
+	return {
+		"fairness": fair,
+		"relations_before": before,
+		"acceptance_class": str(fair.get("acceptance_class", "fair")),
+		"hard_block": bool(fair.get("hard_block", false)),
+		"suu_ratio": float(fair.get("score", 1.0)),
+		"model": "strategic_compact_ledger",
+		"comparisons": _asset_class_comparisons(),
+	}
+
+
+func _asset_class_comparisons() -> Dictionary:
+	var svc: Variant = load("res://scripts/national/StrategicValueCalculator.gd")
+	if svc != null and svc.has_method("compare_asset_classes"):
+		var cv: Variant = svc.compare_asset_classes()
+		return cv as Dictionary if cv is Dictionary else {}
+	return {}
+
+
+func _power_inputs_for_tag(tag: String) -> Dictionary:
+	var t := _norm_tag(tag)
+	var factories: int = 0
+	if typeof(FactoryManager) != TYPE_NIL and FactoryManager.factories is Dictionary:
+		var facs: Dictionary = FactoryManager.factories
+		# Cap scan for performance on huge boards
+		var n: int = 0
+		for fid in facs:
+			n += 1
+			if n > 800:
+				break
+			var f: Variant = facs[fid]
+			if f != null and str(f.owner_tag).to_upper() == t:
+				factories += 1
+	var stock: Dictionary = {}
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.national_stockpile is Dictionary:
+		stock = ProductionManager.national_stockpile
+	var flags: Array = []
+	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("get_country_state"):
+		var st: Dictionary = TechnologyManager.get_country_state(t)
+		if st.get("rule_flags") is Array:
+			flags = (st["rule_flags"] as Array).duplicate()
+	var equip_n: int = 0
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.country_equipment_stockpiles.has(t):
+		var es: Dictionary = ProductionManager.country_equipment_stockpiles[t]
+		for k in es:
+			equip_n += int(es[k])
+	# Avoid full map port walk in hot fairness path — use 0; desk can enrich later
+	var trade_cap: float = 0.0
+	return {
+		"factories": factories,
+		"steel": float(stock.get("steel", 0.0)),
+		"fuel": float(stock.get("fuel", 0.0)),
+		"electronics": float(stock.get("electronics", 0.0)),
+		"equipment_units": equip_n,
+		"tech_flags": flags,
+		"trade_capacity": trade_cap,
+		"naval_ports": 0,
+		"fissiles_stock": float(stock.get("fissiles", 0.0)),
+	}
+
+
+## Spy mission: relation clarity + optional third-party trade deals.
+func spy_relation_and_trade_intel(
+	observer_tag: String,
+	target_tag: String,
+	third_party_tag: String = "",
+	mission_success: bool = true,
+) -> Dictionary:
+	var rm: Object = _relations_manager()
+	var trade_sums: Array = []
+	if not third_party_tag.is_empty():
+		var health: Dictionary = get_bilateral_transit_health(target_tag, third_party_tag)
+		for row in health.get("flows", []):
+			if row is Dictionary:
+				trade_sums.append({
+					"item_id": (row as Dictionary).get("item_id", ""),
+					"delivery_pct": (row as Dictionary).get("delivery_pct", 100),
+					"has_issues": (row as Dictionary).get("has_issues", false),
+					"last_reason": (row as Dictionary).get("last_reason", ""),
+				})
+	if rm != null and rm.has_method("build_spy_relation_report"):
+		var rep_v: Variant = rm.call(
+			"build_spy_relation_report",
+			observer_tag, target_tag, third_party_tag, mission_success, false, trade_sums,
+		)
+		if rep_v is Dictionary:
+			var rep: Dictionary = rep_v as Dictionary
+			rep["transit_with_target"] = get_bilateral_transit_health(observer_tag, target_tag)
+			return rep
+	return {
+		"clarity": 0.35,
+		"transit_with_target": get_bilateral_transit_health(observer_tag, target_tag),
+		"third_party_trade": trade_sums,
+	}
+
+
+## Dual/UI test: seed a temporary ongoing flow without full offer accept (no map signal spam).
+func seed_demo_trade_flow(
+	from_tag: String,
+	to_tag: String,
+	item_id: String = "steel",
+	quantity_per_turn: float = 10.0,
+) -> String:
+	var flow := TradeFlow.new()
+	flow.flow_id = _generate_id()
+	flow.offer_id = "demo"
+	flow.from_tag = _norm_tag(from_tag)
+	flow.to_tag = _norm_tag(to_tag)
+	flow.item_type = TradeItemType.RESOURCE
+	flow.item_id = item_id
+	flow.quantity_per_turn = quantity_per_turn
+	flow.delivery_cadence = 1
+	flow.created_turn = _current_year
+	flow.active = true
+	flow.metadata = {
+		"baseline_quantity_per_turn": quantity_per_turn,
+		"last_delivery_ratio": 1.0,
+		"demo": true,
+	}
+	_trade_flows[flow.flow_id] = flow
+	return flow.flow_id
+
+
+## =============================================================================
+## R6 — AI MONTHLY PROPOSE / ACCEPT (acceptance · flags · nuclear placate)
+## =============================================================================
+
+## Pure decision core (also used by dual): score vs accept floor + hard_block + placate.
+## accept_floor_adjusted already includes placate delta when provided; placate_delta is additive fallback.
+static func ai_accept_decision_core(
+	score: float,
+	accept_floor: float = 0.95,
+	hard_block: bool = false,
+	placate_delta: float = 0.0,
+	refuse_below: float = 0.85,
+) -> Dictionary:
+	if hard_block:
+		return {
+			"decision": "refuse",
+			"reason": "hard_block",
+			"score": score,
+			"threshold": accept_floor + placate_delta,
+			"placate": false,
+			"hard_block": true,
+		}
+	var thr := clampf(accept_floor + placate_delta, 0.55, 1.5)
+	if score < thr:
+		return {
+			"decision": "refuse",
+			"reason": "below_floor",
+			"score": score,
+			"threshold": thr,
+			"placate": false,
+			"hard_block": false,
+		}
+	var placate := thr < refuse_below and score < refuse_below
+	var reason := "placate" if placate else ("generous" if score >= 1.05 else "fair")
+	return {
+		"decision": "accept",
+		"reason": reason,
+		"score": score,
+		"threshold": thr,
+		"placate": placate,
+		"hard_block": false,
+	}
+
+
+## AI evaluator for a live offer (to_tag side decides whether to accept).
+func ai_decide_accept(offer_id: String, for_country: String = "") -> Dictionary:
+	var offer: Dictionary = _offers.get(offer_id, {})
+	if offer.is_empty():
+		return {"decision": "refuse", "reason": "missing_offer", "score": 0.0, "ok": false}
+	if int(offer.get("status", -1)) != TradeStatus.PROPOSED:
+		return {"decision": "refuse", "reason": "not_proposed", "score": 0.0, "ok": false}
+	var tag := _norm_tag(for_country)
+	if tag.is_empty():
+		tag = _norm_tag(str(offer.get("to_tag", "")))
+	var fair: Dictionary = evaluate_fairness(offer_id, tag)
+	var score := float(fair.get("score", 0.0))
+	var hard := bool(fair.get("hard_block", false))
+	var bd: Dictionary = fair.get("breakdown", {}) as Dictionary if fair.get("breakdown") is Dictionary else {}
+	var thr := float(bd.get("accept_floor_adjusted", -1.0))
+	if thr < 0.0:
+		# Rebuild floor from relations + power when fairness lacked matchup
+		var partner: String = str(offer.get("from_tag", "")) if tag == str(offer.get("to_tag", "")) else str(offer.get("to_tag", ""))
+		var rm: Object = _relations_manager()
+		if rm != null and rm.has_method("get_power_matchup_report"):
+			var mu_v: Variant = rm.call(
+				"get_power_matchup_report", tag, partner,
+				_power_inputs_for_tag(tag), _power_inputs_for_tag(partner),
+			)
+			if mu_v is Dictionary:
+				thr = float((mu_v as Dictionary).get("accept_floor_adjusted", 0.95))
+			else:
+				thr = 0.95
+		else:
+			thr = 0.95
+	var refuse_below := 0.85
+	var svc: Variant = load("res://scripts/national/StrategicValueCalculator.gd")
+	if svc != null and svc.has_method("get_rules"):
+		var gr: Variant = svc.get_rules()
+		if gr is Dictionary:
+			var acc: Dictionary = (gr as Dictionary).get("acceptance", {}) as Dictionary if (gr as Dictionary).get("acceptance") is Dictionary else {}
+			refuse_below = float(acc.get("refuse_below", 0.85))
+	# thr already includes nuclear/power placate when sourced from matchup
+	var core: Dictionary = ai_accept_decision_core(score, thr, hard, 0.0, refuse_below)
+	core["offer_id"] = offer_id
+	core["for_country"] = tag
+	core["fairness"] = fair
+	core["ok"] = true
+	core["acceptance_class"] = str(fair.get("acceptance_class", ""))
+	return core
+
+
+## Pick offer/request majors from stockpile scarcity when available (AI surplus heuristic).
+func _ai_pick_surplus_trade_pair(from_tag: String, to_tag: String) -> Dictionary:
+	var majors := ["steel", "fuel", "rubber", "aluminum", "energy", "electronics"]
+	var stock: Dictionary = {}
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.national_stockpile is Dictionary:
+		stock = ProductionManager.national_stockpile
+	# Prefer exporting the highest-stock major; requesting a lower-stock one
+	var best_offer := "steel"
+	var best_offer_v := -1.0
+	var best_req := "fuel"
+	var best_req_v := 1.0e12
+	for m in majors:
+		var v := float(stock.get(m, 50.0))  # neutral default when AI stock unknown
+		if v > best_offer_v:
+			best_offer_v = v
+			best_offer = m
+		if v < best_req_v:
+			best_req_v = v
+			best_req = m
+	if best_offer == best_req:
+		best_req = "fuel" if best_offer != "fuel" else "rubber"
+	return {"offer": best_offer, "request": best_req, "from": _norm_tag(from_tag), "to": _norm_tag(to_tag)}
+
+
+## Create an AI-authored major resource swap (PUBLIC). Marks metadata for monthly AI trail.
+func ai_propose_resource_swap(
+	from_tag: String,
+	to_tag: String,
+	offer_resource: String = "steel",
+	offer_qty: float = 40.0,
+	request_resource: String = "fuel",
+	request_qty: float = 30.0,
+) -> String:
+	var oid := create_major_resource_trade(
+		from_tag, to_tag, offer_resource, offer_qty, request_resource, request_qty, 2
+	)
+	if oid.is_empty():
+		return ""
+	var offer: Dictionary = _offers.get(oid, {})
+	if not offer.is_empty():
+		var meta: Dictionary = offer.get("metadata", {}) as Dictionary if offer.get("metadata") is Dictionary else {}
+		meta["generated_by"] = "ai_monthly"
+		meta["ai_monthly"] = true
+		offer["metadata"] = meta
+		_offers[oid] = offer
+	return oid
+
+
+## Monthly AI trade tick: resolve pending offers to AI countries + propose a few AI–AI swaps.
+## opts: max_resolve, max_propose, pairs (Array of [from,to]), auto_resolve (bool, default true),
+##       include_player_as_target (bool), dry_run, force_propose_only / force_resolve_only
+func process_monthly_ai_trade(year: int = 0, month: int = 0, opts: Dictionary = {}) -> Dictionary:
+	var report := {
+		"year": year, "month": month,
+		"proposed": 0, "accepted": 0, "refused": 0, "skipped": 0,
+		"events": [], "ok": true,
+	}
+	var max_resolve := int(opts.get("max_resolve", 8))
+	var max_propose := int(opts.get("max_propose", 3))
+	var auto_resolve := bool(opts.get("auto_resolve", true))
+	var include_player := bool(opts.get("include_player_as_target", false))
+	var dry_run := bool(opts.get("dry_run", false))
+	var force_resolve_only := bool(opts.get("force_resolve_only", false))
+	var force_propose_only := bool(opts.get("force_propose_only", false))
+	var player := _get_player_country_tag()
+
+	# --- Resolve pending offers where recipient is AI ---
+	if auto_resolve and not force_propose_only:
+		var resolved := 0
+		var offer_ids: Array = _offers.keys()
+		for oid_v in offer_ids:
+			if resolved >= max_resolve:
+				break
+			var oid := str(oid_v)
+			var offer: Dictionary = _offers.get(oid, {})
+			if offer.is_empty() or int(offer.get("status", -1)) != TradeStatus.PROPOSED:
+				continue
+			var to_tag := _norm_tag(str(offer.get("to_tag", "")))
+			var from_tag := _norm_tag(str(offer.get("from_tag", "")))
+			if to_tag.is_empty() or from_tag.is_empty():
+				continue
+			if to_tag == player and not include_player:
+				report["skipped"] = int(report["skipped"]) + 1
+				continue  # never auto-accept for the human player
+			var dec: Dictionary = ai_decide_accept(oid, to_tag)
+			var decision := str(dec.get("decision", "refuse"))
+			if dry_run:
+				(report["events"] as Array).append({
+					"kind": "resolve_dry", "offer_id": oid, "to": to_tag,
+					"decision": decision, "score": dec.get("score", 0.0),
+					"reason": dec.get("reason", ""),
+				})
+				resolved += 1
+				continue
+			if decision == "accept":
+				if accept_offer(oid):
+					report["accepted"] = int(report["accepted"]) + 1
+					resolved += 1
+					(report["events"] as Array).append({
+						"kind": "accept", "offer_id": oid, "to": to_tag, "from": from_tag,
+						"score": dec.get("score", 0.0), "reason": dec.get("reason", ""),
+						"placate": bool(dec.get("placate", false)),
+					})
+				else:
+					# Accept failed (supply) — reject cleanly so market doesn't stall
+					reject_offer(oid, "ai_accept_failed_supply")
+					report["refused"] = int(report["refused"]) + 1
+					resolved += 1
+			else:
+				reject_offer(oid, "ai_" + str(dec.get("reason", "refuse")))
+				report["refused"] = int(report["refused"]) + 1
+				resolved += 1
+				(report["events"] as Array).append({
+					"kind": "refuse", "offer_id": oid, "to": to_tag, "from": from_tag,
+					"score": dec.get("score", 0.0), "reason": dec.get("reason", ""),
+					"hard_block": bool(dec.get("hard_block", false)),
+				})
+
+	# --- Propose a few AI–AI resource swaps ---
+	if not force_resolve_only and max_propose > 0:
+		var pairs: Array = opts.get("pairs", []) as Array if opts.get("pairs") is Array else []
+		if pairs.is_empty():
+			# Default minor churn among majors (skip player as from)
+			var majors: Array = []
+			for mt in ["GER", "FRA", "ENG", "SOV", "ITA", "JAP"]:
+				if str(mt) != player:
+					majors.append(str(mt))
+			if majors.size() >= 2:
+				pairs = [
+					[str(majors[0]), str(majors[1])],
+					[str(majors[mini(2, majors.size() - 1)]), str(majors[0])],
+				]
+		var proposed_n := 0
+		for raw in pairs:
+			if proposed_n >= max_propose:
+				break
+			if not (raw is Array) and not (raw is PackedStringArray):
+				continue
+			var arr: Array = raw as Array if raw is Array else Array(raw)
+			if arr.size() < 2:
+				continue
+			var a := _norm_tag(str(arr[0]))
+			var b := _norm_tag(str(arr[1]))
+			if a.is_empty() or b.is_empty() or a == b:
+				continue
+			if a == player:
+				continue  # AI proposes as from; player may still be to_tag only if include_player
+			var offer_res := str(opts.get("offer_resource", ""))
+			var req_res := str(opts.get("request_resource", ""))
+			# Surplus-aware defaults: export ample major, request tighter major when stock known
+			if offer_res.is_empty() or req_res.is_empty():
+				var surplus: Dictionary = _ai_pick_surplus_trade_pair(a, b)
+				if offer_res.is_empty():
+					offer_res = str(surplus.get("offer", "steel"))
+				if req_res.is_empty():
+					req_res = str(surplus.get("request", "fuel"))
+			var oq := float(opts.get("offer_qty", 40.0))
+			var rq := float(opts.get("request_qty", 30.0))
+			if dry_run:
+				report["proposed"] = int(report["proposed"]) + 1
+				proposed_n += 1
+				(report["events"] as Array).append({
+					"kind": "propose_dry", "from": a, "to": b,
+					"offer": offer_res, "request": req_res,
+				})
+				continue
+			var new_id := ai_propose_resource_swap(a, b, offer_res, oq, req_res, rq)
+			if not new_id.is_empty():
+				report["proposed"] = int(report["proposed"]) + 1
+				proposed_n += 1
+				(report["events"] as Array).append({
+					"kind": "propose", "offer_id": new_id, "from": a, "to": b,
+					"offer": offer_res, "request": req_res,
+				})
+	report["ok"] = true
+	return report
+
+
+## =============================================================================
+## R7 — BASING GRAPH (DOCKING_RIGHTS → host/guest edges)
+## =============================================================================
+
+## Grant foreign basing/docking rights: host allows guest fleet access.
+## province_id 0 = host-wide (any of host's ports); >0 = specific province.
+func grant_basing_rights(
+	host_tag: String,
+	guest_tag: String,
+	province_id: int = 0,
+	duration_months: int = 12,
+	metadata: Dictionary = {},
+) -> Dictionary:
+	var host := _norm_tag(host_tag)
+	var guest := _norm_tag(guest_tag)
+	if host.is_empty() or guest.is_empty() or host == guest:
+		return {"ok": false, "error": "invalid_tags"}
+	var months := maxi(int(duration_months), 1)
+	var pid := maxi(int(province_id), 0)
+	var major := bool(metadata.get("major_port", true))
+	var range_b := float(metadata.get("range_bonus", 0.15))
+	var grant_id := str(metadata.get("grant_id", ""))
+	if grant_id.is_empty():
+		grant_id = "basing_%s_%s_%d_%d" % [host, guest, pid, randi() % 100000]
+	var suu := 0.0
+	var svc: Variant = load("res://scripts/national/StrategicValueCalculator.gd")
+	if svc != null and svc.has_method("docking_suu"):
+		suu = float(svc.docking_suu(float(months), major))
+	var edge := {
+		"grant_id": grant_id,
+		"host_tag": host,
+		"guest_tag": guest,
+		"province_id": pid,
+		"duration_months": months,
+		"remaining_months": months,
+		"major_port": major,
+		"range_bonus": range_b,
+		"active": true,
+		"suu": suu,
+		"offer_id": str(metadata.get("offer_id", "")),
+		"created_year": _current_year,
+		"model": "strategic_compact_ledger",
+		"kind": "docking_rights",
+	}
+	_basing_grants[grant_id] = edge
+	# Optional military-vector nudge (sovereignty cost for host, access comfort for guest)
+	if not bool(metadata.get("silent", false)):
+		var rm: Object = _relations_manager()
+		if rm != null and rm.has_method("apply_deal_outcome"):
+			rm.call("apply_deal_outcome", host, guest, "basing_grant")
+	return {"ok": true, "grant_id": grant_id, "edge": edge.duplicate(true)}
+
+
+func revoke_basing_rights(grant_id: String, reason: String = "") -> bool:
+	if not _basing_grants.has(grant_id):
+		return false
+	var edge: Dictionary = (_basing_grants[grant_id] as Dictionary).duplicate(true)
+	edge["active"] = false
+	edge["remaining_months"] = 0
+	edge["revoked_reason"] = reason
+	_basing_grants[grant_id] = edge
+	return true
+
+
+func has_basing_access(guest_tag: String, host_tag: String = "", province_id: int = 0) -> bool:
+	var guest := _norm_tag(guest_tag)
+	var host := _norm_tag(host_tag)
+	if guest.is_empty():
+		return false
+	for gid in _basing_grants.keys():
+		var edge: Dictionary = _basing_grants[gid] as Dictionary
+		if edge == null or not bool(edge.get("active", false)):
+			continue
+		if int(edge.get("remaining_months", 0)) <= 0:
+			continue
+		if str(edge.get("guest_tag", "")) != guest:
+			continue
+		if not host.is_empty() and str(edge.get("host_tag", "")) != host:
+			continue
+		var epid := int(edge.get("province_id", 0))
+		if province_id > 0 and epid > 0 and epid != province_id:
+			continue
+		return true
+	return false
+
+
+func get_basing_grants_for_guest(guest_tag: String) -> Array:
+	var guest := _norm_tag(guest_tag)
+	var out: Array = []
+	for gid in _basing_grants.keys():
+		var edge: Dictionary = _basing_grants[gid] as Dictionary
+		if edge and str(edge.get("guest_tag", "")) == guest:
+			out.append(edge.duplicate(true))
+	return out
+
+
+func get_basing_grants_for_host(host_tag: String) -> Array:
+	var host := _norm_tag(host_tag)
+	var out: Array = []
+	for gid in _basing_grants.keys():
+		var edge: Dictionary = _basing_grants[gid] as Dictionary
+		if edge and str(edge.get("host_tag", "")) == host:
+			out.append(edge.duplicate(true))
+	return out
+
+
+func get_basing_graph_board(viewer_tag: String = "") -> Dictionary:
+	var viewer := _norm_tag(viewer_tag)
+	var edges: Array = []
+	var active_n := 0
+	for gid in _basing_grants.keys():
+		var edge: Dictionary = _basing_grants[gid] as Dictionary
+		if edge == null:
+			continue
+		if not viewer.is_empty():
+			if str(edge.get("host_tag", "")) != viewer and str(edge.get("guest_tag", "")) != viewer:
+				continue
+		edges.append(edge.duplicate(true))
+		if bool(edge.get("active", false)) and int(edge.get("remaining_months", 0)) > 0:
+			active_n += 1
+	return {
+		"viewer": viewer,
+		"edges": edges,
+		"edge_n": edges.size(),
+		"active_n": active_n,
+		"model": "strategic_compact_ledger",
+		"desk_version": 1,
+	}
+
+
+## Monthly decay of docking rights remaining months.
+func process_monthly_basing_rights(year: int = 0, month: int = 0, opts: Dictionary = {}) -> Dictionary:
+	var force_months := int(opts.get("force_months", 1))
+	var report := {"checked": 0, "expired": 0, "active": 0, "year": year, "month": month, "events": []}
+	for gid in _basing_grants.keys():
+		var edge: Dictionary = (_basing_grants[gid] as Dictionary).duplicate(true)
+		if edge == null:
+			continue
+		report["checked"] = int(report["checked"]) + 1
+		if not bool(edge.get("active", false)):
+			continue
+		var rem := int(edge.get("remaining_months", 0)) - maxi(force_months, 1)
+		edge["remaining_months"] = rem
+		if rem <= 0:
+			edge["active"] = false
+			edge["remaining_months"] = 0
+			edge["expired_year"] = year
+			edge["expired_month"] = month
+			report["expired"] = int(report["expired"]) + 1
+			(report["events"] as Array).append({
+				"kind": "expire", "grant_id": str(gid),
+				"host": edge.get("host_tag", ""), "guest": edge.get("guest_tag", ""),
+			})
+		else:
+			report["active"] = int(report["active"]) + 1
+		_basing_grants[gid] = edge
+	return report
+
+
+## After accept: offered docking = host from grants guest to; requested = host to grants guest from.
+func _write_basing_graph_for_accepted_offer(from_tag: String, to_tag: String, offer: Dictionary) -> Array:
+	var written: Array = []
+	var from := _norm_tag(from_tag)
+	var to := _norm_tag(to_tag)
+	var oid := str(offer.get("id", ""))
+	for item in offer.get("offered", []):
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		if int((item as Dictionary).get("type", -1)) != TradeItemType.DOCKING_RIGHTS:
+			continue
+		var res: Dictionary = _grant_from_docking_item(from, to, item as Dictionary, oid)
+		if bool(res.get("ok", false)):
+			written.append(res)
+	for item in offer.get("requested", []):
+		if typeof(item) != TYPE_DICTIONARY:
+			continue
+		if int((item as Dictionary).get("type", -1)) != TradeItemType.DOCKING_RIGHTS:
+			continue
+		var res2: Dictionary = _grant_from_docking_item(to, from, item as Dictionary, oid)
+		if bool(res2.get("ok", false)):
+			written.append(res2)
+	return written
+
+
+func _grant_from_docking_item(host: String, guest: String, item: Dictionary, offer_id: String) -> Dictionary:
+	var meta: Dictionary = item.get("metadata", {}) as Dictionary if item.get("metadata") is Dictionary else {}
+	var pid := int(meta.get("province_id", 0))
+	if pid <= 0:
+		var id_s := str(item.get("id", ""))
+		if id_s.is_valid_int():
+			pid = int(id_s)
+	var months := int(meta.get("duration_months", 12))
+	if months <= 0:
+		months = 12
+	var major := bool(meta.get("major_port", true))
+	# Infer major from MapManager basing tier when province known
+	if pid > 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_naval_basing"):
+		var b: Dictionary = MapManager.get_naval_basing(pid)
+		var level := str(b.get("level", ""))
+		if level == "major_base":
+			major = true
+		elif level == "none" or level == "anchorage":
+			major = false
+	var range_b := 0.15
+	if meta.has("range_bonus"):
+		range_b = float(meta.get("range_bonus", 0.15))
+	elif meta.get("modifiers") is Dictionary:
+		var mods: Dictionary = meta["modifiers"] as Dictionary
+		if mods.has("naval_access"):
+			range_b = float(mods.get("naval_access", 0.15))
+		elif mods.has("port_access"):
+			range_b = float(mods.get("port_access", 0.15))
+	return grant_basing_rights(host, guest, pid, months, {
+		"major_port": major,
+		"range_bonus": range_b,
+		"offer_id": offer_id,
+		"silent": bool(meta.get("silent", false)),
+	})
+
+
+## Full Trade Desk board for a bilateral pair (UI single payload).
+func build_trade_desk_board(player_tag: String, partner_tag: String) -> Dictionary:
+	var p := _norm_tag(player_tag)
+	var o := _norm_tag(partner_tag)
+	var diplo: Dictionary = get_diplomatic_summary_with(p, o)
+	var transit: Dictionary = get_bilateral_transit_health(p, o)
+	var power: Dictionary = get_national_power_comparison(p, o)
+	var policy: Dictionary = get_bilateral_trade_policy(p, o)
+	var discounts: Dictionary = {}
+	var rm: Object = _relations_manager()
+	if rm != null and rm.has_method("get_relationship_discounts"):
+		var dv: Variant = rm.call("get_relationship_discounts", p, o)
+		if dv is Dictionary:
+			discounts = dv as Dictionary
+	var majors: Dictionary = build_major_resource_trade_board(p)
+	var basing_as_guest: Array = get_basing_grants_for_guest(p)
+	var basing_as_host: Array = get_basing_grants_for_host(p)
+	var basing_with_partner_n := 0
+	for e in basing_as_guest + basing_as_host:
+		if e is Dictionary:
+			var ed: Dictionary = e as Dictionary
+			if not bool(ed.get("active", false)):
+				continue
+			if str(ed.get("host_tag", "")) == o or str(ed.get("guest_tag", "")) == o:
+				basing_with_partner_n += 1
+	var warnings: Array = []
+	if not bool(transit.get("healthy", true)):
+		warnings.append(format_transit_issue_plain(p, o))
+	var mu: Dictionary = power.get("matchup", {}) as Dictionary if power.get("matchup") is Dictionary else {}
+	if bool(mu.get("hopeless", false)):
+		warnings.append("Hopelessly outmatched vs %s — expect hard concessions." % o)
+	elif bool(mu.get("nuclear_asymmetry", false)):
+		warnings.append("%s has nuclear advantage — AI partners will placate them." % o)
+	elif bool(mu.get("outmatched", false)):
+		warnings.append("Outmatched by %s on effective threat." % o)
+	if bool(policy.get("embargo", false)):
+		warnings.append("Embargo active with %s — public trade blocked." % o)
+	if basing_with_partner_n > 0:
+		warnings.append("Active basing/docking rights with %s (%d grant(s))." % [o, basing_with_partner_n])
+	var band: Dictionary = diplo.get("band", {}) as Dictionary if diplo.get("band") is Dictionary else {}
+	return {
+		"player_tag": p,
+		"partner_tag": o,
+		"relations": diplo.get("relations", {}),
+		"crs": float(diplo.get("crs", 0.0)),
+		"band": band,
+		"flags": diplo.get("flags", []),
+		"policy": policy,
+		"discounts": discounts,
+		"power": power,
+		"transit": transit,
+		"transit_plain": format_transit_issue_plain(p, o),
+		"majors_board": majors,
+		"basing": {
+			"as_guest_n": basing_as_guest.size(),
+			"as_host_n": basing_as_host.size(),
+			"with_partner_n": basing_with_partner_n,
+			"has_access": has_basing_access(p, o),
+		},
+		"tariff_treasury": get_tariff_treasury(p),
+		"warnings": warnings,
+		"warning_n": warnings.size(),
+		"model": "strategic_compact_ledger",
+		"desk_version": 1,
+	}
+
+
+## National power board for Trade Desk / diplomacy (hopelessly outmatched warning).
+func get_national_power_comparison(self_tag: String, other_tag: String) -> Dictionary:
+	var rm: Object = _relations_manager()
+	if rm != null and rm.has_method("get_power_matchup_report"):
+		var v: Variant = rm.call(
+			"get_power_matchup_report",
+			self_tag, other_tag,
+			_power_inputs_for_tag(self_tag),
+			_power_inputs_for_tag(other_tag),
+		)
+		if v is Dictionary:
+			return v as Dictionary
+	return {}
+
 
 ## Returns a suggested opinion delta for a completed deal (purely advisory).
 ## A Relations/Diplomacy system can ignore this or scale it by current relations, distance, ideology, etc.
@@ -2515,7 +3841,7 @@ func _calculate_item_value(item: Dictionary, for_country: String) -> float:
 			return base * qty
 
 		TradeItemType.RESOURCE:
-			var rate := float(RESOURCE_BASE_RATES.get(id, 1.0))
+			var rate := get_major_resource_unit_value(id, for_country)
 			# Regional resource bonus if full control of relevant regions (e.g. iron/aluminum in Scandinavia full -> better value for trade)
 			if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_active_regional_control_bonuses"):
 				var reg := MapManager.get_active_regional_control_bonuses(for_country)

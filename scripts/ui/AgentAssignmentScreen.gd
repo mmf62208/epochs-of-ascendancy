@@ -106,6 +106,8 @@ func _ready() -> void:
 	add_to_group("agent_screen")
 	drag_handle = $TitleBar
 	super._ready()
+	z_index = 80
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_apply_content_margins()
 	_apply_screen_theme()
 	_setup_agent_headers()
@@ -121,17 +123,34 @@ func _ready() -> void:
 	roster_filter.item_selected.connect(_on_roster_filter_changed)
 	mission_category_filter.item_selected.connect(_on_mission_category_changed)
 	_connect_agent_signals()
+	_center_on_viewport()
 	refresh_screen()
+	call_deferred("_center_on_viewport")
 
 
 func _apply_content_margins() -> void:
 	var margin := get_node_or_null("MarginContainer") as MarginContainer
 	if margin == null:
 		return
-	margin.add_theme_constant_override("margin_left", 20)
-	margin.add_theme_constant_override("margin_right", 20)
-	margin.add_theme_constant_override("margin_top", 12)
-	margin.add_theme_constant_override("margin_bottom", 12)
+	margin.add_theme_constant_override("margin_left", 26)
+	margin.add_theme_constant_override("margin_right", 22)
+	margin.add_theme_constant_override("margin_top", 16)
+	margin.add_theme_constant_override("margin_bottom", 14)
+
+
+func _center_on_viewport() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var sz: Vector2 = vp.get_visible_rect().size
+	var panel_sz := size
+	if panel_sz.x < 8.0 or panel_sz.y < 8.0:
+		panel_sz = Vector2(1400, 760)
+		custom_minimum_size = panel_sz
+		size = panel_sz
+	global_position = (sz - panel_sz) * 0.5
+	global_position.x = maxf(8.0, global_position.x)
+	global_position.y = maxf(56.0, global_position.y)
 
 
 func _on_close_pressed() -> void:
@@ -174,19 +193,31 @@ func _apply_screen_theme() -> void:
 		$MarginContainer/VBoxContainer/MainArea/IntelColumn/RecentOpsTitle,
 		RetrowaveTheme.MAGENTA,
 	)
-	RetrowaveTheme.style_detail_panel(agent_state_banner)
+	RetrowaveTheme.style_detail_panel_flat(agent_state_banner)
 	RetrowaveTheme.style_body_label(agent_state_label)
+	agent_state_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	RetrowaveTheme.style_title(
 		$MarginContainer/VBoxContainer/MainArea/DetailPanel/DetailMargin/DetailScroll/DetailVBox/HistoryTitle,
 	)
 	RetrowaveTheme.style_title(
 		$MarginContainer/VBoxContainer/MainArea/DetailPanel/DetailMargin/DetailScroll/DetailVBox/MissionsTitle,
 	)
-	RetrowaveTheme.style_detail_panel($MarginContainer/VBoxContainer/MainArea/DetailPanel)
+	RetrowaveTheme.style_detail_panel_flat($MarginContainer/VBoxContainer/MainArea/DetailPanel)
 	RetrowaveTheme.style_detail_label(detail_label)
+	detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var detail_scroll := get_node_or_null(
+		"MarginContainer/VBoxContainer/MainArea/DetailPanel/DetailMargin/DetailScroll"
+	) as ScrollContainer
+	if detail_scroll != null:
+		detail_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+		detail_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+		detail_scroll.clip_contents = true
 	RetrowaveTheme.style_primary_button(assign_mission_button)
 	RetrowaveTheme.style_body_label(feedback_hint)
-	feedback_hint.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	feedback_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	feedback_hint.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+	call_deferred("_relayout_agent_detail_wrap")
 
 
 func _setup_roster_filter() -> void:
@@ -204,19 +235,28 @@ func _setup_roster_filter() -> void:
 func _setup_agent_headers() -> void:
 	for child in agents_header_row.get_children():
 		child.queue_free()
-	for spec in AGENT_HEADER_SPECS:
-		if bool(spec.get("expand", false)):
-			var spacer := Control.new()
-			spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-			agents_header_row.add_child(spacer)
-			continue
-		var label := Label.new()
-		label.text = str(spec.get("text", ""))
-		var width := int(spec.get("width", 100))
-		if width > 0:
-			label.custom_minimum_size = Vector2(width, 0)
-		RetrowaveTheme.style_column_header(label)
-		agents_header_row.add_child(label)
+	var label := Label.new()
+	label.text = "Roster  ·  name  ·  status / mission  ·  skills  ·  select"
+	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	RetrowaveTheme.style_column_header(label)
+	agents_header_row.add_child(label)
+
+
+func _relayout_agent_detail_wrap() -> void:
+	if detail_label == null:
+		return
+	var scroll := get_node_or_null(
+		"MarginContainer/VBoxContainer/MainArea/DetailPanel/DetailMargin/DetailScroll"
+	) as ScrollContainer
+	var w := 260.0
+	if scroll != null and scroll.size.x > 40.0:
+		w = maxf(scroll.size.x - 16.0, 160.0)
+	detail_label.custom_minimum_size = Vector2(w, 0)
+	if agent_state_label != null:
+		agent_state_label.custom_minimum_size = Vector2(w, 0)
+	if feedback_hint != null:
+		feedback_hint.custom_minimum_size = Vector2(maxf(size.x - 80.0, 200.0), 0)
 
 
 func _connect_agent_signals() -> void:
@@ -441,15 +481,16 @@ func _create_agent_row(summary: Dictionary) -> PanelContainer:
 	var panel := PanelContainer.new()
 	var group := str(summary.get("status_group", ""))
 	var on_mission := group == "on_mission"
-	panel.custom_minimum_size = Vector2(0, 44 if on_mission else ROW_HEIGHT)
-	RetrowaveTheme.style_detail_panel(panel)
+	panel.custom_minimum_size = Vector2(0, 64 if on_mission else 52)
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	RetrowaveTheme.style_detail_panel_flat(panel)
 
 	var agent_id := str(summary.get("agent_id", ""))
 	var selected := agent_id == _selected_agent_id
 	panel.tooltip_text = _build_agent_row_tooltip(summary)
 
 	if selected:
-		panel.modulate = Color(0.85, 0.95, 1.0)
+		panel.modulate = Color(0.88, 0.97, 1.08)
 	elif group == "compromised" or bool(summary.get("is_compromised", false)):
 		panel.modulate = Color(1.0, 0.72, 0.55)
 	elif group == "inactive" or bool(summary.get("is_inactive", false)):
@@ -458,18 +499,19 @@ func _create_agent_row(summary: Dictionary) -> PanelContainer:
 		panel.modulate = Color(0.78, 0.92, 1.0)
 
 	var outer := VBoxContainer.new()
-	outer.add_theme_constant_override("separation", 2)
+	outer.add_theme_constant_override("separation", 4)
+	outer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.add_child(outer)
 
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 6)
+	row.add_theme_constant_override("separation", 8)
 	outer.add_child(row)
 
-	# Wire agent portraits from art-batch (new elite/double/visionary)
+	# Portrait
 	var apath := str(summary.get("portrait_path", ""))
 	if not apath.is_empty():
 		var ptex := TextureRect.new()
-		ptex.custom_minimum_size = Vector2(32, 32)
+		ptex.custom_minimum_size = Vector2(36, 36)
 		ptex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 		ptex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		if ResourceLoader.exists(apath):
@@ -477,31 +519,63 @@ func _create_agent_row(summary: Dictionary) -> PanelContainer:
 			if tex:
 				ptex.texture = tex
 		else:
-			ptex.modulate = Color(0.6, 0.6, 0.7)  # placeholder tint
+			ptex.modulate = Color(0.6, 0.6, 0.7)
 		row.add_child(ptex)
 
-	var badge := str(summary.get("status_badge", ""))
-	if not badge.is_empty():
-		row.add_child(_badge_label(badge, group))
-	var status_text := str(summary.get("status_detail", _format_status(summary)))
-	row.add_child(_row_label(str(summary.get("name", "")), 110))
-	row.add_child(_status_label(status_text, 112, group))
-	row.add_child(_row_label(str(summary.get("level", 1)), 32))
-	row.add_child(_row_label(str(summary.get("skills_text", "")), 150))
+	var text_col := VBoxContainer.new()
+	text_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	text_col.add_theme_constant_override("separation", 2)
+	row.add_child(text_col)
 
-	var mission_text := "—"
+	# Headline: name + level
+	var title := Label.new()
+	var badge := str(summary.get("status_badge", ""))
+	var name_txt := str(summary.get("name", "Agent"))
+	title.text = "%s%s  ·  Lv %s" % [
+		(badge + " ") if not badge.is_empty() else "",
+		name_txt,
+		str(summary.get("level", 1)),
+	]
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	RetrowaveTheme.style_detail_label(title)
+	text_col.add_child(title)
+
+	# Major status / mission line
+	var status_text := str(summary.get("status_detail", _format_status(summary)))
+	var mission_text := "Available"
 	if not str(summary.get("mission_name", "")).is_empty():
 		mission_text = str(summary.get("mission_name", ""))
 		if float(summary.get("mission_progress", 0.0)) > 0.0:
-			mission_text += " (%d%%)" % int(float(summary.get("mission_progress", 0.0)) * 100.0)
-	row.add_child(_row_label(mission_text, 110))
+			mission_text += "  ·  %d%%" % int(float(summary.get("mission_progress", 0.0)) * 100.0)
+	var benefit := Label.new()
+	benefit.text = "%s  ·  %s" % [status_text, mission_text]
+	benefit.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	benefit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	RetrowaveTheme.style_body_label(benefit)
+	match group:
+		"compromised":
+			benefit.add_theme_color_override("font_color", RetrowaveTheme.WARNING)
+		"on_mission":
+			benefit.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+		"inactive":
+			benefit.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+		_:
+			benefit.add_theme_color_override("font_color", RetrowaveTheme.SUCCESS)
+	text_col.add_child(benefit)
 
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(spacer)
+	var skills := str(summary.get("skills_text", "")).strip_edges()
+	if not skills.is_empty():
+		var sk := Label.new()
+		sk.text = skills
+		sk.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		RetrowaveTheme.style_body_label(sk)
+		sk.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+		text_col.add_child(sk)
 
 	var select_btn := Button.new()
 	select_btn.text = "Select"
+	select_btn.custom_minimum_size = Vector2(80, 32)
 	select_btn.tooltip_text = "View missions and history for this agent."
 	RetrowaveTheme.style_secondary_button(select_btn)
 	select_btn.pressed.connect(_on_agent_selected.bind(agent_id))
@@ -511,17 +585,16 @@ func _create_agent_row(summary: Dictionary) -> PanelContainer:
 		var progress_row := HBoxContainer.new()
 		progress_row.add_theme_constant_override("separation", 6)
 		outer.add_child(progress_row)
-
 		var bar := ProgressBar.new()
-		bar.custom_minimum_size = Vector2(0, 10)
+		bar.custom_minimum_size = Vector2(0, 12)
 		bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		bar.max_value = 1.0
 		bar.value = float(summary.get("mission_progress", 0.0))
 		bar.show_percentage = false
+		RetrowaveTheme.style_progress_bar(bar)
 		progress_row.add_child(bar)
-
 		var pct_label := Label.new()
-		pct_label.text = "%d%% mission complete" % int(float(summary.get("mission_progress", 0.0)) * 100.0)
+		pct_label.text = "%d%% complete" % int(float(summary.get("mission_progress", 0.0)) * 100.0)
 		RetrowaveTheme.style_body_label(pct_label)
 		pct_label.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
 		progress_row.add_child(pct_label)
@@ -570,16 +643,38 @@ func _populate_targets() -> void:
 		return
 
 	for target_tag in current_data.target_countries:
+		var panel := PanelContainer.new()
+		RetrowaveTheme.style_detail_panel_flat(panel)
+		if str(target_tag) == _selected_target_tag:
+			panel.modulate = Color(0.9, 0.97, 1.08)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		panel.add_child(row)
+		var col := VBoxContainer.new()
+		col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		col.add_theme_constant_override("separation", 2)
+		row.add_child(col)
+		var title := Label.new()
+		title.text = str(target_tag)
+		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		RetrowaveTheme.style_detail_label(title)
+		col.add_child(title)
+		var sub := Label.new()
+		sub.text = "Mission target country"
+		RetrowaveTheme.style_body_label(sub)
+		sub.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+		col.add_child(sub)
 		var btn := Button.new()
-		btn.text = target_tag
-		btn.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		if target_tag == _selected_target_tag:
+		btn.text = "Use"
+		btn.custom_minimum_size = Vector2(64, 28)
+		btn.tooltip_text = "Set %s as the mission target. Eligible missions appear in the detail panel." % target_tag
+		if str(target_tag) == _selected_target_tag:
 			RetrowaveTheme.style_primary_button(btn)
 		else:
 			RetrowaveTheme.style_secondary_button(btn)
-		btn.tooltip_text = "Set %s as the mission target. Eligible missions appear in the detail panel." % target_tag
-		btn.pressed.connect(_on_target_selected.bind(target_tag))
-		targets_content.add_child(btn)
+		btn.pressed.connect(_on_target_selected.bind(str(target_tag)))
+		row.add_child(btn)
+		targets_content.add_child(panel)
 
 
 func _update_intel_column_titles() -> void:
@@ -622,7 +717,7 @@ func _populate_intel_reports() -> void:
 
 func _create_intel_report_row(report: Dictionary) -> PanelContainer:
 	var panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(panel)
+	RetrowaveTheme.style_detail_panel_flat(panel)
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
@@ -724,7 +819,7 @@ func _populate_recent_operations() -> void:
 
 func _create_national_effect_chip(row: Dictionary) -> PanelContainer:
 	var panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(panel)
+	RetrowaveTheme.style_detail_panel_flat(panel)
 	panel.tooltip_text = str(row.get("tooltip_text", ""))
 	if bool(row.get("is_debuff", false)):
 		panel.modulate = Color(1.0, 0.82, 0.75)
@@ -752,7 +847,7 @@ func _create_national_effect_chip(row: Dictionary) -> PanelContainer:
 
 func _create_operation_log_row(op: Dictionary) -> PanelContainer:
 	var panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(panel)
+	RetrowaveTheme.style_detail_panel_flat(panel)
 	panel.tooltip_text = _build_operation_tooltip(op)
 
 	if _highlight_ops_pulse and str(op.get("outcome", "")) == "in_progress":
@@ -884,7 +979,7 @@ func _update_detail_panel() -> void:
 		assign_mission_button.disabled = true
 		return
 
-	var summary := AgentManager.get_agent_summary(_selected_agent_id)
+	var summary: Dictionary = AgentManager.get_agent_summary(_selected_agent_id)
 	if summary.is_empty():
 		agent_state_banner.visible = false
 		detail_label.text = "Agent not found."
@@ -921,6 +1016,7 @@ func _update_detail_panel() -> void:
 		if not expected.is_empty():
 			lines.append("On success: %s" % expected)
 	detail_label.text = "\n".join(lines)
+	call_deferred("_relayout_agent_detail_wrap")
 
 	if _selected_target_tag.is_empty():
 		detail_label.text += "\n\nSelect a target country to view missions."
@@ -936,6 +1032,7 @@ func _update_detail_panel() -> void:
 			detail_label.text += "\nNational compromised tech: %d" % int(
 				tech_sum.get("compromised_tech_count", 0)
 			)
+	call_deferred("_relayout_agent_detail_wrap")
 
 	if not bool(summary.get("can_assign_mission", false)):
 		var note := Label.new()
@@ -949,7 +1046,7 @@ func _update_detail_panel() -> void:
 		return
 
 	var category_filter := _selected_mission_category_filter()
-	var missions := AgentManager.get_eligible_missions_for_agent(_selected_agent_id, category_filter)
+	var missions: Array = AgentManager.get_eligible_missions_for_agent(_selected_agent_id, category_filter)
 	if missions.is_empty():
 		var empty := Label.new()
 		if category_filter.is_empty():
@@ -1088,7 +1185,7 @@ func _unavailable_mission_message(summary: Dictionary) -> String:
 
 func _create_history_row(entry: Dictionary) -> PanelContainer:
 	var panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(panel)
+	RetrowaveTheme.style_detail_panel_flat(panel)
 
 	var box := VBoxContainer.new()
 	box.add_theme_constant_override("separation", 2)
@@ -1161,7 +1258,7 @@ func _build_operation_tooltip(op: Dictionary) -> String:
 
 func _create_mission_preview(mission_row: Dictionary) -> PanelContainer:
 	var panel := PanelContainer.new()
-	RetrowaveTheme.style_detail_panel(panel)
+	RetrowaveTheme.style_detail_panel_flat(panel)
 	var preview: Dictionary = mission_row.get("impact_preview", {})
 	if not preview.is_empty():
 		panel.tooltip_text = AgentMissionImpact.format_compact_preview(preview)
@@ -1250,7 +1347,7 @@ func _on_target_selected(target_tag: String) -> void:
 func _on_recruit_pressed() -> void:
 	if typeof(AgentManager) == TYPE_NIL:
 		return
-	var agent := AgentManager.recruit_agent(country_tag)
+	var agent: Agent = AgentManager.recruit_agent(country_tag)
 	if agent == null:
 		return
 	_selected_agent_id = agent.agent_id

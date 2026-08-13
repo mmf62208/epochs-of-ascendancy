@@ -30,6 +30,21 @@ static func from_dict(data: Dictionary) -> ProductionModifier:
 	return mod
 
 
+func to_dict() -> Dictionary:
+	return {
+		"id": id,
+		"source": source,
+		"output_multiplier": output_multiplier,
+		"reliability_multiplier": reliability_multiplier,
+		"reliability_flat_bonus": reliability_flat_bonus,
+		"retooling_days_multiplier": retooling_days_multiplier,
+		"tooling_gain_multiplier": tooling_gain_multiplier,
+		"new_design_experience_rate_multiplier": new_design_experience_rate_multiplier,
+		"cost_multiplier": cost_multiplier,
+		"tags": tags.duplicate(),
+	}
+
+
 static func _string_array(raw: Variant) -> Array[String]:
 	var out: Array[String] = []
 	if typeof(raw) != TYPE_ARRAY:

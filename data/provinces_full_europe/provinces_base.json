@@ -3,12 +3,14 @@
     "version": 2,
     "source": "sync_phase1_base_catalog.py",
     "province_count": 460,
-    "geometry_authoritative": true
+    "geometry_authoritative": true,
+    "names_assigned": "assign_europe_province_names.py",
+    "name_assignment_unique": 460
   },
   "provinces": [
     {
       "id": 1,
-      "name": "Jerusalem",
+      "name": "Alexandria",
       "terrain": "hills",
       "core_for_tags": [
         "ISR",
@@ -47,7 +49,7 @@
     },
     {
       "id": 6,
-      "name": "Washington DC",
+      "name": "Reykjavik",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -65,7 +67,7 @@
     },
     {
       "id": 7,
-      "name": "Houston Energy Corridor",
+      "name": "Lisbon",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -83,7 +85,7 @@
     },
     {
       "id": 9,
-      "name": "Tokyo",
+      "name": "Salekhard",
       "terrain": "urban",
       "core_for_tags": [
         "JAP"
@@ -101,7 +103,7 @@
     },
     {
       "id": 10,
-      "name": "Beijing",
+      "name": "Vorkuta",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -120,7 +122,7 @@
     },
     {
       "id": 13,
-      "name": "Baku Oil Fields",
+      "name": "Baku",
       "terrain": "plains",
       "core_for_tags": [
         "AZE"
@@ -138,7 +140,7 @@
     },
     {
       "id": 15,
-      "name": "Silicon Valley",
+      "name": "Galway",
       "terrain": "urban",
       "core_for_tags": [
         "USA"
@@ -228,7 +230,7 @@
     },
     {
       "id": 25,
-      "name": "Seoul",
+      "name": "Ufa",
       "terrain": "urban",
       "core_for_tags": [
         "KOR"
@@ -246,7 +248,7 @@
     },
     {
       "id": 27,
-      "name": "Johannesburg",
+      "name": "Benghazi",
       "terrain": "hills",
       "core_for_tags": [
         "SAF"
@@ -266,7 +268,7 @@
     },
     {
       "id": 30,
-      "name": "Sao Paulo",
+      "name": "Casablanca",
       "terrain": "urban",
       "core_for_tags": [
         "BRA"
@@ -303,7 +305,7 @@
     },
     {
       "id": 33,
-      "name": "Hong Kong",
+      "name": "Sumqayit",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -321,7 +323,7 @@
     },
     {
       "id": 34,
-      "name": "Singapore",
+      "name": "Derbent",
       "terrain": "urban",
       "core_for_tags": [
         "SGP"
@@ -339,7 +341,7 @@
     },
     {
       "id": 37,
-      "name": "Ottawa",
+      "name": "Limerick",
       "terrain": "urban",
       "core_for_tags": [
         "CAN"
@@ -357,7 +359,7 @@
     },
     {
       "id": 39,
-      "name": "Vancouver",
+      "name": "Cork",
       "terrain": "coastal",
       "core_for_tags": [
         "CAN"
@@ -375,7 +377,7 @@
     },
     {
       "id": 43,
-      "name": "Guangzhou",
+      "name": "Perm",
       "terrain": "urban",
       "core_for_tags": [
         "CHN"
@@ -394,7 +396,7 @@
     },
     {
       "id": 85,
-      "name": "Damascus",
+      "name": "Hatay",
       "terrain": "urban",
       "core_for_tags": [
         "SYR"
@@ -413,7 +415,7 @@
     },
     {
       "id": 9000,
-      "name": "Province 9000",
+      "name": "Setubal",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -429,7 +431,7 @@
     },
     {
       "id": 9001,
-      "name": "Province 9001",
+      "name": "Faro",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -445,7 +447,7 @@
     },
     {
       "id": 9002,
-      "name": "Province 9002",
+      "name": "Rabat",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -461,7 +463,7 @@
     },
     {
       "id": 9003,
-      "name": "Province 9003",
+      "name": "Leiria",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -477,7 +479,7 @@
     },
     {
       "id": 9004,
-      "name": "Province 9004",
+      "name": "Beja",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -493,7 +495,7 @@
     },
     {
       "id": 9005,
-      "name": "Caracas",
+      "name": "Evora",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -509,7 +511,7 @@
     },
     {
       "id": 9006,
-      "name": "Province 9006",
+      "name": "Coimbra",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -525,7 +527,7 @@
     },
     {
       "id": 9007,
-      "name": "Province 9007",
+      "name": "Huelva",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -541,7 +543,7 @@
     },
     {
       "id": 9008,
-      "name": "New Settlement",
+      "name": "Aveiro",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -557,7 +559,7 @@
     },
     {
       "id": 9009,
-      "name": "New Settlement",
+      "name": "Cadiz",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -573,7 +575,7 @@
     },
     {
       "id": 9010,
-      "name": "Province 9010",
+      "name": "Tangier",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -589,7 +591,7 @@
     },
     {
       "id": 9011,
-      "name": "Anchorage",
+      "name": "Porto",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -605,7 +607,7 @@
     },
     {
       "id": 9012,
-      "name": "Province 9012",
+      "name": "Nakhchivan",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -621,7 +623,7 @@
     },
     {
       "id": 9013,
-      "name": "Province 9013",
+      "name": "Ganja",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -637,7 +639,7 @@
     },
     {
       "id": 9014,
-      "name": "Province 9014",
+      "name": "Makhachkala",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -653,7 +655,7 @@
     },
     {
       "id": 9015,
-      "name": "Province 9015",
+      "name": "Hakkari",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -669,7 +671,7 @@
     },
     {
       "id": 9016,
-      "name": "Province 9016",
+      "name": "Van",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -685,7 +687,7 @@
     },
     {
       "id": 9017,
-      "name": "Penang",
+      "name": "Yerevan",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -701,7 +703,7 @@
     },
     {
       "id": 9018,
-      "name": "Province 9018",
+      "name": "Igdir",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -717,7 +719,7 @@
     },
     {
       "id": 9019,
-      "name": "Province 9019",
+      "name": "Sirnak",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -733,7 +735,7 @@
     },
     {
       "id": 9020,
-      "name": "Province 9020",
+      "name": "Vanadzor",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -749,7 +751,7 @@
     },
     {
       "id": 9021,
-      "name": "Province 9021",
+      "name": "Astrakhan",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -765,7 +767,7 @@
     },
     {
       "id": 9022,
-      "name": "Province 9022",
+      "name": "Tbilisi",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -781,7 +783,7 @@
     },
     {
       "id": 9023,
-      "name": "Auckland",
+      "name": "Grozny",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -797,7 +799,7 @@
     },
     {
       "id": 9024,
-      "name": "Province 9024",
+      "name": "Portalegre",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -813,7 +815,7 @@
     },
     {
       "id": 9025,
-      "name": "Province 9025",
+      "name": "Badajoz",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -829,7 +831,7 @@
     },
     {
       "id": 9026,
-      "name": "New Settlement",
+      "name": "Seville",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -845,7 +847,7 @@
     },
     {
       "id": 9027,
-      "name": "New Settlement",
+      "name": "Viseu",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -861,7 +863,7 @@
     },
     {
       "id": 9028,
-      "name": "Province 9028",
+      "name": "Braga",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -877,7 +879,7 @@
     },
     {
       "id": 9029,
-      "name": "Santiago de Cuba",
+      "name": "Vigo",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -893,7 +895,7 @@
     },
     {
       "id": 9030,
-      "name": "Province 9030",
+      "name": "Tripoli",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -909,7 +911,7 @@
     },
     {
       "id": 9031,
-      "name": "Province 9031",
+      "name": "Heraklion",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -925,7 +927,7 @@
     },
     {
       "id": 9032,
-      "name": "Province 9032",
+      "name": "Rhodes",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -941,7 +943,7 @@
     },
     {
       "id": 9033,
-      "name": "Province 9033",
+      "name": "Ragusa",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -957,7 +959,7 @@
     },
     {
       "id": 9034,
-      "name": "Province 9034",
+      "name": "Syracuse",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -973,7 +975,7 @@
     },
     {
       "id": 9035,
-      "name": "Cape Town",
+      "name": "Tunis",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -989,7 +991,7 @@
     },
     {
       "id": 9036,
-      "name": "Province 9036",
+      "name": "Guarda",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1005,7 +1007,7 @@
     },
     {
       "id": 9037,
-      "name": "Province 9037",
+      "name": "Pontevedra",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1021,7 +1023,7 @@
     },
     {
       "id": 9038,
-      "name": "New Settlement",
+      "name": "Malaga",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1037,7 +1039,7 @@
     },
     {
       "id": 9039,
-      "name": "New Settlement",
+      "name": "Caceres",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1053,7 +1055,7 @@
     },
     {
       "id": 9040,
-      "name": "Province 9040",
+      "name": "Cordoba",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1085,86 +1087,6 @@
     },
     {
       "id": 9042,
-      "name": "Province 9042",
-      "terrain": "plains",
-      "core_for_tags": [],
-      "natural_resources": {
-        "resources": {
-          "oil": 99
-        },
-        "resource_score": 99,
-        "primary_resource": "oil"
-      },
-      "population_base": 1027000,
-      "special_features": [],
-      "special_levels": {}
-    },
-    {
-      "id": 9043,
-      "name": "Province 9043",
-      "terrain": "plains",
-      "core_for_tags": [],
-      "natural_resources": {
-        "resources": {
-          "oil": 99
-        },
-        "resource_score": 99,
-        "primary_resource": "oil"
-      },
-      "population_base": 1027000,
-      "special_features": [],
-      "special_levels": {}
-    },
-    {
-      "id": 9044,
-      "name": "Province 9044",
-      "terrain": "plains",
-      "core_for_tags": [],
-      "natural_resources": {
-        "resources": {
-          "oil": 99
-        },
-        "resource_score": 99,
-        "primary_resource": "oil"
-      },
-      "population_base": 1027000,
-      "special_features": [],
-      "special_levels": {}
-    },
-    {
-      "id": 9045,
-      "name": "Province 9045",
-      "terrain": "plains",
-      "core_for_tags": [],
-      "natural_resources": {
-        "resources": {
-          "oil": 99
-        },
-        "resource_score": 99,
-        "primary_resource": "oil"
-      },
-      "population_base": 1027000,
-      "special_features": [],
-      "special_levels": {}
-    },
-    {
-      "id": 9046,
-      "name": "Province 9046",
-      "terrain": "plains",
-      "core_for_tags": [],
-      "natural_resources": {
-        "resources": {
-          "oil": 99
-        },
-        "resource_score": 99,
-        "primary_resource": "oil"
-      },
-      "population_base": 1027000,
-      "special_features": [],
-      "special_levels": {}
-    },
-    {
-      "id": 9047,
       "name": "Oslo",
       "terrain": "plains",
       "core_for_tags": [],
@@ -1180,8 +1102,88 @@
       "special_levels": {}
     },
     {
+      "id": 9043,
+      "name": "Trondheim",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9044,
+      "name": "Gothenburg",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9045,
+      "name": "Uppsala",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9046,
+      "name": "Aalborg",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9047,
+      "name": "Aarhus",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 99
+        },
+        "resource_score": 99,
+        "primary_resource": "oil"
+      },
+      "population_base": 1027000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
       "id": 9048,
-      "name": "Province 9048",
+      "name": "Oran",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1197,7 +1199,7 @@
     },
     {
       "id": 9049,
-      "name": "Province 9049",
+      "name": "Algiers",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1213,7 +1215,7 @@
     },
     {
       "id": 9050,
-      "name": "Province 9050",
+      "name": "Almeria",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1229,7 +1231,7 @@
     },
     {
       "id": 9051,
-      "name": "Province 9051",
+      "name": "Cartagena",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1245,7 +1247,7 @@
     },
     {
       "id": 9052,
-      "name": "Province 9052",
+      "name": "Granada",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1261,7 +1263,7 @@
     },
     {
       "id": 9053,
-      "name": "Lagos",
+      "name": "Murcia",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1277,7 +1279,7 @@
     },
     {
       "id": 9054,
-      "name": "Province 9054",
+      "name": "Antalya",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1294,7 +1296,7 @@
     },
     {
       "id": 9055,
-      "name": "Province 9055",
+      "name": "Mersin",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1311,7 +1313,7 @@
     },
     {
       "id": 9056,
-      "name": "Province 9056",
+      "name": "Kilis",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1328,7 +1330,7 @@
     },
     {
       "id": 9057,
-      "name": "Province 9057",
+      "name": "Adana",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1345,7 +1347,7 @@
     },
     {
       "id": 9058,
-      "name": "Province 9058",
+      "name": "Mugla",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1362,7 +1364,7 @@
     },
     {
       "id": 9059,
-      "name": "Durban",
+      "name": "Karaman",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1379,7 +1381,7 @@
     },
     {
       "id": 9060,
-      "name": "Province 9060",
+      "name": "Ourense",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1395,7 +1397,7 @@
     },
     {
       "id": 9061,
-      "name": "Province 9061",
+      "name": "A Coruña",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1411,7 +1413,7 @@
     },
     {
       "id": 9062,
-      "name": "Province 9062",
+      "name": "Braganca",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1427,7 +1429,7 @@
     },
     {
       "id": 9063,
-      "name": "Province 9063",
+      "name": "Lugo",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1443,7 +1445,7 @@
     },
     {
       "id": 9064,
-      "name": "Province 9064",
+      "name": "Jaen",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1459,7 +1461,7 @@
     },
     {
       "id": 9065,
-      "name": "Lima",
+      "name": "Salamanca",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1475,7 +1477,7 @@
     },
     {
       "id": 9066,
-      "name": "Province 9066",
+      "name": "Chisinau",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1491,70 +1493,6 @@
     },
     {
       "id": 9067,
-      "name": "Province 9067",
-      "terrain": "plains",
-      "core_for_tags": [],
-      "natural_resources": {
-        "resources": {
-          "oil": 24
-        },
-        "resource_score": 24,
-        "primary_resource": "oil"
-      },
-      "population_base": 1079000,
-      "special_features": [],
-      "special_levels": {}
-    },
-    {
-      "id": 9068,
-      "name": "Province 9068",
-      "terrain": "plains",
-      "core_for_tags": [],
-      "natural_resources": {
-        "resources": {
-          "oil": 24
-        },
-        "resource_score": 24,
-        "primary_resource": "oil"
-      },
-      "population_base": 1079000,
-      "special_features": [],
-      "special_levels": {}
-    },
-    {
-      "id": 9069,
-      "name": "Province 9069",
-      "terrain": "plains",
-      "core_for_tags": [],
-      "natural_resources": {
-        "resources": {
-          "oil": 24
-        },
-        "resource_score": 24,
-        "primary_resource": "oil"
-      },
-      "population_base": 1079000,
-      "special_features": [],
-      "special_levels": {}
-    },
-    {
-      "id": 9070,
-      "name": "Province 9070",
-      "terrain": "plains",
-      "core_for_tags": [],
-      "natural_resources": {
-        "resources": {
-          "oil": 24
-        },
-        "resource_score": 24,
-        "primary_resource": "oil"
-      },
-      "population_base": 1079000,
-      "special_features": [],
-      "special_levels": {}
-    },
-    {
-      "id": 9071,
       "name": "Odessa",
       "terrain": "plains",
       "core_for_tags": [],
@@ -1570,8 +1508,72 @@
       "special_levels": {}
     },
     {
+      "id": 9068,
+      "name": "Mykolaiv",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9069,
+      "name": "Kherson",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9070,
+      "name": "Constanta",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
+      "id": 9071,
+      "name": "Galati",
+      "terrain": "plains",
+      "core_for_tags": [],
+      "natural_resources": {
+        "resources": {
+          "oil": 24
+        },
+        "resource_score": 24,
+        "primary_resource": "oil"
+      },
+      "population_base": 1079000,
+      "special_features": [],
+      "special_levels": {}
+    },
+    {
       "id": 9072,
-      "name": "Province 9072",
+      "name": "Bergen",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1588,7 +1590,7 @@
     },
     {
       "id": 9073,
-      "name": "Province 9073",
+      "name": "Stavanger",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1605,7 +1607,7 @@
     },
     {
       "id": 9074,
-      "name": "Province 9074",
+      "name": "Stockholm",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1622,7 +1624,7 @@
     },
     {
       "id": 9075,
-      "name": "Province 9075",
+      "name": "Malmö",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1639,7 +1641,7 @@
     },
     {
       "id": 9076,
-      "name": "Province 9076",
+      "name": "Odense",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1656,7 +1658,7 @@
     },
     {
       "id": 9077,
-      "name": "Trondheim",
+      "name": "Flensburg",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1673,7 +1675,7 @@
     },
     {
       "id": 9078,
-      "name": "Province 9078",
+      "name": "Gyumri",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1689,7 +1691,7 @@
     },
     {
       "id": 9079,
-      "name": "Province 9079",
+      "name": "Siirt",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1705,7 +1707,7 @@
     },
     {
       "id": 9080,
-      "name": "Province 9080",
+      "name": "Agri",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1721,7 +1723,7 @@
     },
     {
       "id": 9081,
-      "name": "Province 9081",
+      "name": "Kars",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1737,7 +1739,7 @@
     },
     {
       "id": 9082,
-      "name": "Province 9082",
+      "name": "Vladikavkaz",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1753,7 +1755,7 @@
     },
     {
       "id": 9083,
-      "name": "Darwin",
+      "name": "Batman",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1769,7 +1771,7 @@
     },
     {
       "id": 9084,
-      "name": "Province 9084",
+      "name": "Samara",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1785,7 +1787,7 @@
     },
     {
       "id": 9085,
-      "name": "Province 9085",
+      "name": "Ardahan",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1801,7 +1803,7 @@
     },
     {
       "id": 9086,
-      "name": "Province 9086",
+      "name": "Nalchik",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1817,7 +1819,7 @@
     },
     {
       "id": 9087,
-      "name": "Province 9087",
+      "name": "Kutaisi",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1833,7 +1835,7 @@
     },
     {
       "id": 9088,
-      "name": "Province 9088",
+      "name": "Mardin",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1849,7 +1851,7 @@
     },
     {
       "id": 9089,
-      "name": "Manila",
+      "name": "Artvin",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1865,7 +1867,7 @@
     },
     {
       "id": 9090,
-      "name": "Province 9090",
+      "name": "Diyarbakir",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1881,7 +1883,7 @@
     },
     {
       "id": 9091,
-      "name": "Province 9091",
+      "name": "Erzurum",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1897,7 +1899,7 @@
     },
     {
       "id": 9092,
-      "name": "Province 9092",
+      "name": "Artvin District",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1913,7 +1915,7 @@
     },
     {
       "id": 9093,
-      "name": "Province 9093",
+      "name": "Sanliurfa",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1929,7 +1931,7 @@
     },
     {
       "id": 9094,
-      "name": "Province 9094",
+      "name": "Batumi",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1945,7 +1947,7 @@
     },
     {
       "id": 9095,
-      "name": "Christchurch",
+      "name": "Bayburt",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1961,7 +1963,7 @@
     },
     {
       "id": 9096,
-      "name": "Province 9096",
+      "name": "Ulyanovsk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1977,7 +1979,7 @@
     },
     {
       "id": 9097,
-      "name": "Province 9097",
+      "name": "Kazan",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -1993,7 +1995,7 @@
     },
     {
       "id": 9098,
-      "name": "Province 9098",
+      "name": "Saratov",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2009,7 +2011,7 @@
     },
     {
       "id": 9099,
-      "name": "Province 9099",
+      "name": "Rize",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2025,7 +2027,7 @@
     },
     {
       "id": 9100,
-      "name": "Province 9100",
+      "name": "Rize Coast",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2041,7 +2043,7 @@
     },
     {
       "id": 9101,
-      "name": "Cebu",
+      "name": "Rize District",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2057,7 +2059,7 @@
     },
     {
       "id": 9102,
-      "name": "Province 9102",
+      "name": "Zamora",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2073,7 +2075,7 @@
     },
     {
       "id": 9103,
-      "name": "Province 9103",
+      "name": "Ciudad Real",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2089,7 +2091,7 @@
     },
     {
       "id": 9104,
-      "name": "New Settlement",
+      "name": "Avila",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2105,7 +2107,7 @@
     },
     {
       "id": 9105,
-      "name": "New Settlement",
+      "name": "Toledo",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2121,7 +2123,7 @@
     },
     {
       "id": 9106,
-      "name": "Province 9106",
+      "name": "Leon",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2137,7 +2139,7 @@
     },
     {
       "id": 9107,
-      "name": "Honolulu",
+      "name": "Oviedo",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2153,7 +2155,7 @@
     },
     {
       "id": 9108,
-      "name": "Province 9108",
+      "name": "Valladolid",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2169,7 +2171,7 @@
     },
     {
       "id": 9109,
-      "name": "Province 9109",
+      "name": "Segovia",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2185,7 +2187,7 @@
     },
     {
       "id": 9110,
-      "name": "New Settlement",
+      "name": "Palencia",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2201,7 +2203,7 @@
     },
     {
       "id": 9111,
-      "name": "New Settlement",
+      "name": "Guadalajara",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2217,7 +2219,7 @@
     },
     {
       "id": 9112,
-      "name": "Province 9112",
+      "name": "Burgos",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2233,7 +2235,7 @@
     },
     {
       "id": 9113,
-      "name": "Reykjavik",
+      "name": "Albacete",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2249,7 +2251,7 @@
     },
     {
       "id": 9114,
-      "name": "Province 9114",
+      "name": "Waterford",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2265,7 +2267,7 @@
     },
     {
       "id": 9115,
-      "name": "Province 9115",
+      "name": "Derry",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2281,7 +2283,7 @@
     },
     {
       "id": 9116,
-      "name": "Province 9116",
+      "name": "Dublin",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2297,7 +2299,7 @@
     },
     {
       "id": 9117,
-      "name": "Province 9117",
+      "name": "Santander",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2313,7 +2315,7 @@
     },
     {
       "id": 9118,
-      "name": "Province 9118",
+      "name": "Truro",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2329,7 +2331,7 @@
     },
     {
       "id": 9119,
-      "name": "Havana",
+      "name": "Brest",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2345,7 +2347,7 @@
     },
     {
       "id": 9120,
-      "name": "Province 9120",
+      "name": "Cuenca",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2361,7 +2363,7 @@
     },
     {
       "id": 9121,
-      "name": "Province 9121",
+      "name": "Soria",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2377,7 +2379,7 @@
     },
     {
       "id": 9122,
-      "name": "New Settlement",
+      "name": "Alicante",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2393,7 +2395,7 @@
     },
     {
       "id": 9123,
-      "name": "New Settlement",
+      "name": "Logrono",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2409,7 +2411,7 @@
     },
     {
       "id": 9124,
-      "name": "Province 9124",
+      "name": "Bilbao",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2425,7 +2427,7 @@
     },
     {
       "id": 9125,
-      "name": "Colon",
+      "name": "Vitoria",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2441,7 +2443,7 @@
     },
     {
       "id": 9126,
-      "name": "Province 9126",
+      "name": "Teruel",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {},
@@ -2451,7 +2453,7 @@
     },
     {
       "id": 9127,
-      "name": "Province 9127",
+      "name": "San Sebastian",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {},
@@ -2461,7 +2463,7 @@
     },
     {
       "id": 9128,
-      "name": "Province 9128",
+      "name": "Pamplona",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {},
@@ -2471,7 +2473,7 @@
     },
     {
       "id": 9129,
-      "name": "Province 9129",
+      "name": "Valencia",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {},
@@ -2481,7 +2483,7 @@
     },
     {
       "id": 9130,
-      "name": "Province 9130",
+      "name": "Lorient",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {},
@@ -2501,7 +2503,7 @@
     },
     {
       "id": 9132,
-      "name": "Province 9132",
+      "name": "Kirov",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2518,7 +2520,7 @@
     },
     {
       "id": 9133,
-      "name": "Province 9133",
+      "name": "Syktyvkar",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2535,7 +2537,7 @@
     },
     {
       "id": 9134,
-      "name": "Province 9134",
+      "name": "Naryan-Mar",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2552,7 +2554,7 @@
     },
     {
       "id": 9135,
-      "name": "Province 9135",
+      "name": "Yoshkar-Ola",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2569,7 +2571,7 @@
     },
     {
       "id": 9136,
-      "name": "Province 9136",
+      "name": "Cheboksary",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2586,7 +2588,7 @@
     },
     {
       "id": 9137,
-      "name": "Shanghai",
+      "name": "Penza",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2603,7 +2605,7 @@
     },
     {
       "id": 9138,
-      "name": "Province 9138",
+      "name": "Sukhumi",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2619,7 +2621,7 @@
     },
     {
       "id": 9139,
-      "name": "Province 9139",
+      "name": "Stavropol",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2635,7 +2637,7 @@
     },
     {
       "id": 9140,
-      "name": "Province 9140",
+      "name": "Erzincan",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2651,7 +2653,7 @@
     },
     {
       "id": 9141,
-      "name": "Province 9141",
+      "name": "Trabzon",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2667,7 +2669,7 @@
     },
     {
       "id": 9142,
-      "name": "Province 9142",
+      "name": "Gumushane",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2683,7 +2685,7 @@
     },
     {
       "id": 9143,
-      "name": "New Delhi",
+      "name": "Adiyaman",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2699,7 +2701,7 @@
     },
     {
       "id": 9144,
-      "name": "Province 9144",
+      "name": "Gaziantep",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2715,7 +2717,7 @@
     },
     {
       "id": 9145,
-      "name": "Province 9145",
+      "name": "Malatya",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2731,7 +2733,7 @@
     },
     {
       "id": 9146,
-      "name": "Province 9146",
+      "name": "Kahramanmaras",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2747,7 +2749,7 @@
     },
     {
       "id": 9147,
-      "name": "Province 9147",
+      "name": "Osmaniye",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2763,7 +2765,7 @@
     },
     {
       "id": 9148,
-      "name": "Province 9148",
+      "name": "Nigde",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2779,7 +2781,7 @@
     },
     {
       "id": 9149,
-      "name": "Province 9149",
+      "name": "Kayseri",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2795,7 +2797,7 @@
     },
     {
       "id": 9150,
-      "name": "Province 9150",
+      "name": "Saransk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2812,7 +2814,7 @@
     },
     {
       "id": 9151,
-      "name": "Province 9151",
+      "name": "Nizhny Novgorod",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2829,7 +2831,7 @@
     },
     {
       "id": 9152,
-      "name": "Province 9152",
+      "name": "Nizhny Novgorod Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2846,7 +2848,7 @@
     },
     {
       "id": 9153,
-      "name": "Province 9153",
+      "name": "Tambov Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2863,7 +2865,7 @@
     },
     {
       "id": 9154,
-      "name": "Province 9154",
+      "name": "Tambov",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2880,7 +2882,7 @@
     },
     {
       "id": 9155,
-      "name": "Province 9155",
+      "name": "Ivanovo Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2897,7 +2899,7 @@
     },
     {
       "id": 9156,
-      "name": "Province 9156",
+      "name": "Novgorod",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2913,7 +2915,7 @@
     },
     {
       "id": 9157,
-      "name": "Province 9157",
+      "name": "Karelia",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2929,7 +2931,7 @@
     },
     {
       "id": 9158,
-      "name": "Province 9158",
+      "name": "Petrozavodsk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2945,7 +2947,7 @@
     },
     {
       "id": 9159,
-      "name": "Province 9159",
+      "name": "Novgorod Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2961,7 +2963,7 @@
     },
     {
       "id": 9160,
-      "name": "Province 9160",
+      "name": "Pskov Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -2993,7 +2995,7 @@
     },
     {
       "id": 9162,
-      "name": "Province 9162",
+      "name": "Zhytomyr",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3009,7 +3011,7 @@
     },
     {
       "id": 9163,
-      "name": "Province 9163",
+      "name": "Gomel",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3025,7 +3027,7 @@
     },
     {
       "id": 9164,
-      "name": "Province 9164",
+      "name": "Chernihiv",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3041,7 +3043,7 @@
     },
     {
       "id": 9165,
-      "name": "Province 9165",
+      "name": "Cherkasy",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3057,7 +3059,7 @@
     },
     {
       "id": 9166,
-      "name": "Province 9166",
+      "name": "Kirovohrad",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3089,7 +3091,7 @@
     },
     {
       "id": 9168,
-      "name": "Province 9168",
+      "name": "Denizli",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3105,7 +3107,7 @@
     },
     {
       "id": 9169,
-      "name": "Province 9169",
+      "name": "Burdur",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3121,7 +3123,7 @@
     },
     {
       "id": 9170,
-      "name": "Province 9170",
+      "name": "Konya",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3137,7 +3139,7 @@
     },
     {
       "id": 9171,
-      "name": "Province 9171",
+      "name": "Isparta",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3153,7 +3155,7 @@
     },
     {
       "id": 9172,
-      "name": "Province 9172",
+      "name": "Aydin",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3169,7 +3171,7 @@
     },
     {
       "id": 9173,
-      "name": "Cairo",
+      "name": "Usak",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3185,7 +3187,7 @@
     },
     {
       "id": 9174,
-      "name": "Province 9174",
+      "name": "Rize Fix",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3201,7 +3203,7 @@
     },
     {
       "id": 9175,
-      "name": "Province 9175",
+      "name": "Giresun",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3217,7 +3219,7 @@
     },
     {
       "id": 9176,
-      "name": "Province 9176",
+      "name": "Sochi",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3233,7 +3235,7 @@
     },
     {
       "id": 9177,
-      "name": "Province 9177",
+      "name": "Maikop",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3249,7 +3251,7 @@
     },
     {
       "id": 9178,
-      "name": "Province 9178",
+      "name": "Ordu",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3265,7 +3267,7 @@
     },
     {
       "id": 9179,
-      "name": "Tehran",
+      "name": "Sivas",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3281,7 +3283,7 @@
     },
     {
       "id": 9180,
-      "name": "Province 9180",
+      "name": "Tokat",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3298,7 +3300,7 @@
     },
     {
       "id": 9181,
-      "name": "Province 9181",
+      "name": "Tuapse",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3315,7 +3317,7 @@
     },
     {
       "id": 9182,
-      "name": "Province 9182",
+      "name": "Nevsehir",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3332,7 +3334,7 @@
     },
     {
       "id": 9183,
-      "name": "Province 9183",
+      "name": "Samsun",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3349,7 +3351,7 @@
     },
     {
       "id": 9184,
-      "name": "Province 9184",
+      "name": "Amasya",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3366,7 +3368,7 @@
     },
     {
       "id": 9185,
-      "name": "Sydney",
+      "name": "Krasnodar Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3383,7 +3385,7 @@
     },
     {
       "id": 9186,
-      "name": "Province 9186",
+      "name": "Castellon",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3399,7 +3401,7 @@
     },
     {
       "id": 9187,
-      "name": "Province 9187",
+      "name": "Zaragoza",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3415,7 +3417,7 @@
     },
     {
       "id": 9188,
-      "name": "Province 9188",
+      "name": "Huesca",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3431,7 +3433,7 @@
     },
     {
       "id": 9189,
-      "name": "Province 9189",
+      "name": "Lleida",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3447,7 +3449,7 @@
     },
     {
       "id": 9190,
-      "name": "Province 9190",
+      "name": "Tarragona",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3463,7 +3465,7 @@
     },
     {
       "id": 9191,
-      "name": "Buenos Aires",
+      "name": "Bayonne",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3479,7 +3481,7 @@
     },
     {
       "id": 9192,
-      "name": "Province 9192",
+      "name": "Barcelona",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3495,7 +3497,7 @@
     },
     {
       "id": 9193,
-      "name": "Province 9193",
+      "name": "Girona",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3511,7 +3513,7 @@
     },
     {
       "id": 9194,
-      "name": "Province 9194",
+      "name": "Bordeaux",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3527,7 +3529,7 @@
     },
     {
       "id": 9195,
-      "name": "Province 9195",
+      "name": "Toulouse",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3543,7 +3545,7 @@
     },
     {
       "id": 9196,
-      "name": "Province 9196",
+      "name": "Perpignan",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3559,7 +3561,7 @@
     },
     {
       "id": 9197,
-      "name": "Rio de Janeiro",
+      "name": "Nantes",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3575,7 +3577,7 @@
     },
     {
       "id": 9198,
-      "name": "Province 9198",
+      "name": "Ivanovo",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3591,7 +3593,7 @@
     },
     {
       "id": 9199,
-      "name": "Province 9199",
+      "name": "Kostroma",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3607,7 +3609,7 @@
     },
     {
       "id": 9200,
-      "name": "Province 9200",
+      "name": "Vladimir Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3623,7 +3625,7 @@
     },
     {
       "id": 9201,
-      "name": "Province 9201",
+      "name": "Vladimir",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3639,7 +3641,7 @@
     },
     {
       "id": 9202,
-      "name": "Province 9202",
+      "name": "Rostov Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3671,7 +3673,7 @@
     },
     {
       "id": 9204,
-      "name": "Province 9204",
+      "name": "Hebrides",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3687,7 +3689,7 @@
     },
     {
       "id": 9205,
-      "name": "Province 9205",
+      "name": "Belfast",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3703,7 +3705,7 @@
     },
     {
       "id": 9206,
-      "name": "Province 9206",
+      "name": "Pembrokeshire",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3719,7 +3721,7 @@
     },
     {
       "id": 9207,
-      "name": "Province 9207",
+      "name": "Campbeltown",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3735,7 +3737,7 @@
     },
     {
       "id": 9208,
-      "name": "Province 9208",
+      "name": "Plymouth",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3767,7 +3769,7 @@
     },
     {
       "id": 9210,
-      "name": "Province 9210",
+      "name": "Stornoway",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3783,7 +3785,7 @@
     },
     {
       "id": 9211,
-      "name": "Province 9211",
+      "name": "Argyll",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3799,7 +3801,7 @@
     },
     {
       "id": 9212,
-      "name": "Province 9212",
+      "name": "Oban",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3815,7 +3817,7 @@
     },
     {
       "id": 9213,
-      "name": "Province 9213",
+      "name": "Stranraer",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3831,7 +3833,7 @@
     },
     {
       "id": 9214,
-      "name": "Province 9214",
+      "name": "Fort William",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3863,7 +3865,7 @@
     },
     {
       "id": 9216,
-      "name": "Province 9216",
+      "name": "Tampere",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3879,7 +3881,7 @@
     },
     {
       "id": 9217,
-      "name": "Province 9217",
+      "name": "Tallinn",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3895,7 +3897,7 @@
     },
     {
       "id": 9218,
-      "name": "Province 9218",
+      "name": "Tartu",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3911,7 +3913,7 @@
     },
     {
       "id": 9219,
-      "name": "Province 9219",
+      "name": "Pskov",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3927,7 +3929,7 @@
     },
     {
       "id": 9220,
-      "name": "Province 9220",
+      "name": "Riga",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3959,7 +3961,7 @@
     },
     {
       "id": 9222,
-      "name": "Province 9222",
+      "name": "Ullapool",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3975,7 +3977,7 @@
     },
     {
       "id": 9223,
-      "name": "Province 9223",
+      "name": "Inverclyde",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -3991,7 +3993,7 @@
     },
     {
       "id": 9224,
-      "name": "Province 9224",
+      "name": "Ayr",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4007,7 +4009,7 @@
     },
     {
       "id": 9225,
-      "name": "Province 9225",
+      "name": "Isle of Man",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4023,7 +4025,7 @@
     },
     {
       "id": 9226,
-      "name": "Province 9226",
+      "name": "Galloway",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4039,7 +4041,7 @@
     },
     {
       "id": 9227,
-      "name": "Chicago",
+      "name": "Kilmarnock",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4055,7 +4057,7 @@
     },
     {
       "id": 9228,
-      "name": "Province 9228",
+      "name": "Wigtown",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4071,7 +4073,7 @@
     },
     {
       "id": 9229,
-      "name": "Province 9229",
+      "name": "Anglesey",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4087,7 +4089,7 @@
     },
     {
       "id": 9230,
-      "name": "Province 9230",
+      "name": "Paisley",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4103,7 +4105,7 @@
     },
     {
       "id": 9231,
-      "name": "Province 9231",
+      "name": "Swansea",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4119,7 +4121,7 @@
     },
     {
       "id": 9232,
-      "name": "Province 9232",
+      "name": "Glasgow",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4135,7 +4137,7 @@
     },
     {
       "id": 9233,
-      "name": "Detroit",
+      "name": "Snowdonia",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4151,7 +4153,7 @@
     },
     {
       "id": 9234,
-      "name": "Province 9234",
+      "name": "Aksaray",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4167,7 +4169,7 @@
     },
     {
       "id": 9235,
-      "name": "Province 9235",
+      "name": "Krasnodar",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4183,7 +4185,7 @@
     },
     {
       "id": 9236,
-      "name": "Province 9236",
+      "name": "Yozgat",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4199,7 +4201,7 @@
     },
     {
       "id": 9237,
-      "name": "Province 9237",
+      "name": "Gelendzhik",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4215,7 +4217,7 @@
     },
     {
       "id": 9238,
-      "name": "Province 9238",
+      "name": "Corum",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4231,7 +4233,7 @@
     },
     {
       "id": 9239,
-      "name": "Bangalore",
+      "name": "Novorossiysk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4247,7 +4249,7 @@
     },
     {
       "id": 9240,
-      "name": "Province 9240",
+      "name": "Bern",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4263,7 +4265,7 @@
     },
     {
       "id": 9241,
-      "name": "Province 9241",
+      "name": "Konstanz",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4279,7 +4281,7 @@
     },
     {
       "id": 9242,
-      "name": "Province 9242",
+      "name": "Trento",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4295,7 +4297,7 @@
     },
     {
       "id": 9243,
-      "name": "Province 9243",
+      "name": "Modena",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4311,7 +4313,7 @@
     },
     {
       "id": 9244,
-      "name": "Province 9244",
+      "name": "Genoa",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4343,7 +4345,7 @@
     },
     {
       "id": 9246,
-      "name": "Province 9246",
+      "name": "Rostov-on-Don",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4359,7 +4361,7 @@
     },
     {
       "id": 9247,
-      "name": "Province 9247",
+      "name": "Anapa",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4375,7 +4377,7 @@
     },
     {
       "id": 9248,
-      "name": "Province 9248",
+      "name": "Sinop",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4391,7 +4393,7 @@
     },
     {
       "id": 9249,
-      "name": "Province 9249",
+      "name": "Mariupol",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4407,7 +4409,7 @@
     },
     {
       "id": 9250,
-      "name": "Province 9250",
+      "name": "Kerch",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4423,7 +4425,7 @@
     },
     {
       "id": 9251,
-      "name": "Bangkok",
+      "name": "Kirikkale",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4439,7 +4441,7 @@
     },
     {
       "id": 9252,
-      "name": "Province 9252",
+      "name": "Montpellier",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4456,7 +4458,7 @@
     },
     {
       "id": 9253,
-      "name": "Province 9253",
+      "name": "Limoges",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4473,7 +4475,7 @@
     },
     {
       "id": 9254,
-      "name": "Province 9254",
+      "name": "Poitiers",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4490,7 +4492,7 @@
     },
     {
       "id": 9255,
-      "name": "Province 9255",
+      "name": "Cagliari",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4507,7 +4509,7 @@
     },
     {
       "id": 9256,
-      "name": "Province 9256",
+      "name": "Rennes",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4524,7 +4526,7 @@
     },
     {
       "id": 9257,
-      "name": "Sao Paulo",
+      "name": "Angers",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4541,7 +4543,7 @@
     },
     {
       "id": 9258,
-      "name": "Province 9258",
+      "name": "Cankiri",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4557,7 +4559,7 @@
     },
     {
       "id": 9259,
-      "name": "Province 9259",
+      "name": "Kastamonu",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4573,7 +4575,7 @@
     },
     {
       "id": 9260,
-      "name": "Province 9260",
+      "name": "Kastamonu Coast",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4589,7 +4591,7 @@
     },
     {
       "id": 9261,
-      "name": "Province 9261",
+      "name": "Karabuk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4605,7 +4607,7 @@
     },
     {
       "id": 9262,
-      "name": "Province 9262",
+      "name": "Afyon",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4621,7 +4623,7 @@
     },
     {
       "id": 9263,
-      "name": "Baghdad",
+      "name": "Bolu",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4637,7 +4639,7 @@
     },
     {
       "id": 9264,
-      "name": "Province 9264",
+      "name": "Tver",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4654,7 +4656,7 @@
     },
     {
       "id": 9265,
-      "name": "Province 9265",
+      "name": "Yaroslavl Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4671,7 +4673,7 @@
     },
     {
       "id": 9266,
-      "name": "Province 9266",
+      "name": "Yaroslavl",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4688,7 +4690,7 @@
     },
     {
       "id": 9267,
-      "name": "Province 9267",
+      "name": "Ryazan",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4705,7 +4707,7 @@
     },
     {
       "id": 9268,
-      "name": "Province 9268",
+      "name": "Tula",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4739,7 +4741,7 @@
     },
     {
       "id": 9270,
-      "name": "Province 9270",
+      "name": "Leicester",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4755,7 +4757,7 @@
     },
     {
       "id": 9271,
-      "name": "Province 9271",
+      "name": "The Wash",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4771,7 +4773,7 @@
     },
     {
       "id": 9272,
-      "name": "Province 9272",
+      "name": "Norwich Broads",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4787,7 +4789,7 @@
     },
     {
       "id": 9273,
-      "name": "Province 9273",
+      "name": "Dunkirk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4803,7 +4805,7 @@
     },
     {
       "id": 9274,
-      "name": "Province 9274",
+      "name": "Hastings",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4835,7 +4837,7 @@
     },
     {
       "id": 9276,
-      "name": "Province 9276",
+      "name": "Rouen",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4852,7 +4854,7 @@
     },
     {
       "id": 9277,
-      "name": "Province 9277",
+      "name": "Lille",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4869,7 +4871,7 @@
     },
     {
       "id": 9278,
-      "name": "Province 9278",
+      "name": "Charleville",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4886,7 +4888,7 @@
     },
     {
       "id": 9279,
-      "name": "Province 9279",
+      "name": "Troyes",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4903,7 +4905,7 @@
     },
     {
       "id": 9280,
-      "name": "Province 9280",
+      "name": "Orleans",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4937,7 +4939,7 @@
     },
     {
       "id": 9282,
-      "name": "Province 9282",
+      "name": "Rostock",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4955,7 +4957,7 @@
     },
     {
       "id": 9283,
-      "name": "Province 9283",
+      "name": "Greifswald",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4973,7 +4975,7 @@
     },
     {
       "id": 9284,
-      "name": "Province 9284",
+      "name": "Koszalin",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -4991,7 +4993,7 @@
     },
     {
       "id": 9285,
-      "name": "Province 9285",
+      "name": "Zielona Gora",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5009,7 +5011,7 @@
     },
     {
       "id": 9286,
-      "name": "Province 9286",
+      "name": "Cottbus",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5045,7 +5047,7 @@
     },
     {
       "id": 9288,
-      "name": "Province 9288",
+      "name": "Lipetsk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5061,7 +5063,7 @@
     },
     {
       "id": 9289,
-      "name": "Province 9289",
+      "name": "Voronezh",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5077,7 +5079,7 @@
     },
     {
       "id": 9290,
-      "name": "Province 9290",
+      "name": "Voronezh Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5093,7 +5095,7 @@
     },
     {
       "id": 9291,
-      "name": "Province 9291",
+      "name": "Lipetsk Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5109,7 +5111,7 @@
     },
     {
       "id": 9292,
-      "name": "New Settlement",
+      "name": "Donetsk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5125,7 +5127,7 @@
     },
     {
       "id": 9293,
-      "name": "Province 9293",
+      "name": "Berdiansk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5142,7 +5144,7 @@
     },
     {
       "id": 9294,
-      "name": "Province 9294",
+      "name": "Feodosia",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5159,7 +5161,7 @@
     },
     {
       "id": 9295,
-      "name": "Province 9295",
+      "name": "Yalta",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5176,7 +5178,7 @@
     },
     {
       "id": 9296,
-      "name": "Province 9296",
+      "name": "Bartin",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5210,7 +5212,7 @@
     },
     {
       "id": 9298,
-      "name": "Province 9298",
+      "name": "Haarlem",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5226,7 +5228,7 @@
     },
     {
       "id": 9299,
-      "name": "Province 9299",
+      "name": "Leeuwarden",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5242,7 +5244,7 @@
     },
     {
       "id": 9300,
-      "name": "Province 9300",
+      "name": "Groningen",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5258,7 +5260,7 @@
     },
     {
       "id": 9301,
-      "name": "Province 9301",
+      "name": "Emden",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5290,7 +5292,7 @@
     },
     {
       "id": 9303,
-      "name": "Province 9303",
+      "name": "Sumy",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5306,7 +5308,7 @@
     },
     {
       "id": 9304,
-      "name": "Province 9304",
+      "name": "Kursk Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5322,7 +5324,7 @@
     },
     {
       "id": 9305,
-      "name": "Province 9305",
+      "name": "Belgorod Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5338,7 +5340,7 @@
     },
     {
       "id": 9306,
-      "name": "Province 9306",
+      "name": "Belgorod",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5370,7 +5372,7 @@
     },
     {
       "id": 9308,
-      "name": "Province 9308",
+      "name": "Duzce",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5386,7 +5388,7 @@
     },
     {
       "id": 9309,
-      "name": "Province 9309",
+      "name": "Zonguldak",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5402,7 +5404,7 @@
     },
     {
       "id": 9310,
-      "name": "Province 9310",
+      "name": "Eskisehir",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5418,7 +5420,7 @@
     },
     {
       "id": 9311,
-      "name": "Province 9311",
+      "name": "Sakarya",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5450,7 +5452,7 @@
     },
     {
       "id": 9313,
-      "name": "Province 9313",
+      "name": "Kutahya",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5466,7 +5468,7 @@
     },
     {
       "id": 9314,
-      "name": "Province 9314",
+      "name": "Simferopol",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5482,7 +5484,7 @@
     },
     {
       "id": 9315,
-      "name": "Province 9315",
+      "name": "Sevastopol",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5498,7 +5500,7 @@
     },
     {
       "id": 9316,
-      "name": "Province 9316",
+      "name": "Melitopol",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5514,7 +5516,7 @@
     },
     {
       "id": 9317,
-      "name": "Baghdad",
+      "name": "Bilecik",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5530,7 +5532,7 @@
     },
     {
       "id": 9318,
-      "name": "Province 9318",
+      "name": "Kocaeli",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5546,7 +5548,7 @@
     },
     {
       "id": 9319,
-      "name": "Province 9319",
+      "name": "Bursa Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5562,7 +5564,7 @@
     },
     {
       "id": 9320,
-      "name": "Province 9320",
+      "name": "Zaporizhzhia",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5578,7 +5580,7 @@
     },
     {
       "id": 9321,
-      "name": "Province 9321",
+      "name": "Bursa",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5594,7 +5596,7 @@
     },
     {
       "id": 9322,
-      "name": "New Settlement",
+      "name": "Yalova",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5610,7 +5612,7 @@
     },
     {
       "id": 9323,
-      "name": "Province 9323",
+      "name": "Dnipro",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5626,7 +5628,7 @@
     },
     {
       "id": 9324,
-      "name": "Province 9324",
+      "name": "Ryazan Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5642,7 +5644,7 @@
     },
     {
       "id": 9325,
-      "name": "Province 9325",
+      "name": "Manisa",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5658,7 +5660,7 @@
     },
     {
       "id": 9326,
-      "name": "Province 9326",
+      "name": "Balikesir",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5674,7 +5676,7 @@
     },
     {
       "id": 9327,
-      "name": "Jakarta",
+      "name": "Izmir",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5690,7 +5692,7 @@
     },
     {
       "id": 9328,
-      "name": "Province 9328",
+      "name": "Tekirdag",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5706,7 +5708,7 @@
     },
     {
       "id": 9329,
-      "name": "Province 9329",
+      "name": "Canakkale",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5722,7 +5724,7 @@
     },
     {
       "id": 9330,
-      "name": "Province 9330",
+      "name": "Kryvyi Rih",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5738,7 +5740,7 @@
     },
     {
       "id": 9331,
-      "name": "Province 9331",
+      "name": "Poltava",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5770,7 +5772,7 @@
     },
     {
       "id": 9333,
-      "name": "Province 9333",
+      "name": "Kursk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5786,7 +5788,7 @@
     },
     {
       "id": 9334,
-      "name": "Province 9334",
+      "name": "Tula Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5802,7 +5804,7 @@
     },
     {
       "id": 9335,
-      "name": "Province 9335",
+      "name": "Kremenchuk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5818,7 +5820,7 @@
     },
     {
       "id": 9336,
-      "name": "Province 9336",
+      "name": "Orel",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5850,7 +5852,7 @@
     },
     {
       "id": 9338,
-      "name": "Province 9338",
+      "name": "Vologda",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5867,7 +5869,7 @@
     },
     {
       "id": 9339,
-      "name": "Province 9339",
+      "name": "Orel Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5884,7 +5886,7 @@
     },
     {
       "id": 9340,
-      "name": "Province 9340",
+      "name": "Kaluga",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5901,7 +5903,7 @@
     },
     {
       "id": 9341,
-      "name": "Province 9341",
+      "name": "Kaluga Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5918,7 +5920,7 @@
     },
     {
       "id": 9342,
-      "name": "Hanoi",
+      "name": "Cherepovets",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5935,7 +5937,7 @@
     },
     {
       "id": 9343,
-      "name": "Province 9343",
+      "name": "Kirklareli",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5951,7 +5953,7 @@
     },
     {
       "id": 9344,
-      "name": "Province 9344",
+      "name": "Varna",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5967,7 +5969,7 @@
     },
     {
       "id": 9345,
-      "name": "Province 9345",
+      "name": "Burgas",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5983,7 +5985,7 @@
     },
     {
       "id": 9346,
-      "name": "Province 9346",
+      "name": "Bryansk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -5999,7 +6001,7 @@
     },
     {
       "id": 9347,
-      "name": "Kuala Lumpur",
+      "name": "Edirne",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6015,7 +6017,7 @@
     },
     {
       "id": 9348,
-      "name": "Province 9348",
+      "name": "Turku",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6031,7 +6033,7 @@
     },
     {
       "id": 9349,
-      "name": "Province 9349",
+      "name": "Klaipeda",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6047,7 +6049,7 @@
     },
     {
       "id": 9350,
-      "name": "Province 9350",
+      "name": "Kaliningrad",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6063,7 +6065,7 @@
     },
     {
       "id": 9351,
-      "name": "Province 9351",
+      "name": "Gdynia",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6079,7 +6081,7 @@
     },
     {
       "id": 9352,
-      "name": "Stockholm",
+      "name": "Gdansk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6095,7 +6097,7 @@
     },
     {
       "id": 9353,
-      "name": "Province 9353",
+      "name": "Stralsund",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6111,7 +6113,7 @@
     },
     {
       "id": 9354,
-      "name": "Province 9354",
+      "name": "Neubrandenburg",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6127,7 +6129,7 @@
     },
     {
       "id": 9355,
-      "name": "Province 9355",
+      "name": "Szczecin",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6143,7 +6145,7 @@
     },
     {
       "id": 9356,
-      "name": "Province 9356",
+      "name": "Slupsk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6175,7 +6177,7 @@
     },
     {
       "id": 9358,
-      "name": "Province 9358",
+      "name": "Athens",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6193,7 +6195,7 @@
     },
     {
       "id": 9359,
-      "name": "Province 9359",
+      "name": "Patras",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6211,7 +6213,7 @@
     },
     {
       "id": 9360,
-      "name": "Province 9360",
+      "name": "Catania",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6229,7 +6231,7 @@
     },
     {
       "id": 9361,
-      "name": "Province 9361",
+      "name": "Agrigento",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6247,7 +6249,7 @@
     },
     {
       "id": 9362,
-      "name": "New Settlement",
+      "name": "Caltanissetta",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6265,7 +6267,7 @@
     },
     {
       "id": 9363,
-      "name": "Province 9363",
+      "name": "Oristano",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6281,7 +6283,7 @@
     },
     {
       "id": 9364,
-      "name": "Province 9364",
+      "name": "Marseille",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6297,7 +6299,7 @@
     },
     {
       "id": 9365,
-      "name": "Province 9365",
+      "name": "Tours",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6313,7 +6315,7 @@
     },
     {
       "id": 9366,
-      "name": "Province 9366",
+      "name": "Avignon",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6329,7 +6331,7 @@
     },
     {
       "id": 9367,
-      "name": "Buenos Aires",
+      "name": "Toulon",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6345,7 +6347,7 @@
     },
     {
       "id": 9368,
-      "name": "Province 9368",
+      "name": "Sassari",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6361,7 +6363,7 @@
     },
     {
       "id": 9369,
-      "name": "Province 9369",
+      "name": "Nuoro",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6377,7 +6379,7 @@
     },
     {
       "id": 9370,
-      "name": "Province 9370",
+      "name": "Clermont-Ferrand",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6393,7 +6395,7 @@
     },
     {
       "id": 9371,
-      "name": "Province 9371",
+      "name": "Le Mans",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6409,7 +6411,7 @@
     },
     {
       "id": 9372,
-      "name": "Rio de Janeiro",
+      "name": "Trapani",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6425,7 +6427,7 @@
     },
     {
       "id": 9373,
-      "name": "Province 9373",
+      "name": "Exeter",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6441,7 +6443,7 @@
     },
     {
       "id": 9374,
-      "name": "Province 9374",
+      "name": "Cardiff",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6457,7 +6459,7 @@
     },
     {
       "id": 9375,
-      "name": "Province 9375",
+      "name": "Bristol",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6473,7 +6475,7 @@
     },
     {
       "id": 9376,
-      "name": "Province 9376",
+      "name": "Cherbourg",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6489,7 +6491,7 @@
     },
     {
       "id": 9377,
-      "name": "New Settlement",
+      "name": "Bath",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6505,7 +6507,7 @@
     },
     {
       "id": 9378,
-      "name": "Province 9378",
+      "name": "Braila",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6522,7 +6524,7 @@
     },
     {
       "id": 9379,
-      "name": "Province 9379",
+      "name": "Stara Zagora",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6539,7 +6541,7 @@
     },
     {
       "id": 9380,
-      "name": "Province 9380",
+      "name": "Plovdiv",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6556,7 +6558,7 @@
     },
     {
       "id": 9381,
-      "name": "Province 9381",
+      "name": "Ruse",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6573,7 +6575,7 @@
     },
     {
       "id": 9382,
-      "name": "Adelaide",
+      "name": "Bucharest",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6590,7 +6592,7 @@
     },
     {
       "id": 9383,
-      "name": "Province 9383",
+      "name": "Tver Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6607,7 +6609,7 @@
     },
     {
       "id": 9384,
-      "name": "Province 9384",
+      "name": "Arkhangelsk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6624,7 +6626,7 @@
     },
     {
       "id": 9385,
-      "name": "Province 9385",
+      "name": "Smolensk Region",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6641,7 +6643,7 @@
     },
     {
       "id": 9386,
-      "name": "Province 9386",
+      "name": "Smolensk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6658,7 +6660,7 @@
     },
     {
       "id": 9387,
-      "name": "Ho Chi Minh City",
+      "name": "Iasi",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6675,7 +6677,7 @@
     },
     {
       "id": 9388,
-      "name": "Province 9388",
+      "name": "Vinnytsia",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6691,7 +6693,7 @@
     },
     {
       "id": 9389,
-      "name": "Province 9389",
+      "name": "Bacau",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6707,7 +6709,7 @@
     },
     {
       "id": 9390,
-      "name": "Province 9390",
+      "name": "Ploiesti",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6723,7 +6725,7 @@
     },
     {
       "id": 9391,
-      "name": "Province 9391",
+      "name": "Vitebsk",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6739,7 +6741,7 @@
     },
     {
       "id": 9392,
-      "name": "New Settlement",
+      "name": "Brasov",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6755,7 +6757,7 @@
     },
     {
       "id": 9393,
-      "name": "Province 9393",
+      "name": "Pleven",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6771,7 +6773,7 @@
     },
     {
       "id": 9394,
-      "name": "Province 9394",
+      "name": "Pitesti",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6787,7 +6789,7 @@
     },
     {
       "id": 9395,
-      "name": "Province 9395",
+      "name": "Suceava",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6803,7 +6805,7 @@
     },
     {
       "id": 9396,
-      "name": "Province 9396",
+      "name": "Thessaloniki",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6819,7 +6821,7 @@
     },
     {
       "id": 9397,
-      "name": "Isfahan",
+      "name": "Larissa",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6835,7 +6837,7 @@
     },
     {
       "id": 9398,
-      "name": "Province 9398",
+      "name": "Enna",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6851,7 +6853,7 @@
     },
     {
       "id": 9399,
-      "name": "Province 9399",
+      "name": "Palermo",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6867,7 +6869,7 @@
     },
     {
       "id": 9400,
-      "name": "Province 9400",
+      "name": "Reggio Calabria",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6883,7 +6885,7 @@
     },
     {
       "id": 9401,
-      "name": "Province 9401",
+      "name": "Messina",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6899,7 +6901,7 @@
     },
     {
       "id": 9402,
-      "name": "Abuja",
+      "name": "Catanzaro",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6915,7 +6917,7 @@
     },
     {
       "id": 9403,
-      "name": "Province 9403",
+      "name": "Ioannina",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6931,7 +6933,7 @@
     },
     {
       "id": 9404,
-      "name": "Province 9404",
+      "name": "Cosenza",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6947,7 +6949,7 @@
     },
     {
       "id": 9405,
-      "name": "Province 9405",
+      "name": "Gjirokaster",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6963,7 +6965,7 @@
     },
     {
       "id": 9406,
-      "name": "Province 9406",
+      "name": "Korce",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -6995,7 +6997,7 @@
     },
     {
       "id": 9408,
-      "name": "Province 9408",
+      "name": "Caen",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7011,7 +7013,7 @@
     },
     {
       "id": 9409,
-      "name": "Province 9409",
+      "name": "Bournemouth",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7027,7 +7029,7 @@
     },
     {
       "id": 9410,
-      "name": "Province 9410",
+      "name": "Salisbury",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7043,7 +7045,7 @@
     },
     {
       "id": 9411,
-      "name": "Province 9411",
+      "name": "Saint-Etienne",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7059,7 +7061,7 @@
     },
     {
       "id": 9412,
-      "name": "Cordoba",
+      "name": "Le Havre",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7075,7 +7077,7 @@
     },
     {
       "id": 9413,
-      "name": "Province 9413",
+      "name": "Hereford",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7091,7 +7093,7 @@
     },
     {
       "id": 9414,
-      "name": "Province 9414",
+      "name": "Southampton",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7107,7 +7109,7 @@
     },
     {
       "id": 9415,
-      "name": "Province 9415",
+      "name": "Portsmouth",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7123,7 +7125,7 @@
     },
     {
       "id": 9416,
-      "name": "Province 9416",
+      "name": "Gloucester",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7155,7 +7157,7 @@
     },
     {
       "id": 9418,
-      "name": "Province 9418",
+      "name": "Swindon",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7172,7 +7174,7 @@
     },
     {
       "id": 9419,
-      "name": "Province 9419",
+      "name": "Winchester",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7189,7 +7191,7 @@
     },
     {
       "id": 9420,
-      "name": "Province 9420",
+      "name": "Cheltenham",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7206,7 +7208,7 @@
     },
     {
       "id": 9421,
-      "name": "Province 9421",
+      "name": "Shrewsbury",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7223,7 +7225,7 @@
     },
     {
       "id": 9422,
-      "name": "New Settlement",
+      "name": "Worcester",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7240,7 +7242,7 @@
     },
     {
       "id": 9423,
-      "name": "Province 9423",
+      "name": "Chester",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7256,7 +7258,7 @@
     },
     {
       "id": 9424,
-      "name": "Province 9424",
+      "name": "Liverpool",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7272,7 +7274,7 @@
     },
     {
       "id": 9425,
-      "name": "Province 9425",
+      "name": "Wolverhampton",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7288,7 +7290,7 @@
     },
     {
       "id": 9426,
-      "name": "Province 9426",
+      "name": "Oxford",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7304,7 +7306,7 @@
     },
     {
       "id": 9427,
-      "name": "Cali",
+      "name": "Reading",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7320,7 +7322,7 @@
     },
     {
       "id": 9428,
-      "name": "Province 9428",
+      "name": "Blackpool",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7336,7 +7338,7 @@
     },
     {
       "id": 9429,
-      "name": "Province 9429",
+      "name": "Dumfries",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7352,7 +7354,7 @@
     },
     {
       "id": 9430,
-      "name": "Province 9430",
+      "name": "Motherwell",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7368,7 +7370,7 @@
     },
     {
       "id": 9431,
-      "name": "Province 9431",
+      "name": "Crewe",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7384,7 +7386,7 @@
     },
     {
       "id": 9432,
-      "name": "New Settlement",
+      "name": "Warrington",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7400,7 +7402,7 @@
     },
     {
       "id": 9433,
-      "name": "Province 9433",
+      "name": "Lake District",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7416,7 +7418,7 @@
     },
     {
       "id": 9434,
-      "name": "Province 9434",
+      "name": "Wigan",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7432,7 +7434,7 @@
     },
     {
       "id": 9435,
-      "name": "Province 9435",
+      "name": "Stirling",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7448,7 +7450,7 @@
     },
     {
       "id": 9436,
-      "name": "Province 9436",
+      "name": "Preston",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {
@@ -7464,7 +7466,7 @@
     },
     {
       "id": 9437,
-      "name": "New Settlement",
+      "name": "Lancaster",
       "terrain": "plains",
       "core_for_tags": [],
       "natural_resources": {

@@ -104,11 +104,23 @@ func _init_depot_states() -> void:
 
 		state.throughput_capacity = hub.storage_capacity * base_fraction * infra_factor * dev_factor
 		state.stockpile = hub.storage_capacity * float(throughput_rules.get("initial_fill_ratio", 0.65))
+		# Pass 18: seed munitions share of general stock for land ammo UI.
+		state.munitions_stockpile = state.stockpile * 0.35
 		depot_states[hub.province_id] = state
 
 
 func get_depot_state(province_id: int) -> ProvinceDepotState:
 	return depot_states.get(province_id)
+
+
+## Pass 18: munitions readiness 0–1 at province depot (for OOB ammo bar).
+func get_depot_munitions_ratio(province_id: int) -> float:
+	var depot: ProvinceDepotState = depot_states.get(province_id)
+	if depot == null:
+		return -1.0
+	if depot.has_method("munitions_ratio"):
+		return float(depot.munitions_ratio())
+	return -1.0
 
 
 func get_depot_menu_lines(limit: int = 5) -> Array[String]:
@@ -263,22 +275,30 @@ func _process_air_missions(days: float = 1.0) -> void:
 		if f == null or f.get_category() != "air": continue
 		_process_single_air_formation(f, days, year_now, wm_eff)
 	# Also any air in registry from other (demo/enemy air wings if registered via LeaderManager elsewhere)
-	# For tests, force OOB + manual may populate; this covers when formations exist.
-	print("[AIR] _process_air_missions tick (dynamic sorties, fuel, recon, attrition now active)")
+	# Rate-limit log spam — printing every day hung the Output panel / debugger during F5 play.
+	if OS.get_environment("EOA_HEADLESS_EVIDENCE").strip_edges() == "1" or Engine.get_process_frames() % 120 == 0:
+		print("[AIR] _process_air_missions tick (dynamic sorties, fuel, recon, attrition now active)")
 
 func _process_single_air_formation(f: Formation, days: float, year: int, base_wm: float) -> void:
 	if f == null or f.get_category() != "air": return
 	var mid := str(f.current_air_mission) if "current_air_mission" in f else ""
 	if mid == "" or mid == "NONE": return
-	var pid := int(f.get("stationed_province_id", -1)) if f.has_method("get") or "stationed_province_id" in f else -1
+	var pid := -1
+	if "stationed_province_id" in f:
+		pid = int(f.stationed_province_id)
 	if pid < 0 and division_deployments.has(f.formation_id):
-		pid = int(division_deployments[f.formation_id].get("province_id", -1))
+		var dep: Dictionary = division_deployments[f.formation_id] as Dictionary
+		if dep.has("province_id"):
+			pid = int(dep["province_id"])
 	if pid < 0: return
 
-	# Weather per province
+	# Weather per province — prefer pure air sortie readiness gate when available.
 	var w_eff := base_wm
-	if typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_air_mission_effectiveness"):
-		w_eff = float(WeatherManager.call("get_air_mission_effectiveness", pid))
+	if typeof(WeatherManager) != TYPE_NIL:
+		if WeatherManager.has_method("get_air_sortie_weather_eff"):
+			w_eff = float(WeatherManager.get_air_sortie_weather_eff(pid))
+		elif WeatherManager.has_method("get_air_mission_effectiveness"):
+			w_eff = float(WeatherManager.call("get_air_mission_effectiveness", pid))
 	# Enemy AA from registry report (defenders in pid)
 	var en_aa := 0.1
 	var reg_report = force_registry.get_report(pid) if force_registry else null
@@ -311,10 +331,10 @@ func _process_single_air_formation(f: Formation, days: float, year: int, base_wm
 	# Apply to formation readiness/org/strength (fatigue + fuel state)
 	if "organization" in f:
 		f.organization = clampf(float(f.organization) + rdy_imp * 0.7, 0.3, 1.8)
-	if "readiness" in f or f.has_method("set"):
-		var cur_r := float(f.get("readiness", 1.0)) if "readiness" in f else 1.0
+	if "readiness" in f:
+		var cur_r := float(f.readiness)
 		cur_r = clampf(cur_r + rdy_imp, 0.25, 1.6)
-		if "readiness" in f: f.readiness = cur_r
+		f.readiness = cur_r
 	# Strength attrition (AA + mech)
 	var attr := AirMissionProfile.new().apply_air_mission_attrition( float(f.strength if "strength" in f else 1.0), en_aa, sorties, w_eff, stl )
 	if "strength" in f:
@@ -443,9 +463,12 @@ func calculate_daily_supply_consumption(formation_id: String) -> float:
 	var formation := get_formation(formation_id)
 	var prov_id := -1
 	if formation != null:
-		prov_id = int(formation.get("stationed_province_id", -1))
+		if "stationed_province_id" in formation:
+			prov_id = int(formation.stationed_province_id)
 		if prov_id < 0 and division_deployments.has(formation_id):
-			prov_id = int((division_deployments[formation_id] as Dictionary).get("province_id", -1))
+			var dep2: Dictionary = division_deployments[formation_id] as Dictionary
+			if dep2.has("province_id"):
+				prov_id = int(dep2["province_id"])
 	if prov_id >= 0:
 		var ratio := get_air_power_ratio(prov_id, formation.country_tag if formation and "country_tag" in formation else player_tag)
 		var is_adv := ratio >= 1.0
@@ -526,8 +549,61 @@ func get_attrition_cargo_summary(_leader_id: String = "") -> Dictionary:
 
 
 func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
-	# Daily supply simulation driven by central TimeManager
+	# Daily supply simulation driven by central TimeManager.
+	# Interactive F5: always light path (no air/naval recon spam — that made 1x + wheel unusable).
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+		_advance_supply_day_light(1.0)
+		return
 	advance_supply_day(1.0)
+
+
+func _advance_supply_day_light(days: float = 1.0) -> void:
+	## Depot flow without air/naval recon spam — keeps 1x playable past January/February.
+	if days <= 0.0:
+		return
+	_generate_local_supply_from_development_light(days)
+	if force_registry and force_registry.has_method("decay_all_recon"):
+		force_registry.decay_all_recon(days)
+
+
+func _generate_local_supply_from_development_light(days: float) -> void:
+	## Budgeted slice of depots per day so world_full (2k+ depots) cannot freeze the clock.
+	if days <= 0.0 or depot_states.is_empty():
+		return
+	var keys: Array = depot_states.keys()
+	var n := keys.size()
+	if n == 0:
+		return
+	var budget := 96 if n > 800 else n
+	var start := 0
+	if typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+		start = int(TimeManager.total_days_elapsed) % n
+	var checked := 0
+	var offset := 0
+	while checked < budget and offset < n:
+		var pid_var = keys[(start + offset) % n]
+		offset += 1
+		var state: ProvinceDepotState = depot_states.get(pid_var)
+		if state == null:
+			continue
+		checked += 1
+		if state.sabotage_level > 0.0:
+			state.sabotage_level = maxf(0.0, state.sabotage_level - 0.13)
+		var province: Province = null
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+			province = MapManager.get_province(int(pid_var)) as Province
+		if province == null:
+			continue
+		# Skip heavy ProvinceEffects on the light path — use province getter only.
+		var local_gen := province.get_local_supply_generation_modifier()
+		if local_gen <= 0.0:
+			continue
+		var daily_gen := 40.0 * local_gen * days
+		if typeof(AgentManager) != TYPE_NIL and AgentManager.has_method("get_supply_disruption_in_province"):
+			var disruption: float = AgentManager.get_supply_disruption_in_province(int(pid_var))
+			if disruption > 0.0:
+				daily_gen *= (1.0 - clampf(disruption * 0.25, 0.0, 0.6))
+		state.apply_inflow(daily_gen)
 
 func advance_supply_day(days: float = 1.0) -> void:
 	if days <= 0.0:
@@ -564,8 +640,75 @@ func advance_supply_day(days: float = 1.0) -> void:
 		var delivery := 1.0 - plan.interdiction_chance
 		var reinf_bonus := clampf((plan.reinforcement_modifier - 1.0) * 0.6, 0.0, 0.35)
 		delivery = clampf(delivery * (1.0 + reinf_bonus), 0.2, 1.15)
+		# Sea-zone control + weather as ONE compose mult (no triple-count of sea/depot/wx).
+		var sea_mult := get_sea_zone_supply_multiplier_for_path(plan.province_path, player_tag)
+		var chain_ground := "dry"
+		var chain_precip := 0.0
+		var chain_vis := 1.0
+		var chain_risk := 0.0
+		if typeof(WeatherManager) != TYPE_NIL:
+			var wsum := 0.0
+			var wn := 0
+			var path_wx: Array = []
+			for pidv in plan.province_path:
+				var pid := int(pidv)
+				if WeatherManager.has_method("get_supply_weather_multiplier"):
+					var sm := float(WeatherManager.get_supply_weather_multiplier(pid))
+					wsum += sm
+					wn += 1
+					var entry := {"province_id": pid, "ground_state": "dry", "precip_intensity": 0.0}
+					entry["precip_intensity"] = clampf((1.0 - sm) * 2.0, 0.0, 1.0)
+					if sm < 0.75:
+						entry["ground_state"] = "mud"
+					path_wx.append(entry)
+				if WeatherManager.has_method("get_storm_interdiction_chance"):
+					var storm_c := float(WeatherManager.get_storm_interdiction_chance(pid, plan.interdiction_chance))
+					# Storm interdiction residual only (not a full weather mult).
+					delivery *= clampf(1.0 - maxf(0.0, storm_c - plan.interdiction_chance), 0.5, 1.0)
+			if wn > 0:
+				var avg_wx := wsum / float(wn)
+				chain_precip = clampf((1.0 - avg_wx) * 2.0, 0.0, 1.0)
+				if avg_wx < 0.75:
+					chain_ground = "mud"
+			if WeatherManager.has_method("get_naval_spot_weather_multiplier"):
+				chain_vis = float(WeatherManager.get_naval_spot_weather_multiplier(plan.target_province_id))
+			var ranked_wx: Dictionary = MapPolishFormatters.rank_supply_route_weather_risk(path_wx)
+			if not bool(ranked_wx.get("empty", true)):
+				var worst: Dictionary = ranked_wx.get("worst", {})
+				chain_risk = float(worst.get("risk", 0.0)) if worst is Dictionary else 0.0
+		# Sole mult for sea + depot + weather + route risk (compose once).
+		var chain: Dictionary = MapPolishFormatters.supply_chain_health_compose(
+			100.0, sea_mult, chain_ground, chain_precip, chain_vis, chain_risk
+		)
+		delivery = clampf(delivery * float(chain.get("health", 1.0)), 0.12, 1.4)
+		# Basing repair weather loop residual for naval-capable destinations (rate metadata only).
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("basing_repair_weather_for_province"):
+			var br: Dictionary = MapManager.basing_repair_weather_for_province(plan.target_province_id)
+			if not bool(br.get("empty", true)):
+				# Soft org-repair-aware delivery floor when major base services routes in fair weather.
+				var refuel_r := float(br.get("refuel_rate", 0.0))
+				if refuel_r > 0.2:
+					delivery = clampf(delivery * (1.0 + minf(0.05, refuel_r * 0.08)), 0.12, 1.4)
 		var inflow := pulled * delivery
-		var overflow := dst.apply_inflow(inflow)
+		# Pass 18: munitions-tagged cargo fills munitions_stockpile for OOB ammo bars.
+		var cargo := active_cargo if active_cargo != null else SupplyCargoProfile.general_supplies(500.0)
+		var mun_frac := 0.35
+		if cargo != null and "munitions_fraction" in cargo:
+			mun_frac = clampf(float(cargo.munitions_fraction), 0.0, 1.0)
+		elif cargo != null and "cargo_kind" in cargo and str(cargo.cargo_kind) == "munitions":
+			mun_frac = 0.9
+		var mun_in := inflow * mun_frac
+		var overflow := 0.0
+		if mun_in > 0.01 and dst.has_method("apply_munitions_inflow"):
+			# apply_munitions_inflow also adds to general stockpile.
+			overflow = dst.apply_munitions_inflow(mun_in)
+			var rest := maxf(0.0, inflow - mun_in)
+			if rest > 0.0:
+				overflow += dst.apply_inflow(rest)
+		else:
+			overflow = dst.apply_inflow(inflow)
+			if dst != null and "munitions_stockpile" in dst:
+				dst.munitions_stockpile = minf(dst.storage_capacity, dst.munitions_stockpile + inflow * mun_frac)
 		if overflow > 0.0 and src != null:
 			src.apply_inflow(overflow * 0.5)
 		depot_stock_changed.emit(dst.province_id, dst.stockpile)
@@ -749,12 +892,13 @@ func _process_naval_recon(days: float = 1.0) -> void:
 
 	for sea_pid in sea_provinces:
 		var naval_report := force_registry.get_report(sea_pid)
-		if naval_report.navy_total <= 0.0:
+		if naval_report == null or naval_report.get_navy_total() <= 0.0:
 			continue
 
 		# For each owner with naval presence in this seazone
-		for owner in naval_report.naval_strength:
-			var strength = float(naval_report.naval_strength[owner])
+		var naval_strength: Dictionary = naval_report.get_naval_strength()
+		for owner in naval_strength:
+			var strength = float(naval_strength[owner])
 			if strength <= 0.0:
 				continue
 
@@ -772,12 +916,12 @@ func _process_naval_recon(days: float = 1.0) -> void:
 						_add_naval_recon_intel(land_pid, owner, strength * 0.1)
 
 			# Enemy fleet spotting in same seazone
-			for other_owner in naval_report.naval_strength:
+			for other_owner in naval_strength:
 				if other_owner == owner:
 					continue
 				# Simple hostility check (in real game, use diplomacy or at_war)
 				if _are_hostile(owner, other_owner):
-					var other_strength = float(naval_report.naval_strength[other_owner])
+					var other_strength = float(naval_strength[other_owner])
 					# Detection chance based on relative strength + recon value
 					var detect_chance = minf(0.6, (strength * 1.2) / (other_strength + 5.0))
 					if randf() < detect_chance:
@@ -820,10 +964,11 @@ func _process_naval_fuel_endurance_and_repair(days: float = 1.0) -> void:
 	for pidv in sea_pids:
 		var pid := int(pidv)
 		var report := force_registry.get_report(pid)
-		if report.navy_total <= 0.0:
+		if report == null or report.get_navy_total() <= 0.0:
 			continue
-		for owner in report.naval_strength.keys():
-			if float(report.naval_strength[owner]) <= 0.0:
+		var naval_strength: Dictionary = report.get_naval_strength()
+		for owner in naval_strength.keys():
+			if float(naval_strength[owner]) <= 0.0:
 				continue
 			# Find naval formations for this owner (use LeaderManager)
 			for f in LeaderManager.get_formations_for_country(owner):
@@ -856,22 +1001,23 @@ func _process_naval_fuel_endurance_and_repair(days: float = 1.0) -> void:
 					var lf := get_meta("low_fuel_navies") as Dictionary
 					lf[str(pid) + "_" + owner] = cur_fuel
 					set_meta("low_fuel_navies", lf)
-				# Resupply at port or adj port (check presence or special)
-				var at_port := bool(report.naval_at_port_by_tag.get(owner, 0.0) > 0.0)
-				if not at_port and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_adjacent_provinces"):
-					for ap in MapManager.get_adjacent_provinces(pid):
-						var apv: Province = MapManager.get_province(int(ap))
-						if apv != null and (apv.has_feature("port") or apv.has_feature("naval_base") or apv.is_sea == false):
-							at_port = true; break
-				if at_port and cur_fuel < 0.95:
-					cur_fuel = min(1.05, cur_fuel + 0.25 * days)  # refuel
-					if f.has_method("set"): f.set("fuel_level", cur_fuel)
-				# Repair hook: recover org/readiness/strength slowly at port (real dock time later via infra/tech)
-				if at_port:
-					f.organization = clamp(float(f.organization) + 0.04 * days, 0.3, 1.0)
-					f.readiness = clamp(float(f.readiness) + 0.03 * days, 0.3, 1.0)
-					if float(f.strength) < 0.95:
-						f.strength = clamp(float(f.strength) + 0.02 * days, 0.4, 1.0)
+				# Resupply/repair rates from naval basing capacity (not flat at_port only).
+				var rates: Dictionary = _resolve_naval_basing_service_rates(pid, owner, report)
+				if bool(rates.get("can_service", false)):
+					var refuel_r := float(rates.get("refuel_rate", 0.0))
+					var org_r := float(rates.get("repair_org_rate", 0.0))
+					var ready_r := float(rates.get("repair_readiness_rate", 0.0))
+					var str_r := float(rates.get("repair_strength_rate", 0.0))
+					if refuel_r > 0.0 and cur_fuel < 0.95:
+						cur_fuel = min(1.05, cur_fuel + refuel_r * days)
+						if f.has_method("set"):
+							f.set("fuel_level", cur_fuel)
+					if org_r > 0.0:
+						f.organization = clamp(float(f.organization) + org_r * days, 0.3, 1.0)
+					if ready_r > 0.0:
+						f.readiness = clamp(float(f.readiness) + ready_r * days, 0.3, 1.0)
+					if str_r > 0.0 and float(f.strength) < 0.95:
+						f.strength = clamp(float(f.strength) + str_r * days, 0.4, 1.0)
 				# Possible engagement trigger on good mutual detect (beyond log in recon)
 				if randf() < 0.12 * days :  # hostiles exist proxy (simplified; in full check war/diplo)
 					var has_hostile := false
@@ -879,21 +1025,166 @@ func _process_naval_fuel_endurance_and_repair(days: float = 1.0) -> void:
 						if str(o2) != owner and _are_hostile(owner, str(o2)):
 							has_hostile = true; break
 					if has_hostile:
-					# Find possible enemy
-					for o2 in report.naval_strength.keys():
-						if o2 == owner or float(report.naval_strength[o2]) < 1.0: continue
-						if _are_hostile(owner, str(o2)) and randf() < 0.4:
-							if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("execute_naval_engagement"):
-								var intens := clamp(0.4 + (1.0 - cur_fuel) * 0.3, 0.3, 0.9)
-								BattleManager.execute_naval_engagement(owner, str(o2), pid, intens, "sub" in nname, cur_fuel < 0.5)
-							break
+						# Find possible enemy
+						for o2 in report.naval_strength.keys():
+							if o2 == owner or float(report.naval_strength[o2]) < 1.0:
+								continue
+							if _are_hostile(owner, str(o2)) and randf() < 0.4:
+								if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("execute_naval_engagement"):
+									var intens: float = clampf(0.4 + (1.0 - cur_fuel) * 0.3, 0.3, 0.9)
+									BattleManager.execute_naval_engagement(owner, str(o2), pid, intens, "sub" in nname, cur_fuel < 0.5)
+								break
 	# Decay low fuel meta occasionally
 	if has_meta("low_fuel_navies") and randf() < 0.3:
-		var lf2 := get_meta("low_fuel_navies") as Dictionary
+		var lf2: Dictionary = get_meta("low_fuel_navies") as Dictionary
 		for k in lf2.keys():
 			lf2[k] = float(lf2[k]) + 0.05
 			if float(lf2[k]) > 0.9: lf2.erase(k)
 		set_meta("low_fuel_navies", lf2)
+
+
+## Average friendly sea-zone supply multiplier along a route path.
+## Landlocked segments (no sea zone) are skipped; all-land paths → 1.0.
+func get_sea_zone_supply_multiplier_for_path(path: Array, friendly_tag: String = "") -> float:
+	var tag := friendly_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = player_tag.strip_edges().to_upper()
+	var mults: Array = []
+	if typeof(MapManager) == TYPE_NIL:
+		return 1.0
+	for pidv in path:
+		var pid := int(pidv)
+		var control: Dictionary = {}
+		if MapManager.has_method("get_sea_zone_control_for_province"):
+			control = MapManager.get_sea_zone_control_for_province(pid)
+		elif MapManager.has_method("get_sea_zone_strategic_modifiers_for_province"):
+			control = MapManager.get_sea_zone_strategic_modifiers_for_province(pid)
+		if control.is_empty():
+			continue  # no sea zone on this province
+		var fr: Dictionary = {}
+		if typeof(MapPolishFormatters) != TYPE_NIL:
+			fr = MapPolishFormatters.friendly_sea_zone_multipliers_from_dict(control, tag)
+		else:
+			fr = {"supply_multiplier": float(control.get("supply_multiplier", 1.0)), "applies": true}
+		if bool(fr.get("applies", true)):
+			mults.append(float(fr.get("supply_multiplier", 1.0)))
+	if typeof(MapPolishFormatters) != TYPE_NIL:
+		return MapPolishFormatters.combine_path_multipliers(mults, 1.0)
+	if mults.is_empty():
+		return 1.0
+	var s := 0.0
+	for m in mults:
+		s += float(m)
+	return clampf(s / float(mults.size()), 0.5, 1.25)
+
+
+## Average friendly sea-zone trade multiplier along a route path (for TradeManager).
+func get_sea_zone_trade_multiplier_for_path(path: Array, friendly_tag: String = "") -> float:
+	var tag := friendly_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = player_tag.strip_edges().to_upper()
+	var mults: Array = []
+	if typeof(MapManager) == TYPE_NIL:
+		return 1.0
+	for pidv in path:
+		var pid := int(pidv)
+		var control: Dictionary = {}
+		if MapManager.has_method("get_sea_zone_control_for_province"):
+			control = MapManager.get_sea_zone_control_for_province(pid)
+		elif MapManager.has_method("get_sea_zone_strategic_modifiers_for_province"):
+			control = MapManager.get_sea_zone_strategic_modifiers_for_province(pid)
+		if control.is_empty():
+			continue
+		var fr: Dictionary = {}
+		if typeof(MapPolishFormatters) != TYPE_NIL:
+			fr = MapPolishFormatters.friendly_sea_zone_multipliers_from_dict(control, tag)
+		else:
+			fr = {"trade_multiplier": float(control.get("trade_multiplier", 1.0)), "applies": true}
+		if bool(fr.get("applies", true)):
+			mults.append(float(fr.get("trade_multiplier", 1.0)))
+	if typeof(MapPolishFormatters) != TYPE_NIL:
+		return MapPolishFormatters.combine_path_multipliers(mults, 1.0)
+	if mults.is_empty():
+		return 1.0
+	var s := 0.0
+	for m in mults:
+		s += float(m)
+	return clampf(s / float(mults.size()), 0.5, 1.25)
+
+
+## Resolve basing service rates for a sea province (self or adjacent basing).
+## Uses MapManager.get_naval_basing + MapPolishFormatters.basing_repair_refuel_rates.
+func _resolve_naval_basing_service_rates(province_id: int, owner_tag: String, report: ProvinceForceReport = null) -> Dictionary:
+	var empty := {
+		"level": "none",
+		"capacity": 0,
+		"refuel_rate": 0.0,
+		"repair_org_rate": 0.0,
+		"repair_readiness_rate": 0.0,
+		"repair_strength_rate": 0.0,
+		"can_service": false,
+		"scale": 1.0,
+		"summary": "no basing service",
+	}
+	if typeof(MapManager) == TYPE_NIL:
+		return empty
+	var basing: Dictionary = {}
+	var candidates: Array[int] = [province_id]
+	if MapManager.has_method("get_adjacent_provinces"):
+		for ap in MapManager.get_adjacent_provinces(province_id):
+			candidates.append(int(ap))
+	var best: Dictionary = {}
+	var best_rank := -1
+	for cid in candidates:
+		var b: Dictionary = {}
+		if MapManager.has_method("get_naval_basing"):
+			b = MapManager.get_naval_basing(cid)
+		elif MapManager.has_method("get_naval_basing_for_province"):
+			b = MapManager.get_naval_basing_for_province(cid)
+		if b.is_empty() or not bool(b.get("is_naval", false)):
+			continue
+		var rank := 0
+		match str(b.get("level", "none")):
+			"anchorage":
+				rank = 1
+			"port":
+				rank = 2
+			"major_base":
+				rank = 3
+			_:
+				rank = 0
+		if rank > best_rank or (rank == best_rank and int(b.get("capacity", 0)) > int(best.get("capacity", 0))):
+			best_rank = rank
+			best = b
+	# Fallback: legacy at_port presence → treat as generic port rates if basing API empty
+	if best.is_empty():
+		var at_port := false
+		if report != null:
+			at_port = bool(report.naval_at_port_by_tag.get(owner_tag, 0.0) > 0.0)
+		if not at_port and MapManager.has_method("get_adjacent_provinces"):
+			for ap in MapManager.get_adjacent_provinces(province_id):
+				var apv: Province = MapManager.get_province(int(ap)) if MapManager.has_method("get_province") else null
+				if apv != null and (apv.has_feature("port") or apv.has_feature("naval_base")):
+					at_port = true
+					break
+		if at_port:
+			best = {"level": "port", "capacity": 6, "is_naval": true}
+		else:
+			return empty
+	if typeof(MapPolishFormatters) != TYPE_NIL:
+		return MapPolishFormatters.basing_repair_refuel_rates(best)
+	# Inline port-tier fallback if formatter unavailable
+	return {
+		"level": str(best.get("level", "port")),
+		"capacity": int(best.get("capacity", 6)),
+		"refuel_rate": 0.25,
+		"repair_org_rate": 0.04,
+		"repair_readiness_rate": 0.03,
+		"repair_strength_rate": 0.02,
+		"can_service": true,
+		"scale": 1.0,
+		"summary": "fallback port rates",
+	}
 
 
 func ensure_division_formations_for_country(country_tag: String) -> void:
@@ -948,17 +1239,12 @@ func get_land_divisions_at_province(
 	var tag := country_tag.strip_edges().to_upper()
 	if tag.is_empty():
 		tag = player_tag
-	# Teleporters rapid deploy wiring (minor Supply/Leader tie per task)
-	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(tag, "teleportation"):
-		print("[SPACE WIRING] tele rapid formation deploy for %s (first Mars alt + movement/combat reinforce)" % tag)
-	# Teleporters rapid deploy wiring (minor Supply/Leader tie per task)
-	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_rule_flag(tag, "teleportation"):
-		print("[SPACE WIRING] tele rapid formation deploy for %s (first Mars alt + movement/combat reinforce)" % tag)
 	var out: Array[Dictionary] = []
 	if tag.is_empty():
 		return out
-	ensure_division_formations_for_country(tag)
+	# load_all is cached (idempotent); still avoid ensure_* on hot map paths when possible.
 	division_templates.load_all()
+	var seen: Dictionary = {}
 	for fid_var in division_deployments.keys():
 		var fid := str(fid_var)
 		var dep: Dictionary = division_deployments[fid] as Dictionary
@@ -987,6 +1273,30 @@ func get_land_divisions_at_province(
 			"stationed_province_id": province_id,
 			"engineer_brigades": template.count_engineer_brigade_equivalent(),
 		})
+		seen[fid] = true
+	# world_full / scenario OOB: land formations stationed by Formation.stationed_province_id
+	# without a matching DivisionTemplate deployment entry.
+	if not engineers_only and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formations_for_country"):
+		for formation2 in LeaderManager.get_formations_for_country(tag):
+			if formation2 == null:
+				continue
+			var ftype := str(formation2.formation_type) if "formation_type" in formation2 else ""
+			if ftype != Formation.TYPE_DIVISION and ftype != Formation.TYPE_GARRISON:
+				continue
+			var fid2 := str(formation2.formation_id) if "formation_id" in formation2 else ""
+			if fid2.is_empty() or seen.has(fid2):
+				continue
+			var sid := int(formation2.stationed_province_id) if "stationed_province_id" in formation2 else -1
+			if sid != province_id:
+				continue
+			var display2 := str(formation2.name) if "name" in formation2 and not str(formation2.name).is_empty() else fid2
+			out.append({
+				"formation_id": fid2,
+				"display_name": display2,
+				"country_tag": tag,
+				"stationed_province_id": province_id,
+				"engineer_brigades": 0.0,
+			})
 	return out
 
 

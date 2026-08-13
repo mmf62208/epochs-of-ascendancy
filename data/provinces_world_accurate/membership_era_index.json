@@ -1,0 +1,15 @@
+{
+  "eras": [
+    1910,
+    1918,
+    1936,
+    2026
+  ],
+  "default": 1936,
+  "files": {
+    "1910": "hierarchy_membership_1910.json",
+    "1918": "hierarchy_membership_1918.json",
+    "1936": "hierarchy_membership_1936.json",
+    "2026": "hierarchy_membership_2026.json"
+  }
+}

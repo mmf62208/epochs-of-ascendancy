@@ -26,6 +26,7 @@ static func run_all(design_data: DesignDataLoader) -> bool:
 	ok = _test_refinement(design_data) and ok
 	ok = _test_refinement_tradeoffs(design_data) and ok
 	ok = _test_production_manager() and ok
+	ok = _test_factory_line_stockpile_advance() and ok
 	ok = _test_equipment_shortages() and ok
 	ok = _test_national_equipment_stockpile() and ok
 	ok = _test_infantry_equipment_stats(design_data) and ok
@@ -297,6 +298,95 @@ static func _test_equipment_shortages() -> bool:
 
 	pm.clear_unit_equipment_stock("test_div_1")
 	print("  [PASS] equipment shortages and readiness penalties")
+	return true
+
+
+## Shipped path: register factory → bootstrap_line_on_factory → advance_days → country stockpile grows.
+## Also: empty/unassigned line advance must not crash.
+static func _test_factory_line_stockpile_advance() -> bool:
+	var pm := _get_production_manager()
+	if pm == null or typeof(FactoryManager) == TYPE_NIL:
+		print("  [SKIP] factory line stockpile advance (autoloads not available)")
+		return true
+
+	const tag := "GER"
+	const design := "cv33_tankette"
+	const line_id := "plt_stockpile_fac_line"
+	const empty_id := "plt_stockpile_empty_line"
+	const province_id := 887701
+	const advance_days := 100.0
+
+	# --- empty / unassigned: no crash ---
+	pm.remove_line(empty_id)
+	var empty_line = pm.create_line(empty_id)
+	if empty_line == null:
+		print("  [FAIL] create empty line")
+		return false
+	var empty_report: Dictionary = pm.advance_days(10.0)
+	var empty_done := 0
+	if typeof(empty_report.get("lines")) == TYPE_DICTIONARY:
+		empty_done = int(empty_report["lines"].get(empty_id, {}).get("units_completed", 0))
+	pm.remove_line(empty_id)
+	if empty_done != 0:
+		print("  [FAIL] empty line completed units=", empty_done)
+		return false
+	print("  [PASS] empty/unassigned line advance_days no-crash")
+
+	# --- factory-assigned bootstrap → stockpile ---
+	pm.remove_line(line_id)
+	var factory_id := Factory.make_id(province_id, 1)
+	_cleanup_test_factory(FactoryManager, factory_id)
+	var factory := Factory.new()
+	factory.factory_id = factory_id
+	factory.province_id = province_id
+	factory.owner_tag = tag
+	factory.factory_type = "standard"
+	factory.max_production_lines = 2
+	factory.current_efficiency = 1.0
+	FactoryManager.register_factory(factory)
+
+	if not pm.has_method("bootstrap_line_on_factory"):
+		_cleanup_test_factory(FactoryManager, factory_id)
+		print("  [FAIL] bootstrap_line_on_factory missing")
+		return false
+	if not bool(pm.bootstrap_line_on_factory(line_id, design, factory_id)):
+		_cleanup_test_factory(FactoryManager, factory_id)
+		print("  [FAIL] bootstrap_line_on_factory returned false")
+		return false
+
+	var before: Dictionary = pm.get_country_equipment_stockpile(tag)
+	var before_amt := int(before.get(design, 0))
+	var report: Dictionary = pm.advance_days(advance_days)
+	var after: Dictionary = pm.get_country_equipment_stockpile(tag)
+	var after_amt := int(after.get(design, 0))
+	var delta := after_amt - before_amt
+	var line_done := 0
+	if typeof(report.get("lines")) == TYPE_DICTIONARY:
+		line_done = int(report["lines"].get(line_id, {}).get("units_completed", 0))
+
+	pm.remove_line(line_id)
+	_cleanup_test_factory(FactoryManager, factory_id)
+
+	if delta < 1 or line_done < 1:
+		print(
+			"  [FAIL] factory line stockpile advance delta=",
+			delta,
+			" line_done=",
+			line_done,
+			" before=",
+			before_amt,
+			" after=",
+			after_amt,
+		)
+		return false
+	print(
+		"  [PASS] factory line stockpile advance design=",
+		design,
+		" delta=+",
+		delta,
+		" line_done=",
+		line_done,
+	)
 	return true
 
 

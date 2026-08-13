@@ -1,0 +1,123 @@
+{
+  "data_dir": "data/provinces_world_full",
+  "ok_hard": true,
+  "ok_ne": true,
+  "errors": [],
+  "warnings": [],
+  "total_base": 2665,
+  "total_geometry": 2665,
+  "matched": 2665,
+  "orphan_base_only_count": 0,
+  "orphan_geo_only_count": 0,
+  "orphan_base_sample": [],
+  "orphan_geo_sample": [],
+  "land": 2325,
+  "sea": 340,
+  "empty_or_placeholder_names": 0,
+  "densify_style_names": 320,
+  "region_assigned": 2665,
+  "region_assigned_pct": 100.0,
+  "geometry_no_polygon": 0,
+  "ne_land_path": "/home/mikef/Projects/epochs-of-ascendancy/tools/map_generation/data/cache/map_tiles/https_raw.githubusercontent.com_nvkelso_natural-earth-vector_master_geojson_ne_10m_land.geojson",
+  "ne_land_centroids_tested": 2325,
+  "ne_land_centroids_hit": 1675,
+  "ne_land_hit_rate": 0.7204,
+  "ne_land_miss_samples": [
+    {
+      "id": 3,
+      "name": "Ruhr Industrial Area",
+      "centroid": [
+        4175.0,
+        1315.0
+      ]
+    },
+    {
+      "id": 13,
+      "name": "Baku",
+      "centroid": [
+        4381.25,
+        1388.33
+      ]
+    },
+    {
+      "id": 15,
+      "name": "Galway",
+      "centroid": [
+        4154.29,
+        1234.0
+      ]
+    },
+    {
+      "id": 18,
+      "name": "Istanbul",
+      "centroid": [
+        4349.93,
+        1441.75
+      ]
+    },
+    {
+      "id": 19,
+      "name": "Warsaw",
+      "centroid": [
+        4325.0,
+        1300.0
+      ]
+    },
+    {
+      "id": 31,
+      "name": "Volgograd",
+      "centroid": [
+        4346.43,
+        1233.33
+      ]
+    },
+    {
+      "id": 33,
+      "name": "Sumqayit",
+      "centroid": [
+        4568.75,
+        1465.0
+      ]
+    },
+    {
+      "id": 34,
+      "name": "Derbent",
+      "centroid": [
+        4506.25,
+        1388.33
+      ]
+    },
+    {
+      "id": 85,
+      "name": "Hatay",
+      "centroid": [
+        4405.0,
+        1369.29
+      ]
+    },
+    {
+      "id": 9003,
+      "name": "Leiria",
+      "centroid": [
+        3871.67,
+        1451.67
+      ]
+    },
+    {
+      "id": 9004,
+      "name": "Beja",
+      "centroid": [
+        4018.33,
+        1378.33
+      ]
+    },
+    {
+      "id": 9006,
+      "name": "Coimbra",
+      "centroid": [
+        3908.33,
+        1415.0
+      ]
+    }
+  ]
+}

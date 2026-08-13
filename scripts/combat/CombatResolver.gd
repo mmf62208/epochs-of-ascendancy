@@ -13,7 +13,13 @@ func get_effective_combat_power(
 	province_dev: int = -1,
 	province_infra: int = -1,
 ) -> Dictionary:
-	var base_stats := ProductionManager.get_division_final_combat_stats(division_template_id, unit_id)
+	# Prefer explicit unit_id; BattleManager often passes formation_id as division_template_id.
+	var resolve_unit := unit_id if not unit_id.is_empty() else army_id
+	if resolve_unit.is_empty():
+		resolve_unit = division_template_id
+	var base_stats := ProductionManager.get_division_final_combat_stats(division_template_id, resolve_unit)
+	if base_stats.is_empty() and typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("get_formation_equipment_combat_stats"):
+		base_stats = ProductionManager.get_formation_equipment_combat_stats(resolve_unit)
 
 	if base_stats.is_empty():
 		return {}
@@ -118,6 +124,12 @@ func get_effective_combat_power(
 	var unit_mod_factors: Dictionary = {}
 	var guided_mult_soft := 1.0
 	var guided_mult_hard := 1.0
+	# Declared early: used by marine/coastal blocks before province lookup below (Godot 4.7 strict order).
+	var province_for_effects: Province = null
+	var has_guided := false
+	var air_power_ratio: float = 1.0
+	var cas_mult: float = 1.0
+	var def_power: Variant = null
 
 	# Detect guided eligibility (space designer + precision rule or special templates)
 	var owner_for_tech := (leader.country_tag if leader != null else "player")
@@ -132,7 +144,7 @@ func get_effective_combat_power(
 		var tlow := terrain.to_lower()
 		var is_coastal := tlow in ["coast", "coastal", "beach", "river", "marsh", "island", "delta"]
 		if province_for_effects != null:
-			var pt := str(province_for_effects.get("terrain", "")).to_lower() if typeof(province_for_effects) == TYPE_DICTIONARY else (province_for_effects.terrain.to_lower() if province_for_effects != null and "terrain" in province_for_effects else "")
+			var pt := str(province_for_effects.terrain).to_lower()
 			if "coast" in pt or "river" in pt or "beach" in pt:
 				is_coastal = true
 		if is_coastal:
@@ -200,7 +212,7 @@ func get_effective_combat_power(
 	# Prefer passed dev/infra, then lookup by province_id via ScenarioLoader, else light proxy.
 	var prov_dev := province_dev
 	var prov_infra := province_infra
-	var province_for_effects: Province = null
+	# province_for_effects declared earlier for marine/coastal unit blocks
 	if prov_dev < 0 or prov_infra < 0:
 		# Prefer MapManager (central, fast)
 		var p: Province = null
@@ -256,13 +268,8 @@ func get_effective_combat_power(
 						final_readiness *= 1.06
 						final_org *= 1.04
 					var sp_source := ""
-					if province_for_effects:
-						if typeof(province_for_effects) == TYPE_DICTIONARY and province_for_effects.has("source"):
-							sp_source = str(province_for_effects["source"])
-						elif province_for_effects is Object and province_for_effects.has_method("get"):
-							sp_source = str(province_for_effects.get("source"))
-						elif "source" in province_for_effects:
-							sp_source = str(province_for_effects.source)
+					if province_for_effects != null and "source" in province_for_effects:
+						sp_source = str(province_for_effects.source)
 					if terrain == "snow_capped" and sp_source == "real_layers_inference":
 						final_readiness *= 1.03
 			# Mud/rain/ground/visibility full real (from WM movement + direct state; rain->mud penalties on attacker mobility/readiness)
@@ -324,17 +331,24 @@ func get_effective_combat_power(
 	# Uses formation air_mission data if present (set by AirMission system); simple for now, scales with intensity.
 	if formation_for_effects != null:
 		var air_int := 0.0
+		var air_type := ""
 		if typeof(formation_for_effects) == TYPE_DICTIONARY:
-			air_int = float(formation_for_effects.get("air_mission_intensity", 0.0)) if formation_for_effects.has("air_mission_intensity") else 0.0
-			if formation_for_effects.has("air_mission_type") and str(formation_for_effects.get("air_mission_type","")).to_upper() in ["CAS", "CLOSE_AIR_SUPPORT"]:
-				final_soft *= (1.0 + clampf(air_int * 0.12, 0.0, 0.25))
-				final_hard *= (1.0 + clampf(air_int * 0.08, 0.0, 0.18))
-			elif str(formation_for_effects.get("air_mission_type","")).to_upper() in ["INT", "INTERDICTION"]:
-				final_readiness *= (1.0 - clampf(air_int * 0.10, 0.0, 0.20))
-				final_org *= (1.0 - clampf(air_int * 0.07, 0.0, 0.15))
-		elif formation_for_effects is Object and formation_for_effects.has_method("get"):
-			air_int = float(formation_for_effects.call("get", "air_mission_intensity") if formation_for_effects.has("air_mission_intensity") else 0.0)
-			# similar for type...
+			air_int = float(formation_for_effects.get("air_mission_intensity", 0.0))
+			air_type = str(formation_for_effects.get("air_mission_type", "")).to_upper()
+		elif formation_for_effects is Object:
+			# Formation is a Resource — use `in` / property access, not Dictionary.has
+			if "air_mission_intensity" in formation_for_effects:
+				air_int = float(formation_for_effects.air_mission_intensity)
+			if "air_mission_type" in formation_for_effects:
+				air_type = str(formation_for_effects.air_mission_type).to_upper()
+			elif "current_air_mission" in formation_for_effects:
+				air_type = str(formation_for_effects.current_air_mission).to_upper()
+		if air_type in ["CAS", "CLOSE_AIR_SUPPORT"]:
+			final_soft *= (1.0 + clampf(air_int * 0.12, 0.0, 0.25))
+			final_hard *= (1.0 + clampf(air_int * 0.08, 0.0, 0.18))
+		elif air_type in ["INT", "INTERDICTION"]:
+			final_readiness *= (1.0 - clampf(air_int * 0.10, 0.0, 0.20))
+			final_org *= (1.0 - clampf(air_int * 0.07, 0.0, 0.15))
 
 	if prov_dev < 0:
 		prov_dev = 0
@@ -555,7 +569,7 @@ func get_effective_combat_power(
 		var at_bonus := 0.0
 		if "at_support" in str(division_template_id).to_lower() or (formation_for_effects and "anti_tank" in str(formation_for_effects)):
 			at_bonus = 0.15
-		if at_bonus > 0 and float(att_power.get("hard_attack", 0)) > float(final_soft) * 0.5:  # vs armor heavy
+		if at_bonus > 0 and float(base_stats.get("hard_attack", 0)) > float(final_soft) * 0.5:  # vs armor heavy
 			final_soft *= (1.0 + at_bonus)
 			print("[ANTI_TANK] Infantry AT bonus vs armor")
 
@@ -600,6 +614,8 @@ func get_effective_combat_power(
 	# Apply persistent formation strength (casualties from prior battles reduce effective combat power).
 	# Strength <1.0 from unreplaced losses makes units less effective until reinforced from stock (Supply daily).
 	var formation_strength := 1.0
+	var formation_xp := 48.0
+	var experience_mult := 1.0
 	if not army_id.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
 		var form := LeaderManager.get_formation(army_id)
 		if form != null and "strength" in form:
@@ -608,8 +624,26 @@ func get_effective_combat_power(
 				# Exhausted/depleted units suffer extra org/readiness friction
 				final_org *= lerp(1.0, formation_strength, 0.4)
 				final_readiness *= lerp(1.0, formation_strength, 0.6)
-	final_soft *= formation_strength
-	final_hard *= formation_strength
+		if form != null and "combat_experience" in form:
+			formation_xp = clampf(float(form.combat_experience), 0.0, 100.0)
+	# RF1: greens are not veterans — experience band multiplies combat power.
+	var reinf_calc = load("res://scripts/production/ReinforcementLogisticsCalculator.gd")
+	if reinf_calc != null and reinf_calc.has_method("experience_combat_mult"):
+		experience_mult = float(reinf_calc.experience_combat_mult(formation_xp))
+	else:
+		experience_mult = clampf(0.78 + formation_xp * 0.0042, 0.78, 1.2)
+	# CP5: production/design reliability soft mult (breakdown / loss amplification path).
+	var reliability := clampf(float(base_stats.get("reliability", 0.9)), 0.4, 1.0)
+	var prod_rel := clampf(float(base_stats.get("production_reliability", 1.0)), 0.5, 1.0)
+	var reliability_mult := clampf(0.72 + reliability * 0.28, 0.72, 1.0) * clampf(0.9 + prod_rel * 0.1, 0.9, 1.0)
+	final_soft *= formation_strength * experience_mult * reliability_mult
+	final_hard *= formation_strength * experience_mult * reliability_mult
+	if experience_mult < 0.95:
+		final_org *= lerpf(1.0, experience_mult, 0.35)
+		final_readiness *= lerpf(1.0, experience_mult, 0.25)
+	if reliability_mult < 0.95:
+		final_org *= lerpf(1.0, reliability_mult, 0.4)
+		final_readiness *= lerpf(1.0, reliability_mult, 0.35)
 
 	return {
 		"soft_attack": final_soft,
@@ -631,6 +665,11 @@ func get_effective_combat_power(
 		"terrain_bonus_applied": terrain_bonus,
 		"national_combat_modifiers": national_combat if leader != null else {},
 		"formation_strength": formation_strength,
+		"formation_combat_experience": formation_xp,
+		"experience_combat_mult": experience_mult,
+		"reliability": reliability,
+		"production_reliability": prod_rel,
+		"reliability_combat_mult": reliability_mult,
 	}
 
 
@@ -1053,7 +1092,130 @@ func resolve_battle_aftermath(
 			defender_army_id,
 			intensity * 0.65 * defender_casualty_mult,
 		)
+
+	# CP5: munitions/drone stock burn + reliability-amplified losses + troop XP gain.
+	results["attacker_munitions"] = apply_combat_munitions_consume(attacker_army_id, intensity, {"role": "attacker"})
+	results["defender_munitions"] = apply_combat_munitions_consume(defender_army_id, intensity * 0.65, {"role": "defender"})
+	results["attacker_troop_xp"] = apply_formation_combat_experience_gain(attacker_army_id, intensity, battle_result)
+	results["defender_troop_xp"] = apply_formation_combat_experience_gain(defender_army_id, intensity * 0.65, battle_result)
+	results["attacker_reliability"] = get_formation_reliability_snapshot(attacker_army_id)
+	results["defender_reliability"] = get_formation_reliability_snapshot(defender_army_id)
+	results["combat_consume_ok"] = true
+	results["model"] = "equipment_flow_compact_ledger"
 	return results
+
+
+## CP5: burn missile/drone/munition stock for a side after combat intensity.
+func apply_combat_munitions_consume(
+	formation_id: String,
+	intensity: float = 1.0,
+	opts: Dictionary = {},
+) -> Dictionary:
+	var out := {"ok": false, "consumed": 0, "formation_id": formation_id, "events": []}
+	if formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL or typeof(ProductionManager) == TYPE_NIL:
+		return out
+	if not ProductionManager.has_method("consume_munitions_from_stockpile"):
+		return out
+	var f = LeaderManager.get_formation(formation_id)
+	if f == null:
+		return out
+	var tag := str(f.country_tag).strip_edges().to_upper() if "country_tag" in f else ""
+	if tag.is_empty():
+		return out
+	var inten := clampf(intensity, 0.25, 3.0)
+	var design := str(f.design_id).strip_edges() if "design_id" in f else ""
+	var candidates: Array = []
+	# Prefer explicit munitions/drone stock keys, then formation design if missile/drone class.
+	if ProductionManager.has_method("get_country_equipment_stockpile"):
+		var stock: Dictionary = ProductionManager.get_country_equipment_stockpile(tag)
+		for eid in stock.keys():
+			var id_l := str(eid).to_lower()
+			if "missile" in id_l or "drone" in id_l or "munition" in id_l or "rocket" in id_l:
+				if int(stock[eid]) > 0:
+					candidates.append(str(eid))
+	if candidates.is_empty() and not design.is_empty():
+		var dclass := ""
+		if ProductionManager.has_method("resolve_design_class_for_stock"):
+			dclass = str(ProductionManager.resolve_design_class_for_stock(design))
+		if dclass in ["missile", "drone_swarm", "drone", "munition", "rocket_artillery"]:
+			candidates.append(design)
+	if candidates.is_empty():
+		out["ok"] = true  # no munitions to burn is still a valid path
+		out["skipped"] = true
+		return out
+	var total := 0
+	var events: Array = []
+	for eid in candidates:
+		var dclass2 := "missile"
+		if ProductionManager.has_method("resolve_design_class_for_stock"):
+			dclass2 = str(ProductionManager.resolve_design_class_for_stock(str(eid)))
+		var volleys := maxi(1, int(ceil(inten)))
+		var hit: Dictionary = ProductionManager.consume_munitions_from_stockpile(
+			tag, str(eid), volleys, inten, {"design_class": dclass2},
+		)
+		if bool(hit.get("ok", false)):
+			total += int(hit.get("consumed", 0))
+			events.append(hit)
+			# One munitions type per resolve is enough for ledger honesty
+			break
+	out["ok"] = true
+	out["consumed"] = total
+	out["events"] = events
+	out["country_tag"] = tag
+	return out
+
+
+## CP5: surviving combat slowly raises formation combat_experience (troop band, not leaders).
+func apply_formation_combat_experience_gain(
+	formation_id: String,
+	intensity: float = 1.0,
+	battle_result: Dictionary = {},
+) -> Dictionary:
+	var out := {"ok": false, "formation_id": formation_id, "xp_before": 0.0, "xp_after": 0.0, "gained": 0.0}
+	if formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return out
+	var f = LeaderManager.get_formation(formation_id)
+	if f == null or not ("combat_experience" in f):
+		return out
+	var before := clampf(float(f.combat_experience), 0.0, 100.0)
+	var inten := clampf(intensity, 0.1, 3.0)
+	var outcome := str(battle_result.get("outcome", ""))
+	var outcome_mult := 1.0
+	if outcome in ["victory", "breakthrough", "heroic_defense"]:
+		outcome_mult = 1.25
+	elif outcome in ["defeat", "rout"]:
+		outcome_mult = 0.7
+	# Slow gain — mass slaughter replacement is the main XP story; combat is gradual.
+	var gained := clampf(1.2 * inten * outcome_mult, 0.4, 4.5)
+	var after := clampf(before + gained, 0.0, 100.0)
+	f.combat_experience = after
+	out["ok"] = true
+	out["xp_before"] = before
+	out["xp_after"] = after
+	out["gained"] = after - before
+	return out
+
+
+## CP5: reliability snapshot for combat (production stamp + design base).
+func get_formation_reliability_snapshot(formation_id: String) -> Dictionary:
+	var out := {"ok": false, "reliability": 1.0, "production_reliability": 1.0, "breakdown_risk": 0.0}
+	if formation_id.is_empty() or typeof(ProductionManager) == TYPE_NIL:
+		return out
+	if not ProductionManager.has_method("get_formation_equipment_combat_stats"):
+		return out
+	var stats: Dictionary = ProductionManager.get_formation_equipment_combat_stats(formation_id)
+	if stats.is_empty():
+		return out
+	var rel := clampf(float(stats.get("reliability", 0.9)), 0.4, 1.0)
+	var prod := clampf(float(stats.get("production_reliability", 1.0)), 0.5, 1.0)
+	# Low reliability → higher breakdown risk (loss amplification signal)
+	var breakdown := clampf((1.0 - rel) * 0.55 + (1.0 - prod) * 0.25, 0.0, 0.55)
+	out["ok"] = true
+	out["reliability"] = rel
+	out["production_reliability"] = prod
+	out["breakdown_risk"] = breakdown
+	out["combat_mult"] = clampf(0.7 + rel * 0.3, 0.7, 1.0)
+	return out
 
 
 ## Call when a formation is eliminated; ~30% chance of leader death or capture.
@@ -1061,6 +1223,114 @@ func resolve_formation_destroyed(formation_id: String) -> Dictionary:
 	if typeof(LeaderManager) == TYPE_NIL or formation_id.is_empty():
 		return {"type": "none", "leader_id": ""}
 	return LeaderManager.handle_formation_destroyed(formation_id)
+
+
+## CP6: optional deep combat mode — equipment-type weighted resolve (not default grand map).
+## Uses on-hand stock composition + reliability + XP; still formation-level (not RTS 1:1).
+func resolve_deep_combat(
+	attacker_formation_id: String,
+	defender_formation_id: String,
+	opts: Dictionary = {},
+) -> Dictionary:
+	var out := {
+		"ok": false,
+		"deep_ok": false,
+		"mode": "deep_equipment_weighted",
+		"model": "equipment_flow_compact_ledger",
+		"attacker": {},
+		"defender": {},
+		"outcome": "stalemate",
+		"intensity": float(opts.get("intensity", 1.0)),
+	}
+	var inten := clampf(float(opts.get("intensity", 1.0)), 0.25, 3.0)
+	var terrain := str(opts.get("terrain", "plains"))
+	var att_power := get_effective_combat_power("", attacker_formation_id, attacker_formation_id, terrain)
+	var def_power := get_effective_combat_power("", defender_formation_id, defender_formation_id, terrain)
+	if att_power.is_empty() and def_power.is_empty():
+		return out
+	# Equipment composition weights (deep path): on-hand types shift soft/hard further.
+	var att_w := _deep_equipment_weight(attacker_formation_id)
+	var def_w := _deep_equipment_weight(defender_formation_id)
+	var att_soft := float(att_power.get("soft_attack", 0.5)) * float(att_w.get("soft_mult", 1.0))
+	var att_hard := float(att_power.get("hard_attack", 0.1)) * float(att_w.get("hard_mult", 1.0))
+	var def_soft := float(def_power.get("soft_attack", 0.5)) * float(def_w.get("soft_mult", 1.0))
+	var def_hard := float(def_power.get("hard_attack", 0.1)) * float(def_w.get("hard_mult", 1.0))
+	var att_score := (att_soft * 0.65 + att_hard * 0.35) * inten
+	var def_score := (def_soft * 0.55 + def_hard * 0.45) * (0.9 + 0.1 * float(def_power.get("organization", 1.0)))
+	var ratio := att_score / maxf(def_score, 0.05)
+	var outcome := "stalemate"
+	if ratio >= 1.35:
+		outcome = "attacker_breakthrough"
+	elif ratio >= 1.1:
+		outcome = "attacker_victory"
+	elif ratio <= 0.72:
+		outcome = "defender_victory"
+	elif ratio <= 0.9:
+		outcome = "defender_holds"
+	# Munitions consume + troop XP always run on deep resolve
+	var mun_a := apply_combat_munitions_consume(attacker_formation_id, inten, {"role": "attacker", "deep": true})
+	var mun_d := apply_combat_munitions_consume(defender_formation_id, inten * 0.7, {"role": "defender", "deep": true})
+	var xp_a := apply_formation_combat_experience_gain(attacker_formation_id, inten, {"outcome": outcome})
+	var xp_d := apply_formation_combat_experience_gain(defender_formation_id, inten * 0.7, {"outcome": outcome})
+	out["ok"] = true
+	out["deep_ok"] = true
+	out["outcome"] = outcome
+	out["ratio"] = ratio
+	out["attacker"] = {
+		"soft": att_soft, "hard": att_hard, "score": att_score, "weights": att_w,
+		"reliability": att_power.get("reliability", 1.0),
+		"experience_mult": att_power.get("experience_combat_mult", 1.0),
+		"munitions": mun_a, "troop_xp": xp_a,
+	}
+	out["defender"] = {
+		"soft": def_soft, "hard": def_hard, "score": def_score, "weights": def_w,
+		"reliability": def_power.get("reliability", 1.0),
+		"experience_mult": def_power.get("experience_combat_mult", 1.0),
+		"munitions": mun_d, "troop_xp": xp_d,
+	}
+	out["plain"] = "Deep combat: %s (ratio %.2f) — equipment-weighted, not vehicle RTS." % [outcome, ratio]
+	return out
+
+
+func _deep_equipment_weight(formation_id: String) -> Dictionary:
+	var w := {"soft_mult": 1.0, "hard_mult": 1.0, "types": {}, "ok": false}
+	if formation_id.is_empty() or typeof(ProductionManager) == TYPE_NIL:
+		return w
+	if not ProductionManager.has_method("get_unit_equipment_stock"):
+		return w
+	var stock: Dictionary = ProductionManager.get_unit_equipment_stock(formation_id)
+	if stock.is_empty():
+		return w
+	var soft_n := 0
+	var hard_n := 0
+	var total := 0
+	for eid in stock.keys():
+		var n := int(stock[eid])
+		if n <= 0:
+			continue
+		total += n
+		var id_l := str(eid).to_lower()
+		var dclass := ""
+		if ProductionManager.has_method("resolve_design_class_for_stock"):
+			dclass = str(ProductionManager.resolve_design_class_for_stock(str(eid)))
+		w["types"][str(eid)] = n
+		if dclass in ["tank", "missile"] or "tank" in id_l or "armor" in id_l or "missile" in id_l:
+			hard_n += n
+		elif dclass in ["drone_swarm", "fighter"] or "drone" in id_l or "fighter" in id_l:
+			soft_n += int(n * 0.7)
+			hard_n += int(n * 0.3)
+		else:
+			soft_n += n
+	if total <= 0:
+		return w
+	var hard_frac := float(hard_n) / float(total)
+	var soft_frac := float(soft_n) / float(total)
+	w["soft_mult"] = clampf(0.85 + soft_frac * 0.35, 0.85, 1.25)
+	w["hard_mult"] = clampf(0.85 + hard_frac * 0.45, 0.85, 1.35)
+	w["ok"] = true
+	w["hard_frac"] = hard_frac
+	w["soft_frac"] = soft_frac
+	return w
 
 
 func get_combat_width_for_battle(
@@ -1442,12 +1712,13 @@ func resolve_combat(
 		defender_army_id = defender.formation_id
 
 	var terrain := battle_province.terrain if battle_province.terrain != "" else "plains"
+	# unit_id = army/formation id so on-hand equipment shortages feed soft/hard/has_shortages in resolve.
 	var att_power := get_effective_combat_power(
-		att_template, "", attacker_army_id, terrain,
+		att_template, attacker_army_id, attacker_army_id, terrain,
 		battle_province.id, battle_province.development_level, battle_province.infrastructure,
 	)
 	var def_power := get_effective_combat_power(
-		def_template, "", defender_army_id, terrain,
+		def_template, defender_army_id, defender_army_id, terrain,
 		battle_province.id, battle_province.development_level, battle_province.infrastructure,
 	)
 	if att_power.is_empty() or def_power.is_empty():
@@ -1621,19 +1892,20 @@ func _phase_engagement(
 
 
 func _phase_attrition(
-	_battle_province: Province,
+	battle_province: Province,
 	side_state: Dictionary,
 	att_power: Dictionary,
 	def_power: Dictionary,
 ) -> Dictionary:
 	var att_supply := 1.0
 	var def_supply := 1.0
+	var air_dominance_level := str(side_state.get("air_dominance_level", "none"))
 	if bool(att_power.get("has_shortages", false)):
 		att_supply = 0.82
 	if bool(def_power.get("has_shortages", false)):
 		def_supply = 0.88
 	# Full weather tie in attrition phase (mud/rain/snow/precip reduce readiness/org beyond base supply)
-	var pid := _battle_province.id if _battle_province != null else -1
+	var pid := battle_province.id if battle_province != null else -1
 	if pid >= 0 and typeof(WeatherManager) != TYPE_NIL and WeatherManager.has_method("get_movement_multiplier"):
 		var wmult := float(WeatherManager.call("get_movement_multiplier", pid))
 		if wmult < 0.8:
@@ -1678,9 +1950,24 @@ func _phase_attrition(
 		if sm.has_method("get_combat_presence_registry"):
 			var reg = sm.call("get_combat_presence_registry")
 			if reg and reg.has_method("get_report"):
-				var rpt = reg.get_report(battle_province.id) if battle_province else null
-				if rpt:
-					inter_chance = clampf(float(rpt.get("interdict_chance", 0.0)) + float(rpt.get("enemy_control", 0.0)) * 0.15 + float(rpt.get("enemy_air", 0.0)) * 0.08, 0.0, 0.6)
+				var rpt = reg.get_report(battle_province.id) if battle_province != null else null
+				if rpt != null:
+					# ProvinceForceReport is a RefCounted object, not a Dictionary — avoid Object.get(key, default).
+					var interdict_v := 0.0
+					var enemy_ctrl_v := 0.0
+					var enemy_air_v := 0.0
+					if typeof(rpt) == TYPE_DICTIONARY:
+						interdict_v = float(rpt.get("interdict_chance", 0.0))
+						enemy_ctrl_v = float(rpt.get("enemy_control", 0.0))
+						enemy_air_v = float(rpt.get("enemy_air", 0.0))
+					else:
+						if "interdict_chance" in rpt:
+							interdict_v = float(rpt.interdict_chance)
+						if "enemy_control" in rpt:
+							enemy_ctrl_v = float(rpt.enemy_control)
+						if "enemy_air" in rpt:
+							enemy_air_v = float(rpt.enemy_air)
+					inter_chance = clampf(interdict_v + enemy_ctrl_v * 0.15 + enemy_air_v * 0.08, 0.0, 0.6)
 		if inter_chance > 0.01:
 			var inter_mod := 1.0 - clampf(inter_chance * 0.35, 0.0, 0.45)
 			side_state["attacker"]["org"] *= inter_mod
@@ -1697,6 +1984,11 @@ func _phase_resolution(
 	attacker_tag: String,
 	defender_tag: String,
 ) -> Dictionary:
+	var leader = null  # optional attacker leader for breakthrough traits
+	if typeof(LeaderManager) != TYPE_NIL and not attacker_tag.is_empty() and LeaderManager.has_method("get_leader_for_country"):
+		leader = LeaderManager.get_leader_for_country(attacker_tag) if LeaderManager.has_method("get_leader_for_country") else null
+	var att_power: Dictionary = side_state.get("attacker_power", {}) if side_state.has("attacker_power") else {}
+	var def_power: Dictionary = side_state.get("defender_power", {}) if side_state.has("defender_power") else {}
 	var att_score: float = (
 		_side_strength(side_state["attacker"])
 		* float(side_state["attacker"]["org"])
@@ -1737,14 +2029,6 @@ func _phase_resolution(
 			var ewd_d := float(NationalModifierManager.get_combat_modifiers(def_tag_for_space).get("energy_weapon_dmg", 0.0))
 			if ewd_d > 0.0:
 				print("[SPACE WIRING] phasers_torpedoes_2030 DEW flavor active for %s (variable setting stun/kill energy)" % def_tag_for_space)
-	var winner := "attacker" if att_score >= def_score else "defender"
-	var margin := absf(att_score - def_score) / maxf(def_score, 0.01)
-	var outcome := "minor_victory" if margin < 0.12 else "major_victory"
-	if winner == "defender" and margin >= 0.2:
-		outcome = "heroic_defense"
-	elif winner == "defender":
-		outcome = "delay_success"
-
 	# High org + position defending with supplies = far less likely to fold quickly (HoI4-like staying power, puts up fight)
 	# Urban/difficult terrain/fortifications help defenders last longer (stacks with org/supply bias)
 	var def_org := float(side_state["defender"].get("org", 1.0))
@@ -1757,11 +2041,35 @@ func _phase_resolution(
 	var terr := battle_province.terrain if battle_province else "plains"
 	var fort_mod := 1.0
 	if battle_province:
-		fort_mod = float(battle_province.get("fortification_level", battle_province.development_level * 0.08 + (1.0 if "fort" in str(battle_province.special_features) else 0.0)))
+		var fort_lv := 0.0
+		if "fortification_level" in battle_province:
+			fort_lv = float(battle_province.fortification_level)
+		else:
+			fort_lv = float(battle_province.development_level) * 0.08 + (1.0 if "fort" in str(battle_province.special_features) else 0.0)
+		fort_mod = fort_lv
 	if terr in ["urban", "mountains", "jungle", "hills", "marsh", "snow_capped"] or fort_mod > 1.15:
 		def_score *= 1.12 + clampf(fort_mod - 1.0, 0.0, 0.35)
 		if def_org > 0.65:
 			def_score *= 1.1  # entrenched high org in urban/fort/terrain holds longer (prolonged fight)
+
+	# Chance breakthroughs (based on leader initiative/breakthrough trait, margin, org diff, terrain).
+	var leader_break := 0.0
+	if leader != null and "trait_levels" in leader and "breakthrough" in str(leader.trait_levels):
+		leader_break = 0.1
+	if leader != null and "initiative_skill" in leader:
+		leader_break += float(leader.initiative_skill) / 30.0
+	if leader_break > 0 and randf() < leader_break:
+		att_score *= 1.15
+		print("[BREAKTHROUGH CHANCE] Leader trait/initiative caused breakthrough (extra score)")
+
+	# Winner / capture from **final** scores (after defender org/terrain/fort bias + breakthrough).
+	var winner := "attacker" if att_score >= def_score else "defender"
+	var margin := absf(att_score - def_score) / maxf(def_score, 0.01)
+	var outcome := "minor_victory" if margin < 0.12 else "major_victory"
+	if winner == "defender" and margin >= 0.2:
+		outcome = "heroic_defense"
+	elif winner == "defender":
+		outcome = "delay_success"
 	# Similar strength fights last longer (close scores + high org -> prolonged_attrition, less quick fold)
 	if abs(att_score - def_score) / max(def_score, 1.0) < 0.18 and min(def_org, float(side_state["attacker"].get("org", 1.0))) > 0.55:
 		outcome = "prolonged_attrition"
@@ -1773,17 +2081,6 @@ func _phase_resolution(
 		margin *= 0.7
 		print("[BATTLE DURATION] Weaker attack vs strong org/supplied defender -> prolonged (time to break higher, more attrit)")
 
-	# Chance breakthroughs (based on leader initiative/breakthrough trait, margin, org diff, terrain).
-	# Heroic defense already boosts def.
-	var leader_break := 0.0
-	if leader and "breakthrough" in str(leader.trait_levels if hasattr(leader, "trait_levels") else ""):
-		leader_break = 0.1
-	if leader and hasattr(leader, "initiative_skill"):
-		leader_break += leader.initiative_skill / 30.0
-	if leader_break > 0 and randf() < leader_break and margin > 0.1:
-		att_score *= 1.15
-		print("[BREAKTHROUGH CHANCE] Leader trait/initiative caused breakthrough (extra score)")
-	# Similar for defender heroic if high org.
 	var captured := winner == "attacker" and attacker_tag != defender_tag and not attacker_tag.is_empty()
 	var result_dict := {
 		"winner": winner,

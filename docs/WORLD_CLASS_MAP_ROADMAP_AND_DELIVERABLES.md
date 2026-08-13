@@ -1,6 +1,10 @@
 # World-Class Map Roadmap + Deliverables — Epochs of Ascendancy (June 2026)
 
-**Goal:** Turn the current clean, loved vector map layer (grand theater stylized high-res bg + 460 dense European provinces from phase1 gen/merge with children wiring, adjacency, econ/dev layers) into a **living, playable strategic board** that supports real testing and play of all systems (settlement, welfare/cultural war policies, HH pressure, combat, supply, agents, Golden, toasts/Respond). Start with the excellent current Europe section — no need for full world yet.
+> **Superseded for default-board truth (2026-08-12):** Live default is **`world_accurate` ~3520** GIS hybrid (post US+RoW sparse), not the historical Europe-460 focus below.  
+> **Current map-star analysis + gap plan:** [`WORLD_CLASS_MAP_REVIEW.md`](WORLD_CLASS_MAP_REVIEW.md) · status [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md).  
+> Sections below remain a **historical Europe theater catalogue** (settlement/welfare tints, 460-era deliverables).
+
+**Goal (historical):** Turn the current clean, loved vector map layer (grand theater stylized high-res bg + 460 dense European provinces from phase1 gen/merge with children wiring, adjacency, econ/dev layers) into a **living, playable strategic board** that supports real testing and play of all systems (settlement, welfare/cultural war policies, HH pressure, combat, supply, agents, Golden, toasts/Respond). Start with the excellent current Europe section — no need for full world yet.
 
 **Core philosophy (research-backed):** 
 - Vector Polygon2D provinces (current approach) > pure texture/bitmap for a small team and gameplay fidelity. Exact polys drive movement, combat width, supply throughput, attrition, local supply, org recovery, settlement bonuses (2.5%/level defender cap 25% in BattleManager/CombatResolver + Province getters), welfare drag. Clean political fills + subtle tints (settlement cyan-green vitality, welfare red-gray strain) + dynamic overlays (supply polylines, infra roads/rails from built_*, agent rings, conflict) = the "clean map layer" you love, made alive.

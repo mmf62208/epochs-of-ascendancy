@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "policy": {
+    "seed_on_scenario_load": true,
+    "reapply_on_year_tick": false,
+    "reapply_on_daily_tick": false,
+    "reapply_on_save_load": false,
+    "scenario_overrides_win": true,
+    "event_forced_only": true,
+    "player_conquest_preserved": true,
+    "summary": "Ownership tables seed start map only; player agency owns the rest.",
+    "empty": false
+  },
+  "eras": [
+    {
+      "year": 1910,
+      "path": "province_ownership_1910.json",
+      "owner_n": 2325,
+      "ok": true
+    },
+    {
+      "year": 1918,
+      "path": "province_ownership_1918.json",
+      "owner_n": 2325,
+      "ok": true
+    },
+    {
+      "year": 1936,
+      "path": "province_ownership_1936.json",
+      "owner_n": 2325,
+      "ok": true
+    },
+    {
+      "year": 1945,
+      "path": "province_ownership_1945.json",
+      "owner_n": 2325,
+      "ok": true
+    },
+    {
+      "year": 2026,
+      "path": "province_ownership_2026.json",
+      "owner_n": 2325,
+      "ok": true
+    }
+  ],
+  "resolve_note": "Use largest era year <= scenario start_year",
+  "empty": false
+}

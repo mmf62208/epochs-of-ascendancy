@@ -1,0 +1,376 @@
+{
+  "name": "provinces_world_accurate",
+  "stats": {
+    "provinces": 3520,
+    "land": 3180,
+    "sea": 340
+  },
+  "blocks": {
+    "europe_nuts3": 1514,
+    "us_tiger": 130,
+    "row_ne_admin1": 2487,
+    "seas": 340,
+    "row_geoboundaries": 1536,
+    "row_removed_ne": 3246,
+    "us_tiger_pre_merge": 3221,
+    "row_geoboundaries_pre_sparse_merge": 2699
+  },
+  "method": "nuts3_europe + us_block + ne_admin1_row + world_full_seas",
+  "parent_world_full_renumbered": false,
+  "geometry_quality": "gis_hybrid_v1_7_row_geoboundaries_t3+us_merge_v1+row_sparse_merge_v1+row_sparse_merge_v1",
+  "adjacency": "shared_edge_near_vertex_plus_knn",
+  "layers": [
+    "states",
+    "super_regions",
+    "economy",
+    "city",
+    "resources",
+    "terrain",
+    "ownership_eras"
+  ],
+  "states_n": 429,
+  "strategic_regions_n": 61,
+  "super_regions_n": 4,
+  "polish": {
+    "ownership_before": 8421,
+    "ownership_after": 8421,
+    "neighbor_filled": 0,
+    "residual_forced_eng": 0,
+    "unowned_land_after": 0,
+    "sea_names_renamed": 0,
+    "ownership_top": [
+      [
+        "USA",
+        3310
+      ],
+      [
+        "ENG",
+        1296
+      ],
+      [
+        "FRA",
+        642
+      ],
+      [
+        "GER",
+        401
+      ],
+      [
+        "SOV",
+        249
+      ],
+      [
+        "ITA",
+        182
+      ],
+      [
+        "CHI",
+        173
+      ],
+      [
+        "NLD",
+        152
+      ],
+      [
+        "BRA",
+        127
+      ],
+      [
+        "JAP",
+        116
+      ],
+      [
+        "BEL",
+        112
+      ],
+      [
+        "PER",
+        107
+      ],
+      [
+        "POR",
+        103
+      ],
+      [
+        "TUR",
+        82
+      ],
+      [
+        "MEX",
+        81
+      ],
+      [
+        "ARG",
+        76
+      ],
+      [
+        "SIA",
+        74
+      ],
+      [
+        "POL",
+        73
+      ],
+      [
+        "SPA",
+        66
+      ],
+      [
+        "ROM",
+        59
+      ]
+    ],
+    "majors": {
+      "GER": 401,
+      "FRA": 642,
+      "ENG": 1296,
+      "USA": 3310,
+      "SOV": 249,
+      "ITA": 182,
+      "JAP": 116,
+      "CHI": 173,
+      "BRA": 127,
+      "ARG": 76,
+      "MEX": 81
+    },
+    "chokepoints": {
+      "source": "polish_world_accurate_board.py",
+      "count": 34,
+      "mapped_from_world_full": 20,
+      "notes": "Sea/strait + Panama only; centroid map rejects inland false positives."
+    },
+    "choke_ids_n": 34,
+    "choke_sample": [
+      {
+        "id": 950001,
+        "name": "English Channel Zone"
+      },
+      {
+        "id": 950006,
+        "name": "Black Sea Zone"
+      },
+      {
+        "id": 950007,
+        "name": "Red Sea Zone"
+      },
+      {
+        "id": 950008,
+        "name": "Persian Gulf Zone"
+      },
+      {
+        "id": 950012,
+        "name": "East China Sea Zone"
+      },
+      {
+        "id": 950019,
+        "name": "Gibraltar Strait Zone"
+      },
+      {
+        "id": 950020,
+        "name": "Bosporus Approaches"
+      },
+      {
+        "id": 950021,
+        "name": "Suez Canal Zone"
+      },
+      {
+        "id": 950022,
+        "name": "Hormuz Approaches"
+      },
+      {
+        "id": 950023,
+        "name": "Malacca Strait Zone"
+      },
+      {
+        "id": 950024,
+        "name": "Tsushima Strait Zone"
+      },
+      {
+        "id": 950025,
+        "name": "Danish Straits Zone"
+      }
+    ],
+    "scenario_capital_fixes": [],
+    "capital_layers": {
+      "upgraded": 53,
+      "city_n": 4746
+    },
+    "adjacency": {
+      "method": "shared_edge_near_vertex_plus_knn",
+      "quant": 5.0,
+      "near_vertex_touch": 12.0,
+      "land_shared_coverage": 0.9706685666785417,
+      "orphan_land_after": 0,
+      "near_vertex_edges_added": 883,
+      "knn_edges_added": 1536,
+      "d5_1": "2026-07-20 near_vertex residual"
+    }
+  },
+  "terrain_polish": "latlon_adm0_heuristics_v1",
+  "ownership_eras": [
+    "1910",
+    "1918",
+    "1936",
+    "1945",
+    "2026"
+  ],
+  "notes": [
+    "v1.7 geoBoundaries RoW densify tranches 1-3",
+    "100% land ownership; dual board; no world_full renumber",
+    "Phase 4: TestRunner default scenario is world_accurate",
+    "US TIGER counties merged to 1–4 playable provinces per state (2026-07-25).",
+    "RoW sparse merge tranche scopes=africa,australia,oceania_islands survivors=216 dead=987 (2026-07-29).",
+    "RoW sparse merge tranche scopes=central_america,india,siberia_mongolia_sparse_china,south_america survivors=242 dead=1163 (2026-07-29)."
+  ],
+  "row_densify": {
+    "gb_countries_n": 107,
+    "gb_provinces_n": 3357,
+    "added_by": {
+      "CHN": 173,
+      "IND": 125,
+      "IDN": 100,
+      "BRA": 127,
+      "CAN": 76,
+      "AUS": 73,
+      "MEX": 81,
+      "ZAF": 52,
+      "IRN": 66,
+      "EGY": 55,
+      "ARG": 76,
+      "RUS": 83,
+      "PAK": 53,
+      "NGA": 53,
+      "COL": 42,
+      "PER": 41,
+      "CHL": 29,
+      "VEN": 28,
+      "BOL": 18,
+      "SAU": 29,
+      "IRQ": 32,
+      "SYR": 19,
+      "KOR": 29,
+      "PRK": 18,
+      "TWN": 21,
+      "JPN": 47,
+      "NZL": 13,
+      "PNG": 23,
+      "KAZ": 33,
+      "MNG": 22,
+      "DZA": 48,
+      "MAR": 30,
+      "LBY": 22,
+      "COD": 37,
+      "KEN": 26,
+      "ETH": 28,
+      "SDN": 28,
+      "MMR": 36,
+      "MYS": 26,
+      "LKA": 25,
+      "GHA": 25,
+      "AGO": 27,
+      "CUB": 24,
+      "THA": 74,
+      "VNM": 54,
+      "PHL": 86,
+      "UGA": 42,
+      "TZA": 35,
+      "AFG": 30,
+      "AZE": 25,
+      "BFA": 22,
+      "GIN": 24,
+      "DOM": 25,
+      "ECU": 23,
+      "KHM": 28,
+      "TUN": 24,
+      "GTM": 21,
+      "MDG": 25,
+      "TCD": 22,
+      "YEM": 21,
+      "URY": 23,
+      "CIV": 25,
+      "HND": 21,
+      "PRY": 24,
+      "NIC": 22,
+      "LAO": 21,
+      "BDI": 18,
+      "CAF": 20,
+      "UZB": 23,
+      "SEN": 21,
+      "NPL": 25,
+      "SOM": 19,
+      "NAM": 14,
+      "GEO": 14,
+      "JOR": 19,
+      "PAN": 16,
+      "HTI": 14,
+      "SLV": 19,
+      "CRI": 11,
+      "RWA": 13,
+      "MOZ": 20,
+      "ZMB": 16,
+      "ZWE": 18,
+      "BWA": 11,
+      "CMR": 20,
+      "GAB": 15,
+      "COG": 13,
+      "BEN": 14,
+      "TGO": 13,
+      "MLI": 20,
+      "NER": 16,
+      "TKM": 12,
+      "KGZ": 15,
+      "TJK": 11,
+      "ARM": 12,
+      "ISR": 15,
+      "LBN": 11,
+      "OMN": 13,
+      "ARE": 7,
+      "KWT": 8,
+      "QAT": 8,
+      "BGD": 29,
+      "FJI": 5,
+      "GRL": 6,
+      "ISL": 10,
+      "BLR": 20,
+      "MDA": 17
+    },
+    "tranche": 3
+  },
+  "phase4_cutover": "test_runner_default_world_accurate",
+  "strategic_resources": {
+    "version": "hoi_strategic_v1",
+    "resource_province_counts": {
+      "coal": 7006,
+      "steel": 4164,
+      "oil": 1404,
+      "aluminum": 324,
+      "rubber": 433,
+      "tungsten": 256,
+      "chromium": 281
+    }
+  },
+  "us_merge": {
+    "method": "1_to_4_per_state_kmeans_hull",
+    "survivors_n": 130,
+    "dead_n": 3091,
+    "remap_file": "us_county_to_playable_remap.json"
+  },
+  "row_sparse_merge": {
+    "method": "kmeans_hull_by_adm0_state",
+    "scopes": [
+      "central_america",
+      "india",
+      "siberia_mongolia_sparse_china",
+      "south_america"
+    ],
+    "survivors_n": 242,
+    "dead_n": 1163,
+    "remap_file": "row_sparse_to_playable_remap.json",
+    "planned_by_region": {
+      "central_america": 46,
+      "india": 44,
+      "siberia_mongolia_sparse_china": 66,
+      "south_america": 86
+    }
+  }
+}

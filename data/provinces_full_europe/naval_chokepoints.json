@@ -1,0 +1,9 @@
+{
+  "meta": {
+    "source": "filtered from world_full for data/provinces_full_europe",
+    "count": 1
+  },
+  "chokepoint_province_ids": [
+    9131
+  ]
+}

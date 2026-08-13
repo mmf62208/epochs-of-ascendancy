@@ -1,0 +1,26 @@
+{
+  "name": "provinces_pilot_us_tiger",
+  "id_base": 800000,
+  "stats": {
+    "province_n": 3221,
+    "id_base": 800000,
+    "id_min": 800000,
+    "id_max": 803220,
+    "source": "/home/mikef/Projects/epochs-of-ascendancy/tools/map_generation/data/cache/us_counties_fips.geojson",
+    "method": "tiger_county_project_simplify",
+    "world_bbox": [
+      -180.0,
+      -56.0,
+      180.0,
+      83.0
+    ],
+    "world_canvas": [
+      8192.0,
+      4096.0
+    ]
+  },
+  "gis_source": "US Census TIGER county cartographic boundaries",
+  "method": "tiger_county_project_simplify",
+  "parent_world_full_renumbered": false,
+  "geometry_quality": "tiger_gis_pilot"
+}

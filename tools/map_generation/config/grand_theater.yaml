@@ -1,0 +1,116 @@
+# Grand Theater multi-region expansion config
+# See docs/MAP_MULTI_THEATER_EXPANSION.md
+
+name: grand_theater_v1
+target_total_min: 700
+target_total_max: 900
+sea_share_min: 0.12
+sea_share_max: 0.30
+
+island_viability:
+  # Canvas area units (polygon area after densify; relative to current map scale)
+  min_area_micro_exclude: 80.0      # below: merge / do not author as province
+  min_area_airfield: 180.0          # small airstrip possible
+  min_area_port: 320.0              # small port + limited infra
+  min_area_full_facilities: 700.0   # multi-slot factories + multi sites
+  critical_micros:                  # always keep even if small
+    - malta
+    - gibraltar
+    - midway
+    - wake
+    - diego_garcia
+
+theaters:
+  europe_core:
+    priority: 0
+    land_target: 460
+    sea_target: 70
+    density: high
+  mena:
+    priority: 0
+    land_target: 100
+    sea_target: 25
+    density: high
+  north_africa:
+    priority: 1
+    land_target: 50
+    sea_target: 15
+    density: medium
+  far_east_stub:
+    priority: 1
+    land_target: 40
+    sea_target: 30
+    density: medium
+  blue_water:
+    priority: 0
+    land_target: 0
+    sea_target: 50
+    density: low
+
+# Lon/lat seeds for expansion cells (approx). Converted to canvas in expand script.
+expansion_seeds:
+  mena_land:
+    - {name: "Cairo", lon: 31.2, lat: 30.0, domain: coastal_land, island_class: mainland}
+    - {name: "Alexandria Coast", lon: 29.9, lat: 31.2, domain: coastal_land, island_class: mainland}
+    - {name: "Suez", lon: 32.5, lat: 30.0, domain: coastal_land, island_class: mainland}
+    - {name: "Jerusalem Theater", lon: 35.2, lat: 31.8, domain: coastal_land, island_class: mainland}
+    - {name: "Damascus Theater", lon: 36.3, lat: 33.5, domain: land, island_class: mainland}
+    - {name: "Baghdad Theater", lon: 44.4, lat: 33.3, domain: land, island_class: mainland}
+    - {name: "Basra", lon: 47.8, lat: 30.5, domain: coastal_land, island_class: mainland}
+    - {name: "Riyadh Heartland", lon: 46.7, lat: 24.7, domain: land, island_class: mainland}
+    - {name: "Jeddah", lon: 39.2, lat: 21.5, domain: coastal_land, island_class: mainland}
+    - {name: "Tehran Theater", lon: 51.4, lat: 35.7, domain: land, island_class: mainland}
+    - {name: "Isfahan", lon: 51.7, lat: 32.7, domain: land, island_class: mainland}
+    - {name: "Ankara Deep", lon: 32.9, lat: 39.9, domain: land, island_class: mainland}
+    - {name: "Izmir Coast", lon: 27.1, lat: 38.4, domain: coastal_land, island_class: mainland}
+    - {name: "Tripoli Maghreb", lon: 13.2, lat: 32.9, domain: coastal_land, island_class: mainland}
+    - {name: "Tunis", lon: 10.2, lat: 36.8, domain: coastal_land, island_class: mainland}
+    - {name: "Algiers", lon: 3.1, lat: 36.8, domain: coastal_land, island_class: mainland}
+    - {name: "Casablanca", lon: -7.6, lat: 33.6, domain: coastal_land, island_class: mainland}
+    - {name: "Khartoum", lon: 32.5, lat: 15.5, domain: land, island_class: mainland}
+    - {name: "Addis Ababa", lon: 38.7, lat: 9.0, domain: land, island_class: mainland}
+    - {name: "Mombasa", lon: 39.7, lat: -4.0, domain: coastal_land, island_class: mainland}
+  far_east_land:
+    - {name: "Shanghai Coast", lon: 121.5, lat: 31.2, domain: coastal_land, island_class: mainland}
+    - {name: "Beijing Theater", lon: 116.4, lat: 39.9, domain: land, island_class: mainland}
+    - {name: "Guangzhou", lon: 113.3, lat: 23.1, domain: coastal_land, island_class: mainland}
+    - {name: "Manila", lon: 121.0, lat: 14.6, domain: coastal_land, island_class: large}
+    - {name: "Singapore", lon: 103.8, lat: 1.3, domain: coastal_land, island_class: medium}
+    - {name: "Jakarta", lon: 106.8, lat: -6.2, domain: coastal_land, island_class: large}
+    - {name: "Saigon", lon: 106.7, lat: 10.8, domain: coastal_land, island_class: mainland}
+    - {name: "Tokyo Theater", lon: 139.7, lat: 35.7, domain: coastal_land, island_class: large}
+    - {name: "Seoul Theater", lon: 127.0, lat: 37.6, domain: coastal_land, island_class: mainland}
+    - {name: "Hanoi", lon: 105.8, lat: 21.0, domain: coastal_land, island_class: mainland}
+  pacific_islands:
+    - {name: "Midway", lon: -177.4, lat: 28.2, domain: coastal_land, island_class: micro, critical: true}
+    - {name: "Guam", lon: 144.8, lat: 13.4, domain: coastal_land, island_class: small, critical: true}
+    - {name: "Wake", lon: 166.6, lat: 19.3, domain: coastal_land, island_class: micro, critical: true}
+    - {name: "Hawaii Oahu", lon: -157.9, lat: 21.3, domain: coastal_land, island_class: medium, critical: true}
+    - {name: "New Guinea North", lon: 147.0, lat: -5.0, domain: coastal_land, island_class: large}
+    - {name: "Solomon Islands", lon: 160.0, lat: -9.0, domain: coastal_land, island_class: small}
+    - {name: "New Caledonia", lon: 166.5, lat: -22.3, domain: coastal_land, island_class: medium}
+  sea_zones:
+    - {name: "North Sea Zone", lon: 3.0, lat: 56.0, domain: sea}
+    - {name: "English Channel Zone", lon: 1.0, lat: 50.5, domain: strait, naval_importance: 10}
+    - {name: "Baltic Sea Zone", lon: 19.0, lat: 56.0, domain: sea}
+    - {name: "Western Mediterranean", lon: 5.0, lat: 39.0, domain: sea}
+    - {name: "Central Mediterranean", lon: 15.0, lat: 36.0, domain: sea}
+    - {name: "Eastern Mediterranean", lon: 28.0, lat: 34.0, domain: sea}
+    - {name: "Black Sea Zone", lon: 34.0, lat: 43.0, domain: sea}
+    - {name: "Red Sea Zone", lon: 38.0, lat: 20.0, domain: sea, naval_importance: 8}
+    - {name: "Persian Gulf Zone", lon: 52.0, lat: 27.0, domain: sea, naval_importance: 9}
+    - {name: "Arabian Sea Zone", lon: 60.0, lat: 18.0, domain: sea}
+    - {name: "Bay of Bengal Zone", lon: 90.0, lat: 15.0, domain: sea}
+    - {name: "South China Sea Zone", lon: 114.0, lat: 12.0, domain: sea, naval_importance: 9}
+    - {name: "East China Sea Zone", lon: 125.0, lat: 30.0, domain: sea}
+    - {name: "Sea of Japan Zone", lon: 135.0, lat: 40.0, domain: sea}
+    - {name: "Philippine Sea Zone", lon: 135.0, lat: 18.0, domain: sea}
+    - {name: "Coral Sea Zone", lon: 155.0, lat: -15.0, domain: sea}
+    - {name: "Central Pacific Zone", lon: -170.0, lat: 15.0, domain: sea}
+    - {name: "North Atlantic Zone", lon: -30.0, lat: 50.0, domain: sea}
+    - {name: "Mid Atlantic Zone", lon: -30.0, lat: 30.0, domain: sea}
+    - {name: "Gibraltar Strait Zone", lon: -5.5, lat: 36.0, domain: strait, naval_importance: 10}
+    - {name: "Bosporus Approaches", lon: 29.0, lat: 41.1, domain: strait, naval_importance: 10}
+    - {name: "Suez Canal Zone", lon: 32.3, lat: 30.5, domain: strait, naval_importance: 10}
+    - {name: "Hormuz Approaches", lon: 56.5, lat: 26.5, domain: strait, naval_importance: 10}
+    - {name: "Malacca Strait Zone", lon: 100.0, lat: 3.0, domain: strait, naval_importance: 10}

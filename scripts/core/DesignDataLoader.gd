@@ -45,6 +45,33 @@ func get_template(template_id: String) -> UnitTemplate:
 	return templates.get(template_id)
 
 
+## Runtime authoring path (designer duties): inject a custom UnitTemplate into the live catalog.
+## Idempotent — overwrites same id. Used by DesignManager.register_custom_design.
+func register_runtime_template(template: UnitTemplate) -> bool:
+	if template == null:
+		return false
+	var tid := str(template.id).strip_edges()
+	if tid.is_empty():
+		return false
+	templates[tid] = template
+	return true
+
+
+func register_runtime_template_from_dict(data: Dictionary) -> UnitTemplate:
+	if data.is_empty():
+		return null
+	var tpl: UnitTemplate = UnitTemplate.from_dict(data)
+	if tpl == null or str(tpl.id).is_empty():
+		return null
+	if not register_runtime_template(tpl):
+		return null
+	return tpl
+
+
+func has_template(template_id: String) -> bool:
+	return templates.has(str(template_id).strip_edges())
+
+
 func get_infantry_equipment(template_id: String) -> UnitTemplate:
 	var template: UnitTemplate = get_template(template_id)
 	if template == null:

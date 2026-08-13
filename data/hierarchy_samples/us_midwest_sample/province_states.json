@@ -1,0 +1,95 @@
+{
+  "version": 3,
+  "source": "hierarchy_system_product",
+  "naming": "sample",
+  "states": [
+    {
+      "id": 801,
+      "name": "Ohio",
+      "province_ids": [
+        800001,
+        800002,
+        800003,
+        800004,
+        800005,
+        800006
+      ],
+      "province_n": 6,
+      "capital_province_id": 800002,
+      "region_id": 704,
+      "owner_hint": "USA",
+      "theater": "north_america",
+      "tags": [
+        "us_state",
+        "sample"
+      ],
+      "postal_code": "OH"
+    },
+    {
+      "id": 802,
+      "name": "Indiana",
+      "province_ids": [
+        800011,
+        800012,
+        800013,
+        800014,
+        800015,
+        800016
+      ],
+      "province_n": 6,
+      "capital_province_id": 800011,
+      "region_id": 704,
+      "owner_hint": "USA",
+      "theater": "north_america",
+      "tags": [
+        "us_state",
+        "sample"
+      ],
+      "postal_code": "IN"
+    },
+    {
+      "id": 803,
+      "name": "Illinois",
+      "province_ids": [
+        800021,
+        800022,
+        800023,
+        800024,
+        800025,
+        800026
+      ],
+      "province_n": 6,
+      "capital_province_id": 800021,
+      "region_id": 704,
+      "owner_hint": "USA",
+      "theater": "north_america",
+      "tags": [
+        "us_state",
+        "sample"
+      ],
+      "postal_code": "IL"
+    },
+    {
+      "id": 804,
+      "name": "Michigan",
+      "province_ids": [
+        800031,
+        800032,
+        800033,
+        800034,
+        800035,
+        800036
+      ],
+      "province_n": 6,
+      "capital_province_id": 800031,
+      "region_id": 704,
+      "owner_hint": "USA",
+      "theater": "north_america",
+      "tags": [
+        "us_state",
+        "sample"
+      ],
+      "postal_code": "MI"
+    }
+  ]
+}

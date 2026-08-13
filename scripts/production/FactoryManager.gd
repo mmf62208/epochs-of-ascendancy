@@ -238,6 +238,186 @@ func create_shipyard_for_province(province_id: int, owner_tag: String, levels: i
 	return shipyard
 
 
+## Build a resource/energy plant (coal plant, refinery, steel mill, enrichment, …).
+## Plants do not run equipment production lines; they scale province deposit harvest.
+func create_resource_plant_for_province(
+	province_id: int,
+	owner_tag: String,
+	plant_type: String,
+	size_tier: int = 1,
+) -> Factory:
+	var ptype := plant_type.strip_edges().to_lower()
+	if ptype.is_empty():
+		return null
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	if rhc != null and rhc.has_method("is_resource_plant_type"):
+		if not bool(rhc.is_resource_plant_type(ptype)):
+			push_warning("FactoryManager: unknown resource plant type '%s'" % ptype)
+			return null
+	var type_rules: Dictionary = rules.get("factory_types", {}).get(ptype, {}) as Dictionary if rules.get("factory_types", {}).get(ptype) is Dictionary else {}
+	var req := str(type_rules.get("requires_unlock", ""))
+	if not req.is_empty() and typeof(TechnologyManager) != TYPE_NIL:
+		if not TechnologyManager.has_tech_unlock(owner_tag, "rule_flag", req):
+			push_warning(
+				"FactoryManager: %s lacks unlock '%s' for plant type %s"
+				% [owner_tag, req, ptype]
+			)
+			return null
+	var plant: Factory = create_factory_for_province(province_id, owner_tag, 0, ptype, 0)
+	if plant == null:
+		return null
+	plant.size_tier = clampi(size_tier, 1, 5)
+	plant.max_production_lines = 0
+	return plant
+
+
+func is_resource_plant(factory: Factory) -> bool:
+	if factory == null:
+		return false
+	var type_rules: Dictionary = rules.get("factory_types", {}).get(factory.factory_type, {}) as Dictionary if rules.get("factory_types", {}).get(factory.factory_type) is Dictionary else {}
+	if bool(type_rules.get("resource_plant", false)):
+		return true
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	if rhc != null and rhc.has_method("is_resource_plant_type"):
+		return bool(rhc.is_resource_plant_type(factory.factory_type))
+	return false
+
+
+func get_resource_plants_in_province(province_id: int) -> Array:
+	var out: Array = []
+	for f in get_factories_in_province(province_id):
+		if is_resource_plant(f):
+			out.append({
+				"factory_id": f.factory_id,
+				"factory_type": f.factory_type,
+				"plant_type": f.factory_type,
+				"size_tier": int(f.size_tier) if "size_tier" in f else 1,
+				"owner_tag": f.owner_tag,
+			})
+	return out
+
+
+## Inspector / plant panel: browser rows for plants in a province.
+func get_plant_browser_for_province(province_id: int) -> Dictionary:
+	var plants: Array = get_resource_plants_in_province(province_id)
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	var rows: Array = []
+	if rhc != null and rhc.has_method("build_plant_browser_rows"):
+		rows = rhc.build_plant_browser_rows(plants)
+	else:
+		rows = plants
+	return {
+		"province_id": province_id,
+		"plants": rows,
+		"plant_n": rows.size(),
+		"empty": rows.is_empty(),
+	}
+
+
+## Player place-plant action: recommend or override type, create plant if valid.
+func place_resource_plant(
+	province_id: int,
+	owner_tag: String,
+	resources: Dictionary = {},
+	override_plant_type: String = "",
+	size_tier: int = -1,
+) -> Dictionary:
+	var unlocks := {"rule_flags": [], "unlocked_resources": [], "permanent_modifiers": {}}
+	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("get_country_state"):
+		var st: Dictionary = TechnologyManager.get_country_state(owner_tag)
+		if st.get("rule_flags") is Array:
+			unlocks["rule_flags"] = st["rule_flags"]
+		if st.get("unlocked_resources") is Array:
+			unlocks["unlocked_resources"] = st["unlocked_resources"]
+		if st.get("permanent_modifiers") is Dictionary:
+			unlocks["permanent_modifiers"] = st["permanent_modifiers"]
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	var action: Dictionary = {}
+	if rhc != null and rhc.has_method("build_place_plant_action"):
+		action = rhc.build_place_plant_action(resources, unlocks, override_plant_type)
+	if action.is_empty() or not bool(action.get("ok", false)):
+		return {"ok": false, "error": str(action.get("error", "invalid")), "action": action}
+	var tier := int(size_tier) if size_tier > 0 else int(action.get("size_tier", 1))
+	var plant: Factory = create_resource_plant_for_province(
+		province_id, owner_tag, str(action.get("plant_type", "")), tier,
+	)
+	if plant == null:
+		return {"ok": false, "error": "create_failed", "action": action}
+	return {
+		"ok": true,
+		"factory_id": plant.factory_id,
+		"plant_type": plant.factory_type,
+		"size_tier": int(plant.size_tier),
+		"province_id": province_id,
+		"action": action,
+	}
+
+
+## Upgrade energy/resource plant size tier (1–5). Returns new tier or -1.
+func upgrade_resource_plant(factory_id: int, tiers: int = 1) -> int:
+	var f: Factory = get_factory(factory_id)
+	if f == null or not is_resource_plant(f):
+		return -1
+	var cur := int(f.size_tier) if "size_tier" in f else 1
+	f.size_tier = clampi(cur + tiers, 1, 5)
+	_invalidate_production_cache_for_owner(f.owner_tag)
+	return int(f.size_tier)
+
+
+## Auto-place one matching plant on resource-rich provinces that lack resource plants.
+## Caps per owner keep scenario spawn cheap (no micro — pure bootstrap).
+func auto_seed_resource_plants(
+	provinces: Array = [],
+	unlocks_by_tag: Dictionary = {},
+	max_per_owner: int = 12,
+) -> Dictionary:
+	var report := {"seeded": 0, "skipped": 0, "by_tag": {}, "plants": []}
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	if rhc == null or not rhc.has_method("recommend_plant_for_resources"):
+		return report
+	var per_owner: Dictionary = {}
+	for raw in provinces:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var p: Dictionary = raw as Dictionary
+		var pid := int(p.get("province_id", 0))
+		var tag := str(p.get("owner_tag", "")).strip_edges().to_upper()
+		var res: Dictionary = p.get("resources", {}) as Dictionary if p.get("resources") is Dictionary else {}
+		if pid <= 0 or tag.is_empty() or res.is_empty():
+			report["skipped"] = int(report["skipped"]) + 1
+			continue
+		if int(per_owner.get(tag, 0)) >= max_per_owner:
+			continue
+		# Skip if province already has a resource plant
+		if not get_resource_plants_in_province(pid).is_empty():
+			report["skipped"] = int(report["skipped"]) + 1
+			continue
+		var unlocks: Dictionary = unlocks_by_tag.get(tag, {}) as Dictionary if unlocks_by_tag.get(tag) is Dictionary else {}
+		var rec: Dictionary = rhc.recommend_plant_for_resources(res, unlocks) as Dictionary
+		if rec.is_empty():
+			report["skipped"] = int(report["skipped"]) + 1
+			continue
+		var plant: Factory = create_resource_plant_for_province(
+			pid, tag, str(rec.get("plant_type", "")), int(rec.get("size_tier", 1)),
+		)
+		if plant == null:
+			report["skipped"] = int(report["skipped"]) + 1
+			continue
+		report["seeded"] = int(report["seeded"]) + 1
+		per_owner[tag] = int(per_owner.get(tag, 0)) + 1
+		var by_tag: Dictionary = report["by_tag"] as Dictionary
+		by_tag[tag] = int(by_tag.get(tag, 0)) + 1
+		(report["plants"] as Array).append({
+			"factory_id": plant.factory_id,
+			"province_id": pid,
+			"owner_tag": tag,
+			"plant_type": plant.factory_type,
+			"size_tier": int(plant.size_tier),
+			"source_key": str(rec.get("source_key", "")),
+		})
+	return report
+
+
 func convert_factory_to_shipyard(factory_id: int, levels: int = 4) -> bool:
 	var factory: Factory = get_factory(factory_id)
 	if factory == null:

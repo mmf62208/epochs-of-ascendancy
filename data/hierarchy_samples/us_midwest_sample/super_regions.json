@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "super_regions": [
+    {
+      "id": 7,
+      "name": "North America",
+      "region_ids": [
+        704
+      ],
+      "theaters": [
+        "north_america"
+      ],
+      "province_n": 24
+    }
+  ]
+}

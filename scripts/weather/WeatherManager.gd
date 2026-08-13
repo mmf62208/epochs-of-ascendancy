@@ -7,7 +7,9 @@
 # Manipulation via apply_manipulation (from focus/tech/hidden hands).
 # Snow progresses north-to-south + mountains + storms; altitude handled via high_ground_fraction in data.
 
-class_name WeatherManager
+# NOTE: Do NOT use class_name WeatherManager — this node is an autoload singleton.
+# class_name + autoload with the same name makes WeatherManager resolve to the Class DB
+# (script type) under Godot 4.7+, so instance methods appear "non-static" and fail to parse/call.
 extends Node
 
 signal weather_changed(province_id: int, changes: Dictionary)
@@ -48,23 +50,34 @@ func _get_season_progress(month: int, day: int) -> float:
 
 func get_movement_multiplier(pid: int, unit_tags: Array = []) -> float:
 	var w = _province_weather.get(pid, {})
-	var g = w.get("ground_state", "dry")
+	var g = str(w.get("ground_state", "dry"))
+	var vis := float(w.get("visibility", 1.0))
+	var armored := "armor" in unit_tags or "motorized" in unit_tags or "mechanized" in unit_tags
+	if true:
+		return float(MapPolishFormatters.weather_move_multiplier(g, vis, armored))
 	var base = 1.0
 	if g == "mud":
-		base *= 0.45 if "armor" in unit_tags or "motorized" in unit_tags else 0.75
+		base *= 0.45 if armored else 0.75
 	elif g == "frozen" or g == "snow_covered":
 		base *= 0.85
 		if "armor" in unit_tags:
 			base *= 1.15  # frozen ground bonus example
-	if w.get("visibility", 1.0) < 0.3:
+	if vis < 0.3:
 		base *= 0.6
 	return base
 
 func get_air_mission_effectiveness(pid: int) -> float:
 	var w = _province_weather.get(pid, {})
-	var vis = w.get("visibility", 1.0)
-	var storm = w.get("precip_intensity", 0.0)
-	var base = clamp(vis * (1.0 - storm * 0.8), 0.05, 1.0)
+	var vis = float(w.get("visibility", 1.0))
+	var storm = float(w.get("precip_intensity", 0.0))
+	var wind = float(w.get("wind", 0.2))
+	# Prefer pure air-sortie readiness gate (mirrors weather_effects.air_sortie_readiness).
+	var base := 1.0
+	if true:
+		var ready: Dictionary = MapPolishFormatters.air_sortie_weather_readiness(vis, storm, wind)
+		base = float(ready.get("effectiveness", clamp(vis * (1.0 - storm * 0.8), 0.05, 1.0)))
+	else:
+		base = clamp(vis * (1.0 - storm * 0.8), 0.05, 1.0)
 
 	# Wire to AircraftDesignSystem for range/reliability impact on missions (from editor/prototyping)
 	var ads = get_node_or_null("/root/AircraftDesignSystem")  # if autoloaded or added
@@ -117,11 +130,32 @@ func get_naval_spotting_visibility(pid: int) -> float:
 	var base := get_naval_mission_effectiveness(pid)
 	# Spotting slightly different: penalize less for wind (surface waves), more for low vis/precip for visual/radar early.
 	var w = _province_weather.get(pid, {})
-	var vis = w.get("visibility", 1.0)
-	var storm = w.get("precip_intensity", 0.0)
-	var spot = clamp(vis * (1.0 - storm * 0.5), 0.1, 1.0) * base * 0.9 + 0.1  # weighted
+	var vis = float(w.get("visibility", 1.0))
+	var storm = float(w.get("precip_intensity", 0.0))
+	var pure_spot := float(MapPolishFormatters.naval_spot_weather_multiplier(vis, storm))
+	var spot = clamp(pure_spot, 0.1, 1.0) * base * 0.9 + 0.1  # weighted
 	# Tech era later could boost via radar/sat but here base weather; caller applies tech/asset.
 	return clamp(spot, 0.05, 1.2)
+
+
+## Pure naval spot mult without mission-effectiveness base (BattleManager context fill).
+func get_naval_spot_weather_multiplier(pid: int) -> float:
+	var w = _province_weather.get(pid, {})
+	return float(MapPolishFormatters.naval_spot_weather_multiplier(
+		float(w.get("visibility", 1.0)),
+		float(w.get("precip_intensity", 0.0)),
+	))
+
+
+## Air sortie weather effectiveness (pure readiness gate).
+func get_air_sortie_weather_eff(pid: int) -> float:
+	var w = _province_weather.get(pid, {})
+	var ready: Dictionary = MapPolishFormatters.air_sortie_weather_readiness(
+		float(w.get("visibility", 1.0)),
+		float(w.get("precip_intensity", 0.0)),
+		float(w.get("wind", 0.2)),
+	)
+	return float(ready.get("weather_eff", ready.get("effectiveness", 1.0)))
 
 func get_carrier_air_effectiveness(pid: int) -> float:
 	# Carrier launched aircraft more vulnerable to weather than land-based
@@ -182,6 +216,14 @@ func _trigger_sample_event() -> void:
 		print("Weather: sample extreme event triggered (expand with real defs + damage)")
 	print("Env: Event %s (solar/EMP/nuke/espionage can cause blackout equiv to flare, affecting power in province + surrounding)" % etype)
 
+## Pass 9: live province weather dict for icon resolution / inspector.
+func get_province_weather(pid: int) -> Dictionary:
+	var w: Variant = _province_weather.get(pid, {})
+	if w is Dictionary:
+		return (w as Dictionary).duplicate(true)
+	return {}
+
+
 # Example: get summary for player tooltip / weather layer
 func get_conditions_summary(pid: int) -> String:
 	var w = _province_weather.get(pid, {})
@@ -195,6 +237,317 @@ func get_conditions_summary(pid: int) -> String:
 	# Naval note for coastal
 	s += " Naval: %.0f%%" % (get_naval_mission_effectiveness(pid) * 100)
 	return s
+
+
+## Combat weather multiplier (shared pure rules via MapPolishFormatters when available).
+func get_combat_weather_multiplier(pid: int) -> float:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var vis := float(w.get("visibility", 1.0))
+	var precip := float(w.get("precip_intensity", 0.0))
+	var wind := float(w.get("wind", 0.2))
+	if true:
+		return float(MapPolishFormatters.weather_combat_multiplier(vis, precip, wind))
+	return clampf(vis * (1.0 - precip * 0.55) * (1.0 - maxf(0.0, wind - 0.4) * 0.2), 0.2, 1.1)
+
+
+## Supply throughput weather multiplier.
+func get_supply_weather_multiplier(pid: int) -> float:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var g := str(w.get("ground_state", "dry"))
+	var precip := float(w.get("precip_intensity", 0.0))
+	if true:
+		return float(MapPolishFormatters.weather_supply_multiplier(g, precip))
+	return 1.0
+
+
+## Production output weather multiplier.
+func get_production_weather_multiplier(pid: int) -> float:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var temp := float(w.get("temp", 10.0))
+	var precip := float(w.get("precip_intensity", 0.0))
+	if true:
+		return float(MapPolishFormatters.weather_production_multiplier(temp, precip))
+	return 1.0
+
+
+## Storm interdiction bump for supply routes.
+func get_storm_interdiction_chance(pid: int, base_interdiction: float = 0.1) -> float:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var storm := float(w.get("precip_intensity", 0.0))
+	var vis := float(w.get("visibility", 1.0))
+	var bump := storm * 0.18 + maxf(0.0, 0.5 - vis) * 0.12
+	return clampf(base_interdiction + bump, 0.0, 0.95)
+
+
+## Inspector BBCode weather chip (live surface).
+func format_province_weather_chip_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var season := ""
+	if typeof(TimeManager) != TYPE_NIL:
+		var month := int(TimeManager.current_month) if "current_month" in TimeManager else 1
+		if true:
+			season = str(MapPolishFormatters.season_label(month))
+	if true:
+		return str(
+			MapPolishFormatters.format_weather_chip_bbcode(
+				float(w.get("temp", 10.0)),
+				str(w.get("ground_state", "dry")),
+				float(w.get("visibility", 1.0)),
+				float(w.get("precip_intensity", 0.0)),
+				season,
+			)
+		)
+	return "[color=#8899aa]%s[/color]" % get_conditions_summary(pid)
+
+
+## Weather overlay legend BBCode (live surface).
+func format_weather_legend_bbcode() -> String:
+	if true:
+		return str(MapPolishFormatters.format_weather_legend_bbcode())
+	return "[color=#8899aa]Weather legend unavailable[/color]"
+
+
+## Next-day forecast chip for province (deterministic stub).
+func format_province_forecast_chip_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var fx: Dictionary = MapPolishFormatters.forecast_next_day_weather(
+		float(w.get("temp", 10.0)),
+		float(w.get("precip_intensity", 0.0)),
+		float(w.get("visibility", 1.0)),
+		float(w.get("wind", 0.2)),
+		str(w.get("ground_state", "dry")),
+	)
+	return str(fx.get("bbcode", fx.get("label", "")))
+
+
+## Season + daylight chip for current month.
+func format_season_daylight_chip_bbcode() -> String:
+	var month := 1
+	if typeof(TimeManager) != TYPE_NIL and "current_month" in TimeManager:
+		month = int(TimeManager.current_month)
+	var chip: Dictionary = MapPolishFormatters.format_season_daylight_chip(month)
+	return str(chip.get("bbcode", chip.get("plain", "")))
+
+
+## Extreme event severity chip from active events.
+func format_extreme_event_chip_bbcode() -> String:
+	var chip: Dictionary = MapPolishFormatters.format_extreme_event_chip(_active_events)
+	if bool(chip.get("empty", true)):
+		return ""
+	return str(chip.get("bbcode", ""))
+
+
+## Move cost estimate with weather for unit tags.
+func estimate_move_cost_with_weather(pid: int, base_cost: float = 1.0, unit_tags: Array = []) -> Dictionary:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var armored := "armor" in unit_tags or "motorized" in unit_tags or "mechanized" in unit_tags
+	return MapPolishFormatters.estimate_move_cost_with_weather(
+		base_cost,
+		str(w.get("ground_state", "dry")),
+		float(w.get("visibility", 1.0)),
+		armored,
+	)
+
+
+## Storm convoy risk chip for province.
+func format_storm_convoy_risk_bbcode(pid: int, escort_need_base: float = 25.0) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var risk: Dictionary = MapPolishFormatters.storm_convoy_risk(
+		float(w.get("precip_intensity", 0.0)),
+		float(w.get("visibility", 1.0)),
+		escort_need_base,
+		0.1,
+	)
+	return str(risk.get("bbcode", risk.get("label", "")))
+
+
+## Weather pressure index for province.
+func format_weather_pressure_chip_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var p: Dictionary = MapPolishFormatters.weather_pressure_index(
+		float(w.get("visibility", 1.0)),
+		float(w.get("precip_intensity", 0.0)),
+		str(w.get("ground_state", "dry")),
+		float(w.get("wind", 0.2)),
+	)
+	return str(p.get("bbcode", p.get("label", "")))
+
+
+## Trade weather multiplier for province (TradeManager live path).
+func get_trade_weather_multiplier(pid: int) -> float:
+	var w: Dictionary = _province_weather.get(pid, {})
+	return float(MapPolishFormatters.trade_weather_multiplier(
+		str(w.get("ground_state", "dry")),
+		float(w.get("precip_intensity", 0.0)),
+	))
+
+
+## Naval engagement weather tip.
+func format_naval_engagement_weather_tip_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var tip: Dictionary = MapPolishFormatters.naval_engagement_weather_tip(
+		float(w.get("visibility", 1.0)),
+		float(w.get("precip_intensity", 0.0)),
+	)
+	return str(tip.get("bbcode", tip.get("summary", "")))
+
+
+## Air grounding alert (empty when fair).
+func format_air_grounding_alert_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var alert: Dictionary = MapPolishFormatters.air_grounding_alert(
+		float(w.get("visibility", 1.0)),
+		float(w.get("precip_intensity", 0.0)),
+		float(w.get("wind", 0.2)),
+	)
+	if bool(alert.get("empty", true)):
+		return ""
+	return str(alert.get("bbcode", ""))
+
+
+## Freeze/thaw ground chip.
+func format_freeze_thaw_chip_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var ft: Dictionary = MapPolishFormatters.freeze_thaw_transition(
+		str(w.get("ground_state", "dry")),
+		float(w.get("temp", 10.0)),
+		float(w.get("precip_intensity", 0.0)),
+	)
+	return str(ft.get("bbcode", ft.get("summary", "")))
+
+
+## Infra weather wear chip.
+func format_infra_weather_wear_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var wear: Dictionary = MapPolishFormatters.infra_weather_wear(
+		str(w.get("ground_state", "dry")),
+		float(w.get("precip_intensity", 0.0)),
+	)
+	return str(wear.get("bbcode", wear.get("summary", "")))
+
+
+## Coastal fog naval gate chip.
+func format_coastal_fog_gate_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var fog: Dictionary = MapPolishFormatters.coastal_fog_naval_gate(
+		float(w.get("visibility", 1.0)),
+		float(w.get("precip_intensity", 0.0)),
+	)
+	return str(fog.get("bbcode", fog.get("summary", "")))
+
+
+## Compact weather ops section for inspector.
+func format_inspector_weather_section_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	if w.is_empty():
+		return ""
+	var sec: Dictionary = MapPolishFormatters.format_inspector_weather_section(
+		float(w.get("visibility", 1.0)),
+		float(w.get("precip_intensity", 0.0)),
+		str(w.get("ground_state", "dry")),
+		float(w.get("temp", 10.0)),
+		float(w.get("wind", 0.2)),
+	)
+	return str(sec.get("bbcode", ""))
+
+
+## Campaign day risk chip.
+func format_campaign_day_risk_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var month := 1
+	if typeof(TimeManager) != TYPE_NIL and "current_month" in TimeManager:
+		month = int(TimeManager.current_month)
+	var risk: Dictionary = MapPolishFormatters.campaign_day_risk(
+		float(w.get("visibility", 1.0)),
+		float(w.get("precip_intensity", 0.0)),
+		str(w.get("ground_state", "dry")),
+		float(w.get("wind", 0.2)),
+		month,
+	)
+	return str(risk.get("bbcode", risk.get("label", "")))
+
+
+## Production weather alert (empty when fair).
+func format_production_weather_alert_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var alert: Dictionary = MapPolishFormatters.production_weather_alert(
+		float(w.get("temp", 10.0)),
+		float(w.get("precip_intensity", 0.0)),
+		0.85,
+	)
+	if bool(alert.get("empty", true)):
+		return ""
+	return str(alert.get("bbcode", ""))
+
+
+## Combat morale weather mult (attacker).
+func get_combat_morale_weather_mult(pid: int) -> float:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var m: Dictionary = MapPolishFormatters.combat_morale_weather(
+		float(w.get("visibility", 1.0)),
+		float(w.get("precip_intensity", 0.0)),
+		float(w.get("wind", 0.2)),
+	)
+	return float(m.get("morale_mult", 1.0))
+
+
+## Depot weather capacity factor.
+func get_depot_weather_capacity(pid: int, base_capacity: float = 100.0) -> Dictionary:
+	var w: Dictionary = _province_weather.get(pid, {})
+	return MapPolishFormatters.depot_weather_capacity(
+		base_capacity,
+		str(w.get("ground_state", "dry")),
+		float(w.get("precip_intensity", 0.0)),
+	)
+
+
+## Daylight combat mod for current month.
+func format_daylight_combat_mod_bbcode() -> String:
+	var month := 1
+	if typeof(TimeManager) != TYPE_NIL and "current_month" in TimeManager:
+		month = int(TimeManager.current_month)
+	var d: Dictionary = MapPolishFormatters.daylight_combat_mod(month)
+	return str(d.get("bbcode", d.get("summary", "")))
+
+
+## Convoy weather window for province (stub 3-day forecast).
+func format_convoy_weather_window_bbcode(pid: int) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var days: Array = []
+	for i in range(3):
+		days.append({
+			"day_index": i,
+			"visibility": clampf(float(w.get("visibility", 1.0)) + float(i) * 0.1, 0.1, 1.0),
+			"precip_intensity": clampf(float(w.get("precip_intensity", 0.0)) - float(i) * 0.15, 0.0, 1.0),
+			"ground_state": str(w.get("ground_state", "dry")),
+		})
+	var win: Dictionary = MapPolishFormatters.convoy_weather_window(days)
+	return str(win.get("bbcode", win.get("summary", "")))
+
+
+## Sea × naval weather ops mult for province.
+func format_sea_naval_weather_ops_bbcode(pid: int, sea_mult: float = 1.0) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var ops: Dictionary = MapPolishFormatters.sea_naval_weather_ops(
+		sea_mult,
+		float(w.get("visibility", 1.0)),
+		float(w.get("precip_intensity", 0.0)),
+	)
+	return str(ops.get("bbcode", ops.get("summary", "")))
+
+
+## Choke + weather synergy chip.
+func format_choke_weather_synergy_bbcode(pid: int, is_choke: bool = false, controller_friendly: bool = true) -> String:
+	var w: Dictionary = _province_weather.get(pid, {})
+	var syn: Dictionary = MapPolishFormatters.choke_weather_synergy(
+		is_choke,
+		controller_friendly,
+		float(w.get("visibility", 1.0)),
+		float(w.get("precip_intensity", 0.0)),
+	)
+	if bool(syn.get("empty", true)):
+		return ""
+	return str(syn.get("bbcode", ""))
 
 # Integrate power into infra etc.
 func get_infra_effectiveness(pid: int) -> float:
@@ -294,3 +647,60 @@ func get_aggregate_snow_coverage() -> float:
 func get_province_snow(pid: int) -> float:
 	var w = _province_weather.get(pid, {})
 	return float(w.get("snow_coverage", 0.0))
+
+
+## Production output multiplier from local weather (storm/mud/snow hurt factories slightly).
+func get_production_weather_mult(pid: int) -> float:
+	var w: Dictionary = _province_weather.get(pid, {})
+	if w.is_empty():
+		return 1.0
+	var mult := 1.0
+	var precip := float(w.get("precip_intensity", 0.0))
+	var vis := float(w.get("visibility", 1.0))
+	var ground := str(w.get("ground_state", "dry"))
+	if precip > 0.5:
+		mult *= 0.92
+	if vis < 0.35:
+		mult *= 0.95
+	if ground == "mud" or ground == "flooded":
+		mult *= 0.9
+	elif ground == "snow_covered" or ground == "frozen":
+		mult *= 0.94
+	return clampf(mult, 0.5, 1.1)
+
+
+## Debug/test: force weather event on a province (blizzard/rain/mud).
+func force_event_for_test(pid: int, event_type: String = "blizzard") -> void:
+	if not _province_weather.has(pid):
+		initialize_province(pid, {"is_northern": true, "lat": 55.0, "high_ground_fraction": 0.3, "snow_potential": 0.4})
+	var w: Dictionary = _province_weather[pid]
+	match str(event_type).to_lower():
+		"blizzard", "snow":
+			w["precip_intensity"] = 0.85
+			w["precip_type"] = "snow"
+			w["visibility"] = 0.25
+			w["wind"] = 0.7
+			w["ground_state"] = "snow_covered"
+			w["snow_coverage"] = 0.8
+		"mud", "rain":
+			w["precip_intensity"] = 0.7
+			w["precip_type"] = "rain"
+			w["visibility"] = 0.45
+			w["ground_state"] = "mud"
+		_:
+			w["precip_intensity"] = 0.6
+			w["visibility"] = 0.4
+	_province_weather[pid] = w
+	_active_events.append({"type": event_type, "province_id": pid, "day": _last_tick_day})
+	weather_changed.emit(pid, w.duplicate())
+
+
+## Public write for debug harnesses (replaces illegal WeatherManager._province_weather[pid] = ...).
+func debug_set_province_weather(pid: int, data: Dictionary) -> void:
+	if not _province_weather.has(pid):
+		initialize_province(pid, {})
+	var w: Dictionary = _province_weather[pid]
+	for k in data.keys():
+		w[k] = data[k]
+	_province_weather[pid] = w
+	weather_changed.emit(pid, w.duplicate())

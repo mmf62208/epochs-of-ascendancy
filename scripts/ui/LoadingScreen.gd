@@ -3,6 +3,9 @@
 # Cycles four concept artworks at 0–24%, 25–49%, 50–74%, 75–100% load progress.
 extends CanvasLayer
 
+## High layer so load art covers map; must free fully on dismiss or it blocks all clicks.
+const LOADING_LAYER := 80
+
 const LOADING_ART_QUARTERS: Array[Dictionary] = [
 	{
 		"texture": "res://assets/loading_screens/ascendant_globe.jpg",
@@ -26,9 +29,13 @@ const LOADING_ART_QUARTERS: Array[Dictionary] = [
 	},
 ]
 
+const WORDMARK_PATH := "res://assets/graphics/branding/epochs_wordmark.png"
+const WORDMARK_PATH_512 := "res://assets/graphics/branding/epochs_wordmark_512.png"
+
 var _hero_art: TextureRect
 var _bottom_scrim: ColorRect
 var _fade_root: Control
+var _wordmark: TextureRect
 var title_label: Label
 var subtitle_label: Label
 var progress_bar: ProgressBar
@@ -43,8 +50,8 @@ var _input_blocker: ColorRect
 
 
 func _ready() -> void:
-	layer = 100
-	follow_viewport_enabled = true
+	layer = LOADING_LAYER
+	follow_viewport_enabled = false  # screen-space; avoid map-transform coupling
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	add_to_group("loading_screen")
 	visible = false
@@ -93,11 +100,12 @@ func _build_fullscreen_ui() -> void:
 	_fade_root.add_child(base_veil)
 	_fade_root.move_child(base_veil, 0)
 
-	# Bottom scrim for readable text over bright artwork.
+	# Bottom scrim — thin band only under bar/titles so load art stays visible
+	# (was ~55% → ~22% → now ~11% of viewport height).
 	_bottom_scrim = ColorRect.new()
 	_bottom_scrim.name = "BottomScrim"
 	_bottom_scrim.anchor_left = 0.0
-	_bottom_scrim.anchor_top = 0.45
+	_bottom_scrim.anchor_top = 0.89
 	_bottom_scrim.anchor_right = 1.0
 	_bottom_scrim.anchor_bottom = 1.0
 	_bottom_scrim.offset_left = 0
@@ -105,15 +113,15 @@ func _build_fullscreen_ui() -> void:
 	_bottom_scrim.offset_right = 0
 	_bottom_scrim.offset_bottom = 0
 	_bottom_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bottom_scrim.color = Color(0.02, 0.02, 0.05, 0.88)
+	_bottom_scrim.color = Color(0.02, 0.02, 0.05, 0.68)
 	_fade_root.add_child(_bottom_scrim)
 
 	var bottom := MarginContainer.new()
 	bottom.name = "BottomUI"
 	bottom.set_anchors_preset(Control.PRESET_FULL_RECT)
-	bottom.add_theme_constant_override("margin_left", 48)
-	bottom.add_theme_constant_override("margin_right", 48)
-	bottom.add_theme_constant_override("margin_bottom", 40)
+	bottom.add_theme_constant_override("margin_left", 28)
+	bottom.add_theme_constant_override("margin_right", 28)
+	bottom.add_theme_constant_override("margin_bottom", 12)
 	bottom.add_theme_constant_override("margin_top", 0)
 	_fade_root.add_child(bottom)
 
@@ -127,36 +135,56 @@ func _build_fullscreen_ui() -> void:
 	outer_v.add_child(spacer)
 
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 10)
+	vbox.add_theme_constant_override("separation", 4)
 	outer_v.add_child(vbox)
+
+	# Brand wordmark — compact so artwork stays visible behind load UI.
+	_wordmark = TextureRect.new()
+	_wordmark.name = "Wordmark"
+	_wordmark.custom_minimum_size = Vector2(200, 48)
+	_wordmark.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_wordmark.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	_wordmark.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	_wordmark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var wm_tex: Texture2D = null
+	if ResourceLoader.exists(WORDMARK_PATH):
+		wm_tex = load(WORDMARK_PATH) as Texture2D
+	elif ResourceLoader.exists(WORDMARK_PATH_512):
+		wm_tex = load(WORDMARK_PATH_512) as Texture2D
+	if wm_tex != null:
+		_wordmark.texture = wm_tex
+		vbox.add_child(_wordmark)
 
 	title_label = Label.new()
 	title_label.name = "TitleLabel"
 	title_label.text = "EPOCHS OF ASCENDANCY"
-	title_label.add_theme_font_size_override("font_size", 42)
+	# When wordmark is present, title_label carries per-quarter chapter titles (smaller).
+	title_label.add_theme_font_size_override("font_size", 13 if wm_tex != null else 22)
 	title_label.add_theme_color_override("font_color", Color(0.95, 0.86, 0.45))
 	title_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	title_label.visible = true
 	vbox.add_child(title_label)
 
 	subtitle_label = Label.new()
 	subtitle_label.name = "SubtitleLabel"
 	subtitle_label.text = "Forging the epoch..."
-	subtitle_label.add_theme_font_size_override("font_size", 16)
+	subtitle_label.add_theme_font_size_override("font_size", 11)
 	subtitle_label.add_theme_color_override("font_color", Color(0.82, 0.82, 0.9))
 	subtitle_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(subtitle_label)
 
 	progress_bar = ProgressBar.new()
 	progress_bar.name = "ProgressBar"
-	progress_bar.custom_minimum_size = Vector2(0, 22)
+	progress_bar.custom_minimum_size = Vector2(0, 10)
 	progress_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	progress_bar.max_value = 100.0
+	RetrowaveTheme.style_progress_bar(progress_bar)
 	vbox.add_child(progress_bar)
 
 	var pct_label := Label.new()
 	pct_label.name = "PercentLabel"
 	pct_label.text = "0%"
-	pct_label.add_theme_font_size_override("font_size", 13)
+	pct_label.add_theme_font_size_override("font_size", 11)
 	pct_label.add_theme_color_override("font_color", Color(0.85, 0.8, 0.65))
 	pct_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(pct_label)
@@ -166,7 +194,7 @@ func _build_fullscreen_ui() -> void:
 	tip_label.name = "TipLabel"
 	tip_label.text = "Loading..."
 	tip_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	tip_label.add_theme_font_size_override("font_size", 13)
+	tip_label.add_theme_font_size_override("font_size", 11)
 	tip_label.add_theme_color_override("font_color", Color(0.72, 0.72, 0.82))
 	tip_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vbox.add_child(tip_label)
@@ -196,9 +224,43 @@ func show_loading(_option: String = "cycle", initial_tip: String = "Forging the 
 	if title_label:
 		title_label.modulate.a = 1.0
 	print("LoadingScreen: fullscreen cycle mode active (4 artworks @ 25% each).")
+	# Safety: never leave MOUSE_FILTER_STOP forever if hide_and_free is skipped (stuck UI / no zoom).
+	# world_accurate (~5670) scenario load often exceeds 12s — do NOT free the node early (that
+	# stops ScenarioLoader frame yields when progress only awaited with LS present). Soft-unlock
+	# input first; hard free only after a long stall or real hide_and_free from TestRunner.
+	if not has_meta("ls_force_dismiss_timer"):
+		set_meta("ls_force_dismiss_timer", true)
+		var tree := get_tree()
+		if tree:
+			tree.create_timer(18.0).timeout.connect(func():
+				if is_instance_valid(self) and not _hiding:
+					print("LoadingScreen: SAFETY soft-unlock after 18s (keep node for progress).")
+					soft_unlock_input()
+			, CONNECT_ONE_SHOT)
+			tree.create_timer(120.0).timeout.connect(func():
+				if is_instance_valid(self) and visible and not _hiding:
+					print("LoadingScreen: SAFETY hard dismiss after 120s (input unlock).")
+					hide_and_free()
+			, CONNECT_ONE_SHOT)
+
+
+## Unlock pan/zoom/UI without freeing — ScenarioLoader can still call update_progress.
+func soft_unlock_input() -> void:
+	if not is_instance_valid(self):
+		return
+	if _input_blocker:
+		_input_blocker.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_input_blocker.visible = false
+	# CanvasLayer has no mouse_filter — only Control children.
+	if _fade_root:
+		_fade_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		# Allow clicks through translucent load art while progress continues.
+		_fade_root.modulate.a = minf(_fade_root.modulate.a, 0.55)
+	print("LoadingScreen: soft_unlock_input — map input free; progress still updating.")
 
 
 func update_progress(progress: float, tip: String = "") -> void:
+	# After soft_unlock we still accept progress (node not freed). Only skip when fully dismissed.
 	if _hiding:
 		return
 	_ensure_built()
@@ -214,6 +276,26 @@ func update_progress(progress: float, tip: String = "") -> void:
 	if pl:
 		pl.text = "%.1f%%" % (current_progress * 100.0)
 		pl.queue_redraw()
+	# When load reports complete, schedule dismiss so map input is never permanently blocked.
+	# Also unlock earlier once map polys are live (>= 0.58) — residual harness must not block pan/zoom.
+	if current_progress >= 0.58 and not has_meta("ls_map_live_dismiss_scheduled"):
+		set_meta("ls_map_live_dismiss_scheduled", true)
+		var tree_map := get_tree()
+		if tree_map:
+			tree_map.create_timer(0.35).timeout.connect(func():
+				if is_instance_valid(self) and visible and not _hiding:
+					print("LoadingScreen: map-live dismiss (progress>=58% — unlock pan/zoom/UI).")
+					hide_and_free()
+			, CONNECT_ONE_SHOT)
+	if current_progress >= 0.98 and not has_meta("ls_complete_dismiss_scheduled"):
+		set_meta("ls_complete_dismiss_scheduled", true)
+		var tree := get_tree()
+		if tree:
+			tree.create_timer(0.25).timeout.connect(func():
+				if is_instance_valid(self) and visible:
+					print("LoadingScreen: progress-complete dismiss (input unlock).")
+					hide_and_free()
+			, CONNECT_ONE_SHOT)
 
 
 func _apply_loading_art_for_progress(progress: float) -> void:
@@ -250,6 +332,8 @@ func hide_and_free() -> void:
 	if _input_blocker:
 		_input_blocker.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_input_blocker.visible = false
+		_input_blocker.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		_input_blocker.size = Vector2.ZERO
 	if tween:
 		tween.kill()
 		tween = null
@@ -257,7 +341,10 @@ func hide_and_free() -> void:
 	if _fade_root:
 		_fade_root.modulate = Color(1, 1, 1, 0)
 		_fade_root.visible = false
+		_fade_root.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	layer = -128
-	if is_inside_tree():
-		queue_free()
+	# Detach immediately so we cannot block input for a frame after dismiss.
+	if get_parent() != null:
+		get_parent().remove_child(self)
+	queue_free()

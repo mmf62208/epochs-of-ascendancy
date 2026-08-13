@@ -1,0 +1,300 @@
+{
+  "electric_power_generation_1890": {
+    "id": "electric_power_generation_1890",
+    "name": "Electric Power Generation",
+    "domain": "industry",
+    "tree_id": "resource_industry",
+    "node_kind": "research",
+    "column": 0,
+    "row": 0,
+    "tier": 0,
+    "era_min": 1885,
+    "era_max": 1935,
+    "epoch": "pre_war",
+    "prerequisites": [],
+    "research": {
+      "base_cost_days": 70,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "factory_type", "factory_type": "coal_plant" },
+      { "type": "factory_type", "factory_type": "hydro_plant" },
+      { "type": "modifier", "stat": "power_plant_output", "value": 0.05 },
+      { "type": "rule_flag", "flag": "electric_grid" }
+    ],
+    "ui": {
+      "short_effect": "Unlocks coal & hydro energy plants; +5% plant output",
+      "flavor": "Central stations turn coal and falling water into national Energy."
+    }
+  },
+  "chemical_industry_1909": {
+    "id": "chemical_industry_1909",
+    "name": "Chemical Industry Foundations",
+    "domain": "industry",
+    "tree_id": "resource_industry",
+    "node_kind": "research",
+    "column": 1,
+    "row": 0,
+    "tier": 1,
+    "era_min": 1905,
+    "era_max": 1945,
+    "epoch": "pre_war",
+    "prerequisites": ["electric_power_generation_1890"],
+    "research": {
+      "base_cost_days": 80,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "factory_type", "factory_type": "refinery" },
+      { "type": "factory_type", "factory_type": "rubber_works" },
+      { "type": "modifier", "stat": "resource_output", "value": 0.05 },
+      { "type": "rule_flag", "flag": "chemical_industry" }
+    ],
+    "ui": {
+      "short_effect": "Unlocks refineries & rubber works; +5% resource harvest",
+      "flavor": "Dyes, explosives, and process chemistry feed industrial majors."
+    }
+  },
+  "synthetic_materials_1917": {
+    "id": "synthetic_materials_1917",
+    "name": "Synthetic Materials & Early Plastics",
+    "domain": "industry",
+    "tree_id": "resource_industry",
+    "node_kind": "research",
+    "column": 2,
+    "row": 0,
+    "tier": 2,
+    "era_min": 1915,
+    "era_max": 1955,
+    "epoch": "industrial_war",
+    "prerequisites": ["chemical_industry_1909"],
+    "research": {
+      "base_cost_days": 95,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "rule_flag", "flag": "plastics_industry" },
+      { "type": "modifier", "stat": "rubber_efficiency", "value": 0.15 },
+      { "type": "modifier", "stat": "electronics_efficiency", "value": 0.1 },
+      { "type": "factory_type", "factory_type": "electronics_fab" }
+    ],
+    "ui": {
+      "short_effect": "Plastics: +15% rubber & +10% electronics harvest efficiency",
+      "flavor": "Bakelite to synthetic rubber — no separate plastics stockpile; tech softens shortages."
+    }
+  },
+  "steel_industry_1895": {
+    "id": "steel_industry_1895",
+    "name": "Modern Steel Mills",
+    "domain": "industry",
+    "tree_id": "resource_industry",
+    "node_kind": "research",
+    "column": 0,
+    "row": 1,
+    "tier": 0,
+    "era_min": 1890,
+    "era_max": 1940,
+    "epoch": "pre_war",
+    "prerequisites": [],
+    "research": {
+      "base_cost_days": 65,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "factory_type", "factory_type": "steel_mill" },
+      { "type": "modifier", "stat": "resource_output_steel", "value": 0.1 },
+      { "type": "rule_flag", "flag": "steel_industry" }
+    ],
+    "ui": {
+      "short_effect": "Unlocks steel mills; better iron→steel harvest",
+      "flavor": "Bessemer to open-hearth: iron provinces become national Steel income."
+    }
+  },
+  "aluminum_industry_1920": {
+    "id": "aluminum_industry_1920",
+    "name": "Aluminum Smelting Industry",
+    "domain": "industry",
+    "tree_id": "resource_industry",
+    "node_kind": "research",
+    "column": 1,
+    "row": 1,
+    "tier": 1,
+    "era_min": 1915,
+    "era_max": 1960,
+    "epoch": "industrial_war",
+    "prerequisites": ["electric_power_generation_1890", "steel_industry_1895"],
+    "research": {
+      "base_cost_days": 85,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "factory_type", "factory_type": "aluminum_smelter" },
+      { "type": "modifier", "stat": "resource_output", "value": 0.04 },
+      { "type": "rule_flag", "flag": "aluminum_industry" }
+    ],
+    "ui": {
+      "short_effect": "Unlocks aluminum smelters (power-hungry airframe metal)",
+      "flavor": "Hall–Héroult at scale — Energy and bauxite feed Aluminum majors."
+    }
+  },
+  "oil_gas_power_1912": {
+    "id": "oil_gas_power_1912",
+    "name": "Oil & Gas Thermal Power",
+    "domain": "industry",
+    "tree_id": "resource_industry",
+    "node_kind": "research",
+    "column": 2,
+    "row": 1,
+    "tier": 1,
+    "era_min": 1910,
+    "era_max": 1965,
+    "epoch": "industrial_war",
+    "prerequisites": ["electric_power_generation_1890"],
+    "research": {
+      "base_cost_days": 75,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "factory_type", "factory_type": "oil_power_plant" },
+      { "type": "factory_type", "factory_type": "gas_plant" },
+      { "type": "factory_type", "factory_type": "biomass_plant" },
+      { "type": "modifier", "stat": "power_plant_output", "value": 0.08 },
+      { "type": "rule_flag", "flag": "thermal_oil_gas" }
+    ],
+    "ui": {
+      "short_effect": "Oil/gas/biomass plants; oil plants also drip Fuel",
+      "flavor": "Typed energy plants all fill the Energy meter — icons differ, stockpile is one."
+    }
+  },
+  "specials_refining_1930": {
+    "id": "specials_refining_1930",
+    "name": "Strategic Alloys & Specials Refining",
+    "domain": "industry",
+    "tree_id": "resource_industry",
+    "node_kind": "research",
+    "column": 3,
+    "row": 1,
+    "tier": 2,
+    "era_min": 1925,
+    "era_max": 1970,
+    "epoch": "industrial_war",
+    "prerequisites": ["chemical_industry_1909", "steel_industry_1895"],
+    "research": {
+      "base_cost_days": 90,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.12,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "factory_type", "factory_type": "specials_refinery" },
+      { "type": "modifier", "stat": "resource_output", "value": 0.05 },
+      { "type": "rule_flag", "flag": "specials_refining" }
+    ],
+    "ui": {
+      "short_effect": "Unlocks specials refineries (chromium, tungsten, rare earths)",
+      "flavor": "Sparse deposits become Specials — critical for high-end modules."
+    }
+  },
+  "plastics_industry_1945": {
+    "id": "plastics_industry_1945",
+    "name": "Mass Plastics Industry",
+    "domain": "industry",
+    "tree_id": "resource_industry",
+    "node_kind": "research",
+    "column": 3,
+    "row": 0,
+    "tier": 3,
+    "era_min": 1940,
+    "era_max": 1985,
+    "epoch": "cold_war",
+    "prerequisites": ["synthetic_materials_1917"],
+    "research": {
+      "base_cost_days": 100,
+      "category": "industry",
+      "ahead_of_time_penalty_per_year": 0.1,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "rule_flag", "flag": "plastics_industry" },
+      { "type": "modifier", "stat": "rubber_efficiency", "value": 0.1 },
+      { "type": "modifier", "stat": "electronics_efficiency", "value": 0.08 },
+      { "type": "modifier", "stat": "resource_output", "value": 0.05 }
+    ],
+    "ui": {
+      "short_effect": "Plastics scale: stronger rubber/electronics shortage resilience",
+      "flavor": "Polymer age — still no plastics stockpile; modifiers only."
+    }
+  },
+  "enrichment_infrastructure_1943": {
+    "id": "enrichment_infrastructure_1943",
+    "name": "Enrichment Plant Infrastructure",
+    "domain": "industry",
+    "tree_id": "resource_industry",
+    "node_kind": "research",
+    "column": 4,
+    "row": 0,
+    "tier": 3,
+    "era_min": 1940,
+    "era_max": 1980,
+    "epoch": "cold_war",
+    "prerequisites": ["synthetic_fuel_1917", "chemical_industry_1909"],
+    "research": {
+      "base_cost_days": 130,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.18,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "factory_type", "factory_type": "enrichment_plant" },
+      { "type": "factory_type", "factory_type": "nuclear_plant" },
+      { "type": "resource", "resource": "uranium", "bonus": 0.15 },
+      { "type": "resource", "resource": "fissiles", "bonus": 0.1 },
+      { "type": "rule_flag", "flag": "nuclear_fuel" }
+    ],
+    "ui": {
+      "short_effect": "Unlocks Fissiles major + nuclear plants + enrichment",
+      "flavor": "Hidden until nuclear era — uranium provinces become critical."
+    }
+  },
+  "fusion_industrial_power_2040": {
+    "id": "fusion_industrial_power_2040",
+    "name": "Fusion Industrial Power Plants",
+    "domain": "industry",
+    "tree_id": "resource_industry",
+    "node_kind": "project",
+    "column": 5,
+    "row": 0,
+    "tier": 5,
+    "era_min": 2035,
+    "era_max": 2100,
+    "epoch": "far_future",
+    "prerequisites": ["enrichment_infrastructure_1943"],
+    "research": {
+      "base_cost_days": 280,
+      "category": "strategic",
+      "ahead_of_time_penalty_per_year": 0.2,
+      "repeatable": false
+    },
+    "unlocks": [
+      { "type": "factory_type", "factory_type": "fusion_plant" },
+      { "type": "rule_flag", "flag": "fusion_power_industry" },
+      { "type": "modifier", "stat": "power_plant_output", "value": 0.25 }
+    ],
+    "ui": {
+      "short_effect": "Unlocks fusion plants; He-3 sources feed Energy when visible",
+      "flavor": "Endgame Energy — helium-3 never appears as a WWI/WWII major."
+    }
+  }
+}

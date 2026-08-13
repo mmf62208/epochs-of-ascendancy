@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "mode": "full",
+  "policy": {
+    "seed_on_scenario_load": true,
+    "reapply_on_year_tick": false
+  },
+  "eras": [
+    {
+      "year": 1910,
+      "file": "hierarchy_membership_1910.json"
+    },
+    {
+      "year": 1918,
+      "file": "hierarchy_membership_1918.json"
+    },
+    {
+      "year": 1936,
+      "file": "hierarchy_membership_1936.json"
+    },
+    {
+      "year": 2026,
+      "file": "hierarchy_membership_2026.json"
+    }
+  ],
+  "pilot": true,
+  "nuts3": true
+}

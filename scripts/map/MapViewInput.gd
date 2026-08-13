@@ -32,7 +32,15 @@ static func motion_delta(scaled_delta: float) -> float:
 	return maxf(dt, _PAUSE_DELTA_FALLBACK * 0.25)
 
 
-## True when the hovered GUI should block map edge-scroll (not TopInfoBar strip).
+## True when a modal / command-center style overlay is open — blocks ALL map nav
+## (WASD, edge pan, middle/right drag). Does NOT block for mere HUD hover.
+static func modal_blocks_map_nav(viewport: Viewport) -> bool:
+	if viewport == null:
+		return false
+	return _any_visible_blocking_popup(viewport)
+
+
+## True when the hovered GUI should block map edge-scroll (includes TopInfoBar / HUD chrome).
 ## Also returns true if any blocking popup/Window/Screen is currently *open and visible* anywhere
 ## (so edge pan is suppressed even when mouse is at screen edge over the bare map while a dialog is up).
 static func edge_pan_blocked_by_gui(viewport: Viewport) -> bool:
@@ -42,20 +50,26 @@ static func edge_pan_blocked_by_gui(viewport: Viewport) -> bool:
 	var node: Node = hovered
 	const BLOCKING_POPUP_NAMES: PackedStringArray = [
 		"LeaderAssignmentScreen", "PolicyLawScreen", "LeaderPickerPopup", "LeaderDetailScreen",
-		"LeaderReplacementPickerPopup", "NationalSpiritsScreen", "ProductionAssignmentScreen",
+		"LeaderReplacementPickerPopup", "NationalSpiritsScreen", "ProductionAssignmentScreen", "OrderCommandPanel",
 		"AgentAssignmentScreen", "TechnologyScreen", "DiplomacyView", "TradeMarketView",
 		"MainMenu", "RetirementOfferPopup", "RetoolingWarningPopup", "DesignPickerPopup",
 		"MissionPickerPopup", "TrainingPathScreen", "FormationPickerPopup", "SaveManagerPopup",
 		"MainMenuPopup", "DraggablePanel",
 	]
-	# First pass: if hovering over a blocking UI, block (standard case)
+	# First pass: only block when hovering real HUD/modals — NOT every STOP Control
+	# (was returning true for any STOP, so edge pan never worked near legend/notices/map UI).
 	while node != null:
-		if node.name == "TopInfoBar":
-			return false
 		var nname := str(node.name)
-		if nname in BLOCKING_POPUP_NAMES or nname.ends_with("Screen") or nname.ends_with("Popup") or "Picker" in nname or nname.ends_with("View"):
+		# Top bar MUST block edge-pan — otherwise mouse over 1x/Prod continuously
+		# pans the camera and thrash-redraws world_full (no hover flash, no wheel scroll).
+		if nname == "TopInfoBar" or nname == "MapModeToolbar" or nname == "Minimap" or nname == "StrategicMinimap":
 			return true
-		if node is Window:
+		if nname in BLOCKING_POPUP_NAMES or nname.ends_with("Screen") or nname.ends_with("Popup") or "Picker" in nname:
+			return true
+		# DiplomacyView / TradeMarketView are popups; bare "View" suffix is too broad (blocked map chrome).
+		if nname in ["DiplomacyView", "TradeMarketView", "SpaceLayerBoardView", "MatchmakingLobbyView"]:
+			return true
+		if node is Window and (node as Window).visible:
 			return true
 		if node is Panel or node is PanelContainer:
 			var panel_name := nname
@@ -64,13 +78,16 @@ static func edge_pan_blocked_by_gui(viewport: Viewport) -> bool:
 				"SaveManagerPopup",
 				"MainMenuPopup",
 				"SupplyMenuPanel",
+				"SupplyOverlayLegend",
+				"MapLegendPanel",
+				"TechnologyScreen",
 			]:
 				return true
 		node = node.get_parent()
-	if hovered != null and hovered.mouse_filter == Control.MOUSE_FILTER_STOP:
-		return true
+	# NOTE: do NOT treat every MOUSE_FILTER_STOP as a block — map hit areas / labels used STOP
+	# and that disabled edge pan on most of the board.
 
-	# Global popup check: if any known blocking popup/dialog is open+visible (mouse may be on map edge outside it)
+	# Global popup check: modal screens open even if mouse is on map edge
 	if _any_visible_blocking_popup(viewport):
 		return true
 	return false
@@ -108,15 +125,32 @@ static func _is_visible_blocking_node(n: Node) -> bool:
 	# Non-visual top-level scene roots are never blocking popups.
 	if nn == "TopInfoBar" or nn == "WorldMap" or nn == "TestScenario" or nn.begins_with("Map"):
 		return false
+	# Command Center is a CanvasLayer (NOT CanvasItem) — must treat by name before the CanvasItem guard.
+	# Without this, WASD/edge/drag still pan under MainMenu (user playtest 2026-08-07).
+	if nn == "MainMenu" or nn == "MainMenuPopup":
+		if n is CanvasLayer:
+			return true
+		if n is CanvasItem and (n as CanvasItem).visible:
+			return true
+		# Visible if any CanvasItem child is up (Root panel under layer).
+		for ch in n.get_children():
+			if ch is CanvasItem and (ch as CanvasItem).visible:
+				return true
+			if ch is CanvasLayer:
+				return true
+		return true  # named MainMenu on root = open command center
 	# Only CanvasItem / Window nodes have .visible. Guard explicitly with separate statements so no expression can ever read .visible on a plain Node.
 	if not (n is CanvasItem or n is Window):
+		# CanvasLayer screens (other than MainMenu handled above)
+		if n is CanvasLayer and (nn.ends_with("Screen") or nn.ends_with("Popup") or "Picker" in nn):
+			return true
 		return false
 	if not n.visible:
 		return false
 	# Now safe: n is a visible CanvasItem/Window. Check name patterns for popups/panels.
 	if nn in [
 		"LeaderAssignmentScreen", "PolicyLawScreen", "LeaderPickerPopup", "LeaderDetailScreen",
-		"LeaderReplacementPickerPopup", "NationalSpiritsScreen", "ProductionAssignmentScreen",
+		"LeaderReplacementPickerPopup", "NationalSpiritsScreen", "ProductionAssignmentScreen", "OrderCommandPanel",
 		"AgentAssignmentScreen", "TechnologyScreen", "DiplomacyView", "TradeMarketView",
 		"MainMenu", "RetirementOfferPopup", "RetoolingWarningPopup", "DesignPickerPopup",
 		"MissionPickerPopup", "TrainingPathScreen", "FormationPickerPopup", "SaveManagerPopup",

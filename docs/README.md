@@ -1,6 +1,6 @@
 # Documentation Index — Epochs of Ascendancy
 
-**Start here** after the root [README.md](../README.md). For day-to-day work, read **[CURRENT_STATE.md](CURRENT_STATE.md)** first, then **[TODO.md](../TODO.md)** for the backlog.
+**Start here** after the root [README.md](../README.md). For day-to-day full-test work: **[GAME_STATUS_SNAPSHOT.md](GAME_STATUS_SNAPSHOT.md)** + **[GAME_DIRECTOR_PLAN.md](GAME_DIRECTOR_PLAN.md)**. Dual backlog: root **[TODO.md](../TODO.md)**. Session log: [CURRENT_STATE.md](CURRENT_STATE.md).
 
 ---
 
@@ -8,21 +8,24 @@
 
 | Doc | Use when you need… |
 |-----|-------------------|
-| [CURRENT_STATE.md](CURRENT_STATE.md) | What works today, gaps, playtest entry |
-| [TODO.md](../TODO.md) | Prioritized task list |
+| [GAME_STATUS_SNAPSHOT.md](GAME_STATUS_SNAPSHOT.md) | **What is true now** (default board, gaps) |
+| [GAME_DIRECTOR_PLAN.md](GAME_DIRECTOR_PLAN.md) | **Phases + agent roles** toward full-test |
+| [PLAYTEST_AND_DECISION_GUIDE.md](PLAYTEST_AND_DECISION_GUIDE.md) | Launch + human full-test checklists |
+| [MAP_ACCURACY_BUILD.md](MAP_ACCURACY_BUILD.md) | GIS dual-board pipeline / QC |
+| [MASTER_COMPLETION_PLAN.md](MASTER_COMPLETION_PLAN.md) | Long pillar program (no permanent deferrals) |
+| [CURRENT_STATE.md](CURRENT_STATE.md) | Append-only session log |
+| [TODO.md](../TODO.md) | Dual markers / task list |
 | [TESTING_PLAN.md](TESTING_PLAN.md) | Manual + headless regression |
-| [SESSION_NOTES/2026-06-05.md](SESSION_NOTES/2026-06-05.md) | Recent multi-day review |
-| [TEST_MAP_GRAND_THEATER_FOUNDATION.md](TEST_MAP_GRAND_THEATER_FOUNDATION.md) | Map art / editor QC checklist |
 
 ---
 
 ## Playtest & controls
 
-1. Godot **4.6.2+** → `scenes/TestScenario.tscn` → **F5**
-2. **F10** — Debug overlay (draggable title bar, **⤡** resize grip, collapsible sections)
-3. **L / R / T / C / Y** — supply and infrastructure map layers
-4. Headless smoke: `godot --headless --path . res://scenes/TestScenario.tscn --quit-after 15`
-5. Full leader roster tests (heavy): `EOA_RUN_FULL_LEADER_TESTS=1 godot --headless …`
+1. Godot **4.7.1+** → `scenes/TestScenario.tscn` → **F5** (default **`world_accurate`** ~3520)
+2. Scaffold: `EOA_SCENARIO=world_full tools/run_godot.sh`
+3. **F10** — Debug overlay (draggable title bar, **⤡** resize grip, collapsible sections)
+4. **L / R / T / C / Y** — supply and infrastructure map layers
+5. Map QC: `python3 -m unittest tools.map_generation.tests.test_world_accurate_board -v`
 
 ---
 
@@ -30,6 +33,7 @@
 
 | Doc | Topic |
 |-----|--------|
+| [MAP_ACCURACY_BUILD.md](MAP_ACCURACY_BUILD.md) | Accurate board assemble / densify / polish |
 | [MAP_GENERATION_PIPELINE_DESIGN.md](MAP_GENERATION_PIPELINE_DESIGN.md) | Phase 1 Europe generation |
 | [MAP_IMPLEMENTATION_PLAN.md](MAP_IMPLEMENTATION_PLAN.md) | Sequenced map/combat wiring |
 | [MAP_SYSTEM_DESIGN.md](MAP_SYSTEM_DESIGN.md) | Long-form map vision |
@@ -80,3 +84,9 @@
 - [SESSION_NOTES/2026-05-28.md](SESSION_NOTES/2026-05-28.md)
 
 Older detail lives in design docs and TODO history; prefer **CURRENT_STATE** over stale session bullets.
+
+## Map expansion (2026-07)
+
+- [MAP_MULTI_THEATER_EXPANSION.md](MAP_MULTI_THEATER_EXPANSION.md) — **full world** budgets, island/facility rules, phases
+- **Primary:** `data/provinces_world_full/` (~1600) · Scenario: `data/scenarios/world_full.json`
+- Intermediate: `data/provinces_grand_theater/` · Europe baseline: `data/provinces_full_europe/`

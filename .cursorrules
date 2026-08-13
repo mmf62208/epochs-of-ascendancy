@@ -40,3 +40,8 @@ This is a complex Godot 4.6.2 "Forward Plus" grand strategy / alt-history sandbo
 When the AI in Cursor (Composer / Chat) suggests changes, make sure they are minimal, respect existing patterns, and preferably include updates to the fast test paths and docs.
 
 The goal is a polished, replayable living-world grand strategy experience with deep player agency, narrative, and 50+ turn stability.
+# Program plan (2026-07-16)
+# Read docs/MASTER_COMPLETION_PLAN.md before large features.
+# No permanent deferrals: multiplayer/designers/GIS are phased (N/D/M), not abandoned.
+# Dual bar: world_full headless SCRIPT ERROR 0; never renumber world_full province IDs.
+# Prefer vertical playable slices over day-catalogue-only work.
