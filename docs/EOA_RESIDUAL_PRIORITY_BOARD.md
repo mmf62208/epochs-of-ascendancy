@@ -56,7 +56,7 @@ This board ranks **residual** open items after full-test machine close. Marks: *
 - `feature/goals-forward-2026-06-18`
 - any `execute-plan/ceb60fdd-*` / `ceb60fdd-stack-assembly`
 
-Work this tree (`505d91d` + cad45c93 stack). GitHub push is **ops** (no SSH on the director machine). Dual board only via `EOA_SCENARIO=world_full`. Never renumber `world_full` IDs.
+Work from GitHub **`main`** (`51b52e1` = keep-going board on snapshot `505d91d`). Branch off `main`; do not treat draft `origin/cursor/*` as the tip. Dual board only via `EOA_SCENARIO=world_full`. Never renumber `world_full` IDs.
 
 **Next human:** `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · PLAYTEST §0b items 3–15.  
 **Next machine:** playtest-driven shipped-path fix only.

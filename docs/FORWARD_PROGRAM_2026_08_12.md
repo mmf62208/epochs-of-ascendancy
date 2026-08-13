@@ -8,8 +8,8 @@
 | **Status** | Draft (rev 3 — composer save `all_majors_ok`; failed-execute busy-clear kept) |
 | **Board** | Default F5 `world_accurate` **~3520** (land ~3180 + sea 340) |
 | **Engine** | Godot **4.7.1** via `tools/run_godot.sh` |
-| **Local snapshot** | `505d91d` on `main` — “snapshot: world_accurate ~3520 + full-test machine state” |
-| **GitHub** | `git push` **blocked on this machine** (no `~/.ssh`, no `gh`) — ops note, not a code PR |
+| **Snapshot base** | `505d91d` — “snapshot: world_accurate ~3520 + full-test machine state” |
+| **GitHub working tip** | **`origin/main` @ `51b52e1`** (keep-going PR 1–4 landed). Branch off `main`; PRs target `main`. |
 
 **Archive (do not re-open PR 1–3):** this DAG landed 2026-08-12 (PR 1 `2b19597` · PR 2 `30910c2` greps green · PR 3 `7035837` · PR 4 `0b13284`). Live truth is [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md) §0. Body below is the approved design as written, not a to-do list.
 
@@ -40,7 +40,7 @@ No new residual dual packages. No densify. No GameData mega-split. No M6-complet
 | Residual machine items | Closed 2026-08-03 (play-strip, assault *discoverability*, personality multi-AI) |
 | Soft 30fps | Honest FAIL — map-tick proxy mean **34.01 ms / ~29.4 fps** |
 | M6 | Human 20d/60d narrative **still open** — not a machine gate |
-| Local git | `505d91d` on `main`. Push is an ops problem on this host. |
+| GitHub / local tip | `origin/main` @ `51b52e1` (on top of snapshot `505d91d`). Forward work branches from `main`. |
 | Stale remotes **on this clone** | `origin/cursor/fix-void-return-2453` (June `origin/main`). Local `feature/goals-forward-2026-06-18`. **Do not merge** any `origin/cursor/*` or that June feature branch. `cursor/continue-infra-ai-combat-6057` is **not** in this clone’s refs. |
 | In-flight Ladder A worktrees | `execute-plan/ceb60fdd-pr-1` … `pr-6` + `ceb60fdd-stack-assembly` already touch `MapRenderer.gd`. **Do not merge.** This DAG is the forward path (see Key Decision 8). |
 
@@ -113,7 +113,7 @@ Every Cursor / Grok / human session on this tree:
 2. **Load skill** `/eoa-full-test` (`.grok/skills/eoa-full-test/SKILL.md`). Run `tools/eoa_full_test_gates.sh --quick` before claiming done; full script before merge.
 3. **One vertical play-loop slice per session.** Fix the shipped API. Extend the existing product/test. Do not open a new dual package.
 4. **Human plays §0b** and **appends** `docs/SESSION_NOTES/` (do not invent M6 complete).
-5. **Do not merge** `origin/cursor/*`, `feature/goals-forward-2026-06-18`, or `execute-plan/ceb60fdd-*`. Work on this tree (`main` @ `505d91d`+). Dual board only via `EOA_SCENARIO=world_full`. Godot only via `tools/run_godot.sh`.
+5. **Do not merge** `origin/cursor/*`, `feature/goals-forward-2026-06-18`, or `execute-plan/ceb60fdd-*`. Work from GitHub `main` (`51b52e1`+). Dual board only via `EOA_SCENARIO=world_full`. Godot only via `tools/run_godot.sh`.
 
 ```mermaid
 flowchart TD
@@ -310,7 +310,7 @@ Last PR. Short live-truth update, not a new manifesto.
 - **Next human action:** Launch `tools/run_godot.sh --path . res://scenes/TestScenario.tscn`, play PLAYTEST §0b items 3–15, append session notes. M6 20d/60d still open after that.
 - **Next machine action (after this DAG):** Only a playtest-driven bug on a shipped path. No new dual. No GameData split. No `ceb60fdd-*` merge.
 - **Deferred:** soft 30fps, `renderer_frame`, deeper fuel network, designer UX, multi-month personality depth, SE Asia merge, museum/13k/MP/V3, DESIGN_LADDER_A spiderweb/transit (`ceb60fdd-pr-2` / `pr-3` stay parked).
-- **Session start:** `/eoa-full-test` · `tools/eoa_full_test_gates.sh --quick` · this tree (`505d91d`+).
+- **Session start:** `/eoa-full-test` · `tools/eoa_full_test_gates.sh --quick` · GitHub `main` (`51b52e1`+).
 
 ### Optional 5th PR — skipped
 
@@ -456,7 +456,7 @@ Do **not** invent FPS PASS. Do not add `*_primary_live=1` console markers.
 2. No feature flags. Existing killswitch `EOA_INTERACTIVE_MULTI_AI=0` stays. **No** `EOA_ASSAULT_OPEN_INSPECTOR` (F10 sample assault remains the debug exception).
 3. Each PR: `tools/eoa_full_test_gates.sh --quick` green; full script before merge. Optional assault wall-time headless is **not** in `--quick`.
 4. Rollback = revert that PR. Composer is additive; assault UI change is MapRenderer + BattleManager only.
-5. **GitHub publish** is ops, not a PR: install SSH or `gh` on the director machine, push `main` @ `505d91d`+, never force-push over June Cursor history or `ceb60fdd-*`.
+5. **GitHub `main`** is the working tip (`51b52e1`+). Branch → PR → merge to `main`. Never force-push over June Cursor history or `ceb60fdd-*`.
 6. Human: after PR 2, re-run §0b items 7, 11, 14 (B, assault, 5–10 days). Append session notes. M6 remains open.
 
 ```
