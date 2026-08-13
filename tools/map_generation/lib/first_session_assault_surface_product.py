@@ -11,6 +11,79 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 ORDER_PANEL = ROOT / "scripts" / "ui" / "OrderCommandPanel.gd"
+BATTLE_MANAGER = ROOT / "scripts" / "combat" / "BattleManager.gd"
+
+
+def _gd_func_slice(src: str, func_name: str) -> str:
+    needle = "func %s" % func_name
+    i = src.find(needle)
+    if i < 0:
+        return ""
+    lines = src[i:].splitlines()
+    out = [lines[0]]
+    for line in lines[1:]:
+        if line.startswith("func "):
+            break
+        out.append(line)
+    return "\n".join(out)
+
+
+def _execute_success_slice(renderer_src: str) -> str:
+    """From first execute_province_assault in _try_execute_province_attack to func end."""
+    fn = _gd_func_slice(renderer_src, "_try_execute_province_attack")
+    idx = fn.find("execute_province_assault")
+    if idx < 0:
+        return ""
+    return fn[idx:]
+
+
+def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
+    exec_after = _execute_success_slice(renderer_src)
+    b_instant = _gd_func_slice(renderer_src, "_run_live_border_fronts_instant")
+    b_show = _gd_func_slice(renderer_src, "show_live_border_fronts")
+    capture = _gd_func_slice(renderer_src, "refresh_after_capture_light")
+    notify = _gd_func_slice(battle_src, "_notify_map_refresh")
+    post = _gd_func_slice(renderer_src, "_assault_post_ui_light")
+    pin = _gd_func_slice(renderer_src, "_try_open_unit_at_world")
+    attack_btn = _gd_func_slice(renderer_src, "_update_attack_button")
+
+    fail_idx = exec_after.find('if not bool(assault.get("success"')
+    fail_has_busy_clear = False
+    success_tail_clears_busy = False
+    if fail_idx >= 0:
+        fail_to_return = exec_after[fail_idx:]
+        ret_idx = fail_to_return.find("return")
+        fail_block = fail_to_return[: ret_idx if ret_idx >= 0 else len(fail_to_return)]
+        fail_has_busy_clear = "_assault_execute_busy = false" in fail_block
+        success_tail = fail_to_return[ret_idx:] if ret_idx >= 0 else ""
+        success_tail_clears_busy = "_assault_execute_busy = false" in success_tail
+    notify_uses_target = (
+        "target_pid" in notify or "target_province_id" in notify
+    ) and "selected_province_id" not in notify
+    return {
+        "execute_no_info_panel": bool(exec_after) and "show_info_panel" not in exec_after,
+        "execute_no_force_border": bool(exec_after) and "force_border_update" not in exec_after,
+        "b_path_no_info_panel": "show_info_panel" not in b_instant
+        and "show_info_panel" not in b_show,
+        "capture_no_full_fill": bool(capture)
+        and "_refresh_province_fill_colors" not in capture,
+        "capture_no_full_icons": bool(capture)
+        and "_update_unit_icons_for_test" not in capture,
+        "notify_uses_target_pid": bool(notify) and notify_uses_target,
+        "busy_clears_in_post_ui_light": (
+            bool(post)
+            and "_assault_execute_busy = false" in post
+            and fail_has_busy_clear
+            and not success_tail_clears_busy
+            and "_assault_post_ui_light" in exec_after
+        ),
+        "pin_select_no_inspector": bool(pin)
+        and "show_info_panel" not in pin
+        and "_update_attack_button" not in pin,
+        "attack_visible_disabled": bool(attack_btn)
+        and "disabled" in attack_btn
+        and "visible = true" in attack_btn,
+    }
 
 ASSAULT_STEPS: List[str] = [
     "1. Select friendly province with a formation (capital / hub / border)",
@@ -128,6 +201,7 @@ def build_first_session_assault_surface_product(
     if check_wiring:
         ren = MAP_RENDERER.read_text(encoding="utf-8") if MAP_RENDERER.is_file() else ""
         panel = ORDER_PANEL.read_text(encoding="utf-8") if ORDER_PANEL.is_file() else ""
+        bm_src = BATTLE_MANAGER.read_text(encoding="utf-8") if BATTLE_MANAGER.is_file() else ""
         wiring["map_ctrl_click_or_assault"] = (
             "ctrl_pressed" in ren and ("assault" in ren.lower() or "Attack" in ren)
         ) or "Ctrl+click" in ren
@@ -140,13 +214,17 @@ def build_first_session_assault_surface_product(
             or "first_session_assault" in ren
             or "Assault ready" in ren
         )
+        wiring.update(_hang_class_checks(ren, bm_src))
         for k, v in wiring.items():
             if v:
                 passes.append("wire_%s" % k)
             else:
                 fails.append("wire_%s" % k)
 
-    ok = "no_ctrl_click_hint" not in fails and "no_assault_word" not in fails
+    if check_wiring:
+        ok = len(fails) == 0
+    else:
+        ok = "no_ctrl_click_hint" not in fails and "no_assault_word" not in fails
     return {
         "ok": ok,
         "empty": False,

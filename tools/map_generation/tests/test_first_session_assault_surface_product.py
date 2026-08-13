@@ -63,6 +63,22 @@ class TestFirstSessionAssaultSurfaceProduct(unittest.TestCase):
             msg=p.get("wiring"),
         )
 
+    def test_hang_class_wiring_ok(self) -> None:
+        p = build_first_session_assault_surface_product(check_wiring=True)
+        wiring = p.get("wiring") or {}
+        for key in (
+            "execute_no_info_panel",
+            "execute_no_force_border",
+            "b_path_no_info_panel",
+            "capture_no_full_fill",
+            "capture_no_full_icons",
+            "notify_uses_target_pid",
+            "busy_clears_in_post_ui_light",
+        ):
+            self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
+        self.assertEqual(list(p.get("fail") or []), [], msg=p)
+        self.assertTrue(p.get("ok"), msg=p)
+
 
 if __name__ == "__main__":
     unittest.main()

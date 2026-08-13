@@ -667,7 +667,7 @@ func apply_combat_outcome(
 		_station_attacker_on_captured_province(attacker_formation_id, target_pid, attacker_tag)
 		# Defenders cannot remain stationed on a province they just lost.
 		_displace_defender_from_captured_province(result, target_pid)
-		_notify_map_refresh()
+		_notify_map_refresh(int(result.get("target_province_id", target_pid)))
 		_post_battle_news(result, true)
 	elif winner == "attacker":
 		_post_battle_news(result, false)
@@ -1286,21 +1286,17 @@ func _province_defender_tag(province: Province) -> String:
 	return _province_controller_tag(province)
 
 
-func _notify_map_refresh() -> void:
+func _notify_map_refresh(target_pid: int = -1) -> void:
 	var tree := get_tree()
 	if tree == null:
 		return
+	var pid := int(target_pid)
 	for mr in tree.get_nodes_in_group("map_renderer"):
-		# Prefer light capture refresh — full force_border_update freezes world_accurate.
+		# Prefer light capture refresh — full-board rebuild freezes world_accurate.
 		if mr.has_method("refresh_after_capture_light"):
-			var pid := -1
-			# Best-effort last combat target if renderer tracks selection.
-			if "selected_province_id" in mr:
-				pid = int(mr.selected_province_id)
 			mr.call_deferred("refresh_after_capture_light", pid)
-		elif mr.has_method("_update_unit_icons_for_test"):
-			mr.call_deferred("_update_unit_icons_for_test")
-		# Do NOT call force_border_update here (O(all edges) hang after 2nd Ctrl+click).
+		elif mr.has_method("_update_unit_icons_for_pids"):
+			mr.call_deferred("_update_unit_icons_for_pids", [pid])
 
 
 func _post_battle_news(result: Dictionary, captured: bool) -> void:

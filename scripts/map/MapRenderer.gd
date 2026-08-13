@@ -15631,7 +15631,7 @@ func _try_open_unit_at_world(world_pos: Vector2) -> bool:
 		return false
 	_select_map_unit(fo)
 	_show_unit_detail_popup(fo)
-	# Also select host province so inspector + OOB stay in sync.
+	# Stage host province only — pin click must not open inspector (hang class).
 	var pid := -1
 	if "stationed_province_id" in fo:
 		pid = int(fo.stationed_province_id)
@@ -15640,7 +15640,6 @@ func _try_open_unit_at_world(world_pos: Vector2) -> bool:
 		_select_province(p, _province_node(pid))
 		attack_staging_province_id = pid
 		debug_combat_attacker_province_id = pid
-		show_info_panel(p)
 	return true
 
 
@@ -16533,18 +16532,24 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		cap_toast += " (def_bonus=%.0f%% used)" % ((s_def_b - 1.0) * 100.0)
 	_show_inspector_toast(cap_toast, float(cap_flair.get("duration", 3.5)))
 	_play_map_sfx(str(cap_flair.get("sfx", "map")))
-	# NEVER sync force_border_update here — full edge rebuild freezes world_accurate (~3520).
-	# Light capture refresh only (fill + units); borders refresh on next LOD/mapmode switch.
-	if captured:
-		call_deferred("refresh_after_capture_light", target_pid)
-
 	if provinces.has(target_pid):
 		# Soft center without full inspector rebuild when possible (inspector can be heavy).
 		call_deferred("_center_camera_on_province", target_pid, "soft")
-		if provinces.has(target_pid):
-			call_deferred("show_info_panel", provinces[target_pid])
-	_assault_execute_busy = false
+	# Success-path busy-clear lives in deferred light UI only.
+	call_deferred("_assault_post_ui_light", target_pid, from_pid)
 	return true
+
+
+## Capture/assault success: pid-only fill + pins. Busy clears here, not in the execute tail.
+func _assault_post_ui_light(target_pid: int, from_pid: int = -1) -> void:
+	var pids: Array = []
+	if int(target_pid) >= 0:
+		pids.append(int(target_pid))
+	if int(from_pid) >= 0 and int(from_pid) != int(target_pid):
+		pids.append(int(from_pid))
+	_refresh_province_fill_pids(pids)
+	_update_unit_icons_for_pids(pids)
+	_assault_execute_busy = false
 
 
 func _province_controlled_by(province: Province, country_tag: String) -> bool:
@@ -16599,7 +16604,27 @@ func _update_attack_button(province: Province) -> void:
 		attack_staging_province_id if attack_staging_province_id >= 0 else debug_combat_attacker_province_id,
 	)
 	var can_attack := bool(preview.get("ok", false))
+	var panel_open := info_panel != null and info_panel is CanvasItem and info_panel.visible
+	var non_friendly := not _province_controlled_by(province, p_tag)
+	# Inspector on enemy: keep Attack visible; disable with can_assault reason (strip Assault is OOB).
+	if panel_open and non_friendly:
+		_btn_attack.visible = true
+		_btn_attack.disabled = not can_attack
+		if can_attack:
+			_btn_attack.text = "Attack from %s" % str(preview.get("from_province_name", "adjacent"))
+			_btn_attack.tooltip_text = (
+				"Launch assault on %s using %s.\nCtrl+click works from the map too."
+				% [province.name, str(preview.get("division_name", preview.get("formation_id", "division")))]
+			)
+		else:
+			var reason := str(preview.get("reason", "")).strip_edges()
+			if reason.is_empty():
+				reason = "no friendly divs staged here — move units first"
+			_btn_attack.text = "Attack"
+			_btn_attack.tooltip_text = reason
+		return
 	_btn_attack.visible = can_attack
+	_btn_attack.disabled = false
 	if can_attack:
 		_btn_attack.text = "Attack from %s" % str(preview.get("from_province_name", "adjacent"))
 		_btn_attack.tooltip_text = (
@@ -18195,6 +18220,38 @@ func _end_supply_reroute() -> void:
 	var sm := _supply_manager()
 	if sm:
 		sm.clear_reroute_waypoints()
+
+
+## Recolor only listed provinces (capture / assault). Never the accurate-board full scan.
+func _refresh_province_fill_pids(pids: Array) -> void:
+	if pids.is_empty():
+		return
+	if container != null:
+		_zoom_fill_characterization_scale = absf(container.scale.x)
+	var seen: Dictionary = {}
+	for v in pids:
+		var pid := int(v)
+		if pid < 0 or seen.has(pid):
+			continue
+		seen[pid] = true
+		if not province_nodes.has(pid) or not provinces.has(pid):
+			continue
+		var node: Variant = province_nodes[pid]
+		if not (node is Node2D) or not is_instance_valid(node):
+			continue
+		var province: Province = provinces[pid] as Province
+		var poly: Polygon2D = _get_province_polygon(node as Node2D)
+		if poly == null:
+			continue
+		var col := _get_province_color(province)
+		if supply_mode:
+			var fill := ProvinceInsight.depot_fill_ratio(pid)
+			if fill >= 0.0:
+				col = col.lerp(_supply_depot_tint_color(fill), _supply_depot_mix_amount())
+		col = _apply_agent_pressure_base_tint(col, province)
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("has_active_riot") and GameData.has_active_riot(pid):
+			col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)
+		poly.color = col
 
 
 func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
@@ -20934,9 +20991,30 @@ var _stack_pulse_phase: float = 0.0
 ## That path re-parsed division templates + scanned all deployments per province (world_full
 ## ≈ 2665×) and froze pan/zoom after markers appeared, then hard-crashed Godot.
 func _update_unit_icons_for_test() -> void:
-	# Clear previous demo icons only where we placed them.
+	_rebuild_demo_unit_icons({})
+
+
+## Capture/move: rebuild pins for listed pids only (not the full board).
+func _update_unit_icons_for_pids(pids: Array) -> void:
+	var only: Dictionary = {}
+	for v in pids:
+		var pid := int(v)
+		if pid >= 0:
+			only[pid] = true
+	if only.is_empty():
+		return
+	_rebuild_demo_unit_icons(only)
+
+
+func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
+	var scoped := not only_pids.is_empty()
+	# Clear previous demo icons only where we placed them (or only listed pids).
+	var kept: Array = []
 	for id_v in _demo_unit_icon_pids:
 		var id_clear := int(id_v)
+		if scoped and not only_pids.has(id_clear):
+			kept.append(id_clear)
+			continue
 		if not province_nodes.has(id_clear):
 			continue
 		var n_clear: Node2D = province_nodes[id_clear] as Node2D
@@ -20946,12 +21024,16 @@ func _update_unit_icons_for_test() -> void:
 			if c.name.begins_with("DemoUnitIcon_"):
 				c.queue_free()
 	_demo_unit_icon_pids.clear()
-	_stack_badge_pulse_nodes.clear()
+	for k in kept:
+		_demo_unit_icon_pids.append(int(k))
+	if not scoped:
+		_stack_badge_pulse_nodes.clear()
 
 	# province_id -> representative formation (Object) or country_tag String fallback
 	var by_pid: Dictionary = _build_stationed_formation_index_for_icons()
 	if by_pid.is_empty():
-		_update_riot_markers()
+		if not scoped:
+			_update_riot_markers()
 		return
 	var stack_counts: Dictionary = {}
 	var stack_samples: Dictionary = {}
@@ -20966,6 +21048,8 @@ func _update_unit_icons_for_test() -> void:
 	var icons_placed := 0
 	for pid_v in by_pid.keys():
 		var id := int(pid_v)
+		if scoped and not only_pids.has(id):
+			continue
 		if not province_nodes.has(id):
 			continue
 		var n: Node2D = province_nodes[id] as Node2D
@@ -21215,9 +21299,10 @@ func _update_unit_icons_for_test() -> void:
 		_demo_unit_icon_pids.append(id)
 		icons_placed += 1
 
-	if icons_placed > 0:
+	if not scoped and icons_placed > 0:
 		print("[MapRenderer] Unit icons placed=%d (indexed formations, no per-province template reload)" % icons_placed)
-	_update_riot_markers()
+	if not scoped:
+		_update_riot_markers()
 
 
 ## O(formations + deployments) index for unit icons.
@@ -21502,15 +21587,15 @@ func _force_border_update_deferred() -> void:
 		call_deferred("force_border_update")
 
 
-## Light post-capture: recolor fill + unit icons. Skips full border edge rebuild.
-func refresh_after_capture_light(province_id: int = -1) -> void:
-	if province_id >= 0 and provinces.has(province_id):
-		# Single-province fill refresh via full flag false when possible.
-		_refresh_province_fill_colors(false)
-	if has_method("_update_unit_icons_for_test"):
-		call_deferred("_update_unit_icons_for_test")
-	# Borders: optional deferred coalesce — never block unpause.
-	# Skip automatic full rebuild; player can F1 mapmode switch later if needed.
+## Light post-capture: recolor + pins for the passed pids only. Skips full-board work.
+func refresh_after_capture_light(province_id: int = -1, from_province_id: int = -1) -> void:
+	var pids: Array = []
+	if province_id >= 0:
+		pids.append(province_id)
+	if from_province_id >= 0 and from_province_id != province_id:
+		pids.append(from_province_id)
+	_refresh_province_fill_pids(pids)
+	_update_unit_icons_for_pids(pids)
 
 
 func _ensure_border_layer() -> void:
