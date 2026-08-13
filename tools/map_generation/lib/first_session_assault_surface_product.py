@@ -63,13 +63,16 @@ def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
     return {
         "execute_no_info_panel": bool(exec_after) and "show_info_panel" not in exec_after,
         "execute_no_force_border": bool(exec_after) and "force_border_update" not in exec_after,
-        "b_path_no_info_panel": "show_info_panel" not in b_instant
+        "b_path_no_info_panel": bool(b_instant)
+        and bool(b_show)
+        and "show_info_panel" not in b_instant
         and "show_info_panel" not in b_show,
         "capture_no_full_fill": bool(capture)
         and "_refresh_province_fill_colors" not in capture,
         "capture_no_full_icons": bool(capture)
         and "_update_unit_icons_for_test" not in capture,
         "notify_uses_target_pid": bool(notify) and notify_uses_target,
+        "notify_includes_from_pid": bool(notify) and "from_pid" in notify,
         "busy_clears_in_post_ui_light": (
             bool(post)
             and "_assault_execute_busy = false" in post

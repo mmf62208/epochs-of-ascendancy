@@ -667,7 +667,11 @@ func apply_combat_outcome(
 		_station_attacker_on_captured_province(attacker_formation_id, target_pid, attacker_tag)
 		# Defenders cannot remain stationed on a province they just lost.
 		_displace_defender_from_captured_province(result, target_pid)
-		_notify_map_refresh(int(result.get("target_province_id", target_pid)))
+		_notify_map_refresh(
+			int(result.get("target_province_id", target_pid)),
+			int(result.get("from_province_id", from_province_id)),
+			int(result.get("retreat_province_id", -1)),
+		)
 		_post_battle_news(result, true)
 	elif winner == "attacker":
 		_post_battle_news(result, false)
@@ -719,6 +723,7 @@ func _displace_defender_from_captured_province(result: Dictionary, captured_pid:
 	var def_tag := str(result.get("defender_tag", "")).strip_edges().to_upper()
 	var def_fid := str(result.get("defender_formation_id", "")).strip_edges()
 	var retreat_pid := _pick_defender_retreat_province(captured_pid, def_tag)
+	result["retreat_province_id"] = retreat_pid
 
 	var seen: Dictionary = {}
 	var to_move: Array[Formation] = []
@@ -1286,17 +1291,19 @@ func _province_defender_tag(province: Province) -> String:
 	return _province_controller_tag(province)
 
 
-func _notify_map_refresh(target_pid: int = -1) -> void:
+func _notify_map_refresh(target_pid: int = -1, from_pid: int = -1, retreat_pid: int = -1) -> void:
 	var tree := get_tree()
 	if tree == null:
 		return
 	var pid := int(target_pid)
+	var from := int(from_pid)
+	var retreat := int(retreat_pid)
 	for mr in tree.get_nodes_in_group("map_renderer"):
 		# Prefer light capture refresh — full-board rebuild freezes world_accurate.
 		if mr.has_method("refresh_after_capture_light"):
-			mr.call_deferred("refresh_after_capture_light", pid)
+			mr.call_deferred("refresh_after_capture_light", pid, from, retreat)
 		elif mr.has_method("_update_unit_icons_for_pids"):
-			mr.call_deferred("_update_unit_icons_for_pids", [pid])
+			mr.call_deferred("_update_unit_icons_for_pids", [pid, from, retreat])
 
 
 func _post_battle_news(result: Dictionary, captured: bool) -> void:

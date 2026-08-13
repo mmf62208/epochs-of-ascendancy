@@ -73,6 +73,7 @@ class TestFirstSessionAssaultSurfaceProduct(unittest.TestCase):
             "capture_no_full_fill",
             "capture_no_full_icons",
             "notify_uses_target_pid",
+            "notify_includes_from_pid",
             "busy_clears_in_post_ui_light",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))

@@ -15070,8 +15070,8 @@ func _center_camera_on_province(province_id: int, zoom_mode: String = "soft") ->
 	if info_panel is Control and (info_panel as Control).visible:
 		panel_w = maxf(absf((info_panel as Control).offset_right - (info_panel as Control).offset_left), 480.0)
 	else:
-		# Inspector will open left — reserve space so selection isn't under it.
-		panel_w = 520.0
+		# Assault / pin paths no longer open the inspector; do not fake a left dock.
+		panel_w = 0.0
 	# Place province at horizontal center of the free map band (right of panel).
 	var free_left := panel_w + 16.0
 	var free_right := vp.x - 12.0
@@ -15674,6 +15674,13 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 		return false
 	var fid := selected_formation_id
 	var dest := province.id
+	var from_pid := -1
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var pre: Formation = LeaderManager.get_formation(fid)
+		if pre != null and "stationed_province_id" in pre:
+			from_pid = int(pre.stationed_province_id)
+	if from_pid < 0:
+		from_pid = attack_staging_province_id
 	var ok := false
 	var reason := ""
 	if typeof(FormationMovement) != TYPE_NIL:
@@ -15701,7 +15708,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 		attack_staging_province_id = dest
 		debug_combat_attacker_province_id = dest
 		_show_inspector_toast("Moved %s → %s #%d · Ctrl+click enemy from here to assault" % [fid, province.name, dest], 4.0)
-		call_deferred("refresh_after_capture_light", dest)
+		call_deferred("refresh_after_capture_light", dest, from_pid)
 		return true
 	_show_inspector_toast("Move blocked · %s" % (reason if not reason.is_empty() else "no path / not your unit"), 3.5, true)
 	return true  # handled (showed feedback)
@@ -16536,17 +16543,18 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		# Soft center without full inspector rebuild when possible (inspector can be heavy).
 		call_deferred("_center_camera_on_province", target_pid, "soft")
 	# Success-path busy-clear lives in deferred light UI only.
-	call_deferred("_assault_post_ui_light", target_pid, from_pid)
+	var retreat_pid := int(result.get("retreat_province_id", -1))
+	call_deferred("_assault_post_ui_light", target_pid, from_pid, retreat_pid)
 	return true
 
 
 ## Capture/assault success: pid-only fill + pins. Busy clears here, not in the execute tail.
-func _assault_post_ui_light(target_pid: int, from_pid: int = -1) -> void:
+func _assault_post_ui_light(target_pid: int, from_pid: int = -1, retreat_pid: int = -1) -> void:
 	var pids: Array = []
-	if int(target_pid) >= 0:
-		pids.append(int(target_pid))
-	if int(from_pid) >= 0 and int(from_pid) != int(target_pid):
-		pids.append(int(from_pid))
+	for v in [target_pid, from_pid, retreat_pid]:
+		var pid := int(v)
+		if pid >= 0 and not pids.has(pid):
+			pids.append(pid)
 	_refresh_province_fill_pids(pids)
 	_update_unit_icons_for_pids(pids)
 	_assault_execute_busy = false
@@ -21588,12 +21596,12 @@ func _force_border_update_deferred() -> void:
 
 
 ## Light post-capture: recolor + pins for the passed pids only. Skips full-board work.
-func refresh_after_capture_light(province_id: int = -1, from_province_id: int = -1) -> void:
+func refresh_after_capture_light(province_id: int = -1, from_province_id: int = -1, retreat_pid: int = -1) -> void:
 	var pids: Array = []
-	if province_id >= 0:
-		pids.append(province_id)
-	if from_province_id >= 0 and from_province_id != province_id:
-		pids.append(from_province_id)
+	for v in [province_id, from_province_id, retreat_pid]:
+		var pid := int(v)
+		if pid >= 0 and not pids.has(pid):
+			pids.append(pid)
 	_refresh_province_fill_pids(pids)
 	_update_unit_icons_for_pids(pids)
 
