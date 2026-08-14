@@ -37,6 +37,42 @@ def _execute_success_slice(renderer_src: str) -> str:
     return fn[idx:]
 
 
+def _honesty_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
+    """Assault source honesty: named unit on can/execute; no Berlin fallback path."""
+    can_fn = _gd_func_slice(battle_src, "can_assault_province")
+    exec_fn = _gd_func_slice(battle_src, "execute_province_assault")
+    try_fn = _gd_func_slice(renderer_src, "_try_execute_province_attack")
+    prev_fn = _gd_func_slice(battle_src, "preview_assault")
+    # can_assault accepts formation_id 4th arg
+    can_has_fid = "formation_id" in can_fn and (
+        "formation_id: String" in can_fn or "formation_id =" in can_fn or "formation_id:" in can_fn
+    )
+    # execute re-calls can with the same attacker_formation_id
+    exec_can_with_fid = (
+        "can_assault_province(" in exec_fn and "attacker_formation_id" in exec_fn
+    )
+    # Map path uses selected_formation_id + preview_assault / unit formula (not ProvinceInsight toast)
+    try_named = "selected_formation_id" in try_fn
+    try_preview = "preview_assault" in try_fn
+    try_no_insight_toast = "ProvinceInsight.get_battle_preview" not in try_fn
+    try_march_first = "March to the border first" in try_fn
+    # Hex-only / named-unit paths do not call find_attack_source when constrained
+    can_no_fallback_when_set = (
+        "find_attack_source" in can_fn
+        and ("from_pid >= 0" in can_fn or "from_province_id >= 0" in can_fn or "from_pid >= 0" in can_fn)
+        and ("not fid.is_empty()" in can_fn or 'not fid.is_empty()' in can_fn or "formation_id" in can_fn)
+    )
+    return {
+        "can_assault_has_formation_id": bool(can_fn) and can_has_fid,
+        "execute_can_with_fid": bool(exec_fn) and exec_can_with_fid,
+        "map_uses_selected_formation": bool(try_fn) and try_named,
+        "map_uses_preview_assault": bool(try_fn) and try_preview and bool(prev_fn),
+        "map_no_province_insight_toast": bool(try_fn) and try_no_insight_toast,
+        "map_march_first_distant": bool(try_fn) and try_march_first,
+        "can_honest_no_berlin_fallback": bool(can_fn) and can_no_fallback_when_set,
+    }
+
+
 def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
     exec_after = _execute_success_slice(renderer_src)
     b_instant = _gd_func_slice(renderer_src, "_run_live_border_fronts_instant")
@@ -60,7 +96,7 @@ def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
     notify_uses_target = (
         "target_pid" in notify or "target_province_id" in notify
     ) and "selected_province_id" not in notify
-    return {
+    out = {
         "execute_no_info_panel": bool(exec_after) and "show_info_panel" not in exec_after,
         "execute_no_force_border": bool(exec_after) and "force_border_update" not in exec_after,
         "b_path_no_info_panel": bool(b_instant)
@@ -87,6 +123,8 @@ def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
         and "disabled" in attack_btn
         and "visible = true" in attack_btn,
     }
+    out.update(_honesty_checks(renderer_src, battle_src))
+    return out
 
 ASSAULT_STEPS: List[str] = [
     "1. Select friendly province with a formation (capital / hub / border)",

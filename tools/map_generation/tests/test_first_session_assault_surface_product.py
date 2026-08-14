@@ -80,6 +80,20 @@ class TestFirstSessionAssaultSurfaceProduct(unittest.TestCase):
         self.assertEqual(list(p.get("fail") or []), [], msg=p)
         self.assertTrue(p.get("ok"), msg=p)
 
+    def test_assault_honesty_wiring(self) -> None:
+        p = build_first_session_assault_surface_product(check_wiring=True)
+        wiring = p.get("wiring") or {}
+        for key in (
+            "can_assault_has_formation_id",
+            "execute_can_with_fid",
+            "map_uses_selected_formation",
+            "map_uses_preview_assault",
+            "map_no_province_insight_toast",
+            "map_march_first_distant",
+            "can_honest_no_berlin_fallback",
+        ):
+            self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -2849,8 +2849,9 @@ func apply_assault_stage_mutation(
 		)
 		return {"ok": bool(res.get("success", false)), "result": res, "mutation": mut}
 	if BattleManager.has_method("can_assault_province"):
+		# Same honesty as map: named fid + real from/to (no Berlin fallback).
 		var preview: Dictionary = BattleManager.can_assault_province(
-			tag, target_province_id, from_province_id
+			tag, target_province_id, from_province_id, fid
 		)
 		return {"ok": bool(preview.get("ok", false)), "result": preview, "mutation": mut, "prep_only": true}
 	return {"ok": false, "reason": "no assault API", "mutation": mut}

@@ -223,6 +223,7 @@ func can_assault_province(
 	attacker_tag: String,
 	target_province_id: int,
 	from_province_id: int = -1,
+	formation_id: String = "",
 ) -> Dictionary:
 	var tag := attacker_tag.strip_edges().to_upper()
 	if tag.is_empty():
@@ -240,7 +241,23 @@ func can_assault_province(
 	if defender_tag == tag:
 		return {"ok": false, "reason": "Cannot attack your own province"}
 
-	var source := find_attack_source(tag, target_province_id, from_province_id)
+	var fid := formation_id.strip_edges()
+	var from_pid := int(from_province_id)
+	# Named unit: station is authority; no fallback to another division.
+	if not fid.is_empty() and from_pid < 0 and typeof(LeaderManager) != TYPE_NIL:
+		var fo: Formation = LeaderManager.get_formation(fid)
+		if fo != null and "stationed_province_id" in fo:
+			from_pid = int(fo.stationed_province_id)
+
+	var source: Dictionary
+	if not fid.is_empty():
+		source = _validate_attack_source(tag, from_pid, target_province_id, fid)
+	elif from_pid >= 0:
+		# Hex-only: no adjacent-hex fallback (fixes Berlin can=true for Maginot).
+		source = _validate_attack_source(tag, from_pid, target_province_id)
+	else:
+		# AI / Fronts: find any adjacent division.
+		source = find_attack_source(tag, target_province_id, -1)
 	if not bool(source.get("ok", false)):
 		return source
 
@@ -250,7 +267,8 @@ func can_assault_province(
 	source["attacker_tag"] = tag
 	# Carry air dominance from ProvinceInsight for battle context (used in result merge + logs + AAR)
 	if typeof(ProvinceInsight) != TYPE_NIL and typeof(MapManager) != TYPE_NIL:
-		var from_p: Province = MapManager.get_province(from_province_id) if from_province_id >= 0 else target
+		var resolved_from := int(source.get("from_province_id", from_pid))
+		var from_p: Province = MapManager.get_province(resolved_from) if resolved_from >= 0 else target
 		if from_p:
 			var bprev := ProvinceInsight.get_battle_preview(from_p, target)
 			source["air_dominance_level"] = bprev.get("air_dominance_level", "none")
@@ -286,13 +304,114 @@ func find_attack_source(
 	return best
 
 
+## Unit-formula assault preview for map toast (not ProvinceInsight hex 100+infra*3).
+## power = (soft + 1.6*hard) * org * str * xp_mult + initiative; attacker initiative 0.15.
+func preview_assault(
+	attacker_tag: String,
+	target_province_id: int,
+	from_province_id: int = -1,
+	formation_id: String = "",
+) -> Dictionary:
+	var can: Dictionary = can_assault_province(
+		attacker_tag, target_province_id, from_province_id, formation_id
+	)
+	var tag := str(can.get("attacker_tag", attacker_tag)).strip_edges().to_upper()
+	var from_pid := int(can.get("from_province_id", from_province_id))
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		fid = str(can.get("formation_id", ""))
+	var target: Province = null
+	if typeof(MapManager) != TYPE_NIL:
+		target = MapManager.get_province(target_province_id)
+	var from_prov: Province = null
+	if typeof(MapManager) != TYPE_NIL and from_pid >= 0:
+		from_prov = MapManager.get_province(from_pid)
+
+	var att_power := 0.0
+	var def_power := 0.0
+	var att_soft := 0.0
+	var att_hard := 0.0
+	var def_soft := 0.0
+	var def_hard := 0.0
+	var att_org := 1.0
+	var att_str := 1.0
+	var att_xp := 48.0
+	var def_org := 1.0
+	var def_str := 1.0
+	var def_xp := 48.0
+	const ATTACKER_INITIATIVE := 0.15
+
+	if not fid.is_empty() and from_prov != null:
+		att_power = _unit_preview_power(fid, from_prov, tag, ATTACKER_INITIATIVE)
+		var att_stats := _unit_preview_components(fid, from_prov, tag)
+		att_soft = float(att_stats.get("soft", 0.0))
+		att_hard = float(att_stats.get("hard", 0.0))
+		att_org = float(att_stats.get("org", 1.0))
+		att_str = float(att_stats.get("str", 1.0))
+		att_xp = float(att_stats.get("xp", 48.0))
+	elif bool(can.get("ok", false)):
+		att_power = float(can.get("attack_power", 0.0)) + ATTACKER_INITIATIVE
+
+	var def_tag := str(can.get("defender_tag", ""))
+	if def_tag.is_empty() and target != null:
+		def_tag = _province_defender_tag(target)
+	if target != null:
+		var def_divs := get_divisions_at_province(target_province_id, def_tag)
+		var def_fid := ""
+		if not def_divs.is_empty():
+			def_fid = str(def_divs[0].get("formation_id", ""))
+		if not def_fid.is_empty():
+			def_power = _unit_preview_power(def_fid, target, def_tag, 0.0)
+			var def_stats := _unit_preview_components(def_fid, target, def_tag)
+			def_soft = float(def_stats.get("soft", 0.0))
+			def_hard = float(def_stats.get("hard", 0.0))
+			def_org = float(def_stats.get("org", 1.0))
+			def_str = float(def_stats.get("str", 1.0))
+			def_xp = float(def_stats.get("xp", 48.0))
+		else:
+			# Empty hex: synthetic garrison at full org/str, soft/hard from template estimate.
+			var g_id := _garrison_template_for_country(def_tag)
+			def_power = _unit_preview_power(g_id, target, def_tag, 0.0)
+			if def_power <= 0.0:
+				def_power = _estimate_attack_power(g_id, target, def_tag)
+
+	var odds := 0.0
+	var total := att_power + def_power
+	if total > 0.0:
+		odds = clampf((att_power / total) * 100.0, 5.0, 95.0)
+
+	var out := can.duplicate()
+	out["attack_power"] = att_power
+	out["defense_power"] = def_power
+	out["attacker_soft"] = att_soft
+	out["attacker_hard"] = att_hard
+	out["attacker_org"] = att_org
+	out["attacker_strength"] = att_str
+	out["attacker_xp"] = att_xp
+	out["defender_soft"] = def_soft
+	out["defender_hard"] = def_hard
+	out["defender_org"] = def_org
+	out["defender_strength"] = def_str
+	out["defender_xp"] = def_xp
+	out["attacker_initiative"] = ATTACKER_INITIATIVE
+	out["odds_attacker_win"] = odds
+	out["formation_id"] = fid if not fid.is_empty() else str(can.get("formation_id", ""))
+	out["from_province_id"] = from_pid if from_pid >= 0 else int(can.get("from_province_id", -1))
+	out["target_province_id"] = target_province_id
+	out["preview_source"] = "unit_formula"
+	return out
+
+
 func execute_province_assault(
 	attacker_tag: String,
 	target_province_id: int,
 	from_province_id: int = -1,
 	attacker_formation_id: String = "",
 ) -> Dictionary:
-	var preview: Dictionary = can_assault_province(attacker_tag, target_province_id, from_province_id)
+	# Re-validate with the same named fid — no silent swap to another division.
+	var preview: Dictionary = can_assault_province(
+		attacker_tag, target_province_id, from_province_id, attacker_formation_id
+	)
 	if not bool(preview.get("ok", false)):
 		return {"success": false, "reason": preview.get("reason", "Cannot assault")}
 
@@ -1140,9 +1259,13 @@ func _validate_attack_source(
 	attacker_tag: String,
 	from_province_id: int,
 	target_province_id: int,
+	formation_id: String = "",
 ) -> Dictionary:
 	if typeof(MapManager) == TYPE_NIL:
 		return {"ok": false, "reason": "MapManager unavailable"}
+
+	if from_province_id < 0:
+		return {"ok": false, "reason": "No staging province"}
 
 	if from_province_id == target_province_id:
 		return {"ok": false, "reason": "Same province"}
@@ -1161,6 +1284,30 @@ func _validate_attack_source(
 	if divisions.is_empty():
 		return {"ok": false, "reason": "No division at staging province %d" % from_province_id}
 
+	var want_fid := formation_id.strip_edges()
+	var chosen: Dictionary = {}
+	if not want_fid.is_empty():
+		# Named unit must sit at from_pid — never swap to a different division.
+		for entry in divisions:
+			if str(entry.get("formation_id", "")) == want_fid:
+				chosen = entry
+				break
+		if chosen.is_empty():
+			return {
+				"ok": false,
+				"reason": "Formation %s not stationed at staging province %d" % [want_fid, from_province_id],
+			}
+		var power := _estimate_attack_power(want_fid, from_prov, attacker_tag)
+		chosen["attack_power"] = power
+		return {
+			"ok": true,
+			"from_province_id": from_province_id,
+			"from_province_name": from_prov.name,
+			"formation_id": want_fid,
+			"division_name": str(chosen.get("display_name", want_fid)),
+			"attack_power": power,
+		}
+
 	var best := _pick_strongest_division(divisions, from_prov, attacker_tag)
 	return {
 		"ok": true,
@@ -1170,6 +1317,55 @@ func _validate_attack_source(
 		"division_name": str(best.get("display_name", "")),
 		"attack_power": float(best.get("attack_power", 0.0)),
 	}
+
+
+## Live Formation org/str/xp × equipment soft/hard (not ProductionManager shortage org 1.0/0.82).
+func _unit_preview_components(formation_id: String, province: Province, country_tag: String) -> Dictionary:
+	var soft := 0.0
+	var hard := 0.0
+	if _resolver != null:
+		var terrain: String = province.terrain if province != null and province.terrain != "" else "plains"
+		var pid := province.id if province != null else -1
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_effective_terrain_for_demo"):
+			var eff := MapManager.get_effective_terrain_for_demo(pid)
+			if eff != terrain:
+				terrain = eff
+		var dev := province.development_level if province != null else -1
+		var infra := province.infrastructure if province != null else -1
+		var stats: Dictionary = _resolver.get_effective_combat_power(
+			formation_id, formation_id, formation_id, terrain, pid, dev, infra,
+		)
+		soft = float(stats.get("soft_attack", 0.0))
+		hard = float(stats.get("hard_attack", 0.0))
+	var org := 1.0
+	var strength := 1.0
+	var xp := 48.0
+	if typeof(LeaderManager) != TYPE_NIL:
+		var fo: Formation = LeaderManager.get_formation(formation_id)
+		if fo != null:
+			if "organization" in fo:
+				org = maxf(0.0, float(fo.organization))
+			if "strength" in fo:
+				strength = maxf(0.0, float(fo.strength))
+			if "combat_experience" in fo:
+				xp = float(fo.combat_experience)
+	return {"soft": soft, "hard": hard, "org": org, "str": strength, "xp": xp}
+
+
+func _unit_preview_power(
+	formation_id: String,
+	province: Province,
+	country_tag: String,
+	initiative: float = 0.0,
+) -> float:
+	var c := _unit_preview_components(formation_id, province, country_tag)
+	var soft := float(c.get("soft", 0.0))
+	var hard := float(c.get("hard", 0.0))
+	var org := float(c.get("org", 1.0))
+	var strength := float(c.get("str", 1.0))
+	var xp := float(c.get("xp", 48.0))
+	var xp_mult := lerpf(0.85, 1.15, clampf(xp / 100.0, 0.0, 1.0))
+	return (soft + 1.6 * hard) * org * strength * xp_mult + initiative
 
 func _pick_strongest_division(
 	divisions: Array[Dictionary],
