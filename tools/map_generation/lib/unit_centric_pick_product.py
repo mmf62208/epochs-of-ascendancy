@@ -234,7 +234,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         "_open_unit_design_assign_picker" in ren
         and "_apply_unit_design_assign" in ren
         and UNIT_CARD_ASSIGN_BTN in ren
-        and "factory_id = 0" in ren
+        and "assign_mode = true" in ren
     )
     wiring["unit_card_assign_mode"] = card_assign_path
     if card_assign_path:
@@ -242,19 +242,32 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     else:
         fails.append("unit_card_assign_mode")
 
-    # 11) DesignPickerPopup: factory_id==0 skips RetoolingWarningPopup (assign mode).
+    # Chip/pin refresh after assign (visual_archetype may change).
+    apply_fn = _gd_func_slice(ren, "_apply_unit_design_assign")
+    assign_refresh = bool(apply_fn) and (
+        "_refresh_selected_unit_chip" in apply_fn
+        and "_update_unit_icons_for_pids" in apply_fn
+    )
+    wiring["unit_card_assign_refreshes_pin"] = assign_refresh
+    if assign_refresh:
+        passes.append("unit_card_assign_refreshes_pin")
+    else:
+        fails.append("unit_card_assign_refreshes_pin")
+
+    # 11) DesignPickerPopup: assign_mode skips RetoolingWarningPopup + factory_can_build.
     picker = DESIGN_PICKER.read_text(encoding="utf-8") if DESIGN_PICKER.is_file() else ""
     picker_fn = _gd_func_slice(picker, "_on_confirm_pressed") if picker else ""
+    sel_fn = _gd_func_slice(picker, "_is_design_selectable") if picker else ""
+    fac_fn = _gd_func_slice(picker, "_factory_allows_design") if picker else ""
     assign_skip_retool = bool(picker_fn) and (
         "_is_assign_mode" in picker
-        and "factory_id == 0" in picker
+        and "var assign_mode" in picker
         and "RetoolingWarningPopup" in picker_fn
         and (
             "design_chosen" in picker_fn
             or "assign_callback" in picker_fn
             or "assign_callback" in picker
         )
-        # Assign branch returns before retool when factory_id==0.
         and ("return" in picker_fn)
         and picker_fn.find("_is_assign_mode") < picker_fn.find("RetoolingWarningPopup")
     )
@@ -263,6 +276,40 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         passes.append("design_picker_assign_skips_retool")
     else:
         fails.append("design_picker_assign_skips_retool")
+
+    # Selectability short-circuit: assign mode must not call factory_can_build_design.
+    assign_selectable = bool(sel_fn) and (
+        "_is_assign_mode" in sel_fn
+        and "country_may_use_design" in sel_fn
+        and sel_fn.find("_is_assign_mode") < sel_fn.find("is_design_factory_compatible")
+        and "factory_can_build_design" not in sel_fn
+    )
+    wiring["design_picker_assign_selectable"] = assign_selectable
+    if assign_selectable:
+        passes.append("design_picker_assign_selectable")
+    else:
+        fails.append("design_picker_assign_selectable")
+
+    fac_assign_bypass = bool(fac_fn) and (
+        "_is_assign_mode" in fac_fn
+        and fac_fn.find("_is_assign_mode") < fac_fn.find("factory_can_build_design")
+    )
+    wiring["design_picker_factory_allows_assign_bypass"] = fac_assign_bypass
+    if fac_assign_bypass:
+        passes.append("design_picker_factory_allows_assign_bypass")
+    else:
+        fails.append("design_picker_factory_allows_assign_bypass")
+
+    # Assign mode predicate is explicit flag, not bare factory_id==0.
+    assign_flag_only = bool(picker) and (
+        "return assign_mode" in picker
+        or ("return assign_mode" in _gd_func_slice(picker, "_is_assign_mode"))
+    )
+    wiring["design_picker_assign_flag_only"] = assign_flag_only
+    if assign_flag_only:
+        passes.append("design_picker_assign_flag_only")
+    else:
+        fails.append("design_picker_assign_flag_only")
 
     if not check_wiring:
         # Format-only mode still reports integrity strings.

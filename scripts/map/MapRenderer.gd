@@ -16160,7 +16160,9 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			hard_v = float(cstats.get("hard_attack", 0.0))
 			rel_v = float(cstats.get("reliability", 0.0))
 	var xp_mult := lerpf(0.85, 1.15, clampf(xp_raw / 100.0, 0.0, 1.0))
-	var preview_pow := (soft_v + 1.6 * hard_v) * org_v * str_v * xp_mult + 0.15
+	# Idle card: base unit power (no attacker initiative). As-attacker line adds +0.15 separately.
+	var base_pow := (soft_v + 1.6 * hard_v) * org_v * str_v * xp_mult
+	var as_attacker_pow := base_pow + 0.15
 
 	var stock_n := 0
 	if not dsn.is_empty() and not tag.is_empty() and typeof(ProductionManager) != TYPE_NIL:
@@ -16251,7 +16253,8 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		"Soft %.2f · Hard %.2f · Rel %.0f%%"
 		% [soft_v, hard_v, rel_v * 100.0]
 	)
-	lines.append("Preview power: %.2f (incl. +0.15 attacker initiative)" % preview_pow)
+	lines.append("Unit power: %.2f" % base_pow)
+	lines.append("As attacker preview: %.2f (+0.15 initiative)" % as_attacker_pow)
 	lines.append(
 		"Country stockpile (%s): %d" % [dsn if not dsn.is_empty() else "—", stock_n]
 	)
@@ -16369,7 +16372,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	)
 
 
-## Open DesignPickerPopup in assign mode (factory_id=0) — skips RetoolingWarningPopup.
+## Open DesignPickerPopup in explicit assign_mode — skips RetoolingWarningPopup + factory gates.
 func _open_unit_design_assign_picker(formation_id: String, country_tag: String, card_panel: Control = null) -> void:
 	var fid := formation_id.strip_edges()
 	var tag := country_tag.strip_edges().to_upper()
@@ -16382,6 +16385,7 @@ func _open_unit_design_assign_picker(formation_id: String, country_tag: String, 
 	var picker: DesignPickerPopup = picker_scene.instantiate() as DesignPickerPopup
 	if picker == null:
 		return
+	picker.assign_mode = true
 	picker.factory_id = 0
 	picker.country_tag = tag
 	picker.assign_callback = func(design_id: String) -> void:
@@ -16410,22 +16414,44 @@ func _apply_unit_design_assign(
 	if fo == null:
 		_show_inspector_toast("Unit not found", 2.5)
 		return
-	fo.design_id = did
-	# Optional: seed on-hand from country stockpile if available.
+	# Write the domain field that the unit card reads for this formation category.
+	var cat := ""
+	if fo.has_method("get_category"):
+		cat = str(fo.call("get_category"))
+	elif "formation_type" in fo:
+		cat = str(fo.formation_type)
+	var cat_l := cat.to_lower()
+	if cat_l == "air" or cat_l.contains("air"):
+		if "air_design_id" in fo:
+			fo.air_design_id = did
+		else:
+			fo.design_id = did
+	elif cat_l == "naval" or cat_l.contains("fleet") or cat_l.contains("ship") or cat_l.contains("task"):
+		if "naval_design_id" in fo:
+			fo.naval_design_id = did
+		else:
+			fo.design_id = did
+	else:
+		fo.design_id = did
+	# Optional: seed on-hand from country stockpile only when take actually moves units.
 	if typeof(ProductionManager) != TYPE_NIL:
-		var take_n := 0
+		var taken := 0
 		if ProductionManager.has_method("get_country_equipment_stockpile"):
 			var cstk: Dictionary = ProductionManager.get_country_equipment_stockpile(tag)
 			var have := int(cstk.get(did, 0))
 			if have > 0 and ProductionManager.has_method("take_from_country_equipment_stockpile"):
-				take_n = mini(1, have)
-				if take_n > 0:
-					ProductionManager.take_from_country_equipment_stockpile(tag, did, take_n)
-		if take_n > 0 and ProductionManager.has_method("get_unit_equipment_stock") and ProductionManager.has_method("set_unit_equipment_stock"):
+				taken = int(ProductionManager.take_from_country_equipment_stockpile(tag, did, mini(1, have)))
+		if taken > 0 and ProductionManager.has_method("get_unit_equipment_stock") and ProductionManager.has_method("set_unit_equipment_stock"):
 			var cur: Dictionary = ProductionManager.get_unit_equipment_stock(fid)
-			cur[did] = int(cur.get(did, 0)) + take_n
+			cur[did] = int(cur.get(did, 0)) + taken
 			ProductionManager.set_unit_equipment_stock(fid, cur)
 	_show_inspector_toast("Assigned %s to unit" % did, 3.0)
+	# Refresh pin / selected chip for new visual_archetype (pid-scoped only).
+	var station_pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	if station_pid >= 0 and has_method("_update_unit_icons_for_pids"):
+		_update_unit_icons_for_pids([station_pid])
+	if has_method("_refresh_selected_unit_chip"):
+		_refresh_selected_unit_chip()
 	if card_panel != null and is_instance_valid(card_panel):
 		card_panel.queue_free()
 	if fo != null:
