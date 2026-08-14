@@ -63,6 +63,17 @@ def build_map_unit_counter_lod_product() -> Dict[str, Any]:
     else:
         fails.append("missing_sync_vis")
 
+    # Pin pick respects strategic hide: hidden counters skipped (unit-centric pick).
+    if "not counter.visible" in ren and "_pick_unit_formation_at_world" in ren:
+        passes.append("pick_skips_hidden")
+    else:
+        fails.append("pick_skips_hidden")
+    # Strategic discoverability toast remains available for hex click when pins off.
+    if "Zoom in or Shift+U to pick units." in ren:
+        passes.append("strategic_pick_toast")
+    else:
+        fails.append("missing_strategic_pick_toast")
+
     ok = len(fails) == 0
     return {
         "ok": ok,
