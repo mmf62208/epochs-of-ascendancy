@@ -559,7 +559,6 @@ func _gather_save_data() -> Dictionary:
 		data["battles"] = bm_blob.get("battles", [])
 		data["marches"] = bm_blob.get("marches", [])
 		data["battle_manager"] = bm_blob
-		data["battle_manager"] = bm_blob
 
 	return data
 

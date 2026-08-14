@@ -2857,17 +2857,7 @@ func apply_assault_stage_mutation(
 	var tag := str(plan.get("attacker_tag", attacker_tag))
 	var fid := str(plan.get("formation_id", formation_id))
 	if bool(plan.get("execute", false)):
-		# Player-facing stage execute → multi-day battle when available; one-shot remains for headless/debug.
-		if BattleManager.has_method("start_province_battle"):
-			var res_b: Dictionary = BattleManager.start_province_battle(
-				tag, target_province_id, from_province_id, fid
-			)
-			return {
-				"ok": bool(res_b.get("success", false)),
-				"result": res_b,
-				"mutation": mut,
-				"multi_day": true,
-			}
+		# Stage-mutation automation stays one-shot. Player/play-strip multi-day is GameData only.
 		if BattleManager.has_method("execute_province_assault"):
 			var res: Dictionary = BattleManager.execute_province_assault(
 				tag, target_province_id, from_province_id, fid

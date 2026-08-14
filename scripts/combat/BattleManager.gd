@@ -10,7 +10,10 @@ const DEFAULT_GARRISON_TEMPLATE := "german_infantry_division_1943_mixed"
 const ATTACKER_INITIATIVE := 0.15
 const BATTLE_ORG_BREAK := 0.22
 const BATTLE_ATT_STR_FLOOR := 0.35
-const BATTLE_DEF_STR_BREAK := 0.30
+## Pre-clamp break threshold (both sides). Clamp floors: att 0.35 / def 0.30 after break test.
+const BATTLE_STR_BREAK := 0.30
+const BATTLE_DEF_STR_BREAK := BATTLE_STR_BREAK
+const BATTLE_ATT_STR_BREAK := BATTLE_STR_BREAK
 const BATTLE_MAX_DAYS := 12
 const BATTLE_TICK_BUDGET := 8
 const MARCH_DEFAULT_HOURS_PER_HEX := 24.0
@@ -25,8 +28,8 @@ var _battle_day_hooked: bool = false
 var _battle_tick_rr: int = 0
 ## fid -> MarchOrder dict.
 var _marches: Dictionary = {}
-var _march_order_seq: int = 0
-
+var _march_order_seq: int = 0## Round-robin cursor so budgeted ticks never starve battles beyond the first N keys.
+var _battle_tick_rr: int = 0
 
 func _ready() -> void:
 	_resolver = CombatResolver.new()
@@ -288,6 +291,22 @@ func can_assault_province(
 		var fo: Formation = LeaderManager.get_formation(fid)
 		if fo != null and "stationed_province_id" in fo:
 			from_pid = int(fo.stationed_province_id)
+
+	# Named unit already engaging: preview/strip match start_province_battle (no false "ready").
+	if not fid.is_empty() and is_formation_in_battle(fid):
+		return {
+			"ok": false,
+			"reason": "Formation already in battle",
+			"formation_id": fid,
+			"target_province_id": target_province_id,
+		}
+	# Target hex already has an engaging multi-day battle (1v1 theater; no double-defend).
+	if not get_battle_at(target_province_id).is_empty():
+		return {
+			"ok": false,
+			"reason": "Province already under assault",
+			"target_province_id": target_province_id,
+		}
 
 	var source: Dictionary
 	if not fid.is_empty():
@@ -667,7 +686,10 @@ func start_province_battle(
 	if def_tag.is_empty():
 		def_tag = _province_defender_tag(target)
 
-	# 1v1: no second battle on the same edge.
+	# 1v1 theater: block same edge, same target hex, attacker fid, or live defender fid already engaged.
+	# Prevents double org/str ticks on a shared Formation and sticky is_in_combat clears.
+	if not get_battle_at(target_province_id).is_empty():
+		return {"success": false, "reason": "Province already under assault"}
 	for bid_v in _battles.keys():
 		var existing: Dictionary = _battles[bid_v] as Dictionary
 		if str(existing.get("status", "")) != "engaging":
@@ -698,6 +720,19 @@ func start_province_battle(
 	if def_is_synthetic:
 		# Battle-local garrison — do not register on LeaderManager; keep on defender_forms.
 		def_fid = ""
+	# Live defender already in another battle → no shared Form ref double-damage.
+	if not def_fid.is_empty():
+		for bid2 in _battles.keys():
+			var ex2: Dictionary = _battles[bid2] as Dictionary
+			if str(ex2.get("status", "")) != "engaging":
+				continue
+			if _battle_lists_fid(ex2, def_fid):
+				return {
+					"success": false,
+					"reason": "Defender already in battle",
+					"battle_id": str(bid2),
+					"defender_formation_id": def_fid,
+				}
 
 	var start_day := 0
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
@@ -852,29 +887,48 @@ func withdraw_from_battle(formation_id: String) -> Dictionary:
 
 func tick_battles_for_day() -> Dictionary:
 	if _battles.is_empty():
+		_battle_tick_rr = 0
 		return {"ok": true, "ticked": 0, "ended": 0, "active": 0}
 	var ticked := 0
 	var ended := 0
-	var budget := BATTLE_TICK_BUDGET
-	# Stable key order; player-theater first is follow-up.
-	var ids: Array = _battles.keys()
-	ids.sort()
+	# Collect engaging ids (stable sort) then round-robin so budget never starves a row forever.
+	var ids: Array = []
 	var end_ids: Array[String] = []
-	for bid_v in ids:
-		if budget <= 0:
+	for bid_v in _battles.keys():
+		var bid0 := str(bid_v)
+		var b0: Dictionary = _battles[bid0] as Dictionary
+		if str(b0.get("status", "")) != "engaging":
+			end_ids.append(bid0)
+		else:
+			ids.append(bid0)
+	ids.sort()
+	var n := ids.size()
+	if n == 0:
+		for eid in end_ids:
+			if _battles.has(eid):
+				_battles.erase(eid)
+		return {"ok": true, "ticked": 0, "ended": 0, "active": 0}
+	# When few battles, tick all; otherwise budget with rotating start index.
+	var budget := n if n <= BATTLE_TICK_BUDGET else BATTLE_TICK_BUDGET
+	if _battle_tick_rr < 0 or _battle_tick_rr >= n:
+		_battle_tick_rr = 0
+	var start_i := _battle_tick_rr
+	for k in range(n):
+		if ticked >= budget:
 			break
-		var battle_id := str(bid_v)
+		var i := (start_i + k) % n
+		var battle_id := str(ids[i])
 		if not _battles.has(battle_id):
 			continue
 		var battle: Dictionary = _battles[battle_id] as Dictionary
 		if str(battle.get("status", "")) != "engaging":
-			end_ids.append(battle_id)
 			continue
-		budget -= 1
 		ticked += 1
 		var term := _tick_one_battle(battle_id, battle)
 		if not term.is_empty():
 			ended += 1
+	# Advance RR so next day starts after this window (fairness when n > budget).
+	_battle_tick_rr = (start_i + budget) % maxi(n, 1)
 	for eid in end_ids:
 		if _battles.has(eid) and str((_battles[eid] as Dictionary).get("status", "")) != "engaging":
 			_battles.erase(eid)
@@ -883,6 +937,7 @@ func tick_battles_for_day() -> Dictionary:
 		"ticked": ticked,
 		"ended": ended,
 		"active": _battles.size(),
+		"rr": _battle_tick_rr,
 	}
 
 
@@ -997,14 +1052,14 @@ func _tick_one_battle(battle_id: String, battle: Dictionary) -> String:
 		_apply_combat_equipment_loss_for_formation(def_fid, def_str_before, maxf(def_str_raw, 0.01), not att_wins_slice, false)
 
 	var terminal := ""
-	if def_org_raw <= BATTLE_ORG_BREAK or def_str_raw <= BATTLE_DEF_STR_BREAK:
+	if def_org_raw <= BATTLE_ORG_BREAK or def_str_raw <= BATTLE_STR_BREAK:
 		terminal = "defender_broke"
-	elif att_org_raw <= BATTLE_ORG_BREAK or att_str_raw <= BATTLE_DEF_STR_BREAK:
+	elif att_org_raw <= BATTLE_ORG_BREAK or att_str_raw <= BATTLE_ATT_STR_BREAK:
 		terminal = "attacker_broke"
 	elif days >= BATTLE_MAX_DAYS:
 		terminal = "prolonged_stalemate"
 
-	# Clamp survivors after break test.
+	# Clamp survivors after break test (att str floor 0.35; def break floor 0.30).
 	att_form.organization = clampf(att_org_raw, BATTLE_ORG_BREAK, 1.0)
 	att_form.strength = clampf(att_str_raw, BATTLE_ATT_STR_FLOOR, 1.0)
 	def_form.organization = clampf(def_org_raw, BATTLE_ORG_BREAK, 1.0)
@@ -1048,7 +1103,9 @@ func _end_battle(battle_id: String, status: String) -> void:
 		return
 	var battle: Dictionary = _battles[battle_id] as Dictionary
 	battle["status"] = status
-	_clear_battle_combat_flags(battle)
+	# Erase first so _formation_still_in_other_battle does not see this row.
+	_battles.erase(battle_id)
+	_clear_battle_combat_flags(battle, battle_id)
 	var toast_status := status
 	var target_pid := int(battle.get("target_pid", -1))
 	var from_pid := int(battle.get("from_pid", -1))
@@ -1064,8 +1121,6 @@ func _end_battle(battle_id: String, status: String) -> void:
 		elif status == "prolonged_stalemate":
 			msg = "Stalemate · assault stalled"
 		LeaderEventUI.show_toast(msg, 3.5, false, true)
-	# Release battle-local Formation refs with the row.
-	_battles.erase(battle_id)
 	battle_resolved.emit({
 		"battle_id": battle_id,
 		"status": status,
@@ -1076,29 +1131,60 @@ func _end_battle(battle_id: String, status: String) -> void:
 	})
 
 
-func _clear_battle_combat_flags(battle: Dictionary) -> void:
-	var seen: Dictionary = {}
-	for arr_key in ["attacker_forms", "defender_forms"]:
-		var forms: Array = battle.get(arr_key, []) as Array
-		for f_any in forms:
+## Clear is_in_combat only when the formation is not still listed in another engaging row.
+func _clear_battle_combat_flags(battle: Dictionary, ended_battle_id: String = "") -> void:
+	var fids: Array[String] = []
+	for key in ["attacker_formation_id", "defender_formation_id"]:
+		var id := str(battle.get(key, "")).strip_edges()
+		if not id.is_empty() and not fids.has(id):
+			fids.append(id)
+	for arr_key in ["attacker_fids", "defender_fids"]:
+		for x in battle.get(arr_key, []):
+			var sid := str(x).strip_edges()
+			if not sid.is_empty() and not fids.has(sid):
+				fids.append(sid)
+	for arr_key2 in ["attacker_forms", "defender_forms"]:
+		for f_any in battle.get(arr_key2, []):
 			var f: Formation = f_any as Formation
 			if f == null or not is_instance_valid(f):
 				continue
-			var fid := str(f.formation_id) if "formation_id" in f else ""
-			if not fid.is_empty() and seen.has(fid):
-				continue
-			if not fid.is_empty():
-				seen[fid] = true
-			if "is_in_combat" in f:
+			var ffid := str(f.formation_id) if "formation_id" in f else ""
+			if not ffid.is_empty() and not fids.has(ffid):
+				fids.append(ffid)
+			# Synthetic battle-local forms: always clear (not shared across rows).
+			if ffid.is_empty() and "is_in_combat" in f:
 				f.is_in_combat = false
-	# Also clear by fid for live LeaderManager forms that may have been re-fetched.
-	for key in ["attacker_formation_id", "defender_formation_id"]:
-		var id := str(battle.get(key, "")).strip_edges()
-		if id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+	for id2 in fids:
+		if _formation_still_in_other_battle(id2, ended_battle_id):
 			continue
-		var lf: Formation = LeaderManager.get_formation(id)
-		if lf != null and "is_in_combat" in lf:
-			lf.is_in_combat = false
+		if typeof(LeaderManager) != TYPE_NIL:
+			var lf: Formation = LeaderManager.get_formation(id2)
+			if lf != null and "is_in_combat" in lf:
+				lf.is_in_combat = false
+		# Also clear any in-memory form refs on this ended battle that match.
+		for arr_key3 in ["attacker_forms", "defender_forms"]:
+			for f_any2 in battle.get(arr_key3, []):
+				var f2: Formation = f_any2 as Formation
+				if f2 == null or not is_instance_valid(f2):
+					continue
+				var f2id := str(f2.formation_id) if "formation_id" in f2 else ""
+				if f2id == id2 and "is_in_combat" in f2:
+					f2.is_in_combat = false
+
+
+func _formation_still_in_other_battle(formation_id: String, exclude_battle_id: String = "") -> bool:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		return false
+	for bid in _battles.keys():
+		if str(bid) == exclude_battle_id:
+			continue
+		var b: Dictionary = _battles[bid] as Dictionary
+		if str(b.get("status", "")) != "engaging":
+			continue
+		if _battle_lists_fid(b, fid):
+			return true
+	return false
 
 
 func _battle_lists_fid(battle: Dictionary, formation_id: String) -> bool:
