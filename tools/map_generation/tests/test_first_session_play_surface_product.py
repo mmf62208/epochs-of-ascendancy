@@ -26,6 +26,10 @@ CHILD_NAMES = (
     "hotkeys",
     "assault",
     "play_strip",
+    # Unit-centric war loop (PR 1/4/5 + composer close PR 6).
+    "unit_pick",
+    "march",
+    "battle",
 )
 
 
@@ -62,6 +66,9 @@ class TestFirstSessionPlaySurfaceProduct(unittest.TestCase):
             "build_first_session_hotkeys_product",
             "build_first_session_assault_surface_product",
             "build_order_panel_play_strip_product",
+            "build_unit_centric_pick_product",
+            "build_formation_march_product",
+            "build_multi_day_battle_product",
         ):
             self.assertIn(fn, src)
         self.assertNotIn("map_supply_hub_brief_product", src)
