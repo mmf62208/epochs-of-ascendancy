@@ -1281,10 +1281,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_select_province(resolved_province, resolved_node)
 				get_viewport().set_input_as_handled()
 				return
-			# Strategic zoom: pins hidden — one-shot discoverability for unit pick.
+			# Strategic zoom / master-off: pins hidden — one-shot discoverability for unit pick.
 			if not _unit_pick_strategic_hint_shown and not _unit_counters_want_visible():
 				_unit_pick_strategic_hint_shown = true
-				_show_inspector_toast("Zoom in or Shift+U to pick units.", 3.5)
+				_show_inspector_toast("Zoom in to pick units (Shift+U toggles counters).", 3.5)
 			# Select first (outline immediately); center + left inspector (avoid covering selection).
 			_select_province(resolved_province, resolved_node)
 			_center_camera_on_province(resolved_province.id, "soft")
@@ -15679,14 +15679,18 @@ func _select_map_unit(formation: Object) -> void:
 		DebugOverlay.toast_map_debug(toast)
 
 
-## Gold/cyan selected-chip ring on DemoUnitIcon whose formation_id matches selection (no full rebuild).
+## Selected-chip ring via nation-frame helper. One pin per province — match by station pid
+## (stack cycle keeps ring on the province pin even when selected_formation_id is not the rep).
 func _refresh_selected_unit_chip() -> void:
 	if _demo_unit_icon_pids.is_empty():
 		return
-	# Gold outer / cyan glow via nation-frame helper colors.
 	var gold := Color(1.0, 0.85, 0.25, 1.0)
-	var cyan := Color(0.2, 0.9, 1.0, 1.0)
-	var sel_col := gold if not selected_formation_id.is_empty() else cyan
+	# Resolve selected formation's station province (stack cycle: fid changes, pin stays).
+	var sel_pid := -1
+	if not selected_formation_id.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var sel_f: Formation = LeaderManager.get_formation(selected_formation_id)
+		if sel_f != null and "stationed_province_id" in sel_f:
+			sel_pid = int(sel_f.stationed_province_id)
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
 		if not province_nodes.has(id):
@@ -15697,15 +15701,20 @@ func _refresh_selected_unit_chip() -> void:
 		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
 		if counter == null or not is_instance_valid(counter):
 			continue
+		# free() same-frame so re-add is not renamed SelectedFrame2 (queue_free leaves sibling).
 		var old_sel: Node = counter.get_node_or_null("SelectedFrame")
 		if old_sel != null:
-			old_sel.queue_free()
-		if selected_formation_id.is_empty():
+			counter.remove_child(old_sel)
+			old_sel.free()
+		if selected_formation_id.is_empty() or sel_pid < 0:
 			continue
+		# Province pin match (one DemoUnitIcon per pid); formation_id equality is optional fast path.
+		var pin_pid := int(counter.get_meta("province_id", id))
 		var cfid := str(counter.get_meta("formation_id", ""))
-		if cfid.is_empty() or cfid != selected_formation_id:
+		var match_pin := pin_pid == sel_pid or (not cfid.is_empty() and cfid == selected_formation_id)
+		if not match_pin:
 			continue
-		var frame := _make_unit_nation_frame(sel_col)
+		var frame := _make_unit_nation_frame(gold)
 		frame.name = "SelectedFrame"
 		frame.z_index = 20
 		counter.add_child(frame)
@@ -15810,9 +15819,9 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 	var hit_r := maxf(48.0 / maxf(z, 0.05), 20.0)
 	var hit_r2 := hit_r * hit_r
 	var best_player: Object = null
-	var best_player_d := hit_r2
+	var best_player_d := INF
 	var best_any: Object = null
-	var best_any_d := hit_r2
+	var best_any_d := INF
 	var p_tag := _player_tag()
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
@@ -15843,12 +15852,13 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 					fo = f2 as Object
 		if fo == null:
 			continue
-		if d < best_any_d:
+		# Inclusive disk: accept boundary (d == hit_r2) as a valid best.
+		if d <= best_any_d:
 			best_any_d = d
 			best_any = fo
 		# Prefer player-tag pins; closest player pin wins on overlap.
 		if not p_tag.is_empty() and "country_tag" in fo:
-			if str(fo.country_tag).strip_edges().to_upper() == p_tag and d < best_player_d:
+			if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_player_d:
 				best_player_d = d
 				best_player = fo
 	if best_player != null:
