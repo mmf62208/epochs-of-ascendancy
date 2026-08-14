@@ -97,31 +97,30 @@ def build_formation_march_product(*, check_wiring: bool = True) -> Dict[str, Any
     else:
         fails.append("station_formation_on_province")
 
-    # 3) issue_march_order: own_land_only=true, max hops 48, battle block, instant
+    # 3) issue_march_order: own_land_only=true via exact 5th-arg true, max hops 48, battle block, instant
     issue_fn = _gd_func_slice(bm, "issue_march_order")
+    issue_own = "find_land_path(from_pid, dest_pid, tag, MARCH_MAX_HOPS, true)" in issue_fn
     issue_ok = (
         bool(issue_fn)
-        and "find_land_path" in issue_fn
-        and ("own_land_only" in issue_fn or ", true)" in issue_fn)
+        and issue_own
         and "instant" in issue_fn
         and ("_battles" in issue_fn or "_formation_in_active_battle" in issue_fn)
         and "station_formation_on_province" in issue_fn
     )
-    # Prefer explicit true 5th arg for own-land
-    issue_own = "true)" in issue_fn or "own_land_only" in issue_fn
-    wiring["issue_march_order"] = issue_ok and issue_own
-    if issue_ok and issue_own:
+    wiring["issue_march_order"] = issue_ok
+    if issue_ok:
         passes.append("issue_march_order")
     else:
         fails.append("issue_march_order")
 
-    # 4) tick_marches_for_day: hours_acc += 24, station hop, notify light
+    # 4) tick_marches_for_day: hours_acc += 24, station hop, own-land revalidate, notify light
     tick_fn = _gd_func_slice(bm, "tick_marches_for_day")
     tick_ok = (
         bool(tick_fn)
         and "hours_acc" in tick_fn
         and "station_formation_on_province" in tick_fn
         and ("_notify_map_refresh" in tick_fn or "_update_unit_icons_for_pids" in tick_fn)
+        and "_province_controlled_by" in tick_fn
     )
     wiring["tick_marches_for_day"] = tick_ok
     if tick_ok:
@@ -169,8 +168,7 @@ def build_formation_march_product(*, check_wiring: bool = True) -> Dict[str, Any
         fails.append("pin_lerp")
 
     line_ok = (
-        "MARCH_PATH_LINE_BUDGET" in ren
-        and ("8" in ren)
+        "MARCH_PATH_LINE_BUDGET := 8" in ren
         and ("MarchPath" in ren or "_march_path" in ren)
         and "Line2D" in ren
     )
@@ -196,11 +194,12 @@ def build_formation_march_product(*, check_wiring: bool = True) -> Dict[str, Any
     else:
         fails.append("formation_movement_issue_march")
 
-    # 7) SaveLoadManager marches blob
+    # 7) SaveLoadManager marches blob — always apply (clear when keys missing)
     save_ok = (
         '"marches"' in sl
         and "BattleManager" in sl
         and ("apply_save_data" in sl)
+        and "bm_payload" in sl
     )
     wiring["save_marches_blob"] = save_ok
     if save_ok:
@@ -222,6 +221,24 @@ def build_formation_march_product(*, check_wiring: bool = True) -> Dict[str, Any
         passes.append("block_on_battles_not_flag")
     else:
         fails.append("block_on_battles_not_flag")
+
+    # 9) Assault/capture cancels march; hop re-validates control
+    cancel_on_assault = (
+        "cancel_march_order" in bm
+        and "cancel_march_order(attacker_formation_id)" in bm
+    )
+    wiring["cancel_march_on_assault"] = cancel_on_assault
+    if cancel_on_assault:
+        passes.append("cancel_march_on_assault")
+    else:
+        fails.append("cancel_march_on_assault")
+
+    hop_own = "_province_controlled_by" in tick_fn
+    wiring["hop_own_land_revalidate"] = hop_own
+    if hop_own:
+        passes.append("hop_own_land_revalidate")
+    else:
+        fails.append("hop_own_land_revalidate")
 
     if not check_wiring:
         ok = own_arg and issue_ok

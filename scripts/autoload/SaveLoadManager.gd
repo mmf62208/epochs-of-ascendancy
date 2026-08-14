@@ -630,11 +630,14 @@ func _apply_save_data(data: Dictionary) -> void:
 		_apply_leader_state(data["leaders"])
 
 	# 7a. Marches after formations so fids exist; drop unknown fids inside apply.
+	# Always call apply (even empty) so pre-PR4 saves clear autoload _marches from a prior session.
 	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("apply_save_data"):
+		var bm_payload: Dictionary = {}
 		if data.has("battle_manager") and data["battle_manager"] is Dictionary:
-			BattleManager.apply_save_data(data["battle_manager"] as Dictionary)
+			bm_payload = data["battle_manager"] as Dictionary
 		elif data.has("marches"):
-			BattleManager.apply_save_data({"marches": data["marches"]})
+			bm_payload = {"marches": data["marches"]}
+		BattleManager.apply_save_data(bm_payload)
 
 	# 7b. Division map deployments (after leaders; syncs CombatPresenceRegistry engineers)
 	if data.has("supply") and typeof(SupplyManager) != TYPE_NIL:

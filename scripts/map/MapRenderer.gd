@@ -15861,6 +15861,10 @@ func _update_march_visuals(delta: float, sim_paused: bool) -> void:
 	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("get_active_marches"):
 		_clear_all_march_path_lines()
 		return
+	if BattleManager.has_method("has_active_marches") and not BattleManager.has_active_marches():
+		_clear_all_march_path_lines()
+		return
+	# Live dict (no deep-copy); treat as read-only except set_march_visual_t.
 	var marches: Dictionary = BattleManager.get_active_marches()
 	if marches.is_empty():
 		_clear_all_march_path_lines()
@@ -15897,6 +15901,7 @@ func _update_march_visuals(delta: float, sim_paused: bool) -> void:
 		var b_pos: Vector2 = province_centroids.get(b_pid, Vector2.ZERO) as Vector2
 		if a_pos != Vector2.ZERO or b_pos != Vector2.ZERO:
 			var world := a_pos.lerp(b_pos, t)
+			# Only move pin when it represents this marching fid (stack >1 keeps province pin).
 			_set_march_pin_world_pos(fid, a_pid, world)
 		# Remaining path Line2D (budget 8 player marches).
 		if drawn < MARCH_PATH_LINE_BUDGET:
@@ -15912,7 +15917,7 @@ func _update_march_visuals(delta: float, sim_paused: bool) -> void:
 
 
 func _set_march_pin_world_pos(fid: String, station_pid: int, world_pos: Vector2) -> void:
-	# Prefer icon at current station province; fall back to any pin meta-matching fid.
+	# Prefer icon at current station province; only lerp when pin meta matches marching fid.
 	var counter: Node2D = null
 	if province_nodes.has(station_pid):
 		var n: Node2D = province_nodes[station_pid] as Node2D
@@ -15934,7 +15939,10 @@ func _set_march_pin_world_pos(fid: String, station_pid: int, world_pos: Vector2)
 				break
 	if counter == null or not is_instance_valid(counter):
 		return
-	# Convert world map pos → local to province node parent.
+	# Stack >1: province pin represents a different rep — path line only, no pin drift.
+	var pin_fid := str(counter.get_meta("formation_id", ""))
+	if not pin_fid.is_empty() and pin_fid != fid:
+		return
 	var parent_n := counter.get_parent() as Node2D
 	if parent_n != null:
 		counter.global_position = world_pos
@@ -15948,7 +15956,11 @@ func _ensure_march_path_layer() -> void:
 	_march_path_layer = Node2D.new()
 	_march_path_layer.name = "MarchPathLayer"
 	_march_path_layer.z_index = 18
-	add_child(_march_path_layer)
+	# Parent under province container so path shares map-space with pins/centroids.
+	if container != null and is_instance_valid(container):
+		container.add_child(_march_path_layer)
+	else:
+		add_child(_march_path_layer)
 
 
 func _draw_march_remaining_path(fid: String, path: Array, idx: int, visual_t: float) -> void:
