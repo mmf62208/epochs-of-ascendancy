@@ -56,7 +56,11 @@ class TestUnitCentricPickProduct(unittest.TestCase):
             "unit_card_template_stockpile",
             "unit_card_assign_copy",
             "unit_card_assign_mode",
+            "unit_card_assign_refreshes_pin",
             "design_picker_assign_skips_retool",
+            "design_picker_assign_selectable",
+            "design_picker_factory_allows_assign_bypass",
+            "design_picker_assign_flag_only",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 
@@ -102,8 +106,16 @@ class TestUnitCentricPickProduct(unittest.TestCase):
 
     def test_design_picker_assign_mode_skips_retool(self) -> None:
         src = PICKER.read_text(encoding="utf-8")
-        self.assertIn("factory_id == 0", src)
+        self.assertIn("var assign_mode", src)
         self.assertIn("_is_assign_mode", src)
+        # Explicit flag only — not bare factory_id == 0.
+        mode_i = src.find("func _is_assign_mode")
+        self.assertGreaterEqual(mode_i, 0)
+        mode_fn = src[mode_i : mode_i + 200]
+        next_mode = mode_fn.find("\nfunc ", 1)
+        if next_mode > 0:
+            mode_fn = mode_fn[:next_mode]
+        self.assertIn("return assign_mode", mode_fn)
         conf_i = src.find("func _on_confirm_pressed")
         self.assertGreaterEqual(conf_i, 0)
         conf = src[conf_i : conf_i + 900]
@@ -114,6 +126,27 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertLess(conf.find("_is_assign_mode"), conf.find("RetoolingWarningPopup"))
         self.assertIn("design_chosen", src)
         self.assertIn("assign_callback", src)
+
+    def test_design_picker_assign_mode_selectable_without_factory(self) -> None:
+        src = PICKER.read_text(encoding="utf-8")
+        sel_i = src.find("func _is_design_selectable")
+        self.assertGreaterEqual(sel_i, 0)
+        sel = src[sel_i : sel_i + 900]
+        next_fn = sel.find("\nfunc ", 1)
+        if next_fn > 0:
+            sel = sel[:next_fn]
+        self.assertIn("_is_assign_mode", sel)
+        self.assertIn("country_may_use_design", sel)
+        self.assertNotIn("factory_can_build_design", sel)
+        self.assertLess(sel.find("_is_assign_mode"), sel.find("is_design_factory_compatible"))
+        fac_i = src.find("func _factory_allows_design")
+        self.assertGreaterEqual(fac_i, 0)
+        fac = src[fac_i : fac_i + 400]
+        next_fac = fac.find("\nfunc ", 1)
+        if next_fac > 0:
+            fac = fac[:next_fac]
+        self.assertIn("_is_assign_mode", fac)
+        self.assertLess(fac.find("_is_assign_mode"), fac.find("factory_can_build_design"))
 
 
 if __name__ == "__main__":

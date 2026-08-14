@@ -608,6 +608,12 @@ func _on_details_pressed(summary: Dictionary) -> void:
 
 
 func _on_change_pressed(summary: Dictionary) -> void:
+	var fid := int(summary.get("factory_id", 0))
+	# Refuse zero/missing factory — must not open DesignPicker as unit assign mode.
+	if fid <= 0:
+		push_warning("DesignPicker: factory_id missing or zero; refuse retool open")
+		_toast_layer("No factory selected for retool")
+		return
 	var picker_scene: PackedScene = load("res://scenes/ui/DesignPickerPopup.tscn")
 	if picker_scene == null:
 		push_warning("DesignPickerPopup.tscn not found")
@@ -617,7 +623,8 @@ func _on_change_pressed(summary: Dictionary) -> void:
 	if picker == null:
 		return
 
-	picker.factory_id = int(summary.get("factory_id", 0))
+	picker.factory_id = fid
+	picker.assign_mode = false
 	picker.country_tag = country_tag
 	get_tree().root.add_child(picker)
 	picker.popup_centered()

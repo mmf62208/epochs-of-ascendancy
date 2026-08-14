@@ -36,7 +36,10 @@ const DOMAIN_FILTER_TOOLTIPS: PackedStringArray = [
 @export var factory_id: int = 0
 @export var province_id: int = 0
 @export var country_tag: String = "GER"
-## When set (with factory_id == 0), confirm assigns a design to a unit — no factory retool.
+## Explicit unit-assign mode: skips factory retool and factory_can_build gates.
+## Prefer this over factory_id==0 alone so a missing production factory_id cannot mis-route.
+var assign_mode: bool = false
+## Optional callback when assign_mode confirms (MapRenderer unit card).
 var assign_callback: Callable = Callable()
 
 signal design_chosen(design_id: String)
@@ -64,7 +67,8 @@ var _relocate_target_name: String = ""
 
 
 func _is_assign_mode() -> bool:
-	return factory_id == 0
+	# Explicit flag only — never treat a zero/missing factory_id as assign by itself.
+	return assign_mode
 
 
 func _ready() -> void:
@@ -1182,6 +1186,13 @@ func _scroll_list_to_top() -> void:
 
 
 func _is_design_selectable(design_id: String) -> bool:
+	if design_id.is_empty():
+		return false
+	# Unit assign: catalog + country_may_use only — never factory_can_build(null).
+	if _is_assign_mode():
+		if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("country_may_use_design"):
+			return DesignManager.country_may_use_design(country_tag, design_id)
+		return true
 	if typeof(DesignManager) != TYPE_NIL:
 		if not DesignManager.is_design_factory_compatible(design_id, _get_factory()):
 			return false
@@ -1196,6 +1207,9 @@ func _is_design_selectable(design_id: String) -> bool:
 
 
 func _factory_allows_design(design_id: String) -> bool:
+	# Assign mode: null factory must not fail with no_factory.
+	if _is_assign_mode():
+		return true
 	if typeof(TechnologyManager) == TYPE_NIL:
 		return true
 	return bool(
