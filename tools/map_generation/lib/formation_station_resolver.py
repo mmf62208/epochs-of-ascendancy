@@ -9,6 +9,17 @@ from __future__ import annotations
 
 from typing import Dict, Iterable, List, Optional, Sequence, Set
 
+# Mirrors FormationSpawner.TEST_FORMATION_TYPES / LAND_FORMATION_TYPES.
+DEFAULT_FORMATION_TYPES: List[str] = [
+    "division",
+    "division",
+    "fleet",
+    "air_wing",
+    "garrison",
+    "task_force",
+]
+LAND_FORMATION_TYPES: Set[str] = {"division", "garrison"}
+
 
 def resolve_station_province_id(
     capital_id: int,
@@ -93,6 +104,22 @@ def resolve_stations_for_count(
     return out
 
 
+def _normalize_formation_type(raw: object) -> str:
+    return str(raw or "").strip().lower()
+
+
+def land_slot_indices(count: int, formation_types: Sequence[str]) -> List[int]:
+    """Indices i in range(count) whose type cycle entry is land (division|garrison)."""
+    if count <= 0 or not formation_types:
+        return []
+    n = len(formation_types)
+    out: List[int] = []
+    for i in range(count):
+        if _normalize_formation_type(formation_types[i % n]) in LAND_FORMATION_TYPES:
+            out.append(i)
+    return out
+
+
 def resolve_stations_hoi_deploy(
     count: int,
     capital_id: int,
@@ -100,13 +127,16 @@ def resolve_stations_hoi_deploy(
     *,
     key_provinces: Optional[Sequence[int]] = None,
     border_provinces: Optional[Sequence[int]] = None,
+    front_reserve: Optional[Sequence[int]] = None,
+    formation_types: Optional[Sequence[str]] = None,
     valid_land_ids: Optional[Set[int]] = None,
     water_ids: Optional[Set[int]] = None,
 ) -> List[int]:
-    """HOI-style station order: capital → key hubs → border → remaining owned land.
+    """HOI-style station order: front_reserve → capital → key hubs → border → rest.
 
-    Spreads land OOB across industrial hubs and fronts instead of packing only
-    the capital (or first sorted owned id).
+    When formation_types is set, land slots (division|garrison in the type cycle)
+    are filled from ordered; naval/air use capital (or first non-reserved owned)
+    so they never consume a reserved front pid.
     """
     owned: List[int] = []
     seen: Set[int] = set()
@@ -128,11 +158,21 @@ def resolve_stations_hoi_deploy(
 
     ordered: List[int] = []
     used: Set[int] = set()
+    reserved: Set[int] = set()
 
     def _push(pid: int) -> None:
         if pid in seen and pid not in used:
             ordered.append(pid)
             used.add(pid)
+
+    for raw in front_reserve or []:
+        try:
+            pid = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if pid > 0 and pid in seen:
+            reserved.add(pid)
+            _push(pid)
 
     try:
         cap = int(capital_id)
@@ -158,7 +198,33 @@ def resolve_stations_hoi_deploy(
 
     if not ordered:
         return [-1] * max(0, count)
+
+    # Non-land fallback: capital if owned, else first ordered pid not in front_reserve.
+    non_land = -1
+    if cap > 0 and cap in seen:
+        non_land = cap
+    else:
+        for pid in ordered:
+            if pid not in reserved:
+                non_land = pid
+                break
+        if non_land <= 0:
+            non_land = ordered[0]
+
+    types = list(formation_types) if formation_types is not None else None
     out: List[int] = []
+    if types:
+        land_cursor = 0
+        n_types = len(types)
+        for i in range(max(0, count)):
+            ftype = _normalize_formation_type(types[i % n_types]) if n_types else ""
+            if ftype in LAND_FORMATION_TYPES:
+                out.append(ordered[land_cursor % len(ordered)])
+                land_cursor += 1
+            else:
+                out.append(non_land)
+        return out
+
     for i in range(max(0, count)):
         out.append(ordered[i % len(ordered)])
     return out

@@ -1498,8 +1498,10 @@ func _spawn_scenario_formations(scenario_name: String) -> void:
 		# HOI deploy: industrial key hubs + land-border provinces (front stations).
 		var key_hubs: Array = _get_key_provinces_for_tag(str(country_tag))
 		var border_ids: Array = _collect_border_land_ids_for_tag(str(country_tag), owned_land)
+		# Canonical Maginot edge: GER Baden-Baden / FRA Bas-Rhin land front_reserve.
+		var front_reserve: Array = _front_reserve_for_tag(str(country_tag), owned_land)
 		formation_spawner.spawn_test_formations_for_country(
-			str(country_tag), count, capital_id, owned_land, key_hubs, border_ids
+			str(country_tag), count, capital_id, owned_land, key_hubs, border_ids, front_reserve
 		)
 		await get_tree().process_frame
 	LeaderManager.clear_all_leader_caches()
@@ -1634,8 +1636,23 @@ func _collect_owned_land_ids_from_loader(country_tag: String) -> Array[int]:
 	return out
 
 
+func _front_reserve_for_tag(country_tag: String, owned_land: Array) -> Array:
+	## Maginot-facing land stations: GER 710173 (Baden-Baden), FRA 710739 (Bas-Rhin).
+	var tag := country_tag.strip_edges().to_upper()
+	var owned_set: Dictionary = {}
+	for raw in owned_land:
+		owned_set[int(raw)] = true
+	var out: Array = []
+	if tag == "GER" and owned_set.has(710173):
+		out.append(710173)
+	elif tag == "FRA" and owned_set.has(710739):
+		out.append(710739)
+	return out
+
+
 func _print_formation_station_evidence() -> void:
 	## Headless/playtest: land formations on owned land (not obsolete demo pids).
+	## Prints land-station set + front= for reserved Maginot pids (not capital-only).
 	if typeof(LeaderManager) == TYPE_NIL:
 		return
 	var major_tags: Array[String] = ["GER", "FRA", "ENG", "USA", "SOV", "ITA", "JAP"]
@@ -1643,11 +1660,12 @@ func _print_formation_station_evidence() -> void:
 	for tag in major_tags:
 		var land_ok := 0
 		var land_total := 0
-		var sample_station := -1
+		var station_set: Dictionary = {}
 		var owned_land: Array[int] = _collect_owned_land_ids_from_loader(tag)
 		var owned_set: Dictionary = {}
 		for pid in owned_land:
 			owned_set[int(pid)] = true
+		var front_ids: Array = _front_reserve_for_tag(tag, owned_land)
 		for f in LeaderManager.get_formations_for_country(tag):
 			if f == null:
 				continue
@@ -1661,11 +1679,21 @@ func _print_formation_station_evidence() -> void:
 			var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
 			if sid <= 0:
 				continue
-			if sample_station < 0:
-				sample_station = sid
+			station_set[sid] = true
 			if owned_set.has(sid):
 				land_ok += 1
-		parts.append("%s land_ok=%d/%d st=%d" % [tag, land_ok, land_total, sample_station])
+		var st_ids: Array = station_set.keys()
+		st_ids.sort()
+		var st_parts: PackedStringArray = []
+		for sidv in st_ids:
+			st_parts.append(str(int(sidv)))
+		var st_str := ",".join(st_parts) if not st_parts.is_empty() else "-1"
+		var front_parts: PackedStringArray = []
+		for fp in front_ids:
+			if station_set.has(int(fp)):
+				front_parts.append(str(int(fp)))
+		var front_str := ",".join(front_parts) if not front_parts.is_empty() else "-"
+		parts.append("%s land_ok=%d/%d st=%s front=%s" % [tag, land_ok, land_total, st_str, front_str])
 	print("ScenarioLoader: Formation stations (owned land) — %s" % ", ".join(parts))
 
 

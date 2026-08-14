@@ -43,14 +43,18 @@ static func resolve_stations_for_count(count: int, capital_id: int, owned_land_i
 	return resolve_stations_hoi_deploy(count, capital_id, owned_land_ids, [], [])
 
 
-## HOI-style deploy order: capital → key hubs → border provinces → remaining owned land.
+## HOI-style deploy: front_reserve → capital → key hubs → border → remaining owned land.
 ## Mirrors tools/map_generation/lib/formation_station_resolver.resolve_stations_hoi_deploy.
+## When formation_types is non-empty, land slots (division|garrison) fill from ordered;
+## naval/air use capital / first non-reserved so they do not consume front_reserve pids.
 static func resolve_stations_hoi_deploy(
 	count: int,
 	capital_id: int,
 	owned_land_ids: Array,
 	key_provinces: Array = [],
 	border_provinces: Array = [],
+	front_reserve: Array = [],
+	formation_types: Array = [],
 ) -> Array[int]:
 	var out: Array[int] = []
 	if count <= 0:
@@ -69,6 +73,13 @@ static func resolve_stations_hoi_deploy(
 		return out
 	var ordered: Array[int] = []
 	var used: Dictionary = {}
+	var reserved: Dictionary = {}
+	for raw in front_reserve:
+		var rpid := int(raw)
+		if rpid > 0 and owned_seen.has(rpid) and not used.has(rpid):
+			ordered.append(rpid)
+			used[rpid] = true
+			reserved[rpid] = true
 	if capital_id > 0 and owned_seen.has(capital_id) and not used.has(capital_id):
 		ordered.append(capital_id)
 		used[capital_id] = true
@@ -94,6 +105,32 @@ static func resolve_stations_hoi_deploy(
 	if ordered.is_empty():
 		for _i in count:
 			out.append(-1)
+		return out
+	var non_land := -1
+	if capital_id > 0 and owned_seen.has(capital_id):
+		non_land = capital_id
+	else:
+		for pid in ordered:
+			if not reserved.has(pid):
+				non_land = pid
+				break
+		if non_land <= 0:
+			non_land = ordered[0]
+	if not formation_types.is_empty():
+		var land_cursor := 0
+		var n_types := formation_types.size()
+		for i in count:
+			var ftype := str(formation_types[i % n_types]).strip_edges().to_lower()
+			var is_land := false
+			for lt in LAND_FORMATION_TYPES:
+				if ftype == str(lt).strip_edges().to_lower():
+					is_land = true
+					break
+			if is_land:
+				out.append(ordered[land_cursor % ordered.size()])
+				land_cursor += 1
+			else:
+				out.append(non_land)
 		return out
 	for i in count:
 		out.append(ordered[i % ordered.size()])
@@ -140,6 +177,7 @@ func spawn_test_formations_for_country(
 	owned_land_override: Array = [],
 	key_provinces: Array = [],
 	border_provinces: Array = [],
+	front_reserve: Array = [],
 ) -> void:
 	if country_tag.is_empty() or count <= 0:
 		return
@@ -155,9 +193,15 @@ func spawn_test_formations_for_country(
 		owned_land.sort()
 	else:
 		owned_land = collect_owned_land_ids(tag)
-	# HOI deploy: capital + industrial hubs + frontline provinces when provided.
+	# HOI deploy: front_reserve first, then capital + hubs + borders; land slots from type cycle.
 	var stations: Array[int] = resolve_stations_hoi_deploy(
-		count, capital_province_id, owned_land, key_provinces, border_provinces
+		count,
+		capital_province_id,
+		owned_land,
+		key_provinces,
+		border_provinces,
+		front_reserve,
+		TEST_FORMATION_TYPES
 	)
 	var land_stationed := 0
 	var invalid_stations := 0
