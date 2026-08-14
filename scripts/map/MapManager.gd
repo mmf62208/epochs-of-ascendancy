@@ -2856,11 +2856,23 @@ func apply_assault_stage_mutation(
 		return {"ok": false, "reason": "no BattleManager", "mutation": mut}
 	var tag := str(plan.get("attacker_tag", attacker_tag))
 	var fid := str(plan.get("formation_id", formation_id))
-	if bool(plan.get("execute", false)) and BattleManager.has_method("execute_province_assault"):
-		var res: Dictionary = BattleManager.execute_province_assault(
-			tag, target_province_id, from_province_id, fid
-		)
-		return {"ok": bool(res.get("success", false)), "result": res, "mutation": mut}
+	if bool(plan.get("execute", false)):
+		# Player-facing stage execute → multi-day battle when available; one-shot remains for headless/debug.
+		if BattleManager.has_method("start_province_battle"):
+			var res_b: Dictionary = BattleManager.start_province_battle(
+				tag, target_province_id, from_province_id, fid
+			)
+			return {
+				"ok": bool(res_b.get("success", false)),
+				"result": res_b,
+				"mutation": mut,
+				"multi_day": true,
+			}
+		if BattleManager.has_method("execute_province_assault"):
+			var res: Dictionary = BattleManager.execute_province_assault(
+				tag, target_province_id, from_province_id, fid
+			)
+			return {"ok": bool(res.get("success", false)), "result": res, "mutation": mut}
 	if BattleManager.has_method("can_assault_province"):
 		# Same honesty as map: named fid + real from/to (no Berlin fallback).
 		var preview: Dictionary = BattleManager.can_assault_province(
