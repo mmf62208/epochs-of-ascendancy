@@ -106,8 +106,9 @@ static func resolve_stations_hoi_deploy(
 		for _i in count:
 			out.append(-1)
 		return out
+	# Owned capital only when not in front_reserve; else first non-reserved ordered pid.
 	var non_land := -1
-	if capital_id > 0 and owned_seen.has(capital_id):
+	if capital_id > 0 and owned_seen.has(capital_id) and not reserved.has(capital_id):
 		non_land = capital_id
 	else:
 		for pid in ordered:

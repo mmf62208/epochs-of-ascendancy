@@ -199,9 +199,9 @@ def resolve_stations_hoi_deploy(
     if not ordered:
         return [-1] * max(0, count)
 
-    # Non-land fallback: capital if owned, else first ordered pid not in front_reserve.
+    # Non-land fallback: owned capital only if not front_reserve; else first non-reserved.
     non_land = -1
-    if cap > 0 and cap in seen:
+    if cap > 0 and cap in seen and cap not in reserved:
         non_land = cap
     else:
         for pid in ordered:
