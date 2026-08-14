@@ -1342,6 +1342,8 @@ func _process(delta: float) -> void:
 	_pulse_stack_badges(delta)
 	# Pass 52: pin-focus pulse rings (works while paused).
 	_update_pin_focus_pulse(delta)
+	# March pin lerp + remaining-path Line2D (cosmetic; sim hops day-authoritative).
+	_update_march_visuals(delta, sim_paused)
 
 	# Selection/hover outline pulse always (including paused playtest) so shape stays readable.
 	_outline_pulse_phase += delta * 4.5
@@ -15757,6 +15759,8 @@ func _cycle_selected_stack_unit(delta: int) -> bool:
 
 
 ## Order selected unit to a friendly (or owned) province. Returns true if handled.
+## Default: multi-day own-land march via BattleManager.issue_march_order.
+## EOA_UNIT_WAR=0: instant LeaderManager station write (bisect path; no march).
 func _try_move_selected_unit_to_province(province: Province) -> bool:
 	if province == null or selected_formation_id.is_empty():
 		return false
@@ -15775,18 +15779,62 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 			from_pid = int(pre.stationed_province_id)
 	if from_pid < 0:
 		from_pid = attack_staging_province_id
+
+	# Bisect killswitch: instant station only (no multi-day march).
+	if OS.get_environment("EOA_UNIT_WAR").strip_edges() == "0":
+		return _try_move_selected_unit_instant_station(province, fid, dest, from_pid, p_tag)
+
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("issue_march_order"):
+		return _try_move_selected_unit_instant_station(province, fid, dest, from_pid, p_tag)
+
+	var res: Dictionary = BattleManager.issue_march_order(fid, dest, p_tag, false)
+	if bool(res.get("cancelled", false)):
+		_clear_march_path_line(fid)
+		_show_inspector_toast("March cancelled · %s" % fid, 2.5)
+		return true
+	if not bool(res.get("ok", false)):
+		var reason := str(res.get("reason", "no path / not your unit"))
+		var toast := "Move blocked · %s" % reason
+		if reason == "no land path":
+			toast = "No land path · %s → %s" % [fid, province.name]
+		_show_inspector_toast(toast, 3.5, true)
+		return true
+	if str(res.get("reason", "")) == "already there":
+		_show_inspector_toast("Already at %s" % province.name, 2.0)
+		return true
+	var n_hex := int(res.get("hexes", 0))
+	if n_hex <= 0:
+		var path_arr: Array = res.get("path", []) as Array
+		n_hex = maxi(path_arr.size() - 1, 0)
+	var days_est := float(res.get("days_total", float(n_hex)))
+	var pname := province.name if not str(province.name).is_empty() else str(dest)
+	_show_inspector_toast(
+		"March · %s · %d hexes · ~%.0fd · click dest again to cancel" % [pname, n_hex, days_est],
+		4.5,
+	)
+	_sync_march_path_lines()
+	return true
+
+
+## Instant station fallback (EOA_UNIT_WAR=0 or BattleManager missing).
+func _try_move_selected_unit_instant_station(
+	province: Province,
+	fid: String,
+	dest: int,
+	from_pid: int,
+	p_tag: String,
+) -> bool:
 	var ok := false
 	var reason := ""
-	if typeof(FormationMovement) != TYPE_NIL:
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("station_formation_on_province"):
+		var sres: Dictionary = BattleManager.station_formation_on_province(fid, dest, p_tag)
+		ok = bool(sres.get("ok", false))
+		reason = str(sres.get("reason", "stationed"))
+	elif typeof(FormationMovement) != TYPE_NIL:
 		var res: Dictionary = FormationMovement.move_formation_to_province(fid, dest, p_tag)
 		ok = bool(res.get("ok", false))
 		reason = str(res.get("reason", ""))
-	elif typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("move_formation_to_province"):
-		var res2: Dictionary = SupplyManager.move_formation_to_province(fid, dest, p_tag)
-		ok = bool(res2.get("ok", false))
-		reason = str(res2.get("reason", ""))
 	if not ok and typeof(LeaderManager) != TYPE_NIL:
-		# Fallback: station OOB source of truth even if path/template missing.
 		var f: Formation = LeaderManager.get_formation(fid) if LeaderManager.has_method("get_formation") else null
 		if f != null and str(f.country_tag).to_upper() == p_tag:
 			f.stationed_province_id = dest
@@ -15805,7 +15853,151 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 		call_deferred("refresh_after_capture_light", dest, from_pid)
 		return true
 	_show_inspector_toast("Move blocked · %s" % (reason if not reason.is_empty() else "no path / not your unit"), 3.5, true)
-	return true  # handled (showed feedback)
+	return true
+
+
+## Cosmetic march lerp + remaining-path Line2D (budget MARCH_PATH_LINE_BUDGET).
+func _update_march_visuals(delta: float, sim_paused: bool) -> void:
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("get_active_marches"):
+		_clear_all_march_path_lines()
+		return
+	var marches: Dictionary = BattleManager.get_active_marches()
+	if marches.is_empty():
+		_clear_all_march_path_lines()
+		return
+	var time_scale := 1.0
+	if typeof(TimeManager) != TYPE_NIL:
+		if "time_scale" in TimeManager:
+			time_scale = maxf(float(TimeManager.time_scale), 0.0)
+		elif TimeManager.has_method("get_time_scale"):
+			time_scale = maxf(float(TimeManager.get_time_scale()), 0.0)
+	if sim_paused:
+		time_scale = 0.0
+	var rate := (1.0 / MARCH_SECONDS_PER_HEX_VISUAL) * time_scale
+	var drawn := 0
+	var active_fids: Dictionary = {}
+	for fid_v in marches.keys():
+		var fid := str(fid_v)
+		active_fids[fid] = true
+		var order: Dictionary = marches[fid] as Dictionary
+		var path: Array = order.get("path", []) as Array
+		var idx := int(order.get("idx", 0))
+		if path.size() < 2 or idx >= path.size() - 1:
+			continue
+		var t := float(order.get("visual_t", 0.0))
+		if rate > 0.0:
+			var step := minf(delta * rate, MARCH_VISUAL_T_DELTA_CAP)
+			t = minf(t + step, 0.98)  # never fully reach next hex before sim hop
+			if BattleManager.has_method("set_march_visual_t"):
+				BattleManager.set_march_visual_t(fid, t)
+		# Pin lerp along current edge centroids (map-space).
+		var a_pid := int(path[idx])
+		var b_pid := int(path[idx + 1])
+		var a_pos: Vector2 = province_centroids.get(a_pid, Vector2.ZERO) as Vector2
+		var b_pos: Vector2 = province_centroids.get(b_pid, Vector2.ZERO) as Vector2
+		if a_pos != Vector2.ZERO or b_pos != Vector2.ZERO:
+			var world := a_pos.lerp(b_pos, t)
+			_set_march_pin_world_pos(fid, a_pid, world)
+		# Remaining path Line2D (budget 8 player marches).
+		if drawn < MARCH_PATH_LINE_BUDGET:
+			_draw_march_remaining_path(fid, path, idx, t)
+			drawn += 1
+	# Drop lines for finished marches.
+	var stale: Array = []
+	for k in _march_path_lines.keys():
+		if not active_fids.has(str(k)):
+			stale.append(str(k))
+	for s in stale:
+		_clear_march_path_line(str(s))
+
+
+func _set_march_pin_world_pos(fid: String, station_pid: int, world_pos: Vector2) -> void:
+	# Prefer icon at current station province; fall back to any pin meta-matching fid.
+	var counter: Node2D = null
+	if province_nodes.has(station_pid):
+		var n: Node2D = province_nodes[station_pid] as Node2D
+		if n != null:
+			counter = n.get_node_or_null("DemoUnitIcon_" + str(station_pid)) as Node2D
+	if counter == null:
+		for id_v in _demo_unit_icon_pids:
+			var id := int(id_v)
+			if not province_nodes.has(id):
+				continue
+			var n2: Node2D = province_nodes[id] as Node2D
+			if n2 == null:
+				continue
+			var c2: Node2D = n2.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+			if c2 == null:
+				continue
+			if str(c2.get_meta("formation_id", "")) == fid:
+				counter = c2
+				break
+	if counter == null or not is_instance_valid(counter):
+		return
+	# Convert world map pos → local to province node parent.
+	var parent_n := counter.get_parent() as Node2D
+	if parent_n != null:
+		counter.global_position = world_pos
+	else:
+		counter.position = world_pos + Vector2(0, -8)
+
+
+func _ensure_march_path_layer() -> void:
+	if _march_path_layer != null and is_instance_valid(_march_path_layer):
+		return
+	_march_path_layer = Node2D.new()
+	_march_path_layer.name = "MarchPathLayer"
+	_march_path_layer.z_index = 18
+	add_child(_march_path_layer)
+
+
+func _draw_march_remaining_path(fid: String, path: Array, idx: int, visual_t: float) -> void:
+	_ensure_march_path_layer()
+	var line: Line2D = _march_path_lines.get(fid) as Line2D
+	if line == null or not is_instance_valid(line):
+		line = Line2D.new()
+		line.name = "MarchPath_" + fid
+		line.width = 2.0
+		line.default_color = Color(0.35, 0.85, 1.0, 0.75)
+		line.joint_mode = Line2D.LINE_JOINT_ROUND
+		line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		line.end_cap_mode = Line2D.LINE_CAP_ROUND
+		line.z_index = 0
+		_march_path_layer.add_child(line)
+		_march_path_lines[fid] = line
+	var pts: PackedVector2Array = PackedVector2Array()
+	# Start from current lerp position along edge idx → idx+1.
+	if idx < path.size() - 1:
+		var a: Vector2 = province_centroids.get(int(path[idx]), Vector2.ZERO) as Vector2
+		var b: Vector2 = province_centroids.get(int(path[idx + 1]), Vector2.ZERO) as Vector2
+		pts.append(a.lerp(b, visual_t))
+		for i in range(idx + 1, path.size()):
+			var p: Vector2 = province_centroids.get(int(path[i]), Vector2.ZERO) as Vector2
+			if p != Vector2.ZERO:
+				pts.append(p)
+	line.points = pts
+	line.visible = pts.size() >= 2
+
+
+func _clear_march_path_line(fid: String) -> void:
+	if not _march_path_lines.has(fid):
+		return
+	var line: Line2D = _march_path_lines[fid] as Line2D
+	_march_path_lines.erase(fid)
+	if line != null and is_instance_valid(line):
+		line.queue_free()
+
+
+func _clear_all_march_path_lines() -> void:
+	for k in _march_path_lines.keys():
+		var line: Line2D = _march_path_lines[k] as Line2D
+		if line != null and is_instance_valid(line):
+			line.queue_free()
+	_march_path_lines.clear()
+
+
+func _sync_march_path_lines() -> void:
+	_update_march_visuals(0.0, false)
 
 
 func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
@@ -16597,6 +16789,12 @@ var _assault_execute_busy: bool = false
 var selected_formation_id: String = ""
 ## One-shot toast when hex-clicked at strategic zoom (pins hidden).
 var _unit_pick_strategic_hint_shown: bool = false
+## March path Line2D nodes (budget 8) + cosmetic pin lerp. Sim hops are day-authoritative.
+var _march_path_layer: Node2D = null
+var _march_path_lines: Dictionary = {}  # fid -> Line2D
+const MARCH_PATH_LINE_BUDGET := 8
+const MARCH_SECONDS_PER_HEX_VISUAL := 2.5
+const MARCH_VISUAL_T_DELTA_CAP := 0.35
 
 
 func _try_execute_province_attack(target_pid: int, target_province: Province) -> bool:
@@ -21783,6 +21981,7 @@ func _force_border_update_deferred() -> void:
 
 
 ## Light post-capture: recolor + pins for the passed pids only. Skips full-board work.
+## Also restages attack_staging when the selected unit hops into province_id (march arrival).
 func refresh_after_capture_light(province_id: int = -1, from_province_id: int = -1, retreat_pid: int = -1) -> void:
 	var pids: Array = []
 	for v in [province_id, from_province_id, retreat_pid]:
@@ -21791,6 +21990,13 @@ func refresh_after_capture_light(province_id: int = -1, from_province_id: int = 
 			pids.append(pid)
 	_refresh_province_fill_pids(pids)
 	_update_unit_icons_for_pids(pids)
+	# March hop: keep assault staging on the selected pin's new station (pid-scoped only).
+	if not selected_formation_id.is_empty() and province_id >= 0 \
+		and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var sf: Formation = LeaderManager.get_formation(selected_formation_id)
+		if sf != null and "stationed_province_id" in sf and int(sf.stationed_province_id) == province_id:
+			attack_staging_province_id = province_id
+			debug_combat_attacker_province_id = province_id
 
 
 func _ensure_border_layer() -> void:

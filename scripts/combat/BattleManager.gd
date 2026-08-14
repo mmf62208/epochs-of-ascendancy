@@ -6,14 +6,28 @@ signal battle_started(context: Dictionary)
 signal battle_resolved(result: Dictionary)
 
 const DEFAULT_GARRISON_TEMPLATE := "german_infantry_division_1943_mixed"
+const MARCH_DEFAULT_HOURS_PER_HEX := 24.0
+const MARCH_MAX_HOPS := 48
 
 var _resolver: CombatResolver
+## fid -> MarchOrder dict (path, idx, hours_acc, …). PR 4 multi-day own-land hops.
+var _marches: Dictionary = {}
+## battle_id -> Battle dict (PR 5). Used here only to block marches on engaged fids.
+var _battles: Dictionary = {}
+var _march_order_seq: int = 0
 
 
 func _ready() -> void:
 	_resolver = CombatResolver.new()
 	_resolver.name = "CombatResolver"
 	add_child(_resolver)
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_signal("game_day_advanced"):
+		if not TimeManager.game_day_advanced.is_connected(_on_game_day_advanced_marches):
+			TimeManager.game_day_advanced.connect(_on_game_day_advanced_marches)
+
+
+func _on_game_day_advanced_marches(_year: int, _month: int, _day: int) -> void:
+	tick_marches_for_day()
 
 
 ## Multi-phase combat estimate pilot (approach/engage/disengage) — pure via MapPolishFormatters.
@@ -807,30 +821,334 @@ func _station_attacker_on_captured_province(
 	target_pid: int,
 	attacker_tag: String,
 ) -> void:
-	if attacker_formation_id.is_empty() or target_pid < 0:
-		return
-	var tag := attacker_tag.strip_edges().to_upper()
+	station_formation_on_province(attacker_formation_id, target_pid, attacker_tag)
+
+
+## LeaderManager-first station write (capture hops + march hops). Do not hop with SupplyManager alone —
+## that primitive rejects OOB fids without a DivisionTemplate.
+func station_formation_on_province(
+	formation_id: String,
+	province_id: int,
+	country_tag: String,
+) -> Dictionary:
+	if formation_id.is_empty() or province_id < 0:
+		return {"ok": false, "reason": "bad args"}
+	var tag := country_tag.strip_edges().to_upper()
 	var moved := false
 	if typeof(FormationMovement) != TYPE_NIL:
 		var res: Dictionary = FormationMovement.move_formation_to_province(
-			attacker_formation_id, target_pid, tag,
+			formation_id, province_id, tag,
 		)
 		moved = bool(res.get("ok", false))
 	elif typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("move_formation_to_province"):
 		var res2: Dictionary = SupplyManager.move_formation_to_province(
-			attacker_formation_id, target_pid, tag,
+			formation_id, province_id, tag,
 		)
 		moved = bool(res2.get("ok", false))
+	# Always write OOB station truth.
 	if typeof(LeaderManager) != TYPE_NIL:
-		var f: Formation = LeaderManager.get_formation(attacker_formation_id)
+		var f: Formation = LeaderManager.get_formation(formation_id)
 		if f != null:
-			f.stationed_province_id = target_pid
-	# Keep SupplyManager deployment registry aligned when move pipeline could not run fully.
+			f.stationed_province_id = province_id
+		else:
+			return {"ok": false, "reason": "unknown formation", "moved_primitive": moved}
 	if not moved and typeof(SupplyManager) != TYPE_NIL:
-		SupplyManager.division_deployments[attacker_formation_id] = {
-			"province_id": target_pid,
+		SupplyManager.division_deployments[formation_id] = {
+			"province_id": province_id,
 			"country_tag": tag,
 			"order_type": "move_to_province",
+		}
+	return {
+		"ok": true,
+		"formation_id": formation_id,
+		"province_id": province_id,
+		"moved_primitive": moved,
+	}
+
+
+## Own-land multi-day march. Path via find_land_path(..., own_land_only=true).
+## Block only if an active _battles row lists the fid (not is_in_combat alone — PR 5 clears that).
+## instant=true walks the path with station_formation_on_province in one call (tests).
+func issue_march_order(
+	formation_id: String,
+	dest_pid: int,
+	country_tag: String,
+	instant: bool = false,
+) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	if fid.is_empty() or dest_pid < 0 or tag.is_empty():
+		return {"ok": false, "reason": "bad args"}
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return {"ok": false, "reason": "LeaderManager unavailable"}
+	var f: Formation = LeaderManager.get_formation(fid)
+	if f == null:
+		return {"ok": false, "reason": "unknown formation"}
+	var f_tag := str(f.country_tag).strip_edges().to_upper() if "country_tag" in f else ""
+	if not f_tag.is_empty() and f_tag != tag:
+		return {"ok": false, "reason": "not your unit"}
+	var from_pid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+	if from_pid < 0:
+		return {"ok": false, "reason": "no station"}
+	if from_pid == dest_pid:
+		return {"ok": true, "reason": "already there", "formation_id": fid, "path": [from_pid], "days_total": 0, "order_id": ""}
+	if not _province_controlled_by(dest_pid, tag):
+		return {"ok": false, "reason": "dest not controlled"}
+	# Cancel re-issue to same dest.
+	if _marches.has(fid):
+		var existing: Dictionary = _marches[fid] as Dictionary
+		if int(existing.get("dest_pid", -1)) == dest_pid:
+			cancel_march_order(fid)
+			return {"ok": true, "reason": "cancelled", "formation_id": fid, "cancelled": true}
+	if _formation_in_active_battle(fid):
+		return {"ok": false, "reason": "in battle"}
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("find_land_path"):
+		return {"ok": false, "reason": "MapManager unavailable"}
+	var path: Array = MapManager.find_land_path(from_pid, dest_pid, tag, MARCH_MAX_HOPS, true)
+	if path.is_empty() or path.size() < 2:
+		return {"ok": false, "reason": "no land path"}
+	var path_ids: Array[int] = []
+	for p in path:
+		path_ids.append(int(p))
+	if instant:
+		var prev := from_pid
+		for i in range(1, path_ids.size()):
+			var hop_pid := path_ids[i]
+			station_formation_on_province(fid, hop_pid, tag)
+			_notify_map_refresh(hop_pid, prev)
+			prev = hop_pid
+		_marches.erase(fid)
+		print("[MARCH] instant fid=%s path=%s" % [fid, str(path_ids)])
+		return {
+			"ok": true,
+			"reason": "instant",
+			"formation_id": fid,
+			"path": path_ids,
+			"days_total": 0,
+			"order_id": "",
+			"instant": true,
+		}
+	_march_order_seq += 1
+	var order_id := "march_%d" % _march_order_seq
+	var hours := _hours_per_hex_for_pid(path_ids[1] if path_ids.size() > 1 else dest_pid)
+	var days_est := _estimate_march_days(path_ids)
+	var order := {
+		"order_id": order_id,
+		"formation_id": fid,
+		"tag": tag,
+		"path": path_ids,
+		"idx": 0,
+		"dest_pid": dest_pid,
+		"hours_per_hex": hours,
+		"hours_acc": 0.0,
+		"visual_t": 0.0,
+	}
+	_marches[fid] = order
+	print("[MARCH] fid=%s path=%s days=%.1f order=%s" % [fid, str(path_ids), days_est, order_id])
+	return {
+		"ok": true,
+		"reason": "marching",
+		"formation_id": fid,
+		"path": path_ids,
+		"days_total": days_est,
+		"order_id": order_id,
+		"hexes": maxi(path_ids.size() - 1, 0),
+	}
+
+
+func cancel_march_order(formation_id: String) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty() or not _marches.has(fid):
+		return {"ok": false, "reason": "no march"}
+	_marches.erase(fid)
+	return {"ok": true, "formation_id": fid, "cancelled": true}
+
+
+func get_march_order(formation_id: String) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty() or not _marches.has(fid):
+		return {}
+	return (_marches[fid] as Dictionary).duplicate(true)
+
+
+## All active marches (renderer lerp / path draw). Returns fid -> order dict copy.
+func get_active_marches() -> Dictionary:
+	var out: Dictionary = {}
+	for fid in _marches.keys():
+		out[str(fid)] = (_marches[fid] as Dictionary).duplicate(true)
+	return out
+
+
+## Advance visual_t on an active march (renderer cosmetic; sim hops are day-authoritative).
+func set_march_visual_t(formation_id: String, t: float) -> void:
+	var fid := formation_id.strip_edges()
+	if not _marches.has(fid):
+		return
+	var o: Dictionary = _marches[fid] as Dictionary
+	o["visual_t"] = clampf(t, 0.0, 1.0)
+	_marches[fid] = o
+
+
+func tick_marches_for_day() -> Dictionary:
+	if _marches.is_empty():
+		return {"ok": true, "hops": 0, "arrived": 0, "active": 0}
+	var hops_n := 0
+	var arrived_n := 0
+	var done_fids: Array[String] = []
+	for fid_v in _marches.keys():
+		var fid := str(fid_v)
+		var order: Dictionary = _marches[fid] as Dictionary
+		var path: Array = order.get("path", []) as Array
+		if path.size() < 2:
+			done_fids.append(fid)
+			continue
+		var idx := int(order.get("idx", 0))
+		if idx >= path.size() - 1:
+			done_fids.append(fid)
+			continue
+		var hours_acc := float(order.get("hours_acc", 0.0)) + 24.0
+		var hours_need := float(order.get("hours_per_hex", MARCH_DEFAULT_HOURS_PER_HEX))
+		if hours_need <= 0.0:
+			hours_need = MARCH_DEFAULT_HOURS_PER_HEX
+		order["hours_acc"] = hours_acc
+		# May hop more than once if hours_per_hex is very low.
+		while hours_acc >= hours_need and idx < path.size() - 1:
+			hours_acc -= hours_need
+			var old_pid := int(path[idx])
+			idx += 1
+			var new_pid := int(path[idx])
+			var tag := str(order.get("tag", "")).strip_edges().to_upper()
+			station_formation_on_province(fid, new_pid, tag)
+			# Pid-scoped icon update only — never full-board rebuild.
+			_notify_map_refresh(new_pid, old_pid)
+			hops_n += 1
+			order["idx"] = idx
+			order["visual_t"] = 0.0
+			if idx >= path.size() - 1:
+				arrived_n += 1
+				done_fids.append(fid)
+				print("[MARCH] arrived fid=%s pid=%d" % [fid, new_pid])
+				break
+			hours_need = _hours_per_hex_for_pid(int(path[idx + 1]))
+			order["hours_per_hex"] = hours_need
+		order["hours_acc"] = hours_acc
+		order["idx"] = idx
+		if not done_fids.has(fid):
+			_marches[fid] = order
+	for df in done_fids:
+		_marches.erase(df)
+	return {
+		"ok": true,
+		"hops": hops_n,
+		"arrived": arrived_n,
+		"active": _marches.size(),
+	}
+
+
+func _formation_in_active_battle(formation_id: String) -> bool:
+	# No _battles rows yet (PR 5) → never block on this path alone.
+	if _battles.is_empty():
+		return false
+	var fid := formation_id.strip_edges()
+	for bid in _battles.keys():
+		var b: Dictionary = _battles[bid] as Dictionary
+		var status := str(b.get("status", "active")).to_lower()
+		if status in ["ended", "resolved", "cancelled", "done"]:
+			continue
+		var atk: Array = b.get("attacker_fids", []) as Array
+		var def: Array = b.get("defender_fids", []) as Array
+		for x in atk:
+			if str(x) == fid:
+				return true
+		for y in def:
+			if str(y) == fid:
+				return true
+		# Single-fid fields
+		if str(b.get("attacker_formation_id", "")) == fid:
+			return true
+		if str(b.get("defender_formation_id", "")) == fid:
+			return true
+	return false
+
+
+func _hours_per_hex_for_pid(province_id: int) -> float:
+	var h := MARCH_DEFAULT_HOURS_PER_HEX
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province"):
+		return h
+	var p: Province = MapManager.get_province(province_id)
+	if p == null:
+		return h
+	var terr := str(p.terrain).to_lower() if "terrain" in p else ""
+	if terr in ["forest", "woods", "mountain", "mountains", "mtn", "hills", "alpine"]:
+		h *= 1.5
+	var infra := int(p.infrastructure) if "infrastructure" in p else 0
+	if infra >= 6:
+		h *= 0.75
+	return h
+
+
+func _estimate_march_days(path_ids: Array) -> float:
+	if path_ids.size() < 2:
+		return 0.0
+	var total_h := 0.0
+	for i in range(1, path_ids.size()):
+		total_h += _hours_per_hex_for_pid(int(path_ids[i]))
+	return total_h / 24.0
+
+
+func get_save_data() -> Dictionary:
+	var marches_arr: Array = []
+	for fid in _marches.keys():
+		var o: Dictionary = _marches[fid] as Dictionary
+		var path_copy: Array = []
+		for p in o.get("path", []):
+			path_copy.append(int(p))
+		marches_arr.append({
+			"formation_id": str(o.get("formation_id", fid)),
+			"path": path_copy,
+			"idx": int(o.get("idx", 0)),
+			"dest_pid": int(o.get("dest_pid", -1)),
+			"hours_acc": float(o.get("hours_acc", 0.0)),
+			"hours_per_hex": float(o.get("hours_per_hex", MARCH_DEFAULT_HOURS_PER_HEX)),
+			"tag": str(o.get("tag", "")),
+			"order_id": str(o.get("order_id", "")),
+			"visual_t": float(o.get("visual_t", 0.0)),
+		})
+	return {"marches": marches_arr, "march_order_seq": _march_order_seq}
+
+
+func apply_save_data(data: Dictionary) -> void:
+	_marches.clear()
+	if data.is_empty():
+		return
+	_march_order_seq = int(data.get("march_order_seq", 0))
+	var arr: Array = data.get("marches", []) as Array
+	for row_v in arr:
+		if not (row_v is Dictionary):
+			continue
+		var row: Dictionary = row_v as Dictionary
+		var fid := str(row.get("formation_id", "")).strip_edges()
+		if fid.is_empty():
+			continue
+		# Drop unknown fids (formations must exist after leader restore).
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+			if LeaderManager.get_formation(fid) == null:
+				continue
+		var path_ids: Array[int] = []
+		for p in row.get("path", []):
+			path_ids.append(int(p))
+		if path_ids.size() < 2:
+			continue
+		_marches[fid] = {
+			"order_id": str(row.get("order_id", "")),
+			"formation_id": fid,
+			"tag": str(row.get("tag", "")).strip_edges().to_upper(),
+			"path": path_ids,
+			"idx": int(row.get("idx", 0)),
+			"dest_pid": int(row.get("dest_pid", path_ids[path_ids.size() - 1])),
+			"hours_per_hex": float(row.get("hours_per_hex", MARCH_DEFAULT_HOURS_PER_HEX)),
+			"hours_acc": float(row.get("hours_acc", 0.0)),
+			"visual_t": float(row.get("visual_t", 0.0)),
 		}
 
 
