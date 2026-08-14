@@ -742,6 +742,12 @@ func apply_combat_outcome(
 	var attacker_tag := str(result.get("attacker_tag", "")).strip_edges().to_upper()
 	var captured := bool(result.get("province_control_change", false))
 	var winner := str(result.get("winner", ""))
+	# Assault/capture leaves the march path; cancel so next day hop does not yank the unit.
+	if not attacker_formation_id.is_empty():
+		cancel_march_order(attacker_formation_id)
+	var def_fid_cancel := str(result.get("defender_formation_id", "")).strip_edges()
+	if not def_fid_cancel.is_empty():
+		cancel_march_order(def_fid_cancel)
 	# Apply persistent org/readiness damage to the actual live formations (main loop combat now has lasting effects).
 	_apply_combat_damage_to_formations(result, attacker_formation_id)
 
@@ -821,11 +827,14 @@ func _station_attacker_on_captured_province(
 	target_pid: int,
 	attacker_tag: String,
 ) -> void:
+	# External station off the march edge — drop order before hop ticks re-path.
+	cancel_march_order(attacker_formation_id)
 	station_formation_on_province(attacker_formation_id, target_pid, attacker_tag)
 
 
-## LeaderManager-first station write (capture hops + march hops). Do not hop with SupplyManager alone —
-## that primitive rejects OOB fids without a DivisionTemplate.
+## Station write for capture + march hops. Always write LeaderManager when the formation is
+## known; try Supply/FormationMovement primitive; backfill division_deployments if primitive fails
+## (even when fid is unknown to LeaderManager). Do not hop with SupplyManager alone.
 func station_formation_on_province(
 	formation_id: String,
 	province_id: int,
@@ -845,19 +854,21 @@ func station_formation_on_province(
 			formation_id, province_id, tag,
 		)
 		moved = bool(res2.get("ok", false))
-	# Always write OOB station truth.
+	var lm_ok := false
 	if typeof(LeaderManager) != TYPE_NIL:
 		var f: Formation = LeaderManager.get_formation(formation_id)
 		if f != null:
 			f.stationed_province_id = province_id
-		else:
-			return {"ok": false, "reason": "unknown formation", "moved_primitive": moved}
+			lm_ok = true
+	# Backfill deployments even if LM has no Formation (legacy capture path).
 	if not moved and typeof(SupplyManager) != TYPE_NIL:
 		SupplyManager.division_deployments[formation_id] = {
 			"province_id": province_id,
 			"country_tag": tag,
 			"order_type": "move_to_province",
 		}
+	if not lm_ok and typeof(LeaderManager) != TYPE_NIL:
+		return {"ok": false, "reason": "unknown formation", "moved_primitive": moved}
 	return {
 		"ok": true,
 		"formation_id": formation_id,
@@ -971,12 +982,14 @@ func get_march_order(formation_id: String) -> Dictionary:
 	return (_marches[fid] as Dictionary).duplicate(true)
 
 
-## All active marches (renderer lerp / path draw). Returns fid -> order dict copy.
+## Live view of active marches (fid → order). Read-only for callers except set_march_visual_t.
+## Avoids deep-copy every renderer frame.
 func get_active_marches() -> Dictionary:
-	var out: Dictionary = {}
-	for fid in _marches.keys():
-		out[str(fid)] = (_marches[fid] as Dictionary).duplicate(true)
-	return out
+	return _marches
+
+
+func has_active_marches() -> bool:
+	return not _marches.is_empty()
 
 
 ## Advance visual_t on an active march (renderer cosmetic; sim hops are day-authoritative).
@@ -991,9 +1004,10 @@ func set_march_visual_t(formation_id: String, t: float) -> void:
 
 func tick_marches_for_day() -> Dictionary:
 	if _marches.is_empty():
-		return {"ok": true, "hops": 0, "arrived": 0, "active": 0}
+		return {"ok": true, "hops": 0, "arrived": 0, "active": 0, "cancelled": 0}
 	var hops_n := 0
 	var arrived_n := 0
+	var cancelled_n := 0
 	var done_fids: Array[String] = []
 	for fid_v in _marches.keys():
 		var fid := str(fid_v)
@@ -1006,18 +1020,36 @@ func tick_marches_for_day() -> Dictionary:
 		if idx >= path.size() - 1:
 			done_fids.append(fid)
 			continue
+		var tag := str(order.get("tag", "")).strip_edges().to_upper()
+		# External station (capture, displace) left the path edge — drop order.
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+			var live: Formation = LeaderManager.get_formation(fid)
+			if live != null and "stationed_province_id" in live:
+				var live_pid := int(live.stationed_province_id)
+				if live_pid != int(path[idx]):
+					done_fids.append(fid)
+					cancelled_n += 1
+					print("[MARCH] cancel desync fid=%s station=%d path_idx=%d" % [fid, live_pid, int(path[idx])])
+					continue
 		var hours_acc := float(order.get("hours_acc", 0.0)) + 24.0
 		var hours_need := float(order.get("hours_per_hex", MARCH_DEFAULT_HOURS_PER_HEX))
 		if hours_need <= 0.0:
 			hours_need = MARCH_DEFAULT_HOURS_PER_HEX
 		order["hours_acc"] = hours_acc
 		# May hop more than once if hours_per_hex is very low.
+		var aborted := false
 		while hours_acc >= hours_need and idx < path.size() - 1:
 			hours_acc -= hours_need
 			var old_pid := int(path[idx])
 			idx += 1
 			var new_pid := int(path[idx])
-			var tag := str(order.get("tag", "")).strip_edges().to_upper()
+			# Own-land re-check: control may flip mid-march (AI capture, ownership change).
+			if not _province_controlled_by(new_pid, tag):
+				done_fids.append(fid)
+				cancelled_n += 1
+				aborted = true
+				print("[MARCH] cancel lost-control fid=%s pid=%d tag=%s" % [fid, new_pid, tag])
+				break
 			station_formation_on_province(fid, new_pid, tag)
 			# Pid-scoped icon update only — never full-board rebuild.
 			_notify_map_refresh(new_pid, old_pid)
@@ -1031,6 +1063,8 @@ func tick_marches_for_day() -> Dictionary:
 				break
 			hours_need = _hours_per_hex_for_pid(int(path[idx + 1]))
 			order["hours_per_hex"] = hours_need
+		if aborted:
+			continue
 		order["hours_acc"] = hours_acc
 		order["idx"] = idx
 		if not done_fids.has(fid):
@@ -1041,6 +1075,7 @@ func tick_marches_for_day() -> Dictionary:
 		"ok": true,
 		"hops": hops_n,
 		"arrived": arrived_n,
+		"cancelled": cancelled_n,
 		"active": _marches.size(),
 	}
 
