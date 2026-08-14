@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 
 # Discoverability / integrity strings grepped from MapRenderer (must stay in live path).
-STRATEGIC_PICK_TOAST = "Zoom in or Shift+U to pick units."
+STRATEGIC_PICK_TOAST = "Zoom in to pick units (Shift+U toggles counters)."
 STACK_CYCLE_HINT = "Stack %d/%d · [ ] or buttons to cycle"
 SELECTED_FRAME_HOOK = "_refresh_selected_unit_chip"
 HIT_RADIUS_PX = 48.0
@@ -164,6 +164,30 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     else:
         fails.append("select_refreshes_chip")
 
+    # 9) One pin per province: chip must match station province (stack cycle safe).
+    refresh_fn = _gd_func_slice(ren, "_refresh_selected_unit_chip")
+    chip_by_province = (
+        bool(refresh_fn)
+        and "stationed_province_id" in refresh_fn
+        and ("province_id" in refresh_fn or "sel_pid" in refresh_fn)
+        and "pin_pid" in refresh_fn
+    )
+    wiring["chip_match_by_province"] = chip_by_province
+    if chip_by_province:
+        passes.append("chip_match_by_province")
+    else:
+        fails.append("chip_match_by_province")
+
+    # free() same-frame (not queue_free alone) avoids SelectedFrame2 orphans on re-select.
+    frame_free_ok = bool(refresh_fn) and (
+        ".free()" in refresh_fn or "remove_child" in refresh_fn
+    )
+    wiring["selected_frame_immediate_free"] = frame_free_ok
+    if frame_free_ok:
+        passes.append("selected_frame_immediate_free")
+    else:
+        fails.append("selected_frame_immediate_free")
+
     if not check_wiring:
         # Format-only mode still reports integrity strings.
         ok = toast_ok and hit_ok
@@ -189,7 +213,10 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
             "MapRenderer _try_open_unit_at_world",
             "MapRenderer _pick_unit_formation_at_world",
         ],
-        "policy": "pin_first_hit_disk_48_floor_20_selected_chip_no_inspector",
+        "policy": (
+            "pin_first_hit_disk_48_floor_20_selected_chip_no_inspector"
+            "; chip_match_station_province_one_pin_per_hex"
+        ),
     }
 
 

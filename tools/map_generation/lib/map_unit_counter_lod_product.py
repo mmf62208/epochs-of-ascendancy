@@ -69,7 +69,7 @@ def build_map_unit_counter_lod_product() -> Dict[str, Any]:
     else:
         fails.append("pick_skips_hidden")
     # Strategic discoverability toast remains available for hex click when pins off.
-    if "Zoom in or Shift+U to pick units." in ren:
+    if "Zoom in to pick units (Shift+U toggles counters)." in ren:
         passes.append("strategic_pick_toast")
     else:
         fails.append("missing_strategic_pick_toast")

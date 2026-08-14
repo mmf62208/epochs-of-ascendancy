@@ -26,6 +26,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertGreaterEqual(HIT_RADIUS_FLOOR, 20.0)
         self.assertIn("Shift+U", STRATEGIC_PICK_TOAST)
         self.assertIn("Zoom in", STRATEGIC_PICK_TOAST)
+        self.assertIn("toggles counters", STRATEGIC_PICK_TOAST)
 
     def test_product_wiring(self) -> None:
         p = build_unit_centric_pick_product(check_wiring=True)
@@ -42,6 +43,8 @@ class TestUnitCentricPickProduct(unittest.TestCase):
             "strategic_pick_toast",
             "stack_cycle",
             "select_refreshes_chip",
+            "chip_match_by_province",
+            "selected_frame_immediate_free",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 
@@ -67,6 +70,17 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         if next_fn > 0:
             pin_slice = pin_slice[:next_fn]
         self.assertNotIn("show_info_panel", pin_slice)
+        # Stack-cycle chip contract: match station province, free frame same-frame.
+        chip_i = ren.find("func _refresh_selected_unit_chip")
+        self.assertGreaterEqual(chip_i, 0)
+        chip_slice = ren[chip_i : chip_i + 1600]
+        next_chip = chip_slice.find("\nfunc ", 1)
+        if next_chip > 0:
+            chip_slice = chip_slice[:next_chip]
+        self.assertIn("stationed_province_id", chip_slice)
+        self.assertIn("pin_pid", chip_slice)
+        self.assertIn("sel_pid", chip_slice)
+        self.assertIn(".free()", chip_slice)
 
 
 if __name__ == "__main__":
