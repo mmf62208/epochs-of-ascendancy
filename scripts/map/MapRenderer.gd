@@ -16607,23 +16607,47 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		_show_inspector_toast("Set player country (TopInfoBar) before attacking.", 3.0, true)
 		return true
 
-	var from_pid := attack_staging_province_id
+	# Named unit is the assault vector; station beats stale attack_staging_province_id.
+	var fid := selected_formation_id.strip_edges()
+	var from_pid := -1
+	if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var sel_f: Formation = LeaderManager.get_formation(fid)
+		if sel_f != null and "stationed_province_id" in sel_f:
+			from_pid = int(sel_f.stationed_province_id)
+	if from_pid < 0:
+		from_pid = attack_staging_province_id
 	if from_pid < 0:
 		from_pid = debug_combat_attacker_province_id
 
-	# Wire real combat + explicit preview with CURRENT settlement/loyalty/welfare data (Province getters + BM.can_assault; used by map click Ctrl+click, attack button, and F10 sample).
+	# Unit-formula preview (soft/hard × org/str/xp + 0.15 initiative) — not ProvinceInsight hex formula.
 	var pre: Dictionary = {}
-	if typeof(ProvinceInsight) != TYPE_NIL and provinces.has(from_pid):
-		pre = ProvinceInsight.get_battle_preview(provinces[from_pid], target_province)
-	var can_pre := {}
-	if typeof(BattleManager) != TYPE_NIL:
-		can_pre = BattleManager.can_assault_province(p_tag, target_pid, from_pid)
+	if BattleManager.has_method("preview_assault"):
+		pre = BattleManager.preview_assault(p_tag, target_pid, from_pid, fid)
+	else:
+		pre = BattleManager.can_assault_province(p_tag, target_pid, from_pid, fid)
+	var can_pre: Dictionary = pre
 	var t_def_b := 0.0
 	if target_province.has_method("get_settlement_combat_def_bonus"):
 		t_def_b = target_province.get_settlement_combat_def_bonus()
-	print("[MapRenderer] Real combat from map: PREVIEW (live Province settlement/loyalty/welfare) stage#%d vs #%d def_bonus=%.1f%% can=%s (main-loop AI auto via TimeManager; weather/air in resolver)" % [from_pid, target_pid, t_def_b*100.0, str(can_pre.get("ok",false))])
-	if pre:
-		print("  [MAP COMBAT PREVIEW] atk=%.2f def=%.2f (factors current settlement=% .2f on def, welfare drag, loyalty mult)" % [float(pre.get("attack_power",0)), float(pre.get("defense_power",0)), target_province.settlement_level])
+	print("[MapRenderer] Real combat from map: UNIT PREVIEW fid=%s stage#%d vs #%d def_bonus=%.1f%% can=%s power=%.2f vs %.2f" % [
+		fid if not fid.is_empty() else "-", from_pid, target_pid, t_def_b * 100.0,
+		str(can_pre.get("ok", false)), float(pre.get("attack_power", 0.0)), float(pre.get("defense_power", 0.0)),
+	])
+
+	# Distant / non-adjacent: march first — do not arm confirm-to-execute.
+	var not_adj := str(can_pre.get("reason", "")).findn("not adjacent") >= 0
+	if not bool(can_pre.get("ok", false)) and not_adj:
+		var hops := 0
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("find_land_path") and from_pid >= 0:
+			var path: Array = MapManager.find_land_path(from_pid, target_pid, p_tag)
+			hops = maxi(0, path.size() - 1)
+		_assault_confirm_target_id = -1
+		_assault_confirm_msec = 0
+		var march_toast := "March to the border first · %d hexes" % hops
+		if hops <= 0:
+			march_toast = "March to the border first"
+		_show_inspector_toast(march_toast, 4.5, true)
+		return true
 
 	# First Ctrl+click: preview only. Second within 5s on same target: execute.
 	var now_ms := Time.get_ticks_msec()
@@ -16634,20 +16658,15 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	if not confirm:
 		_assault_confirm_target_id = target_pid
 		_assault_confirm_msec = now_ms
-		var atk_p := float(pre.get("attack_power", 0.0)) if pre else 0.0
-		var def_p := float(pre.get("defense_power", 0.0)) if pre else 0.0
-		var odds := float(pre.get("odds_attacker_win", 0.0)) if pre else 0.0
-		var att_n := int(pre.get("attacker_divisions", 0)) if pre else 0
-		var def_n := int(pre.get("defender_divisions", 0)) if pre else 0
+		var atk_p := float(pre.get("attack_power", 0.0))
+		var def_p := float(pre.get("defense_power", 0.0))
+		var odds := float(pre.get("odds_attacker_win", 0.0))
 		var can_ok := bool(can_pre.get("ok", false))
-		var intel_note := "intel rough"
-		if att_n <= 0:
-			intel_note = "no friendly divs staged here — move units first"
-		var prev_toast := "Assault PREVIEW · %s #%d (%d div) → %s #%d (%d div) · power %.0f vs %.0f · odds ~%.0f%% · %s · %s · Ctrl+click AGAIN to execute" % [
-			p_tag, from_pid, att_n, str(target_province.owner_tag), target_pid, def_n,
+		var unit_note := fid if not fid.is_empty() else str(can_pre.get("division_name", "hex"))
+		var prev_toast := "Assault PREVIEW · %s %s #%d → %s #%d · power %.0f vs %.0f · odds ~%.0f%% · %s · Ctrl+click AGAIN to execute" % [
+			p_tag, unit_note, from_pid, str(target_province.owner_tag), target_pid,
 			atk_p, def_p, odds,
 			("ready" if can_ok else str(can_pre.get("reason", "blocked"))),
-			intel_note,
 		]
 		_show_inspector_toast(prev_toast, 6.0)
 		return true
@@ -16660,8 +16679,8 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		return true
 	_assault_execute_busy = true
 	var assault: Dictionary = {}
-	# Protect main thread: resolve combat, then light UI only (no full border rebuild).
-	assault = BattleManager.execute_province_assault(p_tag, target_pid, from_pid)
+	# PR3: still one-shot execute (PR5 switches player confirm to start_province_battle).
+	assault = BattleManager.execute_province_assault(p_tag, target_pid, from_pid, fid)
 	push_map_assault_marker(target_pid, "engage", 0.75)
 	if not bool(assault.get("success", false)):
 		_assault_execute_busy = false
@@ -16760,10 +16779,19 @@ func _update_attack_button(province: Province) -> void:
 		_btn_attack.visible = false
 		return
 
+	var btn_fid := selected_formation_id.strip_edges()
+	var btn_from := -1
+	if not btn_fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var bf: Formation = LeaderManager.get_formation(btn_fid)
+		if bf != null and "stationed_province_id" in bf:
+			btn_from = int(bf.stationed_province_id)
+	if btn_from < 0:
+		btn_from = attack_staging_province_id if attack_staging_province_id >= 0 else debug_combat_attacker_province_id
 	var preview: Dictionary = BattleManager.can_assault_province(
 		p_tag,
 		province.id,
-		attack_staging_province_id if attack_staging_province_id >= 0 else debug_combat_attacker_province_id,
+		btn_from,
+		btn_fid,
 	)
 	var can_attack := bool(preview.get("ok", false))
 	var panel_open := info_panel != null and info_panel is CanvasItem and info_panel.visible
@@ -16782,6 +16810,8 @@ func _update_attack_button(province: Province) -> void:
 			var reason := str(preview.get("reason", "")).strip_edges()
 			if reason.is_empty():
 				reason = "no friendly divs staged here — move units first"
+			if reason.findn("not adjacent") >= 0:
+				reason = "March to the border first"
 			_btn_attack.text = "Attack"
 			_btn_attack.tooltip_text = reason
 		return
