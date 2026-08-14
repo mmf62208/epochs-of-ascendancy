@@ -11,6 +11,7 @@ from typing import Any, Dict, List
 
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
+DESIGN_PICKER = ROOT / "scripts" / "ui" / "DesignPickerPopup.gd"
 
 # Discoverability / integrity strings grepped from MapRenderer (must stay in live path).
 STRATEGIC_PICK_TOAST = "Zoom in to pick units (Shift+U toggles counters)."
@@ -18,6 +19,10 @@ STACK_CYCLE_HINT = "Stack %d/%d · [ ] or buttons to cycle"
 SELECTED_FRAME_HOOK = "_refresh_selected_unit_chip"
 HIT_RADIUS_PX = 48.0
 HIT_RADIUS_FLOOR = 20.0
+# Unit card design surface (PR 6) — integrity strings for discoverability greps.
+UNIT_CARD_MIN_SIZE = "Vector2(320, 360)"
+UNIT_CARD_ASSIGN_COPY = "Designs you produce show up here — assign to this unit."
+UNIT_CARD_ASSIGN_BTN = "Assign design"
 
 
 def _gd_func_slice(src: str, func_name: str) -> str:
@@ -188,6 +193,77 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     else:
         fails.append("selected_frame_immediate_free")
 
+    # 10) Unit card design surface (PR 6): 320×360 + scroll + template/stockpile/assign.
+    card_fn = _gd_func_slice(ren, "_show_unit_detail_popup")
+    card_size_ok = bool(card_fn) and UNIT_CARD_MIN_SIZE in card_fn
+    wiring["unit_card_320x360"] = card_size_ok
+    if card_size_ok:
+        passes.append("unit_card_320x360")
+    else:
+        fails.append("unit_card_320x360")
+
+    card_scroll_ok = bool(card_fn) and (
+        "ScrollContainer" in card_fn or "UnitDetailScroll" in card_fn
+    )
+    wiring["unit_card_scroll"] = card_scroll_ok
+    if card_scroll_ok:
+        passes.append("unit_card_scroll")
+    else:
+        fails.append("unit_card_scroll")
+
+    card_template_ok = bool(card_fn) and (
+        "get_template" in card_fn
+        and "visual_archetype" in card_fn
+        and "get_country_equipment_stockpile" in card_fn
+        and "get_unit_equipment_stock" in card_fn
+    )
+    wiring["unit_card_template_stockpile"] = card_template_ok
+    if card_template_ok:
+        passes.append("unit_card_template_stockpile")
+    else:
+        fails.append("unit_card_template_stockpile")
+
+    card_assign_copy = UNIT_CARD_ASSIGN_COPY in ren
+    wiring["unit_card_assign_copy"] = card_assign_copy
+    if card_assign_copy:
+        passes.append("unit_card_assign_copy")
+    else:
+        fails.append("unit_card_assign_copy")
+
+    card_assign_path = (
+        "_open_unit_design_assign_picker" in ren
+        and "_apply_unit_design_assign" in ren
+        and UNIT_CARD_ASSIGN_BTN in ren
+        and "factory_id = 0" in ren
+    )
+    wiring["unit_card_assign_mode"] = card_assign_path
+    if card_assign_path:
+        passes.append("unit_card_assign_mode")
+    else:
+        fails.append("unit_card_assign_mode")
+
+    # 11) DesignPickerPopup: factory_id==0 skips RetoolingWarningPopup (assign mode).
+    picker = DESIGN_PICKER.read_text(encoding="utf-8") if DESIGN_PICKER.is_file() else ""
+    picker_fn = _gd_func_slice(picker, "_on_confirm_pressed") if picker else ""
+    assign_skip_retool = bool(picker_fn) and (
+        "_is_assign_mode" in picker
+        and "factory_id == 0" in picker
+        and "RetoolingWarningPopup" in picker_fn
+        and (
+            "design_chosen" in picker_fn
+            or "assign_callback" in picker_fn
+            or "assign_callback" in picker
+        )
+        # Assign branch returns before retool when factory_id==0.
+        and ("return" in picker_fn)
+        and picker_fn.find("_is_assign_mode") < picker_fn.find("RetoolingWarningPopup")
+    )
+    wiring["design_picker_assign_skips_retool"] = assign_skip_retool
+    if assign_skip_retool:
+        passes.append("design_picker_assign_skips_retool")
+    else:
+        fails.append("design_picker_assign_skips_retool")
+
     if not check_wiring:
         # Format-only mode still reports integrity strings.
         ok = toast_ok and hit_ok
@@ -202,6 +278,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         "hit_radius_floor": HIT_RADIUS_FLOOR,
         "strategic_toast": STRATEGIC_PICK_TOAST,
         "stack_cycle_hint": STACK_CYCLE_HINT,
+        "unit_card_assign_copy": UNIT_CARD_ASSIGN_COPY,
         "wiring": wiring,
         "pass": passes,
         "fail": fails,
@@ -212,10 +289,13 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
             "map_unit_counter_lod_product",
             "MapRenderer _try_open_unit_at_world",
             "MapRenderer _pick_unit_formation_at_world",
+            "MapRenderer _show_unit_detail_popup",
+            "DesignPickerPopup assign mode",
         ],
         "policy": (
             "pin_first_hit_disk_48_floor_20_selected_chip_no_inspector"
             "; chip_match_station_province_one_pin_per_hex"
+            "; unit_card_template_stockpile_assign_no_factory_retool"
         ),
     }
 

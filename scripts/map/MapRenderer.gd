@@ -16115,8 +16115,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var str_v := clampf(float(formation.strength) if "strength" in formation else 1.0, 0.0, 1.5)
 	var rdy_v := clampf(float(formation.readiness) if "readiness" in formation else 1.0, 0.0, 1.5)
 	var xp_v := 0.0
+	var xp_raw := 0.0
 	if "combat_experience" in formation:
-		xp_v = clampf(float(formation.combat_experience) / 100.0, 0.0, 1.0)
+		xp_raw = float(formation.combat_experience)
+		xp_v = clampf(xp_raw / 100.0, 0.0, 1.0)
 	var fuel_v := -1.0
 	if "fuel_level" in formation:
 		fuel_v = clampf(float(formation.fuel_level), 0.0, 1.5)
@@ -16134,17 +16136,59 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		if p != null:
 			prov_name = p.name
 
+	# Template / archetype / combat lines (design surface — not factory retool).
+	var tpl_display := dsn if not dsn.is_empty() else "—"
+	var tpl_archetype := "—"
+	if not dsn.is_empty() and typeof(GameData) != TYPE_NIL and GameData.design_data != null:
+		if GameData.design_data.has_method("get_template"):
+			var tpl: Variant = GameData.design_data.get_template(dsn)
+			if tpl != null and tpl is Object:
+				if "display_name" in tpl and str(tpl.display_name) != "":
+					tpl_display = str(tpl.display_name)
+				elif "id" in tpl and str(tpl.id) != "":
+					tpl_display = str(tpl.id)
+				if "visual_archetype" in tpl and str(tpl.visual_archetype) != "":
+					tpl_archetype = str(tpl.visual_archetype)
+
+	var soft_v := 0.0
+	var hard_v := 0.0
+	var rel_v := 0.0
+	if not fid.is_empty() and typeof(ProductionManager) != TYPE_NIL:
+		if ProductionManager.has_method("get_formation_equipment_combat_stats"):
+			var cstats: Dictionary = ProductionManager.get_formation_equipment_combat_stats(fid)
+			soft_v = float(cstats.get("soft_attack", 0.0))
+			hard_v = float(cstats.get("hard_attack", 0.0))
+			rel_v = float(cstats.get("reliability", 0.0))
+	var xp_mult := lerpf(0.85, 1.15, clampf(xp_raw / 100.0, 0.0, 1.0))
+	var preview_pow := (soft_v + 1.6 * hard_v) * org_v * str_v * xp_mult + 0.15
+
+	var stock_n := 0
+	if not dsn.is_empty() and not tag.is_empty() and typeof(ProductionManager) != TYPE_NIL:
+		if ProductionManager.has_method("get_country_equipment_stockpile"):
+			var cstk: Dictionary = ProductionManager.get_country_equipment_stockpile(tag)
+			stock_n = int(cstk.get(dsn, 0))
+	var unit_stock_bits: PackedStringArray = []
+	if not fid.is_empty() and typeof(ProductionManager) != TYPE_NIL:
+		if ProductionManager.has_method("get_unit_equipment_stock"):
+			var ustk: Dictionary = ProductionManager.get_unit_equipment_stock(fid)
+			var pairs: Array = []
+			for k in ustk.keys():
+				pairs.append([str(k), int(ustk[k])])
+			pairs.sort_custom(func(a: Array, b: Array) -> bool: return int(a[1]) > int(b[1]))
+			for i in mini(3, pairs.size()):
+				unit_stock_bits.append("%s×%d" % [pairs[i][0], pairs[i][1]])
+
 	var panel := PanelContainer.new()
 	panel.name = "UnitDetailPopup"
 	panel.z_index = 70
 	panel.clip_contents = true
-	panel.custom_minimum_size = Vector2(320, 220)
+	panel.custom_minimum_size = Vector2(320, 360)
 	RetrowaveTheme.style_detail_panel_flat(panel)
-	# Place near mouse, keep on-screen.
+	# Place near mouse, keep on-screen (taller card).
 	var mouse := get_viewport().get_mouse_position() if get_viewport() else Vector2(200, 200)
 	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
 	var px := clampf(mouse.x + 16.0, 12.0, maxf(12.0, vp.x - 340.0))
-	var py := clampf(mouse.y - 40.0, 56.0, maxf(56.0, vp.y - 280.0))
+	var py := clampf(mouse.y - 40.0, 56.0, maxf(56.0, vp.y - 380.0))
 	panel.position = Vector2(px, py)
 	ui.add_child(panel)
 
@@ -16154,13 +16198,15 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	margin.add_theme_constant_override("margin_top", 10)
 	margin.add_theme_constant_override("margin_bottom", 10)
 	panel.add_child(margin)
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
-	margin.add_child(vbox)
+
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 6)
+	outer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(outer)
 
 	var title_row := HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 8)
-	vbox.add_child(title_row)
+	outer.add_child(title_row)
 	var title := Label.new()
 	title.text = name_s
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -16178,9 +16224,20 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	)
 	title_row.add_child(close_btn)
 
+	var scroll := ScrollContainer.new()
+	scroll.name = "UnitDetailScroll"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(296, 280)
+	outer.add_child(scroll)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(vbox)
+
 	var body := Label.new()
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.custom_minimum_size = Vector2(290, 0)
+	body.custom_minimum_size = Vector2(280, 0)
 	var lines: PackedStringArray = []
 	if not tag.is_empty():
 		lines.append("Nation: %s" % tag)
@@ -16188,6 +16245,20 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		lines.append("Type: %s" % ftype.replace("_", " ").capitalize())
 	if not dsn.is_empty():
 		lines.append("Design: %s" % dsn)
+	lines.append("Template: %s" % tpl_display)
+	lines.append("Archetype: %s" % tpl_archetype)
+	lines.append(
+		"Soft %.2f · Hard %.2f · Rel %.0f%%"
+		% [soft_v, hard_v, rel_v * 100.0]
+	)
+	lines.append("Preview power: %.2f (incl. +0.15 attacker initiative)" % preview_pow)
+	lines.append(
+		"Country stockpile (%s): %d" % [dsn if not dsn.is_empty() else "—", stock_n]
+	)
+	if unit_stock_bits.is_empty():
+		lines.append("On-hand unit stock: —")
+	else:
+		lines.append("On-hand unit stock: %s" % ", ".join(unit_stock_bits))
 	lines.append("Stationed: %s" % prov_name)
 	lines.append("Leader: %s" % leader_s)
 	lines.append(
@@ -16216,6 +16287,30 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	body.text = "\n".join(lines)
 	RetrowaveTheme.style_body_label(body)
 	vbox.add_child(body)
+
+	var design_hint := Label.new()
+	design_hint.name = "UnitDesignAssignHint"
+	design_hint.text = "Designs you produce show up here — assign to this unit."
+	design_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	design_hint.custom_minimum_size = Vector2(280, 0)
+	RetrowaveTheme.style_body_label(design_hint)
+	design_hint.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	design_hint.add_theme_font_size_override("font_size", 11)
+	vbox.add_child(design_hint)
+
+	if not fid.is_empty() and not tag.is_empty():
+		var assign_btn := Button.new()
+		assign_btn.name = "AssignDesignButton"
+		assign_btn.text = "Assign design"
+		assign_btn.focus_mode = Control.FOCUS_NONE
+		assign_btn.tooltip_text = "Assign an existing design from stockpile (not factory retool)"
+		RetrowaveTheme.style_primary_button(assign_btn)
+		var assign_fid := fid
+		var assign_tag := tag
+		assign_btn.pressed.connect(func() -> void:
+			_open_unit_design_assign_picker(assign_fid, assign_tag, panel)
+		)
+		vbox.add_child(assign_btn)
 
 	if stack_divs.size() > 1:
 		var cycle_row := HBoxContainer.new()
@@ -16262,7 +16357,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var hint := Label.new()
 	hint.text = "SELECTED · click friendly province to MOVE · Ctrl+click enemy to ASSAULT (preview, then confirm) · Esc: withdraw → close card → clear selection"
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(290, 0)
+	hint.custom_minimum_size = Vector2(280, 0)
 	RetrowaveTheme.style_body_label(hint)
 	hint.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
 	hint.add_theme_font_size_override("font_size", 11)
@@ -16272,6 +16367,69 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		if ev is InputEventMouseButton and ev.pressed:
 			ui.move_child(panel, ui.get_child_count() - 1)
 	)
+
+
+## Open DesignPickerPopup in assign mode (factory_id=0) — skips RetoolingWarningPopup.
+func _open_unit_design_assign_picker(formation_id: String, country_tag: String, card_panel: Control = null) -> void:
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	if fid.is_empty() or tag.is_empty():
+		return
+	var picker_scene: PackedScene = load("res://scenes/ui/DesignPickerPopup.tscn")
+	if picker_scene == null:
+		_show_inspector_toast("Design picker unavailable", 2.5)
+		return
+	var picker: DesignPickerPopup = picker_scene.instantiate() as DesignPickerPopup
+	if picker == null:
+		return
+	picker.factory_id = 0
+	picker.country_tag = tag
+	picker.assign_callback = func(design_id: String) -> void:
+		_apply_unit_design_assign(fid, tag, design_id, card_panel)
+	get_tree().root.add_child(picker)
+
+
+func _apply_unit_design_assign(
+	formation_id: String,
+	country_tag: String,
+	design_id: String,
+	card_panel: Control = null,
+) -> void:
+	var did := design_id.strip_edges()
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	if did.is_empty() or fid.is_empty():
+		return
+	if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("country_may_use_design"):
+		if not DesignManager.country_may_use_design(tag, did):
+			_show_inspector_toast("Design locked for %s" % tag, 3.0)
+			return
+	var fo: Formation = null
+	if typeof(LeaderManager) != TYPE_NIL:
+		fo = LeaderManager.get_formation(fid)
+	if fo == null:
+		_show_inspector_toast("Unit not found", 2.5)
+		return
+	fo.design_id = did
+	# Optional: seed on-hand from country stockpile if available.
+	if typeof(ProductionManager) != TYPE_NIL:
+		var take_n := 0
+		if ProductionManager.has_method("get_country_equipment_stockpile"):
+			var cstk: Dictionary = ProductionManager.get_country_equipment_stockpile(tag)
+			var have := int(cstk.get(did, 0))
+			if have > 0 and ProductionManager.has_method("take_from_country_equipment_stockpile"):
+				take_n = mini(1, have)
+				if take_n > 0:
+					ProductionManager.take_from_country_equipment_stockpile(tag, did, take_n)
+		if take_n > 0 and ProductionManager.has_method("get_unit_equipment_stock") and ProductionManager.has_method("set_unit_equipment_stock"):
+			var cur: Dictionary = ProductionManager.get_unit_equipment_stock(fid)
+			cur[did] = int(cur.get(did, 0)) + take_n
+			ProductionManager.set_unit_equipment_stock(fid, cur)
+	_show_inspector_toast("Assigned %s to unit" % did, 3.0)
+	if card_panel != null and is_instance_valid(card_panel):
+		card_panel.queue_free()
+	if fo != null:
+		_show_unit_detail_popup(fo)
 
 
 func _ensure_station_engineers_button() -> void:

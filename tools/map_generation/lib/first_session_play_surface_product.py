@@ -2,6 +2,9 @@
 
 Thin composer. Child pass bits are p["ok"] except save, which has no ok key
 (use all_majors_ok and dead_n == 0).
+
+Unit-centric war loop (PR 1/4/5/6): also ANDs pick + march + battle builders so
+any red child fails the first-session surface. Not M6.
 """
 from __future__ import annotations
 
@@ -13,6 +16,9 @@ from first_session_assault_surface_product import (  # type: ignore
 from first_session_hotkeys_product import (  # type: ignore
     build_first_session_hotkeys_product,
 )
+from formation_march_product import (  # type: ignore
+    build_formation_march_product,
+)
 from map_live_border_fronts_surface_product import (  # type: ignore
     build_map_live_border_fronts_surface_product,
 )
@@ -20,11 +26,17 @@ from map_supply_corridor_product import build_supply_corridor_product  # type: i
 from map_war_path_surface_product import (  # type: ignore
     build_map_war_path_surface_product,
 )
+from multi_day_battle_product import (  # type: ignore
+    build_multi_day_battle_product,
+)
 from order_panel_play_strip_product import (  # type: ignore
     build_order_panel_play_strip_product,
 )
 from save_resume_primary_command_product import (  # type: ignore
     build_save_resume_primary_command_product,
+)
+from unit_centric_pick_product import (  # type: ignore
+    build_unit_centric_pick_product,
 )
 from world_accurate_capital_pick_product import (  # type: ignore
     build_world_accurate_capital_pick_product,
@@ -50,6 +62,10 @@ def build_first_session_play_surface_product() -> Dict[str, Any]:
         country_tag="GER", check_wiring=True
     )
     play_strip = build_order_panel_play_strip_product(province_id=1)
+    # Unit-centric loop children (PR 1 pick · PR 4 march · PR 5 battle · PR 6 card greps).
+    unit_pick = build_unit_centric_pick_product(check_wiring=True)
+    march = build_formation_march_product(check_wiring=True)
+    battle = build_multi_day_battle_product(check_wiring=True)
 
     bits = {
         "capital_pick": bool(capital_pick.get("ok")),
@@ -60,6 +76,9 @@ def build_first_session_play_surface_product() -> Dict[str, Any]:
         "hotkeys": bool(hotkeys.get("ok")),
         "assault": bool(assault.get("ok")),
         "play_strip": bool(play_strip.get("ok")),
+        "unit_pick": bool(unit_pick.get("ok")),
+        "march": bool(march.get("ok")),
+        "battle": bool(battle.get("ok")),
     }
     products: Dict[str, Mapping[str, Any]] = {
         "capital_pick": capital_pick,
@@ -70,6 +89,9 @@ def build_first_session_play_surface_product() -> Dict[str, Any]:
         "hotkeys": hotkeys,
         "assault": assault,
         "play_strip": play_strip,
+        "unit_pick": unit_pick,
+        "march": march,
+        "battle": battle,
     }
     children = {
         name: _child(ok, products[name].get("summary")) for name, ok in bits.items()

@@ -13,11 +13,14 @@ from unit_centric_pick_product import (  # noqa: E402
     HIT_RADIUS_FLOOR,
     HIT_RADIUS_PX,
     STRATEGIC_PICK_TOAST,
+    UNIT_CARD_ASSIGN_COPY,
+    UNIT_CARD_MIN_SIZE,
     build_unit_centric_pick_product,
     unit_centric_pick_integrity,
 )
 
 RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
+PICKER = ROOT / "scripts" / "ui" / "DesignPickerPopup.gd"
 
 
 class TestUnitCentricPickProduct(unittest.TestCase):
@@ -27,6 +30,9 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn("Shift+U", STRATEGIC_PICK_TOAST)
         self.assertIn("Zoom in", STRATEGIC_PICK_TOAST)
         self.assertIn("toggles counters", STRATEGIC_PICK_TOAST)
+        self.assertIn("320", UNIT_CARD_MIN_SIZE)
+        self.assertIn("360", UNIT_CARD_MIN_SIZE)
+        self.assertIn("assign to this unit", UNIT_CARD_ASSIGN_COPY)
 
     def test_product_wiring(self) -> None:
         p = build_unit_centric_pick_product(check_wiring=True)
@@ -45,6 +51,12 @@ class TestUnitCentricPickProduct(unittest.TestCase):
             "select_refreshes_chip",
             "chip_match_by_province",
             "selected_frame_immediate_free",
+            "unit_card_320x360",
+            "unit_card_scroll",
+            "unit_card_template_stockpile",
+            "unit_card_assign_copy",
+            "unit_card_assign_mode",
+            "design_picker_assign_skips_retool",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 
@@ -81,6 +93,27 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn("pin_pid", chip_slice)
         self.assertIn("sel_pid", chip_slice)
         self.assertIn(".free()", chip_slice)
+        # PR 6 unit card design surface.
+        self.assertIn(UNIT_CARD_MIN_SIZE, ren)
+        self.assertIn(UNIT_CARD_ASSIGN_COPY, ren)
+        self.assertIn("_open_unit_design_assign_picker", ren)
+        self.assertIn("get_country_equipment_stockpile", ren)
+        self.assertIn("get_unit_equipment_stock", ren)
+
+    def test_design_picker_assign_mode_skips_retool(self) -> None:
+        src = PICKER.read_text(encoding="utf-8")
+        self.assertIn("factory_id == 0", src)
+        self.assertIn("_is_assign_mode", src)
+        conf_i = src.find("func _on_confirm_pressed")
+        self.assertGreaterEqual(conf_i, 0)
+        conf = src[conf_i : conf_i + 900]
+        next_fn = conf.find("\nfunc ", 1)
+        if next_fn > 0:
+            conf = conf[:next_fn]
+        self.assertIn("_is_assign_mode", conf)
+        self.assertLess(conf.find("_is_assign_mode"), conf.find("RetoolingWarningPopup"))
+        self.assertIn("design_chosen", src)
+        self.assertIn("assign_callback", src)
 
 
 if __name__ == "__main__":
