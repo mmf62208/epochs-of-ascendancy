@@ -7958,6 +7958,20 @@ func apply_order_panel_action(action_id: String, province_id: int = 1) -> Dictio
 					"live": true,
 					"manager": "BattleManager",
 				}
+		# Player strip: start multi-day battle (same contract as map confirm).
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_province_battle"):
+			var started: Dictionary = BattleManager.start_province_battle(atag, target_pid, from_pid, fid)
+			return {
+				"ok": bool(started.get("success", false)),
+				"result": started,
+				"live": true,
+				"manager": "BattleManager",
+				"formation_id": fid,
+				"from_province_id": from_pid,
+				"target_province_id": target_pid,
+				"multi_day": true,
+				"reason": str(started.get("reason", "")),
+			}
 		if MapManager.has_method("apply_assault_stage_mutation"):
 			var ares: Dictionary = MapManager.apply_assault_stage_mutation(from_pid, target_pid, fid, atag)
 			ares["live"] = true

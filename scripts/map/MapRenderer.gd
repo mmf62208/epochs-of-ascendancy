@@ -1008,6 +1008,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		# Esc: dismiss stuck overlays (legend / tech / info) so playtest is never trapped.
 		if event.keycode == KEY_ESCAPE:
+			# Esc order: withdraw from engaging battle → close unit card → clear selection → overlays.
+			if not selected_formation_id.is_empty() and typeof(BattleManager) != TYPE_NIL:
+				if BattleManager.has_method("is_formation_in_battle") and BattleManager.is_formation_in_battle(selected_formation_id):
+					if BattleManager.has_method("withdraw_from_battle"):
+						var w: Dictionary = BattleManager.withdraw_from_battle(selected_formation_id)
+						if bool(w.get("ok", false)):
+							_show_inspector_toast("Withdrew from battle · selection kept", 3.0)
+							get_viewport().set_input_as_handled()
+							return
 			var ui_esc := get_node_or_null("UI") as CanvasLayer
 			if ui_esc != null:
 				var unit_pop := ui_esc.get_node_or_null("UnitDetailPopup")
@@ -1015,7 +1024,6 @@ func _unhandled_input(event: InputEvent) -> void:
 					unit_pop.queue_free()
 					get_viewport().set_input_as_handled()
 					return
-			# Clear selected map unit before other dismissals.
 			if not selected_formation_id.is_empty():
 				selected_formation_id = ""
 				_refresh_selected_unit_chip()
@@ -16232,8 +16240,27 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		)
 		cycle_row.add_child(next_btn)
 
+	# Break off control when this unit is in an engaging multi-day battle.
+	if not fid.is_empty() and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("is_formation_in_battle"):
+		if BattleManager.is_formation_in_battle(fid):
+			var break_btn := Button.new()
+			break_btn.text = "Break off"
+			break_btn.focus_mode = Control.FOCUS_NONE
+			break_btn.tooltip_text = "Withdraw from the current battle (no capture). Esc also withdraws first."
+			RetrowaveTheme.style_secondary_button(break_btn)
+			var break_fid := fid
+			break_btn.pressed.connect(func() -> void:
+				if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("withdraw_from_battle"):
+					var wr: Dictionary = BattleManager.withdraw_from_battle(break_fid)
+					if bool(wr.get("ok", false)):
+						_show_inspector_toast("Withdrew from battle", 3.0)
+					if is_instance_valid(panel):
+						panel.queue_free()
+			)
+			vbox.add_child(break_btn)
+
 	var hint := Label.new()
-	hint.text = "SELECTED · click friendly province to MOVE · Ctrl+click enemy to ASSAULT (preview, then confirm) · Esc clears selection"
+	hint.text = "SELECTED · click friendly province to MOVE · Ctrl+click enemy to ASSAULT (preview, then confirm) · Esc: withdraw → close card → clear selection"
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.custom_minimum_size = Vector2(290, 0)
 	RetrowaveTheme.style_body_label(hint)
@@ -16889,8 +16916,12 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		return true
 	_assault_execute_busy = true
 	var assault: Dictionary = {}
-	# PR3: still one-shot execute (PR5 switches player confirm to start_province_battle).
-	assault = BattleManager.execute_province_assault(p_tag, target_pid, from_pid, fid)
+	# Player path: multi-day battle. EOA_UNIT_WAR=0 / missing API → one-shot execute (bisect / F10-class).
+	var unit_war_off := OS.get_environment("EOA_UNIT_WAR").strip_edges() == "0"
+	if unit_war_off or not BattleManager.has_method("start_province_battle"):
+		assault = BattleManager.execute_province_assault(p_tag, target_pid, from_pid, fid)
+	else:
+		assault = BattleManager.start_province_battle(p_tag, target_pid, from_pid, fid)
 	push_map_assault_marker(target_pid, "engage", 0.75)
 	if not bool(assault.get("success", false)):
 		_assault_execute_busy = false
@@ -16898,14 +16929,26 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		return true
 
 	var result: Dictionary = assault.get("result", {}) as Dictionary
+	var multi_day := bool(result.get("multi_day", false)) or str(assault.get("status", "")) == "engaging"
 	var winner := str(result.get("winner", ""))
 	var captured := bool(result.get("province_control_change", false))
 	var outcome := str(result.get("outcome", winner))
 	var atk := str(result.get("attacker_tag", p_tag))
 	var def: String = str(result.get("defender_tag", target_province.owner_tag))
 
-	# Phase 4: Enhance inspector combat feedback after real assault (from map mouse or F10). Show outcome details (settlement_def_bonus used, winner, capture) in toast + inspector; log live numbers.
-	# Uses BM result (context merged: settlement_def_bonus, target_settlement_level, loyalty_factor, winner, province_control_change from execute/Resolver).
+	if multi_day:
+		var unit_name := fid if not fid.is_empty() else "unit"
+		_show_inspector_toast(
+			"Battle joined · %s vs %s · daily org/str · clock runs the fight" % [unit_name, def],
+			5.0,
+		)
+		_play_map_sfx("map")
+		print("[MapRenderer] Multi-day battle started target=#%d from=#%d fid=%s" % [target_pid, from_pid, fid])
+		_last_combat_outcome_text = "engaging multi-day battle"
+		call_deferred("_assault_post_ui_light", target_pid, from_pid, -1)
+		return true
+
+	# One-shot path (EOA_UNIT_WAR=0 / F10-class execute via this function under flag).
 	var s_def_b := float(result.get("settlement_def_bonus", 1.0))
 	var t_sett_lev := float(result.get("target_settlement_level", 0.0))
 	var loy_f := float(result.get("loyalty_factor", 1.0))
@@ -16913,7 +16956,6 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	print("[MapRenderer] Real assault (map/F10) live numbers: " + outcome_details + " (settlement_def_bonus applied in BM.execute; see Resolver for phased scores)")
 	_last_combat_outcome_text = outcome_details
 
-	# Capture/assault player feedback via pure flair helper (toast + sfx distinguishable from select/invest/HH).
 	var cap_flair: Dictionary = _MapNextListHelpers.format_capture_assault_flair(
 		target_province.name, atk, def, captured, outcome, winner
 	)
@@ -16923,9 +16965,7 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	_show_inspector_toast(cap_toast, float(cap_flair.get("duration", 3.5)))
 	_play_map_sfx(str(cap_flair.get("sfx", "map")))
 	if provinces.has(target_pid):
-		# Soft center without full inspector rebuild when possible (inspector can be heavy).
 		call_deferred("_center_camera_on_province", target_pid, "soft")
-	# Success-path busy-clear lives in deferred light UI only.
 	var retreat_pid := int(result.get("retreat_province_id", -1))
 	call_deferred("_assault_post_ui_light", target_pid, from_pid, retreat_pid)
 	return true
@@ -16941,6 +16981,40 @@ func _assault_post_ui_light(target_pid: int, from_pid: int = -1, retreat_pid: in
 	_refresh_province_fill_pids(pids)
 	_update_unit_icons_for_pids(pids)
 	_assault_execute_busy = false
+
+
+## Cheap day-tick flash on engaged pins (modulate pulse; no sprite pipeline).
+func flash_battle_day(pids: Array = [], battle: Dictionary = {}) -> void:
+	var target_flash := int(battle.get("target_pid", -1)) if not battle.is_empty() else -1
+	if target_flash < 0 and not pids.is_empty():
+		target_flash = int(pids[0])
+	if target_flash >= 0:
+		push_map_assault_marker(target_flash, "engage", 0.85)
+	var flash_pids: Array = []
+	for v in pids:
+		var pid := int(v)
+		if pid >= 0 and not flash_pids.has(pid):
+			flash_pids.append(pid)
+	if flash_pids.is_empty():
+		return
+	for pid_v in flash_pids:
+		var id := int(pid_v)
+		if not province_nodes.has(id):
+			continue
+		var n: Node2D = province_nodes[id] as Node2D
+		if n == null:
+			continue
+		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+		if counter == null or not is_instance_valid(counter):
+			continue
+		var base_mod: Color = counter.modulate
+		counter.modulate = Color(1.3, 1.0, 0.7, base_mod.a)
+		var tree := get_tree()
+		if tree != null:
+			tree.create_timer(0.18).timeout.connect(func() -> void:
+				if is_instance_valid(counter):
+					counter.modulate = base_mod
+			)
 
 
 func _province_controlled_by(province: Province, country_tag: String) -> bool:
