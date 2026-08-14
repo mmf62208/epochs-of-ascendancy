@@ -16900,7 +16900,7 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		var odds := float(pre.get("odds_attacker_win", 0.0))
 		var can_ok := bool(can_pre.get("ok", false))
 		var unit_note := fid if not fid.is_empty() else str(can_pre.get("division_name", "hex"))
-		var prev_toast := "Assault PREVIEW · %s %s #%d → %s #%d · power %.0f vs %.0f · odds ~%.0f%% · %s · Ctrl+click AGAIN to execute" % [
+		var prev_toast := "Assault PREVIEW · %s %s #%d → %s #%d · power %.0f vs %.0f · odds ~%.0f%% · %s · Ctrl+click AGAIN to join battle" % [
 			p_tag, unit_note, from_pid, str(target_province.owner_tag), target_pid,
 			atk_p, def_p, odds,
 			("ready" if can_ok else str(can_pre.get("reason", "blocked"))),

@@ -17,6 +17,7 @@ SAVE_LOAD = ROOT / "scripts" / "autoload" / "SaveLoadManager.gd"
 COMBAT_RESOLVER = ROOT / "scripts" / "combat" / "CombatResolver.gd"
 
 # Design worked Maginot powers (Panzer III J vs SOMUA @ xp_mult 0.85 + 0.15 initiative).
+# Intentional pure gate: fixed soft/hard, not live CombatResolver equipment (headless loop later).
 MAGINOT_ATT_SOFT = 0.900
 MAGINOT_ATT_HARD = 0.955
 MAGINOT_DEF_SOFT = 0.883
@@ -211,7 +212,7 @@ def build_multi_day_battle_product(*, check_wiring: bool = True) -> Dict[str, An
     else:
         fails.append("start_province_battle")
 
-    # tick + additive + initiative + break + apply_province_capture
+    # tick + additive + initiative + break + apply_province_capture + round-robin fairness
     tick_fn = _gd_func_slice(bm, "tick_battles_for_day")
     tick_one = _gd_func_slice(bm, "_tick_one_battle")
     tick_ok = (
@@ -227,6 +228,61 @@ def build_multi_day_battle_product(*, check_wiring: bool = True) -> Dict[str, An
         passes.append("tick_battles_additive")
     else:
         fails.append("tick_battles_additive")
+    rr_ok = (
+        bool(tick_fn)
+        and "_battle_tick_rr" in bm
+        and ("%" in tick_fn or "mod" in tick_fn.lower() or "% n" in tick_fn or "% maxi" in tick_fn)
+    )
+    wiring["tick_round_robin"] = rr_ok
+    if rr_ok:
+        passes.append("tick_round_robin")
+    else:
+        fails.append("tick_round_robin")
+
+    # Shared defender / target isolation
+    start_isolates = (
+        bool(start_fn)
+        and ("get_battle_at" in start_fn or "Province already under assault" in start_fn)
+        and ("Defender already in battle" in start_fn or "defender" in start_fn.lower())
+    )
+    wiring["start_blocks_shared_defender"] = start_isolates
+    if start_isolates:
+        passes.append("start_blocks_shared_defender")
+    else:
+        fails.append("start_blocks_shared_defender")
+
+    clear_fn = _gd_func_slice(bm, "_clear_battle_combat_flags")
+    clear_safe = (
+        bool(clear_fn)
+        and (
+            "_formation_still_in_other_battle" in clear_fn
+            or "_formation_still_in_other_battle" in bm
+        )
+    )
+    wiring["is_in_combat_clear_if_not_other"] = clear_safe
+    if clear_safe:
+        passes.append("is_in_combat_clear_if_not_other")
+    else:
+        fails.append("is_in_combat_clear_if_not_other")
+
+    can_fn = _gd_func_slice(bm, "can_assault_province")
+    can_blocks = (
+        bool(can_fn)
+        and "already in battle" in can_fn.lower()
+        and ("is_formation_in_battle" in can_fn or "get_battle_for_formation" in can_fn)
+    )
+    wiring["can_blocks_engaged_fid"] = can_blocks
+    if can_blocks:
+        passes.append("can_blocks_engaged_fid")
+    else:
+        fails.append("can_blocks_engaged_fid")
+
+    str_break_named = "BATTLE_ATT_STR_BREAK" in bm and "BATTLE_STR_BREAK" in bm
+    wiring["str_break_constants"] = str_break_named
+    if str_break_named:
+        passes.append("str_break_constants")
+    else:
+        fails.append("str_break_constants")
 
     cap_fn = _gd_func_slice(bm, "apply_province_capture")
     cap_ok = (
@@ -327,12 +383,27 @@ def build_multi_day_battle_product(*, check_wiring: bool = True) -> Dict[str, An
     else:
         fails.append("strip_starts_battle")
 
-    mm_ok = "start_province_battle" in mm
-    wiring["mapmanager_stage_starts_battle"] = mm_ok
-    if mm_ok:
-        passes.append("mapmanager_stage_starts_battle")
+    # Stage-mutation automation stays one-shot; player multi-day is GameData/MapRenderer only.
+    mm_fn = _gd_func_slice(mm, "apply_assault_stage_mutation")
+    mm_oneshot = (
+        bool(mm_fn)
+        and "execute_province_assault" in mm_fn
+        and "BattleManager.start_province_battle" not in mm_fn
+        and "has_method(\"start_province_battle\")" not in mm_fn
+    )
+    wiring["mapmanager_stage_oneshot"] = mm_oneshot
+    if mm_oneshot:
+        passes.append("mapmanager_stage_oneshot")
     else:
-        fails.append("mapmanager_stage_starts_battle")
+        fails.append("mapmanager_stage_oneshot")
+
+    # Preview copy matches multi-day join path.
+    join_copy = "join battle" in ren
+    wiring["preview_join_battle_copy"] = join_copy
+    if join_copy:
+        passes.append("preview_join_battle_copy")
+    else:
+        fails.append("preview_join_battle_copy")
 
     # Save blob battles
     save_ok = (
