@@ -15,10 +15,11 @@
 | Layer | State |
 |-------|--------|
 | **Machine full-test** | **Green** — map M0–M5 closed · HOI open P0 = 0 · year multi-AI 365d PASS · first-session composer + assault hang-class + multi-AI on official gates |
+| **L1 unit war loop (machine)** | **Landed on forward branch** — pin pick · Maginot reserve · honest assault · march · multi-day battle · unit card · see [`FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md`](FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md) |
 | **Human full-test proof** | **Incomplete** — §0b items 3–15 mostly blank · M6 20d/60d narrative **still open** |
-| **Launch** | **Not ready** — need playproof → fix shipped path bugs → Alpha loop polish → content/feel → RC |
+| **Launch** | **L1 Alpha in progress** — machine loop ready for human proof; then ship kit (P2) |
 
-**What moves the needle now:** play the shipped path, write notes, fix what play finds. Do **not** open new dual packages, densify, GameData mega-split, multiplayer product, museum borders, or invent a 30fps PASS.
+**What moves the needle now:** human-play the unit loop (Maginot pin → march → multi-day battle), write notes, fix what play finds. Do **not** open new dual packages, densify, GameData mega-split, multiplayer product, museum borders, or invent a 30fps PASS.
 
 ---
 
@@ -100,19 +101,21 @@ flowchart TD
 
 **Launch gate dependency:** P0 is the only path from “machine green” to “honestly playable.”
 
-### Phase P1 — Alpha loop honesty (after P0 findings)
+### Phase P1 — Alpha loop honesty (unit-centric war loop)
 
-Work **only** items play names. Expected classes (pre-seeded from residual + session feedback — demote if play does not hit them):
+**Active program:** [`FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md`](FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md) (re-homed from `c5a8b0ae` execute-plan stack).
 
-| Priority | Class | Example | Constraint |
-|----------|-------|---------|------------|
-| 1 | Freeze / hang class | Post-assault UI storm regressions | Greps + `first_session_assault_surface` stay green |
-| 2 | Silent fail / discoverability | Attack affordance, empty staging, toast clarity | Extend existing products |
-| 3 | Readability | Mapmode contrast, capital stars, F2 purpose copy | UI strings / tint — not new pillars |
-| 4 | Living board | Multi-AI feel over 5–10d; personality depth only if play asks | No dual spam |
-| 5 | Continuity | Save browser / autosave / resume UX | Existing save products |
+| Priority | Class | Slice | Status |
+|----------|-------|-------|--------|
+| 1 | Unit pick | Pin-first hit disk + selected chip | **Machine landed** |
+| 2 | Front OOB | Maginot GER `710173` / FRA `710739` | **Machine landed** |
+| 3 | Assault honesty | Named fid, no Berlin fallback | **Machine landed** |
+| 4 | March | Own-land hops + pin lerp | **Machine landed** |
+| 5 | Battle depth | Multi-day daily slices | **Machine landed** |
+| 6 | Unit card | Template / stockpile / thin assign | **Machine landed** |
+| 7 | Human proof | §0b + Maginot unit smoke · M6 notes | **Open** |
 
-**Parked unless play demands:** DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2/3`) · SE Asia densify · soft 30fps hard-pass · GameData split.
+**Parked unless play demands:** DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2/3`) · SE Asia densify · soft 30fps hard-pass · GameData split · commercial designer (residual #12).
 
 ### Phase P2 — L1 ship kit
 
@@ -207,8 +210,8 @@ Unchanged from SNAPSHOT §0 — restated for launch:
 
 ## 7. Immediate next three moves
 
-1. **Human:** `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · mark §0b **3–15** · append session notes.  
-2. **Machine:** Close the top play-named bug on a shipped path; keep gates green.  
-3. **Director:** When §0b + M6 are filed, flip SNAPSHOT launch traffic light L0→ready and open Phase P2 (L1 ship kit).
+1. **Human:** F5 TestScenario · §0b **3–15** · Maginot pin on `710173` · march · multi-day battle · unit card · append session notes.  
+2. **Machine:** Close play-named bugs on the shipped unit loop; keep `eoa_full_test_gates.sh` green.  
+3. **Director:** When §0b + M6 are filed, open Phase P2 (L1 ship kit: README play path + known issues).
 
 No calendar estimates — progress is measured by bar exits and session notes, not by weeks on a wall.
