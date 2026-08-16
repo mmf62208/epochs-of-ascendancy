@@ -1,11 +1,13 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-12 (keep-going board · `505d91d` + cad45c93 PR 1–4 · board still ~3520 · machine full-test green · M6 human-only open)  
-**Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
-**How to keep going:** 5-step protocol in §0. Next human: F5 §0b items 3–15. Next machine: playtest-driven shipped-path fix only. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
+**Date:** 2026-08-16 (L1 unit-centric war loop re-homed · launch ladder · board still ~3520 · machine full-test green · M6 human-only open · designer still PARTIAL · **launch bar L1 Alpha in progress**)  
+**Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · keep-going [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
+**Launch ladder:** [`LAUNCH_READINESS_PLAN.md`](LAUNCH_READINESS_PLAN.md) — L0 full-test · L1 Playable Alpha · L2 Early Access · L3 1.0 (MASTER)  
+**L1 forward:** [`FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md`](FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md) — pin → march → multi-day battle → unit card  
+**How to keep going:** 5-step protocol in §0. Next human: F5 §0b items 3–15 (unit pick / march / multi-day battle). Next machine: playtest-driven shipped-path fix only. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
 **Audience:** Human playtester, game director, implementer agents  
-**Source of truth for “what is true now”:** this file + [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md)  
+**Source of truth for “what is true now”:** this file + [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md) · launch path [`LAUNCH_READINESS_PLAN.md`](LAUNCH_READINESS_PLAN.md)  
 **Map star analysis (HOI4/V3 structure):** [`WORLD_CLASS_MAP_REVIEW.md`](WORLD_CLASS_MAP_REVIEW.md)  
 **HOI4 pillar gap review:** [`HOI4_EOA_GAP_REVIEW.md`](HOI4_EOA_GAP_REVIEW.md) · pure `hoi_full_test_gap_matrix_product` (17/17 P0 landed · open P0=0)  
 **Grok partner setup:** [`EOA_GROK_SETUP.md`](EOA_GROK_SETUP.md) · skill `eoa-full-test` · gates `tools/eoa_full_test_gates.sh` · `/eoa-gates`  
@@ -26,17 +28,18 @@ Every Cursor / Grok / human session on this tree:
 
 | Next | Action |
 |------|--------|
-| **Human** | `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · play §0b items **3–15** · append session notes. M6 20d/60d still open after that. |
+| **Human** | `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · play §0b items **3–15** · unit pin on Maginot `710173` · march · multi-day battle · append session notes. M6 20d/60d still open after that. |
 | **Machine** | Playtest-driven bug on a **shipped** path only. No new dual. No GameData split. No `ceb60fdd-*` merge. |
-| **GitHub** | **Ops** — no SSH/`gh` on the director machine. Local snapshot `505d91d` + this stack. Do not force-push over June Cursor history. |
+| **GitHub** | **Ops** — no SSH/`gh` on the director machine. Local snapshot `505d91d` + unit-centric stack. Do not force-push over June Cursor history. |
 
-**This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
+**This DAG (unit-centric war loop PR 1–6 under `505d91d`+):**
 
-- §0b first-session surfaces are **machine-composited** (`first_session_play_surface_product` + gates `--quick`). That is **not** M6.
+- §0b first-session surfaces are **machine-composited** (`first_session_play_surface_product` ANDs capital/fronts/war/corridor/save/hotkeys/assault/play_strip **plus** unit_pick + march + battle). That is **not** M6.
 - Assault hang-class **closed** at `30910c2` (greps green: fill-pids, no full icon rebuild, BM notify `target_pid`, success-path busy clears in `_assault_post_ui_light`; failure still clears synchronously).
 - Interactive multi-AI tag-scope is on the **official gate** (`test_interactive_multi_ai_day_product` in `eoa_full_test_gates.sh`).
+- **Unit-centric loop landed (machine):** pin-first pick · Maginot reserve GER `710173` / FRA `710739` · honest `can_assault` (named fid, no Berlin fallback) · own-land march + pin lerp · multi-day battle (daily org/str, capture on break, attacker initiative +0.15) · unit card template/stockpile/assign mode (not factory retool). **Designer still PARTIAL** (residual item 12 deferred). Board **~3520**.
 
-**Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3.
+**Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3 · commercial HOI designer chrome.
 
 **Do not merge:** `origin/cursor/*` (this clone has `origin/cursor/fix-void-return-2453`) · `feature/goals-forward-2026-06-18` · any `execute-plan/ceb60fdd-*` / `ceb60fdd-stack-assembly`. Work this tree (`505d91d`+). Dual board only via `EOA_SCENARIO=world_full`. Godot only via `tools/run_godot.sh`. Never renumber `world_full` IDs.
 
@@ -52,7 +55,9 @@ Every Cursor / Grok / human session on this tree:
 | **Order strip** | **EOA_PLAY_STRIP** player mode · pure `order_panel_play_strip_product` · dual/harness under `is_debug_build` only |
 | **Interactive multi-AI** | Personality-weighted major order (aggression) + budget 3 prod + 1 soft · pure `interactive_multi_ai_day_product` |
 | **Nation labels** | Capital **contiguous landmass** centroid (BFS) · scale by province n + pop · pure `map_nation_label_landmass_product` |
-| **Unit counters (pins)** | OOB/NATO map chips · **hidden at strategic zoom** · **Shift+U** master toggle · pure `map_unit_counter_lod_product` |
+| **Unit counters (pins)** | OOB/NATO map chips · **hidden at strategic zoom** · **Shift+U** master toggle · **pin-first pick** + selected chip · pure `map_unit_counter_lod_product` + `unit_centric_pick_product` |
+| **Unit-centric war loop** | **Landed (machine PR 1–6)** — pick → Maginot reserve → honest assault → own-land march → multi-day battle → unit card template/stockpile/assign · composer ANDs pick+march+battle+assault · **not M6** · designer **PARTIAL** |
+| **Maginot OOB reserve** | GER land on **`710173`** · FRA land on **`710739`** · front_reserve prepend · pure station resolver |
 | **RoW sparse densify** | **FULL DONE** — T1 Africa/AUS/Oceania + T2 CA/SA/India/sparse Asia · **~2608 → ~458** scoped playable · board **~3520** · remap `row_sparse_to_playable_remap.json` · pure `row_sparse_density_product` · write `merge_row_sparse_to_playable.py` · adj land_shared **~0.974** · 0 orphans · NE hit **0.986** |
 | **Map visual default** | **Clean political** — terrain underlay off · continuous sea + slight zone tint · solid land fills · **HOI-style borders** (dark international only; internal province edges tactical-only — fixes NUTS spiderweb) · pink select outline kept · nation labels high-contrast |
 | **Default scenario** | **`world_accurate`** → `data/provinces_world_accurate/` **~3520** (post US + full RoW sparse; was **~5670** / **~8761**) |
@@ -70,14 +75,14 @@ Every Cursor / Grok / human session on this tree:
 | **Stream 2 state labels** | **DONE** — states mapmode (**Shift+F9**) @ operational · **Europe NUTS budget quota** + geo-grid (not pure province_n) so Maginot theater stays labeled · pure `select_state_labels_for_budget` |
 | **WarLoop first-session** | **DONE** — toolbar **WarLoop** · **Shift+I** · `show_first_session_war_path` (EquipmentFlow ON + Fronts + assault brief) · pure `map_war_path_surface_product` |
 | **Human playtest kit** | **DONE** — `PLAYTEST_AND_DECISION_GUIDE.md` §0b post-merge checklist · **M6 20d/60d narrative still open** |
-| **§0b machine composer** | **DONE (PR 1)** — `first_session_play_surface_product` ANDs eight shipped builders · on `eoa_full_test_gates.sh --quick` · **not M6** |
+| **§0b machine composer** | **DONE (extended PR 6)** — `first_session_play_surface_product` ANDs eight shipped builders **+ unit_pick + march + battle** · on `eoa_full_test_gates.sh --quick` · **not M6** |
 | **Assault hang-class** | **CLOSED (PR 2 · `30910c2` greps green)** — no inspector on execute success · pid-only fill/icons · BM notify `target_pid` · success busy in `_assault_post_ui_light` |
 | **Adjacency** | `shared_edge_near_vertex_plus_knn` · land shared coverage **~0.974** · 0 land orphans · GER↔FRA kept |
 | **Geometry** | GIS hybrid + **us_merge_v1** + **row_sparse_merge_v1** · NE land hit **0.986** |
 | **Map finished (machine)** | **YES** — dual IDs intact · sparse densify closed · pick/multi-front/assault headless green · **M6 human notes not a gate** |
 | **Multi-front map** | Maginot · Polish · Alps · Baltic · CHI–JAP (real edges) |
 | **Multi-front live AI** | **Landed** — enemy border targets (not own stations) · Maginot+Polish headless PASS |
-| **HOI OOB deploy** | capital → key hubs → border → rest |
+| **HOI OOB deploy** | front_reserve (Maginot) → capital → key hubs → border → rest |
 | **Industrial hubs** | 31 key_provinces elevated factories/infra/city tier |
 | **Strategic resources** | coal/steel/oil/rubber/aluminum/chromium/tungsten painted (data **yes**) |
 | **Naval chokes** | **34** sea chokepoints |
@@ -194,10 +199,10 @@ tools/run_godot.sh --path . res://scenes/TestScenario.tscn
 
 **Map machine gate status:** closed. **Full-test play path re-verified 2026-08-01** (unit + QC + headless pick/assault + save + year multi-AI 365d; SCRIPT ERROR 0).  
 
-**§0b composer + hang-class + multi-AI gate (2026-08-12 DAG):** `test_first_session_play_surface_product` · `test_first_session_assault_surface_product` (hang-class greps green at `30910c2`) · `test_interactive_multi_ai_day_product` — all in `tools/eoa_full_test_gates.sh --quick`.
+**§0b composer + hang-class + multi-AI + unit-centric gate (2026-08-13 DAG):** `test_first_session_play_surface_product` (ANDs unit_pick+march+battle) · `test_first_session_assault_surface_product` (hang-class greps green; player path `start_province_battle`) · `test_unit_centric_pick_product` · `test_formation_march_product` · `test_multi_day_battle_product` · `test_interactive_multi_ai_day_product` — all in `tools/eoa_full_test_gates.sh --quick`. **No M6-complete claim.**
 
 **Year multi-AI (lean) latest:** 71 nations · 365 days · major_apply_sum ≥ majors×days/2 · no OOM · shell fail-closed on SCRIPT ERROR / Killed.  
 
 Remaining map-star open item is **human-only M6**. This keep-going board is **PR 4 of 4**, not the only PR.
 
-Next orchestration: **[`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md)**.
+Next orchestration: **[`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md)** · launch ladder **[`LAUNCH_READINESS_PLAN.md`](LAUNCH_READINESS_PLAN.md)**.

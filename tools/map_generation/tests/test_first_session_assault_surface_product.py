@@ -36,6 +36,8 @@ class TestFirstSessionAssaultSurfaceProduct(unittest.TestCase):
         self.assertGreaterEqual(len(ASSAULT_STEPS), 4)
         joined = " ".join(ASSAULT_STEPS)
         self.assertIn("Ctrl+click", joined)
+        self.assertIn("start_province_battle", joined)
+        self.assertIn("daily org/str", joined)
 
     def test_product_ger(self) -> None:
         p = build_first_session_assault_surface_product(
@@ -79,6 +81,24 @@ class TestFirstSessionAssaultSurfaceProduct(unittest.TestCase):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
         self.assertEqual(list(p.get("fail") or []), [], msg=p)
         self.assertTrue(p.get("ok"), msg=p)
+
+    def test_assault_honesty_wiring(self) -> None:
+        p = build_first_session_assault_surface_product(check_wiring=True)
+        wiring = p.get("wiring") or {}
+        for key in (
+            "can_assault_has_formation_id",
+            "execute_can_with_fid",
+            "map_uses_selected_formation",
+            "map_uses_preview_assault",
+            "map_no_province_insight_toast",
+            "map_march_first_distant",
+            "map_starts_province_battle",
+            "can_honest_no_berlin_fallback",
+            "success_slice_starts_battle",
+            "is_in_combat_clears_in_battle_manager",
+            "apply_province_capture_no_damage",
+        ):
+            self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 
 
 if __name__ == "__main__":

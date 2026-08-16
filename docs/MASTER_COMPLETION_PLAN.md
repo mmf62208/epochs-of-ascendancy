@@ -4,7 +4,8 @@
 **Audience:** Producer, implementers, Cursor agents  
 **Rule:** Nothing is “deferred forever.” Everything below has a **phase**, **exit criteria**, and **Cursor prompt**. High-cost items are **later phases**, not abandoned.
 
-**Full-test orchestration (preferred for next sessions):** [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md) · status [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md)
+**Full-test orchestration (preferred for next sessions):** [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md) · status [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md)  
+**Launch bars (L0–L3):** [`LAUNCH_READINESS_PLAN.md`](LAUNCH_READINESS_PLAN.md) — this MASTER file is the multi-month catalogue; launch sequencing starts from human L0 proof, not Phase G0
 
 ---
 

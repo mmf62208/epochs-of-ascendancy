@@ -900,9 +900,17 @@ func get_adjacent_provinces(province_id: int, only_land: bool = true) -> Array[i
 
 ## M4: BFS land path on adjacency (optional owner + transit-rights filter).
 ## Mirrors map_supply_corridor_product.bfs_land_path.
-## When owner_tag set: only own land, unowned, or allied/access-rights land — never neutral
-## (East Prussia requires sea unless POL grants transit). Returns chain or empty within max_hops.
-func find_land_path(from_id: int, to_id: int, owner_tag: String = "", max_hops: int = 80) -> Array[int]:
+## When owner_tag set (own_land_only=false): own land, unowned, or allied/access-rights land —
+## never neutral (East Prussia requires sea unless POL grants transit).
+## When own_land_only=true: BFS neighbors must be controlled by tag (player marches). Do not
+## post-filter a transit path — that breaks adjacency. G/corridor keep default false.
+func find_land_path(
+	from_id: int,
+	to_id: int,
+	owner_tag: String = "",
+	max_hops: int = 80,
+	own_land_only: bool = false,
+) -> Array[int]:
 	var empty: Array[int] = []
 	if from_id <= 0 or to_id <= 0:
 		return empty
@@ -929,7 +937,12 @@ func find_land_path(from_id: int, to_id: int, owner_tag: String = "", max_hops: 
 				if p != null:
 					if bool(p.is_sea):
 						continue
-					if not _land_allows_supply_transit(p, tag):
+					if own_land_only:
+						# Player march: only land controlled by tag (no transit/unowned shortcut).
+						var ctrl := str(p.controller_tag).strip_edges().to_upper() if not str(p.controller_tag).is_empty() else str(p.owner_tag).strip_edges().to_upper()
+						if ctrl != tag:
+							continue
+					elif not _land_allows_supply_transit(p, tag):
 						continue
 			seen[xi] = true
 			prev[xi] = n
@@ -2843,14 +2856,17 @@ func apply_assault_stage_mutation(
 		return {"ok": false, "reason": "no BattleManager", "mutation": mut}
 	var tag := str(plan.get("attacker_tag", attacker_tag))
 	var fid := str(plan.get("formation_id", formation_id))
-	if bool(plan.get("execute", false)) and BattleManager.has_method("execute_province_assault"):
-		var res: Dictionary = BattleManager.execute_province_assault(
-			tag, target_province_id, from_province_id, fid
-		)
-		return {"ok": bool(res.get("success", false)), "result": res, "mutation": mut}
+	if bool(plan.get("execute", false)):
+		# Stage-mutation automation stays one-shot. Player/play-strip multi-day is GameData only.
+		if BattleManager.has_method("execute_province_assault"):
+			var res: Dictionary = BattleManager.execute_province_assault(
+				tag, target_province_id, from_province_id, fid
+			)
+			return {"ok": bool(res.get("success", false)), "result": res, "mutation": mut}
 	if BattleManager.has_method("can_assault_province"):
+		# Same honesty as map: named fid + real from/to (no Berlin fallback).
 		var preview: Dictionary = BattleManager.can_assault_province(
-			tag, target_province_id, from_province_id
+			tag, target_province_id, from_province_id, fid
 		)
 		return {"ok": bool(preview.get("ok", false)), "result": preview, "mutation": mut, "prep_only": true}
 	return {"ok": false, "reason": "no assault API", "mutation": mut}

@@ -7881,27 +7881,117 @@ func apply_order_panel_action(action_id: String, province_id: int = 1) -> Dictio
 	if aid == "hh_campaign_day" or aid == "apply_hh_campaign_day":
 		return apply_hh_campaign_day(province_id)
 	if aid == "apply_assault" or aid == "assault" or aid == "multi_phase_assault":
+		# Resolve selected unit + real from/to (no (pid,pid,"") and no forced ok=true).
+		var atag := "GER"
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+			atag = str(LeaderManager.get_player_country_tag()).to_upper()
+		if atag.is_empty():
+			atag = "GER"
+		var mr: Node = null
+		var tree := get_tree()
+		if tree != null:
+			for n in tree.get_nodes_in_group("map_renderer"):
+				mr = n
+				break
+			if mr == null and tree.current_scene != null:
+				mr = tree.current_scene.find_child("MapRenderer", true, false)
+		var fid := ""
+		if mr != null and "selected_formation_id" in mr:
+			fid = str(mr.selected_formation_id).strip_edges()
+		if fid.is_empty():
+			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("select a unit pin first", 3.5, false, true)
+			return {"ok": false, "reason": "no selected unit", "live": true, "manager": "BattleManager"}
+		var from_pid := -1
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+			var fo: Formation = LeaderManager.get_formation(fid)
+			if fo != null and "stationed_province_id" in fo:
+				from_pid = int(fo.stationed_province_id)
+		if from_pid < 0:
+			return {"ok": false, "reason": "selected unit has no station", "formation_id": fid}
+		var target_pid := -1
+		# Prefer selected enemy province; else current B/Fronts target.
+		if mr != null and "selected_province_id" in mr:
+			var sel_pid := int(mr.selected_province_id)
+			if sel_pid >= 0 and typeof(MapManager) != TYPE_NIL:
+				var sel_p: Province = MapManager.get_province(sel_pid)
+				if sel_p != null:
+					var ctrl := str(sel_p.controller_tag).strip_edges().to_upper()
+					if ctrl.is_empty():
+						ctrl = str(sel_p.owner_tag).strip_edges().to_upper()
+					if not ctrl.is_empty() and ctrl != atag:
+						target_pid = sel_pid
+		if target_pid < 0 and mr != null and "_live_border_fronts_cache" in mr:
+			var fronts: Array = mr._live_border_fronts_cache
+			if fronts is Array and not fronts.is_empty():
+				var row: Variant = fronts[0]
+				if row is Dictionary:
+					target_pid = int(row.get("province_id", -1))
+		if target_pid < 0 and province_id > 0 and province_id != from_pid:
+			# Order-strip may pass an enemy province_id explicitly.
+			if typeof(MapManager) != TYPE_NIL:
+				var arg_p: Province = MapManager.get_province(province_id)
+				if arg_p != null:
+					var actrl := str(arg_p.controller_tag).strip_edges().to_upper()
+					if actrl.is_empty():
+						actrl = str(arg_p.owner_tag).strip_edges().to_upper()
+					if not actrl.is_empty() and actrl != atag:
+						target_pid = province_id
+		if target_pid < 0:
+			if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("select an enemy hex or press B", 3.5, false, true)
+			return {"ok": false, "reason": "no enemy target", "formation_id": fid, "from_province_id": from_pid}
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("can_assault_province"):
+			var can_chk: Dictionary = BattleManager.can_assault_province(atag, target_pid, from_pid, fid)
+			if not bool(can_chk.get("ok", false)):
+				var why := str(can_chk.get("reason", "cannot assault"))
+				if why.findn("not adjacent") >= 0:
+					why = "March to the border first"
+				if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+					LeaderEventUI.show_toast(why, 3.5, false, true)
+				return {
+					"ok": false,
+					"reason": why,
+					"formation_id": fid,
+					"from_province_id": from_pid,
+					"target_province_id": target_pid,
+					"live": true,
+					"manager": "BattleManager",
+				}
+		# Player strip: start multi-day battle (same contract as map confirm).
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_province_battle"):
+			var started: Dictionary = BattleManager.start_province_battle(atag, target_pid, from_pid, fid)
+			return {
+				"ok": bool(started.get("success", false)),
+				"result": started,
+				"live": true,
+				"manager": "BattleManager",
+				"formation_id": fid,
+				"from_province_id": from_pid,
+				"target_province_id": target_pid,
+				"multi_day": true,
+				"reason": str(started.get("reason", "")),
+			}
 		if MapManager.has_method("apply_assault_stage_mutation"):
-			var atag := "GER"
-			if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
-				atag = str(LeaderManager.get_player_country_tag()).to_upper()
-			if atag.is_empty():
-				atag = "GER"
-			var ares: Dictionary = MapManager.apply_assault_stage_mutation(province_id, province_id, "", atag)
-			# Major #28: BattleManager path is live even when prep-only (no execute yet).
-			if typeof(BattleManager) != TYPE_NIL:
-				ares["live"] = true
-				ares["manager"] = "BattleManager"
-				if not bool(ares.get("ok", false)) and bool(ares.get("prep_only", false)):
-					ares["ok"] = true
-				elif not bool(ares.get("ok", false)):
-					# Still count manager presence as live audit success with honest prep fail reason.
-					ares["ok"] = true
-					ares["prep_only"] = true
-					ares["reason"] = str(ares.get("reason", "assault prep path"))
+			var ares: Dictionary = MapManager.apply_assault_stage_mutation(from_pid, target_pid, fid, atag)
+			ares["live"] = true
+			ares["manager"] = "BattleManager"
+			ares["formation_id"] = fid
+			ares["from_province_id"] = from_pid
+			ares["target_province_id"] = target_pid
+			# Honest: never force ok=true on prep/execute fail.
 			return ares
-		if typeof(BattleManager) != TYPE_NIL:
-			return {"ok": true, "live": true, "manager": "BattleManager", "prep_only": true, "reason": "BattleManager present, no MapManager mutation"}
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("execute_province_assault"):
+			var ex: Dictionary = BattleManager.execute_province_assault(atag, target_pid, from_pid, fid)
+			return {
+				"ok": bool(ex.get("success", false)),
+				"result": ex,
+				"live": true,
+				"manager": "BattleManager",
+				"formation_id": fid,
+				"from_province_id": from_pid,
+				"target_province_id": target_pid,
+			}
 		return {"ok": false, "reason": "no assault apply"}
 	if aid == "multi_phase_combat_product" or aid == "apply_multi_phase_combat_product":
 		return apply_multi_phase_combat_product(province_id)
