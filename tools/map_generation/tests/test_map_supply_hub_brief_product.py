@@ -142,7 +142,9 @@ class TestMapSupplyHubBriefProduct(unittest.TestCase):
         self.assertIn("func _resolve_corridor_source_for_tag", ren)
         self.assertIn("func _pick_best_supply_hub_for_front", ren)
         self.assertIn("key_provinces", ren)
-        self.assertIn("Supply hub", ren)
+        # Toast copy is "Supply · … · fuel …" (hub brief product); keep corridor resolve wired.
+        self.assertIn("Supply ·", ren)
+        self.assertIn("fuel_score", ren)
         self.assertIn("highlight_corridor_capital_to_selected", ren)
 
 
