@@ -553,6 +553,13 @@ func _gather_save_data() -> Dictionary:
 	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("get_save_data"):
 		data["relations"] = RelationsManager.get_save_data()
 
+	# --- BattleManager multi-day battles + marches ---
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_save_data"):
+		var bm_blob: Dictionary = BattleManager.get_save_data()
+		data["battles"] = bm_blob.get("battles", [])
+		data["marches"] = bm_blob.get("marches", [])
+		data["battle_manager"] = bm_blob
+
 	return data
 
 
@@ -622,6 +629,18 @@ func _apply_save_data(data: Dictionary) -> void:
 	# 7. Leaders (formations include stationed_province_id)
 	if data.has("leaders") and typeof(LeaderManager) != TYPE_NIL:
 		_apply_leader_state(data["leaders"])
+
+	# 7a. Battles + marches after formations.
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("apply_save_data"):
+		var bm_payload: Dictionary = {}
+		if data.has("battle_manager") and data["battle_manager"] is Dictionary:
+			bm_payload = data["battle_manager"] as Dictionary
+		else:
+			if data.has("battles"):
+				bm_payload["battles"] = data["battles"]
+			if data.has("marches"):
+				bm_payload["marches"] = data["marches"]
+		BattleManager.apply_save_data(bm_payload)
 
 	# 7b. Division map deployments (after leaders; syncs CombatPresenceRegistry engineers)
 	if data.has("supply") and typeof(SupplyManager) != TYPE_NIL:

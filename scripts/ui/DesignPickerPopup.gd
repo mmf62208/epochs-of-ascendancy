@@ -36,6 +36,13 @@ const DOMAIN_FILTER_TOOLTIPS: PackedStringArray = [
 @export var factory_id: int = 0
 @export var province_id: int = 0
 @export var country_tag: String = "GER"
+## Explicit unit-assign mode: skips factory retool and factory_can_build gates.
+## Prefer this over factory_id==0 alone so a missing production factory_id cannot mis-route.
+var assign_mode: bool = false
+## Optional callback when assign_mode confirms (MapRenderer unit card).
+var assign_callback: Callable = Callable()
+
+signal design_chosen(design_id: String)
 
 @onready var title_label: Label = $MarginContainer/VBoxContainer/TitleLabel
 @onready var context_label: Label = $MarginContainer/VBoxContainer/ContextLabel
@@ -59,8 +66,13 @@ var _relocate_target_pid: int = -1
 var _relocate_target_name: String = ""
 
 
+func _is_assign_mode() -> bool:
+	# Explicit flag only — never treat a zero/missing factory_id as assign by itself.
+	return assign_mode
+
+
 func _ready() -> void:
-	title = "Select Production Design"
+	title = "Assign Design to Unit" if _is_assign_mode() else "Select Production Design"
 	close_requested.connect(_on_cancel_pressed)
 	_clamp_window_to_viewport()
 
@@ -80,10 +92,18 @@ func _ready() -> void:
 	legend_label.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
 
 	var tag := country_tag.strip_edges().to_upper()
-	title_label.text = "Production design — %s" % tag if not tag.is_empty() else "Production design"
+	if _is_assign_mode():
+		title_label.text = "Assign design — %s" % tag if not tag.is_empty() else "Assign design"
+		confirm_button.text = "Assign"
+	else:
+		title_label.text = "Production design — %s" % tag if not tag.is_empty() else "Production design"
 	_sync_province_from_factory()
-	_ensure_relocate_map_button()
+	if not _is_assign_mode():
+		_ensure_relocate_map_button()
 	_update_factory_context_label()
+	if _is_assign_mode():
+		context_label.visible = true
+		context_label.text = "Designs you produce show up here — assign to this unit."
 	search_edit.placeholder_text = "Search name, nation, captured, role, year…"
 	search_edit.tooltip_text = (
 		"All words must match (e.g. panzer captured). "
@@ -1166,6 +1186,13 @@ func _scroll_list_to_top() -> void:
 
 
 func _is_design_selectable(design_id: String) -> bool:
+	if design_id.is_empty():
+		return false
+	# Unit assign: catalog + country_may_use only — never factory_can_build(null).
+	if _is_assign_mode():
+		if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("country_may_use_design"):
+			return DesignManager.country_may_use_design(country_tag, design_id)
+		return true
 	if typeof(DesignManager) != TYPE_NIL:
 		if not DesignManager.is_design_factory_compatible(design_id, _get_factory()):
 			return false
@@ -1180,6 +1207,9 @@ func _is_design_selectable(design_id: String) -> bool:
 
 
 func _factory_allows_design(design_id: String) -> bool:
+	# Assign mode: null factory must not fail with no_factory.
+	if _is_assign_mode():
+		return true
 	if typeof(TechnologyManager) == TYPE_NIL:
 		return true
 	return bool(
@@ -1385,6 +1415,15 @@ func _on_design_selected(index: int) -> void:
 
 func _on_confirm_pressed() -> void:
 	if selected_design.is_empty() or not _is_design_selectable(selected_design):
+		return
+	# Assign mode: factory_id == 0 means unit design assign — never retool a factory.
+	if _is_assign_mode():
+		var did := selected_design
+		if assign_callback.is_valid():
+			assign_callback.call(did)
+		design_chosen.emit(did)
+		hide()
+		call_deferred("queue_free")
 		return
 	var warning_scene: PackedScene = load("res://scenes/ui/RetoolingWarningPopup.tscn")
 	if warning_scene == null:

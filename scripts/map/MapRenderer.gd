@@ -447,6 +447,7 @@ func _ready():
 	# Connect infra signals for live inspector project progress and layer updates (playability).
 	call_deferred("_connect_infra_signals_for_inspector")
 	call_deferred("_setup_player_map_ux")
+	call_deferred("_connect_battle_feedback_signals")
 
 	# Setup coarse world territories (hidden by default; shown on world grand load for full stitched scroll + clickable regions outside Europe detailed).
 	# Addresses "not every province/region on the map has a territory you can click to get into" for the world base.
@@ -1008,6 +1009,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		# Esc: dismiss stuck overlays (legend / tech / info) so playtest is never trapped.
 		if event.keycode == KEY_ESCAPE:
+			# Esc order: withdraw from engaging battle → close unit card → clear selection → overlays.
+			if not selected_formation_id.is_empty() and typeof(BattleManager) != TYPE_NIL:
+				if BattleManager.has_method("is_formation_in_battle") and BattleManager.is_formation_in_battle(selected_formation_id):
+					if BattleManager.has_method("withdraw_from_battle"):
+						var w: Dictionary = BattleManager.withdraw_from_battle(selected_formation_id)
+						if bool(w.get("ok", false)):
+							_show_inspector_toast("Withdrew from battle · selection kept", 3.0)
+							get_viewport().set_input_as_handled()
+							return
 			var ui_esc := get_node_or_null("UI") as CanvasLayer
 			if ui_esc != null:
 				var unit_pop := ui_esc.get_node_or_null("UnitDetailPopup")
@@ -1015,13 +1025,24 @@ func _unhandled_input(event: InputEvent) -> void:
 					unit_pop.queue_free()
 					get_viewport().set_input_as_handled()
 					return
-			# Clear selected map unit before other dismissals.
 			if not selected_formation_id.is_empty():
 				selected_formation_id = ""
+				_refresh_selected_unit_chip()
 				_show_inspector_toast("Unit selection cleared", 2.0)
 				get_viewport().set_input_as_handled()
 				return
 			if _dismiss_map_overlays_esc():
+				get_viewport().set_input_as_handled()
+				return
+		# Stack cycle on selected pin province: [ previous · ] next (unit card also has buttons).
+		if (
+			(event.keycode == KEY_BRACKETLEFT or event.keycode == KEY_BRACKETRIGHT)
+			and not selected_formation_id.is_empty()
+			and not event.ctrl_pressed
+			and not event.alt_pressed
+		):
+			var stack_dir := -1 if event.keycode == KEY_BRACKETLEFT else 1
+			if _cycle_selected_stack_unit(stack_dir):
 				get_viewport().set_input_as_handled()
 				return
 		if event.keycode == KEY_L:
@@ -1269,6 +1290,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_select_province(resolved_province, resolved_node)
 				get_viewport().set_input_as_handled()
 				return
+			# Strategic zoom / master-off: pins hidden — one-shot discoverability for unit pick.
+			if not _unit_pick_strategic_hint_shown and not _unit_counters_want_visible():
+				_unit_pick_strategic_hint_shown = true
+				_show_inspector_toast("Zoom in to pick units (Shift+U toggles counters).", 3.5)
 			# Select first (outline immediately); center + left inspector (avoid covering selection).
 			_select_province(resolved_province, resolved_node)
 			_center_camera_on_province(resolved_province.id, "soft")
@@ -1326,6 +1351,8 @@ func _process(delta: float) -> void:
 	_pulse_stack_badges(delta)
 	# Pass 52: pin-focus pulse rings (works while paused).
 	_update_pin_focus_pulse(delta)
+	# March pin lerp + remaining-path Line2D (cosmetic; sim hops day-authoritative).
+	_update_march_visuals(delta, sim_paused)
 
 	# Selection/hover outline pulse always (including paused playtest) so shape stays readable.
 	_outline_pulse_phase += delta * 4.5
@@ -15651,6 +15678,7 @@ func _select_map_unit(formation: Object) -> void:
 	if "formation_id" in formation:
 		fid = str(formation.formation_id)
 	selected_formation_id = fid
+	_refresh_selected_unit_chip()
 	var name_s := str(formation.name) if "name" in formation else fid
 	var pid := int(formation.stationed_province_id) if "stationed_province_id" in formation else -1
 	if pid >= 0:
@@ -15662,7 +15690,86 @@ func _select_map_unit(formation: Object) -> void:
 		DebugOverlay.toast_map_debug(toast)
 
 
+## Selected-chip ring via nation-frame helper. One pin per province — match by station pid
+## (stack cycle keeps ring on the province pin even when selected_formation_id is not the rep).
+func _refresh_selected_unit_chip() -> void:
+	if _demo_unit_icon_pids.is_empty():
+		return
+	var gold := Color(1.0, 0.85, 0.25, 1.0)
+	# Resolve selected formation's station province (stack cycle: fid changes, pin stays).
+	var sel_pid := -1
+	if not selected_formation_id.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var sel_f: Formation = LeaderManager.get_formation(selected_formation_id)
+		if sel_f != null and "stationed_province_id" in sel_f:
+			sel_pid = int(sel_f.stationed_province_id)
+	for id_v in _demo_unit_icon_pids:
+		var id := int(id_v)
+		if not province_nodes.has(id):
+			continue
+		var n: Node2D = province_nodes[id] as Node2D
+		if n == null:
+			continue
+		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+		if counter == null or not is_instance_valid(counter):
+			continue
+		# free() same-frame so re-add is not renamed SelectedFrame2 (queue_free leaves sibling).
+		var old_sel: Node = counter.get_node_or_null("SelectedFrame")
+		if old_sel != null:
+			counter.remove_child(old_sel)
+			old_sel.free()
+		if selected_formation_id.is_empty() or sel_pid < 0:
+			continue
+		# Province pin match (one DemoUnitIcon per pid); formation_id equality is optional fast path.
+		var pin_pid := int(counter.get_meta("province_id", id))
+		var cfid := str(counter.get_meta("formation_id", ""))
+		var match_pin := pin_pid == sel_pid or (not cfid.is_empty() and cfid == selected_formation_id)
+		if not match_pin:
+			continue
+		var frame := _make_unit_nation_frame(gold)
+		frame.name = "SelectedFrame"
+		frame.z_index = 20
+		counter.add_child(frame)
+
+
+## Cycle stack at selected unit's province ([ ] keys / unit card buttons). One pin per province.
+func _cycle_selected_stack_unit(delta: int) -> bool:
+	if selected_formation_id.is_empty() or delta == 0:
+		return false
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return false
+	var cur: Formation = LeaderManager.get_formation(selected_formation_id)
+	if cur == null:
+		return false
+	var pid := int(cur.stationed_province_id) if "stationed_province_id" in cur else -1
+	var tag := str(cur.country_tag).strip_edges().to_upper() if "country_tag" in cur else ""
+	if pid < 0 or tag.is_empty():
+		return false
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("get_divisions_at_province"):
+		return false
+	var divs: Array = BattleManager.get_divisions_at_province(pid, tag)
+	if divs.size() <= 1:
+		return false
+	var idx := 0
+	for i in divs.size():
+		if str(divs[i].get("formation_id", "")) == selected_formation_id:
+			idx = i
+			break
+	var n := divs.size()
+	idx = posmod(idx + delta, n)
+	var next_fid := str(divs[idx].get("formation_id", ""))
+	if next_fid.is_empty():
+		return false
+	var next_f: Formation = LeaderManager.get_formation(next_fid)
+	if next_f == null:
+		return false
+	_select_map_unit(next_f)
+	_show_unit_detail_popup(next_f)
+	return true
+
+
 ## Order selected unit to a friendly (or owned) province. Returns true if handled.
+## Default: multi-day own-land march via BattleManager.issue_march_order.
+## EOA_UNIT_WAR=0: instant LeaderManager station write (bisect path; no march).
 func _try_move_selected_unit_to_province(province: Province) -> bool:
 	if province == null or selected_formation_id.is_empty():
 		return false
@@ -15681,18 +15788,62 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 			from_pid = int(pre.stationed_province_id)
 	if from_pid < 0:
 		from_pid = attack_staging_province_id
+
+	# Bisect killswitch: instant station only (no multi-day march).
+	if OS.get_environment("EOA_UNIT_WAR").strip_edges() == "0":
+		return _try_move_selected_unit_instant_station(province, fid, dest, from_pid, p_tag)
+
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("issue_march_order"):
+		return _try_move_selected_unit_instant_station(province, fid, dest, from_pid, p_tag)
+
+	var res: Dictionary = BattleManager.issue_march_order(fid, dest, p_tag, false)
+	if bool(res.get("cancelled", false)):
+		_clear_march_path_line(fid)
+		_show_inspector_toast("March cancelled · %s" % fid, 2.5)
+		return true
+	if not bool(res.get("ok", false)):
+		var reason := str(res.get("reason", "no path / not your unit"))
+		var toast := "Move blocked · %s" % reason
+		if reason == "no land path":
+			toast = "No land path · %s → %s" % [fid, province.name]
+		_show_inspector_toast(toast, 3.5, true)
+		return true
+	if str(res.get("reason", "")) == "already there":
+		_show_inspector_toast("Already at %s" % province.name, 2.0)
+		return true
+	var n_hex := int(res.get("hexes", 0))
+	if n_hex <= 0:
+		var path_arr: Array = res.get("path", []) as Array
+		n_hex = maxi(path_arr.size() - 1, 0)
+	var days_est := float(res.get("days_total", float(n_hex)))
+	var pname := province.name if not str(province.name).is_empty() else str(dest)
+	_show_inspector_toast(
+		"March · %s · %d hexes · ~%.0fd · click dest again to cancel" % [pname, n_hex, days_est],
+		4.5,
+	)
+	_sync_march_path_lines()
+	return true
+
+
+## Instant station fallback (EOA_UNIT_WAR=0 or BattleManager missing).
+func _try_move_selected_unit_instant_station(
+	province: Province,
+	fid: String,
+	dest: int,
+	from_pid: int,
+	p_tag: String,
+) -> bool:
 	var ok := false
 	var reason := ""
-	if typeof(FormationMovement) != TYPE_NIL:
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("station_formation_on_province"):
+		var sres: Dictionary = BattleManager.station_formation_on_province(fid, dest, p_tag)
+		ok = bool(sres.get("ok", false))
+		reason = str(sres.get("reason", "stationed"))
+	elif typeof(FormationMovement) != TYPE_NIL:
 		var res: Dictionary = FormationMovement.move_formation_to_province(fid, dest, p_tag)
 		ok = bool(res.get("ok", false))
 		reason = str(res.get("reason", ""))
-	elif typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("move_formation_to_province"):
-		var res2: Dictionary = SupplyManager.move_formation_to_province(fid, dest, p_tag)
-		ok = bool(res2.get("ok", false))
-		reason = str(res2.get("reason", ""))
 	if not ok and typeof(LeaderManager) != TYPE_NIL:
-		# Fallback: station OOB source of truth even if path/template missing.
 		var f: Formation = LeaderManager.get_formation(fid) if LeaderManager.has_method("get_formation") else null
 		if f != null and str(f.country_tag).to_upper() == p_tag:
 			f.stationed_province_id = dest
@@ -15711,7 +15862,163 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 		call_deferred("refresh_after_capture_light", dest, from_pid)
 		return true
 	_show_inspector_toast("Move blocked · %s" % (reason if not reason.is_empty() else "no path / not your unit"), 3.5, true)
-	return true  # handled (showed feedback)
+	return true
+
+
+## Cosmetic march lerp + remaining-path Line2D (budget MARCH_PATH_LINE_BUDGET).
+func _update_march_visuals(delta: float, sim_paused: bool) -> void:
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("get_active_marches"):
+		_clear_all_march_path_lines()
+		return
+	if BattleManager.has_method("has_active_marches") and not BattleManager.has_active_marches():
+		_clear_all_march_path_lines()
+		return
+	# Live dict (no deep-copy); treat as read-only except set_march_visual_t.
+	var marches: Dictionary = BattleManager.get_active_marches()
+	if marches.is_empty():
+		_clear_all_march_path_lines()
+		return
+	var time_scale := 1.0
+	if typeof(TimeManager) != TYPE_NIL:
+		if "time_scale" in TimeManager:
+			time_scale = maxf(float(TimeManager.time_scale), 0.0)
+		elif TimeManager.has_method("get_time_scale"):
+			time_scale = maxf(float(TimeManager.get_time_scale()), 0.0)
+	if sim_paused:
+		time_scale = 0.0
+	var rate := (1.0 / MARCH_SECONDS_PER_HEX_VISUAL) * time_scale
+	var drawn := 0
+	var active_fids: Dictionary = {}
+	for fid_v in marches.keys():
+		var fid := str(fid_v)
+		active_fids[fid] = true
+		var order: Dictionary = marches[fid] as Dictionary
+		var path: Array = order.get("path", []) as Array
+		var idx := int(order.get("idx", 0))
+		if path.size() < 2 or idx >= path.size() - 1:
+			continue
+		var t := float(order.get("visual_t", 0.0))
+		if rate > 0.0:
+			var step := minf(delta * rate, MARCH_VISUAL_T_DELTA_CAP)
+			t = minf(t + step, 0.98)  # never fully reach next hex before sim hop
+			if BattleManager.has_method("set_march_visual_t"):
+				BattleManager.set_march_visual_t(fid, t)
+		# Pin lerp along current edge centroids (map-space).
+		var a_pid := int(path[idx])
+		var b_pid := int(path[idx + 1])
+		var a_pos: Vector2 = province_centroids.get(a_pid, Vector2.ZERO) as Vector2
+		var b_pos: Vector2 = province_centroids.get(b_pid, Vector2.ZERO) as Vector2
+		if a_pos != Vector2.ZERO or b_pos != Vector2.ZERO:
+			var world := a_pos.lerp(b_pos, t)
+			# Only move pin when it represents this marching fid (stack >1 keeps province pin).
+			_set_march_pin_world_pos(fid, a_pid, world)
+		# Remaining path Line2D (budget 8 player marches).
+		if drawn < MARCH_PATH_LINE_BUDGET:
+			_draw_march_remaining_path(fid, path, idx, t)
+			drawn += 1
+	# Drop lines for finished marches.
+	var stale: Array = []
+	for k in _march_path_lines.keys():
+		if not active_fids.has(str(k)):
+			stale.append(str(k))
+	for s in stale:
+		_clear_march_path_line(str(s))
+
+
+func _set_march_pin_world_pos(fid: String, station_pid: int, world_pos: Vector2) -> void:
+	# Prefer icon at current station province; only lerp when pin meta matches marching fid.
+	var counter: Node2D = null
+	if province_nodes.has(station_pid):
+		var n: Node2D = province_nodes[station_pid] as Node2D
+		if n != null:
+			counter = n.get_node_or_null("DemoUnitIcon_" + str(station_pid)) as Node2D
+	if counter == null:
+		for id_v in _demo_unit_icon_pids:
+			var id := int(id_v)
+			if not province_nodes.has(id):
+				continue
+			var n2: Node2D = province_nodes[id] as Node2D
+			if n2 == null:
+				continue
+			var c2: Node2D = n2.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+			if c2 == null:
+				continue
+			if str(c2.get_meta("formation_id", "")) == fid:
+				counter = c2
+				break
+	if counter == null or not is_instance_valid(counter):
+		return
+	# Stack >1: province pin represents a different rep — path line only, no pin drift.
+	var pin_fid := str(counter.get_meta("formation_id", ""))
+	if not pin_fid.is_empty() and pin_fid != fid:
+		return
+	var parent_n := counter.get_parent() as Node2D
+	if parent_n != null:
+		counter.global_position = world_pos
+	else:
+		counter.position = world_pos + Vector2(0, -8)
+
+
+func _ensure_march_path_layer() -> void:
+	if _march_path_layer != null and is_instance_valid(_march_path_layer):
+		return
+	_march_path_layer = Node2D.new()
+	_march_path_layer.name = "MarchPathLayer"
+	_march_path_layer.z_index = 18
+	# Parent under province container so path shares map-space with pins/centroids.
+	if container != null and is_instance_valid(container):
+		container.add_child(_march_path_layer)
+	else:
+		add_child(_march_path_layer)
+
+
+func _draw_march_remaining_path(fid: String, path: Array, idx: int, visual_t: float) -> void:
+	_ensure_march_path_layer()
+	var line: Line2D = _march_path_lines.get(fid) as Line2D
+	if line == null or not is_instance_valid(line):
+		line = Line2D.new()
+		line.name = "MarchPath_" + fid
+		line.width = 2.0
+		line.default_color = Color(0.35, 0.85, 1.0, 0.75)
+		line.joint_mode = Line2D.LINE_JOINT_ROUND
+		line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+		line.end_cap_mode = Line2D.LINE_CAP_ROUND
+		line.z_index = 0
+		_march_path_layer.add_child(line)
+		_march_path_lines[fid] = line
+	var pts: PackedVector2Array = PackedVector2Array()
+	# Start from current lerp position along edge idx → idx+1.
+	if idx < path.size() - 1:
+		var a: Vector2 = province_centroids.get(int(path[idx]), Vector2.ZERO) as Vector2
+		var b: Vector2 = province_centroids.get(int(path[idx + 1]), Vector2.ZERO) as Vector2
+		pts.append(a.lerp(b, visual_t))
+		for i in range(idx + 1, path.size()):
+			var p: Vector2 = province_centroids.get(int(path[i]), Vector2.ZERO) as Vector2
+			if p != Vector2.ZERO:
+				pts.append(p)
+	line.points = pts
+	line.visible = pts.size() >= 2
+
+
+func _clear_march_path_line(fid: String) -> void:
+	if not _march_path_lines.has(fid):
+		return
+	var line: Line2D = _march_path_lines[fid] as Line2D
+	_march_path_lines.erase(fid)
+	if line != null and is_instance_valid(line):
+		line.queue_free()
+
+
+func _clear_all_march_path_lines() -> void:
+	for k in _march_path_lines.keys():
+		var line: Line2D = _march_path_lines[k] as Line2D
+		if line != null and is_instance_valid(line):
+			line.queue_free()
+	_march_path_lines.clear()
+
+
+func _sync_march_path_lines() -> void:
+	_update_march_visuals(0.0, false)
 
 
 func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
@@ -15721,10 +16028,14 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 	var z := 1.0
 	if cam:
 		z = maxf(cam.zoom.x, cam.zoom.y)
-	# ~26px screen radius, converted to world units.
-	var hit_r := 26.0 / maxf(z, 0.05)
-	var best_d := hit_r * hit_r
-	var best: Object = null
+	# ~48px screen radius in world units; floor so tactical zoom stays finger-sized.
+	var hit_r := maxf(48.0 / maxf(z, 0.05), 20.0)
+	var hit_r2 := hit_r * hit_r
+	var best_player: Object = null
+	var best_player_d := INF
+	var best_any: Object = null
+	var best_any_d := INF
+	var p_tag := _player_tag()
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
 		if not province_nodes.has(id):
@@ -15735,21 +16046,37 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
 		if counter == null or not is_instance_valid(counter):
 			continue
-		var d := world_pos.distance_squared_to(counter.global_position)
-		if d > best_d:
+		# Hidden pins (strategic LOD) must not steal hex clicks.
+		if not counter.visible:
 			continue
-		best_d = d
+		var d := world_pos.distance_squared_to(counter.global_position)
+		if d > hit_r2:
+			continue
+		var fo: Object = null
 		if counter.has_meta("formation"):
 			var fmeta: Variant = counter.get_meta("formation")
 			if fmeta is Object and is_instance_valid(fmeta as Object):
-				best = fmeta as Object
-				continue
-		var fid := str(counter.get_meta("formation_id", ""))
-		if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
-			var f2: Variant = LeaderManager.get_formation(fid)
-			if f2 is Object:
-				best = f2 as Object
-	return best
+				fo = fmeta as Object
+		if fo == null:
+			var fid := str(counter.get_meta("formation_id", ""))
+			if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+				var f2: Variant = LeaderManager.get_formation(fid)
+				if f2 is Object:
+					fo = f2 as Object
+		if fo == null:
+			continue
+		# Inclusive disk: accept boundary (d == hit_r2) as a valid best.
+		if d <= best_any_d:
+			best_any_d = d
+			best_any = fo
+		# Prefer player-tag pins; closest player pin wins on overlap.
+		if not p_tag.is_empty() and "country_tag" in fo:
+			if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_player_d:
+				best_player_d = d
+				best_player = fo
+	if best_player != null:
+		return best_player
+	return best_any
 
 
 func _show_unit_detail_popup(formation: Object) -> void:
@@ -15789,8 +16116,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var str_v := clampf(float(formation.strength) if "strength" in formation else 1.0, 0.0, 1.5)
 	var rdy_v := clampf(float(formation.readiness) if "readiness" in formation else 1.0, 0.0, 1.5)
 	var xp_v := 0.0
+	var xp_raw := 0.0
 	if "combat_experience" in formation:
-		xp_v = clampf(float(formation.combat_experience) / 100.0, 0.0, 1.0)
+		xp_raw = float(formation.combat_experience)
+		xp_v = clampf(xp_raw / 100.0, 0.0, 1.0)
 	var fuel_v := -1.0
 	if "fuel_level" in formation:
 		fuel_v = clampf(float(formation.fuel_level), 0.0, 1.5)
@@ -15808,17 +16137,61 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		if p != null:
 			prov_name = p.name
 
+	# Template / archetype / combat lines (design surface — not factory retool).
+	var tpl_display := dsn if not dsn.is_empty() else "—"
+	var tpl_archetype := "—"
+	if not dsn.is_empty() and typeof(GameData) != TYPE_NIL and GameData.design_data != null:
+		if GameData.design_data.has_method("get_template"):
+			var tpl: Variant = GameData.design_data.get_template(dsn)
+			if tpl != null and tpl is Object:
+				if "display_name" in tpl and str(tpl.display_name) != "":
+					tpl_display = str(tpl.display_name)
+				elif "id" in tpl and str(tpl.id) != "":
+					tpl_display = str(tpl.id)
+				if "visual_archetype" in tpl and str(tpl.visual_archetype) != "":
+					tpl_archetype = str(tpl.visual_archetype)
+
+	var soft_v := 0.0
+	var hard_v := 0.0
+	var rel_v := 0.0
+	if not fid.is_empty() and typeof(ProductionManager) != TYPE_NIL:
+		if ProductionManager.has_method("get_formation_equipment_combat_stats"):
+			var cstats: Dictionary = ProductionManager.get_formation_equipment_combat_stats(fid)
+			soft_v = float(cstats.get("soft_attack", 0.0))
+			hard_v = float(cstats.get("hard_attack", 0.0))
+			rel_v = float(cstats.get("reliability", 0.0))
+	var xp_mult := lerpf(0.85, 1.15, clampf(xp_raw / 100.0, 0.0, 1.0))
+	# Idle card: base unit power (no attacker initiative). As-attacker line adds +0.15 separately.
+	var base_pow := (soft_v + 1.6 * hard_v) * org_v * str_v * xp_mult
+	var as_attacker_pow := base_pow + 0.15
+
+	var stock_n := 0
+	if not dsn.is_empty() and not tag.is_empty() and typeof(ProductionManager) != TYPE_NIL:
+		if ProductionManager.has_method("get_country_equipment_stockpile"):
+			var cstk: Dictionary = ProductionManager.get_country_equipment_stockpile(tag)
+			stock_n = int(cstk.get(dsn, 0))
+	var unit_stock_bits: PackedStringArray = []
+	if not fid.is_empty() and typeof(ProductionManager) != TYPE_NIL:
+		if ProductionManager.has_method("get_unit_equipment_stock"):
+			var ustk: Dictionary = ProductionManager.get_unit_equipment_stock(fid)
+			var pairs: Array = []
+			for k in ustk.keys():
+				pairs.append([str(k), int(ustk[k])])
+			pairs.sort_custom(func(a: Array, b: Array) -> bool: return int(a[1]) > int(b[1]))
+			for i in mini(3, pairs.size()):
+				unit_stock_bits.append("%s×%d" % [pairs[i][0], pairs[i][1]])
+
 	var panel := PanelContainer.new()
 	panel.name = "UnitDetailPopup"
 	panel.z_index = 70
 	panel.clip_contents = true
-	panel.custom_minimum_size = Vector2(320, 220)
+	panel.custom_minimum_size = Vector2(320, 360)
 	RetrowaveTheme.style_detail_panel_flat(panel)
-	# Place near mouse, keep on-screen.
+	# Place near mouse, keep on-screen (taller card).
 	var mouse := get_viewport().get_mouse_position() if get_viewport() else Vector2(200, 200)
 	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
 	var px := clampf(mouse.x + 16.0, 12.0, maxf(12.0, vp.x - 340.0))
-	var py := clampf(mouse.y - 40.0, 56.0, maxf(56.0, vp.y - 280.0))
+	var py := clampf(mouse.y - 40.0, 56.0, maxf(56.0, vp.y - 380.0))
 	panel.position = Vector2(px, py)
 	ui.add_child(panel)
 
@@ -15828,13 +16201,15 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	margin.add_theme_constant_override("margin_top", 10)
 	margin.add_theme_constant_override("margin_bottom", 10)
 	panel.add_child(margin)
-	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
-	margin.add_child(vbox)
+
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 6)
+	outer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	margin.add_child(outer)
 
 	var title_row := HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 8)
-	vbox.add_child(title_row)
+	outer.add_child(title_row)
 	var title := Label.new()
 	title.text = name_s
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -15852,9 +16227,20 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	)
 	title_row.add_child(close_btn)
 
+	var scroll := ScrollContainer.new()
+	scroll.name = "UnitDetailScroll"
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.custom_minimum_size = Vector2(296, 280)
+	outer.add_child(scroll)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(vbox)
+
 	var body := Label.new()
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.custom_minimum_size = Vector2(290, 0)
+	body.custom_minimum_size = Vector2(280, 0)
 	var lines: PackedStringArray = []
 	if not tag.is_empty():
 		lines.append("Nation: %s" % tag)
@@ -15862,6 +16248,21 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		lines.append("Type: %s" % ftype.replace("_", " ").capitalize())
 	if not dsn.is_empty():
 		lines.append("Design: %s" % dsn)
+	lines.append("Template: %s" % tpl_display)
+	lines.append("Archetype: %s" % tpl_archetype)
+	lines.append(
+		"Soft %.2f · Hard %.2f · Rel %.0f%%"
+		% [soft_v, hard_v, rel_v * 100.0]
+	)
+	lines.append("Unit power: %.2f" % base_pow)
+	lines.append("As attacker preview: %.2f (+0.15 initiative)" % as_attacker_pow)
+	lines.append(
+		"Country stockpile (%s): %d" % [dsn if not dsn.is_empty() else "—", stock_n]
+	)
+	if unit_stock_bits.is_empty():
+		lines.append("On-hand unit stock: —")
+	else:
+		lines.append("On-hand unit stock: %s" % ", ".join(unit_stock_bits))
 	lines.append("Stationed: %s" % prov_name)
 	lines.append("Leader: %s" % leader_s)
 	lines.append(
@@ -15872,14 +16273,113 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		lines.append("Fuel: %.0f%%" % (fuel_v * 100.0))
 	if not fid.is_empty():
 		lines.append("ID: %s" % fid)
+	# Stack at this province (one pin; cycle via [ ] or card buttons).
+	var stack_divs: Array = []
+	if pid >= 0 and not tag.is_empty() and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
+		stack_divs = BattleManager.get_divisions_at_province(pid, tag)
+	if stack_divs.size() > 1:
+		var stack_idx := 0
+		for si in stack_divs.size():
+			if str(stack_divs[si].get("formation_id", "")) == fid:
+				stack_idx = si
+				break
+		lines.append("Stack %d/%d · [ ] or buttons to cycle" % [stack_idx + 1, stack_divs.size()])
+		for si2 in stack_divs.size():
+			var sname := str(stack_divs[si2].get("display_name", stack_divs[si2].get("formation_id", "?")))
+			var mark := "▶ " if si2 == stack_idx else "· "
+			lines.append("%s%s" % [mark, sname])
+	body.name = "UnitDetailStatsBody"
 	body.text = "\n".join(lines)
 	RetrowaveTheme.style_body_label(body)
 	vbox.add_child(body)
 
+	# Live battle line (B1) — refreshed on battle_day_ticked while card stays open.
+	var battle_line := Label.new()
+	battle_line.name = "UnitDetailBattleLine"
+	battle_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	battle_line.custom_minimum_size = Vector2(280, 0)
+	RetrowaveTheme.style_body_label(battle_line)
+	battle_line.add_theme_color_override("font_color", Color(1.0, 0.78, 0.35))
+	battle_line.add_theme_font_size_override("font_size", 12)
+	if not fid.is_empty() and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("is_formation_in_battle") \
+			and BattleManager.is_formation_in_battle(fid):
+		battle_line.text = _format_unit_card_battle_line(fid)
+		battle_line.visible = not battle_line.text.is_empty()
+	else:
+		battle_line.text = ""
+		battle_line.visible = false
+	vbox.add_child(battle_line)
+
+	var design_hint := Label.new()
+	design_hint.name = "UnitDesignAssignHint"
+	design_hint.text = "Designs you produce show up here — assign to this unit."
+	design_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	design_hint.custom_minimum_size = Vector2(280, 0)
+	RetrowaveTheme.style_body_label(design_hint)
+	design_hint.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
+	design_hint.add_theme_font_size_override("font_size", 11)
+	vbox.add_child(design_hint)
+
+	if not fid.is_empty() and not tag.is_empty():
+		var assign_btn := Button.new()
+		assign_btn.name = "AssignDesignButton"
+		assign_btn.text = "Assign design"
+		assign_btn.focus_mode = Control.FOCUS_NONE
+		assign_btn.tooltip_text = "Assign an existing design from stockpile (not factory retool)"
+		RetrowaveTheme.style_primary_button(assign_btn)
+		var assign_fid := fid
+		var assign_tag := tag
+		assign_btn.pressed.connect(func() -> void:
+			_open_unit_design_assign_picker(assign_fid, assign_tag, panel)
+		)
+		vbox.add_child(assign_btn)
+
+	if stack_divs.size() > 1:
+		var cycle_row := HBoxContainer.new()
+		cycle_row.add_theme_constant_override("separation", 8)
+		vbox.add_child(cycle_row)
+		var prev_btn := Button.new()
+		prev_btn.text = "[ Prev"
+		prev_btn.focus_mode = Control.FOCUS_NONE
+		prev_btn.tooltip_text = "Previous unit in stack ([ key)"
+		RetrowaveTheme.style_secondary_button(prev_btn)
+		prev_btn.pressed.connect(func() -> void:
+			_cycle_selected_stack_unit(-1)
+		)
+		cycle_row.add_child(prev_btn)
+		var next_btn := Button.new()
+		next_btn.text = "Next ]"
+		next_btn.focus_mode = Control.FOCUS_NONE
+		next_btn.tooltip_text = "Next unit in stack (] key)"
+		RetrowaveTheme.style_secondary_button(next_btn)
+		next_btn.pressed.connect(func() -> void:
+			_cycle_selected_stack_unit(1)
+		)
+		cycle_row.add_child(next_btn)
+
+	# Break off control when this unit is in an engaging multi-day battle.
+	if not fid.is_empty() and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("is_formation_in_battle"):
+		if BattleManager.is_formation_in_battle(fid):
+			var break_btn := Button.new()
+			break_btn.text = "Break off"
+			break_btn.focus_mode = Control.FOCUS_NONE
+			break_btn.tooltip_text = "Withdraw from the current battle (no capture). Esc also withdraws first."
+			RetrowaveTheme.style_secondary_button(break_btn)
+			var break_fid := fid
+			break_btn.pressed.connect(func() -> void:
+				if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("withdraw_from_battle"):
+					var wr: Dictionary = BattleManager.withdraw_from_battle(break_fid)
+					if bool(wr.get("ok", false)):
+						_show_inspector_toast("Withdrew from battle", 3.0)
+					if is_instance_valid(panel):
+						panel.queue_free()
+			)
+			vbox.add_child(break_btn)
+
 	var hint := Label.new()
-	hint.text = "SELECTED · click friendly province to MOVE · Ctrl+click enemy to ASSAULT (preview, then confirm) · Esc clears selection"
+	hint.text = "SELECTED · click friendly province to MOVE · Ctrl+click enemy to ASSAULT (preview, then confirm) · Esc: withdraw → close card → clear selection"
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(290, 0)
+	hint.custom_minimum_size = Vector2(280, 0)
 	RetrowaveTheme.style_body_label(hint)
 	hint.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
 	hint.add_theme_font_size_override("font_size", 11)
@@ -15889,6 +16389,92 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		if ev is InputEventMouseButton and ev.pressed:
 			ui.move_child(panel, ui.get_child_count() - 1)
 	)
+
+
+## Open DesignPickerPopup in explicit assign_mode — skips RetoolingWarningPopup + factory gates.
+func _open_unit_design_assign_picker(formation_id: String, country_tag: String, card_panel: Control = null) -> void:
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	if fid.is_empty() or tag.is_empty():
+		return
+	var picker_scene: PackedScene = load("res://scenes/ui/DesignPickerPopup.tscn")
+	if picker_scene == null:
+		_show_inspector_toast("Design picker unavailable", 2.5)
+		return
+	var picker: DesignPickerPopup = picker_scene.instantiate() as DesignPickerPopup
+	if picker == null:
+		return
+	picker.assign_mode = true
+	picker.factory_id = 0
+	picker.country_tag = tag
+	picker.assign_callback = func(design_id: String) -> void:
+		_apply_unit_design_assign(fid, tag, design_id, card_panel)
+	get_tree().root.add_child(picker)
+
+
+func _apply_unit_design_assign(
+	formation_id: String,
+	country_tag: String,
+	design_id: String,
+	card_panel: Control = null,
+) -> void:
+	var did := design_id.strip_edges()
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	if did.is_empty() or fid.is_empty():
+		return
+	if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("country_may_use_design"):
+		if not DesignManager.country_may_use_design(tag, did):
+			_show_inspector_toast("Design locked for %s" % tag, 3.0)
+			return
+	var fo: Formation = null
+	if typeof(LeaderManager) != TYPE_NIL:
+		fo = LeaderManager.get_formation(fid)
+	if fo == null:
+		_show_inspector_toast("Unit not found", 2.5)
+		return
+	# Write the domain field that the unit card reads for this formation category.
+	var cat := ""
+	if fo.has_method("get_category"):
+		cat = str(fo.call("get_category"))
+	elif "formation_type" in fo:
+		cat = str(fo.formation_type)
+	var cat_l := cat.to_lower()
+	if cat_l == "air" or cat_l.contains("air"):
+		if "air_design_id" in fo:
+			fo.air_design_id = did
+		else:
+			fo.design_id = did
+	elif cat_l == "naval" or cat_l.contains("fleet") or cat_l.contains("ship") or cat_l.contains("task"):
+		if "naval_design_id" in fo:
+			fo.naval_design_id = did
+		else:
+			fo.design_id = did
+	else:
+		fo.design_id = did
+	# Optional: seed on-hand from country stockpile only when take actually moves units.
+	if typeof(ProductionManager) != TYPE_NIL:
+		var taken := 0
+		if ProductionManager.has_method("get_country_equipment_stockpile"):
+			var cstk: Dictionary = ProductionManager.get_country_equipment_stockpile(tag)
+			var have := int(cstk.get(did, 0))
+			if have > 0 and ProductionManager.has_method("take_from_country_equipment_stockpile"):
+				taken = int(ProductionManager.take_from_country_equipment_stockpile(tag, did, mini(1, have)))
+		if taken > 0 and ProductionManager.has_method("get_unit_equipment_stock") and ProductionManager.has_method("set_unit_equipment_stock"):
+			var cur: Dictionary = ProductionManager.get_unit_equipment_stock(fid)
+			cur[did] = int(cur.get(did, 0)) + taken
+			ProductionManager.set_unit_equipment_stock(fid, cur)
+	_show_inspector_toast("Assigned %s to unit" % did, 3.0)
+	# Refresh pin / selected chip for new visual_archetype (pid-scoped only).
+	var station_pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	if station_pid >= 0 and has_method("_update_unit_icons_for_pids"):
+		_update_unit_icons_for_pids([station_pid])
+	if has_method("_refresh_selected_unit_chip"):
+		_refresh_selected_unit_chip()
+	if card_panel != null and is_instance_valid(card_panel):
+		card_panel.queue_free()
+	if fo != null:
+		_show_unit_detail_popup(fo)
 
 
 func _ensure_station_engineers_button() -> void:
@@ -16443,6 +17029,15 @@ const _ASSAULT_CONFIRM_WINDOW_MS: int = 5000
 var _assault_execute_busy: bool = false
 ## Player-selected map unit (grey pin click) for move / assault staging.
 var selected_formation_id: String = ""
+var _last_battle_day_toast_key: String = ""
+## One-shot toast when hex-clicked at strategic zoom (pins hidden).
+var _unit_pick_strategic_hint_shown: bool = false
+## March path Line2D nodes (budget 8) + cosmetic pin lerp. Sim hops are day-authoritative.
+var _march_path_layer: Node2D = null
+var _march_path_lines: Dictionary = {}  # fid -> Line2D
+const MARCH_PATH_LINE_BUDGET := 8
+const MARCH_SECONDS_PER_HEX_VISUAL := 2.5
+const MARCH_VISUAL_T_DELTA_CAP := 0.35
 
 
 func _try_execute_province_attack(target_pid: int, target_province: Province) -> bool:
@@ -16453,23 +17048,47 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		_show_inspector_toast("Set player country (TopInfoBar) before attacking.", 3.0, true)
 		return true
 
-	var from_pid := attack_staging_province_id
+	# Named unit is the assault vector; station beats stale attack_staging_province_id.
+	var fid := selected_formation_id.strip_edges()
+	var from_pid := -1
+	if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var sel_f: Formation = LeaderManager.get_formation(fid)
+		if sel_f != null and "stationed_province_id" in sel_f:
+			from_pid = int(sel_f.stationed_province_id)
+	if from_pid < 0:
+		from_pid = attack_staging_province_id
 	if from_pid < 0:
 		from_pid = debug_combat_attacker_province_id
 
-	# Wire real combat + explicit preview with CURRENT settlement/loyalty/welfare data (Province getters + BM.can_assault; used by map click Ctrl+click, attack button, and F10 sample).
+	# Unit-formula preview (soft/hard × org/str/xp + 0.15 initiative) — not ProvinceInsight hex formula.
 	var pre: Dictionary = {}
-	if typeof(ProvinceInsight) != TYPE_NIL and provinces.has(from_pid):
-		pre = ProvinceInsight.get_battle_preview(provinces[from_pid], target_province)
-	var can_pre := {}
-	if typeof(BattleManager) != TYPE_NIL:
-		can_pre = BattleManager.can_assault_province(p_tag, target_pid, from_pid)
+	if BattleManager.has_method("preview_assault"):
+		pre = BattleManager.preview_assault(p_tag, target_pid, from_pid, fid)
+	else:
+		pre = BattleManager.can_assault_province(p_tag, target_pid, from_pid, fid)
+	var can_pre: Dictionary = pre
 	var t_def_b := 0.0
 	if target_province.has_method("get_settlement_combat_def_bonus"):
 		t_def_b = target_province.get_settlement_combat_def_bonus()
-	print("[MapRenderer] Real combat from map: PREVIEW (live Province settlement/loyalty/welfare) stage#%d vs #%d def_bonus=%.1f%% can=%s (main-loop AI auto via TimeManager; weather/air in resolver)" % [from_pid, target_pid, t_def_b*100.0, str(can_pre.get("ok",false))])
-	if pre:
-		print("  [MAP COMBAT PREVIEW] atk=%.2f def=%.2f (factors current settlement=% .2f on def, welfare drag, loyalty mult)" % [float(pre.get("attack_power",0)), float(pre.get("defense_power",0)), target_province.settlement_level])
+	print("[MapRenderer] Real combat from map: UNIT PREVIEW fid=%s stage#%d vs #%d def_bonus=%.1f%% can=%s power=%.2f vs %.2f" % [
+		fid if not fid.is_empty() else "-", from_pid, target_pid, t_def_b * 100.0,
+		str(can_pre.get("ok", false)), float(pre.get("attack_power", 0.0)), float(pre.get("defense_power", 0.0)),
+	])
+
+	# Distant / non-adjacent: march first — do not arm confirm-to-execute.
+	var not_adj := str(can_pre.get("reason", "")).findn("not adjacent") >= 0
+	if not bool(can_pre.get("ok", false)) and not_adj:
+		var hops := 0
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("find_land_path") and from_pid >= 0:
+			var path: Array = MapManager.find_land_path(from_pid, target_pid, p_tag)
+			hops = maxi(0, path.size() - 1)
+		_assault_confirm_target_id = -1
+		_assault_confirm_msec = 0
+		var march_toast := "March to the border first · %d hexes" % hops
+		if hops <= 0:
+			march_toast = "March to the border first"
+		_show_inspector_toast(march_toast, 4.5, true)
+		return true
 
 	# First Ctrl+click: preview only. Second within 5s on same target: execute.
 	var now_ms := Time.get_ticks_msec()
@@ -16480,20 +17099,15 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	if not confirm:
 		_assault_confirm_target_id = target_pid
 		_assault_confirm_msec = now_ms
-		var atk_p := float(pre.get("attack_power", 0.0)) if pre else 0.0
-		var def_p := float(pre.get("defense_power", 0.0)) if pre else 0.0
-		var odds := float(pre.get("odds_attacker_win", 0.0)) if pre else 0.0
-		var att_n := int(pre.get("attacker_divisions", 0)) if pre else 0
-		var def_n := int(pre.get("defender_divisions", 0)) if pre else 0
+		var atk_p := float(pre.get("attack_power", 0.0))
+		var def_p := float(pre.get("defense_power", 0.0))
+		var odds := float(pre.get("odds_attacker_win", 0.0))
 		var can_ok := bool(can_pre.get("ok", false))
-		var intel_note := "intel rough"
-		if att_n <= 0:
-			intel_note = "no friendly divs staged here — move units first"
-		var prev_toast := "Assault PREVIEW · %s #%d (%d div) → %s #%d (%d div) · power %.0f vs %.0f · odds ~%.0f%% · %s · %s · Ctrl+click AGAIN to execute" % [
-			p_tag, from_pid, att_n, str(target_province.owner_tag), target_pid, def_n,
+		var unit_note := fid if not fid.is_empty() else str(can_pre.get("division_name", "hex"))
+		var prev_toast := "Assault PREVIEW · %s %s #%d → %s #%d · power %.0f vs %.0f · odds ~%.0f%% · %s · Ctrl+click AGAIN to join battle" % [
+			p_tag, unit_note, from_pid, str(target_province.owner_tag), target_pid,
 			atk_p, def_p, odds,
 			("ready" if can_ok else str(can_pre.get("reason", "blocked"))),
-			intel_note,
 		]
 		_show_inspector_toast(prev_toast, 6.0)
 		return true
@@ -16506,8 +17120,12 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		return true
 	_assault_execute_busy = true
 	var assault: Dictionary = {}
-	# Protect main thread: resolve combat, then light UI only (no full border rebuild).
-	assault = BattleManager.execute_province_assault(p_tag, target_pid, from_pid)
+	# Player path: multi-day battle. EOA_UNIT_WAR=0 / missing API → one-shot execute (bisect / F10-class).
+	var unit_war_off := OS.get_environment("EOA_UNIT_WAR").strip_edges() == "0"
+	if unit_war_off or not BattleManager.has_method("start_province_battle"):
+		assault = BattleManager.execute_province_assault(p_tag, target_pid, from_pid, fid)
+	else:
+		assault = BattleManager.start_province_battle(p_tag, target_pid, from_pid, fid)
 	push_map_assault_marker(target_pid, "engage", 0.75)
 	if not bool(assault.get("success", false)):
 		_assault_execute_busy = false
@@ -16515,14 +17133,26 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		return true
 
 	var result: Dictionary = assault.get("result", {}) as Dictionary
+	var multi_day := bool(result.get("multi_day", false)) or str(assault.get("status", "")) == "engaging"
 	var winner := str(result.get("winner", ""))
 	var captured := bool(result.get("province_control_change", false))
 	var outcome := str(result.get("outcome", winner))
 	var atk := str(result.get("attacker_tag", p_tag))
 	var def: String = str(result.get("defender_tag", target_province.owner_tag))
 
-	# Phase 4: Enhance inspector combat feedback after real assault (from map mouse or F10). Show outcome details (settlement_def_bonus used, winner, capture) in toast + inspector; log live numbers.
-	# Uses BM result (context merged: settlement_def_bonus, target_settlement_level, loyalty_factor, winner, province_control_change from execute/Resolver).
+	if multi_day:
+		var unit_name := fid if not fid.is_empty() else "unit"
+		_show_inspector_toast(
+			"Battle joined · %s vs %s · daily org/str · clock runs the fight" % [unit_name, def],
+			5.0,
+		)
+		_play_map_sfx("map")
+		print("[MapRenderer] Multi-day battle started target=#%d from=#%d fid=%s" % [target_pid, from_pid, fid])
+		_last_combat_outcome_text = "engaging multi-day battle"
+		call_deferred("_assault_post_ui_light", target_pid, from_pid, -1)
+		return true
+
+	# One-shot path (EOA_UNIT_WAR=0 / F10-class execute via this function under flag).
 	var s_def_b := float(result.get("settlement_def_bonus", 1.0))
 	var t_sett_lev := float(result.get("target_settlement_level", 0.0))
 	var loy_f := float(result.get("loyalty_factor", 1.0))
@@ -16530,7 +17160,6 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	print("[MapRenderer] Real assault (map/F10) live numbers: " + outcome_details + " (settlement_def_bonus applied in BM.execute; see Resolver for phased scores)")
 	_last_combat_outcome_text = outcome_details
 
-	# Capture/assault player feedback via pure flair helper (toast + sfx distinguishable from select/invest/HH).
 	var cap_flair: Dictionary = _MapNextListHelpers.format_capture_assault_flair(
 		target_province.name, atk, def, captured, outcome, winner
 	)
@@ -16540,9 +17169,7 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	_show_inspector_toast(cap_toast, float(cap_flair.get("duration", 3.5)))
 	_play_map_sfx(str(cap_flair.get("sfx", "map")))
 	if provinces.has(target_pid):
-		# Soft center without full inspector rebuild when possible (inspector can be heavy).
 		call_deferred("_center_camera_on_province", target_pid, "soft")
-	# Success-path busy-clear lives in deferred light UI only.
 	var retreat_pid := int(result.get("retreat_province_id", -1))
 	call_deferred("_assault_post_ui_light", target_pid, from_pid, retreat_pid)
 	return true
@@ -16558,6 +17185,201 @@ func _assault_post_ui_light(target_pid: int, from_pid: int = -1, retreat_pid: in
 	_refresh_province_fill_pids(pids)
 	_update_unit_icons_for_pids(pids)
 	_assault_execute_busy = false
+
+
+## Cheap day-tick flash on engaged pins (modulate pulse; no sprite pipeline).
+func flash_battle_day(pids: Array = [], battle: Dictionary = {}) -> void:
+	var target_flash := int(battle.get("target_pid", -1)) if not battle.is_empty() else -1
+	if target_flash < 0 and not pids.is_empty():
+		target_flash = int(pids[0])
+	if target_flash >= 0:
+		push_map_assault_marker(target_flash, "engage", 0.85)
+	var flash_pids: Array = []
+	for v in pids:
+		var pid := int(v)
+		if pid >= 0 and not flash_pids.has(pid):
+			flash_pids.append(pid)
+	# Always apply live feedback even when pin list is empty (card + toast + chrome).
+	_toast_battle_day_slice(battle)
+	_refresh_open_unit_card_battle_stats(battle)
+	_apply_battle_pin_combat_chrome(battle, true)
+	if flash_pids.is_empty():
+		return
+	for pid_v in flash_pids:
+		var id := int(pid_v)
+		if not province_nodes.has(id):
+			continue
+		var n: Node2D = province_nodes[id] as Node2D
+		if n == null:
+			continue
+		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+		if counter == null or not is_instance_valid(counter):
+			continue
+		var base_mod: Color = counter.get_meta("combat_chrome_base", counter.modulate) as Color
+		if not counter.has_meta("combat_chrome_base"):
+			counter.set_meta("combat_chrome_base", base_mod)
+		counter.modulate = Color(1.35, 0.95, 0.55, base_mod.a)
+		var tree := get_tree()
+		if tree != null:
+			tree.create_timer(0.18).timeout.connect(func() -> void:
+				if is_instance_valid(counter):
+					# Keep combat chrome tint after flash pulse.
+					if counter.has_meta("combat_chrome_active") and bool(counter.get_meta("combat_chrome_active")):
+						counter.modulate = Color(1.15, 0.72, 0.45, base_mod.a)
+					else:
+						counter.modulate = base_mod
+			)
+
+
+## B1: connect BattleManager day/resolve signals for unit-card + pin chrome (flash already deferred from BM).
+func _connect_battle_feedback_signals() -> void:
+	if typeof(BattleManager) == TYPE_NIL:
+		return
+	if BattleManager.has_signal("battle_resolved") and not BattleManager.battle_resolved.is_connected(_on_battle_resolved_feedback):
+		BattleManager.battle_resolved.connect(_on_battle_resolved_feedback)
+
+
+func _on_battle_resolved_feedback(result: Dictionary) -> void:
+	_apply_battle_pin_combat_chrome(result, false)
+	_refresh_open_unit_card_battle_stats({})
+	# Non-capture ends still need light pin truth (capture path notifies map separately).
+	var status := str(result.get("status", ""))
+	if status in ["attacker_broke", "prolonged_stalemate", "retreat"]:
+		var tpid := int(result.get("target_province_id", result.get("target_pid", -1)))
+		var fpid := int(result.get("from_province_id", result.get("from_pid", -1)))
+		for pid in [tpid, fpid]:
+			if pid >= 0 and has_method("refresh_after_capture_light"):
+				call_deferred("refresh_after_capture_light", pid)
+
+
+func _toast_battle_day_slice(battle: Dictionary) -> void:
+	if battle.is_empty():
+		return
+	var slice: Dictionary = battle.get("last_slice", {}) as Dictionary
+	if slice.is_empty():
+		return
+	var day := int(slice.get("day", battle.get("days_elapsed", 0)))
+	if day <= 0:
+		return
+	# Budget: one toast per battle_id+day (avoid spam if flash called twice).
+	var bid := str(battle.get("battle_id", "%s>%s" % [battle.get("from_pid", -1), battle.get("target_pid", -1)]))
+	var key := "%s:%d" % [bid, day]
+	if _last_battle_day_toast_key == key:
+		return
+	_last_battle_day_toast_key = key
+	# Only toast if player is involved.
+	var p_tag := _player_tag().strip_edges().to_upper()
+	if not p_tag.is_empty():
+		var at := str(battle.get("attacker_tag", "")).strip_edges().to_upper()
+		var dt := str(battle.get("defender_tag", "")).strip_edges().to_upper()
+		if at != p_tag and dt != p_tag:
+			return
+	var att_org := float(slice.get("att_org", 0.0))
+	var def_org := float(slice.get("def_org", 0.0))
+	var att_str := float(slice.get("att_str", 0.0))
+	var def_str := float(slice.get("def_str", 0.0))
+	var msg := "Battle day %d · Att org %.0f%% str %.0f%% · Def org %.0f%% str %.0f%%" % [
+		day, att_org * 100.0, att_str * 100.0, def_org * 100.0, def_str * 100.0
+	]
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast(msg, 2.8, false, true)
+	else:
+		_show_inspector_toast(msg, 2.8)
+
+
+func _format_unit_card_battle_line(formation_id: String) -> String:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty() or typeof(BattleManager) == TYPE_NIL:
+		return ""
+	if not BattleManager.has_method("is_formation_in_battle") or not BattleManager.is_formation_in_battle(fid):
+		return ""
+	var battle: Dictionary = {}
+	if BattleManager.has_method("get_battle_for_formation"):
+		battle = BattleManager.get_battle_for_formation(fid)
+	if battle.is_empty():
+		return "IN BATTLE · engaging"
+	var slice: Dictionary = battle.get("last_slice", {}) as Dictionary
+	var day := int(slice.get("day", battle.get("days_elapsed", 0)))
+	var att_org := float(slice.get("att_org", -1.0))
+	var def_org := float(slice.get("def_org", -1.0))
+	if day > 0 and att_org >= 0.0 and def_org >= 0.0:
+		return "IN BATTLE · day %d · Att org %.0f%% · Def org %.0f%%" % [day, att_org * 100.0, def_org * 100.0]
+	return "IN BATTLE · day %d" % maxi(day, 1)
+
+
+func _refresh_open_unit_card_battle_stats(battle: Dictionary = {}) -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	var panel := ui.get_node_or_null("UnitDetailPopup") as Control
+	if panel == null or not is_instance_valid(panel):
+		return
+	var fid := selected_formation_id.strip_edges()
+	if fid.is_empty():
+		return
+	# Prefer live formation org/str for the stats body.
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var f: Formation = LeaderManager.get_formation(fid)
+		if f != null and is_instance_valid(f):
+			var body := panel.find_child("UnitDetailStatsBody", true, false) as Label
+			if body != null:
+				var org_v := clampf(float(f.organization) if "organization" in f else 1.0, 0.0, 1.5)
+				var str_v := clampf(float(f.strength) if "strength" in f else 1.0, 0.0, 1.5)
+				var rdy_v := clampf(float(f.readiness) if "readiness" in f else 1.0, 0.0, 1.5)
+				var xp_v := 0.0
+				if "combat_experience" in f:
+					xp_v = clampf(float(f.combat_experience) / 100.0, 0.0, 1.0)
+				# Replace the Org/Str line in place when present.
+				var lines: PackedStringArray = body.text.split("\n")
+				var replaced := false
+				for i in lines.size():
+					if str(lines[i]).begins_with("Org "):
+						lines[i] = "Org %.0f%% · Str %.0f%% · Rdy %.0f%% · XP %.0f%%" % [
+							org_v * 100.0, str_v * 100.0, rdy_v * 100.0, xp_v * 100.0
+						]
+						replaced = true
+						break
+				if replaced:
+					body.text = "\n".join(lines)
+	var battle_line := panel.find_child("UnitDetailBattleLine", true, false) as Label
+	if battle_line != null:
+		var line := _format_unit_card_battle_line(fid)
+		battle_line.text = line
+		battle_line.visible = not line.is_empty()
+	# Quiet unused when empty battle dict (resolve path).
+	if not battle.is_empty() and str(battle.get("attacker_formation_id", "")) != fid \
+			and str(battle.get("defender_formation_id", "")) != fid:
+		# Still refresh if selected unit is in any battle; line formatter handles it.
+		pass
+
+
+func _apply_battle_pin_combat_chrome(battle: Dictionary, active: bool) -> void:
+	var pids: Array = []
+	for key in ["target_pid", "from_pid", "target_province_id", "from_province_id"]:
+		var pid := int(battle.get(key, -1))
+		if pid >= 0 and not pids.has(pid):
+			pids.append(pid)
+	for pid_v in pids:
+		var id := int(pid_v)
+		if not province_nodes.has(id):
+			continue
+		var n: Node2D = province_nodes[id] as Node2D
+		if n == null:
+			continue
+		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+		if counter == null or not is_instance_valid(counter):
+			continue
+		if active:
+			if not counter.has_meta("combat_chrome_base"):
+				counter.set_meta("combat_chrome_base", counter.modulate)
+			counter.set_meta("combat_chrome_active", true)
+			var base_a: Color = counter.get_meta("combat_chrome_base") as Color
+			counter.modulate = Color(1.15, 0.72, 0.45, base_a.a)
+		else:
+			counter.set_meta("combat_chrome_active", false)
+			if counter.has_meta("combat_chrome_base"):
+				counter.modulate = counter.get_meta("combat_chrome_base") as Color
+				counter.remove_meta("combat_chrome_base")
 
 
 func _province_controlled_by(province: Province, country_tag: String) -> bool:
@@ -16606,10 +17428,19 @@ func _update_attack_button(province: Province) -> void:
 		_btn_attack.visible = false
 		return
 
+	var btn_fid := selected_formation_id.strip_edges()
+	var btn_from := -1
+	if not btn_fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var bf: Formation = LeaderManager.get_formation(btn_fid)
+		if bf != null and "stationed_province_id" in bf:
+			btn_from = int(bf.stationed_province_id)
+	if btn_from < 0:
+		btn_from = attack_staging_province_id if attack_staging_province_id >= 0 else debug_combat_attacker_province_id
 	var preview: Dictionary = BattleManager.can_assault_province(
 		p_tag,
 		province.id,
-		attack_staging_province_id if attack_staging_province_id >= 0 else debug_combat_attacker_province_id,
+		btn_from,
+		btn_fid,
 	)
 	var can_attack := bool(preview.get("ok", false))
 	var panel_open := info_panel != null and info_panel is CanvasItem and info_panel.visible
@@ -16628,6 +17459,8 @@ func _update_attack_button(province: Province) -> void:
 			var reason := str(preview.get("reason", "")).strip_edges()
 			if reason.is_empty():
 				reason = "no friendly divs staged here — move units first"
+			if reason.findn("not adjacent") >= 0:
+				reason = "March to the border first"
 			_btn_attack.text = "Attack"
 			_btn_attack.tooltip_text = reason
 		return
@@ -21311,6 +22144,9 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 		print("[MapRenderer] Unit icons placed=%d (indexed formations, no per-province template reload)" % icons_placed)
 	if not scoped:
 		_update_riot_markers()
+	# Re-apply selected-chip chrome after pin rebuild (do not rebuild all pins for selection).
+	if not selected_formation_id.is_empty():
+		_refresh_selected_unit_chip()
 
 
 ## O(formations + deployments) index for unit icons.
@@ -21596,6 +22432,7 @@ func _force_border_update_deferred() -> void:
 
 
 ## Light post-capture: recolor + pins for the passed pids only. Skips full-board work.
+## Also restages attack_staging when the selected unit hops into province_id (march arrival).
 func refresh_after_capture_light(province_id: int = -1, from_province_id: int = -1, retreat_pid: int = -1) -> void:
 	var pids: Array = []
 	for v in [province_id, from_province_id, retreat_pid]:
@@ -21604,6 +22441,13 @@ func refresh_after_capture_light(province_id: int = -1, from_province_id: int = 
 			pids.append(pid)
 	_refresh_province_fill_pids(pids)
 	_update_unit_icons_for_pids(pids)
+	# March hop: keep assault staging on the selected pin's new station (pid-scoped only).
+	if not selected_formation_id.is_empty() and province_id >= 0 \
+		and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var sf: Formation = LeaderManager.get_formation(selected_formation_id)
+		if sf != null and "stationed_province_id" in sf and int(sf.stationed_province_id) == province_id:
+			attack_staging_province_id = province_id
+			debug_combat_attacker_province_id = province_id
 
 
 func _ensure_border_layer() -> void:

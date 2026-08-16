@@ -1,9 +1,11 @@
 # EOA — Game Director Plan (phases + agents → full-test world-class)
 
-**Date:** 2026-08-12 (keep-going board · reconciled to live SNAPSHOT · board ~3520)  
+**Date:** 2026-08-16 (keep-going board · launch ladder linked · board ~3520)  
 **Role of this doc:** Single **orchestration** board for implementer agents and human director sessions.  
 **Status truth:** [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md) · **always win** if this file disagrees  
 **Keep-going (this DAG):** SNAPSHOT §0 · [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md) · residual [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md)  
+**Launch ladder (L0→L3):** [`LAUNCH_READINESS_PLAN.md`](LAUNCH_READINESS_PLAN.md) — use after full-test machine green; human M6 still gates L0/L1 exit  
+**L1 forward (unit war loop):** [`FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md`](FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md) — pin → march → multi-day battle → unit card (machine landed; human proof open)  
 **Map as living star (HOI4/V3 structure review):** [`WORLD_CLASS_MAP_REVIEW.md`](WORLD_CLASS_MAP_REVIEW.md)  
 **Long program (no permanent deferrals):** [`MASTER_COMPLETION_PLAN.md`](MASTER_COMPLETION_PLAN.md) — catalogue only; SNAPSHOT wins  
 **Human play:** [`PLAYTEST_AND_DECISION_GUIDE.md`](PLAYTEST_AND_DECISION_GUIDE.md)

@@ -4,16 +4,59 @@ extends Node
 
 signal battle_started(context: Dictionary)
 signal battle_resolved(result: Dictionary)
+signal battle_day_ticked(battle: Dictionary)
 
 const DEFAULT_GARRISON_TEMPLATE := "german_infantry_division_1943_mixed"
+const ATTACKER_INITIATIVE := 0.15
+const BATTLE_ORG_BREAK := 0.22
+const BATTLE_ATT_STR_FLOOR := 0.35
+## Pre-clamp break threshold (both sides). Clamp floors: att 0.35 / def 0.30 after break test.
+const BATTLE_STR_BREAK := 0.30
+const BATTLE_DEF_STR_BREAK := BATTLE_STR_BREAK
+const BATTLE_ATT_STR_BREAK := BATTLE_STR_BREAK
+const BATTLE_MAX_DAYS := 12
+const BATTLE_TICK_BUDGET := 8
+const MARCH_DEFAULT_HOURS_PER_HEX := 24.0
+const MARCH_MAX_HOPS := 48
 
 var _resolver: CombatResolver
-
+## battle_id -> Battle dict (multi-day player path). execute_province_assault stays one-shot.
+var _battles: Dictionary = {}
+var _battle_seq: int = 0
+var _battle_day_hooked: bool = false
+## Round-robin cursor so budgeted ticks never starve battles.
+var _battle_tick_rr: int = 0
+## fid -> MarchOrder dict.
+var _marches: Dictionary = {}
+var _march_order_seq: int = 0## Round-robin cursor so budgeted ticks never starve battles beyond the first N keys.
+var _battle_tick_rr: int = 0
 
 func _ready() -> void:
 	_resolver = CombatResolver.new()
 	_resolver.name = "CombatResolver"
 	add_child(_resolver)
+	_ensure_battle_day_hook()
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_signal("game_day_advanced"):
+		if not TimeManager.game_day_advanced.is_connected(_on_game_day_advanced_marches):
+			TimeManager.game_day_advanced.connect(_on_game_day_advanced_marches)
+
+
+func _ensure_battle_day_hook() -> void:
+	if _battle_day_hooked:
+		return
+	if typeof(TimeManager) == TYPE_NIL or not TimeManager.has_signal("game_day_advanced"):
+		return
+	if not TimeManager.game_day_advanced.is_connected(_on_game_day_advanced_battles):
+		TimeManager.game_day_advanced.connect(_on_game_day_advanced_battles)
+	_battle_day_hooked = true
+
+
+func _on_game_day_advanced_battles(_year: int, _month: int, _day: int) -> void:
+	tick_battles_for_day()
+
+
+func _on_game_day_advanced_marches(_year: int, _month: int, _day: int) -> void:
+	tick_marches_for_day()
 
 
 ## Multi-phase combat estimate pilot (approach/engage/disengage) — pure via MapPolishFormatters.
@@ -223,6 +266,7 @@ func can_assault_province(
 	attacker_tag: String,
 	target_province_id: int,
 	from_province_id: int = -1,
+	formation_id: String = "",
 ) -> Dictionary:
 	var tag := attacker_tag.strip_edges().to_upper()
 	if tag.is_empty():
@@ -240,7 +284,39 @@ func can_assault_province(
 	if defender_tag == tag:
 		return {"ok": false, "reason": "Cannot attack your own province"}
 
-	var source := find_attack_source(tag, target_province_id, from_province_id)
+	var fid := formation_id.strip_edges()
+	var from_pid := int(from_province_id)
+	# Named unit: station is authority; no fallback to another division.
+	if not fid.is_empty() and from_pid < 0 and typeof(LeaderManager) != TYPE_NIL:
+		var fo: Formation = LeaderManager.get_formation(fid)
+		if fo != null and "stationed_province_id" in fo:
+			from_pid = int(fo.stationed_province_id)
+
+	# Named unit already engaging: preview/strip match start_province_battle (no false "ready").
+	if not fid.is_empty() and is_formation_in_battle(fid):
+		return {
+			"ok": false,
+			"reason": "Formation already in battle",
+			"formation_id": fid,
+			"target_province_id": target_province_id,
+		}
+	# Target hex already has an engaging multi-day battle (1v1 theater; no double-defend).
+	if not get_battle_at(target_province_id).is_empty():
+		return {
+			"ok": false,
+			"reason": "Province already under assault",
+			"target_province_id": target_province_id,
+		}
+
+	var source: Dictionary
+	if not fid.is_empty():
+		source = _validate_attack_source(tag, from_pid, target_province_id, fid)
+	elif from_pid >= 0:
+		# Hex-only: no adjacent-hex fallback (fixes Berlin can=true for Maginot).
+		source = _validate_attack_source(tag, from_pid, target_province_id)
+	else:
+		# AI / Fronts: find any adjacent division.
+		source = find_attack_source(tag, target_province_id, -1)
 	if not bool(source.get("ok", false)):
 		return source
 
@@ -250,7 +326,8 @@ func can_assault_province(
 	source["attacker_tag"] = tag
 	# Carry air dominance from ProvinceInsight for battle context (used in result merge + logs + AAR)
 	if typeof(ProvinceInsight) != TYPE_NIL and typeof(MapManager) != TYPE_NIL:
-		var from_p: Province = MapManager.get_province(from_province_id) if from_province_id >= 0 else target
+		var resolved_from := int(source.get("from_province_id", from_pid))
+		var from_p: Province = MapManager.get_province(resolved_from) if resolved_from >= 0 else target
 		if from_p:
 			var bprev := ProvinceInsight.get_battle_preview(from_p, target)
 			source["air_dominance_level"] = bprev.get("air_dominance_level", "none")
@@ -286,13 +363,113 @@ func find_attack_source(
 	return best
 
 
+## Unit-formula assault preview for map toast (not ProvinceInsight hex 100+infra*3).
+## power = (soft + 1.6*hard) * org * str * xp_mult + initiative; attacker initiative 0.15.
+func preview_assault(
+	attacker_tag: String,
+	target_province_id: int,
+	from_province_id: int = -1,
+	formation_id: String = "",
+) -> Dictionary:
+	var can: Dictionary = can_assault_province(
+		attacker_tag, target_province_id, from_province_id, formation_id
+	)
+	var tag := str(can.get("attacker_tag", attacker_tag)).strip_edges().to_upper()
+	var from_pid := int(can.get("from_province_id", from_province_id))
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		fid = str(can.get("formation_id", ""))
+	var target: Province = null
+	if typeof(MapManager) != TYPE_NIL:
+		target = MapManager.get_province(target_province_id)
+	var from_prov: Province = null
+	if typeof(MapManager) != TYPE_NIL and from_pid >= 0:
+		from_prov = MapManager.get_province(from_pid)
+
+	var att_power := 0.0
+	var def_power := 0.0
+	var att_soft := 0.0
+	var att_hard := 0.0
+	var def_soft := 0.0
+	var def_hard := 0.0
+	var att_org := 1.0
+	var att_str := 1.0
+	var att_xp := 48.0
+	var def_org := 1.0
+	var def_str := 1.0
+	var def_xp := 48.0
+
+	if not fid.is_empty() and from_prov != null:
+		att_power = _unit_preview_power(fid, from_prov, tag, ATTACKER_INITIATIVE)
+		var att_stats := _unit_preview_components(fid, from_prov, tag)
+		att_soft = float(att_stats.get("soft", 0.0))
+		att_hard = float(att_stats.get("hard", 0.0))
+		att_org = float(att_stats.get("org", 1.0))
+		att_str = float(att_stats.get("str", 1.0))
+		att_xp = float(att_stats.get("xp", 48.0))
+	elif bool(can.get("ok", false)):
+		att_power = float(can.get("attack_power", 0.0)) + ATTACKER_INITIATIVE
+
+	var def_tag := str(can.get("defender_tag", ""))
+	if def_tag.is_empty() and target != null:
+		def_tag = _province_defender_tag(target)
+	if target != null:
+		var def_divs := get_divisions_at_province(target_province_id, def_tag)
+		var def_fid := ""
+		if not def_divs.is_empty():
+			def_fid = str(def_divs[0].get("formation_id", ""))
+		if not def_fid.is_empty():
+			def_power = _unit_preview_power(def_fid, target, def_tag, 0.0)
+			var def_stats := _unit_preview_components(def_fid, target, def_tag)
+			def_soft = float(def_stats.get("soft", 0.0))
+			def_hard = float(def_stats.get("hard", 0.0))
+			def_org = float(def_stats.get("org", 1.0))
+			def_str = float(def_stats.get("str", 1.0))
+			def_xp = float(def_stats.get("xp", 48.0))
+		else:
+			# Empty hex: synthetic garrison at full org/str, soft/hard from template estimate.
+			var g_id := _garrison_template_for_country(def_tag)
+			def_power = _unit_preview_power(g_id, target, def_tag, 0.0)
+			if def_power <= 0.0:
+				def_power = _estimate_attack_power(g_id, target, def_tag)
+
+	var odds := 0.0
+	var total := att_power + def_power
+	if total > 0.0:
+		odds = clampf((att_power / total) * 100.0, 5.0, 95.0)
+
+	var out := can.duplicate()
+	out["attack_power"] = att_power
+	out["defense_power"] = def_power
+	out["attacker_soft"] = att_soft
+	out["attacker_hard"] = att_hard
+	out["attacker_org"] = att_org
+	out["attacker_strength"] = att_str
+	out["attacker_xp"] = att_xp
+	out["defender_soft"] = def_soft
+	out["defender_hard"] = def_hard
+	out["defender_org"] = def_org
+	out["defender_strength"] = def_str
+	out["defender_xp"] = def_xp
+	out["attacker_initiative"] = ATTACKER_INITIATIVE
+	out["odds_attacker_win"] = odds
+	out["formation_id"] = fid if not fid.is_empty() else str(can.get("formation_id", ""))
+	out["from_province_id"] = from_pid if from_pid >= 0 else int(can.get("from_province_id", -1))
+	out["target_province_id"] = target_province_id
+	out["preview_source"] = "unit_formula"
+	return out
+
+
 func execute_province_assault(
 	attacker_tag: String,
 	target_province_id: int,
 	from_province_id: int = -1,
 	attacker_formation_id: String = "",
 ) -> Dictionary:
-	var preview: Dictionary = can_assault_province(attacker_tag, target_province_id, from_province_id)
+	# Re-validate with the same named fid — no silent swap to another division.
+	var preview: Dictionary = can_assault_province(
+		attacker_tag, target_province_id, from_province_id, attacker_formation_id
+	)
 	if not bool(preview.get("ok", false)):
 		return {"success": false, "reason": preview.get("reason", "Cannot assault")}
 
@@ -435,6 +612,772 @@ func execute_province_assault(
 			debug_aar.call_deferred("show_battle_aar", result)
 
 	return {"success": true, "result": result}
+
+
+## ---------------------------------------------------------------------------
+## Multi-day battles (player / play-strip / map confirm). execute stays one-shot.
+## ---------------------------------------------------------------------------
+
+## LeaderManager-first station write (capture + hops). Not SupplyManager alone.
+func station_formation_on_province(
+	formation_id: String,
+	province_id: int,
+	country_tag: String,
+) -> Dictionary:
+	if formation_id.is_empty() or province_id < 0:
+		return {"ok": false, "reason": "bad args"}
+	var tag := country_tag.strip_edges().to_upper()
+	var moved := false
+	if typeof(FormationMovement) != TYPE_NIL:
+		var res: Dictionary = FormationMovement.move_formation_to_province(
+			formation_id, province_id, tag,
+		)
+		moved = bool(res.get("ok", false))
+	elif typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("move_formation_to_province"):
+		var res2: Dictionary = SupplyManager.move_formation_to_province(
+			formation_id, province_id, tag,
+		)
+		moved = bool(res2.get("ok", false))
+	if typeof(LeaderManager) != TYPE_NIL:
+		var f: Formation = LeaderManager.get_formation(formation_id)
+		if f != null:
+			f.stationed_province_id = province_id
+		else:
+			return {"ok": false, "reason": "unknown formation", "moved_primitive": moved}
+	if not moved and typeof(SupplyManager) != TYPE_NIL:
+		SupplyManager.division_deployments[formation_id] = {
+			"province_id": province_id,
+			"country_tag": tag,
+			"order_type": "move_to_province",
+		}
+	return {
+		"ok": true,
+		"formation_id": formation_id,
+		"province_id": province_id,
+		"moved_primitive": moved,
+	}
+
+
+## Player-path multi-day battle. Capture only on break/retreat via apply_province_capture.
+func start_province_battle(
+	attacker_tag: String,
+	target_province_id: int,
+	from_province_id: int = -1,
+	formation_id: String = "",
+) -> Dictionary:
+	_ensure_battle_day_hook()
+	var can: Dictionary = can_assault_province(
+		attacker_tag, target_province_id, from_province_id, formation_id
+	)
+	if not bool(can.get("ok", false)):
+		return {"success": false, "reason": can.get("reason", "Cannot assault")}
+
+	var tag := str(can.get("attacker_tag", attacker_tag)).strip_edges().to_upper()
+	var from_pid := int(can.get("from_province_id", from_province_id))
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		fid = str(can.get("formation_id", ""))
+	if fid.is_empty():
+		return {"success": false, "reason": "No attacker formation"}
+	var target: Province = MapManager.get_province(target_province_id) if typeof(MapManager) != TYPE_NIL else null
+	if target == null:
+		return {"success": false, "reason": "Target province missing"}
+	var def_tag := str(can.get("defender_tag", "")).strip_edges().to_upper()
+	if def_tag.is_empty():
+		def_tag = _province_defender_tag(target)
+
+	# 1v1 theater: block same edge, same target hex, attacker fid, or live defender fid already engaged.
+	# Prevents double org/str ticks on a shared Formation and sticky is_in_combat clears.
+	if not get_battle_at(target_province_id).is_empty():
+		return {"success": false, "reason": "Province already under assault"}
+	for bid_v in _battles.keys():
+		var existing: Dictionary = _battles[bid_v] as Dictionary
+		if str(existing.get("status", "")) != "engaging":
+			continue
+		if int(existing.get("from_pid", -1)) == from_pid and int(existing.get("target_pid", -1)) == target_province_id:
+			return {"success": false, "reason": "Battle already engaging on this edge", "battle_id": str(bid_v)}
+		if _battle_lists_fid(existing, fid):
+			return {"success": false, "reason": "Formation already in battle", "battle_id": str(bid_v)}
+
+	var att_form: Formation = null
+	if typeof(LeaderManager) != TYPE_NIL:
+		att_form = LeaderManager.get_formation(fid)
+	if att_form == null:
+		att_form = _build_attacker_formation(fid, tag, from_pid)
+	# Keep station on from_pid during engage.
+	if "stationed_province_id" in att_form:
+		att_form.stationed_province_id = from_pid
+
+	var def_form: Formation = _build_defender_formation(target, def_tag)
+	var def_is_synthetic := true
+	var def_fid := ""
+	if typeof(LeaderManager) != TYPE_NIL and not str(def_form.formation_id).is_empty():
+		var live_def: Formation = LeaderManager.get_formation(str(def_form.formation_id))
+		if live_def != null:
+			def_form = live_def
+			def_is_synthetic = false
+			def_fid = str(live_def.formation_id)
+	if def_is_synthetic:
+		# Battle-local garrison — do not register on LeaderManager; keep on defender_forms.
+		def_fid = ""
+	# Live defender already in another battle → no shared Form ref double-damage.
+	if not def_fid.is_empty():
+		for bid2 in _battles.keys():
+			var ex2: Dictionary = _battles[bid2] as Dictionary
+			if str(ex2.get("status", "")) != "engaging":
+				continue
+			if _battle_lists_fid(ex2, def_fid):
+				return {
+					"success": false,
+					"reason": "Defender already in battle",
+					"battle_id": str(bid2),
+					"defender_formation_id": def_fid,
+				}
+
+	var start_day := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		start_day = int(TimeManager.get_total_days_elapsed())
+
+	_battle_seq += 1
+	var battle_id := "b_%d_%d_%s_%d" % [from_pid, target_province_id, fid, _battle_seq]
+	var att_fids: PackedStringArray = PackedStringArray([fid])
+	var def_fids: PackedStringArray = PackedStringArray()
+	if not def_fid.is_empty():
+		def_fids.append(def_fid)
+
+	var battle := {
+		"battle_id": battle_id,
+		"attacker_tag": tag,
+		"defender_tag": def_tag,
+		"attacker_fids": att_fids,
+		"defender_fids": def_fids,
+		"attacker_forms": [att_form],
+		"defender_forms": [def_form],
+		"from_pid": from_pid,
+		"target_pid": target_province_id,
+		"start_day": start_day,
+		"days_elapsed": 0,
+		"status": "engaging",
+		"last_slice": {},
+		"defender_is_synthetic": def_is_synthetic,
+		"attacker_formation_id": fid,
+		"defender_formation_id": def_fid,
+	}
+	_battles[battle_id] = battle
+
+	if "is_in_combat" in att_form:
+		att_form.is_in_combat = true
+	if not def_is_synthetic and def_form != null and "is_in_combat" in def_form:
+		def_form.is_in_combat = true
+
+	var context := {
+		"battle_id": battle_id,
+		"attacker_tag": tag,
+		"defender_tag": def_tag,
+		"target_province_id": target_province_id,
+		"from_province_id": from_pid,
+		"attacker_formation_id": fid,
+		"defender_formation_id": def_fid,
+		"multi_day": true,
+	}
+	battle_started.emit(context)
+	print(
+		"[BATTLE START] id=%s %s %s@%d → %s@%d (synthetic_def=%s)"
+		% [battle_id, fid, tag, from_pid, def_tag, target_province_id, str(def_is_synthetic)]
+	)
+	return {
+		"success": true,
+		"battle_id": battle_id,
+		"status": "engaging",
+		"battle": battle,
+		"result": {
+			"winner": "",
+			"outcome": "engaging",
+			"province_control_change": false,
+			"attacker_tag": tag,
+			"defender_tag": def_tag,
+			"target_province_id": target_province_id,
+			"from_province_id": from_pid,
+			"attacker_formation_id": fid,
+			"defender_formation_id": def_fid,
+			"multi_day": true,
+		},
+	}
+
+
+func get_battle_at(target_pid: int) -> Dictionary:
+	for bid in _battles.keys():
+		var b: Dictionary = _battles[bid] as Dictionary
+		if str(b.get("status", "")) != "engaging":
+			continue
+		if int(b.get("target_pid", -1)) == target_pid:
+			return b.duplicate(true)
+	return {}
+
+
+func get_battle_for_formation(formation_id: String) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		return {}
+	for bid in _battles.keys():
+		var b: Dictionary = _battles[bid] as Dictionary
+		if str(b.get("status", "")) != "engaging":
+			continue
+		if _battle_lists_fid(b, fid):
+			return b.duplicate(true)
+	return {}
+
+
+func is_formation_in_battle(formation_id: String) -> bool:
+	return not get_battle_for_formation(formation_id).is_empty()
+
+
+## Owner flip + station + displace + notify. No damage / equip write-off.
+func apply_province_capture(
+	result: Dictionary,
+	attacker_formation_id: String,
+	from_province_id: int,
+) -> void:
+	var target_pid := int(result.get("target_province_id", result.get("province_id", -1)))
+	var attacker_tag := str(result.get("attacker_tag", "")).strip_edges().to_upper()
+	if target_pid < 0 or attacker_tag.is_empty() or typeof(MapManager) == TYPE_NIL:
+		return
+	result["province_control_change"] = true
+	result["winner"] = "attacker"
+	MapManager.update_province_owner(target_pid, attacker_tag, attacker_tag, false)
+	if not attacker_formation_id.is_empty():
+		station_formation_on_province(attacker_formation_id, target_pid, attacker_tag)
+	_displace_defender_from_captured_province(result, target_pid)
+	_notify_map_refresh(
+		target_pid,
+		int(result.get("from_province_id", from_province_id)),
+		int(result.get("retreat_province_id", -1)),
+	)
+	_post_battle_news(result, true)
+
+
+func withdraw_from_battle(formation_id: String) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		return {"ok": false, "reason": "no formation"}
+	var battle_id := ""
+	var battle: Dictionary = {}
+	for bid in _battles.keys():
+		var b: Dictionary = _battles[bid] as Dictionary
+		if str(b.get("status", "")) != "engaging":
+			continue
+		if _battle_lists_fid(b, fid):
+			battle_id = str(bid)
+			battle = b
+			break
+	if battle_id.is_empty():
+		return {"ok": false, "reason": "not in battle"}
+	_end_battle(battle_id, "retreat")
+	print("[BATTLE END] id=%s status=retreat (withdraw %s)" % [battle_id, fid])
+	return {
+		"ok": true,
+		"battle_id": battle_id,
+		"status": "retreat",
+		"formation_id": fid,
+		"captured": false,
+		"from_pid": int(battle.get("from_pid", -1)),
+		"target_pid": int(battle.get("target_pid", -1)),
+	}
+
+
+func tick_battles_for_day() -> Dictionary:
+	if _battles.is_empty():
+		_battle_tick_rr = 0
+		return {"ok": true, "ticked": 0, "ended": 0, "active": 0}
+	var ticked := 0
+	var ended := 0
+	# Collect engaging ids (stable sort) then round-robin so budget never starves a row forever.
+	var ids: Array = []
+	var end_ids: Array[String] = []
+	for bid_v in _battles.keys():
+		var bid0 := str(bid_v)
+		var b0: Dictionary = _battles[bid0] as Dictionary
+		if str(b0.get("status", "")) != "engaging":
+			end_ids.append(bid0)
+		else:
+			ids.append(bid0)
+	ids.sort()
+	var n := ids.size()
+	if n == 0:
+		for eid in end_ids:
+			if _battles.has(eid):
+				_battles.erase(eid)
+		return {"ok": true, "ticked": 0, "ended": 0, "active": 0}
+	# When few battles, tick all; otherwise budget with rotating start index.
+	var budget := n if n <= BATTLE_TICK_BUDGET else BATTLE_TICK_BUDGET
+	if _battle_tick_rr < 0 or _battle_tick_rr >= n:
+		_battle_tick_rr = 0
+	var start_i := _battle_tick_rr
+	for k in range(n):
+		if ticked >= budget:
+			break
+		var i := (start_i + k) % n
+		var battle_id := str(ids[i])
+		if not _battles.has(battle_id):
+			continue
+		var battle: Dictionary = _battles[battle_id] as Dictionary
+		if str(battle.get("status", "")) != "engaging":
+			continue
+		ticked += 1
+		var term := _tick_one_battle(battle_id, battle)
+		if not term.is_empty():
+			ended += 1
+	# Advance RR so next day starts after this window (fairness when n > budget).
+	_battle_tick_rr = (start_i + budget) % maxi(n, 1)
+	for eid in end_ids:
+		if _battles.has(eid) and str((_battles[eid] as Dictionary).get("status", "")) != "engaging":
+			_battles.erase(eid)
+	return {
+		"ok": true,
+		"ticked": ticked,
+		"ended": ended,
+		"active": _battles.size(),
+		"rr": _battle_tick_rr,
+	}
+
+
+func _tick_one_battle(battle_id: String, battle: Dictionary) -> String:
+	var from_pid := int(battle.get("from_pid", -1))
+	var target_pid := int(battle.get("target_pid", -1))
+	var att_forms: Array = battle.get("attacker_forms", []) as Array
+	var def_forms: Array = battle.get("defender_forms", []) as Array
+	var att_form: Formation = att_forms[0] as Formation if not att_forms.is_empty() else null
+	var def_form: Formation = def_forms[0] as Formation if not def_forms.is_empty() else null
+	var tag := str(battle.get("attacker_tag", "")).strip_edges().to_upper()
+	var def_tag := str(battle.get("defender_tag", "")).strip_edges().to_upper()
+	var fid := str(battle.get("attacker_formation_id", ""))
+	var def_fid := str(battle.get("defender_formation_id", ""))
+	var def_synth := bool(battle.get("defender_is_synthetic", false))
+
+	# Attacker left the edge → retreat, no capture.
+	if att_form == null or not is_instance_valid(att_form):
+		_end_battle(battle_id, "retreat")
+		return "retreat"
+	var att_station := int(att_form.stationed_province_id) if "stationed_province_id" in att_form else -1
+	if att_station != from_pid and att_station != target_pid:
+		_end_battle(battle_id, "retreat")
+		return "retreat"
+	if not _provinces_adjacent(from_pid, target_pid) and att_station != target_pid:
+		_end_battle(battle_id, "retreat")
+		return "retreat"
+
+	# Empty defender (displaced) → capture.
+	if def_form == null or not is_instance_valid(def_form):
+		var empty_res := _battle_capture_result(battle, "retreat")
+		apply_province_capture(empty_res, fid, from_pid)
+		_end_battle(battle_id, "captured")
+		return "captured"
+	if not def_synth:
+		var def_station := int(def_form.stationed_province_id) if "stationed_province_id" in def_form else -1
+		if def_station != target_pid:
+			var left_res := _battle_capture_result(battle, "retreat")
+			apply_province_capture(left_res, fid, from_pid)
+			_end_battle(battle_id, "captured")
+			return "captured"
+
+	var from_prov: Province = MapManager.get_province(from_pid) if typeof(MapManager) != TYPE_NIL else null
+	var target: Province = MapManager.get_province(target_pid) if typeof(MapManager) != TYPE_NIL else null
+	var att_power := _slice_power_from_form(att_form, from_prov if from_prov else target, ATTACKER_INITIATIVE)
+	var def_power := _slice_power_from_form(def_form, target, 0.0)
+	# Optional weather/settlement flavor only — never use resolve_combat province_control_change.
+	if target != null and target.settlement_level > 0.05:
+		def_power *= clampf(1.0 + target.settlement_level * 0.025, 1.0, 1.25)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_river_border") and MapManager.has_river_border(target_pid):
+		def_power *= 1.05
+
+	var hi := maxf(att_power, def_power)
+	var m := 0.0
+	if hi > 0.0:
+		m = absf(att_power - def_power) / hi
+	var att_wins_slice := att_power >= def_power
+
+	var loser_org := 0.12 + 0.08 * m
+	var winner_org := 0.04 + 0.02 * (1.0 - m)
+	var loser_str := 0.10 + 0.06 * m
+	var winner_str := 0.03 + 0.02 * (1.0 - m)
+
+	var att_org_before := float(att_form.organization) if "organization" in att_form else 1.0
+	var att_str_before := float(att_form.strength) if "strength" in att_form else 1.0
+	var def_org_before := float(def_form.organization) if "organization" in def_form else 1.0
+	var def_str_before := float(def_form.strength) if "strength" in def_form else 1.0
+
+	if att_wins_slice:
+		att_form.organization = att_org_before - winner_org
+		att_form.strength = att_str_before - winner_str
+		def_form.organization = def_org_before - loser_org
+		def_form.strength = def_str_before - loser_str
+	else:
+		att_form.organization = att_org_before - loser_org
+		att_form.strength = att_str_before - loser_str
+		def_form.organization = def_org_before - winner_org
+		def_form.strength = def_str_before - winner_str
+
+	# Pre-clamp break tests.
+	var att_org_raw := float(att_form.organization)
+	var att_str_raw := float(att_form.strength)
+	var def_org_raw := float(def_form.organization)
+	var def_str_raw := float(def_form.strength)
+
+	var days := int(battle.get("days_elapsed", 0)) + 1
+	battle["days_elapsed"] = days
+	battle["last_slice"] = {
+		"day": days,
+		"att_power": att_power,
+		"def_power": def_power,
+		"m": m,
+		"att_org": att_org_raw,
+		"def_org": def_org_raw,
+		"att_str": att_str_raw,
+		"def_str": def_str_raw,
+		"att_wins_slice": att_wins_slice,
+	}
+	_battles[battle_id] = battle
+
+	print(
+		"[BATTLE TICK] id=%s day=%d att_org=%.3f def_org=%.3f att=%.2f def=%.2f"
+		% [battle_id, days, att_org_raw, def_org_raw, att_power, def_power]
+	)
+	battle_day_ticked.emit(battle)
+	_notify_battle_day_ui(from_pid, target_pid, battle)
+
+	# Live fids only: light equipment write-off from strength drop.
+	if not fid.is_empty():
+		_apply_combat_equipment_loss_for_formation(fid, att_str_before, maxf(att_str_raw, 0.01), att_wins_slice, false)
+	if not def_synth and not def_fid.is_empty():
+		_apply_combat_equipment_loss_for_formation(def_fid, def_str_before, maxf(def_str_raw, 0.01), not att_wins_slice, false)
+
+	var terminal := ""
+	if def_org_raw <= BATTLE_ORG_BREAK or def_str_raw <= BATTLE_STR_BREAK:
+		terminal = "defender_broke"
+	elif att_org_raw <= BATTLE_ORG_BREAK or att_str_raw <= BATTLE_ATT_STR_BREAK:
+		terminal = "attacker_broke"
+	elif days >= BATTLE_MAX_DAYS:
+		terminal = "prolonged_stalemate"
+
+	# Clamp survivors after break test (att str floor 0.35; def break floor 0.30).
+	att_form.organization = clampf(att_org_raw, BATTLE_ORG_BREAK, 1.0)
+	att_form.strength = clampf(att_str_raw, BATTLE_ATT_STR_FLOOR, 1.0)
+	def_form.organization = clampf(def_org_raw, BATTLE_ORG_BREAK, 1.0)
+	def_form.strength = clampf(def_str_raw, BATTLE_DEF_STR_BREAK, 1.0)
+	if "readiness" in att_form:
+		att_form.readiness = clampf(float(att_form.readiness) - (0.03 if att_wins_slice else 0.06), 0.28, 1.0)
+	if "readiness" in def_form:
+		def_form.readiness = clampf(float(def_form.readiness) - (0.06 if att_wins_slice else 0.03), 0.28, 1.0)
+
+	if terminal == "defender_broke":
+		var cap := _battle_capture_result(battle, "defender_broke")
+		apply_province_capture(cap, fid, from_pid)
+		_end_battle(battle_id, "defender_broke")
+		return "defender_broke"
+	if terminal == "attacker_broke":
+		_end_battle(battle_id, "attacker_broke")
+		return "attacker_broke"
+	if terminal == "prolonged_stalemate":
+		_end_battle(battle_id, "prolonged_stalemate")
+		return "prolonged_stalemate"
+	return ""
+
+
+func _battle_capture_result(battle: Dictionary, outcome: String) -> Dictionary:
+	return {
+		"province_control_change": true,
+		"winner": "attacker",
+		"attacker_tag": str(battle.get("attacker_tag", "")),
+		"defender_tag": str(battle.get("defender_tag", "")),
+		"attacker_formation_id": str(battle.get("attacker_formation_id", "")),
+		"defender_formation_id": str(battle.get("defender_formation_id", "")),
+		"target_province_id": int(battle.get("target_pid", -1)),
+		"from_province_id": int(battle.get("from_pid", -1)),
+		"retreat_province_id": -1,
+		"outcome": outcome,
+	}
+
+
+func _end_battle(battle_id: String, status: String) -> void:
+	if not _battles.has(battle_id):
+		return
+	var battle: Dictionary = _battles[battle_id] as Dictionary
+	battle["status"] = status
+	# Erase first so _formation_still_in_other_battle does not see this row.
+	_battles.erase(battle_id)
+	_clear_battle_combat_flags(battle, battle_id)
+	var toast_status := status
+	var target_pid := int(battle.get("target_pid", -1))
+	var from_pid := int(battle.get("from_pid", -1))
+	print("[BATTLE END] id=%s status=%s day=%d" % [battle_id, status, int(battle.get("days_elapsed", 0))])
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		var msg := "Battle ended · %s" % toast_status
+		if status == "defender_broke" or status == "captured":
+			msg = "Province taken · defender broke"
+		elif status == "attacker_broke":
+			msg = "Assault broken · regroup"
+		elif status == "retreat":
+			msg = "Forces withdrew · no capture"
+		elif status == "prolonged_stalemate":
+			msg = "Stalemate · assault stalled"
+		LeaderEventUI.show_toast(msg, 3.5, false, true)
+	battle_resolved.emit({
+		"battle_id": battle_id,
+		"status": status,
+		"target_province_id": target_pid,
+		"from_province_id": from_pid,
+		"multi_day": true,
+		"province_control_change": status in ["defender_broke", "captured"],
+	})
+
+
+## Clear is_in_combat only when the formation is not still listed in another engaging row.
+func _clear_battle_combat_flags(battle: Dictionary, ended_battle_id: String = "") -> void:
+	var fids: Array[String] = []
+	for key in ["attacker_formation_id", "defender_formation_id"]:
+		var id := str(battle.get(key, "")).strip_edges()
+		if not id.is_empty() and not fids.has(id):
+			fids.append(id)
+	for arr_key in ["attacker_fids", "defender_fids"]:
+		for x in battle.get(arr_key, []):
+			var sid := str(x).strip_edges()
+			if not sid.is_empty() and not fids.has(sid):
+				fids.append(sid)
+	for arr_key2 in ["attacker_forms", "defender_forms"]:
+		for f_any in battle.get(arr_key2, []):
+			var f: Formation = f_any as Formation
+			if f == null or not is_instance_valid(f):
+				continue
+			var ffid := str(f.formation_id) if "formation_id" in f else ""
+			if not ffid.is_empty() and not fids.has(ffid):
+				fids.append(ffid)
+			# Synthetic battle-local forms: always clear (not shared across rows).
+			if ffid.is_empty() and "is_in_combat" in f:
+				f.is_in_combat = false
+	for id2 in fids:
+		if _formation_still_in_other_battle(id2, ended_battle_id):
+			continue
+		if typeof(LeaderManager) != TYPE_NIL:
+			var lf: Formation = LeaderManager.get_formation(id2)
+			if lf != null and "is_in_combat" in lf:
+				lf.is_in_combat = false
+		# Also clear any in-memory form refs on this ended battle that match.
+		for arr_key3 in ["attacker_forms", "defender_forms"]:
+			for f_any2 in battle.get(arr_key3, []):
+				var f2: Formation = f_any2 as Formation
+				if f2 == null or not is_instance_valid(f2):
+					continue
+				var f2id := str(f2.formation_id) if "formation_id" in f2 else ""
+				if f2id == id2 and "is_in_combat" in f2:
+					f2.is_in_combat = false
+
+
+func _formation_still_in_other_battle(formation_id: String, exclude_battle_id: String = "") -> bool:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		return false
+	for bid in _battles.keys():
+		if str(bid) == exclude_battle_id:
+			continue
+		var b: Dictionary = _battles[bid] as Dictionary
+		if str(b.get("status", "")) != "engaging":
+			continue
+		if _battle_lists_fid(b, fid):
+			return true
+	return false
+
+
+func _battle_lists_fid(battle: Dictionary, formation_id: String) -> bool:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		return false
+	if str(battle.get("attacker_formation_id", "")) == fid:
+		return true
+	if str(battle.get("defender_formation_id", "")) == fid:
+		return true
+	for x in battle.get("attacker_fids", []):
+		if str(x) == fid:
+			return true
+	for y in battle.get("defender_fids", []):
+		if str(y) == fid:
+			return true
+	return false
+
+
+func _slice_power_from_form(form: Formation, province: Province, initiative: float) -> float:
+	if form == null:
+		return 0.0
+	var fid := str(form.formation_id) if "formation_id" in form else ""
+	var tag := str(form.country_tag).strip_edges().to_upper() if "country_tag" in form else ""
+	var soft := 0.0
+	var hard := 0.0
+	if _resolver != null and not fid.is_empty():
+		var terrain: String = province.terrain if province != null and province.terrain != "" else "plains"
+		var pid := province.id if province != null else -1
+		var dev := province.development_level if province != null else -1
+		var infra := province.infrastructure if province != null else -1
+		var stats: Dictionary = _resolver.get_effective_combat_power(
+			fid, fid, fid, terrain, pid, dev, infra,
+		)
+		soft = float(stats.get("soft_attack", 0.0))
+		hard = float(stats.get("hard_attack", 0.0))
+	if soft <= 0.0 and hard <= 0.0:
+		# Synthetic garrison fallback so empty-hex defenders still resist.
+		soft = 0.7
+		hard = 0.05
+	var org := float(form.organization) if "organization" in form else 1.0
+	var strength := float(form.strength) if "strength" in form else 1.0
+	var xp := float(form.combat_experience) if "combat_experience" in form else 48.0
+	var xp_mult := lerpf(0.85, 1.15, clampf(xp / 100.0, 0.0, 1.0))
+	return (soft + 1.6 * hard) * maxf(org, 0.0) * maxf(strength, 0.0) * xp_mult + initiative
+
+
+func _notify_battle_day_ui(from_pid: int, target_pid: int, battle: Dictionary) -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	for mr in tree.get_nodes_in_group("map_renderer"):
+		if mr.has_method("flash_battle_day"):
+			mr.call_deferred("flash_battle_day", [from_pid, target_pid], battle)
+		elif mr.has_method("push_map_assault_marker"):
+			mr.call_deferred("push_map_assault_marker", target_pid, "engage", 0.75)
+
+
+func get_save_data() -> Dictionary:
+	var battles_arr: Array = []
+	for bid in _battles.keys():
+		var b: Dictionary = _battles[bid] as Dictionary
+		if str(b.get("status", "")) != "engaging":
+			continue
+		var def_org := 1.0
+		var def_str := 1.0
+		var def_rdy := 1.0
+		var def_forms: Array = b.get("defender_forms", []) as Array
+		if not def_forms.is_empty() and def_forms[0] is Formation:
+			var df: Formation = def_forms[0] as Formation
+			if df != null:
+				def_org = float(df.organization) if "organization" in df else 1.0
+				def_str = float(df.strength) if "strength" in df else 1.0
+				def_rdy = float(df.readiness) if "readiness" in df else 1.0
+		var att_fids_arr: Array = []
+		for x in b.get("attacker_fids", []):
+			att_fids_arr.append(str(x))
+		var def_fids_arr: Array = []
+		for y in b.get("defender_fids", []):
+			def_fids_arr.append(str(y))
+		battles_arr.append({
+			"battle_id": str(b.get("battle_id", bid)),
+			"attacker_tag": str(b.get("attacker_tag", "")),
+			"defender_tag": str(b.get("defender_tag", "")),
+			"attacker_fids": att_fids_arr,
+			"defender_fids": def_fids_arr,
+			"from_pid": int(b.get("from_pid", -1)),
+			"target_pid": int(b.get("target_pid", -1)),
+			"start_day": int(b.get("start_day", 0)),
+			"days_elapsed": int(b.get("days_elapsed", 0)),
+			"status": str(b.get("status", "engaging")),
+			"attacker_formation_id": str(b.get("attacker_formation_id", "")),
+			"defender_formation_id": str(b.get("defender_formation_id", "")),
+			"defender_is_synthetic": bool(b.get("defender_is_synthetic", false)),
+			"defender_org": def_org,
+			"defender_str": def_str,
+			"defender_rdy": def_rdy,
+		})
+	return {
+		"battles": battles_arr,
+		"battle_seq": _battle_seq,
+	}
+
+
+func apply_save_data(data: Dictionary) -> void:
+	_battles.clear()
+	_marches.clear()
+	if data.is_empty():
+		return
+	_ensure_battle_day_hook()
+	_battle_seq = int(data.get("battle_seq", 0))
+	var arr: Array = data.get("battles", []) as Array
+	for row_v in arr:
+		if not (row_v is Dictionary):
+			continue
+		var row: Dictionary = row_v as Dictionary
+		var battle_id := str(row.get("battle_id", "")).strip_edges()
+		if battle_id.is_empty():
+			continue
+		if str(row.get("status", "engaging")) != "engaging":
+			continue
+		var att_fid := str(row.get("attacker_formation_id", "")).strip_edges()
+		if att_fid.is_empty():
+			var af: Array = row.get("attacker_fids", []) as Array
+			if not af.is_empty():
+				att_fid = str(af[0])
+		if att_fid.is_empty():
+			continue
+		# Missing live attacker fid → drop battle.
+		var att_form: Formation = null
+		if typeof(LeaderManager) != TYPE_NIL:
+			att_form = LeaderManager.get_formation(att_fid)
+		if att_form == null:
+			continue
+		var def_fid := str(row.get("defender_formation_id", "")).strip_edges()
+		var def_synth := bool(row.get("defender_is_synthetic", false))
+		var def_form: Formation = null
+		if not def_synth and not def_fid.is_empty() and typeof(LeaderManager) != TYPE_NIL:
+			def_form = LeaderManager.get_formation(def_fid)
+			if def_form == null:
+				# Live defender gone — drop.
+				continue
+		if def_form == null:
+			def_synth = true
+			def_form = Formation.new()
+			def_form.formation_id = _garrison_template_for_country(str(row.get("defender_tag", "")))
+			def_form.country_tag = str(row.get("defender_tag", "")).strip_edges().to_upper()
+			def_form.formation_type = Formation.TYPE_GARRISON
+			def_form.name = "%s Garrison" % def_form.country_tag
+			def_form.stationed_province_id = int(row.get("target_pid", -1))
+			def_form.organization = float(row.get("defender_org", 1.0))
+			def_form.strength = float(row.get("defender_str", 1.0))
+			def_form.readiness = float(row.get("defender_rdy", 1.0))
+			def_fid = ""
+		if "is_in_combat" in att_form:
+			att_form.is_in_combat = true
+		if not def_synth and def_form != null and "is_in_combat" in def_form:
+			def_form.is_in_combat = true
+		var att_fids: PackedStringArray = PackedStringArray([att_fid])
+		var def_fids: PackedStringArray = PackedStringArray()
+		if not def_fid.is_empty():
+			def_fids.append(def_fid)
+		_battles[battle_id] = {
+			"battle_id": battle_id,
+			"attacker_tag": str(row.get("attacker_tag", "")).strip_edges().to_upper(),
+			"defender_tag": str(row.get("defender_tag", "")).strip_edges().to_upper(),
+			"attacker_fids": att_fids,
+			"defender_fids": def_fids,
+			"attacker_forms": [att_form],
+			"defender_forms": [def_form],
+			"from_pid": int(row.get("from_pid", -1)),
+			"target_pid": int(row.get("target_pid", -1)),
+			"start_day": int(row.get("start_day", 0)),
+			"days_elapsed": int(row.get("days_elapsed", 0)),
+			"status": "engaging",
+			"last_slice": {},
+			"defender_is_synthetic": def_synth,
+			"attacker_formation_id": att_fid,
+			"defender_formation_id": def_fid,
+		}
+
+
+	var march_list: Array = data.get("marches", [])
+	if march_list is Array:
+		for item in march_list:
+			if not (item is Dictionary):
+				continue
+			var row: Dictionary = item
+			var fid := str(row.get("formation_id", ""))
+			if fid.is_empty():
+				continue
+			_marches[fid] = row.duplicate(true)
+	_march_order_seq = int(data.get("march_order_seq", _march_order_seq))
 
 func _log_unit_combat(formation_id: String, province: int, other_province: int, result: Dictionary, role: String) -> void:
 	if formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
@@ -609,6 +1552,12 @@ func apply_combat_outcome(
 	var attacker_tag := str(result.get("attacker_tag", "")).strip_edges().to_upper()
 	var captured := bool(result.get("province_control_change", false))
 	var winner := str(result.get("winner", ""))
+	# Assault/capture leaves the march path; cancel so next day hop does not yank the unit.
+	if not attacker_formation_id.is_empty():
+		cancel_march_order(attacker_formation_id)
+	var def_fid_cancel := str(result.get("defender_formation_id", "")).strip_edges()
+	if not def_fid_cancel.is_empty():
+		cancel_march_order(def_fid_cancel)
 	# Apply persistent org/readiness damage to the actual live formations (main loop combat now has lasting effects).
 	_apply_combat_damage_to_formations(result, attacker_formation_id)
 
@@ -659,6 +1608,11 @@ func apply_combat_outcome(
 			dmg_line += "DEF %s: org=%.2f rdy=%.2f str=%.2f" % [def_fid, def_f.organization, def_f.readiness, def_f.strength]
 		if att_f != null or def_f != null:
 			print(dmg_line + (" (prolonged - reduced losses, lasts longer)" if prolonged else ""))
+		# One-shot path: combat is over immediately — clear sticky is_in_combat.
+		if att_f != null:
+			att_f.is_in_combat = false
+		if def_f != null:
+			def_f.is_in_combat = false
 
 	if captured and target_pid >= 0 and typeof(MapManager) != TYPE_NIL:
 		MapManager.update_province_owner(target_pid, attacker_tag, attacker_tag, false)
@@ -680,39 +1634,266 @@ func apply_combat_outcome(
 
 
 ## After ownership flips, station the assaulting land formation on the captured province.
-## FormationMovement→SupplyManager may fail under headless/-s (no network, no division template
-## for OOB fids); LeaderManager.stationed_province_id is the combat OOB source of truth and
-## must still advance.
 func _station_attacker_on_captured_province(
 	attacker_formation_id: String,
 	target_pid: int,
 	attacker_tag: String,
 ) -> void:
-	if attacker_formation_id.is_empty() or target_pid < 0:
-		return
-	var tag := attacker_tag.strip_edges().to_upper()
-	var moved := false
-	if typeof(FormationMovement) != TYPE_NIL:
-		var res: Dictionary = FormationMovement.move_formation_to_province(
-			attacker_formation_id, target_pid, tag,
-		)
-		moved = bool(res.get("ok", false))
-	elif typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("move_formation_to_province"):
-		var res2: Dictionary = SupplyManager.move_formation_to_province(
-			attacker_formation_id, target_pid, tag,
-		)
-		moved = bool(res2.get("ok", false))
-	if typeof(LeaderManager) != TYPE_NIL:
-		var f: Formation = LeaderManager.get_formation(attacker_formation_id)
-		if f != null:
-			f.stationed_province_id = target_pid
-	# Keep SupplyManager deployment registry aligned when move pipeline could not run fully.
-	if not moved and typeof(SupplyManager) != TYPE_NIL:
-		SupplyManager.division_deployments[attacker_formation_id] = {
-			"province_id": target_pid,
-			"country_tag": tag,
-			"order_type": "move_to_province",
+	# External station off the march edge — drop order before hop ticks re-path.
+	cancel_march_order(attacker_formation_id)
+	station_formation_on_province(attacker_formation_id, target_pid, attacker_tag)
+
+
+func issue_march_order(
+	formation_id: String,
+	dest_pid: int,
+	country_tag: String,
+	instant: bool = false,
+) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	if fid.is_empty() or dest_pid < 0 or tag.is_empty():
+		return {"ok": false, "reason": "bad args"}
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return {"ok": false, "reason": "LeaderManager unavailable"}
+	var f: Formation = LeaderManager.get_formation(fid)
+	if f == null:
+		return {"ok": false, "reason": "unknown formation"}
+	var f_tag := str(f.country_tag).strip_edges().to_upper() if "country_tag" in f else ""
+	if not f_tag.is_empty() and f_tag != tag:
+		return {"ok": false, "reason": "not your unit"}
+	var from_pid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+	if from_pid < 0:
+		return {"ok": false, "reason": "no station"}
+	if from_pid == dest_pid:
+		return {"ok": true, "reason": "already there", "formation_id": fid, "path": [from_pid], "days_total": 0, "order_id": ""}
+	if not _province_controlled_by(dest_pid, tag):
+		return {"ok": false, "reason": "dest not controlled"}
+	# Cancel re-issue to same dest.
+	if _marches.has(fid):
+		var existing: Dictionary = _marches[fid] as Dictionary
+		if int(existing.get("dest_pid", -1)) == dest_pid:
+			cancel_march_order(fid)
+			return {"ok": true, "reason": "cancelled", "formation_id": fid, "cancelled": true}
+	if _formation_in_active_battle(fid):
+		return {"ok": false, "reason": "in battle"}
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("find_land_path"):
+		return {"ok": false, "reason": "MapManager unavailable"}
+	var path: Array = MapManager.find_land_path(from_pid, dest_pid, tag, MARCH_MAX_HOPS, true)
+	if path.is_empty() or path.size() < 2:
+		return {"ok": false, "reason": "no land path"}
+	var path_ids: Array[int] = []
+	for p in path:
+		path_ids.append(int(p))
+	if instant:
+		var prev := from_pid
+		for i in range(1, path_ids.size()):
+			var hop_pid := path_ids[i]
+			station_formation_on_province(fid, hop_pid, tag)
+			_notify_map_refresh(hop_pid, prev)
+			prev = hop_pid
+		_marches.erase(fid)
+		print("[MARCH] instant fid=%s path=%s" % [fid, str(path_ids)])
+		return {
+			"ok": true,
+			"reason": "instant",
+			"formation_id": fid,
+			"path": path_ids,
+			"days_total": 0,
+			"order_id": "",
+			"instant": true,
 		}
+	_march_order_seq += 1
+	var order_id := "march_%d" % _march_order_seq
+	var hours := _hours_per_hex_for_pid(path_ids[1] if path_ids.size() > 1 else dest_pid)
+	var days_est := _estimate_march_days(path_ids)
+	var order := {
+		"order_id": order_id,
+		"formation_id": fid,
+		"tag": tag,
+		"path": path_ids,
+		"idx": 0,
+		"dest_pid": dest_pid,
+		"hours_per_hex": hours,
+		"hours_acc": 0.0,
+		"visual_t": 0.0,
+	}
+	_marches[fid] = order
+	print("[MARCH] fid=%s path=%s days=%.1f order=%s" % [fid, str(path_ids), days_est, order_id])
+	return {
+		"ok": true,
+		"reason": "marching",
+		"formation_id": fid,
+		"path": path_ids,
+		"days_total": days_est,
+		"order_id": order_id,
+		"hexes": maxi(path_ids.size() - 1, 0),
+	}
+
+
+func cancel_march_order(formation_id: String) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty() or not _marches.has(fid):
+		return {"ok": false, "reason": "no march"}
+	_marches.erase(fid)
+	return {"ok": true, "formation_id": fid, "cancelled": true}
+
+
+func get_march_order(formation_id: String) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty() or not _marches.has(fid):
+		return {}
+	return (_marches[fid] as Dictionary).duplicate(true)
+
+
+## Live view of active marches (fid → order). Read-only for callers except set_march_visual_t.
+## Avoids deep-copy every renderer frame.
+func get_active_marches() -> Dictionary:
+	return _marches
+
+
+func has_active_marches() -> bool:
+	return not _marches.is_empty()
+
+
+## Advance visual_t on an active march (renderer cosmetic; sim hops are day-authoritative).
+func set_march_visual_t(formation_id: String, t: float) -> void:
+	var fid := formation_id.strip_edges()
+	if not _marches.has(fid):
+		return
+	var o: Dictionary = _marches[fid] as Dictionary
+	o["visual_t"] = clampf(t, 0.0, 1.0)
+	_marches[fid] = o
+
+
+func tick_marches_for_day() -> Dictionary:
+	if _marches.is_empty():
+		return {"ok": true, "hops": 0, "arrived": 0, "active": 0, "cancelled": 0}
+	var hops_n := 0
+	var arrived_n := 0
+	var cancelled_n := 0
+	var done_fids: Array[String] = []
+	for fid_v in _marches.keys():
+		var fid := str(fid_v)
+		var order: Dictionary = _marches[fid] as Dictionary
+		var path: Array = order.get("path", []) as Array
+		if path.size() < 2:
+			done_fids.append(fid)
+			continue
+		var idx := int(order.get("idx", 0))
+		if idx >= path.size() - 1:
+			done_fids.append(fid)
+			continue
+		var tag := str(order.get("tag", "")).strip_edges().to_upper()
+		# External station (capture, displace) left the path edge — drop order.
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+			var live: Formation = LeaderManager.get_formation(fid)
+			if live != null and "stationed_province_id" in live:
+				var live_pid := int(live.stationed_province_id)
+				if live_pid != int(path[idx]):
+					done_fids.append(fid)
+					cancelled_n += 1
+					print("[MARCH] cancel desync fid=%s station=%d path_idx=%d" % [fid, live_pid, int(path[idx])])
+					continue
+		var hours_acc := float(order.get("hours_acc", 0.0)) + 24.0
+		var hours_need := float(order.get("hours_per_hex", MARCH_DEFAULT_HOURS_PER_HEX))
+		if hours_need <= 0.0:
+			hours_need = MARCH_DEFAULT_HOURS_PER_HEX
+		order["hours_acc"] = hours_acc
+		# May hop more than once if hours_per_hex is very low.
+		var aborted := false
+		while hours_acc >= hours_need and idx < path.size() - 1:
+			hours_acc -= hours_need
+			var old_pid := int(path[idx])
+			idx += 1
+			var new_pid := int(path[idx])
+			# Own-land re-check: control may flip mid-march (AI capture, ownership change).
+			if not _province_controlled_by(new_pid, tag):
+				done_fids.append(fid)
+				cancelled_n += 1
+				aborted = true
+				print("[MARCH] cancel lost-control fid=%s pid=%d tag=%s" % [fid, new_pid, tag])
+				break
+			station_formation_on_province(fid, new_pid, tag)
+			# Pid-scoped icon update only — never full-board rebuild.
+			_notify_map_refresh(new_pid, old_pid)
+			hops_n += 1
+			order["idx"] = idx
+			order["visual_t"] = 0.0
+			if idx >= path.size() - 1:
+				arrived_n += 1
+				done_fids.append(fid)
+				print("[MARCH] arrived fid=%s pid=%d" % [fid, new_pid])
+				break
+			hours_need = _hours_per_hex_for_pid(int(path[idx + 1]))
+			order["hours_per_hex"] = hours_need
+		if aborted:
+			continue
+		order["hours_acc"] = hours_acc
+		order["idx"] = idx
+		if not done_fids.has(fid):
+			_marches[fid] = order
+	for df in done_fids:
+		_marches.erase(df)
+	return {
+		"ok": true,
+		"hops": hops_n,
+		"arrived": arrived_n,
+		"cancelled": cancelled_n,
+		"active": _marches.size(),
+	}
+
+
+func _formation_in_active_battle(formation_id: String) -> bool:
+	# No _battles rows yet (PR 5) → never block on this path alone.
+	if _battles.is_empty():
+		return false
+	var fid := formation_id.strip_edges()
+	for bid in _battles.keys():
+		var b: Dictionary = _battles[bid] as Dictionary
+		var status := str(b.get("status", "active")).to_lower()
+		if status in ["ended", "resolved", "cancelled", "done"]:
+			continue
+		var atk: Array = b.get("attacker_fids", []) as Array
+		var def: Array = b.get("defender_fids", []) as Array
+		for x in atk:
+			if str(x) == fid:
+				return true
+		for y in def:
+			if str(y) == fid:
+				return true
+		# Single-fid fields
+		if str(b.get("attacker_formation_id", "")) == fid:
+			return true
+		if str(b.get("defender_formation_id", "")) == fid:
+			return true
+	return false
+
+
+func _hours_per_hex_for_pid(province_id: int) -> float:
+	var h := MARCH_DEFAULT_HOURS_PER_HEX
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province"):
+		return h
+	var p: Province = MapManager.get_province(province_id)
+	if p == null:
+		return h
+	var terr := str(p.terrain).to_lower() if "terrain" in p else ""
+	if terr in ["forest", "woods", "mountain", "mountains", "mtn", "hills", "alpine"]:
+		h *= 1.5
+	var infra := int(p.infrastructure) if "infrastructure" in p else 0
+	if infra >= 6:
+		h *= 0.75
+	return h
+
+
+func _estimate_march_days(path_ids: Array) -> float:
+	if path_ids.size() < 2:
+		return 0.0
+	var total_h := 0.0
+	for i in range(1, path_ids.size()):
+		total_h += _hours_per_hex_for_pid(int(path_ids[i]))
+	return total_h / 24.0
+
 
 
 ## After capture, defender land formations leave the lost province. Prefer adjacent friendly
@@ -1140,9 +2321,13 @@ func _validate_attack_source(
 	attacker_tag: String,
 	from_province_id: int,
 	target_province_id: int,
+	formation_id: String = "",
 ) -> Dictionary:
 	if typeof(MapManager) == TYPE_NIL:
 		return {"ok": false, "reason": "MapManager unavailable"}
+
+	if from_province_id < 0:
+		return {"ok": false, "reason": "No staging province"}
 
 	if from_province_id == target_province_id:
 		return {"ok": false, "reason": "Same province"}
@@ -1161,6 +2346,30 @@ func _validate_attack_source(
 	if divisions.is_empty():
 		return {"ok": false, "reason": "No division at staging province %d" % from_province_id}
 
+	var want_fid := formation_id.strip_edges()
+	var chosen: Dictionary = {}
+	if not want_fid.is_empty():
+		# Named unit must sit at from_pid — never swap to a different division.
+		for entry in divisions:
+			if str(entry.get("formation_id", "")) == want_fid:
+				chosen = entry
+				break
+		if chosen.is_empty():
+			return {
+				"ok": false,
+				"reason": "Formation %s not stationed at staging province %d" % [want_fid, from_province_id],
+			}
+		var power := _estimate_attack_power(want_fid, from_prov, attacker_tag)
+		chosen["attack_power"] = power
+		return {
+			"ok": true,
+			"from_province_id": from_province_id,
+			"from_province_name": from_prov.name,
+			"formation_id": want_fid,
+			"division_name": str(chosen.get("display_name", want_fid)),
+			"attack_power": power,
+		}
+
 	var best := _pick_strongest_division(divisions, from_prov, attacker_tag)
 	return {
 		"ok": true,
@@ -1170,6 +2379,55 @@ func _validate_attack_source(
 		"division_name": str(best.get("display_name", "")),
 		"attack_power": float(best.get("attack_power", 0.0)),
 	}
+
+
+## Live Formation org/str/xp × equipment soft/hard (not ProductionManager shortage org 1.0/0.82).
+func _unit_preview_components(formation_id: String, province: Province, country_tag: String) -> Dictionary:
+	var soft := 0.0
+	var hard := 0.0
+	if _resolver != null:
+		var terrain: String = province.terrain if province != null and province.terrain != "" else "plains"
+		var pid := province.id if province != null else -1
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_effective_terrain_for_demo"):
+			var eff := MapManager.get_effective_terrain_for_demo(pid)
+			if eff != terrain:
+				terrain = eff
+		var dev := province.development_level if province != null else -1
+		var infra := province.infrastructure if province != null else -1
+		var stats: Dictionary = _resolver.get_effective_combat_power(
+			formation_id, formation_id, formation_id, terrain, pid, dev, infra,
+		)
+		soft = float(stats.get("soft_attack", 0.0))
+		hard = float(stats.get("hard_attack", 0.0))
+	var org := 1.0
+	var strength := 1.0
+	var xp := 48.0
+	if typeof(LeaderManager) != TYPE_NIL:
+		var fo: Formation = LeaderManager.get_formation(formation_id)
+		if fo != null:
+			if "organization" in fo:
+				org = maxf(0.0, float(fo.organization))
+			if "strength" in fo:
+				strength = maxf(0.0, float(fo.strength))
+			if "combat_experience" in fo:
+				xp = float(fo.combat_experience)
+	return {"soft": soft, "hard": hard, "org": org, "str": strength, "xp": xp}
+
+
+func _unit_preview_power(
+	formation_id: String,
+	province: Province,
+	country_tag: String,
+	initiative: float = 0.0,
+) -> float:
+	var c := _unit_preview_components(formation_id, province, country_tag)
+	var soft := float(c.get("soft", 0.0))
+	var hard := float(c.get("hard", 0.0))
+	var org := float(c.get("org", 1.0))
+	var strength := float(c.get("str", 1.0))
+	var xp := float(c.get("xp", 48.0))
+	var xp_mult := lerpf(0.85, 1.15, clampf(xp / 100.0, 0.0, 1.0))
+	return (soft + 1.6 * hard) * org * strength * xp_mult + initiative
 
 func _pick_strongest_division(
 	divisions: Array[Dictionary],

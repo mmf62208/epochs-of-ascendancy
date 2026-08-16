@@ -10,7 +10,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
-from formation_station_resolver import resolve_stations_hoi_deploy  # noqa: E402
+from formation_station_resolver import (  # noqa: E402
+    DEFAULT_FORMATION_TYPES,
+    LAND_FORMATION_TYPES,
+    land_slot_indices,
+    resolve_stations_hoi_deploy,
+)
 from world_accurate_industrial_hub_product import (  # noqa: E402
     build_world_accurate_industrial_hub_product,
     world_accurate_industrial_hub_integrity,
@@ -29,6 +34,10 @@ D = ROOT / "data" / "provinces_world_accurate"
 SC = ROOT / "data" / "scenarios" / "world_accurate.json"
 SPAWNER = ROOT / "scripts" / "formations" / "FormationSpawner.gd"
 LOADER = ROOT / "scripts" / "core" / "ScenarioLoader.gd"
+
+# Canonical Maginot edge (world_accurate_multi_front_product.GER_FRA_EDGE).
+GER_MAGINOT = 710173  # Baden-Baden
+FRA_MAGINOT = 710739  # Bas-Rhin
 
 
 @unittest.skipUnless(D.is_dir(), "provinces_world_accurate missing")
@@ -75,15 +84,134 @@ class TestHoiStationDeploy(unittest.TestCase):
                 msg="expected a border station in HOI deploy list",
             )
 
+    def test_ger_front_reserve_710173_on_land_slot(self) -> None:
+        """GER 8-count with real key_provinces stations Maginot 710173 on a land slot."""
+        sc = json.loads(SC.read_text())
+        ger = next(c for c in sc["countries"] if c["tag"] == "GER")
+        own = json.loads((D / "province_ownership_1936.json").read_text())["owners"]
+        owned = [int(k) for k, v in own.items() if v == "GER"]
+        self.assertIn(GER_MAGINOT, owned)
+        keys = list(ger.get("key_provinces") or [])
+        self.assertGreaterEqual(len(keys), 5)
+        # Five hubs would consume all land slots without front_reserve.
+        stations = resolve_stations_hoi_deploy(
+            8,
+            int(ger["capital_province_id"]),
+            owned,
+            key_provinces=keys,
+            front_reserve=[GER_MAGINOT],
+            formation_types=DEFAULT_FORMATION_TYPES,
+        )
+        self.assertEqual(len(stations), 8)
+        land_idx = land_slot_indices(8, DEFAULT_FORMATION_TYPES)
+        self.assertGreaterEqual(len(land_idx), 3)
+        # Derived from type cycle — not hard-coded (0,1,4,6,7) in product code.
+        land_stations = [stations[i] for i in land_idx]
+        self.assertIn(
+            GER_MAGINOT,
+            land_stations,
+            msg=f"expected GER Maginot {GER_MAGINOT} on land slot; land={land_stations}",
+        )
+        # First land slot is first reserve.
+        self.assertEqual(stations[land_idx[0]], GER_MAGINOT)
+        # Naval/air must not sit on reserved front pid.
+        for i, sid in enumerate(stations):
+            ftype = DEFAULT_FORMATION_TYPES[i % len(DEFAULT_FORMATION_TYPES)]
+            if ftype not in LAND_FORMATION_TYPES:
+                self.assertNotEqual(
+                    sid,
+                    GER_MAGINOT,
+                    msg=f"non-land slot {i} ({ftype}) must not consume front {GER_MAGINOT}",
+                )
+
+    def test_fra_front_reserve_710739_on_land_slot(self) -> None:
+        """FRA 8-count with real key_provinces stations Maginot 710739 on a land slot."""
+        sc = json.loads(SC.read_text())
+        fra = next(c for c in sc["countries"] if c["tag"] == "FRA")
+        own = json.loads((D / "province_ownership_1936.json").read_text())["owners"]
+        owned = [int(k) for k, v in own.items() if v == "FRA"]
+        self.assertIn(FRA_MAGINOT, owned)
+        stations = resolve_stations_hoi_deploy(
+            8,
+            int(fra["capital_province_id"]),
+            owned,
+            key_provinces=list(fra.get("key_provinces") or []),
+            front_reserve=[FRA_MAGINOT],
+            formation_types=DEFAULT_FORMATION_TYPES,
+        )
+        self.assertEqual(len(stations), 8)
+        land_idx = land_slot_indices(8, DEFAULT_FORMATION_TYPES)
+        self.assertGreaterEqual(len(land_idx), 3)
+        land_stations = [stations[i] for i in land_idx]
+        self.assertIn(
+            FRA_MAGINOT,
+            land_stations,
+            msg=f"expected FRA Maginot {FRA_MAGINOT} on land slot; land={land_stations}",
+        )
+        self.assertEqual(stations[land_idx[0]], FRA_MAGINOT)
+        for i, sid in enumerate(stations):
+            ftype = DEFAULT_FORMATION_TYPES[i % len(DEFAULT_FORMATION_TYPES)]
+            if ftype not in LAND_FORMATION_TYPES:
+                self.assertNotEqual(
+                    sid,
+                    FRA_MAGINOT,
+                    msg=f"non-land slot {i} ({ftype}) must not consume front {FRA_MAGINOT}",
+                )
+
+    def test_non_land_skips_capital_when_capital_in_front_reserve(self) -> None:
+        """Naval/air must not consume reserved front even if capital == front_reserve."""
+        owned = [100, 200, 300]
+        stations = resolve_stations_hoi_deploy(
+            6,
+            100,
+            owned,
+            key_provinces=[100, 200],
+            front_reserve=[100],
+            formation_types=DEFAULT_FORMATION_TYPES,
+        )
+        land_idx = land_slot_indices(6, DEFAULT_FORMATION_TYPES)
+        self.assertEqual(stations[land_idx[0]], 100)
+        for i, sid in enumerate(stations):
+            ftype = DEFAULT_FORMATION_TYPES[i % len(DEFAULT_FORMATION_TYPES)]
+            if ftype not in LAND_FORMATION_TYPES:
+                self.assertNotEqual(sid, 100, msg=f"non-land slot {i} consumed reserved capital")
+                self.assertIn(sid, (200, 300))
+
     def test_gd_spawner_has_hoi_deploy(self) -> None:
         text = SPAWNER.read_text(encoding="utf-8")
         self.assertIn("resolve_stations_hoi_deploy", text)
         self.assertIn("key_provinces", text)
         self.assertIn("border_provinces", text)
+        self.assertIn("front_reserve", text)
+        self.assertIn("LAND_FORMATION_TYPES", text)
+        # Spawn always passes type cycle so land slots follow TEST_FORMATION_TYPES.
+        self.assertIn("TEST_FORMATION_TYPES", text)
+        self.assertRegex(
+            text,
+            r"resolve_stations_hoi_deploy\s*\([\s\S]*?TEST_FORMATION_TYPES",
+            msg="spawn must pass TEST_FORMATION_TYPES into resolve_stations_hoi_deploy",
+        )
+        # Python DEFAULT_FORMATION_TYPES stays equal to the GD TEST_FORMATION_TYPES cycle.
+        self.assertEqual(
+            list(DEFAULT_FORMATION_TYPES),
+            ["division", "division", "fleet", "air_wing", "garrison", "task_force"],
+        )
+        # GD cycle uses Formation.TYPE_* in the same order as DEFAULT_FORMATION_TYPES.
+        self.assertRegex(
+            text,
+            r"TEST_FORMATION_TYPES[\s\S]*?"
+            r"TYPE_DIVISION[\s\S]*?TYPE_DIVISION[\s\S]*?"
+            r"TYPE_FLEET[\s\S]*?TYPE_AIR_WING[\s\S]*?"
+            r"TYPE_GARRISON[\s\S]*?TYPE_TASK_FORCE",
+        )
         loader = LOADER.read_text(encoding="utf-8")
         self.assertIn("_get_key_provinces_for_tag", loader)
         self.assertIn("_collect_border_land_ids_for_tag", loader)
         self.assertIn("key_hubs", loader)
+        self.assertIn("_front_reserve_for_tag", loader)
+        self.assertIn("710173", loader)
+        self.assertIn("710739", loader)
+        self.assertIn("front=", loader)
 
 
 @unittest.skipUnless(D.is_dir(), "board missing")
