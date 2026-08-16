@@ -26,6 +26,9 @@ from order_panel_play_strip_product import (  # type: ignore
 from save_resume_primary_command_product import (  # type: ignore
     build_save_resume_primary_command_product,
 )
+from unit_centric_pick_product import (  # type: ignore
+    build_unit_centric_pick_product,
+)
 from world_accurate_capital_pick_product import (  # type: ignore
     build_world_accurate_capital_pick_product,
 )
@@ -50,6 +53,7 @@ def build_first_session_play_surface_product() -> Dict[str, Any]:
         country_tag="GER", check_wiring=True
     )
     play_strip = build_order_panel_play_strip_product(province_id=1)
+    unit_pick = build_unit_centric_pick_product(check_wiring=True)
 
     bits = {
         "capital_pick": bool(capital_pick.get("ok")),
@@ -60,6 +64,7 @@ def build_first_session_play_surface_product() -> Dict[str, Any]:
         "hotkeys": bool(hotkeys.get("ok")),
         "assault": bool(assault.get("ok")),
         "play_strip": bool(play_strip.get("ok")),
+        "unit_pick": bool(unit_pick.get("ok")),
     }
     products: Dict[str, Mapping[str, Any]] = {
         "capital_pick": capital_pick,
@@ -70,6 +75,7 @@ def build_first_session_play_surface_product() -> Dict[str, Any]:
         "hotkeys": hotkeys,
         "assault": assault,
         "play_strip": play_strip,
+        "unit_pick": unit_pick,
     }
     children = {
         name: _child(ok, products[name].get("summary")) for name, ok in bits.items()

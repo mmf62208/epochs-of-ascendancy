@@ -85,6 +85,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_first_session_hotkeys_product \
     tools.map_generation.tests.test_first_session_assault_surface_product \
     tools.map_generation.tests.test_order_panel_play_strip_product \
+    tools.map_generation.tests.test_unit_centric_pick_product \
     tools.map_generation.tests.test_interactive_multi_ai_day_product \
     -v || fail
 

@@ -1018,10 +1018,22 @@ func _unhandled_input(event: InputEvent) -> void:
 			# Clear selected map unit before other dismissals.
 			if not selected_formation_id.is_empty():
 				selected_formation_id = ""
+				_refresh_selected_unit_chip()
 				_show_inspector_toast("Unit selection cleared", 2.0)
 				get_viewport().set_input_as_handled()
 				return
 			if _dismiss_map_overlays_esc():
+				get_viewport().set_input_as_handled()
+				return
+		# Stack cycle on selected pin province: [ previous · ] next (unit card also has buttons).
+		if (
+			(event.keycode == KEY_BRACKETLEFT or event.keycode == KEY_BRACKETRIGHT)
+			and not selected_formation_id.is_empty()
+			and not event.ctrl_pressed
+			and not event.alt_pressed
+		):
+			var stack_dir := -1 if event.keycode == KEY_BRACKETLEFT else 1
+			if _cycle_selected_stack_unit(stack_dir):
 				get_viewport().set_input_as_handled()
 				return
 		if event.keycode == KEY_L:
@@ -1269,6 +1281,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_select_province(resolved_province, resolved_node)
 				get_viewport().set_input_as_handled()
 				return
+			# Strategic zoom / master-off: pins hidden — one-shot discoverability for unit pick.
+			if not _unit_pick_strategic_hint_shown and not _unit_counters_want_visible():
+				_unit_pick_strategic_hint_shown = true
+				_show_inspector_toast("Zoom in to pick units (Shift+U toggles counters).", 3.5)
 			# Select first (outline immediately); center + left inspector (avoid covering selection).
 			_select_province(resolved_province, resolved_node)
 			_center_camera_on_province(resolved_province.id, "soft")
@@ -15651,6 +15667,7 @@ func _select_map_unit(formation: Object) -> void:
 	if "formation_id" in formation:
 		fid = str(formation.formation_id)
 	selected_formation_id = fid
+	_refresh_selected_unit_chip()
 	var name_s := str(formation.name) if "name" in formation else fid
 	var pid := int(formation.stationed_province_id) if "stationed_province_id" in formation else -1
 	if pid >= 0:
@@ -15660,6 +15677,83 @@ func _select_map_unit(formation: Object) -> void:
 	_show_inspector_toast(toast, 5.5)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug(toast)
+
+
+## Selected-chip ring via nation-frame helper. One pin per province — match by station pid
+## (stack cycle keeps ring on the province pin even when selected_formation_id is not the rep).
+func _refresh_selected_unit_chip() -> void:
+	if _demo_unit_icon_pids.is_empty():
+		return
+	var gold := Color(1.0, 0.85, 0.25, 1.0)
+	# Resolve selected formation's station province (stack cycle: fid changes, pin stays).
+	var sel_pid := -1
+	if not selected_formation_id.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var sel_f: Formation = LeaderManager.get_formation(selected_formation_id)
+		if sel_f != null and "stationed_province_id" in sel_f:
+			sel_pid = int(sel_f.stationed_province_id)
+	for id_v in _demo_unit_icon_pids:
+		var id := int(id_v)
+		if not province_nodes.has(id):
+			continue
+		var n: Node2D = province_nodes[id] as Node2D
+		if n == null:
+			continue
+		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+		if counter == null or not is_instance_valid(counter):
+			continue
+		# free() same-frame so re-add is not renamed SelectedFrame2 (queue_free leaves sibling).
+		var old_sel: Node = counter.get_node_or_null("SelectedFrame")
+		if old_sel != null:
+			counter.remove_child(old_sel)
+			old_sel.free()
+		if selected_formation_id.is_empty() or sel_pid < 0:
+			continue
+		# Province pin match (one DemoUnitIcon per pid); formation_id equality is optional fast path.
+		var pin_pid := int(counter.get_meta("province_id", id))
+		var cfid := str(counter.get_meta("formation_id", ""))
+		var match_pin := pin_pid == sel_pid or (not cfid.is_empty() and cfid == selected_formation_id)
+		if not match_pin:
+			continue
+		var frame := _make_unit_nation_frame(gold)
+		frame.name = "SelectedFrame"
+		frame.z_index = 20
+		counter.add_child(frame)
+
+
+## Cycle stack at selected unit's province ([ ] keys / unit card buttons). One pin per province.
+func _cycle_selected_stack_unit(delta: int) -> bool:
+	if selected_formation_id.is_empty() or delta == 0:
+		return false
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return false
+	var cur: Formation = LeaderManager.get_formation(selected_formation_id)
+	if cur == null:
+		return false
+	var pid := int(cur.stationed_province_id) if "stationed_province_id" in cur else -1
+	var tag := str(cur.country_tag).strip_edges().to_upper() if "country_tag" in cur else ""
+	if pid < 0 or tag.is_empty():
+		return false
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("get_divisions_at_province"):
+		return false
+	var divs: Array = BattleManager.get_divisions_at_province(pid, tag)
+	if divs.size() <= 1:
+		return false
+	var idx := 0
+	for i in divs.size():
+		if str(divs[i].get("formation_id", "")) == selected_formation_id:
+			idx = i
+			break
+	var n := divs.size()
+	idx = posmod(idx + delta, n)
+	var next_fid := str(divs[idx].get("formation_id", ""))
+	if next_fid.is_empty():
+		return false
+	var next_f: Formation = LeaderManager.get_formation(next_fid)
+	if next_f == null:
+		return false
+	_select_map_unit(next_f)
+	_show_unit_detail_popup(next_f)
+	return true
 
 
 ## Order selected unit to a friendly (or owned) province. Returns true if handled.
@@ -15721,10 +15815,14 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 	var z := 1.0
 	if cam:
 		z = maxf(cam.zoom.x, cam.zoom.y)
-	# ~26px screen radius, converted to world units.
-	var hit_r := 26.0 / maxf(z, 0.05)
-	var best_d := hit_r * hit_r
-	var best: Object = null
+	# ~48px screen radius in world units; floor so tactical zoom stays finger-sized.
+	var hit_r := maxf(48.0 / maxf(z, 0.05), 20.0)
+	var hit_r2 := hit_r * hit_r
+	var best_player: Object = null
+	var best_player_d := INF
+	var best_any: Object = null
+	var best_any_d := INF
+	var p_tag := _player_tag()
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
 		if not province_nodes.has(id):
@@ -15735,21 +15833,37 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
 		if counter == null or not is_instance_valid(counter):
 			continue
-		var d := world_pos.distance_squared_to(counter.global_position)
-		if d > best_d:
+		# Hidden pins (strategic LOD) must not steal hex clicks.
+		if not counter.visible:
 			continue
-		best_d = d
+		var d := world_pos.distance_squared_to(counter.global_position)
+		if d > hit_r2:
+			continue
+		var fo: Object = null
 		if counter.has_meta("formation"):
 			var fmeta: Variant = counter.get_meta("formation")
 			if fmeta is Object and is_instance_valid(fmeta as Object):
-				best = fmeta as Object
-				continue
-		var fid := str(counter.get_meta("formation_id", ""))
-		if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
-			var f2: Variant = LeaderManager.get_formation(fid)
-			if f2 is Object:
-				best = f2 as Object
-	return best
+				fo = fmeta as Object
+		if fo == null:
+			var fid := str(counter.get_meta("formation_id", ""))
+			if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+				var f2: Variant = LeaderManager.get_formation(fid)
+				if f2 is Object:
+					fo = f2 as Object
+		if fo == null:
+			continue
+		# Inclusive disk: accept boundary (d == hit_r2) as a valid best.
+		if d <= best_any_d:
+			best_any_d = d
+			best_any = fo
+		# Prefer player-tag pins; closest player pin wins on overlap.
+		if not p_tag.is_empty() and "country_tag" in fo:
+			if str(fo.country_tag).strip_edges().to_upper() == p_tag and d <= best_player_d:
+				best_player_d = d
+				best_player = fo
+	if best_player != null:
+		return best_player
+	return best_any
 
 
 func _show_unit_detail_popup(formation: Object) -> void:
@@ -15872,9 +15986,43 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		lines.append("Fuel: %.0f%%" % (fuel_v * 100.0))
 	if not fid.is_empty():
 		lines.append("ID: %s" % fid)
+	# Stack at this province (one pin; cycle via [ ] or card buttons).
+	var stack_divs: Array = []
+	var stack_idx := 0
+	if pid >= 0 and not tag.is_empty() and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
+		stack_divs = BattleManager.get_divisions_at_province(pid, tag)
+		for si in stack_divs.size():
+			if str(stack_divs[si].get("formation_id", "")) == fid:
+				stack_idx = si
+				break
+	if stack_divs.size() > 1:
+		lines.append("Stack %d/%d · [ ] or buttons to cycle" % [stack_idx + 1, stack_divs.size()])
 	body.text = "\n".join(lines)
 	RetrowaveTheme.style_body_label(body)
 	vbox.add_child(body)
+
+	if stack_divs.size() > 1:
+		var stack_row := HBoxContainer.new()
+		stack_row.add_theme_constant_override("separation", 6)
+		vbox.add_child(stack_row)
+		var prev_btn := Button.new()
+		prev_btn.text = "["
+		prev_btn.focus_mode = Control.FOCUS_NONE
+		prev_btn.tooltip_text = "Previous unit in stack"
+		RetrowaveTheme.style_secondary_button(prev_btn)
+		prev_btn.pressed.connect(func() -> void:
+			_cycle_selected_stack_unit(-1)
+		)
+		stack_row.add_child(prev_btn)
+		var next_btn := Button.new()
+		next_btn.text = "]"
+		next_btn.focus_mode = Control.FOCUS_NONE
+		next_btn.tooltip_text = "Next unit in stack"
+		RetrowaveTheme.style_secondary_button(next_btn)
+		next_btn.pressed.connect(func() -> void:
+			_cycle_selected_stack_unit(1)
+		)
+		stack_row.add_child(next_btn)
 
 	var hint := Label.new()
 	hint.text = "SELECTED · click friendly province to MOVE · Ctrl+click enemy to ASSAULT (preview, then confirm) · Esc clears selection"
@@ -16443,6 +16591,8 @@ const _ASSAULT_CONFIRM_WINDOW_MS: int = 5000
 var _assault_execute_busy: bool = false
 ## Player-selected map unit (grey pin click) for move / assault staging.
 var selected_formation_id: String = ""
+## One-shot toast when hex-click happens while pins are hidden (strategic / master-off).
+var _unit_pick_strategic_hint_shown: bool = false
 
 
 func _try_execute_province_attack(target_pid: int, target_province: Province) -> bool:
@@ -21311,6 +21461,9 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 		print("[MapRenderer] Unit icons placed=%d (indexed formations, no per-province template reload)" % icons_placed)
 	if not scoped:
 		_update_riot_markers()
+	# Re-apply selected-chip chrome after pin rebuild (do not rebuild all pins for selection).
+	if not selected_formation_id.is_empty():
+		_refresh_selected_unit_chip()
 
 
 ## O(formations + deployments) index for unit icons.
