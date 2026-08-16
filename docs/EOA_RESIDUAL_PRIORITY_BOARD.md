@@ -1,11 +1,12 @@
 # EOA residual priority board (design loop)
 
-**Date:** 2026-08-12  
+**Date:** 2026-08-16  
 **Roles:** Director (prioritize) · Implementer (close) · Skeptic (challenge)  
 **Source truth:** [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md) · [`HOI4_EOA_GAP_REVIEW.md`](HOI4_EOA_GAP_REVIEW.md) · keep-going [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
+**Launch ladder:** [`LAUNCH_READINESS_PLAN.md`](LAUNCH_READINESS_PLAN.md) (L0→L1→L2→L3)  
 **Constraints:** open HOI P0 = 0 · no dual spam · no `world_full` ID renumber · M6 human-only · no GameData split · no `origin/cursor/*` or `ceb60fdd-*` merge  
 
-This board ranks **residual** open items after full-test machine close. Marks: **closed** · **deferred** · **human-only**.
+This board ranks **residual** open items after full-test machine close. Marks: **closed** · **deferred** · **human-only**. Launch priority: close residual **#1 (M6)** before opening L1 ship-kit work.
 
 ---
 
