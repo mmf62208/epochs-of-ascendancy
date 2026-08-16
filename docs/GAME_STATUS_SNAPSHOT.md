@@ -1,11 +1,12 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-12 (keep-going board · `505d91d` + cad45c93 PR 1–4 · board still ~3520 · machine full-test green · M6 human-only open)  
+**Date:** 2026-08-16 (launch ladder published · keep-going board · `505d91d` + cad45c93 PR 1–4 · board still ~3520 · machine full-test green · M6 human-only open · **launch bar L0 human proof open**)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
+**Launch ladder:** [`LAUNCH_READINESS_PLAN.md`](LAUNCH_READINESS_PLAN.md) — L0 full-test · L1 Playable Alpha · L2 Early Access · L3 1.0 (MASTER)  
 **How to keep going:** 5-step protocol in §0. Next human: F5 §0b items 3–15. Next machine: playtest-driven shipped-path fix only. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
 **Audience:** Human playtester, game director, implementer agents  
-**Source of truth for “what is true now”:** this file + [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md)  
+**Source of truth for “what is true now”:** this file + [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md) · launch path [`LAUNCH_READINESS_PLAN.md`](LAUNCH_READINESS_PLAN.md)  
 **Map star analysis (HOI4/V3 structure):** [`WORLD_CLASS_MAP_REVIEW.md`](WORLD_CLASS_MAP_REVIEW.md)  
 **HOI4 pillar gap review:** [`HOI4_EOA_GAP_REVIEW.md`](HOI4_EOA_GAP_REVIEW.md) · pure `hoi_full_test_gap_matrix_product` (17/17 P0 landed · open P0=0)  
 **Grok partner setup:** [`EOA_GROK_SETUP.md`](EOA_GROK_SETUP.md) · skill `eoa-full-test` · gates `tools/eoa_full_test_gates.sh` · `/eoa-gates`  
@@ -200,4 +201,4 @@ tools/run_godot.sh --path . res://scenes/TestScenario.tscn
 
 Remaining map-star open item is **human-only M6**. This keep-going board is **PR 4 of 4**, not the only PR.
 
-Next orchestration: **[`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md)**.
+Next orchestration: **[`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md)** · launch ladder **[`LAUNCH_READINESS_PLAN.md`](LAUNCH_READINESS_PLAN.md)**.
