@@ -17,9 +17,9 @@
 | **Machine full-test** | **Green** — map M0–M5 closed · HOI open P0 = 0 · year multi-AI 365d PASS · first-session composer + assault hang-class + multi-AI on official gates |
 | **L1 unit war loop (machine)** | **Landed on forward branch** — pin pick · Maginot reserve · honest assault · march · multi-day battle · unit card · see [`FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md`](FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md) |
 | **Human full-test proof** | **Incomplete** — §0b items 3–15 mostly blank · M6 20d/60d narrative **still open** |
-| **Launch** | **L1 Alpha in progress** — machine loop ready for human proof; then ship kit (P2) |
+| **Launch** | **L1 machine ready · human proof paused · beta machine push active** — see [`FORWARD_PROGRAM_BETA_MACHINE_PUSH.md`](FORWARD_PROGRAM_BETA_MACHINE_PUSH.md) |
 
-**What moves the needle now:** human-play the unit loop (Maginot pin → march → multi-day battle), write notes, fix what play finds. Do **not** open new dual packages, densify, GameData mega-split, multiplayer product, museum borders, or invent a 30fps PASS.
+**What moves the needle now:** while graphical play is on hold, agents ship fun unit/battle loops (B1 live feedback → B2 reinforce → B3 AI pressure). Do **not** invent M6 complete. Do **not** open new dual packages, densify, GameData mega-split, multiplayer product, museum borders, or invent a 30fps PASS.
 
 ---
 

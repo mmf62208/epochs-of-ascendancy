@@ -447,6 +447,7 @@ func _ready():
 	# Connect infra signals for live inspector project progress and layer updates (playability).
 	call_deferred("_connect_infra_signals_for_inspector")
 	call_deferred("_setup_player_map_ux")
+	call_deferred("_connect_battle_feedback_signals")
 
 	# Setup coarse world territories (hidden by default; shown on world grand load for full stitched scroll + clickable regions outside Europe detailed).
 	# Addresses "not every province/region on the map has a territory you can click to get into" for the world base.
@@ -16287,9 +16288,27 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			var sname := str(stack_divs[si2].get("display_name", stack_divs[si2].get("formation_id", "?")))
 			var mark := "▶ " if si2 == stack_idx else "· "
 			lines.append("%s%s" % [mark, sname])
+	body.name = "UnitDetailStatsBody"
 	body.text = "\n".join(lines)
 	RetrowaveTheme.style_body_label(body)
 	vbox.add_child(body)
+
+	# Live battle line (B1) — refreshed on battle_day_ticked while card stays open.
+	var battle_line := Label.new()
+	battle_line.name = "UnitDetailBattleLine"
+	battle_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	battle_line.custom_minimum_size = Vector2(280, 0)
+	RetrowaveTheme.style_body_label(battle_line)
+	battle_line.add_theme_color_override("font_color", Color(1.0, 0.78, 0.35))
+	battle_line.add_theme_font_size_override("font_size", 12)
+	if not fid.is_empty() and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("is_formation_in_battle") \
+			and BattleManager.is_formation_in_battle(fid):
+		battle_line.text = _format_unit_card_battle_line(fid)
+		battle_line.visible = not battle_line.text.is_empty()
+	else:
+		battle_line.text = ""
+		battle_line.visible = false
+	vbox.add_child(battle_line)
 
 	var design_hint := Label.new()
 	design_hint.name = "UnitDesignAssignHint"
@@ -17010,6 +17029,7 @@ const _ASSAULT_CONFIRM_WINDOW_MS: int = 5000
 var _assault_execute_busy: bool = false
 ## Player-selected map unit (grey pin click) for move / assault staging.
 var selected_formation_id: String = ""
+var _last_battle_day_toast_key: String = ""
 ## One-shot toast when hex-clicked at strategic zoom (pins hidden).
 var _unit_pick_strategic_hint_shown: bool = false
 ## March path Line2D nodes (budget 8) + cosmetic pin lerp. Sim hops are day-authoritative.
@@ -17179,6 +17199,10 @@ func flash_battle_day(pids: Array = [], battle: Dictionary = {}) -> void:
 		var pid := int(v)
 		if pid >= 0 and not flash_pids.has(pid):
 			flash_pids.append(pid)
+	# Always apply live feedback even when pin list is empty (card + toast + chrome).
+	_toast_battle_day_slice(battle)
+	_refresh_open_unit_card_battle_stats(battle)
+	_apply_battle_pin_combat_chrome(battle, true)
 	if flash_pids.is_empty():
 		return
 	for pid_v in flash_pids:
@@ -17191,14 +17215,171 @@ func flash_battle_day(pids: Array = [], battle: Dictionary = {}) -> void:
 		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
 		if counter == null or not is_instance_valid(counter):
 			continue
-		var base_mod: Color = counter.modulate
-		counter.modulate = Color(1.3, 1.0, 0.7, base_mod.a)
+		var base_mod: Color = counter.get_meta("combat_chrome_base", counter.modulate) as Color
+		if not counter.has_meta("combat_chrome_base"):
+			counter.set_meta("combat_chrome_base", base_mod)
+		counter.modulate = Color(1.35, 0.95, 0.55, base_mod.a)
 		var tree := get_tree()
 		if tree != null:
 			tree.create_timer(0.18).timeout.connect(func() -> void:
 				if is_instance_valid(counter):
-					counter.modulate = base_mod
+					# Keep combat chrome tint after flash pulse.
+					if counter.has_meta("combat_chrome_active") and bool(counter.get_meta("combat_chrome_active")):
+						counter.modulate = Color(1.15, 0.72, 0.45, base_mod.a)
+					else:
+						counter.modulate = base_mod
 			)
+
+
+## B1: connect BattleManager day/resolve signals for unit-card + pin chrome (flash already deferred from BM).
+func _connect_battle_feedback_signals() -> void:
+	if typeof(BattleManager) == TYPE_NIL:
+		return
+	if BattleManager.has_signal("battle_resolved") and not BattleManager.battle_resolved.is_connected(_on_battle_resolved_feedback):
+		BattleManager.battle_resolved.connect(_on_battle_resolved_feedback)
+
+
+func _on_battle_resolved_feedback(result: Dictionary) -> void:
+	_apply_battle_pin_combat_chrome(result, false)
+	_refresh_open_unit_card_battle_stats({})
+	# Non-capture ends still need light pin truth (capture path notifies map separately).
+	var status := str(result.get("status", ""))
+	if status in ["attacker_broke", "prolonged_stalemate", "retreat"]:
+		var tpid := int(result.get("target_province_id", result.get("target_pid", -1)))
+		var fpid := int(result.get("from_province_id", result.get("from_pid", -1)))
+		for pid in [tpid, fpid]:
+			if pid >= 0 and has_method("refresh_after_capture_light"):
+				call_deferred("refresh_after_capture_light", pid)
+
+
+func _toast_battle_day_slice(battle: Dictionary) -> void:
+	if battle.is_empty():
+		return
+	var slice: Dictionary = battle.get("last_slice", {}) as Dictionary
+	if slice.is_empty():
+		return
+	var day := int(slice.get("day", battle.get("days_elapsed", 0)))
+	if day <= 0:
+		return
+	# Budget: one toast per battle_id+day (avoid spam if flash called twice).
+	var bid := str(battle.get("battle_id", "%s>%s" % [battle.get("from_pid", -1), battle.get("target_pid", -1)]))
+	var key := "%s:%d" % [bid, day]
+	if _last_battle_day_toast_key == key:
+		return
+	_last_battle_day_toast_key = key
+	# Only toast if player is involved.
+	var p_tag := _player_tag().strip_edges().to_upper()
+	if not p_tag.is_empty():
+		var at := str(battle.get("attacker_tag", "")).strip_edges().to_upper()
+		var dt := str(battle.get("defender_tag", "")).strip_edges().to_upper()
+		if at != p_tag and dt != p_tag:
+			return
+	var att_org := float(slice.get("att_org", 0.0))
+	var def_org := float(slice.get("def_org", 0.0))
+	var att_str := float(slice.get("att_str", 0.0))
+	var def_str := float(slice.get("def_str", 0.0))
+	var msg := "Battle day %d · Att org %.0f%% str %.0f%% · Def org %.0f%% str %.0f%%" % [
+		day, att_org * 100.0, att_str * 100.0, def_org * 100.0, def_str * 100.0
+	]
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast(msg, 2.8, false, true)
+	else:
+		_show_inspector_toast(msg, 2.8)
+
+
+func _format_unit_card_battle_line(formation_id: String) -> String:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty() or typeof(BattleManager) == TYPE_NIL:
+		return ""
+	if not BattleManager.has_method("is_formation_in_battle") or not BattleManager.is_formation_in_battle(fid):
+		return ""
+	var battle: Dictionary = {}
+	if BattleManager.has_method("get_battle_for_formation"):
+		battle = BattleManager.get_battle_for_formation(fid)
+	if battle.is_empty():
+		return "IN BATTLE · engaging"
+	var slice: Dictionary = battle.get("last_slice", {}) as Dictionary
+	var day := int(slice.get("day", battle.get("days_elapsed", 0)))
+	var att_org := float(slice.get("att_org", -1.0))
+	var def_org := float(slice.get("def_org", -1.0))
+	if day > 0 and att_org >= 0.0 and def_org >= 0.0:
+		return "IN BATTLE · day %d · Att org %.0f%% · Def org %.0f%%" % [day, att_org * 100.0, def_org * 100.0]
+	return "IN BATTLE · day %d" % maxi(day, 1)
+
+
+func _refresh_open_unit_card_battle_stats(battle: Dictionary = {}) -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	var panel := ui.get_node_or_null("UnitDetailPopup") as Control
+	if panel == null or not is_instance_valid(panel):
+		return
+	var fid := selected_formation_id.strip_edges()
+	if fid.is_empty():
+		return
+	# Prefer live formation org/str for the stats body.
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var f: Formation = LeaderManager.get_formation(fid)
+		if f != null and is_instance_valid(f):
+			var body := panel.find_child("UnitDetailStatsBody", true, false) as Label
+			if body != null:
+				var org_v := clampf(float(f.organization) if "organization" in f else 1.0, 0.0, 1.5)
+				var str_v := clampf(float(f.strength) if "strength" in f else 1.0, 0.0, 1.5)
+				var rdy_v := clampf(float(f.readiness) if "readiness" in f else 1.0, 0.0, 1.5)
+				var xp_v := 0.0
+				if "combat_experience" in f:
+					xp_v = clampf(float(f.combat_experience) / 100.0, 0.0, 1.0)
+				# Replace the Org/Str line in place when present.
+				var lines: PackedStringArray = body.text.split("\n")
+				var replaced := false
+				for i in lines.size():
+					if str(lines[i]).begins_with("Org "):
+						lines[i] = "Org %.0f%% · Str %.0f%% · Rdy %.0f%% · XP %.0f%%" % [
+							org_v * 100.0, str_v * 100.0, rdy_v * 100.0, xp_v * 100.0
+						]
+						replaced = true
+						break
+				if replaced:
+					body.text = "\n".join(lines)
+	var battle_line := panel.find_child("UnitDetailBattleLine", true, false) as Label
+	if battle_line != null:
+		var line := _format_unit_card_battle_line(fid)
+		battle_line.text = line
+		battle_line.visible = not line.is_empty()
+	# Quiet unused when empty battle dict (resolve path).
+	if not battle.is_empty() and str(battle.get("attacker_formation_id", "")) != fid \
+			and str(battle.get("defender_formation_id", "")) != fid:
+		# Still refresh if selected unit is in any battle; line formatter handles it.
+		pass
+
+
+func _apply_battle_pin_combat_chrome(battle: Dictionary, active: bool) -> void:
+	var pids: Array = []
+	for key in ["target_pid", "from_pid", "target_province_id", "from_province_id"]:
+		var pid := int(battle.get(key, -1))
+		if pid >= 0 and not pids.has(pid):
+			pids.append(pid)
+	for pid_v in pids:
+		var id := int(pid_v)
+		if not province_nodes.has(id):
+			continue
+		var n: Node2D = province_nodes[id] as Node2D
+		if n == null:
+			continue
+		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+		if counter == null or not is_instance_valid(counter):
+			continue
+		if active:
+			if not counter.has_meta("combat_chrome_base"):
+				counter.set_meta("combat_chrome_base", counter.modulate)
+			counter.set_meta("combat_chrome_active", true)
+			var base_a: Color = counter.get_meta("combat_chrome_base") as Color
+			counter.modulate = Color(1.15, 0.72, 0.45, base_a.a)
+		else:
+			counter.set_meta("combat_chrome_active", false)
+			if counter.has_meta("combat_chrome_base"):
+				counter.modulate = counter.get_meta("combat_chrome_base") as Color
+				counter.remove_meta("combat_chrome_base")
 
 
 func _province_controlled_by(province: Province, country_tag: String) -> bool:

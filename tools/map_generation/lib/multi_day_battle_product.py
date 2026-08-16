@@ -424,6 +424,52 @@ def build_multi_day_battle_product(*, check_wiring: bool = True) -> Dict[str, An
     else:
         fails.append("one_shot_clears_is_in_combat")
 
+    # B1 live battle feedback: day toast + open unit card refresh + pin combat chrome
+    flash_fn = _gd_func_slice(ren, "flash_battle_day")
+    toast_fn = _gd_func_slice(ren, "_toast_battle_day_slice")
+    live_toast = (
+        bool(flash_fn)
+        and "_toast_battle_day_slice" in flash_fn
+        and bool(toast_fn)
+        and "Battle day" in toast_fn
+        and "att_org" in toast_fn
+        and "last_slice" in toast_fn
+    )
+    wiring["live_battle_day_toast"] = live_toast
+    if live_toast:
+        passes.append("live_battle_day_toast")
+    else:
+        fails.append("live_battle_day_toast")
+
+    card_fn = _gd_func_slice(ren, "_refresh_open_unit_card_battle_stats")
+    live_card = (
+        bool(card_fn)
+        and "UnitDetailStatsBody" in ren
+        and "UnitDetailBattleLine" in ren
+        and "_refresh_open_unit_card_battle_stats" in flash_fn
+    )
+    wiring["live_unit_card_battle_refresh"] = live_card
+    if live_card:
+        passes.append("live_unit_card_battle_refresh")
+    else:
+        fails.append("live_unit_card_battle_refresh")
+
+    chrome_fn = _gd_func_slice(ren, "_apply_battle_pin_combat_chrome")
+    resolve_fn = _gd_func_slice(ren, "_on_battle_resolved_feedback")
+    live_chrome = (
+        bool(chrome_fn)
+        and "combat_chrome_active" in chrome_fn
+        and "_apply_battle_pin_combat_chrome" in flash_fn
+        and bool(resolve_fn)
+        and "battle_resolved" in ren
+        and "_connect_battle_feedback_signals" in ren
+    )
+    wiring["live_battle_pin_chrome"] = live_chrome
+    if live_chrome:
+        passes.append("live_battle_pin_chrome")
+    else:
+        fails.append("live_battle_pin_chrome")
+
     ok = len(fails) == 0
     return {
         "ok": ok,

@@ -73,6 +73,9 @@ class TestMultiDayBattleProduct(unittest.TestCase):
             "preview_join_battle_copy",
             "battles_save_blob",
             "one_shot_clears_is_in_combat",
+            "live_battle_day_toast",
+            "live_unit_card_battle_refresh",
+            "live_battle_pin_chrome",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 

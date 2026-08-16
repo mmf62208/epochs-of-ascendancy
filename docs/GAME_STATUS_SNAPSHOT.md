@@ -1,10 +1,11 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-16 (L1 unit-centric war loop re-homed · launch ladder · board still ~3520 · machine full-test green · M6 human-only open · designer still PARTIAL · **launch bar L1 Alpha in progress**)  
+**Date:** 2026-08-16 (L1 unit loop + **B1 live battle feedback** · human graphical play **on hold** · agent beta push · board ~3520 · machine full-test green · M6 human-only open · designer still PARTIAL)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · keep-going [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
 **Launch ladder:** [`LAUNCH_READINESS_PLAN.md`](LAUNCH_READINESS_PLAN.md) — L0 full-test · L1 Playable Alpha · L2 Early Access · L3 1.0 (MASTER)  
 **L1 forward:** [`FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md`](FORWARD_PROGRAM_L1_UNIT_WAR_LOOP.md) — pin → march → multi-day battle → unit card  
-**How to keep going:** 5-step protocol in §0. Next human: F5 §0b items 3–15 (unit pick / march / multi-day battle). Next machine: playtest-driven shipped-path fix only. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
+**Beta machine push (playtests paused):** [`FORWARD_PROGRAM_BETA_MACHINE_PUSH.md`](FORWARD_PROGRAM_BETA_MACHINE_PUSH.md) — B1 live battle feedback → reinforce → AI pressure  
+**How to keep going:** 5-step protocol in §0. **Human PC down:** agents ship fun loops (B1+). When graphical play resumes: §0b + Maginot unit smoke. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
 **Audience:** Human playtester, game director, implementer agents  
 **Source of truth for “what is true now”:** this file + [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md) · launch path [`LAUNCH_READINESS_PLAN.md`](LAUNCH_READINESS_PLAN.md)  
@@ -28,9 +29,9 @@ Every Cursor / Grok / human session on this tree:
 
 | Next | Action |
 |------|--------|
-| **Human** | `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · play §0b items **3–15** · unit pin on Maginot `710173` · march · multi-day battle · append session notes. M6 20d/60d still open after that. |
-| **Machine** | Playtest-driven bug on a **shipped** path only. No new dual. No GameData split. No `ceb60fdd-*` merge. |
-| **GitHub** | **Ops** — no SSH/`gh` on the director machine. Local snapshot `505d91d` + unit-centric stack. Do not force-push over June Cursor history. |
+| **Human** | Graphical play **on hold** (director PC). When back: §0b 3–15 · Maginot pin · live battle toasts · append session notes. M6 still open. |
+| **Machine** | **Beta machine push** — fun unit/battle loops ([`FORWARD_PROGRAM_BETA_MACHINE_PUSH.md`](FORWARD_PROGRAM_BETA_MACHINE_PUSH.md)). No new dual. No GameData split. No `ceb60fdd-*` merge. |
+| **GitHub** | Work `cursor/*-10a5` forward branches. Do not force-push over June Cursor history. |
 
 **This DAG (unit-centric war loop PR 1–6 under `505d91d`+):**
 
