@@ -46,10 +46,10 @@ PLAY_ACTIONS: List[Dict[str, Any]] = [
     },
     {
         "action_id": "campaign_alpha_apply_recommended",
-        "label": "Apply recommended next",
+        "label": "Next: Press / Hold / Unpause",
         "key": "",
         "domain": "recommend",
-        "hint": "Run recommended campaign next action",
+        "hint": "War-loop next beat (PlayNextHook)",
     },
     {
         "action_id": "show_war_loop",

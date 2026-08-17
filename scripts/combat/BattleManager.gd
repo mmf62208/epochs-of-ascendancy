@@ -7,7 +7,41 @@ signal battle_resolved(result: Dictionary)
 
 const DEFAULT_GARRISON_TEMPLATE := "german_infantry_division_1943_mixed"
 
+## Multi-day land battle (mirrors unit_multi_day_battle_product).
+const LAND_ORG_BREAK := 0.22
+const LAND_MIN_BATTLE_DAYS := 2
+const LAND_MAX_BATTLE_DAYS := 6
+const LAND_EVEN_DRAIN := 0.20
+const LAND_TEMPLATE_HINT := 100.0
+const LAND_ARMOR_PLAINS_MULT := 1.5
+const LAND_TERRAIN_DAYS_ADD := {
+	"plains": 0,
+	"desert": 0,
+	"hills": 1,
+	"forest": 1,
+	"jungle": 1,
+	"marsh": 1,
+	"urban": 2,
+	"mountain": 2,
+	"fort": 2,
+}
+const LAND_TERRAIN_STRETCH := {
+	"plains": 1.0,
+	"desert": 1.0,
+	"hills": 1.15,
+	"forest": 1.15,
+	"jungle": 1.25,
+	"marsh": 1.25,
+	"urban": 1.45,
+	"mountain": 1.50,
+	"fort": 1.55,
+}
+
 var _resolver: CombatResolver
+## In-memory HOI-style land battles. Owner does not flip until execute_province_assault.
+var _open_land_battles: Array = []
+var _next_land_battle_seq: int = 1
+var _last_land_aar: Dictionary = {}
 
 
 func _ready() -> void:
@@ -435,6 +469,1154 @@ func execute_province_assault(
 			debug_aar.call_deferred("show_battle_aar", result)
 
 	return {"success": true, "result": result}
+
+
+## Open a multi-day land battle, or resolve instantly when the hex is empty.
+## execute_province_assault stays resolution-only (capture / station / displace).
+func start_land_battle(
+	attacker_tag,
+	target_province_id,
+	from_province_id = -1,
+	attacker_formation_id = "",
+) -> Dictionary:
+	var preview: Dictionary = can_assault_province(
+		str(attacker_tag), int(target_province_id), int(from_province_id)
+	)
+	if not bool(preview.get("ok", false)):
+		return {"success": false, "reason": preview.get("reason", "Cannot assault")}
+
+	var tag := str(preview.get("attacker_tag", attacker_tag)).strip_edges().to_upper()
+	var to_id := int(target_province_id)
+	var from_pid := int(preview.get("from_province_id", from_province_id))
+	var fid := str(attacker_formation_id).strip_edges()
+	if fid.is_empty():
+		fid = str(preview.get("formation_id", ""))
+	if fid.is_empty():
+		return {"success": false, "reason": "No attacker formation"}
+
+	var existing: Dictionary = get_land_battle_at(to_id)
+	if not existing.is_empty():
+		if str(existing.get("att_tag", "")) == tag and str(existing.get("att_fid", "")) == fid:
+			return {"success": true, "instant": false, "opened": true, "battle": existing}
+		return {"success": false, "reason": "Battle already in progress", "instant": false, "opened": false}
+
+	var def_tag := str(preview.get("defender_tag", "")).strip_edges().to_upper()
+	var def_divs: Array[Dictionary] = get_divisions_at_province(to_id, def_tag)
+	if def_divs.is_empty():
+		var instant: Dictionary = execute_province_assault(tag, to_id, from_pid, fid)
+		instant["instant"] = true
+		instant["opened"] = false
+		return instant
+
+	var target: Province = MapManager.get_province(to_id) if typeof(MapManager) != TYPE_NIL else null
+	var terrain := "plains"
+	if target != null and not str(target.terrain).is_empty():
+		terrain = str(target.terrain)
+
+	var att_form: Formation = _formation_from_id(fid, tag)
+	var def_pick := _pick_strongest_division(def_divs, target, def_tag)
+	var def_fid := str(def_pick.get("formation_id", "")).strip_edges()
+	if def_fid.is_empty():
+		var instant_empty: Dictionary = execute_province_assault(tag, to_id, from_pid, fid)
+		instant_empty["instant"] = true
+		instant_empty["opened"] = false
+		return instant_empty
+	var def_form: Formation = _formation_from_id(def_fid, def_tag)
+
+	var att_power := land_combat_power(att_form, terrain)
+	var def_power := land_combat_power(def_form, terrain)
+	var att_org := _formation_stat(att_form, "organization", 1.0)
+	var def_org := _formation_stat(def_form, "organization", 1.0)
+	var est_days := _estimate_land_battle_days(att_power, def_power, terrain, false)
+	var day0 := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		day0 = int(TimeManager.get_total_days_elapsed())
+
+	var battle := {
+		"id": "lb_%d" % _next_land_battle_seq,
+		"from_id": from_pid,
+		"to_id": to_id,
+		"att_tag": tag,
+		"def_tag": def_tag,
+		"att_fid": fid,
+		"def_fid": def_fid,
+		"att_fids": [fid],
+		"def_fids": [def_fid],
+		"att_n": 1,
+		"def_n": 1,
+		"att_org": att_org,
+		"def_org": def_org,
+		"att_power": att_power,
+		"def_power": def_power,
+		"combat_width": _battle_combat_width(target, terrain),
+		"att_used_width": 0.0,
+		"terrain": terrain,
+		"day_started": day0,
+		"days_elapsed": 0,
+		"est_days": est_days,
+		"lean": _land_battle_lean(att_power, def_power),
+		"withdraw_pending": false,
+		"att_stance": "press",
+		"ground_hard": _target_is_ground_hard(target, to_id),
+		"next_hook": "",
+	}
+	_rebuild_land_battle_powers(battle)
+	_next_land_battle_seq += 1
+	_open_land_battles.append(battle)
+	_set_formation_in_combat(fid, true)
+	_set_formation_in_combat(def_fid, true)
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("ensure_demo_combat_stock"):
+		ProductionManager.ensure_demo_combat_stock(fid, tag)
+		ProductionManager.ensure_demo_combat_stock(def_fid, def_tag)
+	return {"success": true, "instant": false, "opened": true, "battle": battle.duplicate()}
+
+
+## Interactive F5: at most one AI start_land_battle per day. Never execute_province_assault.
+func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
+	if OS.get_environment("EOA_AI_LAND_BATTLES").strip_edges() == "0":
+		return {"ok": true, "skipped": true, "reason": "killswitch", "started_n": 0}
+	if typeof(LandBattleAi) == TYPE_NIL or not LandBattleAi.has_method("plan_day"):
+		return {"ok": false, "reason": "no planner", "started_n": 0}
+	if typeof(MapManager) == TYPE_NIL:
+		return {"ok": false, "reason": "no map", "started_n": 0}
+
+	var player_tag := "GER"
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		var pt := str(LeaderManager.call("get_player_country_tag")).strip_edges().to_upper()
+		if not pt.is_empty():
+			player_tag = pt
+	elif typeof(SessionPlayers) != TYPE_NIL:
+		for slot in SessionPlayers.slots:
+			if slot is Dictionary and str((slot as Dictionary).get("control", "")).to_lower() == "human":
+				var ht := str((slot as Dictionary).get("tag", "")).strip_edges().to_upper()
+				if not ht.is_empty():
+					player_tag = ht
+				break
+
+	var majors: Array = ["GER", "FRA", "SOV", "JAP", "ITA", "ENG", "POL", "USA"]
+	var candidates: Array = []
+	for raw_tag in majors:
+		var tag := str(raw_tag).to_upper()
+		if tag.is_empty() or tag == player_tag:
+			continue
+		candidates.append(tag)
+	candidates.sort_custom(func(a, b):
+		return LandBattleAi.personality_aggression(str(a)) > LandBattleAi.personality_aggression(str(b))
+	)
+	if candidates.size() > 1:
+		var rot := int(day_index) % candidates.size()
+		candidates = candidates.slice(rot) + candidates.slice(0, rot)
+	var scan_n := mini(int(LandBattleAi.SCAN_TAGS_PER_DAY), candidates.size())
+
+	var open_hexes: Array = []
+	var open_per_tag: Dictionary = {}
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var b: Dictionary = raw
+		open_hexes.append(int(b.get("to_id", -1)))
+		open_hexes.append(int(b.get("from_id", -1)))
+		var at := str(b.get("att_tag", "")).to_upper()
+		if not at.is_empty():
+			open_per_tag[at] = int(open_per_tag.get(at, 0)) + 1
+
+	var opportunities: Array = []
+	for i in range(scan_n):
+		var tag2 := str(candidates[i])
+		if not MapManager.has_method("collect_live_border_assault_targets"):
+			break
+		var targets: Array = MapManager.collect_live_border_assault_targets(tag2, 4)
+		for raw_t in targets:
+			if typeof(raw_t) != TYPE_DICTIONARY:
+				continue
+			var t: Dictionary = raw_t
+			var to_id := int(t.get("province_id", -1))
+			var from_id := int(t.get("from_province_id", -1))
+			if to_id <= 0 or from_id <= 0:
+				continue
+			var preview: Dictionary = can_assault_province(tag2, to_id, from_id)
+			if not bool(preview.get("ok", false)):
+				continue
+			var fid := str(preview.get("formation_id", "")).strip_edges()
+			if fid.is_empty():
+				continue
+			opportunities.append({
+				"tag": tag2,
+				"from_id": from_id,
+				"to_id": to_id,
+				"defender_tag": str(t.get("defender_tag", preview.get("defender_tag", ""))),
+				"formation_id": fid,
+				"has_formation": true,
+				"defender_power": float(t.get("defender_power", 80.0)),
+			})
+
+	var plan: Dictionary = LandBattleAi.plan_day(
+		opportunities, player_tag, int(day_index), open_hexes, open_per_tag, 1
+	)
+	var started: Array = []
+	for raw_pick in plan.get("picks", []):
+		if typeof(raw_pick) != TYPE_DICTIONARY:
+			continue
+		var pick: Dictionary = raw_pick
+		var opened: Dictionary = start_land_battle(
+			str(pick.get("tag", "")),
+			int(pick.get("to_id", -1)),
+			int(pick.get("from_id", -1)),
+			str(pick.get("formation_id", "")),
+		)
+		if bool(opened.get("success", false)) and bool(opened.get("opened", false)):
+			started.append({
+				"tag": str(pick.get("tag", "")),
+				"to_id": int(pick.get("to_id", -1)),
+				"from_id": int(pick.get("from_id", -1)),
+				"defender_tag": str(pick.get("defender_tag", "")),
+			})
+	if not started.is_empty():
+		print("BattleManager: AI opened %d land battle(s) (start_land_battle, day=%d)" % [started.size(), int(day_index)])
+	return {
+		"ok": true,
+		"started_n": started.size(),
+		"started": started,
+		"player_tag": player_tag,
+		"eligible_n": int(plan.get("eligible_n", 0)),
+	}
+
+
+func get_save_data() -> Dictionary:
+	return {
+		"version": 1,
+		"open_battles": get_open_land_battles(),
+		"next_seq": _next_land_battle_seq,
+		"last_aar": _last_land_aar.duplicate(true),
+	}
+
+
+func apply_save_data(data: Dictionary) -> void:
+	_open_land_battles.clear()
+	_last_land_aar = {}
+	if data.is_empty():
+		return
+	var battles: Array = data.get("open_battles", []) as Array
+	for raw in battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = (raw as Dictionary).duplicate(true)
+		if int(row.get("to_id", 0)) <= 0 or str(row.get("att_fid", "")).strip_edges().is_empty():
+			continue
+		if str(row.get("att_tag", "")).strip_edges().is_empty():
+			continue
+		_open_land_battles.append(row)
+		for fid_v in _fid_list(row, "att_fids", "att_fid"):
+			_set_formation_in_combat(str(fid_v), true)
+		for fid_v2 in _fid_list(row, "def_fids", "def_fid"):
+			_set_formation_in_combat(str(fid_v2), true)
+	_next_land_battle_seq = maxi(1, int(data.get("next_seq", _open_land_battles.size() + 1)))
+	if data.get("last_aar") is Dictionary:
+		_last_land_aar = (data["last_aar"] as Dictionary).duplicate(true)
+	if not _open_land_battles.is_empty():
+		print("BattleManager: restored %d open land battle(s)" % _open_land_battles.size())
+
+
+func tick_open_land_battles(days: float = 1.0) -> Array:
+	var out: Array = []
+	var n := maxi(0, int(days))
+	if n <= 0 or _open_land_battles.is_empty():
+		return out
+	for _i in n:
+		var still: Array = []
+		for raw in _open_land_battles:
+			if typeof(raw) != TYPE_DICTIONARY:
+				continue
+			var battle: Dictionary = raw
+			var ev: Dictionary = _tick_one_open_land_battle(battle)
+			if bool(ev.get("resolved", false)):
+				out.append(ev)
+			else:
+				still.append(battle)
+		_open_land_battles = still
+		if _open_land_battles.is_empty():
+			break
+	return out
+
+
+func get_open_land_battles() -> Array:
+	var out: Array = []
+	for raw in _open_land_battles:
+		if typeof(raw) == TYPE_DICTIONARY:
+			out.append((raw as Dictionary).duplicate())
+	return out
+
+
+func get_land_battle_at(province_id: int) -> Dictionary:
+	var pid := int(province_id)
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var battle: Dictionary = raw
+		if int(battle.get("to_id", -1)) == pid or int(battle.get("from_id", -1)) == pid:
+			return battle.duplicate()
+	return {}
+
+
+func get_land_battle_for_formation(formation_id: String) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		return {}
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var battle: Dictionary = raw
+		if _fid_list(battle, "att_fids", "att_fid").has(fid) \
+				or _fid_list(battle, "def_fids", "def_fid").has(fid):
+			return battle.duplicate()
+	return {}
+
+
+func set_land_battle_stance(formation_id: String, stance: String) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var st := str(stance or "press").strip_edges().to_lower()
+	if st not in ["press", "hold", "withdraw"]:
+		st = "press"
+	if st == "withdraw":
+		return withdraw_from_land_battle(fid)
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var battle: Dictionary = raw
+		if not _fid_list(battle, "att_fids", "att_fid").has(fid):
+			continue
+		battle["att_stance"] = st
+		battle["next_hook"] = land_battle_next_hook(battle)
+		return {"ok": true, "stance": st, "next_hook": str(battle.get("next_hook", "")), "to_id": int(battle.get("to_id", -1))}
+	return {"ok": false, "reason": "Not in an open attack"}
+
+
+func land_battle_next_hook(battle: Dictionary) -> String:
+	var def_org := float(battle.get("def_org", 1.0))
+	var drain := 0.18 if str(battle.get("att_stance", "press")) == "press" else 0.12
+	var left := 0
+	var org := def_org
+	while org >= 0.22 and left < 12:
+		org -= drain
+		left += 1
+	var march_eta := 99
+	if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("soonest_calendar_eta_to"):
+		march_eta = int(FormationMovement.soonest_calendar_eta_to(int(battle.get("from_id", -1)), str(battle.get("att_tag", ""))))
+	var hook := ""
+	if march_eta == 1:
+		hook = "Reinforcement arrives tomorrow — Hold to let them join"
+	elif left == 1 and str(battle.get("att_stance", "press")) != "hold":
+		hook = "They break tomorrow — Press, or Hold if you need the next unit"
+	elif left == 1:
+		hook = "They are one day from breaking — Press to finish, or Hold to wait"
+	elif bool(battle.get("ground_hard", false)) and str(battle.get("att_stance", "press")) == "press":
+		hook = "River/fort — Press costs extra org, or Hold a day"
+	else:
+		hook = "Unpause to fight · Press or Hold"
+	return hook
+
+
+func _target_is_ground_hard(target: Province, pid: int) -> bool:
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_river_border") and MapManager.has_river_border(pid):
+		return true
+	if target == null:
+		return false
+	var terr := str(target.terrain).to_lower()
+	if terr in ["urban", "mountain", "mountains", "fort"]:
+		return true
+	if "special_features" in target and target.special_features is Dictionary:
+		var sf: Dictionary = target.special_features
+		if bool(sf.get("fort", false)) or bool(sf.get("fortress", false)) or float(sf.get("fort_level", 0.0)) > 0.0:
+			return true
+	return false
+
+
+## Attacker disengage. If the fight has already ticked (days_elapsed >= 1),
+## resolve immediately as a defender hold (no owner flip). Same-day withdraw
+## sets withdraw_pending so the next daily tick bounces without org-break.
+func withdraw_from_land_battle(formation_id: String) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		return {"ok": false, "reason": "No formation"}
+	var idx := -1
+	var battle: Dictionary = {}
+	for i in _open_land_battles.size():
+		var raw = _open_land_battles[i]
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		if str(row.get("att_fid", "")) == fid or str(row.get("def_fid", "")) == fid:
+			idx = i
+			battle = row
+			break
+	if idx < 0:
+		return {"ok": false, "reason": "Formation not in an open land battle"}
+	# Defender-favor bounce: attacker leaves, owner stays.
+	if int(battle.get("days_elapsed", 0)) >= 1:
+		_finish_land_battle_hold(battle)
+		_open_land_battles.remove_at(idx)
+		return {
+			"ok": true,
+			"resolved": true,
+			"winner": "defender",
+			"to_id": int(battle.get("to_id", -1)),
+			"from_id": int(battle.get("from_id", -1)),
+			"instant": false,
+			"withdrawn": true,
+		}
+	battle["withdraw_pending"] = true
+	return {
+		"ok": true,
+		"resolved": false,
+		"withdraw_pending": true,
+		"to_id": int(battle.get("to_id", -1)),
+		"from_id": int(battle.get("from_id", -1)),
+	}
+
+
+## org * strength * readiness * template hint. Armor design_id ×1.5 on plains.
+## Prefers LandCombatPower when present (soft_attack + mountain infantry).
+func land_combat_power(formation: Object, terrain: String = "plains") -> float:
+	if formation == null:
+		return 0.0
+	if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("combat_power"):
+		return maxf(0.0, float(LandCombatPower.combat_power(formation, terrain)))
+	var org := _formation_stat(formation, "organization", 1.0)
+	var strn := _formation_stat(formation, "strength", 1.0)
+	var rdy := _formation_stat(formation, "readiness", 1.0)
+	var hint := LAND_TEMPLATE_HINT
+	if _formation_is_armor(formation) and _land_terrain_key(terrain) == "plains":
+		hint *= LAND_ARMOR_PLAINS_MULT
+	return maxf(0.0, org * strn * rdy * hint)
+
+
+## March-arrive hook: unit on from_id / to_id joins the open front if same tag.
+func try_reinforce_land_battle(formation_id: String, province_id: int, country_tag: String = "") -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var pid := int(province_id)
+	if fid.is_empty() or pid <= 0:
+		return {"ok": false, "joined": false, "reason": "bad args"}
+	var f: Formation = _formation_from_id(fid, country_tag)
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty() and f != null:
+		tag = str(f.country_tag).strip_edges().to_upper()
+	if f == null:
+		return {"ok": false, "joined": false, "reason": "no formation"}
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var battle: Dictionary = raw
+		var att_tag := str(battle.get("att_tag", "")).to_upper()
+		var def_tag := str(battle.get("def_tag", "")).to_upper()
+		var from_id := int(battle.get("from_id", -1))
+		var to_id := int(battle.get("to_id", -1))
+		var att_fids: Array = _fid_list(battle, "att_fids", "att_fid")
+		var def_fids: Array = _fid_list(battle, "def_fids", "def_fid")
+		if att_fids.has(fid) or def_fids.has(fid):
+			return {"ok": true, "joined": false, "reason": "already in", "battle_id": battle.get("id")}
+		var side := ""
+		if tag == att_tag and (pid == from_id or pid == to_id):
+			side = "attacker"
+		elif tag == def_tag and pid == to_id:
+			side = "defender"
+		if side.is_empty():
+			continue
+		if side == "attacker":
+			att_fids.append(fid)
+			battle["att_fids"] = att_fids
+			var n := att_fids.size()
+			battle["att_org"] = (float(battle.get("att_org", 1.0)) * float(n - 1) + _formation_stat(f, "organization", 1.0)) / float(n)
+		else:
+			def_fids.append(fid)
+			battle["def_fids"] = def_fids
+			var dn := def_fids.size()
+			battle["def_org"] = (float(battle.get("def_org", 1.0)) * float(dn - 1) + _formation_stat(f, "organization", 1.0)) / float(dn)
+		_set_formation_in_combat(fid, true)
+		_rebuild_land_battle_powers(battle)
+		return {
+			"ok": true,
+			"joined": true,
+			"side": side,
+			"att_n": int(battle.get("att_n", 1)),
+			"def_n": int(battle.get("def_n", 1)),
+			"att_power": float(battle.get("att_power", 0.0)),
+			"def_power": float(battle.get("def_power", 0.0)),
+			"est_days": int(battle.get("est_days", 0)),
+			"combat_width": float(battle.get("combat_width", 10.0)),
+			"lean": str(battle.get("lean", "even")),
+			"to_id": to_id,
+			"from_id": from_id,
+		}
+	return {"ok": false, "joined": false, "reason": "no open battle here"}
+
+
+func _fid_list(battle: Dictionary, arr_key: String, one_key: String) -> Array:
+	var out: Array = []
+	var raw: Variant = battle.get(arr_key, [])
+	if raw is Array:
+		for v in raw:
+			var s := str(v).strip_edges()
+			if not s.is_empty() and not out.has(s):
+				out.append(s)
+	var one := str(battle.get(one_key, "")).strip_edges()
+	if not one.is_empty() and not out.has(one):
+		out.insert(0, one)
+	return out
+
+
+func _battle_combat_width(target: Province, terrain: String) -> float:
+	var infra := 2
+	if target != null:
+		infra = clampi(int(target.infrastructure) / 5, 0, 5)
+	if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("combat_width_for_terrain"):
+		return float(LandCombatPower.combat_width_for_terrain(terrain, infra))
+	return 10.0
+
+
+func _rebuild_land_battle_powers(battle: Dictionary) -> void:
+	var terrain := str(battle.get("terrain", "plains"))
+	var att_fids: Array = _fid_list(battle, "att_fids", "att_fid")
+	var def_fids: Array = _fid_list(battle, "def_fids", "def_fid")
+	var att_powers: Array = []
+	var att_widths: Array = []
+	for fid_v in att_fids:
+		var fo: Formation = _formation_from_id(str(fid_v), str(battle.get("att_tag", "")))
+		att_powers.append(land_combat_power(fo, terrain))
+		var aw := 2.0
+		if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("unit_width"):
+			aw = float(LandCombatPower.unit_width(fo))
+		att_widths.append(aw)
+	var def_powers: Array = []
+	var def_widths: Array = []
+	for fid_v2 in def_fids:
+		var df: Formation = _formation_from_id(str(fid_v2), str(battle.get("def_tag", "")))
+		def_powers.append(land_combat_power(df, terrain))
+		var dw := 2.0
+		if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("unit_width"):
+			dw = float(LandCombatPower.unit_width(df))
+		def_widths.append(dw)
+	var cw := float(battle.get("combat_width", 10.0))
+	if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("engaged_power"):
+		battle["att_power"] = float(LandCombatPower.engaged_power(att_powers, att_widths, cw))
+		battle["def_power"] = float(LandCombatPower.engaged_power(def_powers, def_widths, cw))
+	else:
+		var ap := 0.0
+		for p in att_powers:
+			ap += float(p)
+		var dp := 0.0
+		for p2 in def_powers:
+			dp += float(p2)
+		battle["att_power"] = ap
+		battle["def_power"] = dp
+	battle["att_n"] = att_fids.size()
+	battle["def_n"] = def_fids.size()
+	battle["att_fids"] = att_fids
+	battle["def_fids"] = def_fids
+	if not att_fids.is_empty():
+		battle["att_fid"] = att_fids[0]
+	if not def_fids.is_empty():
+		battle["def_fid"] = def_fids[0]
+	var elapsed := int(battle.get("days_elapsed", 0))
+	var remaining := _estimate_land_battle_days(
+		float(battle.get("att_power", 0.0)),
+		float(battle.get("def_power", 0.0)),
+		terrain,
+		false,
+	)
+	battle["est_days"] = maxi(elapsed + 1, remaining)
+	battle["lean"] = _land_battle_lean(float(battle.get("att_power", 0.0)), float(battle.get("def_power", 0.0)))
+
+
+func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
+	var from_id := int(battle.get("from_id", -1))
+	var to_id := int(battle.get("to_id", -1))
+	var ev := {
+		"resolved": false,
+		"winner": "",
+		"to_id": to_id,
+		"from_id": from_id,
+		"instant": false,
+	}
+	# Withdraw bounce: skip further org-break requirement after at least one day.
+	if bool(battle.get("withdraw_pending", false)):
+		battle["days_elapsed"] = int(battle.get("days_elapsed", 0)) + 1
+		if int(battle.get("days_elapsed", 0)) >= 1:
+			_finish_land_battle_hold(battle)
+			ev["resolved"] = true
+			ev["winner"] = "defender"
+			return ev
+		return ev
+
+	var first_day := int(battle.get("days_elapsed", 0)) == 0
+	var cas: Dictionary = _land_battle_cas(battle)
+	var cas_att := float(cas.get("cas_att", 0.0))
+	var cas_def := float(cas.get("cas_def", 0.0))
+	battle["cas_att"] = cas_att
+	battle["cas_def"] = cas_def
+	var att_p := float(battle.get("att_power", 0.0)) + cas_att
+	var def_p := float(battle.get("def_power", 0.0)) + cas_def
+	var plan := _side_avg_stat(battle, "att_fids", "att_fid", "planning")
+	if first_day:
+		att_p *= (1.0 + 0.25 * plan)
+		_halve_side_planning(battle)
+		battle["planning_used"] = plan > 0.01
+	var trench := _side_avg_stat(battle, "def_fids", "def_fid", "entrenchment")
+	def_p *= (1.0 + 0.20 * trench)
+	var att_sup: Dictionary = _land_side_supply_state(str(battle.get("att_tag", "")), from_id)
+	var def_sup: Dictionary = _land_side_supply_state(str(battle.get("def_tag", "")), to_id)
+	battle["supply_att"] = float(att_sup.get("supply", 1.0))
+	battle["supply_def"] = float(def_sup.get("supply", 1.0))
+	battle["enc_att"] = bool(att_sup.get("encircled", false))
+	battle["enc_def"] = bool(def_sup.get("encircled", false))
+	battle["pocket_att"] = bool(att_sup.get("pocket", false))
+	battle["pocket_def"] = bool(def_sup.get("pocket", false))
+	att_p *= float(att_sup.get("supply", 1.0))
+	def_p *= float(def_sup.get("supply", 1.0))
+	_stamp_side_supply_plain(battle, "att_fids", "att_fid", att_sup)
+	_stamp_side_supply_plain(battle, "def_fids", "def_fid", def_sup)
+	var stance := str(battle.get("att_stance", "press")).to_lower()
+	var ground_hard := bool(battle.get("ground_hard", false))
+	if not battle.has("ground_hard"):
+		var tgt: Province = MapManager.get_province(to_id) if typeof(MapManager) != TYPE_NIL else null
+		ground_hard = _target_is_ground_hard(tgt, to_id)
+		battle["ground_hard"] = ground_hard
+	if stance == "hold":
+		att_p *= 0.85
+	else:
+		att_p *= 1.25
+		if ground_hard:
+			att_p *= 0.92
+	var lean := _land_battle_lean(att_p, def_p)
+	battle["lean"] = lean
+
+	var tick: Dictionary = _land_daily_tick(
+		float(battle.get("att_org", 1.0)),
+		float(battle.get("def_org", 1.0)),
+		att_p,
+		def_p,
+		str(battle.get("terrain", "plains")),
+	)
+	var stance_org := 0.04 if stance != "hold" else -0.02
+	if stance != "hold" and ground_hard:
+		stance_org += 0.03
+	battle["att_org"] = clampf(float(tick.get("att_org", 0.0)) - float(att_sup.get("org_drain", 0.0)) - stance_org, 0.0, 1.0)
+	battle["def_org"] = maxf(0.0, float(tick.get("def_org", 0.0)) - float(def_sup.get("org_drain", 0.0)))
+	battle["next_hook"] = land_battle_next_hook(battle)
+	battle["days_elapsed"] = int(battle.get("days_elapsed", 0)) + 1
+	_apply_daily_land_battle_equipment_loss(battle, lean)
+	_apply_land_battle_xp_drip(battle)
+	_gain_defender_entrenchment(battle)
+	var att_org_now := float(battle.get("att_org", 0.0))
+	var def_org_now := float(battle.get("def_org", 0.0))
+	if not bool(tick.get("resolved", false)):
+		if att_org_now < 0.22 or def_org_now < 0.22:
+			tick["resolved"] = true
+			if att_org_now > def_org_now:
+				tick["winner"] = "attacker"
+			elif def_org_now > att_org_now:
+				tick["winner"] = "defender"
+			else:
+				tick["winner"] = "draw"
+		else:
+			return ev
+
+	var winner := str(tick.get("winner", ""))
+	ev["resolved"] = true
+	ev["winner"] = winner
+	if winner == "attacker":
+		_apply_open_battle_org_to_formations(battle)
+		var exec: Dictionary = execute_province_assault(
+			str(battle.get("att_tag", "")),
+			to_id,
+			from_id,
+			str(battle.get("att_fid", "")),
+		)
+		ev["success"] = bool(exec.get("success", false))
+		if not bool(exec.get("success", false)):
+			_finish_land_battle_hold(battle)
+	else:
+		# Defender hold or draw: no owner flip.
+		_finish_land_battle_hold(battle)
+	_record_land_aar(battle, winner, to_id)
+	ev["aar"] = peek_last_land_aar()
+	return ev
+
+
+func peek_last_land_aar() -> Dictionary:
+	return _last_land_aar.duplicate()
+
+
+func clear_last_land_aar() -> void:
+	_last_land_aar = {}
+
+
+func apply_last_land_aar_next() -> Dictionary:
+	var aar: Dictionary = _last_land_aar.duplicate()
+	if aar.is_empty():
+		return {"ok": false, "reason": "no after-action"}
+	var next_pid := int(aar.get("next_pid", -1))
+	var fid := str(aar.get("fid", ""))
+	var tag := str(aar.get("tag", ""))
+	var from_id := int(aar.get("from_id", -1))
+	clear_last_land_aar()
+	if next_pid <= 0 or fid.is_empty() or not has_method("start_land_battle"):
+		return {"ok": false, "reason": "no next hex", "aar": aar}
+	var opened: Dictionary = start_land_battle(tag, next_pid, from_id, fid)
+	return {
+		"ok": bool(opened.get("success", false)),
+		"opened": bool(opened.get("opened", false)),
+		"instant": bool(opened.get("instant", false)),
+		"summary": str(aar.get("line", "Next hex")),
+		"result": opened,
+	}
+
+
+func _record_land_aar(battle: Dictionary, winner: String, to_id: int) -> void:
+	var place := "the hex"
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var p: Province = MapManager.get_province(to_id)
+		if p != null:
+			place = p.name
+	var loss := ""
+	var fid := str(battle.get("att_fid", ""))
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var f: Formation = LeaderManager.get_formation(fid)
+		if f != null and "last_equip_loss_plain" in f:
+			loss = str(f.last_equip_loss_plain)
+	var next_pid := -1
+	var next_place := ""
+	var tag := str(battle.get("att_tag", ""))
+	var stage := to_id if winner == "attacker" else int(battle.get("from_id", to_id))
+	if winner == "attacker" and typeof(LandBattleAar) != TYPE_NIL and LandBattleAar.has_method("pick_next_enemy_hex"):
+		next_pid = int(LandBattleAar.pick_next_enemy_hex(stage, tag))
+		if next_pid > 0 and typeof(MapManager) != TYPE_NIL:
+			var np: Province = MapManager.get_province(next_pid)
+			if np != null:
+				next_place = np.name
+	var line := "Battle ended at %s" % place
+	if typeof(LandBattleAar) != TYPE_NIL and LandBattleAar.has_method("format_line"):
+		line = LandBattleAar.format_line(winner, place, int(battle.get("days_elapsed", 0)), loss, next_place)
+	_last_land_aar = {
+		"winner": winner,
+		"place": place,
+		"days": int(battle.get("days_elapsed", 0)),
+		"loss": loss,
+		"line": line,
+		"next_pid": next_pid,
+		"next_place": next_place,
+		"fid": fid,
+		"from_id": stage,
+		"tag": tag,
+	}
+
+
+func _finish_land_battle_hold(battle: Dictionary) -> void:
+	_apply_open_battle_org_to_formations(battle)
+	for fid_v in _fid_list(battle, "att_fids", "att_fid"):
+		_set_formation_in_combat(str(fid_v), false)
+	for fid_v2 in _fid_list(battle, "def_fids", "def_fid"):
+		_set_formation_in_combat(str(fid_v2), false)
+
+
+func _apply_open_battle_org_to_formations(battle: Dictionary) -> void:
+	var att_org := float(battle.get("att_org", 0.0))
+	var def_org := float(battle.get("def_org", 0.0))
+	for fid_v in _fid_list(battle, "att_fids", "att_fid"):
+		_set_formation_org(str(fid_v), att_org)
+	for fid_v2 in _fid_list(battle, "def_fids", "def_fid"):
+		_set_formation_org(str(fid_v2), def_org)
+
+
+func _set_formation_org(formation_id: String, org: float) -> void:
+	if formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return
+	var f: Formation = LeaderManager.get_formation(formation_id) if LeaderManager.has_method("get_formation") else null
+	if f == null:
+		return
+	f.organization = clampf(org, 0.0, 1.0)
+
+
+func _set_formation_in_combat(formation_id: String, fighting: bool) -> void:
+	if formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return
+	var f: Formation = LeaderManager.get_formation(formation_id) if LeaderManager.has_method("get_formation") else null
+	if f == null:
+		return
+	if "is_in_combat" in f:
+		f.is_in_combat = fighting
+
+
+func _formation_stat(formation: Object, key: String, fallback: float) -> float:
+	if formation == null:
+		return fallback
+	var v: Variant = formation.get(key)
+	if v == null:
+		return fallback
+	return float(v)
+
+
+func _land_side_supply_state(tag: String, pid: int) -> Dictionary:
+	# mirrors land_battle_encircle_product.supply_state
+	var empty := {
+		"encircled": false, "pocket": false, "kind": "connected",
+		"supply": 1.0, "friends": 0, "org_drain": 0.0,
+	}
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty() or pid <= 0 or typeof(MapManager) == TYPE_NIL:
+		return empty
+	var friends := 0
+	if MapManager.has_method("get_adjacent_provinces"):
+		for nb in MapManager.get_adjacent_provinces(pid, true):
+			var np: Province = MapManager.get_province(int(nb)) if MapManager.has_method("get_province") else null
+			if np == null or bool(np.is_sea):
+				continue
+			if _province_controller_tag(np) == t:
+				friends += 1
+	var capital := _capital_pid_for_tag(t)
+	var connected := false
+	if capital > 0:
+		if pid == capital:
+			connected = true
+		elif typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("find_own_land_path"):
+			var path: Array = FormationMovement.find_own_land_path(pid, capital, t, 48)
+			connected = path.size() >= 2 or (path.size() == 1 and int(path[0]) == capital)
+		elif MapManager.has_method("find_land_path"):
+			var lp: Array = MapManager.find_land_path(pid, capital, t, 48)
+			connected = lp.size() >= 2
+	else:
+		connected = friends > 0
+	var pocket := (not connected) and friends == 0
+	var encircled := (not connected) or pocket
+	var kind := "connected"
+	var supply := 1.0
+	var drain := 0.0
+	if pocket:
+		kind = "pocket"
+		supply = 0.15
+		drain = 0.14
+		encircled = true
+	elif not connected:
+		kind = "encircled"
+		supply = 0.40
+		drain = 0.08
+		encircled = true
+	elif pid == capital or friends >= 2:
+		kind = "connected"
+		supply = 1.0
+		encircled = false
+	elif friends <= 1:
+		kind = "thin"
+		supply = 0.75
+		encircled = false
+	return {
+		"encircled": encircled,
+		"pocket": pocket,
+		"kind": kind,
+		"supply": supply,
+		"friends": friends,
+		"org_drain": drain,
+		"capital": capital,
+	}
+
+
+func _capital_pid_for_tag(tag: String) -> int:
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country"):
+		var c: Variant = MapManager.get_country(tag)
+		if c is Object and "capital_province_id" in c:
+			return int(c.capital_province_id)
+		if c is Dictionary:
+			return int((c as Dictionary).get("capital_province_id", -1))
+	return -1
+
+
+func _stamp_side_supply_plain(battle: Dictionary, arr_key: String, one_key: String, state: Dictionary) -> void:
+	var kind := str(state.get("kind", "connected"))
+	var supply := float(state.get("supply", 1.0))
+	var plain := "Supply %.0f%%" % (supply * 100.0)
+	if kind == "pocket":
+		plain += " · POCKET"
+	elif kind == "encircled":
+		plain += " · ENCIRCLED"
+	elif kind == "thin":
+		plain += " · thin corridor"
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return
+	for fid_v in _fid_list(battle, arr_key, one_key):
+		var f: Formation = LeaderManager.get_formation(str(fid_v))
+		if f == null:
+			continue
+		if "last_supply_plain" in f:
+			f.last_supply_plain = plain
+
+
+func _land_battle_cas(battle: Dictionary) -> Dictionary:
+	var cas_att := 0.0
+	var cas_def := 0.0
+	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
+		return {"cas_att": cas_att, "cas_def": cas_def}
+	var forms: Variant = LeaderManager.formations
+	if typeof(forms) != TYPE_DICTIONARY:
+		return {"cas_att": cas_att, "cas_def": cas_def}
+	var to_id := int(battle.get("to_id", -1))
+	var att_tag := str(battle.get("att_tag", "")).strip_edges().to_upper()
+	var def_tag := str(battle.get("def_tag", "")).strip_edges().to_upper()
+	var near := _pids_within_land_hops(to_id, 2)
+	var region_id := 0
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
+		region_id = int(MapManager.get_province_region_id(to_id))
+	for fid in forms:
+		var f: Formation = forms[fid] as Formation
+		if f == null or not _formation_is_air_wing(f):
+			continue
+		var tag := str(f.country_tag).strip_edges().to_upper()
+		if tag != att_tag and tag != def_tag:
+			continue
+		var mission := str(f.current_air_mission).strip_edges().to_upper() if "current_air_mission" in f else ""
+		if mission != "CAS" and mission != "CLOSE_AIR_SUPPORT" and mission != "INTERDICTION" and mission != "AIR_SUPERIORITY":
+			continue
+		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+		if not _cas_station_in_range(sid, to_id, near, region_id):
+			continue
+		var rdy := _formation_stat(f, "readiness", 1.0)
+		var cas_m := 1.2 if mission == "CAS" or mission == "CLOSE_AIR_SUPPORT" else 1.0
+		var power := 25.0 * rdy * cas_m
+		if tag == att_tag:
+			cas_att += power
+		if tag == def_tag:
+			cas_def += power
+	return {"cas_att": cas_att, "cas_def": cas_def}
+
+
+func _formation_is_air_wing(f: Formation) -> bool:
+	if f == null:
+		return false
+	if f.has_method("get_category"):
+		return str(f.get_category()) == "air"
+	var t := str(f.formation_type)
+	return t == Formation.TYPE_AIR_WING or t == Formation.TYPE_AIR_SQUADRON or t == Formation.TYPE_AIR_GROUP
+
+
+func _pids_within_land_hops(origin: int, hops: int) -> Dictionary:
+	var near: Dictionary = {}
+	if origin <= 0:
+		return near
+	near[origin] = true
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
+		return near
+	var frontier: Array = [origin]
+	for _h in hops:
+		var nxt: Array = []
+		for pid_v in frontier:
+			for nb in MapManager.get_adjacent_provinces(int(pid_v), true):
+				var nid := int(nb)
+				if near.has(nid):
+					continue
+				near[nid] = true
+				nxt.append(nid)
+		frontier = nxt
+		if frontier.is_empty():
+			break
+	return near
+
+
+func _cas_station_in_range(sid: int, to_id: int, near: Dictionary, region_id: int) -> bool:
+	if sid <= 0:
+		return false
+	if sid == to_id or near.has(sid):
+		return true
+	if region_id > 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
+		return int(MapManager.get_province_region_id(sid)) == region_id
+	return false
+
+
+func _live_formation(formation_id: String) -> Formation:
+	if formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return null
+	if not LeaderManager.has_method("get_formation"):
+		return null
+	return LeaderManager.get_formation(formation_id)
+
+
+func _side_avg_stat(battle: Dictionary, arr_key: String, one_key: String, stat: String) -> float:
+	var total := 0.0
+	var n := 0
+	for fid_v in _fid_list(battle, arr_key, one_key):
+		var f: Formation = _live_formation(str(fid_v))
+		if f == null or not (stat in f):
+			continue
+		total += float(f.get(stat))
+		n += 1
+	return total / float(n) if n > 0 else 0.0
+
+
+func _halve_side_planning(battle: Dictionary) -> void:
+	for fid_v in _fid_list(battle, "att_fids", "att_fid"):
+		var f: Formation = _live_formation(str(fid_v))
+		if f == null or not ("planning" in f):
+			continue
+		f.planning = clampf(float(f.planning) * 0.5, 0.0, 1.0)
+
+
+func _gain_defender_entrenchment(battle: Dictionary) -> void:
+	for fid_v in _fid_list(battle, "def_fids", "def_fid"):
+		var f: Formation = _live_formation(str(fid_v))
+		if f == null or not ("entrenchment" in f):
+			continue
+		f.entrenchment = clampf(float(f.entrenchment) + 0.06, 0.0, 1.0)
+
+
+func _daily_land_equip_severity(side: String, lean: String) -> float:
+	var base := 0.08 if side == "attacker" else 0.10
+	var loser := (side == "attacker" and lean == "defender") or (side == "defender" and lean == "attacker")
+	if loser:
+		return base + 0.02
+	if lean == "defender" and side == "defender":
+		return 0.08
+	return base
+
+
+func _apply_daily_land_battle_equipment_loss(battle: Dictionary, lean: String) -> void:
+	for fid_v in _fid_list(battle, "att_fids", "att_fid"):
+		_store_daily_equip_loss(str(fid_v), _daily_land_equip_severity("attacker", lean), str(battle.get("att_tag", "")))
+	for fid_v2 in _fid_list(battle, "def_fids", "def_fid"):
+		_store_daily_equip_loss(str(fid_v2), _daily_land_equip_severity("defender", lean), str(battle.get("def_tag", "")))
+
+
+func _store_daily_equip_loss(fid: String, severity: float, country_tag: String) -> void:
+	if fid.is_empty():
+		return
+	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("ensure_demo_combat_stock"):
+		ProductionManager.ensure_demo_combat_stock(fid, country_tag)
+	var removed: Dictionary = {}
+	var plain := "equip sev=%.2f" % severity
+	if typeof(LandBattleAttrition) != TYPE_NIL and LandBattleAttrition.has_method("apply_daily_to_formation"):
+		var report: Dictionary = LandBattleAttrition.apply_daily_to_formation(fid, severity)
+		if typeof(report.get("removed", {})) == TYPE_DICTIONARY:
+			removed = report.get("removed", {}) as Dictionary
+		plain = str(report.get("plain", plain))
+	elif typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("apply_combat_equipment_loss"):
+		var raw: Variant = ProductionManager.apply_combat_equipment_loss(fid, severity)
+		if typeof(raw) == TYPE_DICTIONARY:
+			removed = raw
+		if typeof(LandBattleAttrition) != TYPE_NIL and LandBattleAttrition.has_method("format_loss_plain"):
+			plain = str(LandBattleAttrition.format_loss_plain(removed))
+		elif not removed.is_empty():
+			plain = "lost %s" % str(removed)
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return
+	var f: Formation = LeaderManager.get_formation(fid)
+	if f == null:
+		return
+	if "last_equip_loss" in f:
+		f.last_equip_loss = removed
+	if "last_equip_loss_plain" in f:
+		f.last_equip_loss_plain = plain
+
+
+func _apply_land_battle_xp_drip(battle: Dictionary) -> void:
+	for fid_v in _fid_list(battle, "att_fids", "att_fid"):
+		_add_combat_xp(str(fid_v), 1.5)
+	for fid_v2 in _fid_list(battle, "def_fids", "def_fid"):
+		_add_combat_xp(str(fid_v2), 1.5)
+
+
+func _add_combat_xp(fid: String, amount: float) -> void:
+	if fid.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return
+	var f: Formation = LeaderManager.get_formation(fid) if LeaderManager.has_method("get_formation") else null
+	if f == null or not ("combat_experience" in f):
+		return
+	f.combat_experience = clampf(float(f.combat_experience) + amount, 0.0, 100.0)
+
+
+func _formation_is_armor(formation: Object) -> bool:
+	if formation == null:
+		return false
+	var blob := "%s %s %s" % [
+		str(formation.get("design_id") if formation.get("design_id") != null else ""),
+		str(formation.get("name") if formation.get("name") != null else ""),
+		str(formation.get("formation_id") if formation.get("formation_id") != null else ""),
+	]
+	var low := blob.to_lower()
+	return "panzer" in low or "tank" in low or "armor" in low
+
+
+func _land_terrain_key(terrain: String) -> String:
+	var key := str(terrain).strip_edges().to_lower()
+	return key if not key.is_empty() else "plains"
+
+
+func _land_ratio_days(att_power: float, def_power: float) -> int:
+	var att := maxf(0.0, att_power)
+	var dfn := maxf(1e-9, def_power)
+	var ratio := att / dfn
+	if ratio >= 2.0:
+		return 2
+	if ratio >= 1.5:
+		return 3
+	if ratio >= 1.0:
+		return 4
+	if ratio >= 0.7:
+		return 5
+	return 6
+
+
+func _estimate_land_battle_days(att_power: float, def_power: float, terrain: String, empty_defender: bool) -> int:
+	if empty_defender:
+		return 0
+	var key := _land_terrain_key(terrain)
+	var extra := int(LAND_TERRAIN_DAYS_ADD.get(key, 0))
+	var days := _land_ratio_days(att_power, def_power) + extra
+	return clampi(days, LAND_MIN_BATTLE_DAYS, LAND_MAX_BATTLE_DAYS)
+
+
+func _land_battle_lean(att_power: float, def_power: float) -> String:
+	if att_power > def_power * 1.15:
+		return "attacker"
+	if def_power > att_power * 1.15:
+		return "defender"
+	return "even"
+
+
+func _land_daily_tick(
+	att_org: float,
+	def_org: float,
+	att_power: float,
+	def_power: float,
+	terrain: String,
+) -> Dictionary:
+	var att_p := maxf(0.0, att_power)
+	var def_p := maxf(0.0, def_power)
+	var total := att_p + def_p
+	var a_org := maxf(0.0, att_org)
+	var d_org := maxf(0.0, def_org)
+	if total <= 1e-9:
+		var resolved_empty := a_org < LAND_ORG_BREAK or d_org < LAND_ORG_BREAK
+		var win_empty := ""
+		if resolved_empty:
+			if a_org > d_org:
+				win_empty = "attacker"
+			elif d_org > a_org:
+				win_empty = "defender"
+			else:
+				win_empty = "draw"
+		return {"att_org": a_org, "def_org": d_org, "resolved": resolved_empty, "winner": win_empty}
+	var stretch := maxf(1.0, float(LAND_TERRAIN_STRETCH.get(_land_terrain_key(terrain), 1.0)))
+	var att_loss := (2.0 * LAND_EVEN_DRAIN) * (def_p / total) / stretch
+	var def_loss := (2.0 * LAND_EVEN_DRAIN) * (att_p / total) / stretch
+	a_org = maxf(0.0, a_org - att_loss)
+	d_org = maxf(0.0, d_org - def_loss)
+	var resolved := a_org < LAND_ORG_BREAK or d_org < LAND_ORG_BREAK
+	var winner := ""
+	if resolved:
+		if a_org > d_org:
+			winner = "attacker"
+		elif d_org > a_org:
+			winner = "defender"
+		else:
+			winner = "draw"
+	return {"att_org": a_org, "def_org": d_org, "resolved": resolved, "winner": winner}
+
 
 func _log_unit_combat(formation_id: String, province: int, other_province: int, result: Dictionary, role: String) -> void:
 	if formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:

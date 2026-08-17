@@ -25,7 +25,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertGreaterEqual(HIT_RADIUS_PX, 48.0)
         self.assertGreaterEqual(HIT_RADIUS_FLOOR, 20.0)
         self.assertIn("Shift+U", STRATEGIC_PICK_TOAST)
-        self.assertIn("Zoom in", STRATEGIC_PICK_TOAST)
+        self.assertIn("unit chip", STRATEGIC_PICK_TOAST)
         self.assertIn("toggles counters", STRATEGIC_PICK_TOAST)
 
     def test_product_wiring(self) -> None:

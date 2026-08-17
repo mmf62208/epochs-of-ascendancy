@@ -114,6 +114,13 @@ const LAND_MISSION_ARTILLERY_PREP := "ARTILLERY_PREP"  # Pre-bombard before assa
 @export var combat_experience: float = 48.0
 @export var fuel_level: float = 1.0  # for naval (and future air/land vehicles): 1.0 full, low = reduced power/speed, vuln in combat; consumed on ops, resupplied at hubs/ports/tenders. Naval long endurance but limited.
 
+## Runtime land-battle depth (not part of save schema).
+var last_equip_loss: Dictionary = {}
+var last_equip_loss_plain: String = ""
+var last_supply_plain: String = ""
+var planning: float = 0.0
+var entrenchment: float = 0.0
+
 var assigned_leader: Leader = null
 
 

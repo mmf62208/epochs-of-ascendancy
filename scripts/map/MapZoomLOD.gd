@@ -129,15 +129,19 @@ static func province_internal_border_width(t: Tier) -> float:
 
 
 ## Unit / OOB map counters (DemoUnitIcon pins).
-## Strategic world view: hide for clean political read; operational+ show when master enabled.
+## Master off hides all. Strategic = compact chips (still pickable). Operational+ = full chips.
 static func show_unit_counters(t: Tier, master_enabled: bool = true) -> bool:
 	if not master_enabled:
 		return false
-	return t != Tier.STRATEGIC
+	return true
+
+
+static func unit_counter_compact(t: Tier) -> bool:
+	return t == Tier.STRATEGIC
 
 
 static func unit_counter_min_zoom() -> float:
-	## Zoom must exceed strategic band before counters appear (when master on).
+	## Compact chips remain visible at world zoom; this is the full-chip band.
 	return STRATEGIC_MAX_ZOOM + 0.02
 
 

@@ -162,11 +162,22 @@ func spawn_test_formations_for_country(
 	var land_stationed := 0
 	var invalid_stations := 0
 
+	var border_set: Dictionary = {}
+	for raw_b in border_provinces:
+		var bid := int(raw_b)
+		if bid > 0:
+			border_set[bid] = true
+
 	for i in count:
 		var formation := Formation.new()
 		formation.formation_id = "%s_formation_%d" % [tag, i]
 		formation.country_tag = tag
 		formation.formation_type = TEST_FORMATION_TYPES[i % TEST_FORMATION_TYPES.size()]
+		# HOI deploy parks later slots on land borders — do not put fleets/TFs on Maginot dirt.
+		var preview_station := stations[i] if i < stations.size() else 0
+		if preview_station > 0 and border_set.has(preview_station):
+			if formation.formation_type in [Formation.TYPE_FLEET, Formation.TYPE_TASK_FORCE]:
+				formation.formation_type = Formation.TYPE_DIVISION
 		formation.organization = 1.0
 		formation.readiness = 1.0
 		formation.strength = 1.0

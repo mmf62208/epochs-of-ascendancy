@@ -1195,7 +1195,23 @@ func _rebuild_play_mode_strip() -> void:
 	_add_apply_button("[3] Production", "apply_production", true)
 	_add_apply_button("[1] Station forces", "apply_station", true)
 	_add_apply_button("[8] Checkpoint save", "save_resume_checkpoint", true)
-	_add_apply_button("Apply recommended next", "campaign_alpha_apply_recommended", true)
+	var rec: Dictionary = {}
+	if typeof(PlayNextHook) != TYPE_NIL and PlayNextHook.has_method("recommend"):
+		rec = PlayNextHook.recommend()
+	var rec_hint := str(rec.get("hint", "Unpause a day"))
+	var rec_label := "Next: %s" % str(rec.get("label", "Unpause a day"))
+	_add_plain_label(rec_hint, 220)
+	var rec_btn := Button.new()
+	rec_btn.text = rec_label
+	rec_btn.focus_mode = Control.FOCUS_NONE
+	rec_btn.tooltip_text = rec_hint
+	rec_btn.pressed.connect(func() -> void:
+		if typeof(PlayNextHook) != TYPE_NIL and PlayNextHook.has_method("apply"):
+			var out: Dictionary = PlayNextHook.apply(rec)
+			if typeof(DebugOverlay) != TYPE_NIL:
+				DebugOverlay.toast_map_debug(str(out.get("summary", rec_hint)))
+	)
+	_target_body().add_child(rec_btn)
 	# Map surface shortcuts (toast + MapRenderer when present)
 	var map_row := HBoxContainer.new()
 	_target_body().add_child(map_row)

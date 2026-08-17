@@ -227,6 +227,8 @@ var _hover_fill_province_id: int = -1
 var _select_outline_layer: Node2D = null
 var _select_outline_line: Line2D = null
 var _select_outline_glow: Line2D = null
+var _march_path_line: Line2D = null
+var _next_hook_chip: Button = null
 var _current_theater_bounds: Rect2 = GRAND_THEATER_CANONICAL_BOUNDS  # updated on theater/chunk/world load; used for camera clamp to avoid gray lost space on pan/zoom to NA etc.
 
 # Coarse world territories for clickable "regions" when on full world grand/stitched view.
@@ -324,6 +326,7 @@ var _occupation_layer = null  # OccupationOverlayLayer
 @export var show_construction_progress_overlay: bool = false  # On-demand; default off for world_full frame budget
 var _strategic_flow_layer = null
 var _battle_indicator_layer = null
+var _land_battle_bubble_layer: Node2D = null
 var _domain_ops_layer = null
 var _leader_station_layer = null
 var _construction_progress_layer = null
@@ -737,6 +740,23 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 	if not light:
 		_refresh_province_fill_colors()
 	_refresh_map_time_ui()
+	var open_n := _sync_land_battle_bubbles()
+	if open_n > 0:
+		_play_map_sfx("map")
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_open_land_battles"):
+			for raw_b in BattleManager.get_open_land_battles():
+				if typeof(raw_b) != TYPE_DICTIONARY:
+					continue
+				var hook_s := str((raw_b as Dictionary).get("next_hook", ""))
+				if "tomorrow" in hook_s.to_lower():
+					_show_inspector_toast(hook_s, 4.5)
+					break
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("peek_last_land_aar"):
+			var aar: Dictionary = BattleManager.peek_last_land_aar()
+			var aar_line := str(aar.get("line", ""))
+			if not aar_line.is_empty():
+				_show_inspector_toast(aar_line, 5.5)
+				_play_map_sfx("achievement" if str(aar.get("winner", "")) == "attacker" else "map")
 	# Pass 17: live-update airfield repair rings without full province rebuild.
 	call_deferred("_refresh_feature_progress_rings")
 	# Pass 22: refresh repair queue chip list on day advance.
@@ -1055,7 +1075,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			_show_map_layer_toast("Battle indicators %s" % ("ON" if onj else "OFF"))
 			get_viewport().set_input_as_handled()
 			return
-		if event.keycode == KEY_U and not event.ctrl_pressed:
+		# Shift+U — unit counters. Must beat plain U (supply flow) the same way Shift+I beats I.
+		if event.keycode == KEY_U and event.shift_pressed and not event.ctrl_pressed and not event.alt_pressed:
+			toggle_unit_counters()
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_U and not event.ctrl_pressed and not event.shift_pressed:
 			var onu: bool = toggle_strategic_flow_overlay()
 			_show_map_layer_toast("Supply/sealane flow %s" % ("ON" if onu else "OFF"))
 			get_viewport().set_input_as_handled()
@@ -1123,11 +1148,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if event.keycode == KEY_V and terrain_layer_stack:
 			terrain_layer_stack.toggle_vegetation()
-			get_viewport().set_input_as_handled()
-			return
-		# Shift+U — unit / OOB map counters (round pins). U alone = supply flow / rivers.
-		if event.keycode == KEY_U and event.shift_pressed and not event.ctrl_pressed and not event.alt_pressed:
-			toggle_unit_counters()
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_S and terrain_layer_stack:  # S = persistent peak snow (NASA/DEM mask; seasonal snow via WeatherOverlay)
@@ -1281,10 +1301,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_select_province(resolved_province, resolved_node)
 				get_viewport().set_input_as_handled()
 				return
-			# Strategic zoom / master-off: pins hidden — one-shot discoverability for unit pick.
+			# Master-off: chips hidden — one-shot discoverability for unit pick.
 			if not _unit_pick_strategic_hint_shown and not _unit_counters_want_visible():
 				_unit_pick_strategic_hint_shown = true
-				_show_inspector_toast("Zoom in to pick units (Shift+U toggles counters).", 3.5)
+				_show_inspector_toast("Click a unit chip to command (Shift+U toggles counters).", 3.5)
 			# Select first (outline immediately); center + left inspector (avoid covering selection).
 			_select_province(resolved_province, resolved_node)
 			_center_camera_on_province(resolved_province.id, "soft")
@@ -12425,6 +12445,8 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 	_setup_occupation_layer()
 	_setup_strategic_flow_layer()
 	_setup_battle_indicator_layer()
+	_setup_land_battle_bubble_layer()
+	_refresh_next_hook_chip()
 	_setup_domain_ops_layer()
 	_setup_leader_station_layer()
 	_setup_construction_progress_layer()
@@ -15673,7 +15695,7 @@ func _select_map_unit(formation: Object) -> void:
 	if pid >= 0:
 		attack_staging_province_id = pid
 		debug_combat_attacker_province_id = pid
-	var toast := "Unit selected · %s · click friendly province to MOVE · Ctrl+click enemy to ASSAULT (preview then confirm) · Esc clears" % name_s
+	var toast := "Unit selected · %s · click friendly province to MARCH (days) · Ctrl+click enemy to ASSAULT · Esc clears" % name_s
 	_show_inspector_toast(toast, 5.5)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug(toast)
@@ -15757,6 +15779,7 @@ func _cycle_selected_stack_unit(delta: int) -> bool:
 
 
 ## Order selected unit to a friendly (or owned) province. Returns true if handled.
+## Enqueues own-land march (calendar hops). Instant move_formation_to_province is hop-commit only.
 func _try_move_selected_unit_to_province(province: Province) -> bool:
 	if province == null or selected_formation_id.is_empty():
 		return false
@@ -15768,44 +15791,90 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 		return false
 	var fid := selected_formation_id
 	var dest := province.id
-	var from_pid := -1
-	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
-		var pre: Formation = LeaderManager.get_formation(fid)
-		if pre != null and "stationed_province_id" in pre:
-			from_pid = int(pre.stationed_province_id)
-	if from_pid < 0:
-		from_pid = attack_staging_province_id
-	var ok := false
-	var reason := ""
-	if typeof(FormationMovement) != TYPE_NIL:
-		var res: Dictionary = FormationMovement.move_formation_to_province(fid, dest, p_tag)
-		ok = bool(res.get("ok", false))
-		reason = str(res.get("reason", ""))
-	elif typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("move_formation_to_province"):
-		var res2: Dictionary = SupplyManager.move_formation_to_province(fid, dest, p_tag)
-		ok = bool(res2.get("ok", false))
-		reason = str(res2.get("reason", ""))
-	if not ok and typeof(LeaderManager) != TYPE_NIL:
-		# Fallback: station OOB source of truth even if path/template missing.
-		var f: Formation = LeaderManager.get_formation(fid) if LeaderManager.has_method("get_formation") else null
-		if f != null and str(f.country_tag).to_upper() == p_tag:
-			f.stationed_province_id = dest
-			ok = true
-			reason = "stationed"
-			if typeof(SupplyManager) != TYPE_NIL:
-				SupplyManager.division_deployments[fid] = {
-					"province_id": dest,
-					"country_tag": p_tag,
-					"order_type": "move_to_province",
-				}
-	if ok:
-		attack_staging_province_id = dest
-		debug_combat_attacker_province_id = dest
-		_show_inspector_toast("Moved %s → %s #%d · Ctrl+click enemy from here to assault" % [fid, province.name, dest], 4.0)
-		call_deferred("refresh_after_capture_light", dest, from_pid)
+	if typeof(FormationMovement) == TYPE_NIL or not FormationMovement.has_method("enqueue_own_land_march"):
+		return false
+	var res: Dictionary = FormationMovement.enqueue_own_land_march(fid, dest, p_tag)
+	if bool(res.get("already_here", false)):
+		_show_inspector_toast("Already at %s" % province.name, 2.5)
 		return true
-	_show_inspector_toast("Move blocked · %s" % (reason if not reason.is_empty() else "no path / not your unit"), 3.5, true)
-	return true  # handled (showed feedback)
+	if not bool(res.get("ok", false)):
+		var reason := str(res.get("reason", ""))
+		_show_inspector_toast(
+			"March blocked · %s" % (reason if not reason.is_empty() else "no own-land path"),
+			3.5,
+			true
+		)
+		return true
+	var hops_n := int(res.get("hops", 1))
+	var cal := int(res.get("calendar_days", 1))
+	var path: Array = res.get("path", []) as Array
+	_highlight_march_path(path)
+	_show_inspector_toast(
+		"March · %d hop%s · arrives in %d day%s · unpause to walk · %s"
+		% [hops_n, "s" if hops_n != 1 else "", cal, "s" if cal != 1 else "", province.name],
+		5.0
+	)
+	return true
+
+
+func _highlight_march_path(province_path: Array) -> void:
+	if _march_path_line != null and is_instance_valid(_march_path_line):
+		_march_path_line.queue_free()
+		_march_path_line = null
+	if province_path.size() < 2:
+		return
+	var pts := PackedVector2Array()
+	for pid_v in province_path:
+		var pid := int(pid_v)
+		if province_centroids.has(pid):
+			pts.append(province_centroids[pid] as Vector2)
+		elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
+			var c: Vector2 = MapManager.get_province_centroid(pid)
+			if c != Vector2.ZERO:
+				pts.append(c)
+	if pts.size() < 2:
+		return
+	var line := Line2D.new()
+	line.name = "MarchPathLine"
+	line.width = 3.2
+	line.default_color = Color(1.0, 0.82, 0.22, 0.88)
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	line.points = pts
+	line.z_index = 24
+	add_child(line)
+	_march_path_line = line
+
+
+func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictionary = {}) -> void:
+	var pname := "province %d" % to_pid
+	if provinces.has(to_pid):
+		var p: Province = provinces[to_pid] as Province
+		if p != null:
+			pname = p.name
+	var rf: Dictionary = hop.get("reinforce", {}) as Dictionary if hop is Dictionary else {}
+	if bool(rf.get("joined", false)):
+		_sync_land_battle_bubbles()
+		_play_map_sfx("confirm")
+		_show_inspector_toast(
+			"Reinforced front · %dv%d · lean %s · est. %d days"
+			% [int(rf.get("att_n", 1)), int(rf.get("def_n", 1)), str(rf.get("lean", "even")), int(rf.get("est_days", 0))],
+			4.5
+		)
+		if arrived:
+			attack_staging_province_id = to_pid
+			debug_combat_attacker_province_id = to_pid
+		return
+	if arrived:
+		if _march_path_line != null and is_instance_valid(_march_path_line):
+			_march_path_line.queue_free()
+			_march_path_line = null
+		_show_inspector_toast("Arrived · %s · Ctrl+click enemy to assault" % pname, 4.0)
+		attack_staging_province_id = to_pid
+		debug_combat_attacker_province_id = to_pid
+	else:
+		_show_inspector_toast("Marching · now at %s" % pname, 2.8)
 
 
 func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
@@ -15928,12 +15997,11 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	panel.clip_contents = true
 	panel.custom_minimum_size = Vector2(320, 220)
 	RetrowaveTheme.style_detail_panel_flat(panel)
-	# Place near mouse, keep on-screen.
-	var mouse := get_viewport().get_mouse_position() if get_viewport() else Vector2(200, 200)
+	# Docked HOI-style unit card (bottom-left). UNIT_CARD_DOCK / unit_card_dock — not a mouse popup.
 	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
-	var px := clampf(mouse.x + 16.0, 12.0, maxf(12.0, vp.x - 340.0))
-	var py := clampf(mouse.y - 40.0, 56.0, maxf(56.0, vp.y - 280.0))
-	panel.position = Vector2(px, py)
+	var dock := Vector2(18.0, maxf(64.0, vp.y - 276.0))
+	panel.position = dock
+	panel.set_meta("unit_card_dock", true)
 	ui.add_child(panel)
 
 	var margin := MarginContainer.new()
@@ -15984,6 +16052,8 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	)
 	if fuel_v >= 0.0:
 		lines.append("Fuel: %.0f%%" % (fuel_v * 100.0))
+	if typeof(UnitCardCombatStrip) != TYPE_NIL and UnitCardCombatStrip.has_method("lines_for"):
+		lines.append_array(UnitCardCombatStrip.lines_for(formation))
 	if not fid.is_empty():
 		lines.append("ID: %s" % fid)
 	# Stack at this province (one pin; cycle via [ ] or card buttons).
@@ -16000,6 +16070,103 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	body.text = "\n".join(lines)
 	RetrowaveTheme.style_body_label(body)
 	vbox.add_child(body)
+
+	var cmd_row := HBoxContainer.new()
+	cmd_row.add_theme_constant_override("separation", 6)
+	vbox.add_child(cmd_row)
+	var marching := typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("has_march") \
+		and bool(FormationMovement.has_march(fid))
+	if marching:
+		var halt_btn := Button.new()
+		halt_btn.text = "Halt march"
+		halt_btn.focus_mode = Control.FOCUS_NONE
+		halt_btn.tooltip_text = "Cancel the queued own-land march; stay on the current hex."
+		RetrowaveTheme.style_secondary_button(halt_btn)
+		halt_btn.pressed.connect(func() -> void:
+			if typeof(FormationMovement) != TYPE_NIL:
+				FormationMovement.clear_march(fid)
+			if _march_path_line != null and is_instance_valid(_march_path_line):
+				_march_path_line.queue_free()
+				_march_path_line = null
+			_show_inspector_toast("March halted · %s" % name_s, 3.0)
+			_show_unit_detail_popup(formation)
+		)
+		cmd_row.add_child(halt_btn)
+	var bat: Dictionary = {}
+	if typeof(BattleManager) != TYPE_NIL:
+		if BattleManager.has_method("get_land_battle_for_formation"):
+			bat = BattleManager.get_land_battle_for_formation(fid)
+		if bat.is_empty() and BattleManager.has_method("get_land_battle_at"):
+			bat = BattleManager.get_land_battle_at(pid)
+	var in_battle := not bat.is_empty()
+	if in_battle:
+		var hook := str(bat.get("next_hook", ""))
+		if hook.is_empty() and BattleManager.has_method("land_battle_next_hook"):
+			hook = str(BattleManager.land_battle_next_hook(bat))
+		if not hook.is_empty():
+			lines.append(hook)
+			body.text = "\n".join(lines)
+		var stance_row := HBoxContainer.new()
+		stance_row.add_theme_constant_override("separation", 6)
+		vbox.add_child(stance_row)
+		var cur_st := str(bat.get("att_stance", "press"))
+		if BattleManager.has_method("set_land_battle_stance"):
+			var press_btn := Button.new()
+			press_btn.text = "Press" if cur_st != "press" else "Press ●"
+			press_btn.focus_mode = Control.FOCUS_NONE
+			press_btn.tooltip_text = "Hit harder, spend more org and equipment. Use to finish a breaking front."
+			RetrowaveTheme.style_secondary_button(press_btn)
+			press_btn.pressed.connect(func() -> void:
+				var r: Dictionary = BattleManager.set_land_battle_stance(fid, "press")
+				_show_inspector_toast(str(r.get("next_hook", "Stance: Press")), 3.5)
+				_show_unit_detail_popup(formation)
+			)
+			stance_row.add_child(press_btn)
+			var hold_btn := Button.new()
+			hold_btn.text = "Hold" if cur_st != "hold" else "Hold ●"
+			hold_btn.focus_mode = Control.FOCUS_NONE
+			hold_btn.tooltip_text = "Ease off. Less loss, slower fight. Wait for a reinforcing march."
+			RetrowaveTheme.style_secondary_button(hold_btn)
+			hold_btn.pressed.connect(func() -> void:
+				var r2: Dictionary = BattleManager.set_land_battle_stance(fid, "hold")
+				_show_inspector_toast(str(r2.get("next_hook", "Stance: Hold")), 3.5)
+				_show_unit_detail_popup(formation)
+			)
+			stance_row.add_child(hold_btn)
+	if in_battle and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("withdraw_from_land_battle"):
+		var wd_btn := Button.new()
+		wd_btn.text = "Withdraw"
+		wd_btn.focus_mode = Control.FOCUS_NONE
+		wd_btn.tooltip_text = "Disengage this unit from the open land battle."
+		RetrowaveTheme.style_secondary_button(wd_btn)
+		wd_btn.pressed.connect(func() -> void:
+			var wr: Dictionary = BattleManager.withdraw_from_land_battle(fid)
+			_sync_land_battle_bubbles()
+			_play_map_sfx("error")
+			_show_inspector_toast(
+				"Withdraw · %s" % str(wr.get("reason", wr.get("ok", "done"))),
+				3.5
+			)
+			_show_unit_detail_popup(formation)
+		)
+		cmd_row.add_child(wd_btn)
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_available_leaders"):
+		var avail: Array = LeaderManager.get_available_leaders(tag)
+		if avail.size() > 0:
+			var L: Variant = avail[0]
+			var lname := str(L.name) if L is Object and "name" in L else "leader"
+			var as_btn := Button.new()
+			as_btn.text = "Assign %s" % lname
+			as_btn.focus_mode = Control.FOCUS_NONE
+			as_btn.tooltip_text = "Assign an unused leader of this tag."
+			RetrowaveTheme.style_secondary_button(as_btn)
+			as_btn.pressed.connect(func() -> void:
+				if formation != null and formation.has_method("assign_leader") and L is Object:
+					formation.assign_leader(L as Object)
+				_show_inspector_toast("Leader assigned · %s" % lname, 3.0)
+				_show_unit_detail_popup(formation)
+			)
+			cmd_row.add_child(as_btn)
 
 	if stack_divs.size() > 1:
 		var stack_row := HBoxContainer.new()
@@ -16025,7 +16192,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		stack_row.add_child(next_btn)
 
 	var hint := Label.new()
-	hint.text = "SELECTED · click friendly province to MOVE · Ctrl+click enemy to ASSAULT (preview, then confirm) · Esc clears selection"
+	hint.text = "SELECTED · click friendly land to MARCH (arrives in N days) · Ctrl+click enemy to ASSAULT · Esc clears"
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	hint.custom_minimum_size = Vector2(290, 0)
 	RetrowaveTheme.style_body_label(hint)
@@ -16639,7 +16806,7 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		var intel_note := "intel rough"
 		if att_n <= 0:
 			intel_note = "no friendly divs staged here — move units first"
-		var prev_toast := "Assault PREVIEW · %s #%d (%d div) → %s #%d (%d div) · power %.0f vs %.0f · odds ~%.0f%% · %s · %s · Ctrl+click AGAIN to execute" % [
+		var prev_toast := "Assault PREVIEW · %s #%d (%d div) → %s #%d (%d div) · power %.0f vs %.0f · odds ~%.0f%% · %s · %s · Ctrl+click AGAIN to start a multi-day battle" % [
 			p_tag, from_pid, att_n, str(target_province.owner_tag), target_pid, def_n,
 			atk_p, def_p, odds,
 			("ready" if can_ok else str(can_pre.get("reason", "blocked"))),
@@ -16656,9 +16823,24 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		return true
 	_assault_execute_busy = true
 	var assault: Dictionary = {}
-	# Protect main thread: resolve combat, then light UI only (no full border rebuild).
-	assault = BattleManager.execute_province_assault(p_tag, target_pid, from_pid)
+	# Multi-day open (HOI front) when start_land_battle exists; execute_province_assault is resolve-only.
+	if BattleManager.has_method("start_land_battle"):
+		assault = BattleManager.start_land_battle(p_tag, target_pid, from_pid)
+	else:
+		assault = BattleManager.execute_province_assault(p_tag, target_pid, from_pid)
 	push_map_assault_marker(target_pid, "engage", 0.75)
+	if bool(assault.get("opened", false)):
+		_assault_execute_busy = false
+		var bat: Dictionary = assault.get("battle", {}) as Dictionary
+		var est := int(bat.get("est_days", 4))
+		_sync_land_battle_bubbles()
+		_play_map_sfx("confirm")
+		_show_inspector_toast(
+			"Battle opened · %s · est. %d days · unpause to fight · withdraw from unit card"
+			% [target_province.name, est],
+			5.5
+		)
+		return true
 	if not bool(assault.get("success", false)):
 		_assault_execute_busy = false
 		_show_inspector_toast(str(assault.get("reason", "Attack failed")), 3.2, true)
@@ -17765,6 +17947,66 @@ func get_equipment_flow_glyph_query() -> Dictionary:
 	}
 
 
+func _setup_land_battle_bubble_layer() -> void:
+	const BUBBLE_SCR := "res://scripts/map/LandBattleBubbleLayer.gd"
+	if not ResourceLoader.exists(BUBBLE_SCR):
+		return
+	if _land_battle_bubble_layer == null or not is_instance_valid(_land_battle_bubble_layer):
+		var scr: Script = load(BUBBLE_SCR) as Script
+		if scr == null:
+			return
+		_land_battle_bubble_layer = scr.new() as Node2D
+		if _land_battle_bubble_layer == null:
+			return
+		_land_battle_bubble_layer.name = "LandBattleBubbleLayer"
+		_land_battle_bubble_layer.z_index = 25
+		add_child(_land_battle_bubble_layer)
+	if _land_battle_bubble_layer.has_method("setup"):
+		_land_battle_bubble_layer.call("setup", province_centroids)
+	_sync_land_battle_bubbles()
+
+
+func _refresh_next_hook_chip() -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	if _next_hook_chip == null or not is_instance_valid(_next_hook_chip):
+		_next_hook_chip = Button.new()
+		_next_hook_chip.name = "PlayNextHookChip"
+		_next_hook_chip.focus_mode = Control.FOCUS_NONE
+		_next_hook_chip.z_index = 80
+		_next_hook_chip.position = Vector2(18, 52)
+		_next_hook_chip.custom_minimum_size = Vector2(420, 28)
+		if typeof(RetrowaveTheme) != TYPE_NIL:
+			RetrowaveTheme.style_secondary_button(_next_hook_chip)
+		ui.add_child(_next_hook_chip)
+		_next_hook_chip.pressed.connect(func() -> void:
+			if typeof(PlayNextHook) != TYPE_NIL and PlayNextHook.has_method("apply"):
+				var out: Dictionary = PlayNextHook.apply()
+				_show_inspector_toast(str(out.get("summary", "Next")), 3.5)
+				_refresh_next_hook_chip()
+		)
+	var rec: Dictionary = {}
+	if typeof(PlayNextHook) != TYPE_NIL and PlayNextHook.has_method("recommend"):
+		rec = PlayNextHook.recommend()
+	var hint := str(rec.get("hint", "Unpause a day"))
+	_next_hook_chip.text = "NEXT · %s" % str(rec.get("label", "Unpause a day"))
+	_next_hook_chip.tooltip_text = hint
+
+
+func _sync_land_battle_bubbles() -> int:
+	if _land_battle_bubble_layer == null or not is_instance_valid(_land_battle_bubble_layer):
+		_setup_land_battle_bubble_layer()
+	if _land_battle_bubble_layer == null or not _land_battle_bubble_layer.has_method("set_battles"):
+		return 0
+	var battles: Array = []
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_open_land_battles"):
+		battles = BattleManager.get_open_land_battles()
+	_land_battle_bubble_layer.call("set_battles", battles)
+	_refresh_next_hook_chip()
+	return battles.size()
+
+
 func _setup_battle_indicator_layer() -> void:
 	if not show_battle_indicator_overlay or container == null:
 		remove_overlay_layer("BattleIndicatorOverlay")
@@ -18540,9 +18782,9 @@ func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 			z = maxf(cam.zoom.x, cam.zoom.y)
 		elif container:
 			z = absf(container.scale.x)
-	# zoom high = close-up → larger counters; zoom low = strategic → smaller
+	# zoom high = close-up → larger counters; zoom low = compact but still readable (org/str bars).
 	var t := clampf((z - 0.35) / 2.2, 0.0, 1.0)
-	return lerpf(0.38, 0.95, t)
+	return lerpf(0.72, 1.15, t)
 
 
 func _sync_unit_counter_scales(z: float = -1.0) -> void:
@@ -18592,7 +18834,7 @@ func toggle_unit_counters() -> bool:
 	var z := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
 	var shown := _unit_counters_want_visible(z)
 	var msg := "Unit counters OFF (master)" if not show_unit_counters else (
-		"Unit counters ON · visible at this zoom" if shown else "Unit counters ON · hidden at strategic zoom (zoom in)"
+		"Unit counters ON · visible at this zoom" if shown else "Unit counters ON · hidden (Shift+U)"
 	)
 	if has_method("_show_map_layer_toast"):
 		_show_map_layer_toast(msg)
@@ -18628,6 +18870,76 @@ func _make_unit_nation_frame(col: Color) -> Node2D:
 	line.points = pts
 	root.add_child(line)
 	return root
+
+
+## HOI-style nation color plate behind the NATO glyph (readable at compact zoom).
+func _make_unit_nation_plate(col: Color) -> ColorRect:
+	var plate := ColorRect.new()
+	plate.name = "NationPlate"
+	plate.size = Vector2(40, 34)
+	plate.position = Vector2(-20, -16)
+	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	plate.color = Color(col.r * 0.55, col.g * 0.55, col.b * 0.55, 0.92)
+	return plate
+
+
+## Org (green) + strength (amber) bars on the chip itself.
+func _make_unit_stat_bars(org_v: float, str_v: float) -> Node2D:
+	var root := Node2D.new()
+	root.name = "StatBars"
+	root.position = Vector2(-20, 18)
+	var org_c := clampf(org_v, 0.0, 1.0)
+	var str_c := clampf(str_v, 0.0, 1.0)
+	var bg := ColorRect.new()
+	bg.name = "BarBg"
+	bg.size = Vector2(40, 11)
+	bg.position = Vector2(0, 0)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bg.color = Color(0.06, 0.07, 0.1, 0.88)
+	root.add_child(bg)
+	var org_bar := ColorRect.new()
+	org_bar.name = "OrgBar"
+	org_bar.size = Vector2(maxf(2.0, 40.0 * org_c), 5)
+	org_bar.position = Vector2(0, 0)
+	org_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	org_bar.color = Color(0.28, 0.82, 0.42, 0.95)
+	root.add_child(org_bar)
+	var str_bar := ColorRect.new()
+	str_bar.name = "StrBar"
+	str_bar.size = Vector2(maxf(2.0, 40.0 * str_c), 5)
+	str_bar.position = Vector2(0, 6)
+	str_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	str_bar.color = Color(0.95, 0.72, 0.22, 0.95)
+	root.add_child(str_bar)
+	return root
+
+
+## Plate + org/str on every DemoUnitIcon (call from rebuild; sprites stay on top).
+func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color) -> void:
+	if counter == null:
+		return
+	var old_plate := counter.get_node_or_null("NationPlate")
+	if old_plate != null:
+		counter.remove_child(old_plate)
+		old_plate.free()
+	var old_bars := counter.get_node_or_null("StatBars")
+	if old_bars != null:
+		counter.remove_child(old_bars)
+		old_bars.free()
+	var plate := _make_unit_nation_plate(nation_col)
+	counter.add_child(plate)
+	counter.move_child(plate, 0)
+	var org_v := 1.0
+	var str_v := 1.0
+	if ff != null:
+		if "organization" in ff:
+			org_v = float(ff.organization)
+		if "strength" in ff:
+			str_v = float(ff.strength)
+	counter.add_child(_make_unit_stat_bars(org_v, str_v))
+	if ff != null and "formation_id" in ff:
+		counter.set_meta("formation_id", str(ff.formation_id))
+		counter.set_meta("formation", ff)
 
 
 ## 0..1 how strongly this land province sits on a plains↔hills/mountains transition front.
@@ -21229,7 +21541,7 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 		counter.position = Vector2(0, -8)
 		# Pass 7: zoom-scaled counters — larger when zoomed in, smaller at strategic view.
 		counter.scale = Vector2.ONE * _unit_counter_scale_for_zoom()
-		# LOD: hidden at strategic zoom / when master toggle off (U).
+		# LOD: compact at strategic zoom; hidden only when master toggle off (U).
 		counter.visible = _unit_counters_want_visible()
 		# Store formation ref so map clicks can open unit detail.
 		if ff != null:
@@ -21414,16 +21726,16 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 				atlas.atlas = _nato_sheet_tex
 				atlas.region = reg
 				tex = atlas as Texture2D
+		var nation_tag := force_tag
+		if nation_tag.is_empty() and p != null:
+			nation_tag = p.owner_tag
+		var nation_col := Color(0.85, 0.88, 0.95, 1.0)
+		if not nation_tag.is_empty() and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
+			nation_col = MapManager.get_country_color(nation_tag)
 		if tex:
 			var spr := Sprite2D.new()
 			spr.texture = tex
 			spr.centered = true
-			var nation_tag := force_tag
-			if nation_tag.is_empty() and p != null:
-				nation_tag = p.owner_tag
-			var nation_col := Color(0.85, 0.88, 0.95, 1.0)
-			if not nation_tag.is_empty() and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
-				nation_col = MapManager.get_country_color(nation_tag)
 			# Retrowave chips keep full-color art; nation identity is a frame, not a full modulate wash.
 			if using_retrowave:
 				spr.modulate = Color.WHITE
@@ -21444,6 +21756,7 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 					counter.add_child(_make_unit_nation_frame(nation_col))
 			else:
 				_add_unit_stack_fanout(counter, spr, tex, tex_cache, samples, fan, nation_tag, nation_col, using_retrowave, era_folder)
+			_attach_unit_counter_chrome(counter, ff, nation_col)
 			if stack_n > 1:
 				counter.add_child(_make_formation_stack_badge(stack_n))
 		else:
@@ -21452,6 +21765,7 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			bg.position = Vector2(-10, -8)
 			bg.color = Color(0.1, 0.12, 0.18, 0.9)
 			counter.add_child(bg)
+			_attach_unit_counter_chrome(counter, ff, nation_col)
 			if stack_n > 1:
 				counter.add_child(_make_formation_stack_badge(stack_n))
 		_demo_unit_icon_pids.append(id)

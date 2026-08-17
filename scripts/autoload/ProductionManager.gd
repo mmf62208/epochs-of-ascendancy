@@ -740,6 +740,30 @@ func apply_combat_equipment_loss(formation_id: String, severity: float = 0.5) ->
 	return removed
 
 
+## Seed a small on-hand pack when the formation has no combat stock.
+## CombatLoop / start_land_battle (BattleManager is file-locked):
+##   ProductionManager.ensure_demo_combat_stock(fid, tag)
+func ensure_demo_combat_stock(formation_id: String, country_tag: String = "") -> Dictionary:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty():
+		return {}
+	var stock := get_unit_equipment_stock(fid)
+	for equipment_id in stock.keys():
+		if int(stock[equipment_id]) > 0:
+			return stock
+	var seeded := {
+		"infantry_equipment": 80,
+		"support_equipment": 10,
+	}
+	set_unit_equipment_stock(fid, seeded)
+	var tag := country_tag.strip_edges().to_upper()
+	print(
+		"[DEMO COMBAT STOCK] %s (%s) seeded infantry_equipment=80 support_equipment=10"
+		% [fid, tag]
+	)
+	return seeded.duplicate()
+
+
 func get_division_required_equipment(division_template_id: String) -> Dictionary:
 	var supply := get_node_or_null("/root/SupplyManager")
 	if supply == null:

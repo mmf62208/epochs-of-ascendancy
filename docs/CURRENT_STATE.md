@@ -1,4 +1,4 @@
-> **Status (2026-08-12):** Live truth → [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md) (**~3520** board, machine full-test green, M6 human-only). Director → [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md). Dual markers → root `TODO.md`. Play → [`PLAYTEST_AND_DECISION_GUIDE.md`](PLAYTEST_AND_DECISION_GUIDE.md) §0b. This file remains append-only session log.
+> **Status (2026-08-16):** Live truth → [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md) (**~3520** board, L1 land loop + AI start + land_war save, M6 human-only). Director → [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md). Dual markers → root `TODO.md`. Play → [`PLAYTEST_AND_DECISION_GUIDE.md`](PLAYTEST_AND_DECISION_GUIDE.md) §0b. This file remains append-only session log.
 
 # Current State of Epochs of Ascendancy
 
@@ -9,6 +9,8 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
+> **2026-08-16 L1 AI start + land_war save:** Budgeted interactive AI opens at most one `start_land_battle` per day (`LandBattleAi` + `BattleManager.try_ai_start_land_battles`; killswitch `EOA_AI_LAND_BATTLES=0`). Save blob `land_war` persists open battles + FormationMovement march queues + last AAR. Pure `land_battle_ai_init_product` + `land_war_save_product` on `--quick`. Next: human §0b / M6 notes; optional infra-invest AI tick.
+>
 > **2026-08-12 Git/doc snapshot:** Local `main` reattached (was detached HEAD). Live-truth docs reconciled to **~3520** (SNAPSHOT wins). Game + boards + tools committed as current-state snapshot. GitHub `git push` needs SSH/gh on this machine (no `~/.ssh`). Next: finish §0b / M6 human notes; no new residual duals. Incomplete smoke: `SESSION_NOTES/2026-08-05_m6_smoke.md`.
 >
 > **2026-07-28 Load hang fix:** `world_accurate` (~5670) stalled because LoadingScreen **hard-freed at 12s** while ScenarioLoader only yielded frames when LS was present → rest of load was one sync freeze. Fix: **always** `await process_frame` in `_report_load_progress`; LS **soft_unlock at 18s** (keep node for progress) · hard free only at 120s. Relaunch verified: 58% interactive + harness ready 5670.

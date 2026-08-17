@@ -1,7 +1,7 @@
 """Unit counter (OOB pin) LOD policy — mirrors MapZoomLOD.show_unit_counters.
 
-Strategic = clean political (pins off unless master forced via game toggle off entirely).
-Operational/tactical = pins on when master enabled.
+Strategic = compact chips (still pickable). Operational/tactical = full chips.
+Master toggle off hides all zoom tiers.
 """
 from __future__ import annotations
 
@@ -21,16 +21,26 @@ TIER_TACTICAL = 2
 def show_unit_counters(tier: int, master_enabled: bool = True) -> bool:
     if not master_enabled:
         return False
-    return int(tier) != TIER_STRATEGIC
+    return True
+
+
+def unit_counter_compact(tier: int) -> bool:
+    return int(tier) == TIER_STRATEGIC
 
 
 def build_map_unit_counter_lod_product() -> Dict[str, Any]:
     passes: List[str] = []
     fails: List[str] = []
-    if show_unit_counters(TIER_STRATEGIC, True) is False:
-        passes.append("strategic_hides")
+    if show_unit_counters(TIER_STRATEGIC, True) is True:
+        passes.append("strategic_compact_shows")
     else:
-        fails.append("strategic_shows")
+        fails.append("strategic_hidden")
+    if unit_counter_compact(TIER_STRATEGIC) and not unit_counter_compact(
+        TIER_OPERATIONAL
+    ):
+        passes.append("strategic_is_compact")
+    else:
+        fails.append("compact_policy")
     if show_unit_counters(TIER_OPERATIONAL, True) is True:
         passes.append("operational_shows")
     else:
@@ -50,6 +60,28 @@ def build_map_unit_counter_lod_product() -> Dict[str, Any]:
         passes.append("lod_fn")
     else:
         fails.append("missing_lod_fn")
+    if "func unit_counter_compact" in lod:
+        passes.append("lod_compact_fn")
+    else:
+        fails.append("missing_compact_fn")
+    # Slice show_unit_counters only — other LOD helpers still hide chrome at strategic.
+    lod_fn_slice = ""
+    _needle = "func show_unit_counters"
+    _i = lod.find(_needle)
+    if _i >= 0:
+        _lines = lod[_i:].splitlines()
+        _out = [_lines[0]]
+        for _ln in _lines[1:]:
+            if _ln.startswith("static func ") or _ln.startswith("func "):
+                break
+            _out.append(_ln)
+        lod_fn_slice = "\n".join(_out)
+    if "return t != Tier.STRATEGIC" in lod_fn_slice:
+        fails.append("lod_still_hides_strategic")
+    elif "return true" in lod_fn_slice:
+        passes.append("lod_no_strategic_hide")
+    else:
+        fails.append("lod_still_hides_strategic")
     if "func toggle_unit_counters" in ren and "toggle_unit_counters()" in ren:
         passes.append("renderer_toggle")
     else:
@@ -69,5 +101,5 @@ def build_map_unit_counter_lod_product() -> Dict[str, Any]:
         "pass": passes,
         "fail": fails,
         "summary": "unit_counter_lod · %s" % ("PASS" if ok else "FAIL"),
-        "policy": "strategic_hide_operational_show_master_toggle_U",
+        "policy": "strategic_compact_pickable_operational_full_master_toggle_U",
     }

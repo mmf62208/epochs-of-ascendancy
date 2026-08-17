@@ -290,6 +290,9 @@ func advance_days(days: float) -> void:
 
 		# Headless / harness: synchronous path (evidence needs ordered listeners in one step).
 		game_day_advanced.emit(current_year, current_month, current_day)
+		_tick_own_land_marches()
+		_tick_open_land_battles()
+		_tick_out_of_combat_recovery()
 		if _should_run_daily_ai_combat():
 			if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("simulate_daily_ai_combat"):
 				BattleManager.simulate_daily_ai_combat()
@@ -323,6 +326,10 @@ func _flush_sim_events() -> void:
 		game_day_advanced.emit(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
 		# Budgeted non-player major AI (production/soft) — not full simulate_daily_ai_combat.
 		_maybe_run_interactive_multi_ai()
+		_maybe_run_ai_land_battle_starts()
+		_tick_own_land_marches()
+		_tick_open_land_battles()
+		_tick_out_of_combat_recovery()
 	elif kind == "month":
 		var y := int(ev.get("year", 0))
 		var m := int(ev.get("month", 0))
@@ -386,6 +393,90 @@ func _maybe_run_interactive_multi_ai() -> void:
 	if not GameData.has_method("apply_interactive_multi_ai_day_live"):
 		return
 	GameData.call("apply_interactive_multi_ai_day_live", 1)
+
+
+## Budgeted AI start_land_battle (max 1/day). Same F5 light-sim gate as multi-AI.
+## Killswitch: EOA_AI_LAND_BATTLES=0 (also skipped when interactive multi-AI is off).
+func _maybe_run_ai_land_battle_starts() -> void:
+	if OS.get_environment("EOA_AI_LAND_BATTLES").strip_edges() == "0":
+		return
+	if not _should_run_interactive_multi_ai():
+		return
+	if typeof(BattleManager) == TYPE_NIL:
+		return
+	if not BattleManager.has_method("try_ai_start_land_battles"):
+		return
+	var day_i := 0
+	if has_method("get_total_days_elapsed"):
+		day_i = int(get_total_days_elapsed())
+	BattleManager.try_ai_start_land_battles(day_i)
+
+
+func _tick_own_land_marches() -> void:
+	if typeof(FormationMovement) == TYPE_NIL:
+		return
+	if not FormationMovement.has_method("tick_all_marches"):
+		return
+	var moved: Array = FormationMovement.tick_all_marches(1.0)
+	if moved.is_empty():
+		return
+	var arrived_n := 0
+	for mv in moved:
+		if mv is Dictionary and bool(mv.get("arrived", false)):
+			arrived_n += 1
+	if arrived_n > 0:
+		print("TimeManager: own-land march arrived=%d hops=%d" % [arrived_n, moved.size()])
+
+
+func _tick_open_land_battles() -> void:
+	if typeof(BattleManager) == TYPE_NIL:
+		return
+	if not BattleManager.has_method("tick_open_land_battles"):
+		return
+	var resolved: Array = BattleManager.tick_open_land_battles(1.0)
+	if resolved.is_empty():
+		return
+	var n := 0
+	for ev in resolved:
+		if ev is Dictionary and bool(ev.get("resolved", false)):
+			n += 1
+	if n > 0:
+		print("TimeManager: open land battles resolved=%d" % n)
+
+
+func _tick_out_of_combat_recovery() -> void:
+	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
+		return
+	var forms: Variant = LeaderManager.formations
+	if typeof(forms) != TYPE_DICTIONARY:
+		return
+	var n: int = (forms as Dictionary).size()
+	var budgeted := n > 400
+	for fid in forms:
+		var f: Formation = forms[fid] as Formation
+		if f == null:
+			continue
+		if "is_in_combat" in f and bool(f.is_in_combat):
+			continue
+		var org := float(f.organization) if "organization" in f else 1.0
+		var plan := float(f.planning) if "planning" in f else 1.0
+		if budgeted and org >= 0.99 and plan >= 1.0:
+			continue
+		var rec := 0.06
+		var pid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+		if pid >= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+			var p: Province = MapManager.get_province(pid)
+			if p != null and p.has_method("get_organization_recovery_modifier"):
+				rec = 0.06 * float(p.get_organization_recovery_modifier())
+		if "organization" in f:
+			f.organization = clampf(org + rec, 0.0, 1.0)
+		if "readiness" in f:
+			f.readiness = clampf(float(f.readiness) + 0.04, 0.0, 1.0)
+		var defend := "current_land_mission" in f and str(f.current_land_mission) == Formation.LAND_MISSION_DEFEND
+		if defend and "entrenchment" in f:
+			f.entrenchment = clampf(float(f.entrenchment) + 0.06, 0.0, 1.0)
+		if "planning" in f:
+			f.planning = clampf(plan + 0.08, 0.0, 1.0)
 
 
 ## True for normal graphical F5 play — keep day ticks light so HUD/map stay responsive.

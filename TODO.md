@@ -1,5 +1,7 @@
 # Epochs of Ascendancy — TODO
 
+> **L1 war loop (2026-08-16, machine):** pick → march hops → multi-day battle → AAR/NEXT · **AI `start_land_battle` (1/day)** · **`land_war` save** (open fights + marches). Human M6 20d/60d notes still open. Truth → [`docs/GAME_STATUS_SNAPSHOT.md`](docs/GAME_STATUS_SNAPSHOT.md).
+
 > **Playtest cycle (2026-07-17):** freeze new residual dual packages · human playlists · launch commands → [`docs/PLAYTEST_AND_DECISION_GUIDE.md`](docs/PLAYTEST_AND_DECISION_GUIDE.md) · status → [`GAME_STATUS_ASSESSMENT.md`](GAME_STATUS_ASSESSMENT.md)
 
 

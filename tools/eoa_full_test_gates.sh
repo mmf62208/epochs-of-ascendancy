@@ -86,7 +86,23 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_first_session_assault_surface_product \
     tools.map_generation.tests.test_order_panel_play_strip_product \
     tools.map_generation.tests.test_unit_centric_pick_product \
+    tools.map_generation.tests.test_unit_counter_chrome_product \
+    tools.map_generation.tests.test_unit_own_land_march_product \
+    tools.map_generation.tests.test_unit_multi_day_battle_product \
+    tools.map_generation.tests.test_land_battle_bubble_product \
+    tools.map_generation.tests.test_unit_card_assign_product \
     tools.map_generation.tests.test_interactive_multi_ai_day_product \
+    tools.map_generation.tests.test_land_combat_power_product \
+    tools.map_generation.tests.test_land_battle_reinforce_product \
+    tools.map_generation.tests.test_land_battle_attrition_product \
+    tools.map_generation.tests.test_unit_card_combat_strip_product \
+    tools.map_generation.tests.test_land_battle_depth_product \
+    tools.map_generation.tests.test_land_battle_encircle_product \
+    tools.map_generation.tests.test_land_battle_stance_product \
+    tools.map_generation.tests.test_play_next_hook_product \
+    tools.map_generation.tests.test_land_battle_aar_product \
+    tools.map_generation.tests.test_land_battle_ai_init_product \
+    tools.map_generation.tests.test_land_war_save_product \
     -v || fail
 
 run_step unit_save_path \

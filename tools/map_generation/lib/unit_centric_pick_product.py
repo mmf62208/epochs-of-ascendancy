@@ -13,7 +13,7 @@ ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 
 # Discoverability / integrity strings grepped from MapRenderer (must stay in live path).
-STRATEGIC_PICK_TOAST = "Zoom in to pick units (Shift+U toggles counters)."
+STRATEGIC_PICK_TOAST = "Click a unit chip to command (Shift+U toggles counters)."
 STACK_CYCLE_HINT = "Stack %d/%d · [ ] or buttons to cycle"
 SELECTED_FRAME_HOOK = "_refresh_selected_unit_chip"
 HIT_RADIUS_PX = 48.0

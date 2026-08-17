@@ -27,6 +27,7 @@ CHILD_NAMES = (
     "assault",
     "play_strip",
     "unit_pick",
+    "unit_chrome",
 )
 
 
@@ -64,6 +65,7 @@ class TestFirstSessionPlaySurfaceProduct(unittest.TestCase):
             "build_first_session_assault_surface_product",
             "build_order_panel_play_strip_product",
             "build_unit_centric_pick_product",
+            "build_unit_counter_chrome_product",
         ):
             self.assertIn(fn, src)
         self.assertNotIn("map_supply_hub_brief_product", src)

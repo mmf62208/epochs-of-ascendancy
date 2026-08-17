@@ -44,6 +44,8 @@
 ##   },
 ##   "misc": {},   # Future expansion
 ##   "infrastructure_projects": { "version": 1, "active_projects": { "42": {project dict}, ... } }
+##   "land_war": { "version": 1, "open_battles": [ battle dicts ], "marches": { fid: order },
+##                 "next_seq": 1, "last_aar": {} }
 ## }
 ## }
 ##
@@ -99,12 +101,13 @@
 ## - Leaders (full Leader resources + XP/status/assignments/traits, national positions, officer training, pending retirements/replacements)
 ## - Design lifecycle (if DesignManager provides it)
 ## - InfrastructureDevelopmentManager (active provincial investment projects only; dev/infra levels live under "map")
+## - Land war loop (open multi-day battles + FormationMovement own-land march queues + last AAR)
 ##
 ## Metadata structure (in every save root["metadata"]):
 ##   timestamp, scenario_id, player_tag, last_played, game_version, play_time_seconds (0 for now)
 ##
 ## === LIMITATIONS / WHAT IS NOT SAVED YET ===
-## - Full combat/formation presence beyond division_deployments (routes, intel caches, attrition)
+## - Combat presence beyond open land battles / march queues (intel caches, air/naval in-flight)
 ## - Most NationalSpirit / doctrine beyond Tech
 ## - UI caches, camera, selection state
 ## - Mod or highly transient data
@@ -538,6 +541,18 @@ func _gather_save_data() -> Dictionary:
 		else:
 			data["infrastructure_projects"] = {}
 
+	# --- Open land battles + own-land march queues (L1 war loop continuity) ---
+	var land_war := {"version": 1, "open_battles": [], "marches": {}, "next_seq": 1, "last_aar": {}}
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_save_data"):
+		var bm_blob: Dictionary = BattleManager.get_save_data()
+		land_war["open_battles"] = bm_blob.get("open_battles", [])
+		land_war["next_seq"] = int(bm_blob.get("next_seq", 1))
+		land_war["last_aar"] = bm_blob.get("last_aar", {})
+	if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("get_save_data"):
+		var fm_blob: Dictionary = FormationMovement.get_save_data()
+		land_war["marches"] = fm_blob.get("marches", {})
+	data["land_war"] = land_war
+
 	# --- Province Editor (in-game map design tool - debug only, persists drawn provinces across saves) ---
 	# Uses the get_save_data/apply interface like other managers.
 	var pe := get_tree().get_first_node_in_group("province_editor")
@@ -626,6 +641,18 @@ func _apply_save_data(data: Dictionary) -> void:
 	# 7b. Division map deployments (after leaders; syncs CombatPresenceRegistry engineers)
 	if data.has("supply") and typeof(SupplyManager) != TYPE_NIL:
 		_apply_supply_deployments_state(data["supply"])
+
+	# 7c. Open land battles + march queues (after formations exist)
+	if data.has("land_war") and data["land_war"] is Dictionary:
+		var lw: Dictionary = data["land_war"]
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("apply_save_data"):
+			BattleManager.apply_save_data({
+				"open_battles": lw.get("open_battles", []),
+				"next_seq": int(lw.get("next_seq", 1)),
+				"last_aar": lw.get("last_aar", {}),
+			})
+		if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("apply_save_data"):
+			FormationMovement.apply_save_data({"marches": lw.get("marches", {})})
 
 	# 8. Production + Factories (factories feed lines; apply after map provinces)
 	if data.has("factories") and typeof(FactoryManager) != TYPE_NIL:
