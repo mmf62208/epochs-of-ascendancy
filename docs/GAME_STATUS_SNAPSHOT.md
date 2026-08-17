@@ -28,7 +28,7 @@ Every Cursor / Grok / human session on this tree:
 |------|--------|
 | **Human** | `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · play §0b items **3–15** · zoom Maginot · pick a pin on `710173` (gold chip, no inspector) · append session notes. M6 20d/60d still open after that. |
 | **Machine** | Unpause a few days as GER: an AI neighbor should **open** a multi-day fight (bubble, not instant flip). Ctrl+S mid-fight and reload — same battle + any amber march still there. |
-| **GitHub** | **Ops** — no SSH/`gh` on the director machine. Local snapshot `505d91d` + this stack. Do not force-push over June Cursor history. |
+| **GitHub** | Branch `eoa/l1-war-loop-slice` @ `f544a81` pushed. Do not force-push over June Cursor history. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
 
