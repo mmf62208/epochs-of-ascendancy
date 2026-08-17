@@ -28,7 +28,7 @@ Every Cursor / Grok / human session on this tree:
 |------|--------|
 | **Human** | `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · play §0b items **3–15** · zoom Maginot · pick a pin on `710173` (gold chip, no inspector) · append session notes. M6 20d/60d still open after that. |
 | **Machine** | `--quick` **PASS** (venv numpy/Pillow). Remaining machine: Godot headless on a 4.7.1 host. Soft 30fps still FAIL honest. |
-| **GitHub** | Branch `eoa/l1-war-loop-slice` @ `f544a81` pushed. Do not force-push over June Cursor history. |
+| **GitHub** | Branch `eoa/l1-war-loop-slice` @ `a1d63bf` pushed. Do not force-push over June Cursor history. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
 
