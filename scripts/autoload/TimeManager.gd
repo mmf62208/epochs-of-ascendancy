@@ -326,6 +326,7 @@ func _flush_sim_events() -> void:
 		game_day_advanced.emit(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
 		# Budgeted non-player major AI (production/soft) — not full simulate_daily_ai_combat.
 		_maybe_run_interactive_multi_ai()
+		_maybe_run_ai_infra_invest()
 		_maybe_run_ai_land_battle_starts()
 		_tick_own_land_marches()
 		_tick_open_land_battles()
@@ -393,6 +394,23 @@ func _maybe_run_interactive_multi_ai() -> void:
 	if not GameData.has_method("apply_interactive_multi_ai_day_live"):
 		return
 	GameData.call("apply_interactive_multi_ai_day_live", 1)
+
+
+## Budgeted AI infra invest (max 1 new project/day). Same F5 light-sim gate as multi-AI.
+## Killswitch: EOA_AI_INFRA=0 (also skipped when interactive multi-AI is off).
+func _maybe_run_ai_infra_invest() -> void:
+	if OS.get_environment("EOA_AI_INFRA").strip_edges() == "0":
+		return
+	if not _should_run_interactive_multi_ai():
+		return
+	if typeof(InfrastructureDevelopmentManager) == TYPE_NIL:
+		return
+	if not InfrastructureDevelopmentManager.has_method("try_ai_start_infra_project"):
+		return
+	var day_i := 0
+	if has_method("get_total_days_elapsed"):
+		day_i = int(get_total_days_elapsed())
+	InfrastructureDevelopmentManager.try_ai_start_infra_project("", day_i)
 
 
 ## Budgeted AI start_land_battle (max 1/day). Same F5 light-sim gate as multi-AI.

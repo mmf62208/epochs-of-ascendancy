@@ -29,6 +29,20 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
+_NE_DEPS_INSTALL = (
+    "python3 -m pip install --user -r tools/map_generation/requirements.txt"
+)
+try:
+    import numpy  # noqa: F401
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+try:
+    from PIL import Image  # noqa: F401
+    HAS_PILLOW = True
+except ImportError:
+    HAS_PILLOW = False
+
 from ne_full_geometry_align import (  # noqa: E402
     DEFAULT_NE_LAND,
     WORLD_CANVAS,
@@ -247,6 +261,19 @@ def main(argv: Optional[List[str]] = None) -> int:
     )
     ap.add_argument("--json-out", default="", help="Write full report JSON")
     args = ap.parse_args(argv)
+
+    if not HAS_NUMPY or not HAS_PILLOW:
+        missing = []
+        if not HAS_NUMPY:
+            missing.append("numpy")
+        if not HAS_PILLOW:
+            missing.append("Pillow")
+        print(
+            "FAIL: %s required for map_accuracy_qc (NE land-mask)."
+            % " and ".join(missing)
+        )
+        print(f"  {_NE_DEPS_INSTALL}")
+        return 1
 
     data_dir = Path(args.dir)
     if not data_dir.is_absolute():

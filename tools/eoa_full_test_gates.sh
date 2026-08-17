@@ -7,10 +7,22 @@
 #   tools/eoa_full_test_gates.sh --quick      # pure python only (no Godot)
 #   tools/eoa_full_test_gates.sh --with-perf  # also map-tick perf sample
 #   tools/eoa_full_test_gates.sh --log DIR    # write logs under DIR
+#
+# --quick never launches Godot (no 4.7.1 binary needed). Full path calls
+# tools/run_godot.sh, which exits 1 immediately if no binary is found
+# (fail-closed; it must not hang).
+# NE board/QC needs numpy+Pillow: pip install -r tools/map_generation/requirements.txt
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+
+# Prefer a local venv so numpy/Pillow do not require system Python or sudo.
+if [[ -x "$ROOT/tools/map_generation/.venv/bin/python" ]]; then
+  PYTHON="$ROOT/tools/map_generation/.venv/bin/python"
+else
+  PYTHON=python3
+fi
 
 QUICK=0
 WITH_PERF=0
@@ -39,6 +51,7 @@ if [[ -n "$LOG_DIR" ]]; then
 fi
 
 log() { echo "[eoa-gates] $*"; }
+log "python=$PYTHON"
 
 run_step() {
   local name="$1"
@@ -67,8 +80,16 @@ FAILED=0
 fail() { FAILED=1; }
 
 # --- Pure / unit gates (always) ---
+# Missing numpy/Pillow used to traceback inside the 167-test dump; fail clearly first.
+if ! "$PYTHON" -c "import numpy, PIL" >/dev/null 2>&1; then
+  log "FAIL numpy/Pillow missing — NE board QC (test_world_accurate_board + map_accuracy_qc) cannot run"
+  log "  install (venv, no sudo): python3 -m venv tools/map_generation/.venv && tools/map_generation/.venv/bin/pip install -r tools/map_generation/requirements.txt"
+  log "  or user pip if allowed:  python3 -m pip install --user -r tools/map_generation/requirements.txt"
+  fail
+fi
+
 run_step unit_board_play_path \
-  python3 -m unittest \
+  "$PYTHON" -m unittest \
     tools.map_generation.tests.test_world_accurate_board \
     tools.map_generation.tests.test_row_sparse_density_product \
     tools.map_generation.tests.test_us_state_province_density_product \
@@ -103,23 +124,25 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_land_battle_aar_product \
     tools.map_generation.tests.test_land_battle_ai_init_product \
     tools.map_generation.tests.test_land_war_save_product \
+    tools.map_generation.tests.test_land_battle_ai_campaign_product \
     -v || fail
 
 run_step unit_save_path \
-  python3 -m unittest \
+  "$PYTHON" -m unittest \
     tools.map_generation.tests.test_world_accurate_campaign_feel.TestWorldAccurateCampaignD3 \
     tools.map_generation.tests.test_save_browser_campaign_product \
     tools.map_generation.tests.test_save_resume_primary_command_product \
     tools.map_generation.tests.test_autosave_session_primary_command_product \
     tools.map_generation.tests.test_long_session_save_product \
+    tools.map_generation.tests.test_infra_ai_invest_product \
     -v || fail
 
 run_step map_qc \
-  python3 tools/map_generation/scripts/map_accuracy_qc.py \
+  "$PYTHON" tools/map_generation/scripts/map_accuracy_qc.py \
     --dir data/provinces_world_accurate --min-land-hit 0.90 || fail
 
 run_step hoi_matrix_product \
-  python3 -c "
+  "$PYTHON" -c "
 import sys
 sys.path.insert(0, 'tools/map_generation/lib')
 from hoi_full_test_gap_matrix_product import build_hoi_full_test_gap_matrix_product

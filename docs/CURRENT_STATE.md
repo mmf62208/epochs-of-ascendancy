@@ -9,6 +9,8 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
+> **2026-08-16 L1 campaign + infra + gates:** Five parallel agents. AI spare march-to-front + follow-on start; AI infra invest 1/day; long-session save contract; leader +0–25% in live land power; `--quick` **ALL PASSED** via `tools/map_generation/.venv` (numpy/Pillow). Soft 30fps still FAIL honest. Next: human §0b / M6 20d notes.
+>
 > **2026-08-16 L1 AI start + land_war save:** Budgeted interactive AI opens at most one `start_land_battle` per day (`LandBattleAi` + `BattleManager.try_ai_start_land_battles`; killswitch `EOA_AI_LAND_BATTLES=0`). Save blob `land_war` persists open battles + FormationMovement march queues + last AAR. Pure `land_battle_ai_init_product` + `land_war_save_product` on `--quick`. Next: human §0b / M6 notes; optional infra-invest AI tick.
 >
 > **2026-08-12 Git/doc snapshot:** Local `main` reattached (was detached HEAD). Live-truth docs reconciled to **~3520** (SNAPSHOT wins). Game + boards + tools committed as current-state snapshot. GitHub `git push` needs SSH/gh on this machine (no `~/.ssh`). Next: finish §0b / M6 human notes; no new residual duals. Incomplete smoke: `SESSION_NOTES/2026-08-05_m6_smoke.md`.

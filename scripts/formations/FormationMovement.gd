@@ -322,6 +322,15 @@ static func has_march(formation_id: String) -> bool:
 	return _orders.has(formation_id.strip_edges())
 
 
+static func list_marches() -> Array:
+	var out: Array = []
+	for fid_v in _orders.keys():
+		var row: Dictionary = get_march(str(fid_v))
+		if not row.is_empty():
+			out.append(row)
+	return out
+
+
 static func soonest_calendar_eta_to(province_id: int, country_tag: String = "") -> int:
 	var dest := int(province_id)
 	var tag := country_tag.strip_edges().to_upper()

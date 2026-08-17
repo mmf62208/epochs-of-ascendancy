@@ -1,8 +1,8 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-16 (L1 **HOI land-battle loop** · living counters + march hops + multi-day battles + **AI start** + **land_war save** · board still ~3520 · M6 human-only open)  
+**Date:** 2026-08-16 (L1 land loop + **AI campaign** + **AI infra invest** + long-session save · `--quick` green with map venv · board ~3520 · M6 human-only open)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
-**How to keep going:** 5-step protocol in §0. Next human: F5 §0b items 3–15 · pick a Maginot pin. Next machine: infra-invest AI tick if a human session still feels empty after AI battles land. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
+**How to keep going:** 5-step protocol in §0. Next human: F5 §0b 3–15 + a 20d unpause (M6 notes). Next machine: only playtest-driven shipped-path fixes. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
 **Audience:** Human playtester, game director, implementer agents  
 **Source of truth for “what is true now”:** this file + [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md)  
@@ -27,7 +27,7 @@ Every Cursor / Grok / human session on this tree:
 | Next | Action |
 |------|--------|
 | **Human** | `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · play §0b items **3–15** · zoom Maginot · pick a pin on `710173` (gold chip, no inspector) · append session notes. M6 20d/60d still open after that. |
-| **Machine** | Unpause a few days as GER: an AI neighbor should **open** a multi-day fight (bubble, not instant flip). Ctrl+S mid-fight and reload — same battle + any amber march still there. |
+| **Machine** | `--quick` **PASS** (venv numpy/Pillow). Remaining machine: Godot headless on a 4.7.1 host. Soft 30fps still FAIL honest. |
 | **GitHub** | Branch `eoa/l1-war-loop-slice` @ `f544a81` pushed. Do not force-push over June Cursor history. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
@@ -48,6 +48,9 @@ Every Cursor / Grok / human session on this tree:
 - **L1 land_war save (machine):** `SaveLoadManager` blob `land_war` round-trips open battles (org/stance/days) + march queues + last AAR. Legacy saves without the key stay empty-ok.
 - **L1 long-session save (machine):** `validate_long_session_save` requires metadata/time/map/leaders/infra/land_war/production. Gather always emits `land_war` shape; `save_game_detailed` refuses a missing key. `is_in_combat` already on leaders.
 - **L1 leader in live land battle (machine):** `LandCombatPower.leader_power_mult` +0–25% from assigned commander (attack; defend uses defense or attack×0.6). No leader = 1.0.
+- **L1 AI campaign (machine):** spare rear `enqueue_own_land_march` to a live-border `from_id` (1/day) + one follow-on `start_land_battle` after attacker AAR. Still never `execute_province_assault`.
+- **L1 AI infra invest (machine):** 1 new project/day (`try_ai_start_infra_project`); daily `advance_daily_projects` + `days_remaining`; complete bumps infra +1. Killswitch `EOA_AI_INFRA=0`. Player Invest button unchanged.
+- **Gates host (machine):** `tools/map_generation/.venv` + requirements numpy/Pillow. `--quick` uses that Python. Missing deps fail with a one-line install hint. Soft 30fps still **FAIL** honest (~29.4).
 
 **Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3.
 

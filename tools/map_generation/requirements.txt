@@ -1,2 +1,10 @@
-# Map generation pipeline (optional; stdlib + Pillow minimum)
+# Map generation pipeline (stdlib + Pillow + numpy)
+# numpy+Pillow are required for NE land-mask QC (map_accuracy_qc / test_world_accurate_board).
+# PEP 668 hosts (no system pip): use a venv, then eoa_full_test_gates.sh will pick it up.
+#   python3 -m venv tools/map_generation/.venv
+#   tools/map_generation/.venv/bin/pip install -r tools/map_generation/requirements.txt
+# User pip if the environment allows it (no sudo):
+#   python3 -m pip install --user -r tools/map_generation/requirements.txt
 pillow>=10.0.0
+numpy>=1.26.0
+

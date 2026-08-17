@@ -31,6 +31,7 @@ class ProvincialProject:
 	var modifiers: Dictionary = {}               # "engineer": 0.9, "sabotage": -0.7, "tech": 0.25, "stability": 0.15, ...
 	var political_power_cost: int = 45
 	var start_day: int = 0
+	var days_remaining: int = 0                  # daily tick clock (save + AI/player progress)
 	var status: String = "active"                # active | paused | sabotaged | complete | cancelled
 
 	func get_id() -> String:
@@ -51,6 +52,8 @@ class ProvincialProject:
 		return 100.0 - progress
 
 	func get_eta_days() -> int:
+		if days_remaining > 0:
+			return days_remaining
 		var daily := get_current_work_per_day()
 		if daily <= 0.01:
 			return 999
@@ -60,8 +63,11 @@ class ProvincialProject:
 		return {
 			"id": id,
 			"province_id": province_id,
+			"pid": province_id,
 			"axis": axis,
+			"kind": axis,
 			"owner_tag": owner_tag,
+			"tag": owner_tag,
 			"starting_level": starting_level,
 			"target_level": target_level,
 			"progress": progress,
@@ -69,15 +75,16 @@ class ProvincialProject:
 			"modifiers": modifiers.duplicate(true),
 			"political_power_cost": political_power_cost,
 			"start_day": start_day,
+			"days_remaining": days_remaining,
 			"status": status
 		}
 
 	static func from_save_dict(d: Dictionary) -> ProvincialProject:
 		var p := ProvincialProject.new()
 		p.id = d.get("id", "")
-		p.province_id = int(d.get("province_id", 0))
-		p.axis = d.get("axis", "infrastructure")
-		p.owner_tag = d.get("owner_tag", "")
+		p.province_id = int(d.get("province_id", d.get("pid", 0)))
+		p.axis = str(d.get("axis", d.get("kind", "infrastructure")))
+		p.owner_tag = str(d.get("owner_tag", d.get("tag", "")))
 		p.starting_level = int(d.get("starting_level", 1))
 		p.target_level = int(d.get("target_level", 2))
 		p.progress = float(d.get("progress", 0.0))
@@ -85,6 +92,7 @@ class ProvincialProject:
 		p.modifiers = d.get("modifiers", {}).duplicate(true)
 		p.political_power_cost = int(d.get("political_power_cost", 45))
 		p.start_day = int(d.get("start_day", 0))
+		p.days_remaining = int(d.get("days_remaining", d.get("days_left", 0)))
 		p.status = d.get("status", "active")
 		return p
 
@@ -95,6 +103,8 @@ var _level_defs: Dictionary = {}              # lazy loaded from data/infrastruc
 var _dev_level_defs: Dictionary = {}
 
 var _is_initialized: bool = false
+var _ai_infra_budget_day: int = -1
+var _ai_infra_starts_today: int = 0
 
 
 func _ready() -> void:
@@ -253,6 +263,7 @@ func start_infrastructure_project(province_id: int, target_level: int, investor_
 
 	# Seed initial modifiers (engineers already present give immediate bonus)
 	_refresh_project_modifiers(proj, p)
+	proj.days_remaining = maxi(1, proj.get_eta_days())
 
 	active_projects[province_id] = proj
 	project_started.emit(proj)
@@ -310,6 +321,10 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 		proj.progress = clampf(proj.progress + work, 0.0, 100.0)
 		var delta := proj.progress - before
 
+		if proj.days_remaining <= 0:
+			proj.days_remaining = maxi(1, proj.get_eta_days())
+		proj.days_remaining = maxi(0, proj.days_remaining - 1)
+
 		if delta > 0.001:
 			project_progress_updated.emit(pid, proj, delta)
 			# Light event feedback for playability (avoid spam; only on significant chunks or high %).
@@ -318,7 +333,7 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 				var pname := prov.name if prov else str(pid)
 				LeaderEventUI.show_toast("%s infra project ~%d%% complete (ETA %d days)" % [pname, int(proj.progress), proj.get_eta_days()], 2.0)
 
-		if proj.progress >= 100.0:
+		if proj.progress >= 100.0 or proj.days_remaining <= 0:
 			to_complete.append({"pid": pid, "proj": proj})
 
 	# Complete outside the iteration
@@ -497,6 +512,8 @@ func apply_loaded_data(data: Dictionary) -> void:
 		var pid := int(pid_str)
 		var d: Dictionary = data["active_projects"][pid_str]
 		var proj := ProvincialProject.from_save_dict(d)
+		if proj.days_remaining <= 0:
+			proj.days_remaining = maxi(1, proj.get_eta_days())
 		active_projects[pid] = proj
 
 	print("InfrastructureDevelopmentManager: restored %d active projects from save." % active_projects.size())
@@ -538,9 +555,12 @@ func get_all_active_projects() -> Array:
 			"starting_level": proj.starting_level,
 			"progress_percent": proj.get_progress_percent(),
 			"eta_days": proj.get_eta_days(),
+			"days_remaining": proj.days_remaining,
 			"is_sabotaged": proj.modifiers.has("sabotage") and float(proj.modifiers.get("sabotage", 0.0)) < -0.1,
 			"work_per_day": proj.get_current_work_per_day(),
-			"owner_tag": proj.owner_tag
+			"owner_tag": proj.owner_tag,
+			"tag": proj.owner_tag,
+			"kind": proj.axis
 		})
 	return result
 
@@ -810,6 +830,7 @@ func get_project_status(province_id: int) -> Dictionary:
 		"axis": proj.axis,
 		"progress": proj.progress,
 		"eta_days": proj.get_eta_days(),
+		"days_remaining": proj.days_remaining,
 		"work_per_day": proj.get_current_work_per_day(),
 		"target_level": proj.target_level,
 		"starting_level": proj.starting_level,
@@ -956,6 +977,175 @@ func ai_consider_daily_invests(ai_country_tags: Array = [], chance_per_country: 
 						print("InfrastructureDevelopmentManager: AI %s auto-started infra invest on #%d (ETA %s)" % [tag, pid, str(res.get("eta_days", "?"))])
 						break  # one per country per consider tick
 	return started
+
+
+## Interactive F5: at most one new AI infra project per day. Skip player tag.
+## Prefers low-infra owned land near capital or a live border. Reuses start APIs.
+func try_ai_start_infra_project(tag: String, day_index: int = 0) -> Dictionary:
+	if OS.get_environment("EOA_AI_INFRA").strip_edges() == "0":
+		return {"ok": true, "skipped": true, "started": false, "started_n": 0, "reason": "killswitch"}
+	var player := _player_tag_for_ai()
+	var chosen := tag.strip_edges().to_upper()
+	if chosen.is_empty():
+		chosen = _pick_ai_infra_tag(player, day_index)
+	if chosen.is_empty() or chosen == player:
+		return {"ok": true, "skipped": true, "started": false, "started_n": 0, "reason": "player", "tag": chosen}
+	if _ai_infra_budget_day == day_index and _ai_infra_starts_today >= 1:
+		return {"ok": true, "skipped": true, "started": false, "started_n": 0, "reason": "day_budget", "tag": chosen}
+	var pid := _pick_ai_infra_province(chosen)
+	if pid <= 0:
+		return {"ok": true, "started": false, "started_n": 0, "reason": "no_candidate", "tag": chosen}
+	var started := false
+	if has_method("try_start_infrastructure_investment"):
+		var res: Dictionary = try_start_infrastructure_investment(pid, chosen)
+		started = bool(res.get("success", false))
+	if not started:
+		var p: Province = MapManager.get_province(pid) if typeof(MapManager) != TYPE_NIL else null
+		if p != null and not has_active_project(pid):
+			var cap := _get_era_max(chosen, "infrastructure")
+			var tgt := clampi(int(p.infrastructure) + 1, 1, cap)
+			var proj: ProvincialProject = start_infrastructure_project(pid, tgt, chosen)
+			started = proj != null
+	if not started:
+		return {"ok": true, "started": false, "started_n": 0, "reason": "start_failed", "tag": chosen, "province_id": pid}
+	if _ai_infra_budget_day != day_index:
+		_ai_infra_budget_day = day_index
+		_ai_infra_starts_today = 0
+	_ai_infra_starts_today += 1
+	var live: ProvincialProject = get_active_project(pid)
+	if live != null and live.days_remaining <= 0:
+		live.days_remaining = maxi(1, live.get_eta_days())
+	return {
+		"ok": true,
+		"started": true,
+		"started_n": 1,
+		"tag": chosen,
+		"province_id": pid,
+		"pid": pid,
+		"kind": "infrastructure",
+		"days_remaining": live.days_remaining if live else 0,
+	}
+
+
+## Days-remaining clock. Completes via existing _complete_project and bumps infra +1 (clamp).
+func tick_active_projects(days: int = 1) -> Dictionary:
+	var n := maxi(int(days), 0)
+	var completed: Array = []
+	if n <= 0 or active_projects.is_empty():
+		return {"ok": true, "ticked": n, "completed": completed, "completed_n": 0}
+	var to_complete: Array = []
+	for pid_var in active_projects.keys():
+		var pid := int(pid_var)
+		var proj: ProvincialProject = active_projects[pid]
+		if proj == null or str(proj.status) != "active":
+			continue
+		if proj.days_remaining <= 0:
+			proj.days_remaining = maxi(1, proj.get_eta_days())
+		proj.days_remaining = maxi(0, proj.days_remaining - n)
+		if proj.days_remaining <= 0:
+			to_complete.append({"pid": pid, "proj": proj})
+	for item in to_complete:
+		var pid2 := int(item.pid)
+		var proj2: ProvincialProject = item.proj
+		if typeof(MapManager) != TYPE_NIL:
+			var p: Province = MapManager.get_province(pid2)
+			if p != null:
+				var cap := _get_era_max(proj2.owner_tag, proj2.axis if proj2.axis != "" else "infrastructure")
+				proj2.target_level = clampi(int(p.infrastructure) + 1, 1, cap)
+		_complete_project(pid2, proj2)
+		completed.append(pid2)
+	return {"ok": true, "ticked": n, "completed": completed, "completed_n": completed.size()}
+
+
+func _player_tag_for_ai() -> String:
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		var pt := str(LeaderManager.call("get_player_country_tag")).strip_edges().to_upper()
+		if not pt.is_empty():
+			return pt
+	if typeof(SessionPlayers) != TYPE_NIL:
+		for slot in SessionPlayers.slots:
+			if slot is Dictionary and str((slot as Dictionary).get("control", "")).to_lower() == "human":
+				var ht := str((slot as Dictionary).get("tag", "")).strip_edges().to_upper()
+				if not ht.is_empty():
+					return ht
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_player_tag"):
+		var gt := str(GameData.get_player_tag()).strip_edges().to_upper()
+		if not gt.is_empty():
+			return gt
+	return "GER"
+
+
+func _pick_ai_infra_tag(player: String, day_index: int) -> String:
+	var majors: Array = ["GER", "SOV", "JAP", "FRA", "ITA", "USA", "ENG", "POL"]
+	var n := majors.size()
+	if n <= 0:
+		return ""
+	var rot := posmod(int(day_index), n)
+	var ordered: Array = majors.slice(rot) + majors.slice(0, rot)
+	for raw in ordered:
+		var t := str(raw).to_upper()
+		if t.is_empty() or t == player:
+			continue
+		if _pick_ai_infra_province(t) > 0:
+			return t
+	return ""
+
+
+func _capital_pid_for_tag(tag: String) -> int:
+	var t := tag.strip_edges().to_upper()
+	if typeof(GameData) != TYPE_NIL and "countries" in GameData:
+		var raw: Variant = GameData.countries.get(t)
+		if raw is Dictionary:
+			return int((raw as Dictionary).get("capital_province_id", 0))
+		if raw != null and "capital_province_id" in raw:
+			return int(raw.capital_province_id)
+	return 0
+
+
+func _pick_ai_infra_province(tag: String) -> int:
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
+		return 0
+	var t := tag.strip_edges().to_upper()
+	var owned: Array = MapManager.get_provinces_by_owner(t)
+	if owned.is_empty():
+		return 0
+	var cap_pid := _capital_pid_for_tag(t)
+	var border: Dictionary = {}
+	if MapManager.has_method("collect_live_border_assault_targets"):
+		var fronts: Array = MapManager.collect_live_border_assault_targets(t, 8)
+		for raw in fronts:
+			if typeof(raw) != TYPE_DICTIONARY:
+				continue
+			var from_id := int((raw as Dictionary).get("from_province_id", 0))
+			if from_id > 0:
+				border[from_id] = true
+	var era_max := _get_era_max(t, "infrastructure")
+	var best_pid := 0
+	var best_score := -9999.0
+	for pid_var in owned:
+		var pid := int(pid_var)
+		if pid <= 0 or has_active_project(pid):
+			continue
+		var p: Province = MapManager.get_province(pid)
+		if p == null or bool(p.is_sea):
+			continue
+		var infra := int(p.infrastructure)
+		if infra >= era_max:
+			continue
+		var near_cap := pid == cap_pid
+		if not near_cap and cap_pid > 0 and MapManager.has_method("get_adjacent_provinces"):
+			var nbr: Array = MapManager.get_adjacent_provinces(cap_pid, true)
+			near_cap = nbr.has(pid)
+		var on_border := border.has(pid)
+		var score := float(12 - infra) * 2.0
+		if near_cap:
+			score += 8.0
+		if on_border:
+			score += 7.0
+		if score > best_score:
+			best_score = score
+			best_pid = pid
+	return best_pid
 
 
 func _count_active_projects_for(country_tag: String) -> int:

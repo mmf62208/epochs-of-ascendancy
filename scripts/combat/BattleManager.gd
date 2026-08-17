@@ -571,7 +571,8 @@ func start_land_battle(
 	return {"success": true, "instant": false, "opened": true, "battle": battle.duplicate()}
 
 
-## Interactive F5: at most one AI start_land_battle per day. Never execute_province_assault.
+## Interactive F5: at most one AI start_land_battle per day + 1 spare march + 1 follow-on.
+## Never execute_province_assault from this initiator (resolve-only stays on battle end).
 func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 	if OS.get_environment("EOA_AI_LAND_BATTLES").strip_edges() == "0":
 		return {"ok": true, "skipped": true, "reason": "killswitch", "started_n": 0}
@@ -610,6 +611,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 
 	var open_hexes: Array = []
 	var open_per_tag: Dictionary = {}
+	var combat_fids: Array = []
 	for raw in _open_land_battles:
 		if typeof(raw) != TYPE_DICTIONARY:
 			continue
@@ -619,8 +621,22 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 		var at := str(b.get("att_tag", "")).to_upper()
 		if not at.is_empty():
 			open_per_tag[at] = int(open_per_tag.get(at, 0)) + 1
+		for fid_v in _fid_list(b, "att_fids", "att_fid"):
+			combat_fids.append(str(fid_v))
+		for fid_v2 in _fid_list(b, "def_fids", "def_fid"):
+			combat_fids.append(str(fid_v2))
+
+	var marching_fids: Array = []
+	if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("list_marches"):
+		for raw_m in FormationMovement.list_marches():
+			if typeof(raw_m) != TYPE_DICTIONARY:
+				continue
+			var mid := str((raw_m as Dictionary).get("formation_id", "")).strip_edges()
+			if not mid.is_empty():
+				marching_fids.append(mid)
 
 	var opportunities: Array = []
+	var march_opps: Array = []
 	for i in range(scan_n):
 		var tag2 := str(candidates[i])
 		if not MapManager.has_method("collect_live_border_assault_targets"):
@@ -635,20 +651,77 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 			if to_id <= 0 or from_id <= 0:
 				continue
 			var preview: Dictionary = can_assault_province(tag2, to_id, from_id)
-			if not bool(preview.get("ok", false)):
-				continue
 			var fid := str(preview.get("formation_id", "")).strip_edges()
-			if fid.is_empty():
+			if bool(preview.get("ok", false)) and not fid.is_empty():
+				opportunities.append({
+					"tag": tag2,
+					"from_id": from_id,
+					"to_id": to_id,
+					"defender_tag": str(t.get("defender_tag", preview.get("defender_tag", ""))),
+					"formation_id": fid,
+					"has_formation": true,
+					"defender_power": float(t.get("defender_power", 80.0)),
+				})
 				continue
-			opportunities.append({
-				"tag": tag2,
-				"from_id": from_id,
-				"to_id": to_id,
-				"defender_tag": str(t.get("defender_tag", preview.get("defender_tag", ""))),
-				"formation_id": fid,
-				"has_formation": true,
-				"defender_power": float(t.get("defender_power", 80.0)),
-			})
+			# No adjacent formation: spare rear marches toward from_id (own-land dest).
+			var dest_own := false
+			if MapManager.has_method("get_province"):
+				var dp: Province = MapManager.get_province(from_id)
+				if dp != null and not bool(dp.is_sea):
+					dest_own = _province_controller_tag(dp) == tag2
+			if not dest_own:
+				continue
+			if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+				continue
+			var cap_pid := _capital_pid_for_tag(tag2)
+			var best_spare: Dictionary = {}
+			var best_rank := -1.0
+			for f in LeaderManager.get_formations_for_country(tag2):
+				if f == null:
+					continue
+				var ftype := str(f.formation_type) if "formation_type" in f else ""
+				if ftype != Formation.TYPE_DIVISION:
+					continue
+				var sfid := str(f.formation_id) if "formation_id" in f else ""
+				if sfid.is_empty():
+					continue
+				if marching_fids.has(sfid) or combat_fids.has(sfid):
+					continue
+				if "is_in_combat" in f and bool(f.is_in_combat):
+					continue
+				if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("has_march"):
+					if FormationMovement.has_march(sfid):
+						continue
+				var station := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+				if station <= 0 or station == from_id:
+					continue
+				var has_path := false
+				if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("find_own_land_path"):
+					var path: Array = FormationMovement.find_own_land_path(station, from_id, tag2)
+					has_path = path.size() >= 2
+				if not has_path:
+					continue
+				var at_cap := cap_pid > 0 and station == cap_pid
+				var rank := 2.0 if at_cap else 1.0
+				if rank > best_rank:
+					best_rank = rank
+					best_spare = {
+						"tag": tag2,
+						"from_id": station,
+						"dest_id": from_id,
+						"to_id": to_id,
+						"defender_tag": str(t.get("defender_tag", preview.get("defender_tag", ""))),
+						"formation_id": sfid,
+						"has_own_path": true,
+						"at_rear": true,
+						"at_capital": at_cap,
+						"dest_is_own_land": true,
+						"already_marching": false,
+						"in_combat": false,
+						"defender_power": float(t.get("defender_power", 80.0)),
+					}
+			if not best_spare.is_empty():
+				march_opps.append(best_spare)
 
 	var plan: Dictionary = LandBattleAi.plan_day(
 		opportunities, player_tag, int(day_index), open_hexes, open_per_tag, 1
@@ -673,13 +746,82 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 			})
 	if not started.is_empty():
 		print("BattleManager: AI opened %d land battle(s) (start_land_battle, day=%d)" % [started.size(), int(day_index)])
+
+	var marched: Array = []
+	if LandBattleAi.has_method("plan_marches"):
+		var mplan: Dictionary = LandBattleAi.plan_marches(
+			march_opps, player_tag, int(day_index), marching_fids, combat_fids, 1
+		)
+		for raw_mp in mplan.get("picks", []):
+			if typeof(raw_mp) != TYPE_DICTIONARY:
+				continue
+			var mp: Dictionary = raw_mp
+			if typeof(FormationMovement) == TYPE_NIL or not FormationMovement.has_method("enqueue_own_land_march"):
+				break
+			var enq: Dictionary = FormationMovement.enqueue_own_land_march(
+				str(mp.get("formation_id", "")),
+				int(mp.get("dest_id", -1)),
+				str(mp.get("tag", "")),
+			)
+			if bool(enq.get("ok", false)):
+				marched.append({
+					"tag": str(mp.get("tag", "")),
+					"dest_id": int(mp.get("dest_id", -1)),
+					"from_id": int(mp.get("from_id", -1)),
+					"formation_id": str(mp.get("formation_id", "")),
+				})
+	if not marched.is_empty():
+		print("BattleManager: AI marched %d spare(s) toward front (enqueue_own_land_march, day=%d)" % [marched.size(), int(day_index)])
+
+	var follow: Dictionary = try_ai_follow_on_after_win(player_tag)
 	return {
 		"ok": true,
 		"started_n": started.size(),
 		"started": started,
+		"marched_n": marched.size(),
+		"marched": marched,
+		"follow_on_n": int(follow.get("started_n", 0)),
 		"player_tag": player_tag,
 		"eligible_n": int(plan.get("eligible_n", 0)),
 	}
+
+
+func try_ai_follow_on_after_win(player_tag: String = "") -> Dictionary:
+	if OS.get_environment("EOA_AI_LAND_BATTLES").strip_edges() == "0":
+		return {"ok": true, "skipped": true, "reason": "killswitch", "started_n": 0}
+	if typeof(LandBattleAi) == TYPE_NIL or not LandBattleAi.has_method("plan_follow_on"):
+		return {"ok": false, "reason": "no planner", "started_n": 0}
+	var aar: Dictionary = peek_last_land_aar()
+	if aar.is_empty():
+		return {"ok": true, "started_n": 0}
+	var open_hexes: Array = []
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var b: Dictionary = raw
+		open_hexes.append(int(b.get("to_id", -1)))
+		open_hexes.append(int(b.get("from_id", -1)))
+	var plan: Dictionary = LandBattleAi.plan_follow_on(aar, player_tag, open_hexes, 1)
+	var picks: Array = plan.get("picks", [])
+	if picks.is_empty() or typeof(picks[0]) != TYPE_DICTIONARY:
+		return {"ok": true, "started_n": 0}
+	var pick: Dictionary = picks[0]
+	var opened: Dictionary = start_land_battle(
+		str(pick.get("tag", "")),
+		int(pick.get("to_id", -1)),
+		int(pick.get("from_id", -1)),
+		str(pick.get("formation_id", "")),
+	)
+	if bool(opened.get("success", false)):
+		clear_last_land_aar()
+		print("BattleManager: AI follow-on start_land_battle to=%d" % int(pick.get("to_id", -1)))
+		return {
+			"ok": true,
+			"started_n": 1,
+			"opened": bool(opened.get("opened", false)),
+			"result": opened,
+		}
+	return {"ok": true, "started_n": 0, "result": opened}
 
 
 func get_save_data() -> Dictionary:

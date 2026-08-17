@@ -12,12 +12,33 @@ from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-import numpy as np
+try:
+    import numpy as np
+except ImportError:  # pragma: no cover — lazy: constants/helpers stay importable
+    np = None  # type: ignore[assignment]
 
 try:
     from PIL import Image, ImageDraw
-except ImportError as exc:  # pragma: no cover
-    raise SystemExit("Pillow required for NE full align") from exc
+except ImportError:  # pragma: no cover — lazy: same as numpy
+    Image = None  # type: ignore[assignment]
+    ImageDraw = None  # type: ignore[assignment]
+
+_NE_DEPS_HINT = (
+    "numpy and Pillow are required for NE land-mask QC. "
+    "Install: python3 -m pip install --user -r tools/map_generation/requirements.txt"
+)
+
+
+def _require_numpy():
+    if np is None:
+        raise ImportError(_NE_DEPS_HINT)
+    return np
+
+
+def _require_pillow():
+    if Image is None or ImageDraw is None:
+        raise ImportError(_NE_DEPS_HINT)
+    return Image, ImageDraw
 
 Point = List[float]
 Ring = List[Point]
@@ -148,10 +169,12 @@ def rasterize_land_mask(
     height: int = 1024,
 ) -> np.ndarray:
     """Binary land mask (uint8 0/255) at reduced resolution for speed."""
+    numpy = _require_numpy()
+    pil_image, pil_draw = _require_pillow()
     w, h = int(width), int(height)
     cw, ch = WORLD_CANVAS
-    img = Image.new("L", (w, h), 0)
-    draw = ImageDraw.Draw(img)
+    img = pil_image.new("L", (w, h), 0)
+    draw = pil_draw.Draw(img)
     for ring in rings:
         if len(ring) < 3:
             continue
@@ -162,7 +185,7 @@ def rasterize_land_mask(
             pts.append((max(0, min(w - 1, mx)), max(0, min(h - 1, my))))
         if len(pts) >= 3:
             draw.polygon(pts, fill=255)
-    return np.asarray(img, dtype=np.uint8)
+    return numpy.asarray(img, dtype=numpy.uint8)
 
 
 def sample_mask(mask: np.ndarray, x: float, y: float) -> bool:

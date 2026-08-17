@@ -15,6 +15,18 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "scripts"))
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
+try:
+    import numpy  # noqa: F401
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+try:
+    from PIL import Image  # noqa: F401
+    HAS_PILLOW = True
+except ImportError:
+    HAS_PILLOW = False
+HAS_NE_QC = HAS_NUMPY and HAS_PILLOW
+
 from map_accuracy_qc import run_qc  # noqa: E402
 from ne_full_geometry_align import DEFAULT_NE_LAND  # noqa: E402
 
@@ -47,6 +59,11 @@ class TestWorldAccurateBoard(unittest.TestCase):
         }
         cls.own = json.loads((D / "province_ownership_1936.json").read_text()).get("owners") or {}
 
+    @unittest.skipUnless(
+        HAS_NE_QC,
+        "numpy+Pillow required for NE land-mask QC: "
+        "python3 -m pip install --user -r tools/map_generation/requirements.txt",
+    )
     def test_orphans_and_ne_land(self) -> None:
         report = run_qc(D, ne_path=Path(DEFAULT_NE_LAND), sample_limit=0)
         self.assertTrue(report.get("ok_hard"), report.get("errors"))
