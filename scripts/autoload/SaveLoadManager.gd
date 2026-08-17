@@ -434,6 +434,7 @@ func _gather_save_data() -> Dictionary:
 			"scenario_id": "1936",
 			"player_tag": "USA",
 			"play_time_seconds": 0,
+			"game_version": SAVE_GAME_VERSION,
 		},
 		"time": {},
 		"technology": {},
@@ -442,6 +443,9 @@ func _gather_save_data() -> Dictionary:
 		"supply": {},
 		"national_modifiers": {},
 		"leaders": {},
+		"infrastructure_projects": {},
+		"land_war": {"version": 1, "open_battles": [], "marches": {}, "next_seq": 1, "last_aar": {}},
+		"production": {},
 		"misc": {},
 	}
 
@@ -1269,6 +1273,22 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 		var empty_msg := "Save data empty (gather failed)"
 		push_error("SaveLoadManager: %s" % empty_msg)
 		return {"ok": false, "error": empty_msg, "path": path, "absolute_path": abs_path}
+	# Never write a partial mid-war blob: refuse a missing land_war key.
+	# Always emit the land_war {} shape (empty open_battles / marches are valid).
+	if not data.has("land_war") or typeof(data["land_war"]) != TYPE_DICTIONARY:
+		var missing_lw := "Save data missing land_war key (gather incomplete)"
+		push_error("SaveLoadManager: %s" % missing_lw)
+		return {"ok": false, "error": missing_lw, "path": path, "absolute_path": abs_path}
+	var lw_out: Dictionary = data["land_war"]
+	if not lw_out.has("open_battles") or typeof(lw_out["open_battles"]) != TYPE_ARRAY:
+		lw_out["open_battles"] = []
+	if not lw_out.has("marches") or typeof(lw_out["marches"]) != TYPE_DICTIONARY:
+		lw_out["marches"] = {}
+	if not lw_out.has("next_seq"):
+		lw_out["next_seq"] = 1
+	if not lw_out.has("last_aar") or typeof(lw_out.get("last_aar", null)) != TYPE_DICTIONARY:
+		lw_out["last_aar"] = {}
+	data["land_war"] = lw_out
 
 	var json_text := JSON.stringify(data, "\t")
 	if json_text.is_empty() or json_text == "null":

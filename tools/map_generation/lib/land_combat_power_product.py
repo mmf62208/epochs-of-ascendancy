@@ -18,11 +18,20 @@ ARMOR_MOUNTAIN = 0.85
 MOUNTAIN_INFANTRY_MOUNTAIN = 1.15
 READINESS_MIN = 0.3
 READINESS_MAX = 1.2
+LEADER_BONUS_SCALE = 1.0
+LEADER_BONUS_CAP = 0.25
+LEADER_DEFEND_ATTACK_SCALE = 0.6
 
 _ARMOR_TOKENS = ("armor", "armour", "panzer", "tank")
 _MOUNTAIN_TOKENS = ("mountain", "gebirg")
 
-_GD_FUNCS = ("template_kind", "template_speed", "combat_power")
+_GD_FUNCS = ("template_kind", "template_speed", "combat_power", "leader_power_mult")
+_ATTACK_KEYS = ("attack_modifier", "get_attack_modifier", "attack")
+_DEFENSE_KEYS = ("defense_modifier", "get_defense_modifier", "defense")
+_TERRAIN_KEYS = ("terrain_modifier", "get_terrain_modifier")
+_DEFEND_ROLES = ("defend", "defender", "defense", "def")
+_ATTACK_ROLES = ("attack", "attacker", "offense", "offence", "att")
+_DEFEND_MISSIONS = ("DEFEND", "GARRISON")
 
 
 def _clamp(v: float, lo: float, hi: float) -> float:
@@ -103,7 +112,80 @@ def _soft_attack(data: Mapping[str, Any]) -> Optional[float]:
         return None
 
 
-def combat_power(formation: Any, terrain: str = "plains") -> float:
+def _leader_blob(data: Mapping[str, Any]) -> Optional[Mapping[str, Any]]:
+    for key in ("assigned_leader", "leader"):
+        nested = data.get(key)
+        if isinstance(nested, Mapping):
+            return nested
+    return None
+
+
+def _read_opt(data: Mapping[str, Any], keys: List[str]) -> Optional[float]:
+    for k in keys:
+        if k in data and data.get(k) is not None:
+            try:
+                return float(data.get(k))
+            except (TypeError, ValueError):
+                continue
+    return None
+
+
+def _terrain_mod(blob: Mapping[str, Any], terrain: str) -> float:
+    direct = _read_opt(blob, list(_TERRAIN_KEYS))
+    if direct is not None:
+        return float(direct)
+    raw = blob.get("terrain")
+    if isinstance(raw, Mapping):
+        terr = _norm_terrain(terrain)
+        if terr in raw and raw.get(terr) is not None:
+            try:
+                return float(raw.get(terr))
+            except (TypeError, ValueError):
+                return 0.0
+    return 0.0
+
+
+def _resolve_combat_role(data: Optional[Mapping[str, Any]], role: str = "") -> str:
+    r = str(role or "").strip().lower()
+    if r in _DEFEND_ROLES:
+        return "defend"
+    if r in _ATTACK_ROLES:
+        return "attack"
+    if data is None:
+        return "attack"
+    if bool(data.get("is_defender")):
+        return "defend"
+    cr = str(data.get("combat_role") or data.get("role") or "").strip().lower()
+    if cr in _DEFEND_ROLES:
+        return "defend"
+    mission = str(data.get("current_land_mission") or "").strip().upper()
+    if mission in _DEFEND_MISSIONS:
+        return "defend"
+    return "attack"
+
+
+def leader_power_mult(formation: Any, terrain: str = "plains", role: str = "") -> float:
+    """1.0 + clamp(attack|defense * scale, 0, 0.25). No leader → 1.0."""
+    data = _as_map(formation)
+    if data is None:
+        return 1.0
+    blob = _leader_blob(data)
+    src: Mapping[str, Any] = blob if blob is not None else data
+    attack = _read_opt(src, list(_ATTACK_KEYS))
+    defense = _read_opt(src, list(_DEFENSE_KEYS))
+    has_leader = attack is not None or defense is not None or blob is not None
+    if not has_leader:
+        return 1.0
+    att = float(attack) if attack is not None else 0.0
+    if _resolve_combat_role(data, role) == "defend":
+        raw = float(defense) if defense is not None else att * LEADER_DEFEND_ATTACK_SCALE
+    else:
+        raw = att
+    raw += _terrain_mod(src, terrain)
+    return 1.0 + _clamp(raw * LEADER_BONUS_SCALE, 0.0, LEADER_BONUS_CAP)
+
+
+def combat_power(formation: Any, terrain: str = "plains", role: str = "") -> float:
     data = _as_map(formation)
     if data is None:
         return 0.0
@@ -123,6 +205,7 @@ def combat_power(formation: Any, terrain: str = "plains") -> float:
     soft = _soft_attack(data)
     if soft is not None:
         power *= 0.7 + 0.3 * soft
+    power *= leader_power_mult(data, terrain, role)
     return float(power)
 
 
@@ -176,11 +259,56 @@ def build_land_combat_power_product() -> Dict[str, Any]:
     else:
         fails.append("missing_formation_zero")
 
+    no_lead = leader_power_mult(inf)
+    if abs(no_lead - 1.0) < 1e-9:
+        passes.append("no_leader_mult_1")
+    else:
+        fails.append("no_leader_mult_1")
+
+    att_led = _full(design_id="infantry_division", attack_modifier=0.2)
+    att_mult = leader_power_mult(att_led)
+    if abs(att_mult - 1.2) < 1e-6:
+        passes.append("attack_0_2_about_1_2")
+    else:
+        fails.append("attack_0_2_about_1_2")
+
+    clamped = leader_power_mult(_full(design_id="infantry_division", attack_modifier=0.5))
+    if abs(clamped - 1.25) < 1e-6:
+        passes.append("leader_clamp_1_25")
+    else:
+        fails.append("leader_clamp_1_25")
+
+    def_mult = leader_power_mult(
+        _full(design_id="infantry_division", attack_modifier=0.2, defense_modifier=0.1),
+        "plains",
+        "defend",
+    )
+    if abs(def_mult - 1.1) < 1e-6:
+        passes.append("defender_uses_defense")
+    else:
+        fails.append("defender_uses_defense")
+
+    def_fb = leader_power_mult(att_led, "plains", "defend")
+    if abs(def_fb - (1.0 + 0.2 * LEADER_DEFEND_ATTACK_SCALE)) < 1e-6:
+        passes.append("defender_fallback_attack_0_6")
+    else:
+        fails.append("defender_fallback_attack_0_6")
+
+    led_power = combat_power(att_led, "plains")
+    if abs(led_power - inf_plains * 1.2) < 1e-6:
+        passes.append("combat_power_times_leader")
+    else:
+        fails.append("combat_power_times_leader")
+
     gd_src = LAND_COMBAT_POWER_GD.read_text(encoding="utf-8") if LAND_COMBAT_POWER_GD.is_file() else ""
     if _gd_has_helpers(gd_src):
         passes.append("gd_helpers")
     else:
         fails.append("gd_helpers")
+    if "static func leader_power_mult" in gd_src and "LEADER_BONUS_CAP" in gd_src:
+        passes.append("gd_leader_power_mult")
+    else:
+        fails.append("gd_leader_power_mult")
 
     ok = len(fails) == 0
     fixtures: Dict[str, Any] = {
@@ -190,6 +318,14 @@ def build_land_combat_power_product() -> Dict[str, Any]:
         "armor_mountain": arm_mtn,
         "mountain_infantry_mountain": mtn_mtn,
         "missing": missing,
+        "leader": {
+            "no_leader": no_lead,
+            "attack_0_2": att_mult,
+            "clamp": clamped,
+            "defend": def_mult,
+            "defend_fallback": def_fb,
+            "combat_power_with_leader": led_power,
+        },
         "kinds": {
             "infantry": template_kind(inf),
             "armor": template_kind(arm),
@@ -209,7 +345,7 @@ def build_land_combat_power_product() -> Dict[str, Any]:
         "fixtures": fixtures,
         "summary": "land_combat_power · %s · pass=%d fail=%d"
         % ("PASS" if ok else "FAIL", len(passes), len(fails)),
-        "policy": "base_100_org_str_ready_armor_1.5_plains_0.85_mtn_mtninf_1.15",
+        "policy": "base_100_org_str_ready_armor_1.5_plains_0.85_mtn_mtninf_1.15_leader_1_plus_clamp_0_25",
         "integration": [
             "land_combat_power_product",
             "LandCombatPower.gd",

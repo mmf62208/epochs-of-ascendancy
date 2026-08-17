@@ -111,6 +111,7 @@ run_step unit_save_path \
     tools.map_generation.tests.test_save_browser_campaign_product \
     tools.map_generation.tests.test_save_resume_primary_command_product \
     tools.map_generation.tests.test_autosave_session_primary_command_product \
+    tools.map_generation.tests.test_long_session_save_product \
     -v || fail
 
 run_step map_qc \

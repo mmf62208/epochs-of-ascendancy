@@ -12,9 +12,12 @@ sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 from land_combat_power_product import (  # noqa: E402
     ARMOR_SPEED,
     INFANTRY_SPEED,
+    LEADER_BONUS_CAP,
+    LEADER_DEFEND_ATTACK_SCALE,
     build_land_combat_power_product,
     combat_power,
     land_combat_power_integrity,
+    leader_power_mult,
     template_kind,
     template_speed,
 )
@@ -65,6 +68,49 @@ class TestLandCombatPowerProduct(unittest.TestCase):
         self.assertEqual(template_speed(_form("armor_division")), ARMOR_SPEED)
         self.assertEqual(template_speed(_form("mountain_infantry")), INFANTRY_SPEED)
 
+    def test_no_leader_mult_is_one(self) -> None:
+        self.assertAlmostEqual(leader_power_mult(_form("infantry_division")), 1.0)
+
+    def test_attack_0_2_is_about_1_2(self) -> None:
+        self.assertAlmostEqual(
+            leader_power_mult(_form("infantry_division", attack_modifier=0.2)),
+            1.2,
+            places=5,
+        )
+
+    def test_leader_bonus_clamps_at_1_25(self) -> None:
+        self.assertAlmostEqual(
+            leader_power_mult(_form("infantry_division", attack_modifier=0.5)),
+            1.0 + LEADER_BONUS_CAP,
+        )
+        self.assertAlmostEqual(
+            leader_power_mult(_form("infantry_division", leader={"attack": 0.9})),
+            1.25,
+        )
+
+    def test_defender_uses_defense_else_attack_scaled(self) -> None:
+        self.assertAlmostEqual(
+            leader_power_mult(
+                _form("infantry_division", attack_modifier=0.2, defense_modifier=0.1),
+                "plains",
+                "defend",
+            ),
+            1.1,
+        )
+        self.assertAlmostEqual(
+            leader_power_mult(
+                _form("infantry_division", attack_modifier=0.2),
+                "plains",
+                "defend",
+            ),
+            1.0 + 0.2 * LEADER_DEFEND_ATTACK_SCALE,
+        )
+
+    def test_combat_power_multiplies_leader(self) -> None:
+        base = combat_power(_form("infantry_division"), "plains")
+        led = combat_power(_form("infantry_division", attack_modifier=0.2), "plains")
+        self.assertAlmostEqual(led, base * 1.2)
+
     def test_gd_helper_file(self) -> None:
         path = ROOT / "scripts" / "combat" / "LandCombatPower.gd"
         self.assertTrue(path.is_file())
@@ -73,6 +119,15 @@ class TestLandCombatPowerProduct(unittest.TestCase):
         self.assertIn("static func template_kind", src)
         self.assertIn("static func template_speed", src)
         self.assertIn("static func combat_power", src)
+        self.assertIn("static func leader_power_mult", src)
+        self.assertIn("LEADER_BONUS_CAP", src)
+        self.assertIn("get_attack_modifier", src)
+        self.assertIn("get_defense_modifier", src)
+        form = ROOT / "scripts" / "formations" / "Formation.gd"
+        self.assertTrue(form.is_file())
+        fsrc = form.read_text(encoding="utf-8")
+        self.assertIn("assigned_leader_id", fsrc)
+        self.assertIn("assigned_leader", fsrc)
 
 
 if __name__ == "__main__":

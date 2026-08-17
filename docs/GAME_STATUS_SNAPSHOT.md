@@ -46,6 +46,8 @@ Every Cursor / Grok / human session on this tree:
 - **L1 after-action (machine):** fight end writes one line (`Took X · N days · loss — Press Y next?`). NEXT chip starts the follow-on assault. Board **~3520**.
 - **L1 AI battle start (machine):** budgeted **1** `start_land_battle` / day on a live border (personality + vs-player bonus). Never `execute_province_assault`. Killswitch `EOA_AI_LAND_BATTLES=0`. Full `simulate_daily_ai_combat` stays off in F5.
 - **L1 land_war save (machine):** `SaveLoadManager` blob `land_war` round-trips open battles (org/stance/days) + march queues + last AAR. Legacy saves without the key stay empty-ok.
+- **L1 long-session save (machine):** `validate_long_session_save` requires metadata/time/map/leaders/infra/land_war/production. Gather always emits `land_war` shape; `save_game_detailed` refuses a missing key. `is_in_combat` already on leaders.
+- **L1 leader in live land battle (machine):** `LandCombatPower.leader_power_mult` +0–25% from assigned commander (attack; defend uses defense or attack×0.6). No leader = 1.0.
 
 **Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3.
 

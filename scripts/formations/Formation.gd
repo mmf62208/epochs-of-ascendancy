@@ -122,6 +122,12 @@ var planning: float = 0.0
 var entrenchment: float = 0.0
 
 var assigned_leader: Leader = null
+## Alias of leader_id for LandCombatPower commander lookup (not separately persisted).
+var assigned_leader_id: String:
+	get:
+		return leader_id
+	set(value):
+		leader_id = str(value)
 
 
 func has_leader() -> bool:

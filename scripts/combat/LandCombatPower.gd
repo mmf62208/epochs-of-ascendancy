@@ -13,6 +13,8 @@ const ARMOR_MOUNTAIN := 0.85
 const MOUNTAIN_INFANTRY_MOUNTAIN := 1.15
 const READINESS_MIN := 0.3
 const READINESS_MAX := 1.2
+const LEADER_BONUS_SCALE := 1.0
+const LEADER_BONUS_CAP := 0.25
 
 
 static func template_kind(formation: Object) -> String:
@@ -33,7 +35,7 @@ static func template_speed(formation: Object) -> float:
 	return INFANTRY_SPEED
 
 
-static func combat_power(formation: Object, terrain: String = "plains") -> float:
+static func combat_power(formation: Object, terrain: String = "plains", role: String = "") -> float:
 	if formation == null:
 		return 0.0
 	var org := _prop_f(formation, ["organization", "org"], 1.0)
@@ -52,7 +54,27 @@ static func combat_power(formation: Object, terrain: String = "plains") -> float
 	var soft = _try_template_soft_attack(formation)
 	if soft != null:
 		power *= 0.7 + 0.3 * float(soft)
+	power *= leader_power_mult(formation, terrain, role)
 	return float(power)
+
+
+## 1.0 + clamp(attack|defense * scale, 0, 0.25). Attacker=attack; defender=defense else attack*0.6
+static func leader_power_mult(formation: Object, terrain: String = "plains", role: String = "") -> float:
+	if formation == null:
+		return 1.0
+	var mods := _leader_mods(formation, terrain)
+	if not bool(mods.get("has_leader", false)):
+		return 1.0
+	var raw := 0.0
+	if _resolve_combat_role(formation, role) == "defend":
+		if bool(mods.get("has_defense", false)):
+			raw = float(mods.get("defense", 0.0))
+		else:
+			raw = float(mods.get("attack", 0.0)) * 0.6
+	else:
+		raw = float(mods.get("attack", 0.0))
+	raw += float(mods.get("terrain", 0.0))
+	return 1.0 + clampf(raw * LEADER_BONUS_SCALE, 0.0, LEADER_BONUS_CAP)
 
 
 static func _identity_blob(formation: Object) -> String:
@@ -93,6 +115,112 @@ static func _prop_f(obj: Object, names: Array, fallback: float) -> float:
 		if key in obj:
 			return float(obj.get(key))
 	return fallback
+
+
+static func _prop_opt(obj: Object, names: Array) -> Variant:
+	if obj == null:
+		return null
+	for n in names:
+		var key := str(n)
+		if key in obj:
+			return float(obj.get(key))
+	return null
+
+
+static func _resolve_combat_role(formation: Object, role: String) -> String:
+	var r := str(role).strip_edges().to_lower()
+	if r in ["defend", "defender", "defense", "def"]:
+		return "defend"
+	if r in ["attack", "attacker", "offense", "offence", "att"]:
+		return "attack"
+	if formation == null:
+		return "attack"
+	if "is_defender" in formation and bool(formation.get("is_defender")):
+		return "defend"
+	var cr := ""
+	if "combat_role" in formation:
+		cr = str(formation.get("combat_role"))
+	elif "role" in formation:
+		cr = str(formation.get("role"))
+	var crl := cr.strip_edges().to_lower()
+	if crl in ["defend", "defender", "defense", "def"]:
+		return "defend"
+	var mission := ""
+	if "current_land_mission" in formation:
+		mission = str(formation.get("current_land_mission")).strip_edges().to_upper()
+	if mission in ["DEFEND", "GARRISON"]:
+		return "defend"
+	return "attack"
+
+
+static func _leader_from_formation(formation: Object) -> Object:
+	if formation == null:
+		return null
+	if "assigned_leader" in formation:
+		var assigned = formation.get("assigned_leader")
+		if assigned != null and typeof(assigned) == TYPE_OBJECT:
+			return assigned
+	if "leader" in formation:
+		var nested = formation.get("leader")
+		if nested != null and typeof(nested) == TYPE_OBJECT:
+			return nested
+	var lid := ""
+	if "assigned_leader_id" in formation:
+		lid = str(formation.get("assigned_leader_id")).strip_edges()
+	if lid.is_empty() and "leader_id" in formation:
+		lid = str(formation.get("leader_id")).strip_edges()
+	if typeof(LeaderManager) != TYPE_NIL:
+		if not lid.is_empty() and LeaderManager.has_method("get_leader"):
+			var by_id = LeaderManager.get_leader(lid)
+			if by_id != null:
+				return by_id
+		if "formation_id" in formation and LeaderManager.has_method("get_leader_for_army"):
+			var by_army = LeaderManager.get_leader_for_army(str(formation.get("formation_id")))
+			if by_army != null:
+				return by_army
+	return null
+
+
+static func _leader_mods(formation: Object, terrain: String) -> Dictionary:
+	var out := {
+		"has_leader": false,
+		"has_defense": false,
+		"attack": 0.0,
+		"defense": 0.0,
+		"terrain": 0.0,
+	}
+	var leader: Object = _leader_from_formation(formation)
+	var src: Object = leader if leader != null else formation
+	if src == null:
+		return out
+	var attack: Variant = null
+	var defense: Variant = null
+	if src.has_method("get_attack_modifier"):
+		attack = float(src.call("get_attack_modifier"))
+		out["has_leader"] = true
+	else:
+		attack = _prop_opt(src, ["attack_modifier", "attack"])
+	if src.has_method("get_defense_modifier"):
+		defense = float(src.call("get_defense_modifier"))
+		out["has_defense"] = true
+		out["has_leader"] = true
+	else:
+		defense = _prop_opt(src, ["defense_modifier", "defense"])
+		if defense != null:
+			out["has_defense"] = true
+	if attack != null:
+		out["attack"] = float(attack)
+		out["has_leader"] = true
+	if defense != null:
+		out["defense"] = float(defense)
+		out["has_leader"] = true
+	if src.has_method("get_terrain_modifier"):
+		out["terrain"] = float(src.call("get_terrain_modifier", terrain))
+	else:
+		var tmod = _prop_opt(src, ["terrain_modifier"])
+		if tmod != null:
+			out["terrain"] = float(tmod)
+	return out
 
 
 static func _try_template_soft_attack(formation: Object) -> Variant:
