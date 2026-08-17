@@ -78,6 +78,10 @@ def build_calendar_autosave_product() -> Dict[str, Any]:
         passes.append("sl_writes_autosave")
     else:
         fails.append("sl_writes_autosave")
+    if day_fn and "show_toast" in day_fn and "Autosaved" in day_fn:
+        passes.append("sl_toast")
+    else:
+        fails.append("sl_toast")
     if "EOA_CALENDAR_AUTOSAVE" in sl:
         passes.append("killswitch")
     else:

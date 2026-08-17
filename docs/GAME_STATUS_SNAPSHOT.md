@@ -54,6 +54,7 @@ Every Cursor / Grok / human session on this tree:
 - **L1 7-day autosave (machine):** `game_day_advanced` writes `autosave` every 7 elapsed days (1936 20–60d never hits a year tick). Year + quit still fire. Killswitch `EOA_CALENDAR_AUTOSAVE=0`.
 - **L1 strength trickle (machine):** out-of-combat +0.03 strength/day (≈3 weeks 0.40→1.0). In combat: no replacements.
 - **L1 type letter (machine):** chip shows **I** / **A** / **M** from template (no new art).
+- **L1 formation combat save (machine):** LeaderManager persists combat_experience + planning + entrenchment (and land mission). Mid-campaign load no longer resets XP/trench. Calendar autosave toasts “Autosaved · day N”.
 
 **Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3.
 

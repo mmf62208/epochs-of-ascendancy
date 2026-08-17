@@ -9,6 +9,8 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
+> **2026-08-17 formation combat save:** LeaderManager now persists combat_experience / planning / entrenchment / land mission. Calendar autosave toasts day N. Next: human M6 notes.
+>
 > **2026-08-17 7-day autosave + strength trickle + type letter:** Calendar autosave every 7 days (1936 20–60d never hits year tick). Out-of-combat strength +0.03/day. Chip I/A/M from template. Next: human M6 notes.
 >
 > **2026-08-16 L1 campaign + infra + gates:** Five parallel agents. AI spare march-to-front + follow-on start; AI infra invest 1/day; long-session save contract; leader +0–25% in live land power; `--quick` **ALL PASSED** via `tools/map_generation/.venv` (numpy/Pillow). Soft 30fps still FAIL honest. Next: human §0b / M6 20d notes.

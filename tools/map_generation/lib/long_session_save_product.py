@@ -271,6 +271,11 @@ def shipped_save_integrity() -> Dict[str, Any]:
         passes.append("leaders_load_is_in_combat_additive")
     else:
         fails.append("leaders_load_is_in_combat_additive")
+    for key in ("combat_experience", "planning", "entrenchment"):
+        if get_body and key in get_body and apply_body and 'get("%s"' % key in apply_body:
+            passes.append("leaders_save_%s" % key)
+        else:
+            fails.append("leaders_save_%s" % key)
 
     ok = len(fails) == 0
     return {

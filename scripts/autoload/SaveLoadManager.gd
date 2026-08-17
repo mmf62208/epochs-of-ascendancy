@@ -170,6 +170,8 @@ func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 
 	var res := save_game_detailed("autosave")
 	if res.get("ok", false):
 		print("SaveLoadManager: Calendar autosave day=%d -> autosave.json" % elapsed)
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast("Autosaved · day %d" % elapsed, 2.0)
 	else:
 		push_warning("SaveLoadManager: Calendar autosave failed: %s" % res.get("error", "unknown"))
 

@@ -3179,6 +3179,10 @@ func get_save_data() -> Dictionary:
 			"organization": f.organization,
 			"readiness": f.readiness,
 			"strength": f.strength,
+			"combat_experience": float(f.combat_experience) if "combat_experience" in f else 48.0,
+			"planning": float(f.planning) if "planning" in f else 0.0,
+			"entrenchment": float(f.entrenchment) if "entrenchment" in f else 0.0,
+			"current_land_mission": str(f.current_land_mission) if "current_land_mission" in f else "",
 		}
 
 	return {
@@ -3285,6 +3289,14 @@ func apply_save_data(data: Dictionary) -> void:
 			f.organization = float(fd.get("organization", 1.0))
 			f.readiness = float(fd.get("readiness", 1.0))
 			f.strength = float(fd.get("strength", 1.0))
+			if "combat_experience" in f:
+				f.combat_experience = float(fd.get("combat_experience", 48.0))
+			if "planning" in f:
+				f.planning = float(fd.get("planning", 0.0))
+			if "entrenchment" in f:
+				f.entrenchment = float(fd.get("entrenchment", 0.0))
+			if "current_land_mission" in f and str(fd.get("current_land_mission", "")).strip_edges() != "":
+				f.current_land_mission = str(fd.get("current_land_mission"))
 			formations[f.formation_id] = f
 		print("LeaderManager: Restored %d formation locations" % fdata.size())
 
