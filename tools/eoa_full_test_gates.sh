@@ -125,6 +125,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_land_battle_ai_init_product \
     tools.map_generation.tests.test_land_war_save_product \
     tools.map_generation.tests.test_land_battle_ai_campaign_product \
+    tools.map_generation.tests.test_unit_recovery_replenish_product \
     -v || fail
 
 run_step unit_save_path \
@@ -135,6 +136,7 @@ run_step unit_save_path \
     tools.map_generation.tests.test_autosave_session_primary_command_product \
     tools.map_generation.tests.test_long_session_save_product \
     tools.map_generation.tests.test_infra_ai_invest_product \
+    tools.map_generation.tests.test_calendar_autosave_product \
     -v || fail
 
 run_step map_qc \

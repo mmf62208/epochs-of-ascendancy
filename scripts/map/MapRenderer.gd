@@ -18872,6 +18872,30 @@ func _make_unit_nation_frame(col: Color) -> Node2D:
 	return root
 
 
+## I / A / M from fielded template — no new art, readable at compact zoom.
+func _unit_type_letter(formation: Object) -> String:
+	var kind := "infantry"
+	if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("template_kind"):
+		kind = str(LandCombatPower.template_kind(formation))
+	var k := kind.strip_edges().to_lower()
+	if "armor" in k or "armour" in k or "panzer" in k:
+		return "A"
+	if "mountain" in k or "gebirg" in k:
+		return "M"
+	return "I"
+
+
+func _make_unit_type_letter(letter: String) -> Label:
+	var lab := Label.new()
+	lab.name = "TypeLetter"
+	lab.text = letter if not letter.is_empty() else "I"
+	lab.position = Vector2(-8, -12)
+	lab.add_theme_font_size_override("font_size", 16)
+	lab.add_theme_color_override("font_color", Color(0.95, 0.96, 0.92, 0.96))
+	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	return lab
+
+
 ## HOI-style nation color plate behind the NATO glyph (readable at compact zoom).
 func _make_unit_nation_plate(col: Color) -> ColorRect:
 	var plate := ColorRect.new()
@@ -18926,9 +18950,14 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 	if old_bars != null:
 		counter.remove_child(old_bars)
 		old_bars.free()
+	var old_letter := counter.get_node_or_null("TypeLetter")
+	if old_letter != null:
+		counter.remove_child(old_letter)
+		old_letter.free()
 	var plate := _make_unit_nation_plate(nation_col)
 	counter.add_child(plate)
 	counter.move_child(plate, 0)
+	counter.add_child(_make_unit_type_letter(_unit_type_letter(ff)))
 	var org_v := 1.0
 	var str_v := 1.0
 	if ff != null:

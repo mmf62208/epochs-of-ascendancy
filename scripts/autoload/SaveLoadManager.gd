@@ -151,10 +151,27 @@ func _ready() -> void:
 	_ensure_save_dir()
 	print("SaveLoadManager: Initialized (JSON format v%d, user://saves/)" % SAVE_VERSION)
 
-	# Simple autosave on year boundary (pragmatic for testing/play sessions)
+	# Year boundary + every 7 calendar days (20–60d 1936 never hits a year tick).
 	if typeof(TimeManager) != TYPE_NIL:
 		if not TimeManager.game_year_advanced.is_connected(_on_year_advanced_for_autosave):
 			TimeManager.game_year_advanced.connect(_on_year_advanced_for_autosave)
+		if TimeManager.has_signal("game_day_advanced") \
+				and not TimeManager.game_day_advanced.is_connected(_on_day_advanced_for_autosave):
+			TimeManager.game_day_advanced.connect(_on_day_advanced_for_autosave)
+
+func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 0) -> void:
+	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
+		return
+	var elapsed := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		elapsed = int(TimeManager.get_total_days_elapsed())
+	if elapsed <= 0 or (elapsed % 7) != 0:
+		return
+	var res := save_game_detailed("autosave")
+	if res.get("ok", false):
+		print("SaveLoadManager: Calendar autosave day=%d -> autosave.json" % elapsed)
+	else:
+		push_warning("SaveLoadManager: Calendar autosave failed: %s" % res.get("error", "unknown"))
 
 func _on_year_advanced_for_autosave(_year: int) -> void:
 	# Autosave to a fixed slot; keeps only the latest autosave for simplicity.

@@ -109,6 +109,18 @@ def build_unit_counter_chrome_product(*, check_wiring: bool = True) -> Dict[str,
     else:
         fails.append("chrome_on_rebuild")
 
+    letter_ok = (
+        "func _unit_type_letter" in ren
+        and "func _make_unit_type_letter" in ren
+        and "TypeLetter" in ren
+        and "_make_unit_type_letter" in attach_fn
+    )
+    wiring["type_letter"] = letter_ok
+    if letter_ok:
+        passes.append("type_letter")
+    else:
+        fails.append("type_letter")
+
     popup = _gd_func_slice(ren, "_show_unit_detail_popup")
     dock_ok = bool(popup) and (
         "unit_card_dock" in popup or "UNIT_CARD_DOCK" in popup

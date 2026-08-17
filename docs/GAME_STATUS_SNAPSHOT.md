@@ -1,6 +1,6 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-16 (L1 land loop + **AI campaign** + **AI infra invest** + long-session save · `--quick` green with map venv · board ~3520 · M6 human-only open)  
+**Date:** 2026-08-17 (L1 land loop + AI campaign/infra + **7-day autosave** + **strength trickle** + type letter · `--quick` green · board ~3520 · M6 human-only open)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
 **How to keep going:** 5-step protocol in §0. Next human: F5 §0b 3–15 + a 20d unpause (M6 notes). Next machine: only playtest-driven shipped-path fixes. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
@@ -28,7 +28,7 @@ Every Cursor / Grok / human session on this tree:
 |------|--------|
 | **Human** | `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · play §0b items **3–15** · zoom Maginot · pick a pin on `710173` (gold chip, no inspector) · append session notes. M6 20d/60d still open after that. |
 | **Machine** | `--quick` **PASS** (venv numpy/Pillow). Remaining machine: Godot headless on a 4.7.1 host. Soft 30fps still FAIL honest. |
-| **GitHub** | Branch `eoa/l1-war-loop-slice` @ `a1d63bf` pushed. Do not force-push over June Cursor history. |
+| **GitHub** | Branch `eoa/l1-war-loop-slice` (this stack). Do not force-push over June Cursor history. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
 
@@ -51,6 +51,9 @@ Every Cursor / Grok / human session on this tree:
 - **L1 AI campaign (machine):** spare rear `enqueue_own_land_march` to a live-border `from_id` (1/day) + one follow-on `start_land_battle` after attacker AAR. Still never `execute_province_assault`.
 - **L1 AI infra invest (machine):** 1 new project/day (`try_ai_start_infra_project`); daily `advance_daily_projects` + `days_remaining`; complete bumps infra +1. Killswitch `EOA_AI_INFRA=0`. Player Invest button unchanged.
 - **Gates host (machine):** `tools/map_generation/.venv` + requirements numpy/Pillow. `--quick` uses that Python. Missing deps fail with a one-line install hint. Soft 30fps still **FAIL** honest (~29.4).
+- **L1 7-day autosave (machine):** `game_day_advanced` writes `autosave` every 7 elapsed days (1936 20–60d never hits a year tick). Year + quit still fire. Killswitch `EOA_CALENDAR_AUTOSAVE=0`.
+- **L1 strength trickle (machine):** out-of-combat +0.03 strength/day (≈3 weeks 0.40→1.0). In combat: no replacements.
+- **L1 type letter (machine):** chip shows **I** / **A** / **M** from template (no new art).
 
 **Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3.
 
