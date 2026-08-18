@@ -199,8 +199,8 @@ func _collect_routes() -> Array:
 			out.append(plan)
 			if out.size() >= max_routes:
 				break
-	if out.is_empty() and typeof(MapManager) != TYPE_NIL:
-		# Fallback synthetic corridors from contested pairs (cheap visual proof)
+	if out.is_empty() and typeof(MapManager) != TYPE_NIL and _province_count < 3000:
+		# Fallback synthetic corridors — skip on world_accurate (get_contested_provinces walks 3520).
 		var contested: Dictionary = {}
 		if MapManager.has_method("get_contested_provinces"):
 			contested = MapManager.get_contested_provinces()
@@ -256,18 +256,25 @@ func _draw_arrow_head(pos: Vector2, dir: Vector2, col: Color) -> void:
 
 
 func _draw_chokepoints() -> void:
-	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("has_strategic_chokepoint"):
+	if typeof(MapManager) == TYPE_NIL:
 		return
 	var n := 0
-	for pid_v in _centroids.keys():
+	# Never iterate all 3520 centroids. Prefer the painted choke list if present.
+	var choke_ids: Array = []
+	if MapManager.has_method("get_naval_chokepoint_provinces"):
+		choke_ids = MapManager.get_naval_chokepoint_provinces()
+	elif "naval_chokepoints" in MapManager:
+		choke_ids = MapManager.naval_chokepoints
+	for pid_v in choke_ids:
 		if n >= 16:
 			break
 		var pid := int(pid_v)
-		if MapManager.has_strategic_chokepoint(pid):
-			var c: Vector2 = _centroids[pid]
-			draw_arc(c, 10.0, 0.0, TAU, 16, Color(0.3, 0.7, 1.0, 0.55), 1.6, true)
-			draw_circle(c, 3.0, Color(0.5, 0.85, 1.0, 0.7))
-			n += 1
+		if not _centroids.has(pid):
+			continue
+		var c: Vector2 = _centroids[pid]
+		draw_arc(c, 10.0, 0.0, TAU, 16, Color(0.3, 0.7, 1.0, 0.55), 1.6, true)
+		draw_circle(c, 3.0, Color(0.5, 0.85, 1.0, 0.7))
+		n += 1
 
 
 ## CP3: draw story glyphs per active EquipmentFlow, LOD-aware (aggregate at strategic).

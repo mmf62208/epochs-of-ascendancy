@@ -17825,8 +17825,7 @@ func ensure_equipment_flow_glyphs_on() -> Dictionary:
 	show_equipment_flow_glyphs = true
 	if not show_strategic_flow_overlay:
 		show_strategic_flow_overlay = true
-	# Defer overlay build — sync setup froze Shift+I on world_accurate (~3520).
-	call_deferred("_setup_strategic_flow_layer")
+	# Do not sync-build overlay from WarLoop helper (hang on world_accurate).
 	return get_equipment_flow_glyph_query()
 
 
@@ -17931,8 +17930,9 @@ func show_first_session_war_path(country_tag: String = "") -> Dictionary:
 		lines.append(toast)
 		lines.append("WarLoop: B fronts · I flow · G corridor · Ctrl+click assault")
 		_map_mode_toolbar.call("set_fronts_legend", "\n".join(lines))
-	print("MapRenderer: WarLoop toast · %s · fronts=%d (flow overlay deferred)" % [tag, n_fronts])
-	call_deferred("_setup_strategic_flow_layer")
+	print("MapRenderer: WarLoop toast · %s · fronts=%d (no flow overlay — press I later)" % [tag, n_fronts])
+	# Do not build StrategicFlowOverlay here. Deferred setup still froze the next frame
+	# on world_accurate (get_contested_provinces + first _draw). I-toggle is the flow surface.
 	return result
 
 
