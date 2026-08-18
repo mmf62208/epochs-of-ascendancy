@@ -3163,6 +3163,14 @@ func _deferred_grand_visuals_and_setup() -> void:
 		print("TestRunner: [DEFER] NATO symbols + early data-tied objects + city layer objects now in deferred heavy func (see new/updated defer + [PHASE4 VIS] prints).")
 		print("TestRunner: [DEFER] Infra demo upgrades/builds/edits + special sites (airfield etc) + data-tied heavy + layer counts now deferred (new defer + Phase4 prints updated).")
 
+	# world_accurate F5: phase1 seed block never runs. Park Maginot chips after Europe frame.
+	if (
+		not _wants_headless_evidence()
+		and map_renderer
+		and map_renderer.has_method("ensure_playable_front_chips")
+	):
+		map_renderer.call("ensure_playable_front_chips", true)
+
 	# Final safety hide if loading screen still up (e.g. non-heavy path or orphaned node).
 	_ensure_game_interactive()
 

@@ -12481,8 +12481,12 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 	_rebuild_region_highlight()
 	if _map_minimap != null and is_instance_valid(_map_minimap) and _map_minimap.has_method("invalidate_political_cache"):
 		_map_minimap.call("invalidate_political_cache")
-	_update_unit_icons_for_test()  # demo: show generated NATO icons on provinces that have the test formations spawned in TestRunner/DebugOverlay loads
-	_sync_unit_counter_visibility()  # strategic zoom starts clean (pins off until zoom in / Shift+U)
+	# Park GER/FRA on Maginot then draw chips (spawn already ran in ScenarioLoader).
+	if has_method("ensure_playable_front_chips"):
+		ensure_playable_front_chips(false)
+	else:
+		_update_unit_icons_for_test()
+	_sync_unit_counter_visibility()
 	call_deferred("_rebuild_province_mesh_layer")
 	call_deferred("_sync_batched_mesh_fills", true)
 
@@ -21521,7 +21525,7 @@ func _update_unit_icons_for_test() -> void:
 
 
 ## Park GER/FRA land on the Maginot edge so F5 has pickable strength chips.
-func ensure_playable_front_chips() -> Dictionary:
+func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	const GER_FRONT := 710173
 	const FRA_FRONT := 710739
 	var result := {"ok": false, "ger": 0, "fra": 0, "ger_pid": GER_FRONT, "fra_pid": FRA_FRONT}
@@ -21575,7 +21579,7 @@ func ensure_playable_front_chips() -> Dictionary:
 	_sync_unit_counter_scales()
 	result["ok"] = int(result["ger"]) > 0
 	var graphical := DisplayServer.get_name() != "headless"
-	if graphical and bool(result["ok"]):
+	if graphical and bool(result["ok"]) and focus_camera:
 		_center_camera_on_province(GER_FRONT, "soft")
 		_toast_easy_unit_orders()
 	print(
