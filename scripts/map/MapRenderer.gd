@@ -18431,10 +18431,19 @@ func _ensure_supply_overlay_panel() -> void:
 
 
 func _player_tag() -> String:
+	# Prefer the explicit LeaderManager player (F5 sets GER). Unset falls through
+	# to SupplyManager, then Maginot default — never treat empty as USA.
+	if typeof(LeaderManager) != TYPE_NIL:
+		if "player_country_tag" in LeaderManager:
+			var raw := str(LeaderManager.player_country_tag).strip_edges().to_upper()
+			if not raw.is_empty():
+				return raw
 	var sm := _supply_manager()
-	if sm != null and sm.get("player_tag"):
-		return str(sm.player_tag).strip_edges().to_upper()
-	return ""
+	if sm != null:
+		var st := str(sm.get("player_tag")).strip_edges().to_upper()
+		if not st.is_empty():
+			return st
+	return "GER"
 
 
 func _supply_manager() -> Node:
@@ -18990,11 +18999,11 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 	var str_lab := Label.new()
 	str_lab.name = "StrNum"
 	str_lab.text = "%d" % int(round(clampf(str_v, 0.0, 1.0) * 100.0))
-	str_lab.position = Vector2(10, -8)
-	str_lab.add_theme_font_size_override("font_size", 12)
-	str_lab.add_theme_color_override("font_color", Color(0.98, 0.86, 0.32, 0.98))
-	str_lab.add_theme_color_override("font_outline_color", Color(0.05, 0.05, 0.08, 0.95))
-	str_lab.add_theme_constant_override("outline_size", 3)
+	str_lab.position = Vector2(8, -10)
+	str_lab.add_theme_font_size_override("font_size", 14)
+	str_lab.add_theme_color_override("font_color", Color(0.99, 0.90, 0.38, 1.0))
+	str_lab.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.07, 1.0))
+	str_lab.add_theme_constant_override("outline_size", 4)
 	str_lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	counter.add_child(str_lab)
 	if ff != null and "formation_id" in ff:

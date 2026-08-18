@@ -126,6 +126,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_land_war_save_product \
     tools.map_generation.tests.test_land_battle_ai_campaign_product \
     tools.map_generation.tests.test_unit_recovery_replenish_product \
+    tools.map_generation.tests.test_living_unit_order_loop_product \
     -v || fail
 
 run_step unit_save_path \
@@ -185,6 +186,9 @@ else
   run_step launch_assault \
     tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessWorldAccurateMultiFrontAssaultTest.gd || fail
 
+  run_step launch_unit_order \
+    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessWorldAccurateUnitOrderLoopTest.gd || fail
+
   if [[ -n "$LOG_DIR" ]] && [[ -f "$LOG_DIR/launch_assault.log" ]]; then
     if grep -q 'SCRIPT ERROR' "$LOG_DIR/launch_assault.log"; then
       log "FAIL launch_assault has SCRIPT ERROR"
@@ -192,6 +196,17 @@ else
     fi
     if ! grep -q 'PASS (failures=0)' "$LOG_DIR/launch_assault.log"; then
       log "FAIL launch_assault missing PASS (failures=0)"
+      FAILED=1
+    fi
+  fi
+
+  if [[ -n "$LOG_DIR" ]] && [[ -f "$LOG_DIR/launch_unit_order.log" ]]; then
+    if grep -q 'SCRIPT ERROR' "$LOG_DIR/launch_unit_order.log"; then
+      log "FAIL launch_unit_order has SCRIPT ERROR"
+      FAILED=1
+    fi
+    if ! grep -q 'RESULT=PASS' "$LOG_DIR/launch_unit_order.log"; then
+      log "FAIL launch_unit_order missing RESULT=PASS"
       FAILED=1
     fi
   fi

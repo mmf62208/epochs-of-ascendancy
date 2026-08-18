@@ -1,6 +1,6 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-17 (L1 land loop + AI campaign/infra + **7-day autosave** + **strength trickle** + type letter · `--quick` green · board ~3520 · M6 human-only open)  
+**Date:** 2026-08-17 (L1 land loop + **living unit order loop machine-proven** + AI campaign/infra + 7-day autosave · `--quick` green · board ~3520 · M6 human-only open)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
 **How to keep going:** 5-step protocol in §0. Next human: F5 §0b 3–15 + a 20d unpause (M6 notes). Next machine: only playtest-driven shipped-path fixes. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
@@ -26,8 +26,8 @@ Every Cursor / Grok / human session on this tree:
 
 | Next | Action |
 |------|--------|
-| **Human** | Relaunch F5. **Do not press G / Shift+I for overlays** (toast-only). Click the GER Maginot chip (str % visible) → click own land to MARCH · Ctrl+click FRA to ASSAULT. M6 20d/60d still open. |
-| **Machine** | `--quick` **PASS** (venv numpy/Pillow). Remaining machine: Godot headless on a 4.7.1 host. Soft 30fps still FAIL honest. |
+| **Human** | M6 20d/60d notes still open. Units are a **machine** gate (`HeadlessWorldAccurateUnitOrderLoopTest`) — do not F5 just to prove chips. |
+| **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS**. Soft 30fps still FAIL honest. |
 | **GitHub** | Branch `eoa/l1-war-loop-slice` (this stack). Do not force-push over June Cursor history. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
@@ -35,7 +35,7 @@ Every Cursor / Grok / human session on this tree:
 - §0b first-session surfaces are **machine-composited** (`first_session_play_surface_product` ANDs eight prior builders **+ unit_pick**). That is **not** M6.
 - Assault hang-class **closed** at `30910c2` (greps green: fill-pids, no full icon rebuild, BM notify `target_pid`, success-path busy clears in `_assault_post_ui_light`; failure still clears synchronously).
 - Interactive multi-AI tag-scope is on the **official gate** (`test_interactive_multi_ai_day_product` in `eoa_full_test_gates.sh`).
-- **L1 living counters landed (machine):** pin-first hit disk 48px / floor 20 · gold chip · **inverse-zoom chips (~36–44 screen px at Europe)** · nation plate + **org/str bars + str %** · GER/FRA parked on Maginot `710173`/`710739` · docked HUD card · `[` `]` stack.
+- **L1 living unit order loop (machine):** `living_unit_order_loop_product` on `--quick` · `HeadlessWorldAccurateUnitOrderLoopTest` parks GER `710173` / FRA `710739`, proves DemoUnitIcon + org/str/str% + `enqueue_own_land_march` + `start_land_battle`. F5 QA: `EOA_UNIT_ORDER_QA=1`. Inverse-zoom chips + pin-first pick stay grepped.
 - **L1 G/WarLoop hang-class (playtest):** **G** and **L-on** no longer BFS a 3520 corridor on the key frame (toast: click chip → march / Ctrl+click assault). Shift+I stays toast-only. `highlight_supply_corridor` still exists for tests.
 - **L1 march live (machine):** click friendly land enqueues `enqueue_own_land_march`. TimeManager walks one hop per day. Amber path preview.
 - **L1 multi-day battle live (machine):** `start_land_battle` opens a front (empty defender still instant). TimeManager `_tick_open_land_battles` drains org 2–6 days; attacker win calls `execute_province_assault` (resolve-only). `LandBattleBubbleLayer` + card Halt/Withdraw/Assign. Template power via `LandCombatPower` (armor ≠ infantry).
@@ -208,6 +208,7 @@ python3 tools/map_generation/scripts/map_accuracy_qc.py \
   --dir data/provinces_world_accurate --min-land-hit 0.90
 tools/run_godot.sh --headless -s res://tools/map_manager_pick_harness_accurate.gd
 tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessWorldAccurateMultiFrontAssaultTest.gd
+tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessWorldAccurateUnitOrderLoopTest.gd
 tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessWorldAccurateMapPerfTest.gd
 python3 -m unittest tools.map_generation.tests.test_map_perf_m5_measured -v
 tools/run_godot.sh --path . res://scenes/TestScenario.tscn
@@ -216,6 +217,8 @@ tools/run_godot.sh --path . res://scenes/TestScenario.tscn
 **Map machine gate status:** closed. **Full-test play path re-verified 2026-08-01** (unit + QC + headless pick/assault + save + year multi-AI 365d; SCRIPT ERROR 0).  
 
 **§0b composer + hang-class + multi-AI + L1 living counters (2026-08-16):** `test_first_session_play_surface_product` (includes `unit_pick` + `unit_chrome`) · `test_first_session_assault_surface_product` (hang-class greps green at `30910c2`) · `test_unit_centric_pick_product` · `test_unit_counter_chrome_product` · `test_interactive_multi_ai_day_product` — all in `tools/eoa_full_test_gates.sh --quick`.
+
+**Living unit order loop (2026-08-17):** `test_living_unit_order_loop_product` on `--quick` · `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS** (GER 710173 chip + march + opened Maginot battle, not empty-defender instant). Full gates: `launch_unit_order`.
 
 **Year multi-AI (lean) latest:** 71 nations · 365 days · major_apply_sum ≥ majors×days/2 · no OOM · shell fail-closed on SCRIPT ERROR / Killed.  
 

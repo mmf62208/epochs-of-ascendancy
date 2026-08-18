@@ -618,6 +618,10 @@ func _ensure_game_interactive() -> void:
 	if OS.get_environment("EOA_UI_SMOKE").strip_edges() == "1" and not has_meta("eoa_ui_smoke_ran"):
 		set_meta("eoa_ui_smoke_ran", true)
 		call_deferred("_run_ui_smoke_and_quit")
+	# Living-unit QA on the real F5 path (no human window).
+	if OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() == "1" and not has_meta("eoa_unit_order_qa_ran"):
+		set_meta("eoa_unit_order_qa_ran", true)
+		call_deferred("_run_unit_order_qa_and_quit")
 	# Feb 28 clock advance: EOA_FEB_CLOCK=1 EOA_UI_SMOKE=1 (light sim) godot --headless ...
 	if OS.get_environment("EOA_FEB_CLOCK").strip_edges() == "1" and not has_meta("eoa_feb_clock_ran"):
 		set_meta("eoa_feb_clock_ran", true)
@@ -678,6 +682,118 @@ func _run_feb_clock_advance_test() -> void:
 	print("=== EOA FEB CLOCK ADVANCE end ===")
 	if OS.get_environment("EOA_FEB_CLOCK").strip_edges() == "1" and OS.get_environment("EOA_UI_SMOKE").strip_edges() != "1":
 		get_tree().quit(0)
+
+
+## Headless F5 proof: Maginot chip exists with strength and can be ordered.
+func _run_unit_order_qa_and_quit() -> void:
+	print("=== EOA UNIT ORDER QA begin ===")
+	await get_tree().create_timer(3.0).timeout
+	var fail: PackedStringArray = []
+	var mr: Node = map_renderer
+	if mr == null:
+		mr = find_child("WorldMap", true, false)
+	if mr == null:
+		fail.append("map_missing")
+	else:
+		if mr.has_method("ensure_playable_front_chips"):
+			mr.call("ensure_playable_front_chips", false)
+		var lm: Node = get_node_or_null("/root/LeaderManager")
+		var ger_f: Object = null
+		if lm != null and lm.has_method("get_formations_for_country"):
+			for f in lm.call("get_formations_for_country", "GER"):
+				if f == null:
+					continue
+				var ft := str(f.formation_type) if "formation_type" in f else ""
+				if ft != "division" and ft != "garrison":
+					continue
+				if int(f.stationed_province_id) == 710173:
+					ger_f = f
+					break
+		if ger_f == null:
+			fail.append("no_ger_land_on_710173")
+		else:
+			print(
+				"  [QA] GER fid=%s str=%.2f org=%.2f"
+				% [str(ger_f.formation_id), float(ger_f.strength), float(ger_f.organization)]
+			)
+			if float(ger_f.strength) <= 0.0:
+				fail.append("strength_zero")
+			if float(ger_f.organization) <= 0.0:
+				fail.append("organization_zero")
+			var fid := str(ger_f.formation_id)
+			if "selected_formation_id" in mr:
+				mr.selected_formation_id = fid
+			if mr.has_method("_select_map_unit"):
+				mr.call("_select_map_unit", ger_f)
+			var icon_pids: Array = mr.get("_demo_unit_icon_pids") if "_demo_unit_icon_pids" in mr else []
+			var has_icon := false
+			for v in icon_pids:
+				if int(v) == 710173:
+					has_icon = true
+					break
+			if not has_icon:
+				fail.append("no_demo_icon_710173")
+			else:
+				print("  [QA] DemoUnitIcon index has 710173")
+			var chip: Node = null
+			if "province_nodes" in mr and mr.province_nodes is Dictionary and mr.province_nodes.has(710173):
+				var pn: Node = mr.province_nodes[710173] as Node
+				if pn != null:
+					chip = pn.get_node_or_null("DemoUnitIcon_710173")
+			if chip == null:
+				fail.append("no_demo_icon_node_710173")
+			else:
+				if not chip.has_meta("formation_id") or str(chip.get_meta("formation_id", "")).is_empty():
+					fail.append("chip_meta_missing_formation_id")
+				if chip.get_node_or_null("StrNum") == null:
+					fail.append("icon_missing_StrNum")
+				if chip.get_node_or_null("StatBars") == null:
+					fail.append("icon_missing_StatBars")
+				print(
+					"  [QA] chip formation_id=%s StrNum=%s StatBars=%s"
+					% [
+						str(chip.get_meta("formation_id")) if chip.has_meta("formation_id") else "?",
+						"ok" if chip.get_node_or_null("StrNum") else "MISSING",
+						"ok" if chip.get_node_or_null("StatBars") else "MISSING",
+					]
+				)
+			var rear := -1
+			var mm: Node = get_node_or_null("/root/MapManager")
+			if mm != null and mm.has_method("get_adjacent_provinces"):
+				for nv in mm.call("get_adjacent_provinces", 710173, true):
+					var nid := int(nv)
+					if nid == 710173:
+						continue
+					var np = mm.call("get_province", nid) if mm.has_method("get_province") else null
+					if np == null or bool(np.is_sea):
+						continue
+					if str(np.owner_tag).strip_edges().to_upper() != "GER":
+						continue
+					rear = nid
+					break
+			var mv_scr: Script = load("res://scripts/formations/FormationMovement.gd") as Script
+			if rear <= 0 or mv_scr == null:
+				fail.append("no_ger_rear_or_march_api")
+			else:
+				var marched: Dictionary = mv_scr.call("enqueue_own_land_march", fid, rear, "GER")
+				print("  [QA] march %s" % str(marched))
+				if not bool(marched.get("ok", false)):
+					fail.append("march_blocked_%s" % str(marched.get("reason", "")))
+			var bm: Node = get_node_or_null("/root/BattleManager")
+			if bm != null and bm.has_method("start_land_battle"):
+				# Re-station for assault from the front hex.
+				ger_f.stationed_province_id = 710173
+				var opened: Dictionary = bm.call("start_land_battle", "GER", 710739, 710173, fid)
+				print("  [QA] start_land_battle %s" % str(opened))
+				if not bool(opened.get("success", false)):
+					fail.append("assault_blocked_%s" % str(opened.get("reason", "")))
+			else:
+				fail.append("no_battle_manager")
+	var ok := fail.is_empty()
+	print("EOA UNIT ORDER QA: %s fail=%s" % ["PASS" if ok else "FAIL", str(fail)])
+	print("RESULT=%s" % ("PASS" if ok else "FAIL"))
+	print("=== EOA UNIT ORDER QA end ===")
+	get_tree().quit(0 if ok else 1)
 
 
 ## Headless/editor automation: verify top bar, blockers, province pick after interactive unlock.
@@ -3164,12 +3280,16 @@ func _deferred_grand_visuals_and_setup() -> void:
 		print("TestRunner: [DEFER] Infra demo upgrades/builds/edits + special sites (airfield etc) + data-tied heavy + layer counts now deferred (new defer + Phase4 prints updated).")
 
 	# world_accurate F5: phase1 seed block never runs. Park Maginot chips after Europe frame.
+	# EOA_UNIT_ORDER_QA must park even in headless (evidence skips this otherwise).
 	if (
-		not _wants_headless_evidence()
-		and map_renderer
+		map_renderer
 		and map_renderer.has_method("ensure_playable_front_chips")
+		and (
+			not _wants_headless_evidence()
+			or OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() == "1"
+		)
 	):
-		map_renderer.call("ensure_playable_front_chips", true)
+		map_renderer.call("ensure_playable_front_chips", OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() != "1")
 
 	# Final safety hide if loading screen still up (e.g. non-heavy path or orphaned node).
 	_ensure_game_interactive()
