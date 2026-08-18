@@ -31,6 +31,7 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
             "park_maginot",
             "chip_str_num",
             "inverse_zoom_scale",
+            "chip_on_centroid",
             "pin_before_hex",
             "click_own_land_marches",
             "ctrl_click_starts_battle",

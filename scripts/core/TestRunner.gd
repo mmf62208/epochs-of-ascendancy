@@ -2014,6 +2014,9 @@ func _ready() -> void:
 	_configure_top_info_bar(player_tag)
 	if lm != null and lm.has_method("set_player_country_tag"):
 		lm.call("set_player_country_tag", player_tag)
+	var sm_player := get_node_or_null("/root/SupplyManager")
+	if sm_player != null:
+		sm_player.set("player_tag", player_tag)
 
 	print("TestRunner: Playtest map bootstrapped — production line tests run next frame (map visible first).")
 	if _is_graphical and _loading_screen and is_instance_valid(_loading_screen):

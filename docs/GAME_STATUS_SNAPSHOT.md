@@ -26,7 +26,7 @@ Every Cursor / Grok / human session on this tree:
 
 | Next | Action |
 |------|--------|
-| **Human** | M6 20d/60d notes still open. Units are a **machine** gate (`HeadlessWorldAccurateUnitOrderLoopTest`) — do not F5 just to prove chips. |
+| **Human** | Not required for units. When you do open the map: Maginot chips sit on the hex (centroid), player is GER. M6 20d/60d still open. |
 | **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS**. Soft 30fps still FAIL honest. |
 | **GitHub** | Branch `eoa/l1-war-loop-slice` (this stack). Do not force-push over June Cursor history. |
 

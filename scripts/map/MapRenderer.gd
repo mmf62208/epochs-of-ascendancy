@@ -21625,8 +21625,9 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 		if n_clear == null:
 			continue
 		for c in n_clear.get_children():
-			if c.name.begins_with("DemoUnitIcon_"):
-				c.queue_free()
+			if str(c.name).begins_with("DemoUnitIcon_"):
+				n_clear.remove_child(c)
+				c.free()
 	_demo_unit_icon_pids.clear()
 	for k in kept:
 		_demo_unit_icon_pids.append(int(k))
@@ -21672,7 +21673,11 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 
 		var counter := Node2D.new()
 		counter.name = "DemoUnitIcon_" + str(id)
-		counter.position = Vector2(0, -8)
+		# Province nodes sit at origin; chips must use the same centroid as capital stars.
+		var chip_pos := Vector2(0, -8)
+		if province_centroids.has(id):
+			chip_pos = (province_centroids[id] as Vector2) + Vector2(0, -8)
+		counter.position = chip_pos
 		counter.z_index = 28
 		counter.z_as_relative = false
 		# Inverse-zoom: readable at Europe view, not 15px specks.

@@ -85,6 +85,11 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     wiring["inverse_zoom_scale"] = scale_ok
     (passes if scale_ok else fails).append("inverse_zoom_scale")
 
+    rebuild = _slice(ren, "_rebuild_demo_unit_icons")
+    on_hex = bool(rebuild) and "province_centroids" in rebuild and ".free()" in rebuild
+    wiring["chip_on_centroid"] = on_hex
+    (passes if on_hex else fails).append("chip_on_centroid")
+
     spatial = ""
     marker = "use_spatial_picking and event is InputEventMouseButton"
     i = ren.find(marker)

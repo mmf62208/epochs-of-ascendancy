@@ -2774,6 +2774,9 @@ func _print_industry_bootstrap_evidence() -> void:
 const OOB_PRODUCTION_EVIDENCE_DAYS := 100.0
 
 func _run_oob_production_evidence_advance() -> void:
+	if OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() == "1":
+		print("ScenarioLoader: skip OOB evidence (EOA_UNIT_ORDER_QA)")
+		return
 	var headless := DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server")
 	var wants := headless or OS.get_environment("EOA_RUN_SIM_CYCLES").strip_edges() == "1" or OS.get_environment("EOA_HEADLESS_EVIDENCE").strip_edges() == "1"
 	if not wants:
