@@ -496,4 +496,4 @@ static func _notify_map_light(from_pid: int, to_pid: int, arrived: bool = false,
 		if mr.has_method("refresh_after_capture_light"):
 			mr.call_deferred("refresh_after_capture_light", to_pid, from_pid)
 		if mr.has_method("_on_march_hop_ui"):
-			mr.call_deferred("_on_march_hop_ui", to_pid, arrived, dest_id, mv)
+			mr.call_deferred("_on_march_hop_ui", to_pid, arrived, dest_id, {})

@@ -1196,7 +1196,7 @@ func _rebuild_play_mode_strip() -> void:
 	_add_apply_button("[1] Station forces", "apply_station", true)
 	_add_apply_button("[8] Checkpoint save", "save_resume_checkpoint", true)
 	var rec: Dictionary = {}
-	if typeof(PlayNextHook) != TYPE_NIL and PlayNextHook.has_method("recommend"):
+	if typeof(PlayNextHook) != TYPE_NIL:
 		rec = PlayNextHook.recommend()
 	var rec_hint := str(rec.get("hint", "Unpause a day"))
 	var rec_label := "Next: %s" % str(rec.get("label", "Unpause a day"))
@@ -1206,7 +1206,7 @@ func _rebuild_play_mode_strip() -> void:
 	rec_btn.focus_mode = Control.FOCUS_NONE
 	rec_btn.tooltip_text = rec_hint
 	rec_btn.pressed.connect(func() -> void:
-		if typeof(PlayNextHook) != TYPE_NIL and PlayNextHook.has_method("apply"):
+		if typeof(PlayNextHook) != TYPE_NIL:
 			var out: Dictionary = PlayNextHook.apply(rec)
 			if typeof(DebugOverlay) != TYPE_NIL:
 				DebugOverlay.toast_map_debug(str(out.get("summary", rec_hint)))

@@ -15791,7 +15791,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 		return false
 	var fid := selected_formation_id
 	var dest := province.id
-	if typeof(FormationMovement) == TYPE_NIL or not FormationMovement.has_method("enqueue_own_land_march"):
+	if typeof(FormationMovement) == TYPE_NIL:
 		return false
 	var res: Dictionary = FormationMovement.enqueue_own_land_march(fid, dest, p_tag)
 	if bool(res.get("already_here", false)):
@@ -16052,7 +16052,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	)
 	if fuel_v >= 0.0:
 		lines.append("Fuel: %.0f%%" % (fuel_v * 100.0))
-	if typeof(UnitCardCombatStrip) != TYPE_NIL and UnitCardCombatStrip.has_method("lines_for"):
+	if typeof(UnitCardCombatStrip) != TYPE_NIL:
 		lines.append_array(UnitCardCombatStrip.lines_for(formation))
 	if not fid.is_empty():
 		lines.append("ID: %s" % fid)
@@ -16074,7 +16074,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var cmd_row := HBoxContainer.new()
 	cmd_row.add_theme_constant_override("separation", 6)
 	vbox.add_child(cmd_row)
-	var marching := typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("has_march") \
+	var marching := typeof(FormationMovement) != TYPE_NIL \
 		and bool(FormationMovement.has_march(fid))
 	if marching:
 		var halt_btn := Button.new()
@@ -17981,13 +17981,13 @@ func _refresh_next_hook_chip() -> void:
 			RetrowaveTheme.style_secondary_button(_next_hook_chip)
 		ui.add_child(_next_hook_chip)
 		_next_hook_chip.pressed.connect(func() -> void:
-			if typeof(PlayNextHook) != TYPE_NIL and PlayNextHook.has_method("apply"):
+			if typeof(PlayNextHook) != TYPE_NIL:
 				var out: Dictionary = PlayNextHook.apply()
 				_show_inspector_toast(str(out.get("summary", "Next")), 3.5)
 				_refresh_next_hook_chip()
 		)
 	var rec: Dictionary = {}
-	if typeof(PlayNextHook) != TYPE_NIL and PlayNextHook.has_method("recommend"):
+	if typeof(PlayNextHook) != TYPE_NIL:
 		rec = PlayNextHook.recommend()
 	var hint := str(rec.get("hint", "Unpause a day"))
 	_next_hook_chip.text = "NEXT · %s" % str(rec.get("label", "Unpause a day"))
@@ -18875,7 +18875,7 @@ func _make_unit_nation_frame(col: Color) -> Node2D:
 ## I / A / M from fielded template — no new art, readable at compact zoom.
 func _unit_type_letter(formation: Object) -> String:
 	var kind := "infantry"
-	if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("template_kind"):
+	if typeof(LandCombatPower) != TYPE_NIL:
 		kind = str(LandCombatPower.template_kind(formation))
 	var k := kind.strip_edges().to_lower()
 	if "armor" in k or "armour" in k or "panzer" in k:

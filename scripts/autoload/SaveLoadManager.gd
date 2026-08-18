@@ -571,7 +571,7 @@ func _gather_save_data() -> Dictionary:
 		land_war["open_battles"] = bm_blob.get("open_battles", [])
 		land_war["next_seq"] = int(bm_blob.get("next_seq", 1))
 		land_war["last_aar"] = bm_blob.get("last_aar", {})
-	if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("get_save_data"):
+	if typeof(FormationMovement) != TYPE_NIL:
 		var fm_blob: Dictionary = FormationMovement.get_save_data()
 		land_war["marches"] = fm_blob.get("marches", {})
 	data["land_war"] = land_war
@@ -674,7 +674,7 @@ func _apply_save_data(data: Dictionary) -> void:
 				"next_seq": int(lw.get("next_seq", 1)),
 				"last_aar": lw.get("last_aar", {}),
 			})
-		if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("apply_save_data"):
+		if typeof(FormationMovement) != TYPE_NIL:
 			FormationMovement.apply_save_data({"marches": lw.get("marches", {})})
 
 	# 8. Production + Factories (factories feed lines; apply after map provinces)

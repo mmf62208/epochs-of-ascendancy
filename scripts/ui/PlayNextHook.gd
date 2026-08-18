@@ -50,7 +50,7 @@ static func recommend(player_tag: String = "GER") -> Dictionary:
 				"source": "land_battle",
 			}
 	var eta := 99
-	if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("soonest_calendar_eta_to"):
+	if typeof(FormationMovement) != TYPE_NIL:
 		# Any incoming march for the player (dest unknown): scan via capital-ish 0 skip.
 		pass
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_paused") and bool(TimeManager.is_paused()):

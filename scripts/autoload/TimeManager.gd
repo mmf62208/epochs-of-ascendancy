@@ -433,8 +433,6 @@ func _maybe_run_ai_land_battle_starts() -> void:
 func _tick_own_land_marches() -> void:
 	if typeof(FormationMovement) == TYPE_NIL:
 		return
-	if not FormationMovement.has_method("tick_all_marches"):
-		return
 	var moved: Array = FormationMovement.tick_all_marches(1.0)
 	if moved.is_empty():
 		return

@@ -576,7 +576,7 @@ func start_land_battle(
 func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 	if OS.get_environment("EOA_AI_LAND_BATTLES").strip_edges() == "0":
 		return {"ok": true, "skipped": true, "reason": "killswitch", "started_n": 0}
-	if typeof(LandBattleAi) == TYPE_NIL or not LandBattleAi.has_method("plan_day"):
+	if typeof(LandBattleAi) == TYPE_NIL:
 		return {"ok": false, "reason": "no planner", "started_n": 0}
 	if typeof(MapManager) == TYPE_NIL:
 		return {"ok": false, "reason": "no map", "started_n": 0}
@@ -627,7 +627,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 			combat_fids.append(str(fid_v2))
 
 	var marching_fids: Array = []
-	if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("list_marches"):
+	if typeof(FormationMovement) != TYPE_NIL:
 		for raw_m in FormationMovement.list_marches():
 			if typeof(raw_m) != TYPE_DICTIONARY:
 				continue
@@ -689,14 +689,14 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 					continue
 				if "is_in_combat" in f and bool(f.is_in_combat):
 					continue
-				if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("has_march"):
+				if typeof(FormationMovement) != TYPE_NIL:
 					if FormationMovement.has_march(sfid):
 						continue
 				var station := int(f.stationed_province_id) if "stationed_province_id" in f else -1
 				if station <= 0 or station == from_id:
 					continue
 				var has_path := false
-				if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("find_own_land_path"):
+				if typeof(FormationMovement) != TYPE_NIL:
 					var path: Array = FormationMovement.find_own_land_path(station, from_id, tag2)
 					has_path = path.size() >= 2
 				if not has_path:
@@ -748,7 +748,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 		print("BattleManager: AI opened %d land battle(s) (start_land_battle, day=%d)" % [started.size(), int(day_index)])
 
 	var marched: Array = []
-	if LandBattleAi.has_method("plan_marches"):
+	if true:
 		var mplan: Dictionary = LandBattleAi.plan_marches(
 			march_opps, player_tag, int(day_index), marching_fids, combat_fids, 1
 		)
@@ -756,7 +756,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 			if typeof(raw_mp) != TYPE_DICTIONARY:
 				continue
 			var mp: Dictionary = raw_mp
-			if typeof(FormationMovement) == TYPE_NIL or not FormationMovement.has_method("enqueue_own_land_march"):
+			if typeof(FormationMovement) == TYPE_NIL:
 				break
 			var enq: Dictionary = FormationMovement.enqueue_own_land_march(
 				str(mp.get("formation_id", "")),
@@ -789,7 +789,7 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 func try_ai_follow_on_after_win(player_tag: String = "") -> Dictionary:
 	if OS.get_environment("EOA_AI_LAND_BATTLES").strip_edges() == "0":
 		return {"ok": true, "skipped": true, "reason": "killswitch", "started_n": 0}
-	if typeof(LandBattleAi) == TYPE_NIL or not LandBattleAi.has_method("plan_follow_on"):
+	if typeof(LandBattleAi) == TYPE_NIL:
 		return {"ok": false, "reason": "no planner", "started_n": 0}
 	var aar: Dictionary = peek_last_land_aar()
 	if aar.is_empty():
@@ -942,7 +942,7 @@ func land_battle_next_hook(battle: Dictionary) -> String:
 		org -= drain
 		left += 1
 	var march_eta := 99
-	if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("soonest_calendar_eta_to"):
+	if typeof(FormationMovement) != TYPE_NIL:
 		march_eta = int(FormationMovement.soonest_calendar_eta_to(int(battle.get("from_id", -1)), str(battle.get("att_tag", ""))))
 	var hook := ""
 	if march_eta == 1:
@@ -1021,7 +1021,7 @@ func withdraw_from_land_battle(formation_id: String) -> Dictionary:
 func land_combat_power(formation: Object, terrain: String = "plains") -> float:
 	if formation == null:
 		return 0.0
-	if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("combat_power"):
+	if typeof(LandCombatPower) != TYPE_NIL:
 		return maxf(0.0, float(LandCombatPower.combat_power(formation, terrain)))
 	var org := _formation_stat(formation, "organization", 1.0)
 	var strn := _formation_stat(formation, "strength", 1.0)
@@ -1110,7 +1110,7 @@ func _battle_combat_width(target: Province, terrain: String) -> float:
 	var infra := 2
 	if target != null:
 		infra = clampi(int(target.infrastructure) / 5, 0, 5)
-	if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("combat_width_for_terrain"):
+	if typeof(LandCombatPower) != TYPE_NIL:
 		return float(LandCombatPower.combat_width_for_terrain(terrain, infra))
 	return 10.0
 
@@ -1125,7 +1125,7 @@ func _rebuild_land_battle_powers(battle: Dictionary) -> void:
 		var fo: Formation = _formation_from_id(str(fid_v), str(battle.get("att_tag", "")))
 		att_powers.append(land_combat_power(fo, terrain))
 		var aw := 2.0
-		if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("unit_width"):
+		if typeof(LandCombatPower) != TYPE_NIL:
 			aw = float(LandCombatPower.unit_width(fo))
 		att_widths.append(aw)
 	var def_powers: Array = []
@@ -1134,11 +1134,11 @@ func _rebuild_land_battle_powers(battle: Dictionary) -> void:
 		var df: Formation = _formation_from_id(str(fid_v2), str(battle.get("def_tag", "")))
 		def_powers.append(land_combat_power(df, terrain))
 		var dw := 2.0
-		if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("unit_width"):
+		if typeof(LandCombatPower) != TYPE_NIL:
 			dw = float(LandCombatPower.unit_width(df))
 		def_widths.append(dw)
 	var cw := float(battle.get("combat_width", 10.0))
-	if typeof(LandCombatPower) != TYPE_NIL and LandCombatPower.has_method("engaged_power"):
+	if typeof(LandCombatPower) != TYPE_NIL:
 		battle["att_power"] = float(LandCombatPower.engaged_power(att_powers, att_widths, cw))
 		battle["def_power"] = float(LandCombatPower.engaged_power(def_powers, def_widths, cw))
 	else:
@@ -1329,14 +1329,14 @@ func _record_land_aar(battle: Dictionary, winner: String, to_id: int) -> void:
 	var next_place := ""
 	var tag := str(battle.get("att_tag", ""))
 	var stage := to_id if winner == "attacker" else int(battle.get("from_id", to_id))
-	if winner == "attacker" and typeof(LandBattleAar) != TYPE_NIL and LandBattleAar.has_method("pick_next_enemy_hex"):
+	if winner == "attacker" and typeof(LandBattleAar) != TYPE_NIL:
 		next_pid = int(LandBattleAar.pick_next_enemy_hex(stage, tag))
 		if next_pid > 0 and typeof(MapManager) != TYPE_NIL:
 			var np: Province = MapManager.get_province(next_pid)
 			if np != null:
 				next_place = np.name
 	var line := "Battle ended at %s" % place
-	if typeof(LandBattleAar) != TYPE_NIL and LandBattleAar.has_method("format_line"):
+	if typeof(LandBattleAar) != TYPE_NIL:
 		line = LandBattleAar.format_line(winner, place, int(battle.get("days_elapsed", 0)), loss, next_place)
 	_last_land_aar = {
 		"winner": winner,
@@ -1419,7 +1419,7 @@ func _land_side_supply_state(tag: String, pid: int) -> Dictionary:
 	if capital > 0:
 		if pid == capital:
 			connected = true
-		elif typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_method("find_own_land_path"):
+		elif typeof(FormationMovement) != TYPE_NIL:
 			var path: Array = FormationMovement.find_own_land_path(pid, capital, t, 48)
 			connected = path.size() >= 2 or (path.size() == 1 and int(path[0]) == capital)
 		elif MapManager.has_method("find_land_path"):
@@ -1631,7 +1631,7 @@ func _store_daily_equip_loss(fid: String, severity: float, country_tag: String) 
 		ProductionManager.ensure_demo_combat_stock(fid, country_tag)
 	var removed: Dictionary = {}
 	var plain := "equip sev=%.2f" % severity
-	if typeof(LandBattleAttrition) != TYPE_NIL and LandBattleAttrition.has_method("apply_daily_to_formation"):
+	if typeof(LandBattleAttrition) != TYPE_NIL:
 		var report: Dictionary = LandBattleAttrition.apply_daily_to_formation(fid, severity)
 		if typeof(report.get("removed", {})) == TYPE_DICTIONARY:
 			removed = report.get("removed", {}) as Dictionary
@@ -1640,7 +1640,7 @@ func _store_daily_equip_loss(fid: String, severity: float, country_tag: String) 
 		var raw: Variant = ProductionManager.apply_combat_equipment_loss(fid, severity)
 		if typeof(raw) == TYPE_DICTIONARY:
 			removed = raw
-		if typeof(LandBattleAttrition) != TYPE_NIL and LandBattleAttrition.has_method("format_loss_plain"):
+		if typeof(LandBattleAttrition) != TYPE_NIL:
 			plain = str(LandBattleAttrition.format_loss_plain(removed))
 		elif not removed.is_empty():
 			plain = "lost %s" % str(removed)
