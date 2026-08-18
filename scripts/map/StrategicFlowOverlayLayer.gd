@@ -197,6 +197,8 @@ func _collect_routes() -> Array:
 	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("get_all_routes"):
 		for plan in SupplyManager.get_all_routes():
 			out.append(plan)
+			if out.size() >= max_routes:
+				break
 	if out.is_empty() and typeof(MapManager) != TYPE_NIL:
 		# Fallback synthetic corridors from contested pairs (cheap visual proof)
 		var contested: Dictionary = {}

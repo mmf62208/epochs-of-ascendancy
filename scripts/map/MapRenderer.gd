@@ -17769,9 +17769,8 @@ func _setup_strategic_flow_layer() -> void:
 		return
 	if _strategic_flow_layer == null or not is_instance_valid(_strategic_flow_layer):
 		_strategic_flow_layer = _StrategicFlowOverlayLayerScr.new()
+	# Use already-built renderer centroids — get_all_centroids() walks the whole board.
 	var centroids := province_centroids
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_centroids"):
-		centroids = MapManager.get_all_centroids()
 	var pc := provinces.size()
 	if _strategic_flow_layer.has_method("setup"):
 		_strategic_flow_layer.setup(centroids)
@@ -17826,14 +17825,8 @@ func ensure_equipment_flow_glyphs_on() -> Dictionary:
 	show_equipment_flow_glyphs = true
 	if not show_strategic_flow_overlay:
 		show_strategic_flow_overlay = true
-	_setup_strategic_flow_layer()
-	if _strategic_flow_layer != null and is_instance_valid(_strategic_flow_layer):
-		if _strategic_flow_layer.has_method("set_equipment_flow_glyphs_enabled"):
-			_strategic_flow_layer.set_equipment_flow_glyphs_enabled(true)
-		elif "equipment_flow_glyphs_enabled" in _strategic_flow_layer:
-			_strategic_flow_layer.equipment_flow_glyphs_enabled = true
-		if _strategic_flow_layer.has_method("refresh"):
-			_strategic_flow_layer.refresh()
+	# Defer overlay build — sync setup froze Shift+I on world_accurate (~3520).
+	call_deferred("_setup_strategic_flow_layer")
 	return get_equipment_flow_glyph_query()
 
 
@@ -17882,9 +17875,26 @@ func show_first_session_war_path(country_tag: String = "") -> Dictionary:
 		tag = str(LeaderManager.get_player_country_tag()).to_upper()
 	if tag.is_empty():
 		tag = "GER"
-	var flow_q: Dictionary = ensure_equipment_flow_glyphs_on()
+	# Hang-class: never sync-build the 3520-board flow overlay on the Shift+I frame.
+	# Flags + deferred setup; reuse B fronts cache when warm.
+	show_equipment_flow_glyphs = true
+	show_strategic_flow_overlay = true
+	var flow_q: Dictionary = get_equipment_flow_glyph_query()
 	var fronts_res: Dictionary = {}
-	if has_method("show_live_border_fronts"):
+	var cache_warm := (
+		not _live_border_fronts_cache.is_empty()
+		and _live_border_fronts_cache_tag == tag
+	)
+	if cache_warm:
+		var row0: Dictionary = _live_border_fronts_cache[0] if _live_border_fronts_cache[0] is Dictionary else {}
+		fronts_res = {
+			"ok": true,
+			"count": _live_border_fronts_cache.size(),
+			"targets": _live_border_fronts_cache,
+			"best_province_id": int(row0.get("province_id", -1)),
+			"empty": false,
+		}
+	elif has_method("show_live_border_fronts"):
 		fronts_res = show_live_border_fronts(tag, 6)
 	var best := int(fronts_res.get("best_province_id", -1))
 	var n_fronts := int(fronts_res.get("count", 0))
@@ -17921,6 +17931,8 @@ func show_first_session_war_path(country_tag: String = "") -> Dictionary:
 		lines.append(toast)
 		lines.append("WarLoop: B fronts · I flow · G corridor · Ctrl+click assault")
 		_map_mode_toolbar.call("set_fronts_legend", "\n".join(lines))
+	print("MapRenderer: WarLoop toast · %s · fronts=%d (flow overlay deferred)" % [tag, n_fronts])
+	call_deferred("_setup_strategic_flow_layer")
 	return result
 
 
