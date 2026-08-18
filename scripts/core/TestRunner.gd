@@ -631,7 +631,7 @@ func _toast_first_session_onboarding() -> void:
 	if typeof(DebugOverlay) == TYPE_NIL:
 		return
 	DebugOverlay.toast_map_debug(
-		"First session · play as GER · B Fronts · Shift+I WarLoop · G corridor · Ctrl+S save"
+		"Play as GER · click a chip (str %) · click own land to MARCH · Ctrl+click France to ASSAULT"
 	)
 
 
@@ -2003,25 +2003,11 @@ func _run_production_line_tests() -> void:
 
 
 func _seed_combat_playtest_divisions() -> void:
-	var _mm_seed: Node = get_node_or_null("/root/MapManager")
-	var _sm_seed: Node = get_node_or_null("/root/SupplyManager")
-	if _sm_seed == null or _mm_seed == null:
+	# world_accurate: park GER/FRA land on Maginot (710173 / 710739), not scaffold pids 1/10.
+	if map_renderer and map_renderer.has_method("ensure_playable_front_chips"):
+		var parked: Variant = map_renderer.call("ensure_playable_front_chips")
+		print("TestRunner: playable Maginot chips ", parked)
 		return
-
-	# GER vs FRA: province 1 → adjacent enemy (demo owners already set GER/FRA on 1/2 when adjacent).
-	if _mm_seed.call("get_province", 1) != null:
-		_mm_seed.call("update_province_owner", 1, "GER", "GER", true)
-		var ger: Variant = _sm_seed.call("move_formation_to_province", "german_infantry_division_1943", 1, "GER")
-		if bool(ger.get("ok", false)):
-			print(
-				"TestRunner: GER division on province 1 — set TopInfoBar to GER, click 1 to stage, Ctrl+click FRA neighbor"
-			)
-
-	# USA player default: division on province 10.
-	var usa: Variant = _sm_seed.call("move_formation_to_province", "us_infantry_div_ww2", 10, "USA")
-	if bool(usa.get("ok", false)):
-		print("TestRunner: USA infantry on province 10 — stage friendly province, Ctrl+click enemy neighbor")
-
 	if map_renderer and map_renderer.has_method("_update_unit_icons_for_test"):
 		map_renderer.call_deferred("_update_unit_icons_for_test")
 

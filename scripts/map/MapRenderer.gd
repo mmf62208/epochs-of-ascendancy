@@ -1180,9 +1180,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			set_map_mode("supply")
 			get_viewport().set_input_as_handled()
 			return
-		# M4: G — highlight supply corridor capital/hub → currently selected province
+		# G must stay cheap on world_accurate: 3520 BFS / preview_player_route freezes the input frame.
 		if event.keycode == KEY_G and not event.ctrl_pressed and not event.alt_pressed:
-			highlight_corridor_capital_to_selected()
+			_toast_easy_unit_orders()
 			get_viewport().set_input_as_handled()
 			return
 		# First-session help toast (? or Shift+/)
@@ -17829,11 +17829,25 @@ func ensure_equipment_flow_glyphs_on() -> Dictionary:
 	return get_equipment_flow_glyph_query()
 
 
+## Cheap G / first-session order toast — never pathfinds.
+func _toast_easy_unit_orders() -> void:
+	var toast := (
+		"Click a GER chip (green org / amber str) · click own land to MARCH · "
+		+ "Ctrl+click France to ASSAULT · Esc clears"
+	)
+	if typeof(DebugOverlay) != TYPE_NIL:
+		DebugOverlay.toast_map_debug(toast)
+	_show_inspector_toast(toast, 6.0)
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast(toast, 6.0)
+	print("MapRenderer: G toast-only (no corridor BFS)")
+
+
 ## First-session help toast (? / Shift+/) — mirrors first_session_hotkeys_product.
 func _toast_first_session_help() -> void:
 	var toast := (
-		"Help · B Fronts · Shift+I WarLoop · I flow · G corridor · Ctrl+click assault · "
-		+ "F1–F9 mapmodes · Ctrl+S save · Ctrl+L load · Home Europe"
+		"Help · click a GER chip (str %) · click own land to MARCH · Ctrl+click enemy to ASSAULT · "
+		+ "B Fronts · F1–F9 mapmodes · Ctrl+S save · Home Europe"
 	)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug(toast)
@@ -17897,11 +17911,7 @@ func show_first_session_war_path(country_tag: String = "") -> Dictionary:
 		fronts_res = show_live_border_fronts(tag, 6)
 	var best := int(fronts_res.get("best_province_id", -1))
 	var n_fronts := int(fronts_res.get("count", 0))
-	var toast := "WarLoop · %s · flow ON · fronts %d · target #%s · B cycle · Ctrl+click Assault · G corridor" % [
-		tag,
-		n_fronts,
-		str(best) if best > 0 else "?",
-	]
+	var toast := "Click a GER chip · march own land · Ctrl+click France to assault · fronts %d" % n_fronts
 	var result := {
 		"ok": true,
 		"empty": n_fronts <= 0,
@@ -18511,13 +18521,8 @@ func _toggle_supply_overlay() -> void:
 			ol_infra.queue_redraw()
 	if supply_mode:
 		_setup_supply_layer()
-		# Auto capital→selected (or capital→front) corridor — single path, not mesh.
-		var corr := highlight_corridor_capital_to_selected()
-		if not bool(corr.get("ok", false)) and selected_province_id < 0:
-			# No selection: toast only; click a province then G again / click while G is on.
-			if typeof(DebugOverlay) != TYPE_NIL:
-				DebugOverlay.toast_map_debug("Supply G · select a province then G for capital→front corridor")
-			_show_inspector_toast("Supply corridor · click a front province (G) · sea if no land transit rights", 4.0)
+		# Hang-class: do not BFS a 3520-board corridor on the L/G frame.
+		_show_inspector_toast("Supply legend ON · click a unit chip to order (march / Ctrl+click assault)", 4.0)
 		_update_supply_overlay_legend()
 	else:
 		_end_supply_reroute()
@@ -18784,7 +18789,7 @@ func _prefer_retrowave_unit_icon(tex_path: String) -> String:
 	return p
 
 
-## Pass 7: unit counter world scale vs camera zoom (screen-stable-ish size).
+## Keep chips ~36–44 screen px at Europe zoom (old lerp left 15px specks).
 func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 	var z := z_override
 	if z < 0.0:
@@ -18794,9 +18799,9 @@ func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 			z = maxf(cam.zoom.x, cam.zoom.y)
 		elif container:
 			z = absf(container.scale.x)
-	# zoom high = close-up → larger counters; zoom low = compact but still readable (org/str bars).
-	var t := clampf((z - 0.35) / 2.2, 0.0, 1.0)
-	return lerpf(0.72, 1.15, t)
+	var screen_px := lerpf(36.0, 44.0, clampf((z - 0.2) / 1.6, 0.0, 1.0))
+	var target := screen_px / (32.0 * maxf(z, 0.04))
+	return clampf(target, 0.35, 16.0)
 
 
 func _sync_unit_counter_scales(z: float = -1.0) -> void:
@@ -18978,6 +18983,16 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 		if "strength" in ff:
 			str_v = float(ff.strength)
 	counter.add_child(_make_unit_stat_bars(org_v, str_v))
+	var str_lab := Label.new()
+	str_lab.name = "StrNum"
+	str_lab.text = "%d" % int(round(clampf(str_v, 0.0, 1.0) * 100.0))
+	str_lab.position = Vector2(10, -8)
+	str_lab.add_theme_font_size_override("font_size", 12)
+	str_lab.add_theme_color_override("font_color", Color(0.98, 0.86, 0.32, 0.98))
+	str_lab.add_theme_color_override("font_outline_color", Color(0.05, 0.05, 0.08, 0.95))
+	str_lab.add_theme_constant_override("outline_size", 3)
+	str_lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	counter.add_child(str_lab)
 	if ff != null and "formation_id" in ff:
 		counter.set_meta("formation_id", str(ff.formation_id))
 		counter.set_meta("formation", ff)
@@ -21505,6 +21520,71 @@ func _update_unit_icons_for_test() -> void:
 	_rebuild_demo_unit_icons({})
 
 
+## Park GER/FRA land on the Maginot edge so F5 has pickable strength chips.
+func ensure_playable_front_chips() -> Dictionary:
+	const GER_FRONT := 710173
+	const FRA_FRONT := 710739
+	var result := {"ok": false, "ger": 0, "fra": 0, "ger_pid": GER_FRONT, "fra_pid": FRA_FRONT}
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+		return result
+	var ger_land: Array = []
+	for f in LeaderManager.get_formations_for_country("GER"):
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft == Formation.TYPE_DIVISION or ft == Formation.TYPE_GARRISON:
+			ger_land.append(f)
+	var fra_land: Array = []
+	for f2 in LeaderManager.get_formations_for_country("FRA"):
+		if f2 == null:
+			continue
+		var ft2 := str(f2.formation_type) if "formation_type" in f2 else ""
+		if ft2 == Formation.TYPE_DIVISION or ft2 == Formation.TYPE_GARRISON:
+			fra_land.append(f2)
+	var ger_nbr := -1
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_adjacent_provinces"):
+		for nv in MapManager.get_adjacent_provinces(GER_FRONT, true):
+			var nid := int(nv)
+			if nid == GER_FRONT or not provinces.has(nid):
+				continue
+			var np: Province = provinces[nid] as Province
+			if np == null or bool(np.is_sea):
+				continue
+			if str(np.owner_tag).strip_edges().to_upper() == "GER":
+				ger_nbr = nid
+				break
+	if ger_land.size() >= 1 and "stationed_province_id" in ger_land[0]:
+		ger_land[0].stationed_province_id = GER_FRONT
+		result["ger"] = int(result["ger"]) + 1
+	if ger_land.size() >= 2 and "stationed_province_id" in ger_land[1]:
+		ger_land[1].stationed_province_id = GER_FRONT
+		result["ger"] = int(result["ger"]) + 1
+	if ger_land.size() >= 3 and ger_nbr > 0 and "stationed_province_id" in ger_land[2]:
+		ger_land[2].stationed_province_id = ger_nbr
+		result["ger"] = int(result["ger"]) + 1
+		result["ger_nbr"] = ger_nbr
+	if fra_land.size() >= 1 and "stationed_province_id" in fra_land[0]:
+		fra_land[0].stationed_province_id = FRA_FRONT
+		result["fra"] = int(result["fra"]) + 1
+	if fra_land.size() >= 2 and "stationed_province_id" in fra_land[1]:
+		fra_land[1].stationed_province_id = FRA_FRONT
+		result["fra"] = int(result["fra"]) + 1
+	show_unit_counters = true
+	_update_unit_icons_for_test()
+	_sync_unit_counter_visibility()
+	_sync_unit_counter_scales()
+	result["ok"] = int(result["ger"]) > 0
+	var graphical := DisplayServer.get_name() != "headless"
+	if graphical and bool(result["ok"]):
+		_center_camera_on_province(GER_FRONT, "soft")
+		_toast_easy_unit_orders()
+	print(
+		"MapRenderer: playable front chips GER=%d FRA=%d pid=%d"
+		% [int(result["ger"]), int(result["fra"]), GER_FRONT]
+	)
+	return result
+
+
 ## Capture/move: rebuild pins for listed pids only (not the full board).
 func _update_unit_icons_for_pids(pids: Array) -> void:
 	var only: Dictionary = {}
@@ -21580,7 +21660,9 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 		var counter := Node2D.new()
 		counter.name = "DemoUnitIcon_" + str(id)
 		counter.position = Vector2(0, -8)
-		# Pass 7: zoom-scaled counters — larger when zoomed in, smaller at strategic view.
+		counter.z_index = 28
+		counter.z_as_relative = false
+		# Inverse-zoom: readable at Europe view, not 15px specks.
 		counter.scale = Vector2.ONE * _unit_counter_scale_for_zoom()
 		# LOD: compact at strategic zoom; hidden only when master toggle off (U).
 		counter.visible = _unit_counters_want_visible()

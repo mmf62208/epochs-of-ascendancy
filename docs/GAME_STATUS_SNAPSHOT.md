@@ -26,7 +26,7 @@ Every Cursor / Grok / human session on this tree:
 
 | Next | Action |
 |------|--------|
-| **Human** | `tools/run_godot.sh --path . res://scenes/TestScenario.tscn` · play §0b items **3–15** · zoom Maginot · pick a pin on `710173` (gold chip, no inspector) · append session notes. M6 20d/60d still open after that. |
+| **Human** | Relaunch F5. **Do not press G / Shift+I for overlays** (toast-only). Click the GER Maginot chip (str % visible) → click own land to MARCH · Ctrl+click FRA to ASSAULT. M6 20d/60d still open. |
 | **Machine** | `--quick` **PASS** (venv numpy/Pillow). Remaining machine: Godot headless on a 4.7.1 host. Soft 30fps still FAIL honest. |
 | **GitHub** | Branch `eoa/l1-war-loop-slice` (this stack). Do not force-push over June Cursor history. |
 
@@ -35,7 +35,8 @@ Every Cursor / Grok / human session on this tree:
 - §0b first-session surfaces are **machine-composited** (`first_session_play_surface_product` ANDs eight prior builders **+ unit_pick**). That is **not** M6.
 - Assault hang-class **closed** at `30910c2` (greps green: fill-pids, no full icon rebuild, BM notify `target_pid`, success-path busy clears in `_assault_post_ui_light`; failure still clears synchronously).
 - Interactive multi-AI tag-scope is on the **official gate** (`test_interactive_multi_ai_day_product` in `eoa_full_test_gates.sh`).
-- **L1 living counters landed (machine):** pin-first hit disk 48px / floor 20 · gold chip · **compact chips stay pickable at strategic zoom** · nation plate + **org/str bars on the chip** · docked HUD card · `[` `]` stack.
+- **L1 living counters landed (machine):** pin-first hit disk 48px / floor 20 · gold chip · **inverse-zoom chips (~36–44 screen px at Europe)** · nation plate + **org/str bars + str %** · GER/FRA parked on Maginot `710173`/`710739` · docked HUD card · `[` `]` stack.
+- **L1 G/WarLoop hang-class (playtest):** **G** and **L-on** no longer BFS a 3520 corridor on the key frame (toast: click chip → march / Ctrl+click assault). Shift+I stays toast-only. `highlight_supply_corridor` still exists for tests.
 - **L1 march live (machine):** click friendly land enqueues `enqueue_own_land_march`. TimeManager walks one hop per day. Amber path preview.
 - **L1 multi-day battle live (machine):** `start_land_battle` opens a front (empty defender still instant). TimeManager `_tick_open_land_battles` drains org 2–6 days; attacker win calls `execute_province_assault` (resolve-only). `LandBattleBubbleLayer` + card Halt/Withdraw/Assign. Template power via `LandCombatPower` (armor ≠ infantry).
 - **L1 reinforce + width (machine):** march onto `from_id`/`to_id` of an open fight calls `try_reinforce_land_battle`. Combat width (terrain/infra) caps engaged power; overflow ×0.35. Bubble shows `2v1`.
