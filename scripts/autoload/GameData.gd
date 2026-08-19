@@ -5598,6 +5598,16 @@ func apply_designer_field_live(step: String = "stats", province_id: int = 1, dom
 		seeded += 1
 		if has_method("apply_order_panel_action"):
 			apply_order_panel_action("apply_production", province_id)
+		# Living map unit: designer field must land a selectable chip (Maginot for dual pid 1).
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("field_designed_unit"):
+			var map_pid := int(province_id)
+			if map_pid < 1000:
+				map_pid = 710173
+			var did := str(st.get("variant_id", "")).strip_edges()
+			if did.is_empty():
+				did = "panzer_iii_j_medium" if dom == "land" else did
+			if not did.is_empty():
+				st["map_field"] = LeaderManager.field_designed_unit("GER", did, map_pid, dom)
 	st["seeded"] = seeded
 	st["combat"] = combat
 	st["tick_count"] = int(st.get("tick_count", 0)) + 1

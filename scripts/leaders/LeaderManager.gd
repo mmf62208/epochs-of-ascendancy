@@ -454,6 +454,90 @@ func register_formation(formation: Formation) -> void:
 	invalidate_leader_cache(formation.country_tag)
 
 
+## Field a designer template as a living map unit (selectable chip + orders).
+func field_designed_unit(
+	country_tag: String,
+	design_id: String,
+	province_id: int,
+	domain: String = "land",
+) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var did := design_id.strip_edges()
+	var pid := int(province_id)
+	var dom := domain.strip_edges().to_lower()
+	if tag.is_empty() or did.is_empty() or pid <= 0:
+		return {"ok": false, "error": "bad_args"}
+	if pid < 1000:
+		pid = 710173 if tag == "GER" else pid
+		if pid <= 0:
+			return {"ok": false, "error": "no_station"}
+	# Reuse a same-design unit already on this hex.
+	for existing in get_formations_for_country(tag):
+		if existing == null:
+			continue
+		if int(existing.stationed_province_id) != pid:
+			continue
+		var ed := str(existing.design_id) if "design_id" in existing else ""
+		if ed == did:
+			_notify_map_icon_pid(pid)
+			return {
+				"ok": true,
+				"already": true,
+				"formation_id": str(existing.formation_id),
+				"design_id": did,
+				"province_id": pid,
+				"country_tag": tag,
+			}
+	var f := Formation.new()
+	f.formation_id = "fielded_%s_%s_%d" % [tag.to_lower(), did, Time.get_ticks_msec() % 100000]
+	f.country_tag = tag
+	f.name = "%s %s" % [tag, did]
+	f.organization = 1.0
+	f.readiness = 1.0
+	f.strength = 1.0
+	f.stationed_province_id = pid
+	match dom:
+		"naval":
+			f.formation_type = Formation.TYPE_FLEET
+			f.naval_design_id = did
+		"air":
+			f.formation_type = Formation.TYPE_AIR_WING
+			f.air_design_id = did
+		"space":
+			f.formation_type = Formation.TYPE_SPACE_WING
+			f.design_id = did
+		_:
+			f.formation_type = Formation.TYPE_DIVISION
+			f.design_id = did
+			f.current_land_mission = Formation.LAND_MISSION_ASSAULT
+	register_formation(f)
+	_notify_map_icon_pid(pid)
+	print(
+		"LeaderManager: fielded designer unit %s design=%s @%d"
+		% [f.formation_id, did, pid]
+	)
+	return {
+		"ok": true,
+		"already": false,
+		"formation_id": f.formation_id,
+		"design_id": did,
+		"province_id": pid,
+		"country_tag": tag,
+		"formation_type": f.formation_type,
+	}
+
+
+func _notify_map_icon_pid(pid: int) -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr == null:
+		mr = tree.root.find_child("WorldMap", true, false)
+	if mr != null and mr.has_method("_update_unit_icons_for_pids"):
+		mr.call_deferred("_update_unit_icons_for_pids", [pid])
+
+
 func get_formation(formation_id: String) -> Formation:
 	return formations.get(formation_id) as Formation
 

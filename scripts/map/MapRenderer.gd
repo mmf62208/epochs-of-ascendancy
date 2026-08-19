@@ -21547,6 +21547,15 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 		var ft := str(f.formation_type) if "formation_type" in f else ""
 		if ft == Formation.TYPE_DIVISION or ft == Formation.TYPE_GARRISON:
 			ger_land.append(f)
+	if ger_land.is_empty() and LeaderManager.has_method("field_designed_unit"):
+		LeaderManager.field_designed_unit("GER", "panzer_iii_j_medium", GER_FRONT, "land")
+		ger_land.clear()
+		for f3 in LeaderManager.get_formations_for_country("GER"):
+			if f3 == null:
+				continue
+			var ft3 := str(f3.formation_type) if "formation_type" in f3 else ""
+			if ft3 == Formation.TYPE_DIVISION or ft3 == Formation.TYPE_GARRISON:
+				ger_land.append(f3)
 	var fra_land: Array = []
 	for f2 in LeaderManager.get_formations_for_country("FRA"):
 		if f2 == null:
@@ -21568,6 +21577,9 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 				break
 	if ger_land.size() >= 1 and "stationed_province_id" in ger_land[0]:
 		ger_land[0].stationed_province_id = GER_FRONT
+		if "design_id" in ger_land[0] and str(ger_land[0].design_id).is_empty():
+			ger_land[0].design_id = "panzer_iii_j_medium"
+		result["design_id"] = str(ger_land[0].design_id) if "design_id" in ger_land[0] else ""
 		result["ger"] = int(result["ger"]) + 1
 	if ger_land.size() >= 2 and "stationed_province_id" in ger_land[1]:
 		ger_land[1].stationed_province_id = GER_FRONT

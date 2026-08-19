@@ -72,6 +72,7 @@ func _run() -> void:
 	if not _setup_map_renderer_pins():
 		return
 	_test_front_chips()
+	_test_designer_field()
 	_test_march_and_assault()
 	_cleanup()
 
@@ -283,6 +284,47 @@ func _test_front_chips() -> void:
 		_fail("chip missing OrgBar/StrBar")
 	else:
 		_pass("chip OrgBar+StrBar present")
+
+
+func _test_designer_field() -> void:
+	var dm: Node = _autoload("DesignManager")
+	var did := "custom_ger_land_qa"
+	if dm != null and dm.has_method("register_custom_design"):
+		var reg: Dictionary = dm.call(
+			"register_custom_design",
+			ATT_TAG,
+			{"id": did, "design_id": did, "domain": "land", "modules": ["land_main", "land_engine"]},
+		)
+		print("  [INFO] register_custom_design %s" % str(reg))
+		if not bool(reg.get("ok", false)):
+			_fail("register_custom_design failed")
+			return
+		_pass("designer registered %s" % did)
+	if _lm == null or not _lm.has_method("field_designed_unit"):
+		_fail("field_designed_unit missing")
+		return
+	var fielded: Dictionary = _lm.call("field_designed_unit", ATT_TAG, did, GER_FRONT, "land")
+	print("  [INFO] field_designed_unit %s" % str(fielded))
+	if not bool(fielded.get("ok", false)):
+		_fail("field_designed_unit failed: %s" % str(fielded))
+		return
+	_pass("fielded designer unit %s" % str(fielded.get("formation_id", "")))
+	if _mr.has_method("ensure_playable_front_chips"):
+		_mr.call("ensure_playable_front_chips", false)
+	var ger_f: Object = _ger_on_front()
+	if ger_f == null:
+		_fail("no GER on front after designer field")
+		return
+	var stamped := str(ger_f.design_id) if "design_id" in ger_f else ""
+	if stamped.is_empty():
+		_fail("front GER missing design_id after field")
+		return
+	_pass("front GER design_id=%s" % stamped)
+	var chip: Node = _chip_on(GER_FRONT)
+	if chip == null:
+		_fail("no chip after designer field")
+		return
+	_pass("designer chip still on %d" % GER_FRONT)
 
 
 func _test_march_and_assault() -> void:

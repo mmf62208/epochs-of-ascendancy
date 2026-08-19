@@ -778,6 +778,18 @@ func register_custom_design(country_tag: String, design_data: Dictionary) -> Dic
 	}
 
 
+## Put a frozen designer template on the map as a selectable ordered unit.
+func field_design_on_map(
+	country_tag: String,
+	design_id: String,
+	province_id: int = 710173,
+	domain: String = "land",
+) -> Dictionary:
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("field_designed_unit"):
+		return {"ok": false, "error": "no_field_api"}
+	return LeaderManager.field_designed_unit(country_tag, design_id, province_id, domain)
+
+
 func _register_custom_as_unit_template(country_tag: String, design_id: String, data: Dictionary) -> bool:
 	if typeof(GameData) == TYPE_NIL or GameData.design_data == null:
 		return false

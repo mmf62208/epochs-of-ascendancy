@@ -259,12 +259,29 @@ func _on_finalize() -> void:
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_designer_duties_live"):
 		GameData.apply_designer_duties_live("register", 1, _domain, _current_tag, design_id)
 
+	var fielded_fid := ""
+	if reg_ok and typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("field_design_on_map"):
+		var field_pid := 710173 if _current_tag.to_upper() == "GER" else -1
+		if field_pid < 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):
+			for pv in MapManager.get_provinces_by_owner(_current_tag):
+				var pp = MapManager.get_province(int(pv)) if MapManager.has_method("get_province") else null
+				if pp != null and not bool(pp.is_sea):
+					field_pid = int(pp.id)
+					break
+		if field_pid > 0:
+			var fielded: Dictionary = DesignManager.field_design_on_map(
+				_current_tag, design_id, field_pid, _domain
+			)
+			if bool(fielded.get("ok", false)):
+				fielded_fid = str(fielded.get("formation_id", ""))
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		var suffix := " - registered" if reg_ok else " - saved locally"
+		if not fielded_fid.is_empty():
+			suffix += " · fielded on map · click chip to order"
 		LeaderEventUI.show_toast(
 			"Design finalized: %s (%s, %d modules)%s" % [design_id, _domain, _selected_modules.size(), suffix],
 			5.0,
 			true,
 		)
-	print("[DOMAIN DESIGNER] Finalized %s for %s domain=%s" % [design_id, _current_tag, _domain])
+	print("[DOMAIN DESIGNER] Finalized %s for %s domain=%s fielded=%s" % [design_id, _current_tag, _domain, fielded_fid])
 	queue_free()

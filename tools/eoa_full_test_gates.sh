@@ -127,6 +127,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_land_battle_ai_campaign_product \
     tools.map_generation.tests.test_unit_recovery_replenish_product \
     tools.map_generation.tests.test_living_unit_order_loop_product \
+    tools.map_generation.tests.test_designer_field_map_unit_product \
     -v || fail
 
 run_step unit_save_path \
