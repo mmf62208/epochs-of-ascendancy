@@ -460,6 +460,7 @@ func field_designed_unit(
 	design_id: String,
 	province_id: int,
 	domain: String = "land",
+	extras: Dictionary = {},
 ) -> Dictionary:
 	var tag := country_tag.strip_edges().to_upper()
 	var did := design_id.strip_edges()
@@ -492,10 +493,13 @@ func field_designed_unit(
 	f.formation_id = "fielded_%s_%s_%d" % [tag.to_lower(), did, Time.get_ticks_msec() % 100000]
 	f.country_tag = tag
 	f.name = "%s %s" % [tag, did]
-	f.organization = 1.0
+	f.organization = clampf(float(extras.get("organization", extras.get("org", 1.0))), 0.2, 1.0)
 	f.readiness = 1.0
-	f.strength = 1.0
+	f.strength = clampf(float(extras.get("strength", 1.0)), 0.2, 1.0)
 	f.stationed_province_id = pid
+	var vis := str(extras.get("visual_archetype", "")).strip_edges()
+	if not vis.is_empty():
+		f.set_meta("visual_archetype", vis)
 	match dom:
 		"naval":
 			f.formation_type = Formation.TYPE_FLEET
@@ -524,6 +528,8 @@ func field_designed_unit(
 		"province_id": pid,
 		"country_tag": tag,
 		"formation_type": f.formation_type,
+		"strength": f.strength,
+		"visual_archetype": vis,
 	}
 
 

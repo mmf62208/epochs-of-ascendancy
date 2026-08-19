@@ -325,6 +325,16 @@ func _test_designer_field() -> void:
 		_fail("no chip after designer field")
 		return
 	_pass("designer chip still on %d" % GER_FRONT)
+	var sfx_scr: Script = load("res://scripts/audio/LandBattleSfx.gd") as Script
+	if sfx_scr == null or not sfx_scr.has_method("key_for_unit"):
+		_fail("LandBattleSfx.key_for_unit missing")
+		return
+	var armor_clash := str(sfx_scr.call("key_for_unit", "clash", "armor"))
+	var inf_move := str(sfx_scr.call("key_for_unit", "move", "infantry"))
+	if armor_clash.is_empty() or inf_move.is_empty():
+		_fail("type sfx keys empty")
+		return
+	_pass("type sfx clash=%s move=%s" % [armor_clash, inf_move])
 
 
 func _test_march_and_assault() -> void:

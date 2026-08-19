@@ -742,7 +742,7 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 	_refresh_map_time_ui()
 	var open_n := _sync_land_battle_bubbles()
 	if open_n > 0:
-		_play_map_sfx("map")
+		_play_unit_loop_sfx("clash", _formation_for_sfx())
 		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_open_land_battles"):
 			for raw_b in BattleManager.get_open_land_battles():
 				if typeof(raw_b) != TYPE_DICTIONARY:
@@ -15813,6 +15813,7 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	var cal := int(res.get("calendar_days", 1))
 	var path: Array = res.get("path", []) as Array
 	_highlight_march_path(path)
+	_play_unit_loop_sfx("move", _formation_for_sfx())
 	_show_inspector_toast(
 		"March · %d hop%s · arrives in %d day%s · unpause to walk · %s"
 		% [hops_n, "s" if hops_n != 1 else "", cal, "s" if cal != 1 else "", province.name],
@@ -15874,10 +15875,12 @@ func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictio
 		if _march_path_line != null and is_instance_valid(_march_path_line):
 			_march_path_line.queue_free()
 			_march_path_line = null
+		_play_unit_loop_sfx("arrive", _formation_for_sfx())
 		_show_inspector_toast("Arrived · %s · Ctrl+click enemy to assault" % pname, 4.0)
 		attack_staging_province_id = to_pid
 		debug_combat_attacker_province_id = to_pid
 	else:
+		_play_unit_loop_sfx("move", _formation_for_sfx())
 		_show_inspector_toast("Marching · now at %s" % pname, 2.8)
 
 
@@ -16707,6 +16710,24 @@ func _play_map_action_flair_select(province: Province) -> void:
 		_last_select_flair_msec = Time.get_ticks_msec()
 
 
+func _formation_for_sfx() -> Object:
+	if selected_formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return null
+	if LeaderManager.has_method("get_formation"):
+		return LeaderManager.get_formation(selected_formation_id)
+	return null
+
+
+func _play_unit_loop_sfx(event: String, formation: Object = null) -> void:
+	var kind := "infantry"
+	if formation != null and typeof(LandCombatPower) != TYPE_NIL:
+		kind = str(LandCombatPower.template_kind(formation))
+	var key := "select"
+	if typeof(LandBattleSfx) != TYPE_NIL:
+		key = str(LandBattleSfx.key_for_unit(event, kind))
+	_play_map_sfx(key)
+
+
 func _play_map_sfx(kind: String) -> void:
 	# Pass 56–59: pin focus mute / volume / bus.
 	if kind == "pin_focus" and not get_pin_focus_sfx_enabled():
@@ -16838,7 +16859,7 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		var bat: Dictionary = assault.get("battle", {}) as Dictionary
 		var est := int(bat.get("est_days", 4))
 		_sync_land_battle_bubbles()
-		_play_map_sfx("confirm")
+		_play_unit_loop_sfx("clash", _formation_for_sfx())
 		_show_inspector_toast(
 			"Battle opened · %s · est. %d days · unpause to fight · withdraw from unit card"
 			% [target_province.name, est],
@@ -18996,6 +19017,14 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 		if "strength" in ff:
 			str_v = float(ff.strength)
 	counter.add_child(_make_unit_stat_bars(org_v, str_v))
+	if ff != null and "is_in_combat" in ff and bool(ff.is_in_combat):
+		var pulse := ColorRect.new()
+		pulse.name = "CombatPulse"
+		pulse.size = Vector2(44, 38)
+		pulse.position = Vector2(-22, -18)
+		pulse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pulse.color = Color(0.95, 0.35, 0.18, 0.28)
+		counter.add_child(pulse)
 	var str_lab := Label.new()
 	str_lab.name = "StrNum"
 	str_lab.text = "%d" % int(round(clampf(str_v, 0.0, 1.0) * 100.0))
@@ -21725,6 +21754,10 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 				var tpl = GameData.design_data.get_template(dsn)
 				if tpl != null:
 					arch = str(tpl.visual_archetype).to_lower().strip_edges()
+			if ff.has_meta("visual_archetype"):
+				var meta_arch := str(ff.get_meta("visual_archetype")).strip_edges()
+				if not meta_arch.is_empty():
+					arch = meta_arch.to_lower()
 		var era_folder := "modern"
 		if "ww1" in arch or "ww2" in arch or "interwar" in arch or "191" in dsn or "193" in dsn or "194" in dsn:
 			era_folder = "ww2"

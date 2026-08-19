@@ -34,6 +34,32 @@ static func key_for(event: String) -> String:
 			return "select"
 
 
+## Type-flavored cues still map to existing _SFX_PATHS keys (no new wavs).
+static func key_for_unit(event: String, unit_kind: String = "infantry") -> String:
+	var ev := event.strip_edges().to_lower()
+	var kind := unit_kind.strip_edges().to_lower()
+	var armor := "armor" in kind or "tank" in kind or "panzer" in kind
+	var arty := "artillery" in kind or "rocket" in kind
+	var air := "air" in kind or "fighter" in kind or "bomber" in kind
+	if ev == "move" or ev == "march" or ev == "hop":
+		if armor:
+			return KEY_ORDER_CONFIRM
+		if arty:
+			return KEY_DAILY_CLASH
+		return "select"
+	if ev == "clash" or ev == "combat" or ev == "battle":
+		if armor:
+			return KEY_CAPTURE
+		if arty:
+			return KEY_BOUNCE
+		if air:
+			return "select"
+		return KEY_DAILY_CLASH
+	if ev == "arrive":
+		return KEY_ORDER_CONFIRM
+	return key_for(ev)
+
+
 static func path_for(event: String) -> String:
 	match key_for(event):
 		KEY_ORDER_CONFIRM:

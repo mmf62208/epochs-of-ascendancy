@@ -13,8 +13,22 @@ var _doctrine_key: String = "rugged_redundancy"
 var _domain_option: OptionButton
 var _base_option: OptionButton
 var _doctrine_option: OptionButton
+var _symbol_option: OptionButton
+var _strength_slider: HSlider
+var _org_slider: HSlider
+var _preview: TextureRect
 var _modules_container: VBoxContainer
 var _stats_label: Label
+var _symbol_id: String = "medium_tank"
+var _strength_v: float = 1.0
+var _org_v: float = 1.0
+
+const DOMAIN_SYMBOLS := {
+	"land": ["infantry", "light_tank", "medium_tank", "heavy_tank", "artillery"],
+	"naval": ["destroyer", "cruiser", "submarine", "carrier"],
+	"air": ["fighter", "bomber"],
+	"space": ["rocket"],
+}
 
 const DOMAIN_BASES := {
 	"land": ["chassis_medium_tank", "chassis_light_tank", "chassis_heavy_tank", "infantry_kit"],
@@ -39,8 +53,8 @@ const DOMAIN_DOCTRINES := {
 
 
 func _ready() -> void:
-	title = "Domain Designer"
-	size = Vector2i(520, 640)
+	title = "Unit Designer"
+	size = Vector2i(540, 760)
 	transient = true
 	exclusive = true
 	close_requested.connect(queue_free)
@@ -84,7 +98,7 @@ func _build_ui() -> void:
 	pad.add_child(col)
 
 	var hdr := Label.new()
-	hdr.text = "Full designer duties: catalog, compose, freeze, register"
+	hdr.text = "Pick a symbol, set strength, freeze — the unit appears on the map ready to order."
 	hdr.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(hdr)
 
@@ -118,6 +132,41 @@ func _build_ui() -> void:
 	row_doc.add_child(_doctrine_option)
 	col.add_child(row_doc)
 
+	var row_sym := HBoxContainer.new()
+	row_sym.add_child(_make_lbl("Symbol:"))
+	_symbol_option = OptionButton.new()
+	_symbol_option.item_selected.connect(_on_symbol_selected)
+	row_sym.add_child(_symbol_option)
+	_preview = TextureRect.new()
+	_preview.custom_minimum_size = Vector2(40, 40)
+	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	row_sym.add_child(_preview)
+	col.add_child(row_sym)
+
+	var row_str := HBoxContainer.new()
+	row_str.add_child(_make_lbl("Strength:"))
+	_strength_slider = HSlider.new()
+	_strength_slider.min_value = 0.4
+	_strength_slider.max_value = 1.0
+	_strength_slider.step = 0.05
+	_strength_slider.value = 1.0
+	_strength_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_strength_slider.value_changed.connect(_on_strength_changed)
+	row_str.add_child(_strength_slider)
+	col.add_child(row_str)
+
+	var row_org := HBoxContainer.new()
+	row_org.add_child(_make_lbl("Org:"))
+	_org_slider = HSlider.new()
+	_org_slider.min_value = 0.4
+	_org_slider.max_value = 1.0
+	_org_slider.step = 0.05
+	_org_slider.value = 1.0
+	_org_slider.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_org_slider.value_changed.connect(_on_org_changed)
+	row_org.add_child(_org_slider)
+	col.add_child(row_org)
+
 	var mod_hdr := Label.new()
 	mod_hdr.text = "Modules"
 	col.add_child(mod_hdr)
@@ -141,7 +190,7 @@ func _build_ui() -> void:
 	cancel.pressed.connect(queue_free)
 	btns.add_child(cancel)
 	var finalize_btn := Button.new()
-	finalize_btn.text = "Freeze & Register"
+	finalize_btn.text = "Field on map"
 	finalize_btn.pressed.connect(_on_finalize)
 	btns.add_child(finalize_btn)
 	col.add_child(btns)
@@ -162,6 +211,33 @@ func _on_doctrine_selected(i: int) -> void:
 	if _doctrine_option:
 		_doctrine_key = str(_doctrine_option.get_item_metadata(i))
 		_update_stats()
+
+
+func _on_symbol_selected(i: int) -> void:
+	if _symbol_option:
+		_symbol_id = str(_symbol_option.get_item_metadata(i))
+		_refresh_symbol_preview()
+		_update_stats()
+
+
+func _on_strength_changed(v: float) -> void:
+	_strength_v = clampf(v, 0.4, 1.0)
+	_update_stats()
+
+
+func _on_org_changed(v: float) -> void:
+	_org_v = clampf(v, 0.4, 1.0)
+	_update_stats()
+
+
+func _refresh_symbol_preview() -> void:
+	if _preview == null:
+		return
+	var path := "res://assets/graphics/units/nato/ww2/%s_32.png" % _symbol_id
+	if ResourceLoader.exists(path):
+		_preview.texture = load(path) as Texture2D
+	else:
+		_preview.texture = null
 
 
 func _make_lbl(t: String) -> Label:
@@ -199,7 +275,18 @@ func _refresh_for_domain() -> void:
 			if str(_doctrine_option.get_item_metadata(i)) == _doctrine_key:
 				_doctrine_option.select(i)
 				break
-	title = "Domain Designer - %s (%s)" % [_domain.capitalize(), _current_tag]
+	if _symbol_option:
+		_symbol_option.clear()
+		var syms: Array = DOMAIN_SYMBOLS.get(_domain, ["infantry"]) as Array
+		for s in syms:
+			var sid := str(s)
+			_symbol_option.add_item(sid.replace("_", " ").capitalize())
+			_symbol_option.set_item_metadata(_symbol_option.item_count - 1, sid)
+		if not syms.is_empty():
+			_symbol_id = str(syms[0])
+			_symbol_option.select(0)
+		_refresh_symbol_preview()
+	title = "Unit Designer - %s (%s)" % [_domain.capitalize(), _current_tag]
 	_update_stats()
 
 
@@ -223,8 +310,9 @@ func _update_stats() -> void:
 	var text := "Domain: %s\nBase: %s\nDoctrine: %s\nModules: %d selected\n" % [
 		_domain, _selected_base, _doctrine_key, n,
 	]
+	text += "Symbol: %s  Strength: %.0f%%  Org: %.0f%%\n" % [_symbol_id, _strength_v * 100.0, _org_v * 100.0]
 	text += "Est. Power: %d  Mass: %d  Cost: %d  Rel: %.0f%%\n" % [power, mass, cost, rel * 100.0]
-	text += "\nFreeze registers a custom design for production seed."
+	text += "\nField on map places a selectable chip you can march and assault with."
 	_stats_label.text = text
 
 
@@ -247,6 +335,9 @@ func _on_finalize() -> void:
 		"domain": _domain,
 		"doctrine": _doctrine_key,
 		"frozen": true,
+		"visual_archetype": _symbol_id,
+		"strength": _strength_v,
+		"organization": _org_v,
 	}
 
 	var reg_ok := false
@@ -270,7 +361,8 @@ func _on_finalize() -> void:
 					break
 		if field_pid > 0:
 			var fielded: Dictionary = DesignManager.field_design_on_map(
-				_current_tag, design_id, field_pid, _domain
+				_current_tag, design_id, field_pid, _domain,
+				{"strength": _strength_v, "organization": _org_v, "visual_archetype": _symbol_id},
 			)
 			if bool(fielded.get("ok", false)):
 				fielded_fid = str(fielded.get("formation_id", ""))

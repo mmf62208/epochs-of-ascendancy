@@ -784,10 +784,11 @@ func field_design_on_map(
 	design_id: String,
 	province_id: int = 710173,
 	domain: String = "land",
+	extras: Dictionary = {},
 ) -> Dictionary:
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("field_designed_unit"):
 		return {"ok": false, "error": "no_field_api"}
-	return LeaderManager.field_designed_unit(country_tag, design_id, province_id, domain)
+	return LeaderManager.field_designed_unit(country_tag, design_id, province_id, domain, extras)
 
 
 func _register_custom_as_unit_template(country_tag: String, design_id: String, data: Dictionary) -> bool:
@@ -822,6 +823,8 @@ func _register_custom_as_unit_template(country_tag: String, design_id: String, d
 			visual = "medium_tank"
 			size_cat = "Medium"
 			prod_days = 45.0
+	if str(data.get("visual_archetype", "")).strip_edges() != "":
+		visual = str(data.get("visual_archetype")).strip_edges()
 	var mod_ids: Array = []
 	if data.get("modules") is Array:
 		for m in data.get("modules") as Array:
