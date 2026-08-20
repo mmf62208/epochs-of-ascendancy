@@ -675,6 +675,7 @@ func apply_save_data(data: Dictionary) -> void:
 
 	if data.has("custom_designs"):
 		_custom_designs = (data.get("custom_designs", {}) as Dictionary).duplicate(true)
+		_reregister_custom_templates()
 
 
 ## === Custom designer authoring (full designer duties) ===
@@ -754,6 +755,7 @@ func register_custom_design(country_tag: String, design_data: Dictionary) -> Dic
 	data["frozen"] = true
 	data["custom"] = true
 	data["registered_year"] = get_current_year()
+	data["composition"] = composition_blob_from_data(data)
 	if not _custom_designs.has(tag):
 		_custom_designs[tag] = {}
 	(_custom_designs[tag] as Dictionary)[design_id] = data.duplicate(true)
@@ -874,6 +876,12 @@ func _register_custom_as_unit_template(country_tag: String, design_id: String, d
 		"slots": {},
 		"unlock_year": get_current_year(),
 		"custom": true,
+		"mobility": str(data.get("mobility", "foot")),
+		"armor_element": str(data.get("armor_element", "")),
+		"support": str(data.get("support", "")),
+		"infantry_bns": int(data.get("infantry_bns", 1)),
+		"tank_bns": int(data.get("tank_bns", 0)),
+		"composition": composition_blob_from_data(data),
 	}
 	if dd.has_method("register_runtime_template_from_dict"):
 		var tpl = dd.register_runtime_template_from_dict(tpl_dict)
@@ -883,6 +891,72 @@ func _register_custom_as_unit_template(country_tag: String, design_id: String, d
 	if built == null:
 		return false
 	return bool(dd.register_runtime_template(built))
+
+
+func composition_blob_from_data(data: Dictionary) -> Dictionary:
+	var src: Dictionary = data
+	if data.get("composition") is Dictionary and not (data.get("composition") as Dictionary).is_empty():
+		src = data.get("composition") as Dictionary
+	var mob := str(src.get("mobility", data.get("mobility", "foot"))).strip_edges().to_lower()
+	if mob.is_empty() or mob == "none":
+		mob = "foot"
+	var arm := str(src.get("armor_element", data.get("armor_element", ""))).strip_edges().to_lower()
+	if arm in ["none", "foot"]:
+		arm = ""
+	var sup := str(src.get("support", data.get("support", ""))).strip_edges().to_lower()
+	if sup in ["none", "foot"]:
+		sup = ""
+	var inf_n := clampi(int(src.get("infantry_bns", data.get("infantry_bns", 1))), 1, 6)
+	var tank_n := clampi(int(src.get("tank_bns", data.get("tank_bns", 0))), 0, 3)
+	var vis := str(src.get("visual_archetype", data.get("visual_archetype", ""))).strip_edges()
+	if arm.is_empty():
+		var blob := (vis + " " + str(data.get("id", data.get("design_id", "")))).to_lower()
+		if "heavy" in blob and "tank" in blob:
+			arm = "heavy_tank"
+		elif "light" in blob and "tank" in blob:
+			arm = "light_tank"
+		elif "tank" in blob or "panzer" in blob or "armor" in blob:
+			arm = "medium_tank"
+	if tank_n <= 0 and arm != "":
+		tank_n = 1
+	return {
+		"mobility": mob,
+		"armor_element": arm,
+		"support": sup,
+		"infantry_bns": inf_n,
+		"tank_bns": tank_n,
+		"visual_archetype": vis,
+	}
+
+
+func composition_from_design(country_tag: String, design_id: String) -> Dictionary:
+	var did := design_id.strip_edges()
+	var custom: Dictionary = get_custom_design(country_tag, did)
+	if not custom.is_empty():
+		return composition_blob_from_data(custom)
+	if typeof(GameData) != TYPE_NIL and GameData.design_data != null and GameData.design_data.has_method("get_template"):
+		var tpl = GameData.design_data.get_template(did)
+		if tpl != null:
+			var blob: Dictionary = {}
+			if "composition" in tpl and tpl.composition is Dictionary:
+				blob = (tpl.composition as Dictionary).duplicate(true)
+			if blob.is_empty():
+				blob = {
+					"visual_archetype": str(tpl.visual_archetype) if "visual_archetype" in tpl else "",
+				}
+			return composition_blob_from_data(blob)
+	return composition_blob_from_data({})
+
+
+func _reregister_custom_templates() -> void:
+	for tag_v in _custom_designs.keys():
+		var tag := str(tag_v)
+		var bucket: Dictionary = _custom_designs[tag] as Dictionary
+		for did_v in bucket.keys():
+			var row: Dictionary = bucket[did_v] as Dictionary if bucket[did_v] is Dictionary else {}
+			if row.is_empty():
+				continue
+			_register_custom_as_unit_template(tag, str(did_v), row)
 
 
 func get_custom_design(country_tag: String, design_id: String) -> Dictionary:

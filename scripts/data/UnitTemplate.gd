@@ -53,6 +53,8 @@ extends Resource
 @export var infantry_equipment_per_soldier: float = 1.0
 @export var sustainment_equipment_per_soldier: float = 1.0
 @export var description: String = ""
+## Fielded-template land composition (designer duties). Empty = infer from id/visual.
+@export var composition: Dictionary = {}
 
 
 func get_module_ids() -> Array[String]:
@@ -134,6 +136,11 @@ static func from_dict(data: Dictionary) -> UnitTemplate:
 	tpl.infantry_equipment_per_soldier = float(data.get("infantry_equipment_per_soldier", 1.0))
 	tpl.sustainment_equipment_per_soldier = float(data.get("sustainment_equipment_per_soldier", 1.0))
 	tpl.infantry_equipment_stats = _parse_infantry_equipment_stats(data)
+	tpl.composition = _dict_from_variant(data.get("composition", {}))
+	if tpl.composition.is_empty():
+		for key in ["mobility", "armor_element", "support", "infantry_bns", "tank_bns"]:
+			if data.has(key) and str(data.get(key, "")).strip_edges() != "":
+				tpl.composition[str(key)] = data[key]
 	if tpl.is_infantry_equipment():
 		if tpl.base_type.is_empty():
 			tpl.base_type = "InfantryEquipment"

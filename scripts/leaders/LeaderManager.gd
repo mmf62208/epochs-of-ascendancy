@@ -499,22 +499,14 @@ func field_designed_unit(
 	f.readiness = 1.0
 	f.strength = clampf(float(extras.get("strength", 1.0)), 0.2, 1.0)
 	f.stationed_province_id = pid
-	var vis := str(extras.get("visual_archetype", "")).strip_edges()
-	if not vis.is_empty():
-		f.set_meta("visual_archetype", vis)
-	var mob := str(extras.get("mobility", "")).strip_edges().to_lower()
-	if not mob.is_empty():
-		f.set_meta("mobility", mob)
-	var arm_el := str(extras.get("armor_element", "")).strip_edges().to_lower()
-	if not arm_el.is_empty() and arm_el != "none":
-		f.set_meta("armor_element", arm_el)
-	var sup := str(extras.get("support", "")).strip_edges().to_lower()
-	if not sup.is_empty() and sup != "none":
-		f.set_meta("support", sup)
-	if extras.has("infantry_bns"):
-		f.set_meta("infantry_bns", clampi(int(extras.get("infantry_bns", 1)), 1, 6))
-	if extras.has("tank_bns"):
-		f.set_meta("tank_bns", clampi(int(extras.get("tank_bns", 0)), 0, 3))
+	var stamped: Dictionary = extras.duplicate(true) if extras else {}
+	if typeof(DesignManager) != TYPE_NIL:
+		var from_design: Dictionary = DesignManager.composition_from_design(tag, did)
+		for k in ["mobility", "armor_element", "support", "infantry_bns", "tank_bns", "visual_archetype"]:
+			var cur := str(stamped.get(k, "")).strip_edges()
+			if cur.is_empty() and from_design.has(k):
+				stamped[k] = from_design[k]
+	_stamp_formation_composition(f, stamped)
 	if "fuel_level" in f:
 		f.fuel_level = 1.0
 	match dom:
@@ -551,8 +543,29 @@ func field_designed_unit(
 		"country_tag": tag,
 		"formation_type": f.formation_type,
 		"strength": f.strength,
-		"visual_archetype": vis,
+		"visual_archetype": str(stamped.get("visual_archetype", "")),
 	}
+
+
+func _stamp_formation_composition(f: Formation, extras: Dictionary) -> void:
+	if f == null:
+		return
+	var vis := str(extras.get("visual_archetype", "")).strip_edges()
+	if not vis.is_empty():
+		f.set_meta("visual_archetype", vis)
+	var mob := str(extras.get("mobility", "")).strip_edges().to_lower()
+	if not mob.is_empty() and mob != "none":
+		f.set_meta("mobility", mob)
+	var arm_el := str(extras.get("armor_element", "")).strip_edges().to_lower()
+	if not arm_el.is_empty() and arm_el != "none":
+		f.set_meta("armor_element", arm_el)
+	var sup := str(extras.get("support", "")).strip_edges().to_lower()
+	if not sup.is_empty() and sup != "none":
+		f.set_meta("support", sup)
+	if extras.has("infantry_bns"):
+		f.set_meta("infantry_bns", clampi(int(extras.get("infantry_bns", 1)), 1, 6))
+	if extras.has("tank_bns"):
+		f.set_meta("tank_bns", clampi(int(extras.get("tank_bns", 0)), 0, 3))
 
 
 var organize_priority: String = "field"
@@ -683,6 +696,13 @@ func enqueue_organize(plan: Dictionary) -> Dictionary:
 			f.set_meta("organize_mode", "refit")
 			f.set_meta("organize_target_design", did)
 			f.set_meta("organize_target_strength", tgt_str)
+			var refit_blob: Dictionary = extras.duplicate(true) if extras else {}
+			if typeof(DesignManager) != TYPE_NIL:
+				var from_d: Dictionary = DesignManager.composition_from_design(tag, did)
+				for k in ["mobility", "armor_element", "support", "infantry_bns", "tank_bns", "visual_archetype"]:
+					if str(refit_blob.get(k, "")).strip_edges().is_empty() and from_d.has(k):
+						refit_blob[k] = from_d[k]
+			_stamp_formation_composition(f, refit_blob)
 			converted += 1
 			jobs_out.append({"formation_id": str(f.formation_id), "mode": "refit", "days": 7, "deploy_pid": int(f.stationed_province_id)})
 		if mode == "refit":
@@ -762,6 +782,8 @@ func tick_organize_day() -> Dictionary:
 			var tgt := str(f.get_meta("organize_target_design", ""))
 			if not tgt.is_empty() and "design_id" in f:
 				f.design_id = tgt
+				if typeof(DesignManager) != TYPE_NIL:
+					_stamp_formation_composition(f, DesignManager.composition_from_design(str(f.country_tag), tgt))
 			done.append(str(f.formation_id))
 	var keep: Array = []
 	for job in organize_jobs:

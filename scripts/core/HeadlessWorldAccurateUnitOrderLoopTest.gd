@@ -22,6 +22,7 @@ var _lm: Node = null
 var _mm: Node = null
 var _bm: Node = null
 var _mr: Node = null
+var _designed_fid: String = ""
 
 
 func _init() -> void:
@@ -72,8 +73,8 @@ func _run() -> void:
 	if not _setup_map_renderer_pins():
 		return
 	_test_front_chips()
-	_test_designer_field()
 	_test_organize()
+	_test_designer_field()
 	_test_march_and_assault()
 	_cleanup()
 
@@ -419,26 +420,102 @@ func _test_front_chips() -> void:
 func _test_designer_field() -> void:
 	var dm: Node = _autoload("DesignManager")
 	var did := "custom_ger_land_qa"
+	var design_blob := {
+		"id": did,
+		"design_id": did,
+		"domain": "land",
+		"modules": ["land_main", "land_engine"],
+		"mobility": "truck",
+		"armor_element": "medium_tank",
+		"support": "artillery",
+		"infantry_bns": 3,
+		"tank_bns": 1,
+		"visual_archetype": "medium_tank",
+	}
 	if dm != null and dm.has_method("register_custom_design"):
-		var reg: Dictionary = dm.call(
-			"register_custom_design",
-			ATT_TAG,
-			{"id": did, "design_id": did, "domain": "land", "modules": ["land_main", "land_engine"]},
-		)
+		var reg: Dictionary = dm.call("register_custom_design", ATT_TAG, design_blob)
 		print("  [INFO] register_custom_design %s" % str(reg))
 		if not bool(reg.get("ok", false)):
 			_fail("register_custom_design failed")
 			return
 		_pass("designer registered %s" % did)
+		if dm.has_method("get_custom_design"):
+			var stored: Dictionary = dm.call("get_custom_design", ATT_TAG, did)
+			if int(stored.get("infantry_bns", 0)) != 3 or str(stored.get("mobility", "")) != "truck":
+				_fail("registered template lost composition: %s" % str(stored))
+				return
+			_pass("registered template composition inf=%s mob=%s" % [
+				str(stored.get("infantry_bns")), str(stored.get("mobility")),
+			])
+		if dm.has_method("get_save_data"):
+			var dsave: Dictionary = dm.call("get_save_data")
+			var customs: Dictionary = dsave.get("custom_designs", {}) as Dictionary
+			var ger_c: Dictionary = customs.get(ATT_TAG, {}) as Dictionary if customs.has(ATT_TAG) else {}
+			var row: Dictionary = ger_c.get(did, {}) as Dictionary if ger_c.has(did) else {}
+			if int(row.get("infantry_bns", 0)) != 3:
+				_fail("custom_designs save missing infantry_bns: %s" % str(row))
+				return
+			if dm.has_method("apply_save_data"):
+				dm.call("apply_save_data", dsave)
+				var again: Dictionary = dm.call("get_custom_design", ATT_TAG, did)
+				if int(again.get("infantry_bns", 0)) != 3 or str(again.get("support", "")) != "artillery":
+					_fail("custom design save/load dropped composition: %s" % str(again))
+					return
+				_pass("custom design save/load infantry_bns=3 support=artillery")
 	if _lm == null or not _lm.has_method("field_designed_unit"):
 		_fail("field_designed_unit missing")
 		return
-	var fielded: Dictionary = _lm.call("field_designed_unit", ATT_TAG, did, GER_FRONT, "land")
+	# extras omit composition on purpose — field path must stamp from the registered template
+	var fielded: Dictionary = _lm.call(
+		"field_designed_unit", ATT_TAG, did, GER_FRONT, "land", {"force_new": true}
+	)
 	print("  [INFO] field_designed_unit %s" % str(fielded))
 	if not bool(fielded.get("ok", false)):
 		_fail("field_designed_unit failed: %s" % str(fielded))
 		return
-	_pass("fielded designer unit %s" % str(fielded.get("formation_id", "")))
+	_designed_fid = str(fielded.get("formation_id", ""))
+	_pass("fielded designer unit %s" % _designed_fid)
+	var designed: Object = _lm.call("get_formation", _designed_fid) if _lm.has_method("get_formation") else null
+	if designed == null:
+		_fail("fielded formation missing after stamp")
+		return
+	if str(designed.get_meta("mobility", "")) != "truck":
+		_fail("stored mobility want truck got %s" % str(designed.get_meta("mobility", "")))
+		return
+	if str(designed.get_meta("armor_element", "")) != "medium_tank":
+		_fail("stored armor_element want medium_tank got %s" % str(designed.get_meta("armor_element", "")))
+		return
+	if str(designed.get_meta("support", "")) != "artillery":
+		_fail("stored support want artillery got %s" % str(designed.get_meta("support", "")))
+		return
+	if int(designed.get_meta("infantry_bns", 0)) != 3 or int(designed.get_meta("tank_bns", -1)) != 1:
+		_fail("stored bns want 3/1 got %s/%s" % [
+			str(designed.get_meta("infantry_bns", 0)), str(designed.get_meta("tank_bns", -1)),
+		])
+		return
+	_pass("stored composition truck + medium_tank + artillery 3inf/1tank")
+	var pwr: Script = load("res://scripts/combat/LandCombatPower.gd") as Script
+	if pwr != null and pwr.has_method("template_speed") and pwr.has_method("unit_width"):
+		var spd := float(pwr.call("template_speed", designed))
+		var wid := float(pwr.call("unit_width", designed))
+		if abs(spd - 1.5) > 0.01:
+			_fail("template_speed want 1.5 (slowest tank) got %s" % spd)
+			return
+		if abs(wid - 9.0) > 0.01:
+			_fail("unit_width want 9 (3 inf + 1 med tank) got %s" % wid)
+			return
+		_pass("fielded min-speed=%.1f width=%.0f" % [spd, wid])
+	if _lm.has_method("get_save_data"):
+		var lsave: Dictionary = _lm.call("get_save_data")
+		var forms: Dictionary = lsave.get("formations", {}) as Dictionary
+		var frow: Dictionary = forms.get(_designed_fid, {}) as Dictionary if forms.has(_designed_fid) else {}
+		if str(frow.get("mobility", "")) != "truck" or int(frow.get("infantry_bns", 0)) != 3:
+			_fail("formation save missing composition: %s" % str(frow))
+			return
+		if not frow.has("fuel_level"):
+			_fail("formation save missing fuel_level")
+			return
+		_pass("formation save mobility=truck inf=3 fuel_level")
 	if _mr.has_method("ensure_playable_front_chips"):
 		_mr.call("ensure_playable_front_chips", false)
 	var ger_f: Object = _ger_on_front()
@@ -675,7 +752,13 @@ func _test_organize() -> void:
 
 
 func _test_march_and_assault() -> void:
-	var ger_f: Object = _ger_on_front()
+	var ger_f: Object = null
+	if not _designed_fid.is_empty() and _lm.has_method("get_formation"):
+		ger_f = _lm.call("get_formation", _designed_fid)
+		if ger_f != null:
+			ger_f.stationed_province_id = GER_FRONT
+	if ger_f == null:
+		ger_f = _ger_on_front()
 	if ger_f == null:
 		_fail("march/assault skipped — no GER on front")
 		return

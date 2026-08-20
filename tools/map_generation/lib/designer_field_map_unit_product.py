@@ -42,6 +42,22 @@ def build_designer_field_map_unit_product(*, check_wiring: bool = True) -> Dict[
     wiring["designer_popup_fields"] = popup_fields
     (passes if popup_fields else fails).append("designer_popup_fields")
 
+    extras = "infantry_bns" in pop and "armor_element" in pop and "mobility" in pop
+    wiring["field_extras_composition"] = extras
+    (passes if extras else fails).append("field_extras_composition")
+
+    persist = "func composition_from_design" in dm and "custom_designs" in dm
+    wiring["template_composition_persist"] = persist
+    (passes if persist else fails).append("template_composition_persist")
+
+    stamp = "_stamp_formation_composition" in lm and "composition_from_design" in lm
+    wiring["field_stamps_from_template"] = stamp
+    (passes if stamp else fails).append("field_stamps_from_template")
+
+    existing = "_apply_stored_template" in pop and "Existing template" in pop
+    wiring["existing_template_reload"] = existing
+    (passes if existing else fails).append("existing_template_reload")
+
     live = "field_designed_unit" in gd and "func apply_designer_field_live" in gd
     wiring["field_seed_lands_chip"] = live
     (passes if live else fails).append("field_seed_lands_chip")

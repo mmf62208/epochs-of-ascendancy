@@ -275,6 +275,7 @@ func _build_ui() -> void:
 	_template_row.add_child(_make_lbl("Existing:"))
 	_template_option = OptionButton.new()
 	_template_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_template_option.item_selected.connect(_on_existing_template_selected)
 	_template_row.add_child(_template_option)
 	_template_row.visible = false
 	col.add_child(_template_row)
@@ -381,7 +382,57 @@ func _on_mode_selected(i: int) -> void:
 		_template_row.visible = existing
 	if _refit_check:
 		_refit_check.visible = existing
+	if existing:
+		_apply_stored_template()
 	_update_stats()
+
+
+func _on_existing_template_selected(_i: int) -> void:
+	_apply_stored_template()
+	_update_stats()
+
+
+func _select_option_by_meta(opt: OptionButton, value: String) -> void:
+	if opt == null:
+		return
+	var want := str(value).strip_edges()
+	for i in range(opt.item_count):
+		if str(opt.get_item_metadata(i)) == want:
+			opt.select(i)
+			return
+
+
+func _apply_stored_template() -> void:
+	if _template_option == null or _template_option.item_count <= 0:
+		return
+	var did := str(_template_option.get_item_metadata(_template_option.selected)).strip_edges()
+	if did.is_empty():
+		return
+	var blob: Dictionary = {}
+	if typeof(DesignManager) != TYPE_NIL:
+		blob = DesignManager.composition_from_design(_current_tag, did)
+	if blob.is_empty():
+		return
+	var vis := str(blob.get("visual_archetype", "")).strip_edges()
+	if not vis.is_empty() and _symbol_option:
+		_select_option_by_meta(_symbol_option, vis)
+		_symbol_id = vis
+		_refresh_symbol_preview()
+	_select_option_by_meta(_mobility_option, str(blob.get("mobility", "foot")))
+	_select_option_by_meta(_armor_add_option, str(blob.get("armor_element", "")))
+	var supports: PackedStringArray = PackedStringArray()
+	for part in str(blob.get("support", "")).split(","):
+		var s := part.strip_edges().to_lower()
+		if not s.is_empty() and s != "none" and not supports.has(s):
+			supports.append(s)
+	if _support_option:
+		_select_option_by_meta(_support_option, supports[0] if supports.size() > 0 else "")
+	if _support2_option:
+		_select_option_by_meta(_support2_option, supports[1] if supports.size() > 1 else "")
+	if _inf_bn_spin:
+		_inf_bn_spin.value = clampi(int(blob.get("infantry_bns", 1)), 1, 6)
+	if _tank_bn_spin:
+		_tank_bn_spin.value = clampi(int(blob.get("tank_bns", 0)), 0, 3)
 
 
 func _refresh_organize_options() -> void:
@@ -623,6 +674,18 @@ func _update_stats() -> void:
 		inf_n,
 		tank_n,
 	]
+	var toe: Dictionary = LandCombatPower.equipment_toe(comp)
+	if not toe.is_empty():
+		var bits: PackedStringArray = PackedStringArray()
+		var keys: Array = toe.keys()
+		keys.sort()
+		for k in keys:
+			if bits.size() >= 4:
+				break
+			var short := str(k).replace("_equipment", "").replace("_", " ")
+			bits.append("%s %d" % [short, int(toe[k])])
+		if not bits.is_empty():
+			text += "TOE " + " · ".join(bits) + "\n"
 	var existing := _mode_existing != null and _mode_existing.selected == 1
 	var n_u := int(_count_spin.value) if _count_spin else 1
 	var days := 10 if existing else 14

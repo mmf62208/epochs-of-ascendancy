@@ -680,6 +680,8 @@ def build_unit_composition_combat_product(*, check_wiring: bool = True) -> Dict[
         _ok("popup_artillery", "Artillery" in pop)
         _ok("popup_bns", "infantry_bns" in pop and "tank_bns" in pop)
         _ok("popup_support_ex", "Recon" in pop and "Anti-tank" in pop and "Engineers" in pop)
+        _ok("popup_prefield_stats", "slowest" in pop and "TOE" in pop and "Field on map" in pop)
+        _ok("popup_existing_reload", "_apply_stored_template" in pop and "Existing template" in pop)
         _ok("attr_men", "manpower_lost" in attr and "men" in attr)
         _ok("national_manpower", "adjust_manpower" in attr)
         _ok("attr_fuel", "apply_fuel_burn" in attr or "fuel_level" in attr)
@@ -696,6 +698,10 @@ def build_unit_composition_combat_product(*, check_wiring: bool = True) -> Dict[
         _ok("on_official_quick", "test_unit_composition_combat_product" in gates)
         _ok("harness_comp", "composition_stats" in harness and "manpower_lost" in harness)
         _ok("harness_full", "pierce_mult" in harness and "infantry_bns" in harness)
+        _ok("harness_field_stamp", "force_new" in harness and "template_speed" in harness and "unit_width" in harness)
+        dm = (ROOT / "scripts" / "production" / "DesignManager.gd").read_text(encoding="utf-8") if (ROOT / "scripts" / "production" / "DesignManager.gd").is_file() else ""
+        _ok("design_persist", "func composition_from_design" in dm and "composition_blob_from_data" in dm)
+        _ok("field_from_design", "composition_from_design" in lm and "_stamp_formation_composition" in lm)
 
     ok = len(fails) == 0
     return {

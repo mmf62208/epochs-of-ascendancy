@@ -41,6 +41,7 @@ def build_unit_design_creator_loop_product(*, check_wiring: bool = True) -> Dict
     _ok("no_new_sfx_paths", '"confirm"' in ren and "Sound FX Starter Pack" in ren)
     _ok("combat_pulse", "CombatPulse" in ren)
     _ok("field_extras", "visual_archetype" in lm and "extras" in lm)
+    _ok("field_composition_extras", "infantry_bns" in pop and "mobility" in pop)
     _ok("harness_sfx", "key_for_unit" in harness)
     _ok("on_official_quick", "test_unit_design_creator_loop_product" in gates)
 
