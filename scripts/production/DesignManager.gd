@@ -791,6 +791,13 @@ func field_design_on_map(
 	return LeaderManager.field_designed_unit(country_tag, design_id, province_id, domain, extras)
 
 
+## Recruit / refit through the organize queue (train days, core deploy, field-vs-new priority).
+func enqueue_organize_on_map(plan: Dictionary) -> Dictionary:
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("enqueue_organize"):
+		return {"ok": false, "error": "no_organize_api"}
+	return LeaderManager.enqueue_organize(plan)
+
+
 func _register_custom_as_unit_template(country_tag: String, design_id: String, data: Dictionary) -> bool:
 	if typeof(GameData) == TYPE_NIL or GameData.design_data == null:
 		return false

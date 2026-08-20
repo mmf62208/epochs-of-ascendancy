@@ -22,6 +22,13 @@ var _stats_label: Label
 var _symbol_id: String = "medium_tank"
 var _strength_v: float = 1.0
 var _org_v: float = 1.0
+var _mode_existing: OptionButton
+var _template_option: OptionButton
+var _template_row: HBoxContainer
+var _count_spin: SpinBox
+var _priority_option: OptionButton
+var _deploy_option: OptionButton
+var _refit_check: CheckBox
 
 const DOMAIN_SYMBOLS := {
 	"land": ["infantry", "light_tank", "medium_tank", "heavy_tank", "artillery"],
@@ -54,7 +61,7 @@ const DOMAIN_DOCTRINES := {
 
 func _ready() -> void:
 	title = "Unit Designer"
-	size = Vector2i(540, 760)
+	size = Vector2i(560, 880)
 	transient = true
 	exclusive = true
 	close_requested.connect(queue_free)
@@ -66,6 +73,7 @@ func set_player_tag(tag: String) -> void:
 	_current_tag = tag.strip_edges().to_upper()
 	if _current_tag.is_empty():
 		_current_tag = "USA"
+	_refresh_organize_options()
 
 
 func set_domain(domain: String) -> void:
@@ -98,7 +106,7 @@ func _build_ui() -> void:
 	pad.add_child(col)
 
 	var hdr := Label.new()
-	hdr.text = "Pick a symbol, set strength, freeze — the unit appears on the map ready to order."
+	hdr.text = "Use an existing template or create a new one. New units train over days; existing templates send equipment to the field (org/readiness/strength dip until ready). Deploy on a core province."
 	hdr.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	col.add_child(hdr)
 
@@ -167,6 +175,61 @@ func _build_ui() -> void:
 	row_org.add_child(_org_slider)
 	col.add_child(row_org)
 
+	var org_hdr := Label.new()
+	org_hdr.text = "Organize / recruit"
+	col.add_child(org_hdr)
+
+	var row_mode := HBoxContainer.new()
+	row_mode.add_child(_make_lbl("Template:"))
+	_mode_existing = OptionButton.new()
+	_mode_existing.add_item("New template")
+	_mode_existing.add_item("Existing template")
+	_mode_existing.select(0)
+	_mode_existing.item_selected.connect(_on_mode_selected)
+	row_mode.add_child(_mode_existing)
+	col.add_child(row_mode)
+
+	_template_row = HBoxContainer.new()
+	_template_row.add_child(_make_lbl("Existing:"))
+	_template_option = OptionButton.new()
+	_template_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_template_row.add_child(_template_option)
+	_template_row.visible = false
+	col.add_child(_template_row)
+
+	var row_cnt := HBoxContainer.new()
+	row_cnt.add_child(_make_lbl("Count:"))
+	_count_spin = SpinBox.new()
+	_count_spin.min_value = 1
+	_count_spin.max_value = 8
+	_count_spin.step = 1
+	_count_spin.value = 1
+	row_cnt.add_child(_count_spin)
+	col.add_child(row_cnt)
+
+	var row_pri := HBoxContainer.new()
+	row_pri.add_child(_make_lbl("Priority:"))
+	_priority_option = OptionButton.new()
+	_priority_option.add_item("Field units first")
+	_priority_option.set_item_metadata(0, "field")
+	_priority_option.add_item("New units first")
+	_priority_option.set_item_metadata(1, "new")
+	_priority_option.select(0)
+	row_pri.add_child(_priority_option)
+	col.add_child(row_pri)
+
+	var row_dep := HBoxContainer.new()
+	row_dep.add_child(_make_lbl("Deploy:"))
+	_deploy_option = OptionButton.new()
+	_deploy_option.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row_dep.add_child(_deploy_option)
+	col.add_child(row_dep)
+
+	_refit_check = CheckBox.new()
+	_refit_check.text = "Also refit fielded units (equipment in transit)"
+	_refit_check.visible = false
+	col.add_child(_refit_check)
+
 	var mod_hdr := Label.new()
 	mod_hdr.text = "Modules"
 	col.add_child(mod_hdr)
@@ -230,6 +293,61 @@ func _on_org_changed(v: float) -> void:
 	_update_stats()
 
 
+func _on_mode_selected(i: int) -> void:
+	var existing := i == 1
+	if _template_row:
+		_template_row.visible = existing
+	if _refit_check:
+		_refit_check.visible = existing
+	_update_stats()
+
+
+func _refresh_organize_options() -> void:
+	if _template_option:
+		_template_option.clear()
+		var ids: Array = []
+		if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("get_active_designs"):
+			ids = DesignManager.get_active_designs(_current_tag, _domain)
+		if ids.is_empty() and typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("get_custom_design_ids"):
+			ids = DesignManager.get_custom_design_ids(_current_tag, _domain)
+		if ids.is_empty():
+			match _domain:
+				"naval":
+					ids = ["hull_destroyer"]
+				"air":
+					ids = ["airframe_fighter"]
+				"space":
+					ids = ["bus_satellite"]
+				_:
+					ids = ["panzer_iii_j_medium", "infantry_kit"]
+		for did in ids:
+			var sid := str(did)
+			_template_option.add_item(sid.replace("_", " "))
+			_template_option.set_item_metadata(_template_option.item_count - 1, sid)
+		if _template_option.item_count > 0:
+			_template_option.select(0)
+	if _deploy_option:
+		_deploy_option.clear()
+		var cores: Array = []
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("list_core_deploy_pids"):
+			cores = LeaderManager.list_core_deploy_pids(_current_tag)
+		if cores.is_empty() and _current_tag.to_upper() == "GER":
+			cores = [710173, 710300]
+		for pid_v in cores:
+			var pid := int(pid_v)
+			var label := str(pid)
+			if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+				var p = MapManager.get_province(pid)
+				if p != null:
+					var nm := str(p.name) if "name" in p else ""
+					if not nm.is_empty():
+						label = "%s (%d)" % [nm, pid]
+			_deploy_option.add_item(label)
+			_deploy_option.set_item_metadata(_deploy_option.item_count - 1, pid)
+		if _deploy_option.item_count > 0:
+			_deploy_option.select(0)
+
+
 func _refresh_symbol_preview() -> void:
 	if _preview == null:
 		return
@@ -287,6 +405,7 @@ func _refresh_for_domain() -> void:
 			_symbol_option.select(0)
 		_refresh_symbol_preview()
 	title = "Unit Designer - %s (%s)" % [_domain.capitalize(), _current_tag]
+	_refresh_organize_options()
 	_update_stats()
 
 
@@ -312,7 +431,13 @@ func _update_stats() -> void:
 	]
 	text += "Symbol: %s  Strength: %.0f%%  Org: %.0f%%\n" % [_symbol_id, _strength_v * 100.0, _org_v * 100.0]
 	text += "Est. Power: %d  Mass: %d  Cost: %d  Rel: %.0f%%\n" % [power, mass, cost, rel * 100.0]
-	text += "\nField on map places a selectable chip you can march and assault with."
+	var existing := _mode_existing != null and _mode_existing.selected == 1
+	var n_u := int(_count_spin.value) if _count_spin else 1
+	var days := 10 if existing else 14
+	text += "Organize: %d unit(s) · %d train days · %s first.\n" % [
+		n_u, days, "field" if (_priority_option == null or _priority_option.selected == 0) else "new",
+	]
+	text += "\nField on map places a selectable chip you can march and assault with once trained."
 	_stats_label.text = text
 
 
@@ -325,7 +450,10 @@ func _on_finalize() -> void:
 		elif mods.size() == 1:
 			_selected_modules[str(mods[0])] = true
 
+	var existing := _mode_existing != null and _mode_existing.selected == 1
 	var design_id := "custom_%s_%s_%d" % [_current_tag.to_lower(), _domain, int(Time.get_ticks_msec()) % 100000]
+	if existing and _template_option and _template_option.item_count > 0:
+		design_id = str(_template_option.get_item_metadata(_template_option.selected))
 	var design_data := {
 		"id": design_id,
 		"design_id": design_id,
@@ -340,8 +468,8 @@ func _on_finalize() -> void:
 		"organization": _org_v,
 	}
 
-	var reg_ok := false
-	if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("register_custom_design"):
+	var reg_ok := existing
+	if not existing and typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("register_custom_design"):
 		var res: Dictionary = DesignManager.register_custom_design(_current_tag, design_data)
 		reg_ok = bool(res.get("ok", false))
 		if reg_ok:
@@ -350,30 +478,69 @@ func _on_finalize() -> void:
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_designer_duties_live"):
 		GameData.apply_designer_duties_live("register", 1, _domain, _current_tag, design_id)
 
+	var deploy_pid := 710173 if _current_tag.to_upper() == "GER" else -1
+	if _deploy_option and _deploy_option.item_count > 0:
+		deploy_pid = int(_deploy_option.get_item_metadata(_deploy_option.selected))
+	if deploy_pid <= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):
+		for pv in MapManager.get_provinces_by_owner(_current_tag):
+			var pp = MapManager.get_province(int(pv)) if MapManager.has_method("get_province") else null
+			if pp != null and not bool(pp.is_sea):
+				deploy_pid = int(pp.id)
+				break
+
+	var count := clampi(int(_count_spin.value) if _count_spin else 1, 1, 8)
+	var pri := "field"
+	if _priority_option and _priority_option.item_count > 0:
+		pri = str(_priority_option.get_item_metadata(_priority_option.selected))
+	var plan := {
+		"country_tag": _current_tag,
+		"mode": "existing" if existing else "new",
+		"template_id": design_id,
+		"design_id": design_id,
+		"count": count,
+		"deploy_pid": deploy_pid,
+		"priority": pri,
+		"domain": _domain,
+		"refit_fielded": existing and _refit_check != null and _refit_check.button_pressed,
+		"extras": {
+			"visual_archetype": _symbol_id,
+			"strength": _strength_v,
+			"organization": _org_v,
+			"force_new": true,
+		},
+	}
+
 	var fielded_fid := ""
-	if reg_ok and typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("field_design_on_map"):
-		var field_pid := 710173 if _current_tag.to_upper() == "GER" else -1
-		if field_pid < 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):
-			for pv in MapManager.get_provinces_by_owner(_current_tag):
-				var pp = MapManager.get_province(int(pv)) if MapManager.has_method("get_province") else null
-				if pp != null and not bool(pp.is_sea):
-					field_pid = int(pp.id)
-					break
-		if field_pid > 0:
-			var fielded: Dictionary = DesignManager.field_design_on_map(
-				_current_tag, design_id, field_pid, _domain,
-				{"strength": _strength_v, "organization": _org_v, "visual_archetype": _symbol_id},
-			)
-			if bool(fielded.get("ok", false)):
-				fielded_fid = str(fielded.get("formation_id", ""))
+	var orged: Dictionary = {}
+	if typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("enqueue_organize_on_map"):
+		orged = DesignManager.enqueue_organize_on_map(plan)
+	elif typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("enqueue_organize"):
+		orged = LeaderManager.enqueue_organize(plan)
+	elif reg_ok and typeof(DesignManager) != TYPE_NIL and DesignManager.has_method("field_design_on_map") and deploy_pid > 0:
+		orged = DesignManager.field_design_on_map(
+			_current_tag, design_id, deploy_pid, _domain,
+			{"strength": 0.50, "organization": 0.40, "visual_archetype": _symbol_id, "force_new": true},
+		)
+	if bool(orged.get("ok", false)):
+		var jobs: Array = orged.get("jobs", []) as Array
+		if not jobs.is_empty() and jobs[0] is Dictionary:
+			fielded_fid = str((jobs[0] as Dictionary).get("formation_id", orged.get("formation_id", "")))
+		else:
+			fielded_fid = str(orged.get("formation_id", ""))
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		var suffix := " - registered" if reg_ok else " - saved locally"
 		if not fielded_fid.is_empty():
-			suffix += " · fielded on map · click chip to order"
+			suffix += " · organizing %d · %d days · click chip when trained" % [
+				int(orged.get("count", count)), int(orged.get("train_days", 14)),
+			]
+		elif str(orged.get("error", "")) == "not_core":
+			suffix += " · deploy must be a core province"
 		LeaderEventUI.show_toast(
 			"Design finalized: %s (%s, %d modules)%s" % [design_id, _domain, _selected_modules.size(), suffix],
 			5.0,
 			true,
 		)
-	print("[DOMAIN DESIGNER] Finalized %s for %s domain=%s fielded=%s" % [design_id, _current_tag, _domain, fielded_fid])
+	print("[DOMAIN DESIGNER] Finalized %s for %s domain=%s fielded=%s orged=%s" % [
+		design_id, _current_tag, _domain, fielded_fid, str(orged.get("ok", false)),
+	])
 	queue_free()

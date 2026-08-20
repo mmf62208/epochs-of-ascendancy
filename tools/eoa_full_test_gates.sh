@@ -129,6 +129,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_living_unit_order_loop_product \
     tools.map_generation.tests.test_designer_field_map_unit_product \
     tools.map_generation.tests.test_unit_design_creator_loop_product \
+    tools.map_generation.tests.test_unit_organize_queue_product \
     -v || fail
 
 run_step unit_save_path \

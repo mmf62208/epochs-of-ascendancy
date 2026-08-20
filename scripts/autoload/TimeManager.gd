@@ -293,6 +293,7 @@ func advance_days(days: float) -> void:
 		_tick_own_land_marches()
 		_tick_open_land_battles()
 		_tick_out_of_combat_recovery()
+		_tick_organize_queue()
 		if _should_run_daily_ai_combat():
 			if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("simulate_daily_ai_combat"):
 				BattleManager.simulate_daily_ai_combat()
@@ -331,6 +332,7 @@ func _flush_sim_events() -> void:
 		_tick_own_land_marches()
 		_tick_open_land_battles()
 		_tick_out_of_combat_recovery()
+		_tick_organize_queue()
 	elif kind == "month":
 		var y := int(ev.get("year", 0))
 		var m := int(ev.get("month", 0))
@@ -460,6 +462,11 @@ func _tick_open_land_battles() -> void:
 		print("TimeManager: open land battles resolved=%d" % n)
 
 
+func _tick_organize_queue() -> void:
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("tick_organize_day"):
+		LeaderManager.tick_organize_day()
+
+
 func _tick_out_of_combat_recovery() -> void:
 	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
 		return
@@ -471,6 +478,8 @@ func _tick_out_of_combat_recovery() -> void:
 	for fid in forms:
 		var f: Formation = forms[fid] as Formation
 		if f == null:
+			continue
+		if "is_training" in f and bool(f.is_training):
 			continue
 		if "is_in_combat" in f and bool(f.is_in_combat):
 			continue

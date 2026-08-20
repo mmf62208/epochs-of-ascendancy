@@ -73,6 +73,7 @@ func _run() -> void:
 		return
 	_test_front_chips()
 	_test_designer_field()
+	_test_organize()
 	_test_march_and_assault()
 	_cleanup()
 
@@ -113,6 +114,7 @@ func _setup_maginot_map() -> bool:
 		p.set("is_sea", false)
 		p.set("infrastructure", 4)
 		p.set("development_level", 3)
+		p.set("core_for", [str(row["tag"])])
 		provs[pid] = p
 		if adj_sys.has_method("register_province"):
 			adj_sys.call("register_province", p)
@@ -335,6 +337,137 @@ func _test_designer_field() -> void:
 		_fail("type sfx keys empty")
 		return
 	_pass("type sfx clash=%s move=%s" % [armor_clash, inf_move])
+
+
+func _test_organize() -> void:
+	if _lm == null or not _lm.has_method("enqueue_organize"):
+		_fail("enqueue_organize missing")
+		return
+	if not _lm.has_method("tick_organize_day") or not _lm.has_method("list_core_deploy_pids"):
+		_fail("organize tick/core APIs missing")
+		return
+	var cores: Array = _lm.call("list_core_deploy_pids", ATT_TAG)
+	var has_front := false
+	for c in cores:
+		if int(c) == GER_FRONT or int(c) == GER_REAR:
+			has_front = true
+			break
+	if not has_front:
+		_fail("list_core_deploy_pids missed GER cores: %s" % str(cores))
+		return
+	_pass("core deploy pids n=%d" % cores.size())
+
+	var bad: Dictionary = _lm.call("enqueue_organize", {
+		"country_tag": ATT_TAG,
+		"mode": "new",
+		"template_id": ATT_DESIGN,
+		"count": 1,
+		"deploy_pid": 1,
+		"priority": "field",
+		"domain": "land",
+	})
+	if bool(bad.get("ok", true)) or str(bad.get("error", "")) != "not_core":
+		_fail("core gate failed: %s" % str(bad))
+		return
+	_pass("core gate rejects non-core")
+
+	var spawned: Dictionary = _lm.call("enqueue_organize", {
+		"country_tag": ATT_TAG,
+		"mode": "new",
+		"template_id": "custom_ger_train_qa",
+		"count": 2,
+		"deploy_pid": GER_REAR,
+		"priority": "new",
+		"domain": "land",
+		"extras": {"force_new": true, "visual_archetype": "infantry"},
+	})
+	if not bool(spawned.get("ok", false)) or int(spawned.get("count", 0)) < 2:
+		_fail("multi recruit failed: %s" % str(spawned))
+		return
+	if int(spawned.get("train_days", 0)) != 14:
+		_fail("new train days want 14 got %s" % str(spawned.get("train_days")))
+		return
+	_pass("multi recruit n=%d days=%s" % [int(spawned.get("count", 0)), str(spawned.get("train_days"))])
+
+	var jobs: Array = spawned.get("jobs", []) as Array
+	if jobs.is_empty() or not (jobs[0] is Dictionary):
+		_fail("organize jobs empty")
+		return
+	var fid0 := str((jobs[0] as Dictionary).get("formation_id", ""))
+	var f0: Object = _lm.call("get_formation", fid0)
+	if f0 == null or not bool(f0.get("is_training")):
+		_fail("new unit not training")
+		return
+	var org0 := float(f0.get("organization"))
+	if org0 > 0.45:
+		_fail("new unit org not dipped: %s" % org0)
+		return
+	_pass("new unit training org=%.2f" % org0)
+
+	if _lm.has_method("set_organize_priority"):
+		_lm.call("set_organize_priority", "field", ATT_TAG)
+		_pass("priority field")
+		_lm.call("set_organize_priority", "new", ATT_TAG)
+		_pass("priority new")
+
+	for _i in 14:
+		_lm.call("tick_organize_day")
+	f0 = _lm.call("get_formation", fid0)
+	if f0 == null or bool(f0.get("is_training")) or float(f0.get("organization")) < 0.99:
+		_fail("train did not complete: %s" % str(f0))
+		return
+	_pass("new unit trained org=%.2f" % float(f0.get("organization")))
+
+	var existing: Dictionary = _lm.call("enqueue_organize", {
+		"country_tag": ATT_TAG,
+		"mode": "existing",
+		"template_id": ATT_DESIGN,
+		"count": 1,
+		"deploy_pid": GER_REAR,
+		"priority": "field",
+		"domain": "land",
+		"extras": {"force_new": true},
+	})
+	if not bool(existing.get("ok", false)) or int(existing.get("train_days", 0)) != 10:
+		_fail("existing train days want 10: %s" % str(existing))
+		return
+	_pass("existing template train_days=10")
+
+	var refit: Dictionary = _lm.call("enqueue_organize", {
+		"country_tag": ATT_TAG,
+		"mode": "refit",
+		"template_id": ATT_DESIGN,
+		"count": 1,
+		"deploy_pid": GER_REAR,
+		"priority": "field",
+		"domain": "land",
+	})
+	if not bool(refit.get("ok", false)):
+		_fail("refit failed: %s" % str(refit))
+		return
+	var rjobs: Array = refit.get("jobs", []) as Array
+	var rid := str((rjobs[0] as Dictionary).get("formation_id", "")) if not rjobs.is_empty() and rjobs[0] is Dictionary else ""
+	if rid == GER_FID:
+		_fail("refit hit Maginot GER_FID")
+		return
+	var rf: Object = _lm.call("get_formation", rid)
+	if rf == null:
+		_fail("refit formation missing")
+		return
+	if int(rf.get("stationed_province_id")) != GER_REAR:
+		_fail("refit should prefer deploy pid %d got %s" % [GER_REAR, str(rf.get("stationed_province_id"))])
+		return
+	if float(rf.get("organization")) > 0.70:
+		_fail("refit org not dipped: %s" % str(rf.get("organization")))
+		return
+	_pass("refit org dipped %.2f fid=%s" % [float(rf.get("organization")), rid])
+	for _j in 7:
+		_lm.call("tick_organize_day")
+	rf = _lm.call("get_formation", rid)
+	if rf == null or bool(rf.get("is_training")):
+		_fail("refit did not complete")
+		return
+	_pass("refit ready org=%.2f" % float(rf.get("organization")))
 
 
 func _test_march_and_assault() -> void:

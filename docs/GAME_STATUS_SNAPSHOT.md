@@ -1,6 +1,6 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-17 (L1 land loop + **living unit order loop machine-proven** + AI campaign/infra + 7-day autosave · `--quick` green · board ~3520 · M6 human-only open)  
+**Date:** 2026-08-20 (L1 land loop + living units + **organize/recruit queue** · `--quick` green · board ~3520 · M6 human-only open)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
 **How to keep going:** 5-step protocol in §0. Next human: F5 §0b 3–15 + a 20d unpause (M6 notes). Next machine: only playtest-driven shipped-path fixes. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
@@ -27,7 +27,7 @@ Every Cursor / Grok / human session on this tree:
 | Next | Action |
 |------|--------|
 | **Human** | Not required for units. When you do open the map: Maginot chips sit on the hex (centroid), player is GER. M6 20d/60d still open. |
-| **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS**. Soft 30fps still FAIL honest. |
+| **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS** (organize/train/priority included). Soft 30fps still FAIL honest. |
 | **GitHub** | Branch `eoa/l1-war-loop-slice` (this stack). Do not force-push over June Cursor history. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
@@ -38,6 +38,7 @@ Every Cursor / Grok / human session on this tree:
 - **L1 living unit order loop (machine):** `living_unit_order_loop_product` on `--quick` · `HeadlessWorldAccurateUnitOrderLoopTest` parks GER `710173` / FRA `710739`, proves DemoUnitIcon + org/str/str% + `enqueue_own_land_march` + `start_land_battle`. F5 QA: `EOA_UNIT_ORDER_QA=1`. Inverse-zoom chips + pin-first pick stay grepped.
 - **L1 designer → map unit (machine):** Finalize in DomainDesignPopup / Field seed calls `LeaderManager.field_designed_unit` (via `DesignManager.field_design_on_map`). Custom template becomes a division on Maginot, chip rebuilds, pick/march/assault still **RESULT=PASS**. Product `designer_field_map_unit_product` on `--quick`.
 - **L1 unit creator + loop SFX (machine):** Unit Designer picks NATO **symbol** + **strength/org** sliders, fields that chip. Combat bubble pulses; `LandBattleSfx.key_for_unit` maps armor/infantry **move** and **clash** to existing pack keys (no new wavs). Product `unit_design_creator_loop_product` on `--quick`.
+- **L1 organize / recruit queue (machine):** Designer **existing vs new** template · multi-recruit (1–8) · core-province deploy · field-vs-new equipment priority. New units train 14d (existing template 10d) at reduced org/rdy/str; refit of fielded units 7d with org/rdy/str dip until ready. `LeaderManager.enqueue_organize` + `tick_organize_day` (TimeManager daily). Product `unit_organize_queue_product` on `--quick`. Headless `_test_organize`. Not commercial HOI designer.
 - **L1 G/WarLoop hang-class (playtest):** **G** and **L-on** no longer BFS a 3520 corridor on the key frame (toast: click chip → march / Ctrl+click assault). Shift+I stays toast-only. `highlight_supply_corridor` still exists for tests.
 - **L1 march live (machine):** click friendly land enqueues `enqueue_own_land_march`. TimeManager walks one hop per day. Amber path preview.
 - **L1 multi-day battle live (machine):** `start_land_battle` opens a front (empty defender still instant). TimeManager `_tick_open_land_battles` drains org 2–6 days; attacker win calls `execute_province_assault` (resolve-only). `LandBattleBubbleLayer` + card Halt/Withdraw/Assign. Template power via `LandCombatPower` (armor ≠ infantry).
