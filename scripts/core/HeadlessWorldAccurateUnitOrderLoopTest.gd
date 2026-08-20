@@ -404,13 +404,66 @@ func _test_organize() -> void:
 		return
 	_pass("new unit training org=%.2f" % org0)
 
+	if _mr != null and _mr.has_method("_attach_unit_counter_chrome"):
+		var rear_chip: Node = _chip_on(GER_REAR)
+		if rear_chip == null and _mr.has_method("_update_unit_icons_for_pids"):
+			_mr.call("_update_unit_icons_for_pids", [GER_REAR])
+			rear_chip = _chip_on(GER_REAR)
+		if rear_chip != null:
+			_mr.call("_attach_unit_counter_chrome", rear_chip, f0, Color(0.2, 0.4, 0.2, 1.0))
+			if rear_chip.get_node_or_null("TrainPulse") == null:
+				_fail("TrainPulse missing on training chip")
+				return
+			_pass("TrainPulse on training chip")
+		else:
+			_fail("no rear chip to stamp TrainPulse")
+			return
+
+	var strip_scr: Script = load("res://scripts/ui/UnitCardCombatStrip.gd") as Script
+	if strip_scr == null or not strip_scr.has_method("lines_for"):
+		_fail("UnitCardCombatStrip.lines_for missing")
+		return
+	var strip_txt := "\n".join(strip_scr.call("lines_for", f0))
+	if "Training" not in strip_txt:
+		_fail("card strip missing Training: %s" % strip_txt)
+		return
+	_pass("card strip %s" % strip_txt.replace("\n", " · "))
+
+	if _lm.has_method("get_save_data"):
+		var blob: Dictionary = _lm.call("get_save_data")
+		if str(blob.get("organize_priority", "")) != "new":
+			_fail("save organize_priority want new got %s" % str(blob.get("organize_priority")))
+			return
+		var fblob: Dictionary = blob.get("formations", {}) as Dictionary
+		var saved: Dictionary = fblob.get(fid0, {}) as Dictionary if fblob.has(fid0) else {}
+		if not bool(saved.get("is_training", false)):
+			_fail("save lost is_training for %s" % fid0)
+			return
+		if float(saved.get("organize_days", 0.0)) < 1.0:
+			_fail("save lost organize_days")
+			return
+		_pass("save organize_priority + days")
+
+	if _lm.has_method("organize_equip_share"):
+		var sh_new := float(_lm.call("organize_equip_share", true))
+		if sh_new < 0.99:
+			_fail("new-priority share for training want 1.0 got %s" % sh_new)
+			return
+		_pass("equip share training=%.2f" % sh_new)
+
 	if _lm.has_method("set_organize_priority"):
 		_lm.call("set_organize_priority", "field", ATT_TAG)
 		_pass("priority field")
 		_lm.call("set_organize_priority", "new", ATT_TAG)
 		_pass("priority new")
 
-	for _i in 14:
+	_lm.call("tick_organize_day")
+	f0 = _lm.call("get_formation", fid0)
+	if f0 == null or float(f0.get("organization")) <= org0 + 0.001:
+		_fail("daily organize tick did not raise org")
+		return
+	_pass("daily tick org %.2f → %.2f" % [org0, float(f0.get("organization"))])
+	for _i in 13:
 		_lm.call("tick_organize_day")
 	f0 = _lm.call("get_formation", fid0)
 	if f0 == null or bool(f0.get("is_training")) or float(f0.get("organization")) < 0.99:

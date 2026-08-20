@@ -320,10 +320,14 @@ func _refresh_organize_options() -> void:
 					ids = ["bus_satellite"]
 				_:
 					ids = ["panzer_iii_j_medium", "infantry_kit"]
+		var n_ids := 0
 		for did in ids:
+			if n_ids >= 40:
+				break
 			var sid := str(did)
 			_template_option.add_item(sid.replace("_", " "))
 			_template_option.set_item_metadata(_template_option.item_count - 1, sid)
+			n_ids += 1
 		if _template_option.item_count > 0:
 			_template_option.select(0)
 	if _deploy_option:

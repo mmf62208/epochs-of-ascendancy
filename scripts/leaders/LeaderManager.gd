@@ -597,6 +597,12 @@ func set_organize_priority(mode: String, country_tag: String = "") -> void:
 			ProductionManager.set_unit_priority_reinforcement(fid, want)
 
 
+func organize_equip_share(is_training: bool) -> float:
+	if organize_priority == "new":
+		return 1.0 if is_training else 0.35
+	return 0.35 if is_training else 1.0
+
+
 func enqueue_organize(plan: Dictionary) -> Dictionary:
 	var tag := str(plan.get("country_tag", "")).strip_edges().to_upper()
 	if tag.is_empty():
@@ -624,6 +630,7 @@ func enqueue_organize(plan: Dictionary) -> Dictionary:
 	var pri := str(plan.get("priority", organize_priority)).strip_edges().to_lower()
 	set_organize_priority(pri, tag)
 	var extras: Dictionary = plan.get("extras", {}) as Dictionary if plan.get("extras") is Dictionary else {}
+	var tgt_str := clampf(float(extras.get("strength", extras.get("target_strength", 1.0))), 0.4, 1.0)
 	var jobs_out: Array = []
 	var also_refit := bool(plan.get("refit_fielded", false)) and mode != "refit"
 	if mode == "refit" or also_refit:
@@ -655,10 +662,12 @@ func enqueue_organize(plan: Dictionary) -> Dictionary:
 			f.set_meta("organize_days", 7.0)
 			f.set_meta("organize_mode", "refit")
 			f.set_meta("organize_target_design", did)
+			f.set_meta("organize_target_strength", tgt_str)
 			converted += 1
 			jobs_out.append({"formation_id": str(f.formation_id), "mode": "refit", "days": 7, "deploy_pid": int(f.stationed_province_id)})
 		if mode == "refit":
 			organize_jobs.append_array(jobs_out)
+			_notify_map_icon_pid(pid)
 			return {"ok": converted > 0, "mode": "refit", "count": converted, "jobs": jobs_out, "train_days": 7}
 	for i in n:
 		var field_ex: Dictionary = extras.duplicate(true) if extras else {}
@@ -680,8 +689,10 @@ func enqueue_organize(plan: Dictionary) -> Dictionary:
 			f2.set_meta("organize_days", float(days))
 			f2.set_meta("organize_mode", mode)
 			f2.set_meta("organize_target_design", did)
+			f2.set_meta("organize_target_strength", tgt_str)
 		jobs_out.append({"formation_id": fid, "mode": mode, "days": days, "deploy_pid": pid})
 	organize_jobs.append_array(jobs_out)
+	_notify_map_icon_pid(pid)
 	print("LeaderManager: enqueue_organize mode=%s n=%d days=%d pid=%d" % [mode, jobs_out.size(), days, pid])
 	return {
 		"ok": not jobs_out.is_empty(),
@@ -697,6 +708,7 @@ func enqueue_organize(plan: Dictionary) -> Dictionary:
 func tick_organize_day() -> Dictionary:
 	var done: Array = []
 	var active := 0
+	var touch_pids: Dictionary = {}
 	for f_id in formations:
 		var f: Formation = formations[f_id] as Formation
 		if f == null:
@@ -708,30 +720,83 @@ func tick_organize_day() -> Dictionary:
 		var need := float(f.get_meta("organize_days", 14.0))
 		var t := clampf(f.training_progress / maxf(need, 1.0), 0.0, 1.0)
 		var mode := str(f.get_meta("organize_mode", "new"))
+		var tgt_str := clampf(float(f.get_meta("organize_target_strength", 1.0)), 0.4, 1.0)
 		if mode == "refit":
 			f.organization = 0.65 + 0.35 * t
 			f.readiness = 0.55 + 0.45 * t
-			f.strength = clampf(float(f.strength) + 0.03, 0.2, 1.0)
+			var start_str := clampf(tgt_str * 0.85, 0.2, 1.0)
+			f.strength = start_str + (tgt_str - start_str) * t
 		else:
 			f.organization = 0.40 + 0.60 * t
 			f.readiness = 0.35 + 0.65 * t
-			f.strength = 0.50 + 0.50 * t
+			f.strength = 0.50 + (tgt_str - 0.50) * t
+		var pid := int(f.stationed_province_id)
+		if pid > 0 and touch_pids.size() < 12:
+			touch_pids[pid] = true
 		if f.training_progress + 0.001 >= need:
 			f.is_training = false
 			f.is_trained = true
 			f.organization = 1.0
 			f.readiness = 1.0
-			f.strength = 1.0
+			f.strength = tgt_str
 			var tgt := str(f.get_meta("organize_target_design", ""))
 			if not tgt.is_empty() and "design_id" in f:
 				f.design_id = tgt
 			done.append(str(f.formation_id))
-			_notify_map_icon_pid(int(f.stationed_province_id))
+	var keep: Array = []
+	for job in organize_jobs:
+		if not (job is Dictionary):
+			continue
+		var jf: Formation = get_formation(str((job as Dictionary).get("formation_id", "")))
+		if jf != null and bool(jf.is_training):
+			keep.append(job)
+	organize_jobs = keep
+	if not done.is_empty():
+		var tag := str(get_player_country_tag()) if has_method("get_player_country_tag") else "GER"
+		set_organize_priority(organize_priority, tag)
 	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("daily_reinforcement_tick"):
-		ProductionManager.daily_reinforcement_tick({})
+		ProductionManager.daily_reinforcement_tick(_organize_required_map())
+	for pid_v in touch_pids.keys():
+		_notify_map_icon_pid(int(pid_v))
 	if not done.is_empty():
 		print("LeaderManager: organize ready n=%d" % done.size())
-	return {"ok": true, "active": active, "ready": done}
+	return {"ok": true, "active": active, "ready": done, "priority": organize_priority}
+
+
+func _organize_required_map() -> Dictionary:
+	var required: Dictionary = {}
+	var n_new := 0
+	var n_field := 0
+	for f_id in formations:
+		var f: Formation = formations[f_id] as Formation
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
+			continue
+		if bool(f.is_in_combat):
+			continue
+		if bool(f.is_training):
+			if n_new >= 8:
+				continue
+			var share := organize_equip_share(true)
+			required[str(f.formation_id)] = {
+				"infantry_equipment": maxi(1, int(round(8.0 * share))),
+				"_country_tag": str(f.country_tag),
+			}
+			n_new += 1
+		else:
+			if n_field >= 8:
+				continue
+			if float(f.strength) >= 0.99:
+				continue
+			var share_f := organize_equip_share(false)
+			required[str(f.formation_id)] = {
+				"infantry_equipment": maxi(1, int(round(8.0 * share_f))),
+				"_country_tag": str(f.country_tag),
+			}
+			n_field += 1
+	return required
 
 
 func _notify_map_icon_pid(pid: int) -> void:
@@ -3474,6 +3539,11 @@ func get_save_data() -> Dictionary:
 			"planning": float(f.planning) if "planning" in f else 0.0,
 			"entrenchment": float(f.entrenchment) if "entrenchment" in f else 0.0,
 			"current_land_mission": str(f.current_land_mission) if "current_land_mission" in f else "",
+			"organize_days": float(f.get_meta("organize_days", 0.0)) if f.has_meta("organize_days") else 0.0,
+			"organize_mode": str(f.get_meta("organize_mode", "")) if f.has_meta("organize_mode") else "",
+			"organize_target_design": str(f.get_meta("organize_target_design", "")) if f.has_meta("organize_target_design") else "",
+			"organize_target_strength": float(f.get_meta("organize_target_strength", 1.0)) if f.has_meta("organize_target_strength") else 1.0,
+			"visual_archetype": str(f.get_meta("visual_archetype", "")) if f.has_meta("visual_archetype") else "",
 		}
 
 	return {
@@ -3485,6 +3555,7 @@ func get_save_data() -> Dictionary:
 		"pending_leader_replacements": pending_leader_replacements.duplicate(true),
 		"player_country_tag": player_country_tag,
 		"service_doctrines": service_doctrines.duplicate(true),
+		"organize_priority": organize_priority,
 	}
 
 func apply_save_data(data: Dictionary) -> void:
@@ -3553,6 +3624,8 @@ func apply_save_data(data: Dictionary) -> void:
 			pending_leader_replacements.append(x if x is Dictionary else {})
 	if data.has("player_country_tag"):
 		player_country_tag = str(data["player_country_tag"])
+	if data.has("organize_priority"):
+		organize_priority = "new" if str(data.get("organize_priority")).strip_edges().to_lower() == "new" else "field"
 
 	if data.has("service_doctrines"):
 		service_doctrines = (data["service_doctrines"] as Dictionary).duplicate(true)
@@ -3588,7 +3661,27 @@ func apply_save_data(data: Dictionary) -> void:
 				f.entrenchment = float(fd.get("entrenchment", 0.0))
 			if "current_land_mission" in f and str(fd.get("current_land_mission", "")).strip_edges() != "":
 				f.current_land_mission = str(fd.get("current_land_mission"))
+			if float(fd.get("organize_days", 0.0)) > 0.0:
+				f.set_meta("organize_days", float(fd.get("organize_days")))
+			if str(fd.get("organize_mode", "")).strip_edges() != "":
+				f.set_meta("organize_mode", str(fd.get("organize_mode")))
+			if str(fd.get("organize_target_design", "")).strip_edges() != "":
+				f.set_meta("organize_target_design", str(fd.get("organize_target_design")))
+			if fd.has("organize_target_strength"):
+				f.set_meta("organize_target_strength", clampf(float(fd.get("organize_target_strength", 1.0)), 0.4, 1.0))
+			if str(fd.get("visual_archetype", "")).strip_edges() != "":
+				f.set_meta("visual_archetype", str(fd.get("visual_archetype")))
 			formations[f.formation_id] = f
+		organize_jobs.clear()
+		for fid2 in formations:
+			var ft2: Formation = formations[fid2] as Formation
+			if ft2 != null and bool(ft2.is_training):
+				organize_jobs.append({
+					"formation_id": str(ft2.formation_id),
+					"mode": str(ft2.get_meta("organize_mode", "new")),
+					"days": int(ft2.get_meta("organize_days", 14.0)),
+					"deploy_pid": int(ft2.stationed_province_id),
+				})
 		print("LeaderManager: Restored %d formation locations" % fdata.size())
 
 	print("LeaderManager: Restored %d leaders + positions" % leaders.size())

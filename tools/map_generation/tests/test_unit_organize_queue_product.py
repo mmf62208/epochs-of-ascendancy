@@ -13,10 +13,14 @@ from unit_organize_queue_product import (  # noqa: E402
     EXISTING_TRAIN_DAYS,
     NEW_TRAIN_DAYS,
     REFIT_DAYS,
+    apply_organize_save,
     build_unit_organize_queue_product,
+    equip_share,
+    pack_organize_save,
     plan_organize,
     split_equip_budget,
     tick_stats,
+    training_label,
     unit_organize_queue_integrity,
 )
 
@@ -41,6 +45,17 @@ class TestUnitOrganizeQueueProduct(unittest.TestCase):
         sp = split_equip_budget(10, 8, 8, "field")
         self.assertEqual(sp["field"], 8.0)
         self.assertEqual(sp["new"], 2.0)
+        self.assertEqual(equip_share(is_training=True, priority="field"), 0.35)
+        self.assertEqual(equip_share(is_training=True, priority="new"), 1.0)
+        self.assertIn("Training 5/14d", training_label(mode="new", progress=5, train_days=14))
+        packed = pack_organize_save(
+            priority="new",
+            formations=[{"formation_id": "x", "is_training": True, "training_progress": 2}],
+        )
+        forms = {"x": {"formation_id": "x"}}
+        applied = apply_organize_save(packed, forms)
+        self.assertEqual(int(applied["restored"]), 1)
+        self.assertTrue(forms["x"]["is_training"])
 
     def test_product_wiring(self) -> None:
         p = build_unit_organize_queue_product(check_wiring=True)

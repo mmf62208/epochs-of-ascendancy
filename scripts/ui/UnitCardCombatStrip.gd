@@ -29,6 +29,19 @@ static func lines_for(formation: Object) -> PackedStringArray:
 	if "strength" in formation:
 		str_v = float(formation.get("strength"))
 	lines.append("Strength %.0f%%" % _as_percent(str_v))
+	if "is_training" in formation and bool(formation.get("is_training")):
+		var prog := float(formation.get("training_progress")) if "training_progress" in formation else 0.0
+		var need := 14.0
+		var mode := "new"
+		if formation.has_method("has_meta"):
+			if bool(formation.has_meta("organize_days")):
+				need = float(formation.get_meta("organize_days"))
+			if bool(formation.has_meta("organize_mode")):
+				mode = str(formation.get_meta("organize_mode"))
+		if mode == "refit":
+			lines.append("Refit %d/%dd · org/str recovering" % [int(prog), int(need)])
+		else:
+			lines.append("Training %d/%dd · not combat-ready" % [int(prog), int(need)])
 	return lines
 
 

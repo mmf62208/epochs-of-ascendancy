@@ -71,6 +71,19 @@ class TestUnitCardCombatStripProduct(unittest.TestCase):
             ["XP Seasoned", "Entrenchment 80%", "Strength 100%"],
         )
         self.assertIn("Planning", "\n".join(lines_for({"planning": 0.1})))
+        self.assertIn(
+            "Training 3/14d",
+            "\n".join(
+                lines_for(
+                    {
+                        "is_training": True,
+                        "training_progress": 3,
+                        "organize_days": 14,
+                        "strength": 0.5,
+                    }
+                )
+            ),
+        )
 
     def test_bbcode_and_extras(self) -> None:
         bb = bbcode_for({"combat_experience": 90.0, "strength": 1.0})

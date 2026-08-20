@@ -19025,6 +19025,14 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 		pulse.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		pulse.color = Color(0.95, 0.35, 0.18, 0.28)
 		counter.add_child(pulse)
+	elif ff != null and "is_training" in ff and bool(ff.is_training):
+		var train := ColorRect.new()
+		train.name = "TrainPulse"
+		train.size = Vector2(44, 38)
+		train.position = Vector2(-22, -18)
+		train.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		train.color = Color(0.92, 0.74, 0.22, 0.30)
+		counter.add_child(train)
 	var str_lab := Label.new()
 	str_lab.name = "StrNum"
 	str_lab.text = "%d" % int(round(clampf(str_v, 0.0, 1.0) * 100.0))

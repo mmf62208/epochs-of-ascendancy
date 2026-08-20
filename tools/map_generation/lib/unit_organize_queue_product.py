@@ -14,6 +14,8 @@ ROOT = Path(__file__).resolve().parents[3]
 LEADER = ROOT / "scripts" / "leaders" / "LeaderManager.gd"
 POPUP = ROOT / "scripts" / "ui" / "DomainDesignPopup.gd"
 TM = ROOT / "scripts" / "autoload" / "TimeManager.gd"
+STRIP = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
+RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 GATES = ROOT / "tools" / "eoa_full_test_gates.sh"
 HARNESS = ROOT / "scripts" / "core" / "HeadlessWorldAccurateUnitOrderLoopTest.gd"
 
@@ -98,6 +100,78 @@ def tick_stats(job: Dict[str, Any], days: float = 1.0) -> Dict[str, Any]:
         out["combat_ready"] = False
         out["is_training"] = True
     return out
+
+
+def equip_share(*, is_training: bool, priority: str = PRIORITY_FIELD) -> float:
+    """Daily equipment weight: preferred bucket 1.0, other 0.35."""
+    pri = str(priority or PRIORITY_FIELD).strip().lower()
+    training = bool(is_training)
+    if pri == PRIORITY_NEW:
+        return 1.0 if training else 0.35
+    return 0.35 if training else 1.0
+
+
+def training_label(*, mode: str, progress: float, train_days: float) -> str:
+    need = max(1.0, float(train_days or 1.0))
+    prog = max(0.0, min(need, float(progress or 0.0)))
+    m = str(mode or "new").strip().lower()
+    if m in ("refit", "convert", "existing_field"):
+        return "Refit %d/%dd · org/str recovering" % (int(prog), int(need))
+    return "Training %d/%dd · not combat-ready" % (int(prog), int(need))
+
+
+def pack_organize_save(
+    *,
+    priority: str = PRIORITY_FIELD,
+    formations: Sequence[Dict[str, Any]] | None = None,
+) -> Dict[str, Any]:
+    pri = PRIORITY_NEW if str(priority).strip().lower() == PRIORITY_NEW else PRIORITY_FIELD
+    training: List[Dict[str, Any]] = []
+    for f in formations or []:
+        if not isinstance(f, dict) or not bool(f.get("is_training")):
+            continue
+        training.append(
+            {
+                "formation_id": str(f.get("formation_id", "")),
+                "organize_days": float(f.get("organize_days", NEW_TRAIN_DAYS)),
+                "organize_mode": str(f.get("organize_mode", "new")),
+                "organize_target_design": str(f.get("organize_target_design", "")),
+                "organize_target_strength": clamp01(
+                    float(f.get("organize_target_strength", 1.0)), 0.4, 1.0
+                ),
+                "training_progress": float(f.get("training_progress", 0.0)),
+            }
+        )
+    return {"organize_priority": pri, "training": training}
+
+
+def apply_organize_save(
+    blob: Dict[str, Any] | None,
+    formations: Dict[str, Dict[str, Any]] | None = None,
+) -> Dict[str, Any]:
+    data = blob if isinstance(blob, dict) else {}
+    pri = str(data.get("organize_priority", PRIORITY_FIELD)).strip().lower()
+    if pri != PRIORITY_NEW:
+        pri = PRIORITY_FIELD
+    restored = 0
+    forms = formations if isinstance(formations, dict) else {}
+    for row in data.get("training") or []:
+        if not isinstance(row, dict):
+            continue
+        fid = str(row.get("formation_id", ""))
+        if not fid or fid not in forms:
+            continue
+        f = forms[fid]
+        f["is_training"] = True
+        f["organize_days"] = float(row.get("organize_days", NEW_TRAIN_DAYS))
+        f["organize_mode"] = str(row.get("organize_mode", "new"))
+        f["organize_target_design"] = str(row.get("organize_target_design", ""))
+        f["organize_target_strength"] = clamp01(
+            float(row.get("organize_target_strength", 1.0)), 0.4, 1.0
+        )
+        f["training_progress"] = float(row.get("training_progress", 0.0))
+        restored += 1
+    return {"ok": True, "priority": pri, "restored": restored}
 
 
 def split_equip_budget(
@@ -232,12 +306,56 @@ def build_unit_organize_queue_product(*, check_wiring: bool = True) -> Dict[str,
     else:
         fails.append("priority_split")
 
+    sh_f = equip_share(is_training=True, priority=PRIORITY_FIELD)
+    sh_n = equip_share(is_training=True, priority=PRIORITY_NEW)
+    if sh_f == 0.35 and sh_n == 1.0 and equip_share(is_training=False, priority=PRIORITY_FIELD) == 1.0:
+        passes.append("equip_share")
+    else:
+        fails.append("equip_share")
+
+    lab = training_label(mode="new", progress=5.0, train_days=14.0)
+    if "Training 5/14d" in lab:
+        passes.append("training_label")
+    else:
+        fails.append("training_label")
+
+    packed = pack_organize_save(
+        priority=PRIORITY_NEW,
+        formations=[
+            {
+                "formation_id": "a",
+                "is_training": True,
+                "organize_days": 14,
+                "organize_mode": "new",
+                "organize_target_design": "infantry_kit",
+                "training_progress": 3,
+            },
+            {"formation_id": "b", "is_training": False},
+        ],
+    )
+    restored_forms = {
+        "a": {"formation_id": "a", "is_training": False},
+        "b": {"formation_id": "b", "is_training": False},
+    }
+    applied = apply_organize_save(packed, restored_forms)
+    if (
+        packed.get("organize_priority") == PRIORITY_NEW
+        and int(applied.get("restored", 0)) == 1
+        and bool(restored_forms["a"].get("is_training"))
+        and float(restored_forms["a"].get("training_progress", 0)) == 3.0
+    ):
+        passes.append("save_blob")
+    else:
+        fails.append("save_blob")
+
     if check_wiring:
         lm = LEADER.read_text(encoding="utf-8") if LEADER.is_file() else ""
         pop = POPUP.read_text(encoding="utf-8") if POPUP.is_file() else ""
         tm = TM.read_text(encoding="utf-8") if TM.is_file() else ""
         gates = GATES.read_text(encoding="utf-8") if GATES.is_file() else ""
         harness = HARNESS.read_text(encoding="utf-8") if HARNESS.is_file() else ""
+        strip = STRIP.read_text(encoding="utf-8") if STRIP.is_file() else ""
+        ren = RENDERER.read_text(encoding="utf-8") if RENDERER.is_file() else ""
 
         def _ok(name: str, cond: bool) -> None:
             wiring[name] = cond
@@ -253,6 +371,11 @@ def build_unit_organize_queue_product(*, check_wiring: bool = True) -> Dict[str,
         _ok("tm_tick", "tick_organize_day" in tm)
         _ok("on_official_quick", "test_unit_organize_queue_product" in gates)
         _ok("harness_organize", "enqueue_organize" in harness and "tick_organize_day" in harness)
+        _ok("save_priority", '"organize_priority"' in lm and "organize_days" in lm)
+        _ok("equip_share_api", "func organize_equip_share" in lm)
+        _ok("chip_train_pulse", "TrainPulse" in ren)
+        _ok("card_training_line", "is_training" in strip and "Training" in strip)
+        _ok("harness_save_or_chip", "TrainPulse" in harness or "organize_priority" in harness)
 
     ok = len(fails) == 0
     return {

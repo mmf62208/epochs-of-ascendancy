@@ -78,6 +78,20 @@ def lines_for(formation: Any) -> List[str]:
         except (TypeError, ValueError):
             str_v = 1.0
     out.append("Strength %.0f%%" % _as_percent(str_v))
+    if bool(data.get("is_training")):
+        try:
+            prog = float(data.get("training_progress", 0.0) or 0.0)
+        except (TypeError, ValueError):
+            prog = 0.0
+        try:
+            need = float(data.get("organize_days", data.get("train_days", 14.0)) or 14.0)
+        except (TypeError, ValueError):
+            need = 14.0
+        mode = str(data.get("organize_mode", "new") or "new").strip().lower()
+        if mode in ("refit", "convert"):
+            out.append("Refit %d/%dd · org/str recovering" % (int(prog), int(need)))
+        else:
+            out.append("Training %d/%dd · not combat-ready" % (int(prog), int(need)))
     return out
 
 
