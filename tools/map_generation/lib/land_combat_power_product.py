@@ -238,9 +238,19 @@ def combat_power(formation: Any, terrain: str = "plains", role: str = "", oppone
         soft_c = _read_f(data, ["soft"], 1.0)
         hard_c = _read_f(data, ["hard"], 0.0)
         def_h = _read_f(opp, ["hardness"], 0.0) if opp is not None else 0.0
+        power *= 0.70 + 0.12 * _clamp(soft_c, 0.5, 4.0)
+        power *= 0.92 + 0.08 * _clamp(hard_c, 0.0, 2.0)
         mixed = hardness_mix(soft_c, hard_c, def_h)
-        power *= 0.70 + 0.12 * _clamp(mixed, 0.5, 4.0)
-        power *= absorb_mult(role, _read_f(data, ["breakthrough"], 0.0), _read_f(data, ["defense"], 1.0))
+        power *= _clamp(mixed / max(soft_c, 0.01), 0.50, 1.25)
+        bns = max(
+            _read_f(data, ["infantry_bns"], 1.0) + _read_f(data, ["tank_bns"], 0.0),
+            1.0,
+        )
+        power *= absorb_mult(
+            role,
+            _read_f(data, ["breakthrough"], 0.0) / bns,
+            _read_f(data, ["defense"], 1.0) / bns,
+        )
         if opp is not None and _resolve_combat_role(data, role) != "defend":
             gap = hard_c - _read_f(opp, ["armor"], 0.0)
             power *= _clamp(1.0 + 0.18 * gap, 0.70, 1.35)
@@ -402,11 +412,12 @@ def build_land_combat_power_product() -> Dict[str, Any]:
         breakthrough=0.4,
         defense=3.0,
         hardness=0.0,
+        infantry_bns=1,
+        tank_bns=0,
     )
-    soft_tgt = {"hardness": 0.0, "armor": 0.0}
-    hard_tgt = {"hardness": 0.80, "armor": 0.70}
-    vs_soft = combat_power(inf_comp, "plains", "attack", soft_tgt)
-    vs_hard = combat_power(inf_comp, "plains", "attack", hard_tgt)
+    same_armor = 0.70
+    vs_soft = combat_power(inf_comp, "plains", "attack", {"hardness": 0.10, "armor": same_armor})
+    vs_hard = combat_power(inf_comp, "plains", "attack", {"hardness": 0.55, "armor": same_armor})
     if vs_soft > vs_hard:
         passes.append("attack_vs_hard_differs_from_soft")
     else:
@@ -418,7 +429,56 @@ def build_land_combat_power_product() -> Dict[str, Any]:
     else:
         fails.append("attack_defend_absorb_split")
 
-    if "static func hardness_mix" in gd_src and "static func absorb_mult" in gd_src:
+    from unit_composition_combat_product import compose as _compose
+
+    designed = _compose(
+        mobility="truck",
+        armor="medium_tank",
+        support="artillery",
+        infantry_bns=3,
+        tank_bns=1,
+    )
+    designed_form = _full(
+        design_id="custom_truck_med",
+        soft=float(designed.get("soft", 0)),
+        hard=float(designed.get("hard", 0)),
+        breakthrough=float(designed.get("breakthrough", 0)),
+        defense=float(designed.get("defense", 1)),
+        hardness=float(designed.get("hardness", 0)),
+        infantry_bns=int(designed.get("infantry_bns", 3)),
+        tank_bns=int(designed.get("tank_bns", 1)),
+        armor=float(designed.get("armor", 0)),
+    )
+    st = _compose(mobility="foot", armor="medium_tank", infantry_bns=6, tank_bns=1)
+    ht = _compose(mobility="foot", armor="medium_tank", infantry_bns=1, tank_bns=3)
+    vs_s2 = combat_power(
+        designed_form,
+        "plains",
+        "attack",
+        {"hardness": float(st.get("hardness", 0)), "armor": float(st.get("armor", 0))},
+    )
+    vs_h2 = combat_power(
+        designed_form,
+        "plains",
+        "attack",
+        {"hardness": float(ht.get("hardness", 0)), "armor": float(ht.get("armor", 0))},
+    )
+    same_arm = abs(float(st.get("armor", 0)) - float(ht.get("armor", 0))) < 0.01
+    if same_arm and vs_s2 > vs_h2:
+        passes.append("compose_hardness_changes_power_same_armor")
+    else:
+        fails.append("compose_hardness_changes_power_same_armor")
+    if combat_power(designed_form, "plains", "attack") != combat_power(designed_form, "plains", "defend"):
+        passes.append("compose_attack_absorb_ne_defend")
+    else:
+        fails.append("compose_attack_absorb_ne_defend")
+
+    if (
+        "static func hardness_mix" in gd_src
+        and "static func absorb_mult" in gd_src
+        and "static func hardness_factor" in gd_src
+        and "static func line_battalions" in gd_src
+    ):
         passes.append("gd_hardness_breakthrough")
     else:
         fails.append("gd_hardness_breakthrough")

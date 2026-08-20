@@ -13,9 +13,11 @@ from unit_composition_combat_product import (  # noqa: E402
     absorb_mult,
     build_unit_composition_combat_product,
     compose,
+    composition_absorb,
     daily_losses,
     fuel_burn,
     fuel_speed_mult,
+    hardness_factor,
     hardness_mix,
     manpower_lost,
     pierce_mult,
@@ -72,6 +74,24 @@ class TestUnitCompositionCombatProduct(unittest.TestCase):
         self.assertGreater(float(mixed["breakthrough"]), float(foot["breakthrough"]))
         self.assertGreater(hardness_mix(3.0, 0.3, 0.0), hardness_mix(3.0, 0.3, 0.80))
         self.assertGreater(absorb_mult("attack", 3.0, 1.0), absorb_mult("attack", 0.4, 1.0))
+        designed = compose(
+            mobility="truck",
+            armor="medium_tank",
+            support="artillery",
+            infantry_bns=3,
+            tank_bns=1,
+        )
+        st = compose(mobility="foot", armor="medium_tank", infantry_bns=6, tank_bns=1)
+        ht = compose(mobility="foot", armor="medium_tank", infantry_bns=1, tank_bns=3)
+        self.assertAlmostEqual(float(st["armor"]), float(ht["armor"]))
+        self.assertGreater(float(ht["hardness"]), float(st["hardness"]))
+        self.assertGreater(
+            hardness_factor(designed["soft"], designed["hard"], st["hardness"]),
+            hardness_factor(designed["soft"], designed["hard"], ht["hardness"]),
+        )
+        self.assertNotEqual(composition_absorb("attack", designed), composition_absorb("defend", designed))
+        self.assertLess(composition_absorb("attack", designed), 1.399)
+        self.assertLess(composition_absorb("defend", designed), 1.399)
 
     def test_product_wiring(self) -> None:
         p = build_unit_composition_combat_product(check_wiring=True)

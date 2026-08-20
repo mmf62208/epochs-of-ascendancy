@@ -415,6 +415,16 @@ static func hardness_mix(soft: float, hard: float, defender_hardness: float) -> 
 	return (1.0 - h) * float(soft) + h * float(hard)
 
 
+static func hardness_factor(soft: float, hard: float, defender_hardness: float) -> float:
+	## Ratio of mixed attack to all-soft. Large TOE no longer saturates a 4.0 clamp.
+	var mixed := hardness_mix(soft, hard, defender_hardness)
+	return clampf(mixed / maxf(float(soft), 0.01), 0.50, 1.25)
+
+
+static func line_battalions(comp: Dictionary) -> float:
+	return maxf(float(comp.get("infantry_bns", 1)) + float(comp.get("tank_bns", 0)), 1.0)
+
+
 static func absorb_mult(role: String, breakthrough: float, defense: float) -> float:
 	var r := str(role).strip_edges().to_lower()
 	if r in ["defend", "defender", "defense", "def"]:
@@ -545,21 +555,22 @@ static func combat_power(formation: Object, terrain: String = "plains", role: St
 	if bool(comp.get("has_composition", false)):
 		var soft_c := float(comp.get("soft", 0.0))
 		var hard_c := float(comp.get("hard", 0.0))
+		power *= 0.70 + 0.12 * clampf(soft_c, 0.5, 4.0)
+		power *= 0.92 + 0.08 * clampf(hard_c, 0.0, 2.0)
 		var oc: Dictionary = {}
 		if opponent != null:
 			oc = composition_from_formation(opponent)
-			var mixed := hardness_mix(soft_c, hard_c, float(oc.get("hardness", 0.0)))
-			power *= 0.70 + 0.12 * clampf(mixed, 0.5, 4.0)
-		else:
-			power *= 0.70 + 0.12 * clampf(soft_c, 0.5, 4.0)
-			power *= 0.92 + 0.08 * clampf(hard_c, 0.0, 2.0)
+			power *= hardness_factor(soft_c, hard_c, float(oc.get("hardness", 0.0)))
 		var armor_v := float(comp.get("armor", 0.0))
+		var bns := line_battalions(comp)
+		var bt := float(comp.get("breakthrough", 0.0)) / bns
+		var df := float(comp.get("defense", 1.0)) / bns
 		if _resolve_combat_role(formation, role) == "defend":
 			power *= (1.0 + 0.30 * clampf(armor_v, 0.0, 1.0))
-			power *= absorb_mult("defend", float(comp.get("breakthrough", 0.0)), float(comp.get("defense", 1.0)))
+			power *= absorb_mult("defend", bt, df)
 		else:
 			power *= (1.0 + 0.12 * clampf(armor_v, 0.0, 1.0))
-			power *= absorb_mult("attack", float(comp.get("breakthrough", 0.0)), float(comp.get("defense", 1.0)))
+			power *= absorb_mult("attack", bt, df)
 			if opponent != null:
 				power *= pierce_mult(hard_c, float(oc.get("armor", 0.0)))
 	else:

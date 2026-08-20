@@ -396,6 +396,44 @@ def hardness_mix(soft: float, hard: float, defender_hardness: float) -> float:
     return round((1.0 - h) * s + h * h_atk, 4)
 
 
+def hardness_factor(soft: float, hard: float, defender_hardness: float) -> float:
+    mixed = hardness_mix(soft, hard, defender_hardness)
+    try:
+        s = float(soft)
+    except (TypeError, ValueError):
+        s = 0.0
+    return round(max(0.50, min(1.25, mixed / max(s, 0.01))), 4)
+
+
+def line_battalions(composition: Mapping[str, Any] | None) -> float:
+    if not isinstance(composition, Mapping):
+        return 1.0
+    try:
+        inf_n = int(composition.get("infantry_bns", 1) or 1)
+    except (TypeError, ValueError):
+        inf_n = 1
+    try:
+        tank_n = int(composition.get("tank_bns", 0) or 0)
+    except (TypeError, ValueError):
+        tank_n = 0
+    return float(max(1, inf_n + tank_n))
+
+
+def composition_absorb(role: str, composition: Mapping[str, Any] | None) -> float:
+    """Per-line-battalion absorb so real TOE does not pin the 1.40 cap."""
+    data = composition if isinstance(composition, Mapping) else {}
+    bns = line_battalions(data)
+    try:
+        bt = float(data.get("breakthrough", 0.0) or 0.0) / bns
+    except (TypeError, ValueError):
+        bt = 0.0
+    try:
+        df = float(data.get("defense", 1.0) or 1.0) / bns
+    except (TypeError, ValueError):
+        df = 1.0
+    return absorb_mult(role, bt, df)
+
+
 def absorb_mult(role: str, breakthrough: float, defense: float) -> float:
     """Attacker uses breakthrough; defender uses defense. Extra absorb = more power kept."""
     r = str(role or "").strip().lower()
@@ -710,6 +748,36 @@ def build_unit_composition_combat_product(*, check_wiring: bool = True) -> Dict[
         passes.append("breakthrough_attack_defense_defend")
     else:
         fails.append("breakthrough_attack_defense_defend")
+    designed = compose(
+        mobility="truck",
+        armor="medium_tank",
+        support="artillery",
+        infantry_bns=3,
+        tank_bns=1,
+    )
+    soft_tgt = compose(mobility="foot", armor="medium_tank", infantry_bns=6, tank_bns=1)
+    hard_tgt = compose(mobility="foot", armor="medium_tank", infantry_bns=1, tank_bns=3)
+    same_armor = abs(float(soft_tgt.get("armor", 0)) - float(hard_tgt.get("armor", 0))) < 0.01
+    hf_s = hardness_factor(
+        float(designed.get("soft", 0)),
+        float(designed.get("hard", 0)),
+        float(soft_tgt.get("hardness", 0)),
+    )
+    hf_h = hardness_factor(
+        float(designed.get("soft", 0)),
+        float(designed.get("hard", 0)),
+        float(hard_tgt.get("hardness", 0)),
+    )
+    if same_armor and hf_s > hf_h and float(hard_tgt.get("hardness", 0)) > float(soft_tgt.get("hardness", 0)):
+        passes.append("compose_hardness_same_armor")
+    else:
+        fails.append("compose_hardness_same_armor")
+    att_abs = composition_absorb("attack", designed)
+    def_abs = composition_absorb("defend", designed)
+    if att_abs != def_abs and att_abs < 1.399 and def_abs < 1.399:
+        passes.append("compose_absorb_not_capped")
+    else:
+        fails.append("compose_absorb_not_capped")
     short = shortage_mult({"infantry_equipment": 20}, {"infantry_equipment": 80, "trucks": 24})
     full_fill = shortage_mult({"infantry_equipment": 80, "trucks": 24}, {"infantry_equipment": 80, "trucks": 24})
     if short < 0.85 and abs(full_fill - 1.0) < 0.001 and shortage_mult({}, {"infantry_equipment": 80}) == 1.0:
@@ -750,8 +818,8 @@ def build_unit_composition_combat_product(*, check_wiring: bool = True) -> Dict[
         _ok("speed_min", "func template_speed" in power)
         _ok("equip_toe", "equipment" in power or "EL_EQUIP" in power)
         _ok("gd_pierce", "func pierce_mult" in power)
-        _ok("gd_hardness", "func hardness_mix" in power and "EL_HARDNESS" in power)
-        _ok("gd_breakthrough", "func absorb_mult" in power and "EL_BREAKTHROUGH" in power)
+        _ok("gd_hardness", "func hardness_mix" in power and "EL_HARDNESS" in power and "func hardness_factor" in power)
+        _ok("gd_breakthrough", "func absorb_mult" in power and "EL_BREAKTHROUGH" in power and "line_battalions" in power)
         _ok("popup_bt_hard", "Breakthrough" in pop and "Hardness" in pop)
         _ok("gd_fuel", "fuel_use" in power and "func fuel_speed_mult" in power)
         _ok("gd_width", "EL_WIDTH" in power or '"width"' in power)

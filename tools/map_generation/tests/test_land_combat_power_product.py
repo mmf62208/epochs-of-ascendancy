@@ -24,6 +24,7 @@ from land_combat_power_product import (  # noqa: E402
     template_speed,
     xp_power_mult,
 )
+from unit_composition_combat_product import compose  # noqa: E402
 
 
 def _form(design_id: str, **kw):
@@ -121,12 +122,42 @@ class TestLandCombatPowerProduct(unittest.TestCase):
             defense=3.0,
             hardness=0.0,
         )
-        vs_soft = combat_power(inf, "plains", "attack", {"hardness": 0.0, "armor": 0.0})
-        vs_hard = combat_power(inf, "plains", "attack", {"hardness": 0.80, "armor": 0.70})
+        vs_soft = combat_power(inf, "plains", "attack", {"hardness": 0.10, "armor": 0.70})
+        vs_hard = combat_power(inf, "plains", "attack", {"hardness": 0.55, "armor": 0.70})
         self.assertGreater(vs_soft, vs_hard)
         self.assertNotEqual(
             combat_power(inf, "plains", "attack"),
             combat_power(inf, "plains", "defend"),
+        )
+        designed = compose(
+            mobility="truck",
+            armor="medium_tank",
+            support="artillery",
+            infantry_bns=3,
+            tank_bns=1,
+        )
+        form = _form(
+            "custom_truck_med",
+            soft=float(designed["soft"]),
+            hard=float(designed["hard"]),
+            breakthrough=float(designed["breakthrough"]),
+            defense=float(designed["defense"]),
+            hardness=float(designed["hardness"]),
+            infantry_bns=int(designed["infantry_bns"]),
+            tank_bns=int(designed["tank_bns"]),
+            armor=float(designed["armor"]),
+        )
+        st = compose(mobility="foot", armor="medium_tank", infantry_bns=6, tank_bns=1)
+        ht = compose(mobility="foot", armor="medium_tank", infantry_bns=1, tank_bns=3)
+        self.assertAlmostEqual(float(st["armor"]), float(ht["armor"]))
+        self.assertGreater(float(ht["hardness"]), float(st["hardness"]))
+        self.assertGreater(
+            combat_power(form, "plains", "attack", {"hardness": st["hardness"], "armor": st["armor"]}),
+            combat_power(form, "plains", "attack", {"hardness": ht["hardness"], "armor": ht["armor"]}),
+        )
+        self.assertNotEqual(
+            combat_power(form, "plains", "attack"),
+            combat_power(form, "plains", "defend"),
         )
 
     def test_combat_power_multiplies_leader(self) -> None:

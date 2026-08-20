@@ -518,19 +518,45 @@ func _test_designer_field() -> void:
 				soft_t.set("strength", 1.0)
 				soft_t.set("readiness", 1.0)
 				soft_t.set_meta("mobility", "foot")
+				soft_t.set_meta("armor_element", "medium_tank")
+				soft_t.set_meta("infantry_bns", 6)
+				soft_t.set_meta("tank_bns", 1)
 				var hard_t: Object = form_scr.new()
 				hard_t.set("organization", 1.0)
 				hard_t.set("strength", 1.0)
 				hard_t.set("readiness", 1.0)
-				hard_t.set_meta("armor_element", "heavy_tank")
+				hard_t.set_meta("mobility", "foot")
+				hard_t.set_meta("armor_element", "medium_tank")
 				hard_t.set_meta("infantry_bns", 1)
 				hard_t.set_meta("tank_bns", 3)
+				var oc_s: Dictionary = pwr.call("composition_from_formation", soft_t)
+				var oc_h: Dictionary = pwr.call("composition_from_formation", hard_t)
+				if abs(float(oc_s.get("armor", 0)) - float(oc_h.get("armor", 0))) > 0.01:
+					_fail("same-armor targets required for hardness test a=%.2f b=%.2f" % [
+						float(oc_s.get("armor", 0)), float(oc_h.get("armor", 0)),
+					])
+					return
+				if float(oc_h.get("hardness", 0)) <= float(oc_s.get("hardness", 0)):
+					_fail("hard target hardness not higher")
+					return
 				var vs_soft := float(pwr.call("combat_power", designed, "plains", "attack", soft_t))
 				var vs_hard := float(pwr.call("combat_power", designed, "plains", "attack", hard_t))
 				if vs_soft <= vs_hard:
-					_fail("attack vs_hard should differ (soft-target higher) soft=%.1f hard=%.1f" % [vs_soft, vs_hard])
+					_fail("hardness should change power vs same-armor targets soft=%.1f hard=%.1f" % [vs_soft, vs_hard])
 					return
-				_pass("hardness/pierce vs_hard=%.0f vs_soft=%.0f" % [vs_hard, vs_soft])
+				var dc: Dictionary = pwr.call("composition_from_formation", designed)
+				var bns := maxf(float(dc.get("infantry_bns", 1)) + float(dc.get("tank_bns", 0)), 1.0)
+				var att_a := float(pwr.call("absorb_mult", "attack", float(dc.get("breakthrough", 0)) / bns, float(dc.get("defense", 1)) / bns))
+				var def_a := float(pwr.call("absorb_mult", "defend", float(dc.get("breakthrough", 0)) / bns, float(dc.get("defense", 1)) / bns))
+				if abs(att_a - def_a) < 0.001:
+					_fail("attack absorb should differ from defend absorb att=%.3f def=%.3f" % [att_a, def_a])
+					return
+				var att_p := float(pwr.call("combat_power", designed, "plains", "attack"))
+				var def_p := float(pwr.call("combat_power", designed, "plains", "defend"))
+				if abs(att_p - def_p) < 0.01:
+					_fail("attack power should differ from defend on designed unit att=%.1f def=%.1f" % [att_p, def_p])
+					return
+				_pass("hardness/pierce vs_hard=%.0f vs_soft=%.0f absorb att=%.2f def=%.2f" % [vs_hard, vs_soft, att_a, def_a])
 	if _lm.has_method("get_save_data"):
 		var lsave: Dictionary = _lm.call("get_save_data")
 		var forms: Dictionary = lsave.get("formations", {}) as Dictionary
