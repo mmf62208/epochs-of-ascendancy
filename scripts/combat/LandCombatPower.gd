@@ -93,6 +93,34 @@ const EL_HARD := {
 	"medium_tank": 1.00,
 	"heavy_tank": 1.25,
 }
+const EL_BREAKTHROUGH := {
+	"infantry": 0.40,
+	"motorcycle": 0.50,
+	"truck": 0.60,
+	"halftrack": 0.80,
+	"artillery": 0.20,
+	"recon": 0.30,
+	"engineer": 0.30,
+	"anti_tank": 0.25,
+	"anti_air": 0.20,
+	"light_tank": 1.40,
+	"medium_tank": 1.80,
+	"heavy_tank": 1.40,
+}
+const EL_HARDNESS := {
+	"infantry": 0.0,
+	"motorcycle": 0.0,
+	"truck": 0.05,
+	"halftrack": 0.35,
+	"artillery": 0.05,
+	"recon": 0.0,
+	"engineer": 0.0,
+	"anti_tank": 0.05,
+	"anti_air": 0.05,
+	"light_tank": 0.55,
+	"medium_tank": 0.70,
+	"heavy_tank": 0.85,
+}
 const EL_FUEL := {
 	"infantry": 0.0,
 	"motorcycle": 0.04,
@@ -256,6 +284,9 @@ static func composition_stats(
 	var men := 0
 	var soft := 0.0
 	var hard := 0.0
+	var breakthrough := 0.0
+	var hardness_w := 0.0
+	var hardness_n := 0.0
 	var fuel_use := 0.0
 	var supply_need := 0.0
 	var width := 0.0
@@ -272,6 +303,9 @@ static func composition_stats(
 		men += int(EL_MANPOWER.get(eid, 0)) * n
 		soft += float(EL_SOFT.get(eid, 1.0)) * float(n)
 		hard += float(EL_HARD.get(eid, 0.0)) * float(n)
+		breakthrough += float(EL_BREAKTHROUGH.get(eid, 0.0)) * float(n)
+		hardness_w += float(EL_HARDNESS.get(eid, 0.0)) * float(n)
+		hardness_n += float(n)
 		fuel_use += float(EL_FUEL.get(eid, 0.0)) * float(n)
 		supply_need += float(EL_SUPPLY.get(eid, 0.0)) * float(n)
 		width += float(EL_WIDTH.get(eid, 0.0)) * float(n)
@@ -309,6 +343,8 @@ static func composition_stats(
 		"manpower": men,
 		"soft": soft,
 		"hard": hard,
+		"breakthrough": breakthrough,
+		"hardness": (hardness_w / hardness_n) if hardness_n > 0.0 else 0.0,
 		"fuel_use": fuel_use,
 		"supply_need": supply_need,
 		"width": width,
@@ -372,6 +408,18 @@ static func equipment_toe(comp: Dictionary) -> Dictionary:
 	for k in (raw as Dictionary).keys():
 		out[str(k)] = int((raw as Dictionary)[k])
 	return out
+
+
+static func hardness_mix(soft: float, hard: float, defender_hardness: float) -> float:
+	var h := clampf(float(defender_hardness), 0.0, 1.0)
+	return (1.0 - h) * float(soft) + h * float(hard)
+
+
+static func absorb_mult(role: String, breakthrough: float, defense: float) -> float:
+	var r := str(role).strip_edges().to_lower()
+	if r in ["defend", "defender", "defense", "def"]:
+		return clampf(0.75 + 0.18 * maxf(0.0, float(defense)), 0.75, 1.40)
+	return clampf(0.78 + 0.16 * maxf(0.0, float(breakthrough)), 0.75, 1.40)
 
 
 static func pierce_mult(hard: float, defender_armor: float) -> float:
@@ -496,17 +544,23 @@ static func combat_power(formation: Object, terrain: String = "plains", role: St
 	var comp: Dictionary = composition_from_formation(formation)
 	if bool(comp.get("has_composition", false)):
 		var soft_c := float(comp.get("soft", 0.0))
-		power *= 0.70 + 0.12 * clampf(soft_c, 0.5, 4.0)
 		var hard_c := float(comp.get("hard", 0.0))
-		power *= 0.92 + 0.08 * clampf(hard_c, 0.0, 2.0)
+		var oc: Dictionary = {}
+		if opponent != null:
+			oc = composition_from_formation(opponent)
+			var mixed := hardness_mix(soft_c, hard_c, float(oc.get("hardness", 0.0)))
+			power *= 0.70 + 0.12 * clampf(mixed, 0.5, 4.0)
+		else:
+			power *= 0.70 + 0.12 * clampf(soft_c, 0.5, 4.0)
+			power *= 0.92 + 0.08 * clampf(hard_c, 0.0, 2.0)
 		var armor_v := float(comp.get("armor", 0.0))
 		if _resolve_combat_role(formation, role) == "defend":
 			power *= (1.0 + 0.30 * clampf(armor_v, 0.0, 1.0))
-			power *= clampf(0.75 + 0.20 * float(comp.get("defense", 1.0)), 0.75, 1.35)
+			power *= absorb_mult("defend", float(comp.get("breakthrough", 0.0)), float(comp.get("defense", 1.0)))
 		else:
 			power *= (1.0 + 0.12 * clampf(armor_v, 0.0, 1.0))
+			power *= absorb_mult("attack", float(comp.get("breakthrough", 0.0)), float(comp.get("defense", 1.0)))
 			if opponent != null:
-				var oc: Dictionary = composition_from_formation(opponent)
 				power *= pierce_mult(hard_c, float(oc.get("armor", 0.0)))
 	else:
 		var soft = _try_template_soft_attack(formation)

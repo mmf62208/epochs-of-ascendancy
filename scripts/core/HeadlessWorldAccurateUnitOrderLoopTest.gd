@@ -505,6 +505,32 @@ func _test_designer_field() -> void:
 			_fail("unit_width want 9 (3 inf + 1 med tank) got %s" % wid)
 			return
 		_pass("fielded min-speed=%.1f width=%.0f" % [spd, wid])
+		if pwr.has_method("hardness_mix") and pwr.has_method("combat_power"):
+			var mix_soft := float(pwr.call("hardness_mix", 3.0, 0.3, 0.0))
+			var mix_hard := float(pwr.call("hardness_mix", 3.0, 0.3, 0.80))
+			if mix_soft <= mix_hard:
+				_fail("hardness_mix soft target should beat hard target %.2f vs %.2f" % [mix_soft, mix_hard])
+				return
+			var form_scr: Script = load("res://scripts/formations/Formation.gd") as Script
+			if form_scr != null:
+				var soft_t: Object = form_scr.new()
+				soft_t.set("organization", 1.0)
+				soft_t.set("strength", 1.0)
+				soft_t.set("readiness", 1.0)
+				soft_t.set_meta("mobility", "foot")
+				var hard_t: Object = form_scr.new()
+				hard_t.set("organization", 1.0)
+				hard_t.set("strength", 1.0)
+				hard_t.set("readiness", 1.0)
+				hard_t.set_meta("armor_element", "heavy_tank")
+				hard_t.set_meta("infantry_bns", 1)
+				hard_t.set_meta("tank_bns", 3)
+				var vs_soft := float(pwr.call("combat_power", designed, "plains", "attack", soft_t))
+				var vs_hard := float(pwr.call("combat_power", designed, "plains", "attack", hard_t))
+				if vs_soft <= vs_hard:
+					_fail("attack vs_hard should differ (soft-target higher) soft=%.1f hard=%.1f" % [vs_soft, vs_hard])
+					return
+				_pass("hardness/pierce vs_hard=%.0f vs_soft=%.0f" % [vs_hard, vs_soft])
 	if _lm.has_method("get_save_data"):
 		var lsave: Dictionary = _lm.call("get_save_data")
 		var forms: Dictionary = lsave.get("formations", {}) as Dictionary

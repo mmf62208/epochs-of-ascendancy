@@ -668,8 +668,10 @@ func _update_stats() -> void:
 		float(comp.get("width", 2.0)),
 		float(comp.get("fuel_use", 0.0)),
 	]
-	text += "Defense %.1f · Men %d · %d inf bn · %d tank bn\n" % [
+	text += "Defense %.1f · Breakthrough %.1f · Hardness %.0f%% · Men %d · %d inf bn · %d tank bn\n" % [
 		float(comp.get("defense", 1.0)),
+		float(comp.get("breakthrough", 0.0)),
+		float(comp.get("hardness", 0.0)) * 100.0,
 		int(comp.get("manpower", 3000)),
 		inf_n,
 		tank_n,

@@ -14,8 +14,10 @@ from land_combat_power_product import (  # noqa: E402
     INFANTRY_SPEED,
     LEADER_BONUS_CAP,
     LEADER_DEFEND_ATTACK_SCALE,
+    absorb_mult,
     build_land_combat_power_product,
     combat_power,
+    hardness_mix,
     land_combat_power_integrity,
     leader_power_mult,
     template_kind,
@@ -105,6 +107,26 @@ class TestLandCombatPowerProduct(unittest.TestCase):
                 "defend",
             ),
             1.0 + 0.2 * LEADER_DEFEND_ATTACK_SCALE,
+        )
+
+    def test_hardness_and_breakthrough(self) -> None:
+        self.assertGreater(hardness_mix(3.0, 0.3, 0.0), hardness_mix(3.0, 0.3, 0.80))
+        self.assertGreater(absorb_mult("attack", 3.0, 1.0), absorb_mult("attack", 0.4, 1.0))
+        self.assertGreater(absorb_mult("defend", 0.4, 3.0), absorb_mult("attack", 0.4, 3.0))
+        inf = _form(
+            "infantry_kit",
+            soft=3.0,
+            hard=0.3,
+            breakthrough=0.4,
+            defense=3.0,
+            hardness=0.0,
+        )
+        vs_soft = combat_power(inf, "plains", "attack", {"hardness": 0.0, "armor": 0.0})
+        vs_hard = combat_power(inf, "plains", "attack", {"hardness": 0.80, "armor": 0.70})
+        self.assertGreater(vs_soft, vs_hard)
+        self.assertNotEqual(
+            combat_power(inf, "plains", "attack"),
+            combat_power(inf, "plains", "defend"),
         )
 
     def test_combat_power_multiplies_leader(self) -> None:

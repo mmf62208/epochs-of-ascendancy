@@ -185,7 +185,38 @@ def leader_power_mult(formation: Any, terrain: str = "plains", role: str = "") -
     return 1.0 + _clamp(raw * LEADER_BONUS_SCALE, 0.0, LEADER_BONUS_CAP)
 
 
-def combat_power(formation: Any, terrain: str = "plains", role: str = "") -> float:
+def hardness_mix(soft: float, hard: float, defender_hardness: float) -> float:
+    try:
+        h = _clamp(float(defender_hardness), 0.0, 1.0)
+    except (TypeError, ValueError):
+        h = 0.0
+    try:
+        s = float(soft)
+    except (TypeError, ValueError):
+        s = 0.0
+    try:
+        ha = float(hard)
+    except (TypeError, ValueError):
+        ha = 0.0
+    return (1.0 - h) * s + h * ha
+
+
+def absorb_mult(role: str, breakthrough: float, defense: float) -> float:
+    r = str(role or "").strip().lower()
+    try:
+        bt = max(0.0, float(breakthrough))
+    except (TypeError, ValueError):
+        bt = 0.0
+    try:
+        df = max(0.0, float(defense))
+    except (TypeError, ValueError):
+        df = 0.0
+    if r in _DEFEND_ROLES:
+        return _clamp(0.75 + 0.18 * df, 0.75, 1.40)
+    return _clamp(0.78 + 0.16 * bt, 0.75, 1.40)
+
+
+def combat_power(formation: Any, terrain: str = "plains", role: str = "", opponent: Any = None) -> float:
     data = _as_map(formation)
     if data is None:
         return 0.0
@@ -202,9 +233,21 @@ def combat_power(formation: Any, terrain: str = "plains", role: str = "") -> flo
             power *= ARMOR_MOUNTAIN
     elif kind == "mountain_infantry" and terr == "mountain":
         power *= MOUNTAIN_INFANTRY_MOUNTAIN
-    soft = _soft_attack(data)
-    if soft is not None:
-        power *= 0.7 + 0.3 * soft
+    opp = _as_map(opponent)
+    if "soft" in data or "hardness" in data or "breakthrough" in data:
+        soft_c = _read_f(data, ["soft"], 1.0)
+        hard_c = _read_f(data, ["hard"], 0.0)
+        def_h = _read_f(opp, ["hardness"], 0.0) if opp is not None else 0.0
+        mixed = hardness_mix(soft_c, hard_c, def_h)
+        power *= 0.70 + 0.12 * _clamp(mixed, 0.5, 4.0)
+        power *= absorb_mult(role, _read_f(data, ["breakthrough"], 0.0), _read_f(data, ["defense"], 1.0))
+        if opp is not None and _resolve_combat_role(data, role) != "defend":
+            gap = hard_c - _read_f(opp, ["armor"], 0.0)
+            power *= _clamp(1.0 + 0.18 * gap, 0.70, 1.35)
+    else:
+        soft = _soft_attack(data)
+        if soft is not None:
+            power *= 0.7 + 0.3 * soft
     power *= leader_power_mult(data, terrain, role)
     if "combat_experience" in data and data.get("combat_experience") is not None:
         try:
@@ -338,6 +381,47 @@ def build_land_combat_power_product() -> Dict[str, Any]:
         passes.append("gd_xp_power_mult")
     else:
         fails.append("gd_xp_power_mult")
+
+    if hardness_mix(3.0, 0.3, 0.0) > hardness_mix(3.0, 0.3, 0.80):
+        passes.append("hardness_mix_soft_gt_hard_target")
+    else:
+        fails.append("hardness_mix_soft_gt_hard_target")
+    if absorb_mult("attack", 3.0, 1.0) > absorb_mult("attack", 0.4, 1.0):
+        passes.append("breakthrough_helps_attack")
+    else:
+        fails.append("breakthrough_helps_attack")
+    if absorb_mult("defend", 0.4, 3.0) > absorb_mult("attack", 0.4, 3.0):
+        passes.append("defense_helps_defend")
+    else:
+        fails.append("defense_helps_defend")
+
+    inf_comp = _full(
+        design_id="infantry_kit",
+        soft=3.0,
+        hard=0.3,
+        breakthrough=0.4,
+        defense=3.0,
+        hardness=0.0,
+    )
+    soft_tgt = {"hardness": 0.0, "armor": 0.0}
+    hard_tgt = {"hardness": 0.80, "armor": 0.70}
+    vs_soft = combat_power(inf_comp, "plains", "attack", soft_tgt)
+    vs_hard = combat_power(inf_comp, "plains", "attack", hard_tgt)
+    if vs_soft > vs_hard:
+        passes.append("attack_vs_hard_differs_from_soft")
+    else:
+        fails.append("attack_vs_hard_differs_from_soft")
+    att_p = combat_power(inf_comp, "plains", "attack")
+    def_p = combat_power(inf_comp, "plains", "defend")
+    if def_p != att_p:
+        passes.append("attack_defend_absorb_split")
+    else:
+        fails.append("attack_defend_absorb_split")
+
+    if "static func hardness_mix" in gd_src and "static func absorb_mult" in gd_src:
+        passes.append("gd_hardness_breakthrough")
+    else:
+        fails.append("gd_hardness_breakthrough")
 
     ok = len(fails) == 0
     fixtures: Dict[str, Any] = {

@@ -10,11 +10,13 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from unit_composition_combat_product import (  # noqa: E402
+    absorb_mult,
     build_unit_composition_combat_product,
     compose,
     daily_losses,
     fuel_burn,
     fuel_speed_mult,
+    hardness_mix,
     manpower_lost,
     pierce_mult,
     shortage_mult,
@@ -66,6 +68,10 @@ class TestUnitCompositionCombatProduct(unittest.TestCase):
         self.assertLess(fuel_speed_mult(0.10, 0.20), 0.80)
         self.assertEqual(fuel_speed_mult(1.0, 0.0), 1.0)
         self.assertLess(fuel_burn(1.0, 0.20, "march"), 1.0)
+        self.assertGreater(float(mixed["hardness"]), float(foot["hardness"]))
+        self.assertGreater(float(mixed["breakthrough"]), float(foot["breakthrough"]))
+        self.assertGreater(hardness_mix(3.0, 0.3, 0.0), hardness_mix(3.0, 0.3, 0.80))
+        self.assertGreater(absorb_mult("attack", 3.0, 1.0), absorb_mult("attack", 0.4, 1.0))
 
     def test_product_wiring(self) -> None:
         p = build_unit_composition_combat_product(check_wiring=True)

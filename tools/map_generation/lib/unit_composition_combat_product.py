@@ -32,6 +32,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": False,
         "soft": 1.0,
         "hard": 0.15,
+        "breakthrough": 0.40,
+        "hardness": 0.0,
         "fuel": 0.0,
         "supply": 0.8,
         "width": 2.0,
@@ -45,6 +47,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": True,
         "soft": 0.85,
         "hard": 0.10,
+        "breakthrough": 0.50,
+        "hardness": 0.0,
         "fuel": 0.04,
         "supply": 0.4,
         "width": 0.0,
@@ -58,6 +62,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": True,
         "soft": 1.0,
         "hard": 0.10,
+        "breakthrough": 0.60,
+        "hardness": 0.05,
         "fuel": 0.06,
         "supply": 0.5,
         "width": 0.0,
@@ -71,6 +77,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": True,
         "soft": 1.05,
         "hard": 0.35,
+        "breakthrough": 0.80,
+        "hardness": 0.35,
         "fuel": 0.08,
         "supply": 0.6,
         "width": 0.0,
@@ -84,6 +92,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": False,
         "soft": 1.40,
         "hard": 0.45,
+        "breakthrough": 0.20,
+        "hardness": 0.05,
         "fuel": 0.02,
         "supply": 0.5,
         "width": 0.0,
@@ -97,6 +107,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": False,
         "soft": 0.35,
         "hard": 0.05,
+        "breakthrough": 0.30,
+        "hardness": 0.0,
         "fuel": 0.03,
         "supply": 0.25,
         "width": 0.0,
@@ -110,6 +122,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": False,
         "soft": 0.25,
         "hard": 0.10,
+        "breakthrough": 0.30,
+        "hardness": 0.0,
         "fuel": 0.02,
         "supply": 0.35,
         "width": 0.0,
@@ -123,6 +137,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": False,
         "soft": 0.20,
         "hard": 0.85,
+        "breakthrough": 0.25,
+        "hardness": 0.05,
         "fuel": 0.02,
         "supply": 0.40,
         "width": 0.0,
@@ -136,6 +152,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": False,
         "soft": 0.40,
         "hard": 0.20,
+        "breakthrough": 0.20,
+        "hardness": 0.05,
         "fuel": 0.02,
         "supply": 0.35,
         "width": 0.0,
@@ -149,6 +167,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": False,
         "soft": 1.10,
         "hard": 0.70,
+        "breakthrough": 1.40,
+        "hardness": 0.55,
         "fuel": 0.12,
         "supply": 0.8,
         "width": 2.0,
@@ -162,6 +182,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": False,
         "soft": 1.20,
         "hard": 1.00,
+        "breakthrough": 1.80,
+        "hardness": 0.70,
         "fuel": 0.16,
         "supply": 1.0,
         "width": 3.0,
@@ -175,6 +197,8 @@ ELEMENTS: Dict[str, Dict[str, Any]] = {
         "mounted": False,
         "soft": 1.15,
         "hard": 1.25,
+        "breakthrough": 1.40,
+        "hardness": 0.85,
         "fuel": 0.20,
         "supply": 1.2,
         "width": 3.0,
@@ -284,6 +308,9 @@ def compose(
     manpower = 0
     soft = 0.0
     hard = 0.0
+    breakthrough = 0.0
+    hardness_w = 0.0
+    hardness_n = 0.0
     fuel_use = 0.0
     supply_need = 0.0
     width = 0.0
@@ -302,6 +329,9 @@ def compose(
         manpower += int(e["manpower"]) * n
         soft += float(e.get("soft", 1.0)) * n
         hard += float(e.get("hard", 0.0)) * n
+        breakthrough += float(e.get("breakthrough", 0.0)) * n
+        hardness_w += float(e.get("hardness", 0.0)) * n
+        hardness_n += float(n)
         fuel_use += float(e.get("fuel", 0.0)) * n
         supply_need += float(e.get("supply", 0.0)) * n
         width += float(e.get("width", 0.0)) * n
@@ -333,6 +363,8 @@ def compose(
         "manpower": manpower,
         "soft": round(soft, 3),
         "hard": round(hard, 3),
+        "breakthrough": round(breakthrough, 3),
+        "hardness": round((hardness_w / hardness_n) if hardness_n > 0 else 0.0, 3),
         "fuel_use": round(fuel_use, 3),
         "supply_need": round(supply_need, 3),
         "width": round(width, 3),
@@ -345,6 +377,39 @@ def compose(
 
 def remaining_men(toe: int, strength: float) -> int:
     return max(0, int(round(float(max(0, int(toe))) * max(0.0, min(1.0, float(strength))))))
+
+
+def hardness_mix(soft: float, hard: float, defender_hardness: float) -> float:
+    """Share of attack that lands: (1-hardness)*soft + hardness*hard."""
+    try:
+        s = float(soft)
+    except (TypeError, ValueError):
+        s = 0.0
+    try:
+        h_atk = float(hard)
+    except (TypeError, ValueError):
+        h_atk = 0.0
+    try:
+        h = max(0.0, min(1.0, float(defender_hardness)))
+    except (TypeError, ValueError):
+        h = 0.0
+    return round((1.0 - h) * s + h * h_atk, 4)
+
+
+def absorb_mult(role: str, breakthrough: float, defense: float) -> float:
+    """Attacker uses breakthrough; defender uses defense. Extra absorb = more power kept."""
+    r = str(role or "").strip().lower()
+    try:
+        bt = max(0.0, float(breakthrough))
+    except (TypeError, ValueError):
+        bt = 0.0
+    try:
+        df = max(0.0, float(defense))
+    except (TypeError, ValueError):
+        df = 0.0
+    if r in ("defend", "defender", "defense", "def"):
+        return round(max(0.75, min(1.40, 0.75 + 0.18 * df)), 4)
+    return round(max(0.75, min(1.40, 0.78 + 0.16 * bt)), 4)
 
 
 def pierce_mult(hard: float, defender_armor: float) -> float:
@@ -633,6 +698,18 @@ def build_unit_composition_combat_product(*, check_wiring: bool = True) -> Dict[
         passes.append("pierce_hard_vs_armor")
     else:
         fails.append("pierce_hard_vs_armor")
+    if float(mixed.get("hardness", 0)) > float(foot.get("hardness", 0)) and float(mixed.get("breakthrough", 0)) > float(foot.get("breakthrough", 0)):
+        passes.append("tanks_hardness_breakthrough")
+    else:
+        fails.append("tanks_hardness_breakthrough")
+    if hardness_mix(3.0, 0.3, 0.0) > hardness_mix(3.0, 0.3, 0.80):
+        passes.append("hardness_mix_soft_vs_hard")
+    else:
+        fails.append("hardness_mix_soft_vs_hard")
+    if absorb_mult("attack", 3.0, 1.0) > absorb_mult("attack", 0.4, 1.0) and absorb_mult("defend", 0.4, 3.0) > absorb_mult("attack", 0.4, 3.0):
+        passes.append("breakthrough_attack_defense_defend")
+    else:
+        fails.append("breakthrough_attack_defense_defend")
     short = shortage_mult({"infantry_equipment": 20}, {"infantry_equipment": 80, "trucks": 24})
     full_fill = shortage_mult({"infantry_equipment": 80, "trucks": 24}, {"infantry_equipment": 80, "trucks": 24})
     if short < 0.85 and abs(full_fill - 1.0) < 0.001 and shortage_mult({}, {"infantry_equipment": 80}) == 1.0:
@@ -673,6 +750,9 @@ def build_unit_composition_combat_product(*, check_wiring: bool = True) -> Dict[
         _ok("speed_min", "func template_speed" in power)
         _ok("equip_toe", "equipment" in power or "EL_EQUIP" in power)
         _ok("gd_pierce", "func pierce_mult" in power)
+        _ok("gd_hardness", "func hardness_mix" in power and "EL_HARDNESS" in power)
+        _ok("gd_breakthrough", "func absorb_mult" in power and "EL_BREAKTHROUGH" in power)
+        _ok("popup_bt_hard", "Breakthrough" in pop and "Hardness" in pop)
         _ok("gd_fuel", "fuel_use" in power and "func fuel_speed_mult" in power)
         _ok("gd_width", "EL_WIDTH" in power or '"width"' in power)
         _ok("gd_shortage", "func shortage_mult" in power)
@@ -698,6 +778,7 @@ def build_unit_composition_combat_product(*, check_wiring: bool = True) -> Dict[
         _ok("on_official_quick", "test_unit_composition_combat_product" in gates)
         _ok("harness_comp", "composition_stats" in harness and "manpower_lost" in harness)
         _ok("harness_full", "pierce_mult" in harness and "infantry_bns" in harness)
+        _ok("harness_hardness", "hardness_mix" in harness or "vs_hard" in harness or "vs a hard" in harness.lower())
         _ok("harness_field_stamp", "force_new" in harness and "template_speed" in harness and "unit_width" in harness)
         dm = (ROOT / "scripts" / "production" / "DesignManager.gd").read_text(encoding="utf-8") if (ROOT / "scripts" / "production" / "DesignManager.gd").is_file() else ""
         _ok("design_persist", "func composition_from_design" in dm and "composition_blob_from_data" in dm)
