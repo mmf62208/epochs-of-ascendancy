@@ -314,6 +314,21 @@ func _test_front_chips() -> void:
 			_fail("replacements did not dilute XP: %s" % diluted)
 		else:
 			_pass("replacement dilute 90→%.1f" % diluted)
+		if pwr.has_method("composition_stats"):
+			var truck_c: Dictionary = pwr.call("composition_stats", "truck", "")
+			var mix_c: Dictionary = pwr.call("composition_stats", "truck", "medium_tank")
+			var foot_t: Dictionary = pwr.call("composition_stats", "foot", "medium_tank")
+			if float(truck_c.get("speed", 0)) < 1.99:
+				_fail("truck mobility want speed 2.0 got %s" % str(truck_c.get("speed")))
+			elif abs(float(mix_c.get("speed", 0)) - 1.5) > 0.01:
+				_fail("truck+tank slowest want 1.5 got %s" % str(mix_c.get("speed")))
+			elif abs(float(foot_t.get("speed", 0)) - 1.0) > 0.01:
+				_fail("foot+tank slowest want 1.0 got %s" % str(foot_t.get("speed")))
+			else:
+				_pass("composition speed truck=%.1f mix=%.1f foot+tank=%.1f" % [
+					float(truck_c.get("speed", 0)), float(mix_c.get("speed", 0)), float(foot_t.get("speed", 0)),
+				])
+				_pass("manpower_lost toe mix=%d" % int(mix_c.get("manpower", 0)))
 
 
 func _test_designer_field() -> void:

@@ -29,6 +29,10 @@ var _count_spin: SpinBox
 var _priority_option: OptionButton
 var _deploy_option: OptionButton
 var _refit_check: CheckBox
+var _mobility_option: OptionButton
+var _armor_add_option: OptionButton
+var _mobility_row: HBoxContainer
+var _armor_add_row: HBoxContainer
 
 const DOMAIN_SYMBOLS := {
 	"land": ["infantry", "light_tank", "medium_tank", "heavy_tank", "artillery"],
@@ -174,6 +178,36 @@ func _build_ui() -> void:
 	_org_slider.value_changed.connect(_on_org_changed)
 	row_org.add_child(_org_slider)
 	col.add_child(row_org)
+
+	_mobility_row = HBoxContainer.new()
+	_mobility_row.add_child(_make_lbl("Mobility:"))
+	_mobility_option = OptionButton.new()
+	_mobility_option.add_item("Foot")
+	_mobility_option.set_item_metadata(0, "foot")
+	_mobility_option.add_item("Motorcycle")
+	_mobility_option.set_item_metadata(1, "motorcycle")
+	_mobility_option.add_item("Truck")
+	_mobility_option.set_item_metadata(2, "truck")
+	_mobility_option.add_item("Half-track")
+	_mobility_option.set_item_metadata(3, "halftrack")
+	_mobility_option.select(0)
+	_mobility_option.item_selected.connect(func(_i: int) -> void: _update_stats())
+	_mobility_row.add_child(_mobility_option)
+	col.add_child(_mobility_row)
+
+	_armor_add_row = HBoxContainer.new()
+	_armor_add_row.add_child(_make_lbl("Vehicles:"))
+	_armor_add_option = OptionButton.new()
+	_armor_add_option.add_item("None")
+	_armor_add_option.set_item_metadata(0, "")
+	_armor_add_option.add_item("Light tank")
+	_armor_add_option.set_item_metadata(1, "light_tank")
+	_armor_add_option.add_item("Medium tank")
+	_armor_add_option.set_item_metadata(2, "medium_tank")
+	_armor_add_option.select(0)
+	_armor_add_option.item_selected.connect(func(_i: int) -> void: _update_stats())
+	_armor_add_row.add_child(_armor_add_option)
+	col.add_child(_armor_add_row)
 
 	var org_hdr := Label.new()
 	org_hdr.text = "Organize / recruit"
@@ -368,6 +402,25 @@ func _make_lbl(t: String) -> Label:
 	return l
 
 
+func _mobility_id() -> String:
+	if _mobility_option and _mobility_option.item_count > 0:
+		return str(_mobility_option.get_item_metadata(_mobility_option.selected))
+	return "foot"
+
+
+func _armor_element_id() -> String:
+	var arm := ""
+	if _armor_add_option and _armor_add_option.item_count > 0:
+		arm = str(_armor_add_option.get_item_metadata(_armor_add_option.selected))
+	if arm.is_empty() and "tank" in _symbol_id:
+		if "heavy" in _symbol_id:
+			return "heavy_tank"
+		if "light" in _symbol_id:
+			return "light_tank"
+		return "medium_tank"
+	return arm
+
+
 func _refresh_for_domain() -> void:
 	_selected_modules.clear()
 	_doctrine_key = str(DOMAIN_DOCTRINES.get(_domain, "rugged_redundancy"))
@@ -409,6 +462,10 @@ func _refresh_for_domain() -> void:
 			_symbol_option.select(0)
 		_refresh_symbol_preview()
 	title = "Unit Designer - %s (%s)" % [_domain.capitalize(), _current_tag]
+	if _mobility_row:
+		_mobility_row.visible = _domain == "land"
+	if _armor_add_row:
+		_armor_add_row.visible = _domain == "land"
 	_refresh_organize_options()
 	_update_stats()
 
@@ -435,6 +492,26 @@ func _update_stats() -> void:
 	]
 	text += "Symbol: %s  Strength: %.0f%%  Org: %.0f%%\n" % [_symbol_id, _strength_v * 100.0, _org_v * 100.0]
 	text += "Est. Power: %d  Mass: %d  Cost: %d  Rel: %.0f%%\n" % [power, mass, cost, rel * 100.0]
+	var mob := "foot"
+	if _mobility_option and _mobility_option.item_count > 0:
+		mob = str(_mobility_option.get_item_metadata(_mobility_option.selected))
+	var arm := ""
+	if _armor_add_option and _armor_add_option.item_count > 0:
+		arm = str(_armor_add_option.get_item_metadata(_armor_add_option.selected))
+	if "tank" in _symbol_id and arm.is_empty():
+		if "heavy" in _symbol_id:
+			arm = "heavy_tank"
+		elif "light" in _symbol_id:
+			arm = "light_tank"
+		else:
+			arm = "medium_tank"
+	var comp: Dictionary = LandCombatPower.composition_stats(mob, arm)
+	text += "Speed %.1f (slowest element) · Armor %.0f%% · Defense %.1f · Men %d\n" % [
+		float(comp.get("speed", 1.0)),
+		float(comp.get("armor", 0.0)) * 100.0,
+		float(comp.get("defense", 1.0)),
+		int(comp.get("manpower", 3000)),
+	]
 	var existing := _mode_existing != null and _mode_existing.selected == 1
 	var n_u := int(_count_spin.value) if _count_spin else 1
 	var days := 10 if existing else 14
@@ -470,6 +547,8 @@ func _on_finalize() -> void:
 		"visual_archetype": _symbol_id,
 		"strength": _strength_v,
 		"organization": _org_v,
+		"mobility": _mobility_id(),
+		"armor_element": _armor_element_id(),
 	}
 
 	var reg_ok := existing
@@ -511,6 +590,8 @@ func _on_finalize() -> void:
 			"strength": _strength_v,
 			"organization": _org_v,
 			"force_new": true,
+			"mobility": _mobility_id(),
+			"armor_element": _armor_element_id(),
 		},
 	}
 

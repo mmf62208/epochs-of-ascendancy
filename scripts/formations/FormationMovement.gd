@@ -148,25 +148,8 @@ static func _ctrl_tag(province: Province) -> String:
 
 
 static func template_profile(formation: Object) -> Dictionary:
-	var kind := "infantry"
-	var speed := INFANTRY_SPEED
-	var blob := ""
-	if formation != null:
-		if "design_id" in formation:
-			blob += str(formation.design_id)
-		if "name" in formation:
-			blob += " " + str(formation.name)
-		if "formation_type" in formation:
-			blob += " " + str(formation.formation_type)
-		if formation.has_method("get_category"):
-			blob += " " + str(formation.call("get_category"))
-	blob = blob.to_lower()
-	if "mountain" in blob or "gebirg" in blob:
-		kind = "mountain_infantry"
-	if "armor" in blob or "armour" in blob or "panzer" in blob or "tank" in blob \
-			or "motor" in blob or "mech" in blob:
-		kind = "armor"
-		speed = ARMOR_SPEED
+	var kind := str(LandCombatPower.template_kind(formation))
+	var speed := float(LandCombatPower.template_speed(formation))
 	return {"template_kind": kind, "template_speed": speed}
 
 

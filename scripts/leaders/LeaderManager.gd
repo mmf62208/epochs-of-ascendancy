@@ -502,6 +502,12 @@ func field_designed_unit(
 	var vis := str(extras.get("visual_archetype", "")).strip_edges()
 	if not vis.is_empty():
 		f.set_meta("visual_archetype", vis)
+	var mob := str(extras.get("mobility", "")).strip_edges().to_lower()
+	if not mob.is_empty():
+		f.set_meta("mobility", mob)
+	var arm_el := str(extras.get("armor_element", "")).strip_edges().to_lower()
+	if not arm_el.is_empty() and arm_el != "none":
+		f.set_meta("armor_element", arm_el)
 	match dom:
 		"naval":
 			f.formation_type = Formation.TYPE_FLEET
@@ -3550,6 +3556,9 @@ func get_save_data() -> Dictionary:
 			"organize_target_strength": float(f.get_meta("organize_target_strength", 1.0)) if f.has_meta("organize_target_strength") else 1.0,
 			"visual_archetype": str(f.get_meta("visual_archetype", "")) if f.has_meta("visual_archetype") else "",
 			"combat_log": f.combat_log.duplicate() if "combat_log" in f and f.combat_log is Array else [],
+			"mobility": str(f.get_meta("mobility", "foot")) if f.has_meta("mobility") else "foot",
+			"armor_element": str(f.get_meta("armor_element", "")) if f.has_meta("armor_element") else "",
+			"last_manpower_loss": int(f.last_manpower_loss) if "last_manpower_loss" in f else 0,
 		}
 
 	return {
@@ -3677,6 +3686,12 @@ func apply_save_data(data: Dictionary) -> void:
 				f.set_meta("organize_target_strength", clampf(float(fd.get("organize_target_strength", 1.0)), 0.4, 1.0))
 			if str(fd.get("visual_archetype", "")).strip_edges() != "":
 				f.set_meta("visual_archetype", str(fd.get("visual_archetype")))
+			if str(fd.get("mobility", "")).strip_edges() != "":
+				f.set_meta("mobility", str(fd.get("mobility")))
+			if str(fd.get("armor_element", "")).strip_edges() != "":
+				f.set_meta("armor_element", str(fd.get("armor_element")))
+			if "last_manpower_loss" in f:
+				f.last_manpower_loss = int(fd.get("last_manpower_loss", 0))
 			if fd.get("combat_log") is Array:
 				f.combat_log.clear()
 				for row in fd.get("combat_log") as Array:

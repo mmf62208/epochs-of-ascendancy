@@ -131,6 +131,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_unit_design_creator_loop_product \
     tools.map_generation.tests.test_unit_organize_queue_product \
     tools.map_generation.tests.test_unit_living_story_product \
+    tools.map_generation.tests.test_unit_composition_combat_product \
     -v || fail
 
 run_step unit_save_path \

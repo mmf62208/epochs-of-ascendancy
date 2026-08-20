@@ -117,6 +117,7 @@ const LAND_MISSION_ARTILLERY_PREP := "ARTILLERY_PREP"  # Pre-bombard before assa
 ## Runtime land-battle depth. planning / entrenchment / combat_experience persist in LeaderManager save.
 var last_equip_loss: Dictionary = {}
 var last_equip_loss_plain: String = ""
+var last_manpower_loss: int = 0
 var last_supply_plain: String = ""
 var planning: float = 0.0
 var entrenchment: float = 0.0

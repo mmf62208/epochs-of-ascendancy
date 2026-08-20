@@ -65,25 +65,42 @@ static func apply_daily_to_formation(formation_id: String, severity: float) -> D
 		if typeof(raw) == TYPE_DICTIONARY:
 			removed = raw
 	var strength_after := -1.0
+	var manpower_lost := 0
 	if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
 		var form: Formation = LeaderManager.get_formation(fid)
 		if form != null and "strength" in form:
 			var drain := STRENGTH_DRAIN_FACTOR * severity
-			form.strength = clampf(float(form.strength) - drain, 0.0, 1.0)
+			var str_before := float(form.strength)
+			form.strength = clampf(str_before - drain, 0.0, 1.0)
 			strength_after = float(form.strength)
+			var toe := 3000
+			var comp: Dictionary = LandCombatPower.composition_from_formation(form)
+			if int(comp.get("manpower", 0)) > 0:
+				toe = int(comp.get("manpower"))
+			manpower_lost = maxi(0, int(round(float(toe) * str_before * drain)))
+			if "last_manpower_loss" in form:
+				form.last_manpower_loss = manpower_lost
+			else:
+				form.set_meta("last_manpower_loss", manpower_lost)
 			if drain >= 0.08 and "combat_experience" in form:
 				form.combat_experience = LandCombatPower.dilute_xp_heavy_loss(
 					float(form.combat_experience), drain
 				)
 	var plain := format_loss_plain(removed)
+	if manpower_lost > 0:
+		if plain == NO_STOCK:
+			plain = "men −%d" % manpower_lost
+		else:
+			plain = "men −%d · %s" % [manpower_lost, plain]
 	print(
-		"[LAND BATTLE ATTRITION] %s %s str=%.2f sev=%.2f"
-		% [fid, plain, strength_after, severity]
+		"[LAND BATTLE ATTRITION] %s %s str=%.2f sev=%.2f men=%d"
+		% [fid, plain, strength_after, severity, manpower_lost]
 	)
 	return {
 		"removed": removed,
 		"strength_after": strength_after,
 		"plain": plain,
+		"manpower_lost": manpower_lost,
 	}
 
 

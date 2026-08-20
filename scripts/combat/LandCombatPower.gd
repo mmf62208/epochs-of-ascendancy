@@ -8,6 +8,44 @@ extends RefCounted
 const INFANTRY_SPEED := 1.0
 const ARMOR_SPEED := 1.5
 const BASE_POWER := 100.0
+## Infantry + transport + tanks. Speed = min of remaining (mounted infantry drops foot).
+const EL_SPEED := {
+	"infantry": 1.0,
+	"motorcycle": 2.4,
+	"truck": 2.0,
+	"halftrack": 1.6,
+	"light_tank": 1.8,
+	"medium_tank": 1.5,
+	"heavy_tank": 1.2,
+}
+const EL_ARMOR := {
+	"infantry": 0.0,
+	"motorcycle": 0.0,
+	"truck": 0.05,
+	"halftrack": 0.35,
+	"light_tank": 0.45,
+	"medium_tank": 0.70,
+	"heavy_tank": 0.90,
+}
+const EL_DEFENSE := {
+	"infantry": 1.0,
+	"motorcycle": 0.65,
+	"truck": 0.75,
+	"halftrack": 1.20,
+	"light_tank": 1.10,
+	"medium_tank": 1.30,
+	"heavy_tank": 1.50,
+}
+const EL_MANPOWER := {
+	"infantry": 3000,
+	"motorcycle": 400,
+	"truck": 200,
+	"halftrack": 280,
+	"light_tank": 400,
+	"medium_tank": 500,
+	"heavy_tank": 520,
+}
+const MOUNTED_IDS := ["motorcycle", "truck", "halftrack"]
 const ARMOR_PLAINS_HILLS := 1.5
 const ARMOR_MOUNTAIN := 0.85
 const MOUNTAIN_INFANTRY_MOUNTAIN := 1.15
@@ -30,9 +68,86 @@ static func template_kind(formation: Object) -> String:
 
 
 static func template_speed(formation: Object) -> float:
+	var c: Dictionary = composition_from_formation(formation)
+	if bool(c.get("has_composition", false)):
+		return float(c.get("speed", INFANTRY_SPEED))
 	if template_kind(formation) == "armor":
 		return ARMOR_SPEED
 	return INFANTRY_SPEED
+
+
+static func composition_stats(mobility: String = "foot", armor_element: String = "", core: String = "infantry") -> Dictionary:
+	var core_id := str(core).strip_edges().to_lower()
+	if not EL_SPEED.has(core_id):
+		core_id = "infantry"
+	var mob := str(mobility).strip_edges().to_lower()
+	if mob.is_empty() or mob == "none":
+		mob = "foot"
+	var arm := str(armor_element).strip_edges().to_lower()
+	if arm in ["none", "foot"]:
+		arm = ""
+	var ids: Array = [core_id]
+	if EL_SPEED.has(mob) and not ids.has(mob):
+		ids.append(mob)
+	if EL_SPEED.has(arm) and not ids.has(arm):
+		ids.append(arm)
+	var mounted := false
+	for i in ids:
+		if str(i) in MOUNTED_IDS:
+			mounted = true
+			break
+	var speeds: Array = []
+	var armor_v := 0.0
+	var defense := 0.0
+	var men := 0
+	for i in ids:
+		var eid := str(i)
+		if mounted and eid == "infantry":
+			pass
+		else:
+			speeds.append(float(EL_SPEED.get(eid, 1.0)))
+		armor_v = maxf(armor_v, float(EL_ARMOR.get(eid, 0.0)))
+		defense += float(EL_DEFENSE.get(eid, 0.0))
+		men += int(EL_MANPOWER.get(eid, 0))
+	var speed := INFANTRY_SPEED
+	if not speeds.is_empty():
+		speed = float(speeds[0])
+		for s in speeds:
+			speed = minf(speed, float(s))
+	var kind := "infantry"
+	if arm != "":
+		kind = "armor"
+	elif mounted:
+		kind = "motor"
+	return {
+		"ok": true,
+		"has_composition": mounted or arm != "" or mob != "foot",
+		"ids": ids,
+		"mobility": mob,
+		"armor_element": arm,
+		"speed": speed,
+		"armor": armor_v,
+		"defense": defense,
+		"manpower": men,
+		"mounted": mounted,
+		"kind": kind,
+	}
+
+
+static func composition_from_formation(formation: Object) -> Dictionary:
+	var mob := "foot"
+	var arm := ""
+	if formation == null:
+		return composition_stats(mob, arm)
+	if formation.has_meta("mobility"):
+		mob = str(formation.get_meta("mobility"))
+	elif "mobility" in formation:
+		mob = str(formation.get("mobility"))
+	if formation.has_meta("armor_element"):
+		arm = str(formation.get_meta("armor_element"))
+	elif "armor_element" in formation:
+		arm = str(formation.get("armor_element"))
+	return composition_stats(mob, arm)
 
 
 static func combat_power(formation: Object, terrain: String = "plains", role: String = "") -> float:
@@ -57,6 +172,14 @@ static func combat_power(formation: Object, terrain: String = "plains", role: St
 	power *= leader_power_mult(formation, terrain, role)
 	if "combat_experience" in formation:
 		power *= xp_power_mult(float(formation.get("combat_experience")))
+	var comp: Dictionary = composition_from_formation(formation)
+	var armor_v := float(comp.get("armor", 0.0))
+	if armor_v > 0.001 or bool(comp.get("mounted", false)):
+		if _resolve_combat_role(formation, role) == "defend":
+			power *= (1.0 + 0.30 * clampf(armor_v, 0.0, 1.0))
+			power *= clampf(0.75 + 0.20 * float(comp.get("defense", 1.0)), 0.75, 1.35)
+		else:
+			power *= (1.0 + 0.12 * clampf(armor_v, 0.0, 1.0))
 	return float(power)
 
 
