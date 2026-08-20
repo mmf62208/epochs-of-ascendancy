@@ -508,6 +508,9 @@ func field_designed_unit(
 	var arm_el := str(extras.get("armor_element", "")).strip_edges().to_lower()
 	if not arm_el.is_empty() and arm_el != "none":
 		f.set_meta("armor_element", arm_el)
+	var sup := str(extras.get("support", "")).strip_edges().to_lower()
+	if not sup.is_empty() and sup != "none":
+		f.set_meta("support", sup)
 	match dom:
 		"naval":
 			f.formation_type = Formation.TYPE_FLEET
@@ -3558,6 +3561,7 @@ func get_save_data() -> Dictionary:
 			"combat_log": f.combat_log.duplicate() if "combat_log" in f and f.combat_log is Array else [],
 			"mobility": str(f.get_meta("mobility", "foot")) if f.has_meta("mobility") else "foot",
 			"armor_element": str(f.get_meta("armor_element", "")) if f.has_meta("armor_element") else "",
+			"support": str(f.get_meta("support", "")) if f.has_meta("support") else "",
 			"last_manpower_loss": int(f.last_manpower_loss) if "last_manpower_loss" in f else 0,
 		}
 
@@ -3690,6 +3694,8 @@ func apply_save_data(data: Dictionary) -> void:
 				f.set_meta("mobility", str(fd.get("mobility")))
 			if str(fd.get("armor_element", "")).strip_edges() != "":
 				f.set_meta("armor_element", str(fd.get("armor_element")))
+			if str(fd.get("support", "")).strip_edges() != "":
+				f.set_meta("support", str(fd.get("support")))
 			if "last_manpower_loss" in f:
 				f.last_manpower_loss = int(fd.get("last_manpower_loss", 0))
 			if fd.get("combat_log") is Array:

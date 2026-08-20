@@ -329,6 +329,51 @@ func _test_front_chips() -> void:
 					float(truck_c.get("speed", 0)), float(mix_c.get("speed", 0)), float(foot_t.get("speed", 0)),
 				])
 				_pass("manpower_lost toe mix=%d" % int(mix_c.get("manpower", 0)))
+				var guns: Dictionary = pwr.call("composition_stats", "truck", "medium_tank", "infantry", "artillery")
+				if abs(float(guns.get("speed", 0)) - 1.5) > 0.01:
+					_fail("towed artillery want speed 1.5 got %s" % str(guns.get("speed")))
+				else:
+					_pass("artillery towed speed=%.1f guns=%s" % [
+						float(guns.get("speed", 0)), str((guns.get("equipment", {}) as Dictionary).get("artillery", 0)),
+					])
+	var ger_form: Object = _ger_on_front()
+	if ger_form != null and pwr != null and pwr.has_method("composition_from_formation"):
+		var inferred: Dictionary = pwr.call("composition_from_formation", ger_form)
+		if str(inferred.get("armor_element", "")) != "medium_tank":
+			_fail("panzer infer armor_element want medium_tank got %s" % str(inferred.get("armor_element")))
+		else:
+			_pass("inferred panzer armor=%s tanks=%s" % [
+				str(inferred.get("armor_element")), str((inferred.get("equipment", {}) as Dictionary).get("tanks", 0)),
+			])
+		var att_p := float(pwr.call("combat_power", ger_form, "plains", "attack"))
+		var def_p := float(pwr.call("combat_power", ger_form, "plains", "defend"))
+		if def_p <= att_p:
+			_fail("armored defend should beat attack on same unit att=%.1f def=%.1f" % [att_p, def_p])
+		else:
+			_pass("armor defend %.0f > attack %.0f" % [def_p, att_p])
+	var attr_scr: Script = load("res://scripts/combat/LandBattleAttrition.gd") as Script
+	var pm: Node = _autoload("ProductionManager")
+	if attr_scr != null and attr_scr.has_method("apply_daily_to_formation") and ger_form != null:
+		if pm != null and pm.has_method("ensure_demo_combat_stock"):
+			pm.call("ensure_demo_combat_stock", str(ger_form.get("formation_id")), ATT_TAG)
+		var loss_a: Dictionary = attr_scr.call("apply_daily_to_formation", str(ger_form.get("formation_id")), 0.10)
+		if int(loss_a.get("manpower_lost", 0)) <= 0:
+			_fail("attacker manpower_lost missing: %s" % str(loss_a))
+		else:
+			_pass("combat loss att men=%d plain=%s" % [int(loss_a.get("manpower_lost", 0)), str(loss_a.get("plain", ""))])
+		var fra: Object = null
+		if _lm.has_method("get_formation"):
+			fra = _lm.call("get_formation", FRA_FID)
+		if fra != null:
+			if pm != null and pm.has_method("ensure_demo_combat_stock"):
+				pm.call("ensure_demo_combat_stock", FRA_FID, DEF_TAG)
+			var loss_d: Dictionary = attr_scr.call("apply_daily_to_formation", FRA_FID, 0.06)
+			if int(loss_d.get("manpower_lost", 0)) <= 0:
+				_fail("defender manpower_lost missing: %s" % str(loss_d))
+			else:
+				_pass("combat loss def men=%d" % int(loss_d.get("manpower_lost", 0)))
+			fra.set("strength", 1.0)
+		ger_form.set("strength", 1.0)
 
 
 func _test_designer_field() -> void:

@@ -523,8 +523,8 @@ func start_land_battle(
 		return instant_empty
 	var def_form: Formation = _formation_from_id(def_fid, def_tag)
 
-	var att_power := land_combat_power(att_form, terrain)
-	var def_power := land_combat_power(def_form, terrain)
+	var att_power := land_combat_power(att_form, terrain, "attack")
+	var def_power := land_combat_power(def_form, terrain, "defend")
 	var att_org := _formation_stat(att_form, "organization", 1.0)
 	var def_org := _formation_stat(def_form, "organization", 1.0)
 	var est_days := _estimate_land_battle_days(att_power, def_power, terrain, false)
@@ -1018,11 +1018,11 @@ func withdraw_from_land_battle(formation_id: String) -> Dictionary:
 
 ## org * strength * readiness * template hint. Armor design_id ×1.5 on plains.
 ## Prefers LandCombatPower when present (soft_attack + mountain infantry).
-func land_combat_power(formation: Object, terrain: String = "plains") -> float:
+func land_combat_power(formation: Object, terrain: String = "plains", role: String = "") -> float:
 	if formation == null:
 		return 0.0
 	if typeof(LandCombatPower) != TYPE_NIL:
-		return maxf(0.0, float(LandCombatPower.combat_power(formation, terrain)))
+		return maxf(0.0, float(LandCombatPower.combat_power(formation, terrain, role)))
 	var org := _formation_stat(formation, "organization", 1.0)
 	var strn := _formation_stat(formation, "strength", 1.0)
 	var rdy := _formation_stat(formation, "readiness", 1.0)
@@ -1123,7 +1123,7 @@ func _rebuild_land_battle_powers(battle: Dictionary) -> void:
 	var att_widths: Array = []
 	for fid_v in att_fids:
 		var fo: Formation = _formation_from_id(str(fid_v), str(battle.get("att_tag", "")))
-		att_powers.append(land_combat_power(fo, terrain))
+		att_powers.append(land_combat_power(fo, terrain, "attack"))
 		var aw := 2.0
 		if typeof(LandCombatPower) != TYPE_NIL:
 			aw = float(LandCombatPower.unit_width(fo))
@@ -1132,7 +1132,7 @@ func _rebuild_land_battle_powers(battle: Dictionary) -> void:
 	var def_widths: Array = []
 	for fid_v2 in def_fids:
 		var df: Formation = _formation_from_id(str(fid_v2), str(battle.get("def_tag", "")))
-		def_powers.append(land_combat_power(df, terrain))
+		def_powers.append(land_combat_power(df, terrain, "defend"))
 		var dw := 2.0
 		if typeof(LandCombatPower) != TYPE_NIL:
 			dw = float(LandCombatPower.unit_width(df))
@@ -1321,10 +1321,20 @@ func _record_land_aar(battle: Dictionary, winner: String, to_id: int) -> void:
 			place = p.name
 	var loss := ""
 	var fid := str(battle.get("att_fid", ""))
+	var def_loss := ""
 	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
 		var f: Formation = LeaderManager.get_formation(fid)
 		if f != null and "last_equip_loss_plain" in f:
 			loss = str(f.last_equip_loss_plain)
+		var dfid := str(battle.get("def_fid", ""))
+		var df: Formation = LeaderManager.get_formation(dfid) if not dfid.is_empty() else null
+		if df != null and "last_equip_loss_plain" in df:
+			def_loss = str(df.last_equip_loss_plain)
+	if not def_loss.is_empty() and def_loss != loss:
+		if loss.is_empty():
+			loss = "def %s" % def_loss
+		else:
+			loss = "att %s · def %s" % [loss, def_loss]
 	var next_pid := -1
 	var next_place := ""
 	var tag := str(battle.get("att_tag", ""))

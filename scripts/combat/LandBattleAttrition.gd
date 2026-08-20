@@ -82,6 +82,9 @@ static func apply_daily_to_formation(formation_id: String, severity: float) -> D
 				form.last_manpower_loss = manpower_lost
 			else:
 				form.set_meta("last_manpower_loss", manpower_lost)
+			var tag := str(form.country_tag).strip_edges().to_upper()
+			if manpower_lost > 0 and tag != "" and typeof(GameData) != TYPE_NIL and GameData.has_method("adjust_manpower"):
+				GameData.adjust_manpower(tag, -manpower_lost, "land_battle")
 			if drain >= 0.08 and "combat_experience" in form:
 				form.combat_experience = LandCombatPower.dilute_xp_heavy_loss(
 					float(form.combat_experience), drain
@@ -110,6 +113,10 @@ static func _short_name(equipment_id: String) -> String:
 		return "equip"
 	if "rifle" in key or "infantry" in key or "small_arms" in key:
 		return "rifles"
+	if "motorcycle" in key:
+		return "motorcycles"
+	if "halftrack" in key or "half-track" in key:
+		return "halftracks"
 	if "truck" in key or "motorized" in key:
 		return "trucks"
 	if "support" in key:
@@ -128,6 +135,10 @@ static func _preferred_rank(name: String) -> int:
 		"support":
 			return 1
 		"trucks":
+			return 2
+		"motorcycles":
+			return 2
+		"halftracks":
 			return 2
 		"artillery":
 			return 3

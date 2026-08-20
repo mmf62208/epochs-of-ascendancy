@@ -31,12 +31,15 @@ static func lines_for(formation: Object) -> PackedStringArray:
 	lines.append("Strength %.0f%%" % _as_percent(str_v))
 	var comp: Dictionary = LandCombatPower.composition_from_formation(formation)
 	if bool(comp.get("has_composition", false)) or float(comp.get("armor", 0.0)) > 0.001:
+		var toe := int(comp.get("manpower", 0))
+		var left := maxi(0, int(round(float(toe) * str_v)))
 		lines.append(
-			"Speed %.1f · Armor %.0f%% · Men %d"
+			"Speed %.1f · Armor %.0f%% · Men %d/%d"
 			% [
 				float(comp.get("speed", 1.0)),
 				float(comp.get("armor", 0.0)) * 100.0,
-				int(comp.get("manpower", 0)),
+				left,
+				toe,
 			]
 		)
 	if "last_manpower_loss" in formation:

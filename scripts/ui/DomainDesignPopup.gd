@@ -31,8 +31,10 @@ var _deploy_option: OptionButton
 var _refit_check: CheckBox
 var _mobility_option: OptionButton
 var _armor_add_option: OptionButton
+var _support_option: OptionButton
 var _mobility_row: HBoxContainer
 var _armor_add_row: HBoxContainer
+var _support_row: HBoxContainer
 
 const DOMAIN_SYMBOLS := {
 	"land": ["infantry", "light_tank", "medium_tank", "heavy_tank", "artillery"],
@@ -208,6 +210,18 @@ func _build_ui() -> void:
 	_armor_add_option.item_selected.connect(func(_i: int) -> void: _update_stats())
 	_armor_add_row.add_child(_armor_add_option)
 	col.add_child(_armor_add_row)
+
+	_support_row = HBoxContainer.new()
+	_support_row.add_child(_make_lbl("Support:"))
+	_support_option = OptionButton.new()
+	_support_option.add_item("None")
+	_support_option.set_item_metadata(0, "")
+	_support_option.add_item("Artillery")
+	_support_option.set_item_metadata(1, "artillery")
+	_support_option.select(0)
+	_support_option.item_selected.connect(func(_i: int) -> void: _update_stats())
+	_support_row.add_child(_support_option)
+	col.add_child(_support_row)
 
 	var org_hdr := Label.new()
 	org_hdr.text = "Organize / recruit"
@@ -421,6 +435,12 @@ func _armor_element_id() -> String:
 	return arm
 
 
+func _support_id() -> String:
+	if _support_option and _support_option.item_count > 0:
+		return str(_support_option.get_item_metadata(_support_option.selected))
+	return ""
+
+
 func _refresh_for_domain() -> void:
 	_selected_modules.clear()
 	_doctrine_key = str(DOMAIN_DOCTRINES.get(_domain, "rugged_redundancy"))
@@ -466,6 +486,8 @@ func _refresh_for_domain() -> void:
 		_mobility_row.visible = _domain == "land"
 	if _armor_add_row:
 		_armor_add_row.visible = _domain == "land"
+	if _support_row:
+		_support_row.visible = _domain == "land"
 	_refresh_organize_options()
 	_update_stats()
 
@@ -505,7 +527,8 @@ func _update_stats() -> void:
 			arm = "light_tank"
 		else:
 			arm = "medium_tank"
-	var comp: Dictionary = LandCombatPower.composition_stats(mob, arm)
+	var sup := _support_id()
+	var comp: Dictionary = LandCombatPower.composition_stats(mob, arm, "infantry", sup)
 	text += "Speed %.1f (slowest element) · Armor %.0f%% · Defense %.1f · Men %d\n" % [
 		float(comp.get("speed", 1.0)),
 		float(comp.get("armor", 0.0)) * 100.0,
@@ -549,6 +572,7 @@ func _on_finalize() -> void:
 		"organization": _org_v,
 		"mobility": _mobility_id(),
 		"armor_element": _armor_element_id(),
+		"support": _support_id(),
 	}
 
 	var reg_ok := existing
@@ -592,6 +616,7 @@ func _on_finalize() -> void:
 			"force_new": true,
 			"mobility": _mobility_id(),
 			"armor_element": _armor_element_id(),
+			"support": _support_id(),
 		},
 	}
 

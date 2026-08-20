@@ -35,6 +35,10 @@ class TestUnitCompositionCombatProduct(unittest.TestCase):
         self.assertGreater(int(att["manpower_lost"]), 0)
         self.assertGreater(int(dfn["manpower_lost"]), 0)
         self.assertGreaterEqual(int(att["manpower_lost"]), int(dfn["manpower_lost"]))
+        guns = compose(mobility="truck", armor="medium_tank", support="artillery")
+        self.assertEqual(float(guns["speed"]), 1.5)
+        self.assertEqual(int((guns.get("equipment") or {}).get("artillery", 0)), 12)
+        self.assertIn("trucks", att.get("removed") or {})
 
     def test_product_wiring(self) -> None:
         p = build_unit_composition_combat_product(check_wiring=True)

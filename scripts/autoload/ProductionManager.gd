@@ -755,11 +755,17 @@ func ensure_demo_combat_stock(formation_id: String, country_tag: String = "") ->
 		"infantry_equipment": 80,
 		"support_equipment": 10,
 	}
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var form: Formation = LeaderManager.get_formation(fid)
+		if form != null:
+			var toe: Dictionary = LandCombatPower.equipment_toe(LandCombatPower.composition_from_formation(form))
+			if not toe.is_empty():
+				seeded = toe
 	set_unit_equipment_stock(fid, seeded)
 	var tag := country_tag.strip_edges().to_upper()
 	print(
-		"[DEMO COMBAT STOCK] %s (%s) seeded infantry_equipment=80 support_equipment=10"
-		% [fid, tag]
+		"[DEMO COMBAT STOCK] %s (%s) seeded %s"
+		% [fid, tag, str(seeded)]
 	)
 	return seeded.duplicate()
 

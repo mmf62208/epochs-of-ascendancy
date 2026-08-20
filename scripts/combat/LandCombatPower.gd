@@ -14,6 +14,7 @@ const EL_SPEED := {
 	"motorcycle": 2.4,
 	"truck": 2.0,
 	"halftrack": 1.6,
+	"artillery": 0.85,
 	"light_tank": 1.8,
 	"medium_tank": 1.5,
 	"heavy_tank": 1.2,
@@ -23,6 +24,7 @@ const EL_ARMOR := {
 	"motorcycle": 0.0,
 	"truck": 0.05,
 	"halftrack": 0.35,
+	"artillery": 0.05,
 	"light_tank": 0.45,
 	"medium_tank": 0.70,
 	"heavy_tank": 0.90,
@@ -32,6 +34,7 @@ const EL_DEFENSE := {
 	"motorcycle": 0.65,
 	"truck": 0.75,
 	"halftrack": 1.20,
+	"artillery": 0.80,
 	"light_tank": 1.10,
 	"medium_tank": 1.30,
 	"heavy_tank": 1.50,
@@ -41,9 +44,40 @@ const EL_MANPOWER := {
 	"motorcycle": 400,
 	"truck": 200,
 	"halftrack": 280,
+	"artillery": 350,
 	"light_tank": 400,
 	"medium_tank": 500,
 	"heavy_tank": 520,
+}
+const EL_SOFT := {
+	"infantry": 1.0,
+	"motorcycle": 0.85,
+	"truck": 1.0,
+	"halftrack": 1.05,
+	"artillery": 1.40,
+	"light_tank": 1.10,
+	"medium_tank": 1.20,
+	"heavy_tank": 1.15,
+}
+const EL_HARD := {
+	"infantry": 0.15,
+	"motorcycle": 0.10,
+	"truck": 0.10,
+	"halftrack": 0.35,
+	"artillery": 0.45,
+	"light_tank": 0.70,
+	"medium_tank": 1.00,
+	"heavy_tank": 1.25,
+}
+const EL_EQUIP := {
+	"infantry": {"infantry_equipment": 80},
+	"motorcycle": {"motorcycles": 40},
+	"truck": {"trucks": 24},
+	"halftrack": {"halftracks": 16},
+	"artillery": {"artillery": 12},
+	"light_tank": {"tanks": 12},
+	"medium_tank": {"tanks": 10},
+	"heavy_tank": {"tanks": 8},
 }
 const MOUNTED_IDS := ["motorcycle", "truck", "halftrack"]
 const ARMOR_PLAINS_HILLS := 1.5
@@ -76,7 +110,7 @@ static func template_speed(formation: Object) -> float:
 	return INFANTRY_SPEED
 
 
-static func composition_stats(mobility: String = "foot", armor_element: String = "", core: String = "infantry") -> Dictionary:
+static func composition_stats(mobility: String = "foot", armor_element: String = "", core: String = "infantry", support: String = "") -> Dictionary:
 	var core_id := str(core).strip_edges().to_lower()
 	if not EL_SPEED.has(core_id):
 		core_id = "infantry"
@@ -86,11 +120,16 @@ static func composition_stats(mobility: String = "foot", armor_element: String =
 	var arm := str(armor_element).strip_edges().to_lower()
 	if arm in ["none", "foot"]:
 		arm = ""
+	var sup := str(support).strip_edges().to_lower()
+	if sup in ["none", "foot"]:
+		sup = ""
 	var ids: Array = [core_id]
 	if EL_SPEED.has(mob) and not ids.has(mob):
 		ids.append(mob)
 	if EL_SPEED.has(arm) and not ids.has(arm):
 		ids.append(arm)
+	if EL_SPEED.has(sup) and not ids.has(sup):
+		ids.append(sup)
 	var mounted := false
 	for i in ids:
 		if str(i) in MOUNTED_IDS:
@@ -100,15 +139,23 @@ static func composition_stats(mobility: String = "foot", armor_element: String =
 	var armor_v := 0.0
 	var defense := 0.0
 	var men := 0
+	var soft := 0.0
+	var hard := 0.0
+	var equip: Dictionary = {}
 	for i in ids:
 		var eid := str(i)
-		if mounted and eid == "infantry":
+		if mounted and eid in ["infantry", "artillery"]:
 			pass
 		else:
 			speeds.append(float(EL_SPEED.get(eid, 1.0)))
 		armor_v = maxf(armor_v, float(EL_ARMOR.get(eid, 0.0)))
 		defense += float(EL_DEFENSE.get(eid, 0.0))
 		men += int(EL_MANPOWER.get(eid, 0))
+		soft += float(EL_SOFT.get(eid, 1.0))
+		hard += float(EL_HARD.get(eid, 0.0))
+		var pack: Dictionary = EL_EQUIP.get(eid, {}) as Dictionary if EL_EQUIP.get(eid, {}) is Dictionary else {}
+		for ek in pack.keys():
+			equip[str(ek)] = int(equip.get(str(ek), 0)) + int(pack[ek])
 	var speed := INFANTRY_SPEED
 	if not speeds.is_empty():
 		speed = float(speeds[0])
@@ -121,14 +168,18 @@ static func composition_stats(mobility: String = "foot", armor_element: String =
 		kind = "motor"
 	return {
 		"ok": true,
-		"has_composition": mounted or arm != "" or mob != "foot",
+		"has_composition": mounted or arm != "" or mob != "foot" or sup != "",
 		"ids": ids,
 		"mobility": mob,
 		"armor_element": arm,
+		"support": sup,
 		"speed": speed,
 		"armor": armor_v,
 		"defense": defense,
 		"manpower": men,
+		"soft": soft,
+		"hard": hard,
+		"equipment": equip,
 		"mounted": mounted,
 		"kind": kind,
 	}
@@ -137,8 +188,9 @@ static func composition_stats(mobility: String = "foot", armor_element: String =
 static func composition_from_formation(formation: Object) -> Dictionary:
 	var mob := "foot"
 	var arm := ""
+	var sup := ""
 	if formation == null:
-		return composition_stats(mob, arm)
+		return composition_stats(mob, arm, "infantry", sup)
 	if formation.has_meta("mobility"):
 		mob = str(formation.get_meta("mobility"))
 	elif "mobility" in formation:
@@ -147,7 +199,36 @@ static func composition_from_formation(formation: Object) -> Dictionary:
 		arm = str(formation.get_meta("armor_element"))
 	elif "armor_element" in formation:
 		arm = str(formation.get("armor_element"))
-	return composition_stats(mob, arm)
+	if formation.has_meta("support"):
+		sup = str(formation.get_meta("support"))
+	elif "support" in formation:
+		sup = str(formation.get("support"))
+	if arm.is_empty():
+		arm = _infer_armor_element(formation)
+	return composition_stats(mob, arm, "infantry", sup)
+
+
+static func _infer_armor_element(formation: Object) -> String:
+	var blob := _identity_blob(formation)
+	if formation != null and formation.has_meta("visual_archetype"):
+		blob += " " + str(formation.get_meta("visual_archetype")).to_lower()
+	if "heavy" in blob and "tank" in blob:
+		return "heavy_tank"
+	if "light" in blob and "tank" in blob:
+		return "light_tank"
+	if _is_armor_blob(blob):
+		return "medium_tank"
+	return ""
+
+
+static func equipment_toe(comp: Dictionary) -> Dictionary:
+	var raw: Variant = comp.get("equipment", {})
+	if typeof(raw) != TYPE_DICTIONARY:
+		return {}
+	var out: Dictionary = {}
+	for k in (raw as Dictionary).keys():
+		out[str(k)] = int((raw as Dictionary)[k])
+	return out
 
 
 static func combat_power(formation: Object, terrain: String = "plains", role: String = "") -> float:
@@ -166,20 +247,25 @@ static func combat_power(formation: Object, terrain: String = "plains", role: St
 			power *= ARMOR_MOUNTAIN
 	elif kind == "mountain_infantry" and terr == "mountain":
 		power *= MOUNTAIN_INFANTRY_MOUNTAIN
-	var soft = _try_template_soft_attack(formation)
-	if soft != null:
-		power *= 0.7 + 0.3 * float(soft)
-	power *= leader_power_mult(formation, terrain, role)
-	if "combat_experience" in formation:
-		power *= xp_power_mult(float(formation.get("combat_experience")))
 	var comp: Dictionary = composition_from_formation(formation)
-	var armor_v := float(comp.get("armor", 0.0))
-	if armor_v > 0.001 or bool(comp.get("mounted", false)):
+	if bool(comp.get("has_composition", false)):
+		var soft_c := float(comp.get("soft", 0.0))
+		power *= 0.70 + 0.12 * clampf(soft_c, 0.5, 4.0)
+		var hard_c := float(comp.get("hard", 0.0))
+		power *= 0.92 + 0.08 * clampf(hard_c, 0.0, 2.0)
+		var armor_v := float(comp.get("armor", 0.0))
 		if _resolve_combat_role(formation, role) == "defend":
 			power *= (1.0 + 0.30 * clampf(armor_v, 0.0, 1.0))
 			power *= clampf(0.75 + 0.20 * float(comp.get("defense", 1.0)), 0.75, 1.35)
 		else:
 			power *= (1.0 + 0.12 * clampf(armor_v, 0.0, 1.0))
+	else:
+		var soft = _try_template_soft_attack(formation)
+		if soft != null:
+			power *= 0.7 + 0.3 * float(soft)
+	power *= leader_power_mult(formation, terrain, role)
+	if "combat_experience" in formation:
+		power *= xp_power_mult(float(formation.get("combat_experience")))
 	return float(power)
 
 
