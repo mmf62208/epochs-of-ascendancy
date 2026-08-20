@@ -523,8 +523,8 @@ func start_land_battle(
 		return instant_empty
 	var def_form: Formation = _formation_from_id(def_fid, def_tag)
 
-	var att_power := land_combat_power(att_form, terrain, "attack")
-	var def_power := land_combat_power(def_form, terrain, "defend")
+	var att_power := land_combat_power(att_form, terrain, "attack", def_form)
+	var def_power := land_combat_power(def_form, terrain, "defend", att_form)
 	var att_org := _formation_stat(att_form, "organization", 1.0)
 	var def_org := _formation_stat(def_form, "organization", 1.0)
 	var est_days := _estimate_land_battle_days(att_power, def_power, terrain, false)
@@ -1018,11 +1018,11 @@ func withdraw_from_land_battle(formation_id: String) -> Dictionary:
 
 ## org * strength * readiness * template hint. Armor design_id ×1.5 on plains.
 ## Prefers LandCombatPower when present (soft_attack + mountain infantry).
-func land_combat_power(formation: Object, terrain: String = "plains", role: String = "") -> float:
+func land_combat_power(formation: Object, terrain: String = "plains", role: String = "", opponent: Object = null) -> float:
 	if formation == null:
 		return 0.0
 	if typeof(LandCombatPower) != TYPE_NIL:
-		return maxf(0.0, float(LandCombatPower.combat_power(formation, terrain, role)))
+		return maxf(0.0, float(LandCombatPower.combat_power(formation, terrain, role, opponent)))
 	var org := _formation_stat(formation, "organization", 1.0)
 	var strn := _formation_stat(formation, "strength", 1.0)
 	var rdy := _formation_stat(formation, "readiness", 1.0)
@@ -1119,20 +1119,34 @@ func _rebuild_land_battle_powers(battle: Dictionary) -> void:
 	var terrain := str(battle.get("terrain", "plains"))
 	var att_fids: Array = _fid_list(battle, "att_fids", "att_fid")
 	var def_fids: Array = _fid_list(battle, "def_fids", "def_fid")
+	var att_forms: Array = []
+	var def_forms: Array = []
+	for fid_v in att_fids:
+		att_forms.append(_formation_from_id(str(fid_v), str(battle.get("att_tag", ""))))
+	for fid_v2 in def_fids:
+		def_forms.append(_formation_from_id(str(fid_v2), str(battle.get("def_tag", ""))))
+	var opp_def: Object = null
+	for df0 in def_forms:
+		if df0 != null:
+			opp_def = df0
+			break
+	var opp_att: Object = null
+	for af0 in att_forms:
+		if af0 != null:
+			opp_att = af0
+			break
 	var att_powers: Array = []
 	var att_widths: Array = []
-	for fid_v in att_fids:
-		var fo: Formation = _formation_from_id(str(fid_v), str(battle.get("att_tag", "")))
-		att_powers.append(land_combat_power(fo, terrain, "attack"))
+	for fo in att_forms:
+		att_powers.append(land_combat_power(fo, terrain, "attack", opp_def))
 		var aw := 2.0
 		if typeof(LandCombatPower) != TYPE_NIL:
 			aw = float(LandCombatPower.unit_width(fo))
 		att_widths.append(aw)
 	var def_powers: Array = []
 	var def_widths: Array = []
-	for fid_v2 in def_fids:
-		var df: Formation = _formation_from_id(str(fid_v2), str(battle.get("def_tag", "")))
-		def_powers.append(land_combat_power(df, terrain, "defend"))
+	for df in def_forms:
+		def_powers.append(land_combat_power(df, terrain, "defend", opp_att))
 		var dw := 2.0
 		if typeof(LandCombatPower) != TYPE_NIL:
 			dw = float(LandCombatPower.unit_width(df))

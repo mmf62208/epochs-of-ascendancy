@@ -336,6 +336,35 @@ func _test_front_chips() -> void:
 					_pass("artillery towed speed=%.1f guns=%s" % [
 						float(guns.get("speed", 0)), str((guns.get("equipment", {}) as Dictionary).get("artillery", 0)),
 					])
+				var triple: Dictionary = pwr.call(
+					"composition_stats", "truck", "medium_tank", "infantry", "artillery,recon", 3, 2
+				)
+				if int(triple.get("infantry_bns", 0)) != 3 or abs(float(triple.get("width", 0)) - 12.0) > 0.01:
+					_fail("battalion width want inf=3 width=12 got inf=%s w=%s" % [
+						str(triple.get("infantry_bns")), str(triple.get("width")),
+					])
+				elif float(triple.get("fuel_use", 0)) <= 0.2:
+					_fail("fuel_use want >0.2 got %s" % str(triple.get("fuel_use")))
+				else:
+					_pass("infantry_bns=%d tanks=%d width=%.0f fuel_use=%.2f" % [
+						int(triple.get("infantry_bns", 0)),
+						int(triple.get("tank_bns", 0)),
+						float(triple.get("width", 0)),
+						float(triple.get("fuel_use", 0)),
+					])
+				if pwr.has_method("pierce_mult"):
+					var ph := float(pwr.call("pierce_mult", 1.25, 0.0))
+					var pl := float(pwr.call("pierce_mult", 0.15, 0.70))
+					if ph <= pl:
+						_fail("pierce_mult tank vs inf should beat inf vs tank hi=%.2f lo=%.2f" % [ph, pl])
+					else:
+						_pass("pierce_mult hard-vs-soft=%.2f bounce=%.2f" % [ph, pl])
+				if pwr.has_method("shortage_mult"):
+					var sm := float(pwr.call("shortage_mult", {"infantry_equipment": 20}, {"infantry_equipment": 80}))
+					if sm >= 0.85:
+						_fail("shortage_mult want <0.85 got %s" % sm)
+					else:
+						_pass("shortage_mult half-stock=%.2f" % sm)
 	var ger_form: Object = _ger_on_front()
 	if ger_form != null and pwr != null and pwr.has_method("composition_from_formation"):
 		var inferred: Dictionary = pwr.call("composition_from_formation", ger_form)
@@ -373,7 +402,18 @@ func _test_front_chips() -> void:
 			else:
 				_pass("combat loss def men=%d" % int(loss_d.get("manpower_lost", 0)))
 			fra.set("strength", 1.0)
+			if "fuel_level" in fra:
+				fra.set("fuel_level", 1.0)
 		ger_form.set("strength", 1.0)
+		if ger_form != null and "fuel_level" in ger_form:
+			var wet := float(pwr.call("template_speed", ger_form)) if pwr != null else 1.5
+			ger_form.set("fuel_level", 0.10)
+			var dry := float(pwr.call("template_speed", ger_form)) if pwr != null else 1.5
+			ger_form.set("fuel_level", 1.0)
+			if dry >= wet - 0.01:
+				_fail("low fuel should slow panzer wet=%.2f dry=%.2f" % [wet, dry])
+			else:
+				_pass("fuel speed wet=%.2f dry=%.2f" % [wet, dry])
 
 
 func _test_designer_field() -> void:

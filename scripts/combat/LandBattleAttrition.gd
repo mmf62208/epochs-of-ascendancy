@@ -89,6 +89,7 @@ static func apply_daily_to_formation(formation_id: String, severity: float) -> D
 				form.combat_experience = LandCombatPower.dilute_xp_heavy_loss(
 					float(form.combat_experience), drain
 				)
+			LandCombatPower.apply_fuel_burn(form, "combat")
 	var plain := format_loss_plain(removed)
 	if manpower_lost > 0:
 		if plain == NO_STOCK:
@@ -119,6 +120,12 @@ static func _short_name(equipment_id: String) -> String:
 		return "halftracks"
 	if "truck" in key or "motorized" in key:
 		return "trucks"
+	if "recon" in key:
+		return "recon"
+	if "anti_tank" in key or "anti-tank" in key:
+		return "AT"
+	if "anti_air" in key or "anti-air" in key:
+		return "AA"
 	if "support" in key:
 		return "support"
 	if "artillery" in key:

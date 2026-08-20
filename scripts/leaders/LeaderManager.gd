@@ -511,6 +511,12 @@ func field_designed_unit(
 	var sup := str(extras.get("support", "")).strip_edges().to_lower()
 	if not sup.is_empty() and sup != "none":
 		f.set_meta("support", sup)
+	if extras.has("infantry_bns"):
+		f.set_meta("infantry_bns", clampi(int(extras.get("infantry_bns", 1)), 1, 6))
+	if extras.has("tank_bns"):
+		f.set_meta("tank_bns", clampi(int(extras.get("tank_bns", 0)), 0, 3))
+	if "fuel_level" in f:
+		f.fuel_level = 1.0
 	match dom:
 		"naval":
 			f.formation_type = Formation.TYPE_FLEET
@@ -3562,6 +3568,9 @@ func get_save_data() -> Dictionary:
 			"mobility": str(f.get_meta("mobility", "foot")) if f.has_meta("mobility") else "foot",
 			"armor_element": str(f.get_meta("armor_element", "")) if f.has_meta("armor_element") else "",
 			"support": str(f.get_meta("support", "")) if f.has_meta("support") else "",
+			"infantry_bns": int(f.get_meta("infantry_bns", 1)) if f.has_meta("infantry_bns") else 1,
+			"tank_bns": int(f.get_meta("tank_bns", 0)) if f.has_meta("tank_bns") else 0,
+			"fuel_level": float(f.fuel_level) if "fuel_level" in f else 1.0,
 			"last_manpower_loss": int(f.last_manpower_loss) if "last_manpower_loss" in f else 0,
 		}
 
@@ -3696,6 +3705,12 @@ func apply_save_data(data: Dictionary) -> void:
 				f.set_meta("armor_element", str(fd.get("armor_element")))
 			if str(fd.get("support", "")).strip_edges() != "":
 				f.set_meta("support", str(fd.get("support")))
+			if fd.has("infantry_bns"):
+				f.set_meta("infantry_bns", clampi(int(fd.get("infantry_bns", 1)), 1, 6))
+			if fd.has("tank_bns"):
+				f.set_meta("tank_bns", clampi(int(fd.get("tank_bns", 0)), 0, 3))
+			if "fuel_level" in f:
+				f.fuel_level = clampf(float(fd.get("fuel_level", 1.0)), 0.0, 1.0)
 			if "last_manpower_loss" in f:
 				f.last_manpower_loss = int(fd.get("last_manpower_loss", 0))
 			if fd.get("combat_log") is Array:

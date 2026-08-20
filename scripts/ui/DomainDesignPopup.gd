@@ -32,9 +32,15 @@ var _refit_check: CheckBox
 var _mobility_option: OptionButton
 var _armor_add_option: OptionButton
 var _support_option: OptionButton
+var _support2_option: OptionButton
+var _inf_bn_spin: SpinBox
+var _tank_bn_spin: SpinBox
 var _mobility_row: HBoxContainer
 var _armor_add_row: HBoxContainer
 var _support_row: HBoxContainer
+var _support2_row: HBoxContainer
+var _inf_bn_row: HBoxContainer
+var _tank_bn_row: HBoxContainer
 
 const DOMAIN_SYMBOLS := {
 	"land": ["infantry", "light_tank", "medium_tank", "heavy_tank", "artillery"],
@@ -206,22 +212,50 @@ func _build_ui() -> void:
 	_armor_add_option.set_item_metadata(1, "light_tank")
 	_armor_add_option.add_item("Medium tank")
 	_armor_add_option.set_item_metadata(2, "medium_tank")
+	_armor_add_option.add_item("Heavy tank")
+	_armor_add_option.set_item_metadata(3, "heavy_tank")
 	_armor_add_option.select(0)
 	_armor_add_option.item_selected.connect(func(_i: int) -> void: _update_stats())
 	_armor_add_row.add_child(_armor_add_option)
 	col.add_child(_armor_add_row)
 
+	_inf_bn_row = HBoxContainer.new()
+	_inf_bn_row.add_child(_make_lbl("Infantry bns:"))
+	_inf_bn_spin = SpinBox.new()
+	_inf_bn_spin.min_value = 1
+	_inf_bn_spin.max_value = 6
+	_inf_bn_spin.step = 1
+	_inf_bn_spin.value = 3
+	_inf_bn_spin.value_changed.connect(func(_v: float) -> void: _update_stats())
+	_inf_bn_row.add_child(_inf_bn_spin)
+	col.add_child(_inf_bn_row)
+
+	_tank_bn_row = HBoxContainer.new()
+	_tank_bn_row.add_child(_make_lbl("Tank bns:"))
+	_tank_bn_spin = SpinBox.new()
+	_tank_bn_spin.min_value = 0
+	_tank_bn_spin.max_value = 3
+	_tank_bn_spin.step = 1
+	_tank_bn_spin.value = 1
+	_tank_bn_spin.value_changed.connect(func(_v: float) -> void: _update_stats())
+	_tank_bn_row.add_child(_tank_bn_spin)
+	col.add_child(_tank_bn_row)
+
 	_support_row = HBoxContainer.new()
 	_support_row.add_child(_make_lbl("Support:"))
 	_support_option = OptionButton.new()
-	_support_option.add_item("None")
-	_support_option.set_item_metadata(0, "")
-	_support_option.add_item("Artillery")
-	_support_option.set_item_metadata(1, "artillery")
-	_support_option.select(0)
+	_fill_support_option(_support_option)
 	_support_option.item_selected.connect(func(_i: int) -> void: _update_stats())
 	_support_row.add_child(_support_option)
 	col.add_child(_support_row)
+
+	_support2_row = HBoxContainer.new()
+	_support2_row.add_child(_make_lbl("Support 2:"))
+	_support2_option = OptionButton.new()
+	_fill_support_option(_support2_option)
+	_support2_option.item_selected.connect(func(_i: int) -> void: _update_stats())
+	_support2_row.add_child(_support2_option)
+	col.add_child(_support2_row)
 
 	var org_hdr := Label.new()
 	org_hdr.text = "Organize / recruit"
@@ -416,6 +450,25 @@ func _make_lbl(t: String) -> Label:
 	return l
 
 
+func _fill_support_option(opt: OptionButton) -> void:
+	if opt == null:
+		return
+	opt.clear()
+	opt.add_item("None")
+	opt.set_item_metadata(0, "")
+	opt.add_item("Artillery")
+	opt.set_item_metadata(1, "artillery")
+	opt.add_item("Recon")
+	opt.set_item_metadata(2, "recon")
+	opt.add_item("Engineers")
+	opt.set_item_metadata(3, "engineer")
+	opt.add_item("Anti-tank")
+	opt.set_item_metadata(4, "anti_tank")
+	opt.add_item("Anti-air")
+	opt.set_item_metadata(5, "anti_air")
+	opt.select(0)
+
+
 func _mobility_id() -> String:
 	if _mobility_option and _mobility_option.item_count > 0:
 		return str(_mobility_option.get_item_metadata(_mobility_option.selected))
@@ -436,9 +489,30 @@ func _armor_element_id() -> String:
 
 
 func _support_id() -> String:
-	if _support_option and _support_option.item_count > 0:
-		return str(_support_option.get_item_metadata(_support_option.selected))
-	return ""
+	var bits: PackedStringArray = PackedStringArray()
+	for opt in [_support_option, _support2_option]:
+		if opt == null or opt.item_count <= 0:
+			continue
+		var s := str(opt.get_item_metadata(opt.selected)).strip_edges().to_lower()
+		if s.is_empty() or s == "none" or bits.has(s):
+			continue
+		bits.append(s)
+	return ",".join(bits)
+
+
+func _infantry_bns() -> int:
+	if _inf_bn_spin:
+		return clampi(int(_inf_bn_spin.value), 1, 6)
+	return 3
+
+
+func _tank_bns() -> int:
+	var arm := _armor_element_id()
+	if arm.is_empty():
+		return 0
+	if _tank_bn_spin:
+		return clampi(int(_tank_bn_spin.value), 0, 3)
+	return 1
 
 
 func _refresh_for_domain() -> void:
@@ -488,6 +562,12 @@ func _refresh_for_domain() -> void:
 		_armor_add_row.visible = _domain == "land"
 	if _support_row:
 		_support_row.visible = _domain == "land"
+	if _support2_row:
+		_support2_row.visible = _domain == "land"
+	if _inf_bn_row:
+		_inf_bn_row.visible = _domain == "land"
+	if _tank_bn_row:
+		_tank_bn_row.visible = _domain == "land"
 	_refresh_organize_options()
 	_update_stats()
 
@@ -528,12 +608,20 @@ func _update_stats() -> void:
 		else:
 			arm = "medium_tank"
 	var sup := _support_id()
-	var comp: Dictionary = LandCombatPower.composition_stats(mob, arm, "infantry", sup)
-	text += "Speed %.1f (slowest element) · Armor %.0f%% · Defense %.1f · Men %d\n" % [
+	var inf_n := _infantry_bns()
+	var tank_n := _tank_bns()
+	var comp: Dictionary = LandCombatPower.composition_stats(mob, arm, "infantry", sup, inf_n, tank_n)
+	text += "Speed %.1f (slowest) · Armor %.0f%% · Width %.0f · Fuel use %.2f\n" % [
 		float(comp.get("speed", 1.0)),
 		float(comp.get("armor", 0.0)) * 100.0,
+		float(comp.get("width", 2.0)),
+		float(comp.get("fuel_use", 0.0)),
+	]
+	text += "Defense %.1f · Men %d · %d inf bn · %d tank bn\n" % [
 		float(comp.get("defense", 1.0)),
 		int(comp.get("manpower", 3000)),
+		inf_n,
+		tank_n,
 	]
 	var existing := _mode_existing != null and _mode_existing.selected == 1
 	var n_u := int(_count_spin.value) if _count_spin else 1
@@ -573,6 +661,8 @@ func _on_finalize() -> void:
 		"mobility": _mobility_id(),
 		"armor_element": _armor_element_id(),
 		"support": _support_id(),
+		"infantry_bns": _infantry_bns(),
+		"tank_bns": _tank_bns(),
 	}
 
 	var reg_ok := existing
@@ -617,6 +707,8 @@ func _on_finalize() -> void:
 			"mobility": _mobility_id(),
 			"armor_element": _armor_element_id(),
 			"support": _support_id(),
+			"infantry_bns": _infantry_bns(),
+			"tank_bns": _tank_bns(),
 		},
 	}
 

@@ -459,14 +459,16 @@ static func _commit_ready_hops(order: Dictionary) -> Array:
 			hop_row["reinforced"] = bool(rf.get("joined", false))
 			hop_row["reinforce"] = rf
 		out.append(hop_row)
+		var f2: Object = null
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+			f2 = LeaderManager.get_formation(fid)
+		if f2 != null:
+			LandCombatPower.apply_fuel_burn(f2, "march")
 		if arrived:
 			order["arrived"] = true
 			order["hop_index"] = path.size()
 			break
 		order["hop_index"] = hop_i + 1
-		var f2: Object = null
-		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
-			f2 = LeaderManager.get_formation(fid)
 		order["hop_cost"] = _hop_cost_into(int(path[hop_i + 1]), template_profile(f2))
 	return out
 

@@ -483,6 +483,14 @@ func _tick_out_of_combat_recovery() -> void:
 			continue
 		if "is_in_combat" in f and bool(f.is_in_combat):
 			continue
+		if "fuel_level" in f:
+			var marching := false
+			if typeof(FormationMovement) != TYPE_NIL:
+				marching = bool(FormationMovement.has_march(str(fid)))
+			if not marching:
+				var fuel_need := float(LandCombatPower.composition_from_formation(f).get("fuel_use", 0.0))
+				if fuel_need > 1e-9:
+					LandCombatPower.apply_fuel_resupply(f, 0.10)
 		var org := float(f.organization) if "organization" in f else 1.0
 		var plan := float(f.planning) if "planning" in f else 1.0
 		var strn := float(f.strength) if "strength" in f else 1.0

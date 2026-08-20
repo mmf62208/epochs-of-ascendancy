@@ -13,7 +13,11 @@ from unit_composition_combat_product import (  # noqa: E402
     build_unit_composition_combat_product,
     compose,
     daily_losses,
+    fuel_burn,
+    fuel_speed_mult,
     manpower_lost,
+    pierce_mult,
+    shortage_mult,
     unit_composition_combat_integrity,
 )
 
@@ -39,6 +43,29 @@ class TestUnitCompositionCombatProduct(unittest.TestCase):
         self.assertEqual(float(guns["speed"]), 1.5)
         self.assertEqual(int((guns.get("equipment") or {}).get("artillery", 0)), 12)
         self.assertIn("trucks", att.get("removed") or {})
+        triple = compose(
+            mobility="truck",
+            armor="medium_tank",
+            support="artillery,recon",
+            infantry_bns=3,
+            tank_bns=2,
+        )
+        self.assertEqual(int(triple["infantry_bns"]), 3)
+        self.assertEqual(int(triple["tank_bns"]), 2)
+        self.assertGreater(int(triple["manpower"]), int(mixed["manpower"]))
+        self.assertEqual(int((triple.get("equipment") or {}).get("tanks", 0)), 20)
+        self.assertAlmostEqual(float(triple["width"]), 12.0)
+        self.assertGreater(float(triple["fuel_use"]), float(truck["fuel_use"]))
+        self.assertIn("recon", list(triple.get("supports") or []))
+        atg = compose(mobility="truck", support="anti_tank,engineer")
+        self.assertAlmostEqual(float(atg["speed"]), 2.0)
+        self.assertGreater(float(atg["hard"]), float(truck["hard"]))
+        self.assertGreater(pierce_mult(1.25, 0.0), pierce_mult(0.15, 0.70))
+        self.assertLess(shortage_mult({"infantry_equipment": 20}, {"infantry_equipment": 80}), 0.85)
+        self.assertEqual(shortage_mult({}, {"infantry_equipment": 80}), 1.0)
+        self.assertLess(fuel_speed_mult(0.10, 0.20), 0.80)
+        self.assertEqual(fuel_speed_mult(1.0, 0.0), 1.0)
+        self.assertLess(fuel_burn(1.0, 0.20, "march"), 1.0)
 
     def test_product_wiring(self) -> None:
         p = build_unit_composition_combat_product(check_wiring=True)

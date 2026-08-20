@@ -1,6 +1,6 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-20 (L1 land loop + living units + organize + **composition/speed/armor + combat losses** · `--quick` green · board ~3520 · M6 human-only open)  
+**Date:** 2026-08-20 (L1 land loop + living units + organize + **composition battalions/support/fuel/width/pierce** · `--quick` green · board ~3520 · M6 human-only open)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
 **How to keep going:** 5-step protocol in §0. Next human: F5 §0b 3–15 + a 20d unpause (M6 notes). Next machine: only playtest-driven shipped-path fixes. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
@@ -60,6 +60,7 @@ Every Cursor / Grok / human session on this tree:
 - **L1 type letter (machine):** chip shows **I** / **A** / **L** / **H** / **G** / **M** / **R** from designer `visual_archetype` (NATO glyph + colored letter).
 - **L1 living unit story (machine):** Counter shows **org + str + readiness** bars. Troop XP (green→veteran) multiplies combat power (~0.80–1.18). Daily replacements dilute XP toward recruit 22; heavy combat strength loss (≥8%) trims veterans. Unit card keeps last battle records + commander initial on chip. Product `unit_living_story_product` on `--quick`.
 - **L1 composition + combat losses (machine):** Designer mounts infantry with **motorcycle / truck / half-track**, optional tanks, optional **artillery** (trucks tow guns). Speed = **slowest remaining element**. Composition seeds vehicle TOE (rifles/trucks/tanks/guns); daily land tick writes **men + equipment for attacker and defender**, deducts national manpower, and defenders use armor/defense in `land_combat_power(..., defend)`. Card shows remaining men. Product `unit_composition_combat_product` on `--quick`.
+- **L1 composition depth (machine):** Designer **1–6 infantry bns** + **0–3 tank bns** + support **artillery / recon / engineers / AT / AA** (two slots). Line battalions set **combat width**; support is 0-width and towed when mounted. **Fuel use** burns on march hops and daily combat; dry tanks/trucks slow and lose power (foot unhindered). Attacker **hard vs defender armor** is `pierce_mult`. On-hand stock vs TOE applies a **shortage** readiness hit. Card shows width, fuel, TOE. Save round-trips bns + `fuel_level`. Still not commercial HOI battalion designer.
 - **L1 formation combat save (machine):** LeaderManager persists combat_experience + planning + entrenchment (and land mission). Mid-campaign load no longer resets XP/trench. Calendar autosave toasts “Autosaved · day N”.
 
 **Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3.

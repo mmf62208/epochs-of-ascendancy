@@ -33,6 +33,9 @@ static func lines_for(formation: Object) -> PackedStringArray:
 	if bool(comp.get("has_composition", false)) or float(comp.get("armor", 0.0)) > 0.001:
 		var toe := int(comp.get("manpower", 0))
 		var left := maxi(0, int(round(float(toe) * str_v)))
+		var fuel_pct := 100.0
+		if "fuel_level" in formation:
+			fuel_pct = clampf(float(formation.get("fuel_level")), 0.0, 1.0) * 100.0
 		lines.append(
 			"Speed %.1f · Armor %.0f%% · Men %d/%d"
 			% [
@@ -42,6 +45,22 @@ static func lines_for(formation: Object) -> PackedStringArray:
 				toe,
 			]
 		)
+		lines.append(
+			"Width %.0f · Fuel %.0f%%"
+			% [float(comp.get("width", 2.0)), fuel_pct]
+		)
+		var toe_eq: Dictionary = LandCombatPower.equipment_toe(comp)
+		if not toe_eq.is_empty():
+			var bits: PackedStringArray = PackedStringArray()
+			var keys: Array = toe_eq.keys()
+			keys.sort()
+			for k in keys:
+				if bits.size() >= 4:
+					break
+				var short := str(k).replace("_equipment", "").replace("_", " ")
+				bits.append("%s %d" % [short, int(toe_eq[k])])
+			if not bits.is_empty():
+				lines.append("TOE " + " · ".join(bits))
 	if "last_manpower_loss" in formation:
 		var men_l := int(formation.get("last_manpower_loss"))
 		if men_l > 0 and "last_equip_loss_plain" not in formation:

@@ -15,6 +15,10 @@ const EL_SPEED := {
 	"truck": 2.0,
 	"halftrack": 1.6,
 	"artillery": 0.85,
+	"recon": 1.20,
+	"engineer": 1.0,
+	"anti_tank": 0.90,
+	"anti_air": 0.90,
 	"light_tank": 1.8,
 	"medium_tank": 1.5,
 	"heavy_tank": 1.2,
@@ -25,6 +29,10 @@ const EL_ARMOR := {
 	"truck": 0.05,
 	"halftrack": 0.35,
 	"artillery": 0.05,
+	"recon": 0.0,
+	"engineer": 0.0,
+	"anti_tank": 0.05,
+	"anti_air": 0.05,
 	"light_tank": 0.45,
 	"medium_tank": 0.70,
 	"heavy_tank": 0.90,
@@ -35,6 +43,10 @@ const EL_DEFENSE := {
 	"truck": 0.75,
 	"halftrack": 1.20,
 	"artillery": 0.80,
+	"recon": 0.40,
+	"engineer": 0.90,
+	"anti_tank": 0.60,
+	"anti_air": 0.50,
 	"light_tank": 1.10,
 	"medium_tank": 1.30,
 	"heavy_tank": 1.50,
@@ -45,6 +57,10 @@ const EL_MANPOWER := {
 	"truck": 200,
 	"halftrack": 280,
 	"artillery": 350,
+	"recon": 120,
+	"engineer": 250,
+	"anti_tank": 220,
+	"anti_air": 200,
 	"light_tank": 400,
 	"medium_tank": 500,
 	"heavy_tank": 520,
@@ -55,6 +71,10 @@ const EL_SOFT := {
 	"truck": 1.0,
 	"halftrack": 1.05,
 	"artillery": 1.40,
+	"recon": 0.35,
+	"engineer": 0.25,
+	"anti_tank": 0.20,
+	"anti_air": 0.40,
 	"light_tank": 1.10,
 	"medium_tank": 1.20,
 	"heavy_tank": 1.15,
@@ -65,9 +85,55 @@ const EL_HARD := {
 	"truck": 0.10,
 	"halftrack": 0.35,
 	"artillery": 0.45,
+	"recon": 0.05,
+	"engineer": 0.10,
+	"anti_tank": 0.85,
+	"anti_air": 0.20,
 	"light_tank": 0.70,
 	"medium_tank": 1.00,
 	"heavy_tank": 1.25,
+}
+const EL_FUEL := {
+	"infantry": 0.0,
+	"motorcycle": 0.04,
+	"truck": 0.06,
+	"halftrack": 0.08,
+	"artillery": 0.02,
+	"recon": 0.03,
+	"engineer": 0.02,
+	"anti_tank": 0.02,
+	"anti_air": 0.02,
+	"light_tank": 0.12,
+	"medium_tank": 0.16,
+	"heavy_tank": 0.20,
+}
+const EL_SUPPLY := {
+	"infantry": 0.8,
+	"motorcycle": 0.4,
+	"truck": 0.5,
+	"halftrack": 0.6,
+	"artillery": 0.5,
+	"recon": 0.25,
+	"engineer": 0.35,
+	"anti_tank": 0.40,
+	"anti_air": 0.35,
+	"light_tank": 0.8,
+	"medium_tank": 1.0,
+	"heavy_tank": 1.2,
+}
+const EL_WIDTH := {
+	"infantry": 2.0,
+	"motorcycle": 0.0,
+	"truck": 0.0,
+	"halftrack": 0.0,
+	"artillery": 0.0,
+	"recon": 0.0,
+	"engineer": 0.0,
+	"anti_tank": 0.0,
+	"anti_air": 0.0,
+	"light_tank": 2.0,
+	"medium_tank": 3.0,
+	"heavy_tank": 3.0,
 }
 const EL_EQUIP := {
 	"infantry": {"infantry_equipment": 80},
@@ -75,11 +141,18 @@ const EL_EQUIP := {
 	"truck": {"trucks": 24},
 	"halftrack": {"halftracks": 16},
 	"artillery": {"artillery": 12},
+	"recon": {"recon_equipment": 12},
+	"engineer": {"support_equipment": 20},
+	"anti_tank": {"anti_tank": 12},
+	"anti_air": {"anti_air": 12},
 	"light_tank": {"tanks": 12},
 	"medium_tank": {"tanks": 10},
 	"heavy_tank": {"tanks": 8},
 }
 const MOUNTED_IDS := ["motorcycle", "truck", "halftrack"]
+const SKIP_SPEED_WHEN_MOUNTED := ["infantry", "artillery", "recon", "engineer", "anti_tank", "anti_air"]
+const INFANTRY_BNS_MAX := 6
+const TANK_BNS_MAX := 3
 const ARMOR_PLAINS_HILLS := 1.5
 const ARMOR_MOUNTAIN := 0.85
 const MOUNTAIN_INFANTRY_MOUNTAIN := 1.15
@@ -103,14 +176,39 @@ static func template_kind(formation: Object) -> String:
 
 static func template_speed(formation: Object) -> float:
 	var c: Dictionary = composition_from_formation(formation)
+	var base := INFANTRY_SPEED
 	if bool(c.get("has_composition", false)):
-		return float(c.get("speed", INFANTRY_SPEED))
-	if template_kind(formation) == "armor":
-		return ARMOR_SPEED
-	return INFANTRY_SPEED
+		base = float(c.get("speed", INFANTRY_SPEED))
+	elif template_kind(formation) == "armor":
+		base = ARMOR_SPEED
+	return base * fuel_speed_mult(formation, float(c.get("fuel_use", 0.0)))
 
 
-static func composition_stats(mobility: String = "foot", armor_element: String = "", core: String = "infantry", support: String = "") -> Dictionary:
+static func _split_supports(support: String) -> Array:
+	var out: Array = []
+	for part in str(support).replace(";", ",").split(","):
+		var s := str(part).strip_edges().to_lower()
+		if s.is_empty() or s in ["none", "foot"]:
+			continue
+		if s == "engineers":
+			s = "engineer"
+		if s in ["at", "anti-tank"]:
+			s = "anti_tank"
+		if s in ["aa", "anti-air"]:
+			s = "anti_air"
+		if EL_SPEED.has(s) and not out.has(s):
+			out.append(s)
+	return out
+
+
+static func composition_stats(
+	mobility: String = "foot",
+	armor_element: String = "",
+	core: String = "infantry",
+	support: String = "",
+	infantry_bns: int = 1,
+	tank_bns: int = -1,
+) -> Dictionary:
 	var core_id := str(core).strip_edges().to_lower()
 	if not EL_SPEED.has(core_id):
 		core_id = "infantry"
@@ -120,16 +218,33 @@ static func composition_stats(mobility: String = "foot", armor_element: String =
 	var arm := str(armor_element).strip_edges().to_lower()
 	if arm in ["none", "foot"]:
 		arm = ""
-	var sup := str(support).strip_edges().to_lower()
-	if sup in ["none", "foot"]:
-		sup = ""
+	var inf_n := clampi(int(infantry_bns), 1, INFANTRY_BNS_MAX)
+	var tank_n := 0
+	if int(tank_bns) < 0:
+		tank_n = 1 if EL_SPEED.has(arm) else 0
+	else:
+		tank_n = clampi(int(tank_bns), 0, TANK_BNS_MAX)
+		if tank_n <= 0:
+			arm = ""
+	if not EL_SPEED.has(arm):
+		arm = ""
+		tank_n = 0
+	var sup_list: Array = _split_supports(support)
+	var counts: Dictionary = {core_id: inf_n}
+	if EL_SPEED.has(mob):
+		counts[mob] = inf_n
+	if arm != "":
+		counts[arm] = tank_n
+	for sid in sup_list:
+		counts[str(sid)] = 1
 	var ids: Array = [core_id]
 	if EL_SPEED.has(mob) and not ids.has(mob):
 		ids.append(mob)
 	if EL_SPEED.has(arm) and not ids.has(arm):
 		ids.append(arm)
-	if EL_SPEED.has(sup) and not ids.has(sup):
-		ids.append(sup)
+	for sid in sup_list:
+		if not ids.has(str(sid)):
+			ids.append(str(sid))
 	var mounted := false
 	for i in ids:
 		if str(i) in MOUNTED_IDS:
@@ -141,21 +256,28 @@ static func composition_stats(mobility: String = "foot", armor_element: String =
 	var men := 0
 	var soft := 0.0
 	var hard := 0.0
+	var fuel_use := 0.0
+	var supply_need := 0.0
+	var width := 0.0
 	var equip: Dictionary = {}
 	for i in ids:
 		var eid := str(i)
-		if mounted and eid in ["infantry", "artillery"]:
-			pass
-		else:
+		var n := int(counts.get(eid, 1))
+		if n <= 0:
+			continue
+		if not (mounted and eid in SKIP_SPEED_WHEN_MOUNTED):
 			speeds.append(float(EL_SPEED.get(eid, 1.0)))
 		armor_v = maxf(armor_v, float(EL_ARMOR.get(eid, 0.0)))
-		defense += float(EL_DEFENSE.get(eid, 0.0))
-		men += int(EL_MANPOWER.get(eid, 0))
-		soft += float(EL_SOFT.get(eid, 1.0))
-		hard += float(EL_HARD.get(eid, 0.0))
+		defense += float(EL_DEFENSE.get(eid, 0.0)) * float(n)
+		men += int(EL_MANPOWER.get(eid, 0)) * n
+		soft += float(EL_SOFT.get(eid, 1.0)) * float(n)
+		hard += float(EL_HARD.get(eid, 0.0)) * float(n)
+		fuel_use += float(EL_FUEL.get(eid, 0.0)) * float(n)
+		supply_need += float(EL_SUPPLY.get(eid, 0.0)) * float(n)
+		width += float(EL_WIDTH.get(eid, 0.0)) * float(n)
 		var pack: Dictionary = EL_EQUIP.get(eid, {}) as Dictionary if EL_EQUIP.get(eid, {}) is Dictionary else {}
 		for ek in pack.keys():
-			equip[str(ek)] = int(equip.get(str(ek), 0)) + int(pack[ek])
+			equip[str(ek)] = int(equip.get(str(ek), 0)) + int(pack[ek]) * n
 	var speed := INFANTRY_SPEED
 	if not speeds.is_empty():
 		speed = float(speeds[0])
@@ -166,19 +288,30 @@ static func composition_stats(mobility: String = "foot", armor_element: String =
 		kind = "armor"
 	elif mounted:
 		kind = "motor"
+	var has_comp := mounted or arm != "" or mob != "foot" or not sup_list.is_empty() or inf_n != 1 or tank_n > 1
+	var sup_join := PackedStringArray()
+	for sid in sup_list:
+		sup_join.append(str(sid))
 	return {
 		"ok": true,
-		"has_composition": mounted or arm != "" or mob != "foot" or sup != "",
+		"has_composition": has_comp,
 		"ids": ids,
+		"counts": counts,
 		"mobility": mob,
 		"armor_element": arm,
-		"support": sup,
+		"support": ",".join(sup_join),
+		"supports": sup_list,
+		"infantry_bns": inf_n,
+		"tank_bns": tank_n,
 		"speed": speed,
 		"armor": armor_v,
 		"defense": defense,
 		"manpower": men,
 		"soft": soft,
 		"hard": hard,
+		"fuel_use": fuel_use,
+		"supply_need": supply_need,
+		"width": width,
 		"equipment": equip,
 		"mounted": mounted,
 		"kind": kind,
@@ -189,8 +322,10 @@ static func composition_from_formation(formation: Object) -> Dictionary:
 	var mob := "foot"
 	var arm := ""
 	var sup := ""
+	var inf_n := 1
+	var tank_n := -1
 	if formation == null:
-		return composition_stats(mob, arm, "infantry", sup)
+		return composition_stats(mob, arm, "infantry", sup, inf_n, tank_n)
 	if formation.has_meta("mobility"):
 		mob = str(formation.get_meta("mobility"))
 	elif "mobility" in formation:
@@ -203,9 +338,17 @@ static func composition_from_formation(formation: Object) -> Dictionary:
 		sup = str(formation.get_meta("support"))
 	elif "support" in formation:
 		sup = str(formation.get("support"))
+	if formation.has_meta("infantry_bns"):
+		inf_n = int(formation.get_meta("infantry_bns"))
+	elif "infantry_bns" in formation:
+		inf_n = int(formation.get("infantry_bns"))
+	if formation.has_meta("tank_bns"):
+		tank_n = int(formation.get_meta("tank_bns"))
+	elif "tank_bns" in formation:
+		tank_n = int(formation.get("tank_bns"))
 	if arm.is_empty():
 		arm = _infer_armor_element(formation)
-	return composition_stats(mob, arm, "infantry", sup)
+	return composition_stats(mob, arm, "infantry", sup, inf_n, tank_n)
 
 
 static func _infer_armor_element(formation: Object) -> String:
@@ -231,7 +374,110 @@ static func equipment_toe(comp: Dictionary) -> Dictionary:
 	return out
 
 
-static func combat_power(formation: Object, terrain: String = "plains", role: String = "") -> float:
+static func pierce_mult(hard: float, defender_armor: float) -> float:
+	return clampf(1.0 + 0.18 * (float(hard) - float(defender_armor)), 0.70, 1.35)
+
+
+static func shortage_mult(stock: Dictionary, toe: Dictionary) -> float:
+	if toe.is_empty():
+		return 1.0
+	if stock.is_empty():
+		return 1.0
+	var need := 0
+	var have := 0
+	for k in toe.keys():
+		var n := int(toe[k])
+		if n <= 0:
+			continue
+		need += n
+		have += mini(n, maxi(0, int(stock.get(k, 0))))
+	if need <= 0:
+		return 1.0
+	return clampf(0.55 + 0.45 * (float(have) / float(need)), 0.55, 1.0)
+
+
+static func fuel_speed_mult(formation: Object, fuel_use: float = -1.0) -> float:
+	var use := float(fuel_use)
+	if use < 0.0:
+		use = float(composition_from_formation(formation).get("fuel_use", 0.0))
+	if use <= 1e-9:
+		return 1.0
+	var f := _fuel_level_of(formation)
+	if f >= 0.35:
+		return 1.0
+	return 0.45 + 0.55 * (f / 0.35)
+
+
+static func fuel_power_mult(formation: Object, fuel_use: float = -1.0) -> float:
+	var use := float(fuel_use)
+	if use < 0.0:
+		use = float(composition_from_formation(formation).get("fuel_use", 0.0))
+	if use <= 1e-9:
+		return 1.0
+	var f := _fuel_level_of(formation)
+	if f >= 0.30:
+		return 1.0
+	return 0.55 + 0.45 * (f / 0.30)
+
+
+static func apply_fuel_burn(formation: Object, kind: String = "march") -> float:
+	if formation == null:
+		return 1.0
+	var use := float(composition_from_formation(formation).get("fuel_use", 0.0))
+	var cur := _fuel_level_of(formation)
+	if use <= 1e-9:
+		return cur
+	var combat := str(kind).strip_edges().to_lower() == "combat"
+	var rate := (0.10 + use * 0.22) if combat else (0.08 + use * 0.18)
+	var nxt := clampf(cur - rate, 0.0, 1.0)
+	_set_fuel_level(formation, nxt)
+	return nxt
+
+
+static func apply_fuel_resupply(formation: Object, amount: float = 0.10) -> float:
+	if formation == null:
+		return 1.0
+	var nxt := clampf(_fuel_level_of(formation) + maxf(0.0, amount), 0.0, 1.0)
+	_set_fuel_level(formation, nxt)
+	return nxt
+
+
+static func _fuel_level_of(formation: Object) -> float:
+	if formation == null:
+		return 1.0
+	if "fuel_level" in formation:
+		return clampf(float(formation.get("fuel_level")), 0.0, 1.0)
+	if formation.has_meta("fuel_level"):
+		return clampf(float(formation.get_meta("fuel_level")), 0.0, 1.0)
+	return 1.0
+
+
+static func _set_fuel_level(formation: Object, value: float) -> void:
+	if formation == null:
+		return
+	var v := clampf(value, 0.0, 1.0)
+	if "fuel_level" in formation:
+		formation.set("fuel_level", v)
+	else:
+		formation.set_meta("fuel_level", v)
+
+
+static func shortage_mult_for_formation(formation: Object, comp: Dictionary = {}) -> float:
+	if formation == null or typeof(ProductionManager) == TYPE_NIL:
+		return 1.0
+	var fid := ""
+	if "formation_id" in formation:
+		fid = str(formation.get("formation_id"))
+	if fid.is_empty() or not ProductionManager.has_method("get_unit_equipment_stock"):
+		return 1.0
+	var stock: Dictionary = ProductionManager.get_unit_equipment_stock(fid)
+	if stock.is_empty():
+		return 1.0
+	var toe: Dictionary = equipment_toe(comp if not comp.is_empty() else composition_from_formation(formation))
+	return shortage_mult(stock, toe)
+
+
+static func combat_power(formation: Object, terrain: String = "plains", role: String = "", opponent: Object = null) -> float:
 	if formation == null:
 		return 0.0
 	var org := _prop_f(formation, ["organization", "org"], 1.0)
@@ -259,10 +505,19 @@ static func combat_power(formation: Object, terrain: String = "plains", role: St
 			power *= clampf(0.75 + 0.20 * float(comp.get("defense", 1.0)), 0.75, 1.35)
 		else:
 			power *= (1.0 + 0.12 * clampf(armor_v, 0.0, 1.0))
+			if opponent != null:
+				var oc: Dictionary = composition_from_formation(opponent)
+				power *= pierce_mult(hard_c, float(oc.get("armor", 0.0)))
 	else:
 		var soft = _try_template_soft_attack(formation)
 		if soft != null:
 			power *= 0.7 + 0.3 * float(soft)
+		if opponent != null and _resolve_combat_role(formation, role) != "defend":
+			var oc2: Dictionary = composition_from_formation(opponent)
+			if float(oc2.get("armor", 0.0)) > 0.001:
+				power *= pierce_mult(0.15, float(oc2.get("armor", 0.0)))
+	power *= fuel_power_mult(formation, float(comp.get("fuel_use", 0.0)))
+	power *= shortage_mult_for_formation(formation, comp)
 	power *= leader_power_mult(formation, terrain, role)
 	if "combat_experience" in formation:
 		power *= xp_power_mult(float(formation.get("combat_experience")))
@@ -551,6 +806,9 @@ const ARMOR_WIDTH := 3.0
 
 
 static func unit_width(formation: Object) -> float:
+	var c: Dictionary = composition_from_formation(formation)
+	if bool(c.get("has_composition", false)) and float(c.get("width", 0.0)) > 0.1:
+		return maxf(0.1, float(c.get("width")))
 	if template_kind(formation) == "armor":
 		return ARMOR_WIDTH
 	return INFANTRY_WIDTH
