@@ -286,6 +286,34 @@ func _test_front_chips() -> void:
 		_fail("chip missing OrgBar/StrBar")
 	else:
 		_pass("chip OrgBar+StrBar present")
+		if bars.get_node_or_null("RdyBar") == null:
+			_fail("chip missing RdyBar")
+		else:
+			_pass("chip RdyBar present")
+	var letter: Node = chip.get_node_or_null("TypeLetter")
+	if letter == null:
+		_fail("chip missing TypeLetter")
+	else:
+		var lt := str(letter.get("text") if "text" in letter else "")
+		if lt != "A":
+			_fail("GER panzer TypeLetter want A got %s" % lt)
+		else:
+			_pass("TypeLetter=%s" % lt)
+	var pwr: Script = load("res://scripts/combat/LandCombatPower.gd") as Script
+	if pwr == null or not pwr.has_method("xp_power_mult"):
+		_fail("LandCombatPower.xp_power_mult missing")
+	else:
+		var gxp := float(pwr.call("xp_power_mult", 12.0))
+		var vxp := float(pwr.call("xp_power_mult", 90.0))
+		if not (gxp < 0.95 and vxp > 1.05):
+			_fail("xp_power_mult bands g=%s v=%s" % [gxp, vxp])
+		else:
+			_pass("xp_power_mult green=%.2f vet=%.2f" % [gxp, vxp])
+		var diluted := float(pwr.call("dilute_xp_replacements", 90.0, 0.4, 1.0, 22.0))
+		if diluted >= 85.0:
+			_fail("replacements did not dilute XP: %s" % diluted)
+		else:
+			_pass("replacement dilute 90→%.1f" % diluted)
 
 
 func _test_designer_field() -> void:
@@ -337,6 +365,29 @@ func _test_designer_field() -> void:
 		_fail("type sfx keys empty")
 		return
 	_pass("type sfx clash=%s move=%s" % [armor_clash, inf_move])
+	var ger_hist: Object = _ger_on_front()
+	if ger_hist != null and ger_hist.has_method("log_combat"):
+		ger_hist.call("log_combat", "1936-01-04", GER_FRONT, "win", PackedStringArray(["press"]), "Guderian", "victory")
+		var strip_h: Script = load("res://scripts/ui/UnitCardCombatStrip.gd") as Script
+		if strip_h != null and strip_h.has_method("lines_for"):
+			var hist_txt := "\n".join(strip_h.call("lines_for", ger_hist))
+			if "victory" not in hist_txt:
+				_fail("card missing battle history: %s" % hist_txt)
+			else:
+				_pass("card battle history")
+	if ger_hist != null and "combat_experience" in ger_hist:
+		ger_hist.set("combat_experience", 90.0)
+		ger_hist.set("strength", 0.50)
+		var tm: Node = _autoload("TimeManager")
+		if tm != null and tm.has_method("_tick_out_of_combat_recovery"):
+			tm.call("_tick_out_of_combat_recovery")
+			var xp2 := float(ger_hist.get("combat_experience"))
+			if xp2 >= 89.9:
+				_fail("recovery replacements did not dilute XP: %s" % xp2)
+			else:
+				_pass("recovery dilute XP 90→%.1f" % xp2)
+		ger_hist.set("strength", 1.0)
+		ger_hist.set("combat_experience", 48.0)
 
 
 func _test_organize() -> void:

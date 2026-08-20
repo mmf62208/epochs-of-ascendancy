@@ -42,6 +42,25 @@ static func lines_for(formation: Object) -> PackedStringArray:
 			lines.append("Refit %d/%dd · org/str recovering" % [int(prog), int(need)])
 		else:
 			lines.append("Training %d/%dd · not combat-ready" % [int(prog), int(need)])
+	if "combat_log" in formation:
+		var raw: Variant = formation.get("combat_log")
+		if raw is Array:
+			var log: Array = raw as Array
+			var start := maxi(0, log.size() - 3)
+			for i in range(start, log.size()):
+				var row: Variant = log[i]
+				if not (row is Dictionary):
+					continue
+				var d: Dictionary = row as Dictionary
+				var date := str(d.get("date", "")).strip_edges()
+				var outcome := str(d.get("outcome", d.get("result", ""))).strip_edges()
+				var bits := PackedStringArray()
+				if not date.is_empty():
+					bits.append(date)
+				if not outcome.is_empty():
+					bits.append(outcome)
+				if not bits.is_empty():
+					lines.append(" ".join(bits))
 	return lines
 
 

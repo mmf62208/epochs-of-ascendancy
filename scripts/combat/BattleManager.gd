@@ -1350,6 +1350,17 @@ func _record_land_aar(battle: Dictionary, winner: String, to_id: int) -> void:
 		"from_id": stage,
 		"tag": tag,
 	}
+	var log_result := {
+		"winner": winner,
+		"attacker_tag": str(battle.get("att_tag", "")),
+		"defender_tag": str(battle.get("def_tag", "")),
+		"attacker_power": float(battle.get("att_power", 0.0)),
+		"defender_power": float(battle.get("def_power", 0.0)),
+		"province_control_change": winner == "attacker",
+	}
+	_log_unit_combat(fid, int(battle.get("from_id", -1)), to_id, log_result, "attacker")
+	for dfid in _fid_list(battle, "def_fids", "def_fid"):
+		_log_unit_combat(str(dfid), to_id, int(battle.get("from_id", -1)), log_result, "defender")
 
 
 func _finish_land_battle_hold(battle: Dictionary) -> void:

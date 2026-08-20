@@ -489,7 +489,13 @@ func _tick_out_of_combat_recovery() -> void:
 		if budgeted and org >= 0.99 and plan >= 1.0 and strn >= 0.99:
 			continue
 		if "strength" in f and strn < 1.0:
-			f.strength = clampf(strn + 0.03, 0.0, 1.0)
+			var new_s := clampf(strn + 0.03, 0.0, 1.0)
+			var gain := new_s - strn
+			f.strength = new_s
+			if gain > 0.0001 and "combat_experience" in f:
+				f.combat_experience = LandCombatPower.dilute_xp_replacements(
+					float(f.combat_experience), gain, new_s, 22.0
+				)
 		var rec := 0.06
 		var pid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
 		if pid >= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):

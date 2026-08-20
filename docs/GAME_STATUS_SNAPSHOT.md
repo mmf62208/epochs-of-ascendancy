@@ -1,6 +1,6 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-20 (L1 land loop + living units + **organize/recruit queue** · `--quick` green · board ~3520 · M6 human-only open)  
+**Date:** 2026-08-20 (L1 land loop + living units + organize queue + **unit look/XP/history** · `--quick` green · board ~3520 · M6 human-only open)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
 **How to keep going:** 5-step protocol in §0. Next human: F5 §0b 3–15 + a 20d unpause (M6 notes). Next machine: only playtest-driven shipped-path fixes. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
@@ -57,7 +57,8 @@ Every Cursor / Grok / human session on this tree:
 - **Gates host (machine):** `tools/map_generation/.venv` + requirements numpy/Pillow. `--quick` uses that Python. Missing deps fail with a one-line install hint. Soft 30fps still **FAIL** honest (~29.4).
 - **L1 7-day autosave (machine):** `game_day_advanced` writes `autosave` every 7 elapsed days (1936 20–60d never hits a year tick). Year + quit still fire. Killswitch `EOA_CALENDAR_AUTOSAVE=0`.
 - **L1 strength trickle (machine):** out-of-combat +0.03 strength/day (≈3 weeks 0.40→1.0). In combat: no replacements.
-- **L1 type letter (machine):** chip shows **I** / **A** / **M** from template (no new art).
+- **L1 type letter (machine):** chip shows **I** / **A** / **L** / **H** / **G** / **M** / **R** from designer `visual_archetype` (NATO glyph + colored letter).
+- **L1 living unit story (machine):** Counter shows **org + str + readiness** bars. Troop XP (green→veteran) multiplies combat power (~0.80–1.18). Daily replacements dilute XP toward recruit 22; heavy combat strength loss (≥8%) trims veterans. Unit card keeps last battle records + commander initial on chip. Product `unit_living_story_product` on `--quick`.
 - **L1 formation combat save (machine):** LeaderManager persists combat_experience + planning + entrenchment (and land mission). Mid-campaign load no longer resets XP/trench. Calendar autosave toasts “Autosaved · day N”.
 
 **Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3.

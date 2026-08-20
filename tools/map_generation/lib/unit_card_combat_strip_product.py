@@ -92,6 +92,16 @@ def lines_for(formation: Any) -> List[str]:
             out.append("Refit %d/%dd · org/str recovering" % (int(prog), int(need)))
         else:
             out.append("Training %d/%dd · not combat-ready" % (int(prog), int(need)))
+    clog = data.get("combat_log")
+    if isinstance(clog, (list, tuple)):
+        for raw in list(clog)[-3:]:
+            if not isinstance(raw, Mapping):
+                continue
+            date = str(raw.get("date") or "").strip()
+            outcome = str(raw.get("outcome") or raw.get("result") or "").strip()
+            bits = [b for b in (date, outcome) if b]
+            if bits:
+                out.append(" ".join(bits))
     return out
 
 

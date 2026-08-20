@@ -20,6 +20,7 @@ from land_combat_power_product import (  # noqa: E402
     leader_power_mult,
     template_kind,
     template_speed,
+    xp_power_mult,
 )
 
 

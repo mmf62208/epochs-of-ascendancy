@@ -25,7 +25,7 @@ LEADER_DEFEND_ATTACK_SCALE = 0.6
 _ARMOR_TOKENS = ("armor", "armour", "panzer", "tank")
 _MOUNTAIN_TOKENS = ("mountain", "gebirg")
 
-_GD_FUNCS = ("template_kind", "template_speed", "combat_power", "leader_power_mult")
+_GD_FUNCS = ("template_kind", "template_speed", "combat_power", "leader_power_mult", "xp_power_mult")
 _ATTACK_KEYS = ("attack_modifier", "get_attack_modifier", "attack")
 _DEFENSE_KEYS = ("defense_modifier", "get_defense_modifier", "defense")
 _TERRAIN_KEYS = ("terrain_modifier", "get_terrain_modifier")
@@ -206,7 +206,25 @@ def combat_power(formation: Any, terrain: str = "plains", role: str = "") -> flo
     if soft is not None:
         power *= 0.7 + 0.3 * soft
     power *= leader_power_mult(data, terrain, role)
+    if "combat_experience" in data and data.get("combat_experience") is not None:
+        try:
+            power *= xp_power_mult(float(data.get("combat_experience")))
+        except (TypeError, ValueError):
+            pass
     return float(power)
+
+
+def xp_power_mult(xp: float) -> float:
+    x = _clamp(float(xp), 0.0, 100.0)
+    if x <= 20.0:
+        return 0.78 + (0.88 - 0.78) * (x / 20.0)
+    if x <= 40.0:
+        return 0.88 + (0.98 - 0.88) * ((x - 20.0) / 20.0)
+    if x <= 60.0:
+        return 0.98 + (1.0 - 0.98) * ((x - 40.0) / 20.0)
+    if x <= 80.0:
+        return 1.0 + (1.1 - 1.0) * ((x - 60.0) / 20.0)
+    return 1.1 + (1.2 - 1.1) * ((x - 80.0) / 20.0)
 
 
 def _full(*, design_id: str, name: str = "", **kw: Any) -> Dict[str, Any]:
@@ -300,6 +318,13 @@ def build_land_combat_power_product() -> Dict[str, Any]:
     else:
         fails.append("combat_power_times_leader")
 
+    green_p = combat_power(_full(design_id="infantry_division", combat_experience=10.0), "plains")
+    vet_p = combat_power(_full(design_id="infantry_division", combat_experience=90.0), "plains")
+    if green_p < inf_plains < vet_p:
+        passes.append("xp_shifts_power")
+    else:
+        fails.append("xp_shifts_power")
+
     gd_src = LAND_COMBAT_POWER_GD.read_text(encoding="utf-8") if LAND_COMBAT_POWER_GD.is_file() else ""
     if _gd_has_helpers(gd_src):
         passes.append("gd_helpers")
@@ -309,6 +334,10 @@ def build_land_combat_power_product() -> Dict[str, Any]:
         passes.append("gd_leader_power_mult")
     else:
         fails.append("gd_leader_power_mult")
+    if "static func xp_power_mult" in gd_src:
+        passes.append("gd_xp_power_mult")
+    else:
+        fails.append("gd_xp_power_mult")
 
     ok = len(fails) == 0
     fixtures: Dict[str, Any] = {

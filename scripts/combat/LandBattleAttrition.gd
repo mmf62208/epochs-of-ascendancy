@@ -71,6 +71,10 @@ static func apply_daily_to_formation(formation_id: String, severity: float) -> D
 			var drain := STRENGTH_DRAIN_FACTOR * severity
 			form.strength = clampf(float(form.strength) - drain, 0.0, 1.0)
 			strength_after = float(form.strength)
+			if drain >= 0.08 and "combat_experience" in form:
+				form.combat_experience = LandCombatPower.dilute_xp_heavy_loss(
+					float(form.combat_experience), drain
+				)
 	var plain := format_loss_plain(removed)
 	print(
 		"[LAND BATTLE ATTRITION] %s %s str=%.2f sev=%.2f"

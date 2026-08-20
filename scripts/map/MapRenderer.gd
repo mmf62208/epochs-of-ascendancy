@@ -18923,26 +18923,54 @@ func _make_unit_nation_frame(col: Color) -> Node2D:
 	return root
 
 
-## I / A / M from fielded template — no new art, readable at compact zoom.
+## I / A / L / H / G / M / R from designer visual_archetype, else template kind.
 func _unit_type_letter(formation: Object) -> String:
-	var kind := "infantry"
+	var arch := ""
+	if formation != null and formation.has_meta("visual_archetype"):
+		arch = str(formation.get_meta("visual_archetype")).strip_edges().to_lower()
+	var blob := arch
 	if typeof(LandCombatPower) != TYPE_NIL:
-		kind = str(LandCombatPower.template_kind(formation))
-	var k := kind.strip_edges().to_lower()
-	if "armor" in k or "armour" in k or "panzer" in k:
-		return "A"
+		blob += " " + str(LandCombatPower.template_kind(formation))
+	if formation != null and "design_id" in formation:
+		blob += " " + str(formation.design_id)
+	var k := blob.strip_edges().to_lower()
+	if "artillery" in k:
+		return "G"
+	if "rocket" in k:
+		return "R"
+	if "heavy" in k and "tank" in k:
+		return "H"
+	if "light" in k and "tank" in k:
+		return "L"
 	if "mountain" in k or "gebirg" in k:
 		return "M"
+	if "armor" in k or "armour" in k or "panzer" in k or "tank" in k:
+		return "A"
 	return "I"
+
+
+func _unit_letter_color(letter: String) -> Color:
+	match letter:
+		"A", "H", "L":
+			return Color(0.98, 0.84, 0.32, 0.98)
+		"G", "R":
+			return Color(0.98, 0.62, 0.22, 0.98)
+		"M":
+			return Color(0.55, 0.86, 0.52, 0.98)
+		_:
+			return Color(0.95, 0.96, 0.92, 0.96)
 
 
 func _make_unit_type_letter(letter: String) -> Label:
 	var lab := Label.new()
 	lab.name = "TypeLetter"
-	lab.text = letter if not letter.is_empty() else "I"
+	var L := letter if not letter.is_empty() else "I"
+	lab.text = L
 	lab.position = Vector2(-8, -12)
 	lab.add_theme_font_size_override("font_size", 16)
-	lab.add_theme_color_override("font_color", Color(0.95, 0.96, 0.92, 0.96))
+	lab.add_theme_color_override("font_color", _unit_letter_color(L))
+	lab.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.07, 1.0))
+	lab.add_theme_constant_override("outline_size", 3)
 	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return lab
 
@@ -18958,16 +18986,17 @@ func _make_unit_nation_plate(col: Color) -> ColorRect:
 	return plate
 
 
-## Org (green) + strength (amber) bars on the chip itself.
-func _make_unit_stat_bars(org_v: float, str_v: float) -> Node2D:
+## Org (green) + strength (amber) + readiness (cyan) bars on the chip itself.
+func _make_unit_stat_bars(org_v: float, str_v: float, rdy_v: float = 1.0) -> Node2D:
 	var root := Node2D.new()
 	root.name = "StatBars"
 	root.position = Vector2(-20, 18)
 	var org_c := clampf(org_v, 0.0, 1.0)
 	var str_c := clampf(str_v, 0.0, 1.0)
+	var rdy_c := clampf(rdy_v, 0.0, 1.0)
 	var bg := ColorRect.new()
 	bg.name = "BarBg"
-	bg.size = Vector2(40, 11)
+	bg.size = Vector2(40, 16)
 	bg.position = Vector2(0, 0)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bg.color = Color(0.06, 0.07, 0.1, 0.88)
@@ -18982,10 +19011,17 @@ func _make_unit_stat_bars(org_v: float, str_v: float) -> Node2D:
 	var str_bar := ColorRect.new()
 	str_bar.name = "StrBar"
 	str_bar.size = Vector2(maxf(2.0, 40.0 * str_c), 5)
-	str_bar.position = Vector2(0, 6)
+	str_bar.position = Vector2(0, 5)
 	str_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	str_bar.color = Color(0.95, 0.72, 0.22, 0.95)
 	root.add_child(str_bar)
+	var rdy_bar := ColorRect.new()
+	rdy_bar.name = "RdyBar"
+	rdy_bar.size = Vector2(maxf(2.0, 40.0 * rdy_c), 5)
+	rdy_bar.position = Vector2(0, 10)
+	rdy_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rdy_bar.color = Color(0.38, 0.78, 0.95, 0.95)
+	root.add_child(rdy_bar)
 	return root
 
 
@@ -19011,12 +19047,35 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 	counter.add_child(_make_unit_type_letter(_unit_type_letter(ff)))
 	var org_v := 1.0
 	var str_v := 1.0
+	var rdy_v := 1.0
 	if ff != null:
 		if "organization" in ff:
 			org_v = float(ff.organization)
 		if "strength" in ff:
 			str_v = float(ff.strength)
-	counter.add_child(_make_unit_stat_bars(org_v, str_v))
+		if "readiness" in ff:
+			rdy_v = float(ff.readiness)
+	counter.add_child(_make_unit_stat_bars(org_v, str_v, rdy_v))
+	var old_lead := counter.get_node_or_null("LeaderMark")
+	if old_lead != null:
+		counter.remove_child(old_lead)
+		old_lead.free()
+	if ff != null and "leader_id" in ff and str(ff.leader_id).strip_edges() != "":
+		var mark := Label.new()
+		mark.name = "LeaderMark"
+		var lname := str(ff.leader_id)
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_leader"):
+			var L: Variant = LeaderManager.get_leader(str(ff.leader_id))
+			if L != null and L is Object and "name" in L:
+				lname = str(L.name)
+		mark.text = lname.substr(0, 1).to_upper() if not lname.is_empty() else "*"
+		mark.position = Vector2(-18, 6)
+		mark.add_theme_font_size_override("font_size", 10)
+		mark.add_theme_color_override("font_color", Color(0.92, 0.94, 0.98, 0.95))
+		mark.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.07, 1.0))
+		mark.add_theme_constant_override("outline_size", 3)
+		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		counter.add_child(mark)
 	if ff != null and "is_in_combat" in ff and bool(ff.is_in_combat):
 		var pulse := ColorRect.new()
 		pulse.name = "CombatPulse"

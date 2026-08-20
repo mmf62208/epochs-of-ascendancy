@@ -55,7 +55,41 @@ static func combat_power(formation: Object, terrain: String = "plains", role: St
 	if soft != null:
 		power *= 0.7 + 0.3 * float(soft)
 	power *= leader_power_mult(formation, terrain, role)
+	if "combat_experience" in formation:
+		power *= xp_power_mult(float(formation.get("combat_experience")))
 	return float(power)
+
+
+## Green ~0.80 · regular ~1.0 · veteran ~1.18. Same curve as ReinforcementLogisticsCalculator.
+static func xp_power_mult(xp: float) -> float:
+	var x := clampf(xp, 0.0, 100.0)
+	if x <= 20.0:
+		return lerpf(0.78, 0.88, x / 20.0)
+	if x <= 40.0:
+		return lerpf(0.88, 0.98, (x - 20.0) / 20.0)
+	if x <= 60.0:
+		return lerpf(0.98, 1.0, (x - 40.0) / 20.0)
+	if x <= 80.0:
+		return lerpf(1.0, 1.1, (x - 60.0) / 20.0)
+	return lerpf(1.1, 1.2, (x - 80.0) / 20.0)
+
+
+static func dilute_xp_replacements(old_xp: float, strength_gain: float, new_strength: float, recruit_xp: float = 22.0) -> float:
+	var old_v := clampf(old_xp, 0.0, 100.0)
+	var rec := clampf(recruit_xp, 0.0, 100.0)
+	var gain := maxf(0.0, strength_gain)
+	var new_s := maxf(0.05, new_strength)
+	var frac := clampf(gain / new_s, 0.0, 1.0)
+	var blended := (1.0 - frac) * old_v + frac * rec
+	blended += 0.30 * (1.0 - frac)
+	return clampf(blended, 0.0, 100.0)
+
+
+static func dilute_xp_heavy_loss(old_xp: float, strength_lost: float) -> float:
+	var drop := maxf(0.0, strength_lost)
+	if drop < 0.08:
+		return clampf(old_xp, 0.0, 100.0)
+	return clampf(old_xp * (1.0 - 0.20 * drop), 0.0, 100.0)
 
 
 ## 1.0 + clamp(attack|defense * scale, 0, 0.25). Attacker=attack; defender=defense else attack*0.6

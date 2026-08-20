@@ -517,6 +517,11 @@ func field_designed_unit(
 			f.design_id = did
 			f.current_land_mission = Formation.LAND_MISSION_ASSAULT
 	register_formation(f)
+	if str(f.leader_id).strip_edges().is_empty() and has_method("pick_leader_id_for_formation"):
+		var used: Dictionary = _seed_used_leader_ids() if has_method("_seed_used_leader_ids") else {}
+		var pick := pick_leader_id_for_formation(tag, f.formation_type, used, ["general", "field_marshal"])
+		if not pick.is_empty() and has_method("assign_leader_to_formation"):
+			assign_leader_to_formation(pick, f.formation_id)
 	_notify_map_icon_pid(pid)
 	print(
 		"LeaderManager: fielded designer unit %s design=%s @%d"
@@ -3544,6 +3549,7 @@ func get_save_data() -> Dictionary:
 			"organize_target_design": str(f.get_meta("organize_target_design", "")) if f.has_meta("organize_target_design") else "",
 			"organize_target_strength": float(f.get_meta("organize_target_strength", 1.0)) if f.has_meta("organize_target_strength") else 1.0,
 			"visual_archetype": str(f.get_meta("visual_archetype", "")) if f.has_meta("visual_archetype") else "",
+			"combat_log": f.combat_log.duplicate() if "combat_log" in f and f.combat_log is Array else [],
 		}
 
 	return {
@@ -3671,6 +3677,13 @@ func apply_save_data(data: Dictionary) -> void:
 				f.set_meta("organize_target_strength", clampf(float(fd.get("organize_target_strength", 1.0)), 0.4, 1.0))
 			if str(fd.get("visual_archetype", "")).strip_edges() != "":
 				f.set_meta("visual_archetype", str(fd.get("visual_archetype")))
+			if fd.get("combat_log") is Array:
+				f.combat_log.clear()
+				for row in fd.get("combat_log") as Array:
+					if row is Dictionary:
+						f.combat_log.append(row)
+			if str(fd.get("leader_id", "")).strip_edges() != "":
+				f.leader_id = str(fd.get("leader_id"))
 			formations[f.formation_id] = f
 		organize_jobs.clear()
 		for fid2 in formations:
