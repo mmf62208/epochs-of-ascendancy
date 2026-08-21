@@ -17,6 +17,8 @@ func get_effective_combat_power(
 	var resolve_unit := unit_id if not unit_id.is_empty() else army_id
 	if resolve_unit.is_empty():
 		resolve_unit = division_template_id
+	if ProductionManager == null:
+		return {}
 	var base_stats := ProductionManager.get_division_final_combat_stats(division_template_id, resolve_unit)
 	if base_stats.is_empty() and typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("get_formation_equipment_combat_stats"):
 		base_stats = ProductionManager.get_formation_equipment_combat_stats(resolve_unit)

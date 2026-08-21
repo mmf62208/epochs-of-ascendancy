@@ -1004,7 +1004,11 @@ func _update_date_time() -> void:
 
 
 func _update_resources() -> void:
-	var stockpile: Dictionary = ProductionManager.national_stockpile
+	var stockpile: Dictionary = {}
+	if ProductionManager != null:
+		var raw = ProductionManager.get("national_stockpile")
+		if raw is Dictionary:
+			stockpile = raw
 	steel_label.text = "Steel: %.0f" % float(stockpile.get("steel", 0.0))
 	aluminum_label.text = "Aluminum: %.0f" % float(stockpile.get("aluminum", 0.0))
 	# Fuel major absorbs oil feedstock; show Fuel (Energy when present for industry meter).

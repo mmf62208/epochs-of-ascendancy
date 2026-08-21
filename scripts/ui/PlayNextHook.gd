@@ -267,11 +267,13 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 			break
 	facts["training"] = _training_rows(tag)
 	facts["dry_fuel"] = _dry_fuel_rows(tag)
-	if typeof(ProductionManager) != TYPE_NIL and "national_stockpile" in ProductionManager:
-		var st: Dictionary = ProductionManager.national_stockpile
-		facts["steel_stock"] = float(st.get("steel", 99.0))
-		facts["fuel_stock"] = float(st.get("fuel", 0.0))
-		facts["oil_stock"] = float(st.get("oil", 0.0))
+	if ProductionManager != null:
+		var raw = ProductionManager.get("national_stockpile")
+		if raw is Dictionary:
+			var st: Dictionary = raw
+			facts["steel_stock"] = float(st.get("steel", 99.0))
+			facts["fuel_stock"] = float(st.get("fuel", 0.0))
+			facts["oil_stock"] = float(st.get("oil", 0.0))
 	facts["has_vehicle"] = _has_vehicle(tag)
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_paused"):
 		facts["paused"] = bool(TimeManager.is_paused())
@@ -401,10 +403,12 @@ static func _recommend_organize(tag: String) -> Dictionary:
 
 static func _recommend_fuel(tag: String) -> Dictionary:
 	var facts: Dictionary = {"dry_fuel": _dry_fuel_rows(tag)}
-	if typeof(ProductionManager) != TYPE_NIL and "national_stockpile" in ProductionManager:
-		var st: Dictionary = ProductionManager.national_stockpile
-		facts["fuel_stock"] = float(st.get("fuel", 0.0))
-		facts["oil_stock"] = float(st.get("oil", 0.0))
+	if ProductionManager != null:
+		var raw = ProductionManager.get("national_stockpile")
+		if raw is Dictionary:
+			var st: Dictionary = raw
+			facts["fuel_stock"] = float(st.get("fuel", 0.0))
+			facts["oil_stock"] = float(st.get("oil", 0.0))
 	var rec := rank_from_snapshot(facts)
 	if str(rec.get("source", "")) != "fuel":
 		return {}
@@ -413,9 +417,11 @@ static func _recommend_fuel(tag: String) -> Dictionary:
 
 static func _recommend_shortage(tag: String) -> Dictionary:
 	var facts: Dictionary = {"has_vehicle": _has_vehicle(tag)}
-	if typeof(ProductionManager) != TYPE_NIL and "national_stockpile" in ProductionManager:
-		var st: Dictionary = ProductionManager.national_stockpile
-		facts["steel_stock"] = float(st.get("steel", 99.0))
+	if ProductionManager != null:
+		var raw = ProductionManager.get("national_stockpile")
+		if raw is Dictionary:
+			var st: Dictionary = raw
+			facts["steel_stock"] = float(st.get("steel", 99.0))
 	var rec := rank_from_snapshot(facts)
 	if str(rec.get("source", "")) != "industry":
 		return {}

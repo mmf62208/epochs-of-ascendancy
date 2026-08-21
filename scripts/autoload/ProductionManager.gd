@@ -2459,7 +2459,7 @@ func daily_formation_reinforce_from_stockpile() -> Dictionary:
 			int(report["units_reinforced"]),
 			int(report["equipment_moved"]),
 		]
-		if typeof(DebugOverlay) != TYPE_NIL and DebugOverlay.has_method("toast_map_debug"):
+		if typeof(DebugOverlay) != TYPE_NIL:
 			DebugOverlay.toast_map_debug(last_stockpile_toe_plain)
 	return report
 

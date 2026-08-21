@@ -109,7 +109,7 @@ static func bbcode_for(formation: Object) -> String:
 
 
 static func _stockpile_toe_line(formation: Object) -> String:
-	if typeof(ProductionManager) == TYPE_NIL:
+	if ProductionManager == null:
 		return ""
 	var fid := ""
 	if "formation_id" in formation:
