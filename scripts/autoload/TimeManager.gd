@@ -291,9 +291,13 @@ func advance_days(days: float) -> void:
 		# Headless / harness: synchronous path (evidence needs ordered listeners in one step).
 		game_day_advanced.emit(current_year, current_month, current_day)
 		_tick_own_land_marches()
-		_tick_open_land_battles()
-		_tick_out_of_combat_recovery()
-		_tick_organize_queue()
+		var n_res := _tick_open_land_battles()
+		if n_res > 0 and is_interactive_light_sim():
+			call_deferred("_tick_out_of_combat_recovery")
+			call_deferred("_tick_organize_queue")
+		else:
+			_tick_out_of_combat_recovery()
+			_tick_organize_queue()
 		if _should_run_daily_ai_combat():
 			if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("simulate_daily_ai_combat"):
 				BattleManager.simulate_daily_ai_combat()
@@ -330,9 +334,13 @@ func _flush_sim_events() -> void:
 		_maybe_run_ai_infra_invest()
 		_maybe_run_ai_land_battle_starts()
 		_tick_own_land_marches()
-		_tick_open_land_battles()
-		_tick_out_of_combat_recovery()
-		_tick_organize_queue()
+		var n_res := _tick_open_land_battles()
+		if n_res > 0 and is_interactive_light_sim():
+			call_deferred("_tick_out_of_combat_recovery")
+			call_deferred("_tick_organize_queue")
+		else:
+			_tick_out_of_combat_recovery()
+			_tick_organize_queue()
 	elif kind == "month":
 		var y := int(ev.get("year", 0))
 		var m := int(ev.get("month", 0))
@@ -446,20 +454,21 @@ func _tick_own_land_marches() -> void:
 		print("TimeManager: own-land march arrived=%d hops=%d" % [arrived_n, moved.size()])
 
 
-func _tick_open_land_battles() -> void:
+func _tick_open_land_battles() -> int:
 	if typeof(BattleManager) == TYPE_NIL:
-		return
+		return 0
 	if not BattleManager.has_method("tick_open_land_battles"):
-		return
+		return 0
 	var resolved: Array = BattleManager.tick_open_land_battles(1.0)
 	if resolved.is_empty():
-		return
+		return 0
 	var n := 0
 	for ev in resolved:
 		if ev is Dictionary and bool(ev.get("resolved", false)):
 			n += 1
 	if n > 0:
 		print("TimeManager: open land battles resolved=%d" % n)
+	return n
 
 
 func _tick_organize_queue() -> void:

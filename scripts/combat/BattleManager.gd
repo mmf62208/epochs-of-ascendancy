@@ -1281,21 +1281,39 @@ func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
 	ev["winner"] = winner
 	if winner == "attacker":
 		_apply_open_battle_org_to_formations(battle)
-		var exec: Dictionary = execute_province_assault(
-			str(battle.get("att_tag", "")),
-			to_id,
-			from_id,
-			str(battle.get("att_fid", "")),
-		)
-		ev["success"] = bool(exec.get("success", false))
-		if not bool(exec.get("success", false)):
-			_finish_land_battle_hold(battle)
+		var att_tag := str(battle.get("att_tag", ""))
+		var att_fid := str(battle.get("att_fid", ""))
+		if _interactive_light_sim():
+			# Hang-class: capture/UI never runs on the sim tick. 20d on 15f3e1d
+			# stalled after "open land battles resolved=1" when execute was inline.
+			call_deferred("_deferred_resolve_attacker_win", att_tag, to_id, from_id, att_fid)
+			ev["success"] = true
+			ev["deferred_capture"] = true
+		else:
+			var exec: Dictionary = execute_province_assault(att_tag, to_id, from_id, att_fid)
+			ev["success"] = bool(exec.get("success", false))
+			if not bool(exec.get("success", false)):
+				_finish_land_battle_hold(battle)
 	else:
 		# Defender hold or draw: no owner flip.
 		_finish_land_battle_hold(battle)
 	_record_land_aar(battle, winner, to_id)
 	ev["aar"] = peek_last_land_aar()
 	return ev
+
+
+func _interactive_light_sim() -> bool:
+	return (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_interactive_light_sim")
+		and bool(TimeManager.is_interactive_light_sim())
+	)
+
+
+func _deferred_resolve_attacker_win(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:
+	var exec: Dictionary = execute_province_assault(att_tag, to_id, from_id, att_fid)
+	if not bool(exec.get("success", false)):
+		_set_formation_in_combat(att_fid, false)
 
 
 func peek_last_land_aar() -> Dictionary:
@@ -1451,10 +1469,13 @@ func _land_side_supply_state(tag: String, pid: int) -> Dictionary:
 				friends += 1
 	var capital := _capital_pid_for_tag(t)
 	var connected := false
-	if capital > 0:
-		if pid == capital:
-			connected = true
-		elif typeof(FormationMovement) != TYPE_NIL:
+	if capital > 0 and pid == capital:
+		connected = true
+	elif _interactive_light_sim():
+		# Hang-class: no own-land BFS on the F5 sim tick (48-hop capital walk).
+		connected = friends > 0
+	elif capital > 0:
+		if typeof(FormationMovement) != TYPE_NIL:
 			var path: Array = FormationMovement.find_own_land_path(pid, capital, t, 48)
 			connected = path.size() >= 2 or (path.size() == 1 and int(path[0]) == capital)
 		elif MapManager.has_method("find_land_path"):

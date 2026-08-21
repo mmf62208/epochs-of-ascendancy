@@ -78,6 +78,8 @@ class TestFirstSessionAssaultSurfaceProduct(unittest.TestCase):
             "owner_change_no_full_border",
             "owner_change_no_full_mesh",
             "owner_change_no_label_bfs",
+            "resolve_capture_deferred_on_light",
+            "supply_no_bfs_on_light",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
         self.assertEqual(list(p.get("fail") or []), [], msg=p)

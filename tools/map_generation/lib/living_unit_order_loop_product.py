@@ -172,6 +172,8 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     post_fn = _slice(ren, "_assault_post_ui_light")
     notify_fn = _slice(bm, "_notify_map_refresh")
     tick_fn = _slice(bm, "_tick_one_open_land_battle")
+    deferred_fn = _slice(bm, "_deferred_resolve_attacker_win")
+    supply_fn = _slice(bm, "_land_side_supply_state")
     resolve_ok = (
         bool(owner_fn)
         and "_refresh_single_province_fill" in owner_fn
@@ -185,6 +187,13 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "refresh_after_capture_light" in notify_fn
         and bool(tick_fn)
         and "execute_province_assault" in tick_fn
+        and "_deferred_resolve_attacker_win" in tick_fn
+        and "call_deferred" in tick_fn
+        and bool(deferred_fn)
+        and "execute_province_assault" in deferred_fn
+        and bool(supply_fn)
+        and "_interactive_light_sim" in supply_fn
+        and "is_interactive_light_sim" in _slice(bm, "_interactive_light_sim")
     )
     wiring["resolve_hang_safe"] = resolve_ok
     (passes if resolve_ok else fails).append("resolve_hang_safe")

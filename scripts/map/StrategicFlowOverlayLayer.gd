@@ -101,7 +101,10 @@ func _ready() -> void:
 			MapManager.province_data_changed.connect(_on_data)
 
 
-func _on_data(_pid: int, _what: String) -> void:
+func _on_data(_pid: int, what: String) -> void:
+	if what in ["owner", "controller", "all"]:
+		if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+			return
 	queue_redraw()
 
 

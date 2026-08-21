@@ -70,6 +70,9 @@ func _ready() -> void:
 
 
 func _on_province_data_changed(_pid: int, what: String) -> void:
+	if what in ["owner", "controller", "all"]:
+		if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+			return
 	if what in ["owner", "controller", "all", "occupation", "garrison"]:
 		_request_redraw()
 
