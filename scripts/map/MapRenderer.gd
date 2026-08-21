@@ -210,6 +210,9 @@ var _left_pan_active := false
 var _left_press_screen := Vector2.ZERO
 const LEFT_PAN_SLOP_PX := 8.0
 var _last_mouse_pos := Vector2.ZERO
+## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
+var _inspector_held_closed := false
+var _camera_nudge_gen := 0
 
 var provinces: Dictionary[int, Province] = {}
 var geometry: Dictionary = {}
@@ -12150,6 +12153,8 @@ func _sync_weather_mapmode_particles(enable: bool) -> void:
 
 
 func hide_info_panel() -> void:
+	_inspector_held_closed = true
+	_camera_nudge_gen += 1
 	if info_panel and info_panel is CanvasItem:
 		info_panel.visible = false
 	elif info_panel != null:
@@ -15282,6 +15287,7 @@ func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> b
 
 
 func _select_province(province: Province, node: Node2D) -> void:
+	_inspector_held_closed = false
 	if selected_province_id >= 0 and selected_province_id != province.id:
 		_set_selection_outline(selected_province_id, false)
 
@@ -15302,6 +15308,16 @@ func _select_province(province: Province, node: Node2D) -> void:
 	_update_supply_legend_text()
 	_update_compare_hint_label()
 	_play_map_action_flair_select(province)
+
+
+func _nudge_camera_after_panel(province_id: int, gen: int) -> void:
+	if gen != _camera_nudge_gen:
+		return
+	if _inspector_held_closed:
+		return
+	if info_panel == null or not (info_panel is CanvasItem) or not (info_panel as CanvasItem).visible:
+		return
+	_center_camera_on_province(province_id, "keep")
 
 
 ## Pan/zoom so the province sits in the free map area (right of left-docked inspector).
@@ -15625,12 +15641,15 @@ func show_info_panel(province: Province) -> void:
 		push_warning("MapRenderer: info_panel is not a CanvasItem (type=" + str(info_panel.get_class()) + ", script=" + str(info_panel.get_script()) + ") — cannot show inspector. Check scene NodePath exports for the MapRenderer or wiring in _wire_info_panel_refs.")
 		return
 
+	if _inspector_held_closed:
+		return
 	_layout_map_ui()
 	info_panel.visible = true
 	_layout_info_panel_inner()
-	# After panel is visible, nudge camera so selection sits in free map band (right of panel).
+	# After panel is visible, nudge once so selection sits in the free map band.
+	# Dismiss bumps _camera_nudge_gen so a Close cannot leave this as a teleport.
 	if not info_panel.has_meta("user_moved") and selected_province_id == province.id:
-		call_deferred("_center_camera_on_province", province.id, "keep")
+		call_deferred("_nudge_camera_after_panel", province.id, _camera_nudge_gen)
 	# Second + third pass after size settles so wrap width matches real scroll viewport.
 	call_deferred("_layout_info_panel_inner")
 	get_tree().create_timer(0.05).timeout.connect(_layout_info_panel_inner, CONNECT_ONE_SHOT)

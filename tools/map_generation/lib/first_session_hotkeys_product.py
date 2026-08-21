@@ -182,6 +182,11 @@ def build_first_session_hotkeys_product(
             and "_left_pan_active" in ren
             and "LEFT_PAN_SLOP_PX" in ren
         )
+        wiring["no_camera_nudge_after_close"] = (
+            "_inspector_held_closed" in ren
+            and "_camera_nudge_gen" in ren
+            and "func _nudge_camera_after_panel" in ren
+        )
 
         for k, v in wiring.items():
             if v:
