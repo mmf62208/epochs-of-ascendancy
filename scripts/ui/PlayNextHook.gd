@@ -1,6 +1,6 @@
 # scripts/ui/PlayNextHook.gd
 ## One recommended next beat for the play-strip / map chip.
-## War-loop first (stance / tomorrow), then unpause. Not Campaign Alpha leftovers.
+## War first, then organize-ready, dry fuel, steel shortage — idle unpause last.
 class_name PlayNextHook
 extends RefCounted
 
@@ -49,10 +49,15 @@ static func recommend(player_tag: String = "GER") -> Dictionary:
 				"to_id": int(b.get("to_id", -1)),
 				"source": "land_battle",
 			}
-	var eta := 99
-	if typeof(FormationMovement) != TYPE_NIL:
-		# Any incoming march for the player (dest unknown): scan via capital-ish 0 skip.
-		pass
+	var org := _recommend_organize(tag)
+	if not org.is_empty():
+		return org
+	var fuel := _recommend_fuel(tag)
+	if not fuel.is_empty():
+		return fuel
+	var short := _recommend_shortage(tag)
+	if not short.is_empty():
+		return short
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_paused") and bool(TimeManager.is_paused()):
 		return {
 			"ok": true,
@@ -96,6 +101,20 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 			"action": action,
 			"summary": str(st.get("next_hook", r.get("hint", action))),
 		}
+	if action == "refuel" and typeof(ProductionManager) != TYPE_NIL \
+			and ProductionManager.has_method("refuel_formation_from_stockpile") and not fid.is_empty():
+		var rf: Dictionary = ProductionManager.refuel_formation_from_stockpile(fid, 0.10)
+		return {
+			"ok": bool(rf.get("ok", false)),
+			"action": "refuel",
+			"summary": str(r.get("hint", "Refuel")),
+		}
+	if action == "send_trained" and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
+		TimeManager.set_paused(false)
+		return {"ok": true, "action": "send_trained", "summary": str(r.get("hint", "Training ready"))}
+	if action == "shortage" and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
+		TimeManager.set_paused(false)
+		return {"ok": true, "action": "shortage", "summary": str(r.get("hint", "Shortage"))}
 	if action == "unpause" and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(false)
 		return {"ok": true, "action": "unpause", "summary": str(r.get("hint", "Unpause"))}
@@ -110,5 +129,139 @@ static func _action_label(action: String) -> String:
 			return "Hold for tomorrow"
 		"next_hex":
 			return "Press the next hex"
+		"send_trained":
+			return "Training ready tomorrow"
+		"refuel":
+			return "Refuel tanks"
+		"shortage":
+			return "Steel short — produce / develop"
 		_:
 			return "Unpause a day"
+
+
+static func _training_days_left(formation: Object) -> float:
+	if formation == null:
+		return 99.0
+	var need := 14.0
+	if formation.has_meta("organize_days"):
+		need = float(formation.get_meta("organize_days"))
+	var prog := float(formation.get("training_progress")) if "training_progress" in formation else 0.0
+	return maxf(0.0, need - prog)
+
+
+static func _recommend_organize(tag: String) -> Dictionary:
+	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
+		return {}
+	var forms: Variant = LeaderManager.formations
+	if typeof(forms) != TYPE_DICTIONARY:
+		return {}
+	var scanned := 0
+	for fid in forms:
+		if scanned >= 48:
+			break
+		scanned += 1
+		var f: Object = (forms as Dictionary)[fid]
+		if f == null:
+			continue
+		if str(f.get("country_tag")).strip_edges().to_upper() != tag:
+			continue
+		if not ("is_training" in f) or not bool(f.get("is_training")):
+			continue
+		if _training_days_left(f) > 1.001:
+			continue
+		return {
+			"ok": true,
+			"action": "send_trained",
+			"label": "Training ready tomorrow",
+			"hint": "Division ready — send to the front",
+			"fid": str(f.get("formation_id")) if "formation_id" in f else str(fid),
+			"to_id": int(f.get("stationed_province_id")) if "stationed_province_id" in f else -1,
+			"source": "organize",
+		}
+	return {}
+
+
+static func _recommend_fuel(tag: String) -> Dictionary:
+	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
+		return {}
+	var forms: Variant = LeaderManager.formations
+	if typeof(forms) != TYPE_DICTIONARY:
+		return {}
+	var scanned := 0
+	for fid in forms:
+		if scanned >= 48:
+			break
+		scanned += 1
+		var f: Object = (forms as Dictionary)[fid]
+		if f == null:
+			continue
+		if str(f.get("country_tag")).strip_edges().to_upper() != tag:
+			continue
+		if "is_training" in f and bool(f.get("is_training")):
+			continue
+		var use := 0.0
+		if typeof(LandCombatPower) != TYPE_NIL:
+			var comp: Dictionary = LandCombatPower.composition_from_formation(f)
+			use = float(comp.get("fuel_use", 0.0))
+		if use <= 1e-9:
+			continue
+		var fl := 1.0
+		if "fuel_level" in f:
+			fl = float(f.get("fuel_level"))
+		if fl >= 0.35:
+			continue
+		var stock_fuel := 0.0
+		var stock_oil := 0.0
+		if typeof(ProductionManager) != TYPE_NIL and "national_stockpile" in ProductionManager:
+			var st: Dictionary = ProductionManager.national_stockpile
+			stock_fuel = float(st.get("fuel", 0.0))
+			stock_oil = float(st.get("oil", 0.0))
+		var empty := stock_fuel + stock_oil <= 0.001
+		return {
+			"ok": true,
+			"action": "refuel",
+			"label": "Tanks dry" if empty else "Refuel tanks",
+			"hint": "Empty fuel stock — take oil or develop a well" if empty else "National fuel can refill",
+			"fid": str(f.get("formation_id")) if "formation_id" in f else str(fid),
+			"to_id": int(f.get("stationed_province_id")) if "stationed_province_id" in f else -1,
+			"source": "fuel",
+		}
+	return {}
+
+
+static func _recommend_shortage(tag: String) -> Dictionary:
+	if typeof(ProductionManager) == TYPE_NIL or not ("national_stockpile" in ProductionManager):
+		return {}
+	var st: Dictionary = ProductionManager.national_stockpile
+	if float(st.get("steel", 99.0)) >= 1.0:
+		return {}
+	var has_vehicle := false
+	if typeof(LeaderManager) != TYPE_NIL and "formations" in LeaderManager:
+		var forms: Variant = LeaderManager.formations
+		if typeof(forms) == TYPE_DICTIONARY:
+			var n := 0
+			for fid in forms:
+				if n >= 24:
+					break
+				n += 1
+				var f: Object = (forms as Dictionary)[fid]
+				if f == null:
+					continue
+				if str(f.get("country_tag")).strip_edges().to_upper() != tag:
+					continue
+				if typeof(LandCombatPower) != TYPE_NIL:
+					var comp: Dictionary = LandCombatPower.composition_from_formation(f)
+					if float(comp.get("fuel_use", 0.0)) > 1e-9:
+						has_vehicle = true
+						break
+	if not has_vehicle:
+		return {}
+	return {
+		"ok": true,
+		"action": "shortage",
+		"label": "Steel short — produce / develop",
+		"hint": "TOE lines cannot pay steel",
+		"fid": "",
+		"to_id": -1,
+		"source": "industry",
+	}

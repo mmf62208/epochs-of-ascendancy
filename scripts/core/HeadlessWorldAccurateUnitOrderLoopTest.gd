@@ -777,6 +777,24 @@ func _test_organize() -> void:
 		_fail("new unit org not dipped: %s" % org0)
 		return
 	_pass("new unit training org=%.2f" % org0)
+	f0.set_meta("organize_days", 2.0)
+	if "training_progress" in f0:
+		f0.set("training_progress", 1.0)
+	var hook_scr: Script = load("res://scripts/ui/PlayNextHook.gd") as Script
+	if hook_scr == null or not hook_scr.has_method("recommend"):
+		_fail("PlayNextHook.recommend missing")
+		return
+	var nxt: Dictionary = hook_scr.call("recommend", ATT_TAG) as Dictionary
+	if str(nxt.get("action", "unpause")) == "unpause":
+		_fail("NEXT idle while training 1d left: %s" % str(nxt))
+		return
+	if str(nxt.get("source", "")) != "organize" and str(nxt.get("action", "")) != "send_trained":
+		_fail("NEXT should be organize-ready got %s" % str(nxt))
+		return
+	_pass("NEXT train-ready action=%s source=%s" % [str(nxt.get("action")), str(nxt.get("source"))])
+	f0.set_meta("organize_days", 14.0)
+	if "training_progress" in f0:
+		f0.set("training_progress", 0.0)
 
 	if _mr != null and _mr.has_method("_attach_unit_counter_chrome"):
 		var rear_chip: Node = _chip_on(GER_REAR)
