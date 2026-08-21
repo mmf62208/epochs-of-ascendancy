@@ -18,6 +18,7 @@ from era_resource_deposits_product import (  # noqa: E402
     harvest_factory_feeds,
     harvest_nation,
     icon_px_for_amount,
+    painted_aluminum_deposit,
     refuel_from_stockpile,
     scale_deposits_for_year,
 )
@@ -30,8 +31,15 @@ class TestEraResourceDepositsProduct(unittest.TestCase):
         c = scale_deposits_for_year(BAKU_OIL, 2026)
         self.assertLess(float(a.get("oil", 0)), float(b.get("oil", 0)))
         self.assertLess(float(b.get("oil", 0)), float(c.get("oil", 0)))
-        alum = scale_deposits_for_year({"aluminum": 2.0}, 1918)
+        painted = painted_aluminum_deposit()
+        self.assertGreaterEqual(float(painted.get("aluminum", 0)), 16.0)
+        alum = scale_deposits_for_year(painted, 1918)
         self.assertNotIn("aluminum", alum)
+        alum_36 = scale_deposits_for_year(painted, 1936)
+        self.assertGreater(float(alum_36.get("aluminum", 0)), 0.0)
+        self.assertFalse(
+            build_develop_resource_action(painted, "aluminum", year=1918, stockpile={"steel": 40}).get("ok")
+        )
         self.assertGreater(icon_px_for_amount(4.0), icon_px_for_amount(1.0))
 
     def test_harvest_and_develop(self) -> None:

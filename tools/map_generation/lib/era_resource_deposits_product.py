@@ -11,6 +11,7 @@ in a coal province.
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any, Dict, Mapping, Optional, Sequence
 
@@ -32,7 +33,7 @@ ERA_SCALE: Dict[str, Dict[int, float]] = {
     "steel": {0: 0.65, 1: 1.00, 2: 1.20},
     "oil": {0: 0.32, 1: 1.00, 2: 1.80},
     "rubber": {0: 0.40, 1: 1.00, 2: 0.75},
-    "aluminum": {0: 0.12, 1: 1.00, 2: 1.55},
+    "aluminum": {0: 0.00, 1: 1.00, 2: 1.55},
     "chromium": {0: 0.35, 1: 1.00, 2: 1.25},
     "tungsten": {0: 0.28, 1: 1.00, 2: 1.30},
     "uranium": {0: 0.00, 1: 0.08, 2: 1.00},
@@ -62,6 +63,16 @@ REFUEL_STOCK_PER_TENTH = 0.5
 BAKU_OIL = {"oil": 3.0}
 RUHR_COAL = {"coal": 4.0, "steel": 2.0, "iron": 2.0}
 BAUXITE = {"aluminum": 2.0}
+PAINTED_ALUM_PID = "800095"
+
+
+def painted_aluminum_deposit() -> Dict[str, float]:
+    """Board 1936-painted aluminum (province 800095 is 36, not the tiny test fixture)."""
+    path = ROOT / "data" / "provinces_world_accurate" / "province_resources_layer.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    row = (data.get("provinces") or {}).get(PAINTED_ALUM_PID) or {}
+    amt = float(row.get("aluminum") or 0.0)
+    return {"aluminum": amt}
 MALAYA_RUBBER = {"rubber": 3.0}
 GER_SLICE = (
     {"oil": 3.0},
@@ -431,10 +442,21 @@ def build_era_resource_industry_product() -> Dict[str, Any]:
         float(coal_18.get("coal", 0)) > float(coal_26.get("coal", 0)),
     )
 
-    alum_18 = scale_deposits_for_year(BAUXITE, 1918)
-    alum_36 = scale_deposits_for_year(BAUXITE, 1936)
+    painted_al = painted_aluminum_deposit()
+    _ok(
+        passes,
+        fails,
+        "painted_alum_size",
+        float(painted_al.get("aluminum", 0)) >= 16.0,
+    )
+    alum_18 = scale_deposits_for_year(painted_al, 1918)
+    alum_36 = scale_deposits_for_year(painted_al, 1936)
     _ok(passes, fails, "aluminum_hidden_1918", "aluminum" not in alum_18)
     _ok(passes, fails, "aluminum_present_1936", float(alum_36.get("aluminum", 0)) > 0.0)
+    hidden_painted = build_develop_resource_action(
+        painted_al, "aluminum", year=1918, stockpile={"steel": 40}
+    )
+    _ok(passes, fails, "cannot_develop_painted_1918_alum", not bool(hidden_painted.get("ok")))
 
     u_18 = scale_deposits_for_year({"uranium": 2.0}, 1918)
     u_26 = scale_deposits_for_year({"uranium": 2.0}, 2026)

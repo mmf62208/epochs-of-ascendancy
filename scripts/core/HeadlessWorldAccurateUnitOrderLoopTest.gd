@@ -912,10 +912,23 @@ func _test_era_resources() -> void:
 	if float(oil_36.get("oil", 0)) >= float(oil_26.get("oil", 0)):
 		_fail("1936 oil should be less than 2026")
 		return
-	var alum_18 := rhc.call("scale_deposits_for_year", {"aluminum": 2.0}, 1918) as Dictionary
+	var painted_alum := {"aluminum": 36.0}
+	var alum_18 := rhc.call("scale_deposits_for_year", painted_alum, 1918) as Dictionary
 	if alum_18.has("aluminum"):
-		_fail("1918 should hide aluminum")
+		_fail("1918 should hide painted-size aluminum=36")
 		return
+	var alum_36y := rhc.call("scale_deposits_for_year", painted_alum, 1936) as Dictionary
+	if float(alum_36y.get("aluminum", 0.0)) <= 0.0:
+		_fail("1936 should keep painted-size aluminum")
+		return
+	if rhc.has_method("build_develop_resource_action"):
+		var hide_dev: Dictionary = rhc.call(
+			"build_develop_resource_action", painted_alum, "aluminum", 1918, {}, {"steel": 40.0}
+		) as Dictionary
+		if bool(hide_dev.get("ok", false)):
+			_fail("1918 must not develop painted-size aluminum: %s" % str(hide_dev))
+			return
+	_pass("1918 hides painted aluminum=36; 1936 keeps %.1f" % float(alum_36y.get("aluminum", 0)))
 	_pass("era oil 1918=%.2f 1936=%.2f 2026=%.2f" % [
 		float(oil_18.get("oil", 0)), float(oil_36.get("oil", 0)), float(oil_26.get("oil", 0)),
 	])
