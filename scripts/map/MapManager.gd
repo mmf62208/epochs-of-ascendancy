@@ -620,6 +620,38 @@ func has_river_border(pid: int) -> bool:
 		return true  # demo intent for 82 even if peek timing
 	return false
 
+func are_provinces_adjacent(a: int, b: int) -> bool:
+	if _adjacency == null or not _adjacency.has_method("are_adjacent"):
+		return false
+	return bool(_adjacency.are_adjacent(a, b))
+
+
+## Sentence for a Channel/Gibraltar-class choke using shipped contest + supply bonus.
+func flag_naval_choke(pid: int) -> Dictionary:
+	var result := {"ok": false, "pid": int(pid), "name": "", "sentence": "", "bonus": 1.0}
+	if not has_strategic_chokepoint(pid):
+		return result
+	var p: Province = get_province(pid) if has_method("get_province") else null
+	var pname := str(p.name).strip_edges() if p != null else ""
+	if pname.is_empty():
+		pname = "Channel" if pid == 950001 else ("Gibraltar" if pid == 950019 else str(pid))
+	var bonus := get_chokepoint_or_river_supply_bonus(pid)
+	var own := str(p.owner_tag) if p != null else ""
+	var ctrl := str(p.controller_tag) if p != null else ""
+	var contest: Dictionary = MapPolishFormatters.compute_chokepoint_contest(
+		pid, ctrl, own, bonus
+	)
+	var sentence := "%s choke flagged" % pname
+	if float(bonus) > 1.001:
+		sentence += " (supply ×%.2f)" % bonus
+	result["ok"] = true
+	result["name"] = pname
+	result["sentence"] = sentence
+	result["bonus"] = bonus
+	result["contest"] = contest
+	return result
+
+
 func has_strategic_chokepoint(pid: int) -> bool:
 	if pid in _naval_chokepoint_ids:
 		return true

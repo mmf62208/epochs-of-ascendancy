@@ -17,6 +17,10 @@ const ATT_TAG := "GER"
 const DEF_TAG := "FRA"
 const JAP_TAG := "JAP"
 const CHI_TAG := "CHI"
+const ENG_TAG := "ENG"
+const ENG_CHANNEL := 950001  # English Channel Zone choke
+const ENG_NORTH_SEA := 950000  # adjacent sea hop
+const ENG_FLEET_DESIGN := "king_george_v_class_bb"
 const GER_FID := "uol_ger_maginot"
 const FRA_FID := "uol_fra_maginot"
 const GER_FID_2 := "uol_ger_stack"
@@ -79,6 +83,7 @@ func _run() -> void:
 	if not _setup_map_renderer_pins():
 		return
 	_test_front_chips()
+	_test_eng_channel_fleet()
 	_test_organize()
 	_test_completing_bars()
 	_test_designer_field()
@@ -107,6 +112,8 @@ func _setup_maginot_map() -> bool:
 		{"id": JAP_FRONT, "tag": JAP_TAG, "name": "JAP CHI-JAP edge"},
 		{"id": CHI_FRONT, "tag": CHI_TAG, "name": "CHI vs JAP edge"},
 		{"id": JAP_REAR, "tag": JAP_TAG, "name": "JAP CHI-JAP rear"},
+		{"id": ENG_CHANNEL, "tag": ENG_TAG, "name": "English Channel Zone", "sea": true},
+		{"id": ENG_NORTH_SEA, "tag": ENG_TAG, "name": "North Sea Zone", "sea": true},
 	]
 	var provs: Dictionary = {}
 	var countries: Dictionary = {
@@ -114,6 +121,7 @@ func _setup_maginot_map() -> bool:
 		DEF_TAG: {"tag": DEF_TAG, "name": "France"},
 		JAP_TAG: {"tag": JAP_TAG, "name": "Japan"},
 		CHI_TAG: {"tag": CHI_TAG, "name": "China"},
+		ENG_TAG: {"tag": ENG_TAG, "name": "United Kingdom"},
 	}
 	for row in rows:
 		var pid := int(row["id"])
@@ -121,12 +129,13 @@ func _setup_maginot_map() -> bool:
 		if p == null:
 			_fail("Province create failed")
 			return false
+		var sea := bool(row.get("sea", false))
 		p.set("id", pid)
-		p.set("owner_tag", str(row["tag"]))
-		p.set("controller_tag", str(row["tag"]))
-		p.set("terrain", "plains")
+		p.set("owner_tag", "" if sea else str(row["tag"]))
+		p.set("controller_tag", "" if sea else str(row["tag"]))
+		p.set("terrain", "sea" if sea else "plains")
 		p.set("name", str(row["name"]))
-		p.set("is_sea", false)
+		p.set("is_sea", sea)
 		p.set("infrastructure", 4)
 		p.set("development_level", 3)
 		p.set("core_for", [str(row["tag"])])
@@ -208,7 +217,7 @@ func _setup_map_renderer_pins() -> bool:
 		_mr.container = container
 	root.add_child(_mr)
 
-	var pids: Array = [GER_FRONT, FRA_FRONT, GER_REAR, JAP_FRONT, CHI_FRONT, JAP_REAR]
+	var pids: Array = [GER_FRONT, FRA_FRONT, GER_REAR, JAP_FRONT, CHI_FRONT, JAP_REAR, ENG_CHANNEL, ENG_NORTH_SEA]
 	for pid_v in pids:
 		var pid := int(pid_v)
 		var gp = _mm.call("get_province", pid) if _mm.has_method("get_province") else null
@@ -240,6 +249,13 @@ func _setup_map_renderer_pins() -> bool:
 			_fail("world OOB JAP pid want %d got %s" % [JAP_FRONT, str(parked.get("jap"))])
 			return false
 		_pass("world OOB JAP stationed pid=%d" % JAP_FRONT)
+		if not bool(parked.get("fleet_ok", false)):
+			_fail("ENG Channel fleet not stationed at %d" % ENG_CHANNEL)
+			return false
+		if int(parked.get("fleet_pid", 0)) != ENG_CHANNEL:
+			_fail("ENG fleet pid want %d got %s" % [ENG_CHANNEL, str(parked.get("fleet_pid"))])
+			return false
+		_pass("ENG fleet parked on Channel %d" % ENG_CHANNEL)
 	return true
 
 
@@ -457,6 +473,70 @@ func _test_front_chips() -> void:
 				_fail("low fuel should slow panzer wet=%.2f dry=%.2f" % [wet, dry])
 			else:
 				_pass("fuel speed wet=%.2f dry=%.2f" % [wet, dry])
+
+
+func _test_eng_channel_fleet() -> void:
+	var fleet: Object = null
+	if _lm != null and _lm.has_method("get_formations_for_country"):
+		for ff in _lm.call("get_formations_for_country", ENG_TAG):
+			if ff == null or not ("stationed_province_id" in ff):
+				continue
+			var ft := str(ff.formation_type) if "formation_type" in ff else ""
+			if ft != "fleet" and ft != "task_force" and ft != "ship":
+				continue
+			if int(ff.stationed_province_id) == ENG_CHANNEL:
+				fleet = ff
+				break
+	if fleet == null:
+		_fail("no ENG fleet on Channel sea hex %d" % ENG_CHANNEL)
+		return
+	var sea_p = _mm.call("get_province", ENG_CHANNEL) if _mm.has_method("get_province") else null
+	if sea_p == null or not bool(sea_p.get("is_sea")):
+		_fail("Channel %d is not a sea hex" % ENG_CHANNEL)
+		return
+	_pass("ENG fleet on sea hex %d" % ENG_CHANNEL)
+	var chip: Node = _chip_on(ENG_CHANNEL)
+	if chip == null:
+		_fail("no DemoUnitIcon on Channel fleet %d" % ENG_CHANNEL)
+	elif not chip.has_meta("formation_id") or str(chip.get_meta("formation_id", "")).is_empty():
+		_fail("ENG fleet chip missing formation_id")
+	else:
+		_pass("ENG fleet DemoUnitIcon pickable on %d" % ENG_CHANNEL)
+	var fid := str(fleet.formation_id)
+	var mv_scr: Script = load("res://scripts/formations/FormationMovement.gd") as Script
+	if mv_scr == null or not mv_scr.has_method("enqueue_own_sea_hop"):
+		_fail("enqueue_own_sea_hop missing")
+		return
+	var hopped: Dictionary = mv_scr.call("enqueue_own_sea_hop", fid, ENG_NORTH_SEA, ENG_TAG)
+	print("  [INFO] ENG sea-hop dest=%d %s" % [ENG_NORTH_SEA, str(hopped)])
+	if not bool(hopped.get("ok", false)):
+		_fail("ENG sea-hop not ok: %s" % str(hopped.get("reason", hopped)))
+		return
+	_pass("ENG sea-hop ok hops=%s dest=%d" % [str(hopped.get("hops", "?")), ENG_NORTH_SEA])
+	if "stationed_province_id" in fleet:
+		fleet.stationed_province_id = ENG_CHANNEL
+	if _mr != null and _mr.has_method("flag_choke_for_pid"):
+		var flagged: Dictionary = _mr.call("flag_choke_for_pid", ENG_CHANNEL)
+		print("  [INFO] Channel choke %s" % str(flagged))
+		if not bool(flagged.get("ok", false)):
+			_fail("Channel choke not flagged: %s" % str(flagged))
+			return
+		var sentence := str(flagged.get("sentence", "")).to_lower()
+		if "channel" not in sentence and "gibraltar" not in sentence and "choke" not in sentence:
+			_fail("choke sentence missing Channel/Gibraltar: %s" % str(flagged.get("sentence")))
+			return
+		_pass("Channel choke flagged")
+	else:
+		_fail("flag_choke_for_pid missing")
+		return
+	var hook_scr: Script = load("res://scripts/ui/PlayNextHook.gd") as Script
+	if hook_scr != null and hook_scr.has_method("recommend"):
+		var rec: Dictionary = hook_scr.call("recommend", ENG_TAG)
+		print("  [INFO] ENG NEXT %s" % str(rec))
+		if str(rec.get("source", "")) != "choke":
+			_fail("ENG NEXT want choke got %s" % str(rec.get("source")))
+		else:
+			_pass("ENG NEXT choke source=%s" % str(rec.get("source")))
 
 
 func _test_designer_field() -> void:

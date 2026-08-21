@@ -122,6 +122,21 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			"to_id": -1,
 			"source": "focus",
 		}
+	var choke_v: Variant = f.get("fleet_choke", {})
+	if choke_v is Dictionary and int((choke_v as Dictionary).get("pid", 0)) > 0:
+		var ch: Dictionary = choke_v as Dictionary
+		var sentence := str(ch.get("sentence", "")).strip_edges()
+		if sentence.is_empty():
+			sentence = "Channel choke flagged"
+		return {
+			"ok": true,
+			"action": "choke_flag",
+			"label": sentence,
+			"hint": sentence,
+			"fid": str(ch.get("fid", "")),
+			"to_id": int(ch.get("pid", -1)),
+			"source": "choke",
+		}
 	if bool(f.get("any_open_battle", false)) or bool(f.get("has_open_battle", false)):
 		return {
 			"ok": true,
@@ -222,6 +237,8 @@ static func _action_label(action: String) -> String:
 			return "Research completes tomorrow"
 		"focus_done":
 			return "Focus completes tomorrow"
+		"choke_flag":
+			return "Channel choke flagged"
 		"show_war_loop":
 			return "WarLoop · B Fronts · Ctrl+click"
 		_:
@@ -293,7 +310,46 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 		var dleft := float(ResourceHarvestCalculator.develop_days_remaining())
 		if dleft >= 0.0:
 			facts["develop_days_left"] = dleft
+	facts["fleet_choke"] = _fleet_choke_row(tag)
 	return facts
+
+
+static func _fleet_choke_row(tag: String) -> Dictionary:
+	var empty := {}
+	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
+		return empty
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("has_strategic_chokepoint"):
+		return empty
+	var forms: Variant = LeaderManager.formations
+	if typeof(forms) != TYPE_DICTIONARY:
+		return empty
+	var scanned := 0
+	for fid in forms:
+		if scanned >= 48:
+			break
+		scanned += 1
+		var f: Object = (forms as Dictionary)[fid]
+		if f == null:
+			continue
+		if str(f.get("country_tag")).strip_edges().to_upper() != tag:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft != "fleet" and ft != "task_force" and ft != "ship":
+			continue
+		var pid := int(f.get("stationed_province_id")) if "stationed_province_id" in f else -1
+		if pid <= 0 or not MapManager.has_strategic_chokepoint(pid):
+			continue
+		var sentence := "Channel choke flagged"
+		if MapManager.has_method("flag_naval_choke"):
+			var fl: Dictionary = MapManager.flag_naval_choke(pid)
+			if bool(fl.get("ok", false)):
+				sentence = str(fl.get("sentence", sentence))
+		return {
+			"fid": str(f.get("formation_id")) if "formation_id" in f else str(fid),
+			"pid": pid,
+			"sentence": sentence,
+		}
+	return empty
 
 
 static func _training_days_left(formation: Object) -> float:

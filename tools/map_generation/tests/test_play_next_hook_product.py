@@ -124,6 +124,26 @@ class TestPlayNextHookProduct(unittest.TestCase):
             }
         )
         self.assertEqual(dry.get("action"), "refuel")
+        choke = rank_next_beat(
+            {
+                "fleet_choke": {
+                    "fid": "eng_fleet",
+                    "pid": 950001,
+                    "sentence": "English Channel Zone choke flagged",
+                }
+            }
+        )
+        self.assertEqual(choke.get("action"), "choke_flag")
+        self.assertEqual(choke.get("source"), "choke")
+        self.assertIn("channel", str(choke.get("label", "")).lower())
+        war_beats_choke = rank_next_beat(
+            {
+                "has_open_battle": True,
+                "battle_hook": "They break tomorrow — Press",
+                "fleet_choke": {"fid": "eng_fleet", "pid": 950001, "sentence": "choke"},
+            }
+        )
+        self.assertEqual(war_beats_choke.get("action"), "press")
 
 
 if __name__ == "__main__":

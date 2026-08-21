@@ -169,6 +169,17 @@ def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
             "fid": str(f.get("focus_id") or ""),
             "hint": fname or "Focus completes tomorrow",
         }
+    choke = f.get("fleet_choke") or {}
+    if isinstance(choke, dict) and int(choke.get("pid") or 0) > 0:
+        sentence = str(choke.get("sentence") or "Channel choke flagged").strip()
+        return {
+            "ok": True,
+            "action": "choke_flag",
+            "source": "choke",
+            "label": sentence,
+            "fid": str(choke.get("fid") or ""),
+            "hint": sentence,
+        }
     if bool(f.get("any_open_battle")) or bool(f.get("has_open_battle")):
         return {
             "ok": True,

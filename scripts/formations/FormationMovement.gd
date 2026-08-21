@@ -293,6 +293,77 @@ static func enqueue_own_land_march(
 	}
 
 
+## Adjacent-sea hop only (no land BFS, no 3520 scan). Fleet / TF / ship.
+static func enqueue_own_sea_hop(
+	formation_id: String,
+	dest_id: int,
+	country_tag: String,
+) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	if fid.is_empty() or tag.is_empty() or dest_id <= 0:
+		return {"ok": false, "reason": "bad args"}
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return {"ok": false, "reason": "no formation"}
+	var f: Formation = LeaderManager.get_formation(fid)
+	if f == null:
+		return {"ok": false, "reason": "unknown unit"}
+	if str(f.country_tag).strip_edges().to_upper() != tag:
+		return {"ok": false, "reason": "not your unit"}
+	var ft := str(f.formation_type) if "formation_type" in f else ""
+	if ft != Formation.TYPE_FLEET and ft != Formation.TYPE_TASK_FORCE and ft != Formation.TYPE_SHIP:
+		return {"ok": false, "reason": "not a fleet"}
+	var from_id := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+	if from_id <= 0:
+		return {"ok": false, "reason": "no station"}
+	if from_id == dest_id:
+		return {"ok": false, "reason": "already here", "already_here": true}
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province"):
+		return {"ok": false, "reason": "no map"}
+	var dest: Province = MapManager.get_province(dest_id)
+	var from_p: Province = MapManager.get_province(from_id)
+	if dest == null or from_p == null:
+		return {"ok": false, "reason": "no dest"}
+	if not bool(dest.is_sea) or not bool(from_p.is_sea):
+		return {"ok": false, "reason": "not sea"}
+	var adjacent := false
+	if MapManager.has_method("get_adjacent_provinces"):
+		for nv in MapManager.get_adjacent_provinces(from_id, false):
+			if int(nv) == dest_id:
+				adjacent = true
+				break
+	if not adjacent and MapManager.has_method("are_provinces_adjacent"):
+		adjacent = bool(MapManager.are_provinces_adjacent(from_id, dest_id))
+	if not adjacent:
+		return {"ok": false, "reason": "not adjacent sea"}
+	var path: Array[int] = [from_id, dest_id]
+	var order := {
+		"formation_id": fid,
+		"country_tag": tag,
+		"path": path,
+		"hop_index": 1,
+		"progress": 0.0,
+		"hop_cost": 1.0,
+		"dest_id": dest_id,
+		"from_id": from_id,
+		"order_type": "own_sea_hop",
+	}
+	_orders[fid] = order
+	return {
+		"ok": true,
+		"reason": "",
+		"path": path,
+		"hops": 1,
+		"eta_days": 1.0,
+		"calendar_days": 1,
+		"from_id": from_id,
+		"dest_id": dest_id,
+		"formation_id": fid,
+		"sea": true,
+		"replaced": true,
+	}
+
+
 static func clear_march(formation_id: String) -> bool:
 	var fid := formation_id.strip_edges()
 	if fid.is_empty() or not _orders.has(fid):

@@ -11,6 +11,8 @@ sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from living_unit_order_loop_product import (  # noqa: E402
     CHI_FRONT,
+    ENG_CHANNEL,
+    ENG_NORTH_SEA,
     FRA_FRONT,
     GER_FRONT,
     JAP_FRONT,
@@ -25,6 +27,8 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
         self.assertEqual(FRA_FRONT, 710739)
         self.assertEqual(JAP_FRONT, 903981)
         self.assertEqual(CHI_FRONT, 902598)
+        self.assertEqual(ENG_CHANNEL, 950001)
+        self.assertEqual(ENG_NORTH_SEA, 950000)
 
     def test_product_wiring(self) -> None:
         p = build_living_unit_order_loop_product(check_wiring=True)
@@ -34,6 +38,9 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
         for key in (
             "park_maginot",
             "world_oob_majors",
+            "park_channel_fleet",
+            "sea_hop_api",
+            "choke_flag",
             "chip_str_num",
             "inverse_zoom_scale",
             "chip_on_centroid",

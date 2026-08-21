@@ -16,12 +16,16 @@ BATTLE_MANAGER = ROOT / "scripts" / "combat" / "BattleManager.gd"
 HARNESS = ROOT / "scripts" / "core" / "HeadlessWorldAccurateUnitOrderLoopTest.gd"
 GATES = ROOT / "tools" / "eoa_full_test_gates.sh"
 TIME_MANAGER = ROOT / "scripts" / "autoload" / "TimeManager.gd"
+MAP_MANAGER = ROOT / "scripts" / "map" / "MapManager.gd"
+HOOK_GD = ROOT / "scripts" / "ui" / "PlayNextHook.gd"
 
 GER_FRONT = 710173
 FRA_FRONT = 710739
 JAP_FRONT = 903981
 CHI_FRONT = 902598
 JAP_REAR = 903966
+ENG_CHANNEL = 950001
+ENG_NORTH_SEA = 950000
 
 
 def _slice(src: str, func_name: str) -> str:
@@ -73,6 +77,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "stationed_province_id" in park
         and "_update_unit_icons_for_test" in park
         and "_station_world_major_oob_chips" in park
+        and "_station_eng_channel_fleet" in park
     )
     wiring["park_maginot"] = park_ok
     (passes if park_ok else fails).append("park_maginot")
@@ -91,6 +96,42 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     )
     wiring["world_oob_majors"] = oob_ok
     (passes if oob_ok else fails).append("world_oob_majors")
+
+    fleet_fn = _slice(ren, "_station_eng_channel_fleet")
+    fleet_ok = (
+        bool(fleet_fn)
+        and str(ENG_CHANNEL) in fleet_fn
+        and "naval" in fleet_fn
+        and "ENG" in fleet_fn
+    )
+    wiring["park_channel_fleet"] = fleet_ok
+    (passes if fleet_ok else fails).append("park_channel_fleet")
+
+    sea_hop = _slice(mv, "enqueue_own_sea_hop")
+    sea_ok = (
+        bool(sea_hop)
+        and "not a fleet" in sea_hop
+        and "get_adjacent_provinces" in sea_hop
+        and "false" in sea_hop
+        and "find_own_land_path" not in sea_hop
+        and "is_sea" in sea_hop
+    )
+    wiring["sea_hop_api"] = sea_ok
+    (passes if sea_ok else fails).append("sea_hop_api")
+
+    mm = MAP_MANAGER.read_text(encoding="utf-8") if MAP_MANAGER.is_file() else ""
+    hook = HOOK_GD.read_text(encoding="utf-8") if HOOK_GD.is_file() else ""
+    choke_fn = _slice(mm, "flag_naval_choke")
+    choke_ok = (
+        bool(choke_fn)
+        and "has_strategic_chokepoint" in choke_fn
+        and "get_chokepoint_or_river_supply_bonus" in choke_fn
+        and "choke flagged" in choke_fn
+    )
+    g_flag = "flag_naval_choke" in _slice(ren, "_request_hang_safe_supply_corridor")
+    next_choke = "choke_flag" in hook and "fleet_choke" in hook
+    wiring["choke_flag"] = choke_ok and g_flag and next_choke
+    (passes if wiring["choke_flag"] else fails).append("choke_flag")
 
     chrome = _slice(ren, "_attach_unit_counter_chrome")
     chrome_ok = (
@@ -232,7 +273,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     wiring["strategic_pick_skip"] = strat_skip
     (passes if strat_skip else fails).append("strategic_pick_skip")
 
-    mv_ok = "func enqueue_own_land_march" in mv
+    mv_ok = "func enqueue_own_land_march" in mv and "func enqueue_own_sea_hop" in mv
     bm_ok = "func start_land_battle" in bm
     wiring["march_api"] = mv_ok
     wiring["battle_api"] = bm_ok
@@ -251,7 +292,12 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and str(CHI_FRONT) in harness
         and "JAP DemoUnitIcon pickable" in harness
         and "CHI-JAP start_land_battle opened" in harness
+        and str(ENG_CHANNEL) in harness
+        and "ENG fleet on sea hex" in harness
+        and "ENG sea-hop ok" in harness
+        and "Channel choke flagged" in harness
         and "enqueue_own_land_march" in harness
+        and "enqueue_own_sea_hop" in harness
         and "start_land_battle" in harness
         and "ensure_playable_front_chips" in harness
         and "DemoUnitIcon" in harness

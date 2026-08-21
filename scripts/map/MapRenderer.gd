@@ -2237,6 +2237,11 @@ func _request_hang_safe_supply_corridor() -> void:
 		target = int(row0.get("province_id", -1))
 	if target > 0:
 		var toast := "Supply corridor · drawing capital → %s…" % _province_display_name(target)
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint") \
+				and MapManager.has_strategic_chokepoint(target) and MapManager.has_method("flag_naval_choke"):
+			var fl: Dictionary = MapManager.flag_naval_choke(target)
+			if bool(fl.get("ok", false)):
+				toast = "%s · %s" % [toast, str(fl.get("sentence", "choke flagged"))]
 		if typeof(DebugOverlay) != TYPE_NIL:
 			DebugOverlay.toast_map_debug(toast)
 		_show_inspector_toast(toast, 3.5)
@@ -22028,6 +22033,10 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	result["majors"] = majors
 	result["jap"] = int((majors.get("JAP", {}) as Dictionary).get("pid", 0))
 	result["jap_ok"] = bool((majors.get("JAP", {}) as Dictionary).get("ok", false))
+	var fleet: Dictionary = _station_eng_channel_fleet()
+	result["fleet"] = fleet
+	result["fleet_pid"] = int(fleet.get("pid", 0))
+	result["fleet_ok"] = bool(fleet.get("ok", false))
 	show_unit_counters = true
 	_update_unit_icons_for_test()
 	_sync_unit_counter_visibility()
@@ -22038,10 +22047,65 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 		_center_camera_on_province(GER_FRONT, "soft")
 		_toast_easy_unit_orders()
 	print(
-		"MapRenderer: playable front chips GER=%d FRA=%d pid=%d jap=%d"
-		% [int(result["ger"]), int(result["fra"]), GER_FRONT, int(result["jap"])]
+		"MapRenderer: playable front chips GER=%d FRA=%d pid=%d jap=%d fleet=%d"
+		% [int(result["ger"]), int(result["fra"]), GER_FRONT, int(result["jap"]), int(result["fleet_pid"])]
 	)
 	return result
+
+
+## ENG fleet chip on English Channel sea hex 950001 (Gibraltar 950019 is the other choke).
+func _station_eng_channel_fleet() -> Dictionary:
+	const CHANNEL := 950001
+	const DESIGN := "king_george_v_class_bb"
+	var result := {"ok": false, "tag": "ENG", "pid": CHANNEL, "fid": ""}
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+		return result
+	var target: Object = null
+	for f in LeaderManager.get_formations_for_country("ENG"):
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft != Formation.TYPE_FLEET and ft != Formation.TYPE_TASK_FORCE and ft != Formation.TYPE_SHIP:
+			continue
+		if "stationed_province_id" in f and int(f.stationed_province_id) == CHANNEL:
+			target = f
+			break
+	if target == null:
+		for f2 in LeaderManager.get_formations_for_country("ENG"):
+			if f2 == null:
+				continue
+			var ft2 := str(f2.formation_type) if "formation_type" in f2 else ""
+			if ft2 != Formation.TYPE_FLEET and ft2 != Formation.TYPE_TASK_FORCE and ft2 != Formation.TYPE_SHIP:
+				continue
+			target = f2
+			if "stationed_province_id" in target:
+				target.stationed_province_id = CHANNEL
+			break
+	if target == null and LeaderManager.has_method("field_designed_unit"):
+		var fielded: Variant = LeaderManager.field_designed_unit("ENG", DESIGN, CHANNEL, "naval")
+		if fielded is Dictionary and bool((fielded as Dictionary).get("ok", false)):
+			result["fid"] = str((fielded as Dictionary).get("formation_id", ""))
+			result["ok"] = true
+			return result
+		return result
+	if target == null:
+		return result
+	result["fid"] = str(target.formation_id) if "formation_id" in target else ""
+	result["ok"] = true
+	return result
+
+
+func flag_choke_for_pid(pid: int) -> Dictionary:
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("flag_naval_choke"):
+		return {"ok": false, "pid": pid}
+	var flagged: Dictionary = MapManager.flag_naval_choke(pid)
+	if bool(flagged.get("ok", false)):
+		var sentence := str(flagged.get("sentence", "choke flagged"))
+		if typeof(DebugOverlay) != TYPE_NIL:
+			DebugOverlay.toast_map_debug(sentence)
+		_show_inspector_toast(sentence, 3.5)
+		print("MapRenderer: ", sentence)
+	return flagged
 
 
 ## One land division per major on a named hex. Not a 3520 scan.
