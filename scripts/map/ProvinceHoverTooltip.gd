@@ -43,7 +43,8 @@ func _ready() -> void:
 	_rich.custom_minimum_size = Vector2(max_width - 12.0, 0)
 	_rich.add_theme_font_size_override("normal_font_size", font_size)
 	_rich.meta_clicked.connect(_on_meta_clicked)
-	_rich.mouse_filter = Control.MOUSE_FILTER_STOP
+	# IGNORE: a stuck tooltip must not bury inspector Close or map clicks.
+	_rich.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(_rich)
 
 	_panel_style = StyleBoxFlat.new()

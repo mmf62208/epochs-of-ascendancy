@@ -411,6 +411,9 @@ func _ready():
 	if btn_close:
 		btn_close.text = "Close"
 		btn_close.tooltip_text = "Close province inspector"
+		btn_close.process_mode = Node.PROCESS_MODE_ALWAYS
+		btn_close.focus_mode = Control.FOCUS_NONE
+		btn_close.mouse_filter = Control.MOUSE_FILTER_STOP
 		if not btn_close.pressed.is_connected(_on_close_pressed):
 			btn_close.pressed.connect(_on_close_pressed)
 	else:
@@ -1029,13 +1032,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		# Esc: dismiss stuck overlays (legend / tech / info) so playtest is never trapped.
 		if event.keycode == KEY_ESCAPE:
-			var ui_esc := get_node_or_null("UI") as CanvasLayer
-			if ui_esc != null:
-				var unit_pop := ui_esc.get_node_or_null("UnitDetailPopup")
-				if unit_pop != null:
-					unit_pop.queue_free()
-					get_viewport().set_input_as_handled()
-					return
+			# One Esc must unstick play: unit card + inspector + hover tooltip + GUI focus.
+			if _inspector_stack_blocking_input():
+				_dismiss_inspector_and_restore_input()
+				get_viewport().set_input_as_handled()
+				return
 			# Clear selected map unit before other dismissals.
 			if not selected_formation_id.is_empty():
 				selected_formation_id = ""
@@ -1093,6 +1094,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 			var ong: bool = toggle_equipment_flow_glyphs()
+			if hover_tooltip != null and hover_tooltip.has_method("hide_tooltip"):
+				hover_tooltip.hide_tooltip()
 			var gq: Dictionary = get_equipment_flow_glyph_query()
 			_show_map_layer_toast(
 				"Equipment flow glyphs %s · tier %s · max %s · Shift+I=WarLoop" % [
@@ -1544,7 +1547,7 @@ func _screen_to_world(screen_pos: Vector2) -> Vector2:
 
 
 func _on_close_pressed() -> void:
-	hide_info_panel()
+	_dismiss_inspector_and_restore_input()
 
 
 ## Player-facing map UX: toolbar, minimap, search, adjacency preview, optional mesh layer.
@@ -1698,6 +1701,8 @@ func _layout_info_panel_inner() -> void:
 		btn_close.position = Vector2(panel_w - PAD_R - close_w, 8.0)
 		btn_close.custom_minimum_size = Vector2(close_w, 26)
 		btn_close.size = Vector2(close_w, 26)
+		btn_close.process_mode = Node.PROCESS_MODE_ALWAYS
+		btn_close.focus_mode = Control.FOCUS_NONE
 		btn_close.mouse_filter = Control.MOUSE_FILTER_STOP
 	_ensure_province_id_badge()
 	if _province_id_badge != null and btn_close != null:
@@ -12078,6 +12083,42 @@ func hide_info_panel() -> void:
 	_selected_coarse_id = 0
 
 
+func _inspector_stack_blocking_input() -> bool:
+	# Hover tooltip alone is normal map chrome — do not treat it as a trap.
+	if info_panel != null and info_panel is CanvasItem and (info_panel as CanvasItem).visible:
+		return true
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui != null and ui.get_node_or_null("UnitDetailPopup") != null:
+		return true
+	return false
+
+
+## Inspector Close / Esc / unit-card Close: hide stack and restore map keys/clicks.
+func _dismiss_inspector_and_restore_input() -> void:
+	hide_info_panel()
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui != null:
+		var unit_pop := ui.get_node_or_null("UnitDetailPopup")
+		if unit_pop != null:
+			unit_pop.queue_free()
+	if hover_tooltip != null:
+		if hover_tooltip.has_method("hide_tooltip"):
+			hover_tooltip.hide_tooltip()
+		elif hover_tooltip is CanvasItem:
+			(hover_tooltip as CanvasItem).visible = false
+	if not selected_formation_id.is_empty():
+		selected_formation_id = ""
+		_refresh_selected_unit_chip()
+	_corridor_click_armed = false
+	_is_middle_dragging = false
+	if has_method("_hide_oob_strip"):
+		_hide_oob_strip()
+	var vp := get_viewport()
+	if vp != null:
+		vp.gui_release_focus()
+	print("MapRenderer: inspector Close restored input")
+
+
 ## Top-right province id chip on the inspector (playtest callouts: "look at #710569").
 func _ensure_province_id_badge() -> void:
 	if _province_id_badge != null and is_instance_valid(_province_id_badge):
@@ -15994,6 +16035,9 @@ func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictio
 func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 	if _demo_unit_icon_pids.is_empty():
 		return null
+	# Strategic cull / master off: terrain, capitals, ocean beat chips.
+	if not _unit_counters_want_visible():
+		return null
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	var z := 1.0
 	if cam:
@@ -16142,9 +16186,9 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	close_btn.text = "Close"
 	close_btn.focus_mode = Control.FOCUS_NONE
 	RetrowaveTheme.style_secondary_button(close_btn)
+	close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	close_btn.pressed.connect(func() -> void:
-		if is_instance_valid(panel):
-			panel.queue_free()
+		_dismiss_inspector_and_restore_input()
 	)
 	title_row.add_child(close_btn)
 
@@ -18025,7 +18069,8 @@ func toggle_equipment_flow_glyphs() -> bool:
 		if _strategic_flow_layer.has_method("refresh"):
 			_strategic_flow_layer.refresh()
 	elif show_strategic_flow_overlay:
-		_setup_strategic_flow_layer()
+		# Hang-class: never sync-build the 3520-board flow overlay on the I key frame.
+		call_deferred("_setup_strategic_flow_layer")
 	return show_equipment_flow_glyphs
 
 

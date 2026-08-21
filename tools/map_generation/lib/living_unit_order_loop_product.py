@@ -141,6 +141,23 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     wiring["g_hang_safe"] = g_request and g_no_sync_bfs and deferred_ok and click_arm
     (passes if wiring["g_hang_safe"] else fails).append("g_hang_safe")
 
+    close_fn = _slice(ren, "_on_close_pressed")
+    dismiss_fn = _slice(ren, "_dismiss_inspector_and_restore_input")
+    pick_fn = _slice(ren, "_pick_unit_formation_at_world")
+    close_ok = (
+        bool(close_fn)
+        and "_dismiss_inspector_and_restore_input" in close_fn
+        and bool(dismiss_fn)
+        and "gui_release_focus" in dismiss_fn
+        and "UnitDetailPopup" in dismiss_fn
+        and "hide_tooltip" in dismiss_fn
+    )
+    wiring["inspector_close_restores"] = close_ok
+    (passes if close_ok else fails).append("inspector_close_restores")
+    strat_skip = bool(pick_fn) and "_unit_counters_want_visible" in pick_fn
+    wiring["strategic_pick_skip"] = strat_skip
+    (passes if strat_skip else fails).append("strategic_pick_skip")
+
     mv_ok = "func enqueue_own_land_march" in mv
     bm_ok = "func start_land_battle" in bm
     wiring["march_api"] = mv_ok

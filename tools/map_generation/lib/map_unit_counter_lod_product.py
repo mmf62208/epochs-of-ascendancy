@@ -109,6 +109,10 @@ def build_map_unit_counter_lod_product() -> Dict[str, Any]:
         passes.append("hidden_pins_skip_hex")
     else:
         fails.append("hidden_pins_steal_hex")
+    if "_unit_counters_want_visible" in pick_fn:
+        passes.append("strategic_pick_skip")
+    else:
+        fails.append("strategic_pick_still_hits")
 
     ok = len(fails) == 0
     return {

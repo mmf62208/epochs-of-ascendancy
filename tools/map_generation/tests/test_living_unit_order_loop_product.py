@@ -36,6 +36,8 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
             "click_own_land_marches",
             "ctrl_click_starts_battle",
             "g_hang_safe",
+            "inspector_close_restores",
+            "strategic_pick_skip",
             "march_api",
             "battle_api",
             "f5_boot_and_qa",

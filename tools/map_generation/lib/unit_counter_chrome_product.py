@@ -138,7 +138,11 @@ def build_unit_counter_chrome_product(*, check_wiring: bool = True) -> Dict[str,
 
     pick_fn = _gd_func_slice(ren, "_pick_unit_formation_at_world")
     # Hidden chips (strategic cull / master off) must not steal hex clicks.
-    pick_ok = bool(pick_fn) and "not counter.visible" in pick_fn
+    pick_ok = (
+        bool(pick_fn)
+        and "not counter.visible" in pick_fn
+        and "_unit_counters_want_visible" in pick_fn
+    )
     wiring["pick_skips_hidden_only"] = pick_ok
     if pick_ok:
         passes.append("pick_skips_hidden_only")
