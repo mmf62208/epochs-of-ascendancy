@@ -204,6 +204,11 @@ var _ocean_floor: Polygon2D = null
 
 var _is_middle_dragging := false
 var _middle_drag_start := Vector2.ZERO
+## Left-drag pan (play extra). Slop keeps a click as a pick.
+var _left_pan_armed := false
+var _left_pan_active := false
+var _left_press_screen := Vector2.ZERO
+const LEFT_PAN_SLOP_PX := 8.0
 var _last_mouse_pos := Vector2.ZERO
 
 var provinces: Dictionary[int, Province] = {}
@@ -967,7 +972,7 @@ func _apply_home_key(shift_pressed: bool) -> void:
 	else:
 		center_europe_in_world_view()
 		if typeof(DebugOverlay) != TYPE_NIL:
-			DebugOverlay.toast_map_debug("Map: Europe · WASD/edge/MMB pan · wheel zoom · Shift+Home=world")
+			DebugOverlay.toast_map_debug("Map: Europe · left-drag/WASD/edge/MMB pan · wheel zoom · Shift+Home=world")
 
 
 func _input(event: InputEvent) -> void:
@@ -1288,10 +1293,38 @@ func _unhandled_input(event: InputEvent) -> void:
 
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
-	if use_spatial_picking and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			if MapViewInput.modal_blocks_map_nav(get_viewport()):
+				_left_pan_armed = false
+				_left_pan_active = false
+				return
+			var world_pos_arm := _screen_to_world(get_viewport().get_mouse_position())
+			# Chip click stays immediate so unit cards do not wait on mouse-up.
+			if _try_open_unit_at_world(world_pos_arm):
+				_left_pan_armed = false
+				_left_pan_active = false
+				get_viewport().set_input_as_handled()
+				return
+			# Ctrl/Shift keep immediate pick (assault / debug / engineers).
+			if not event.ctrl_pressed and not event.shift_pressed:
+				_left_pan_armed = true
+				_left_pan_active = false
+				_left_press_screen = get_viewport().get_mouse_position()
+				_last_mouse_pos = _left_press_screen
+				return
+		else:
+			var did_left_pan := _left_pan_active
+			_left_pan_armed = false
+			_left_pan_active = false
+			if did_left_pan:
+				get_viewport().set_input_as_handled()
+				return
+			if MapViewInput.modal_blocks_map_nav(get_viewport()):
+				return
 		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
 		# Prefer unit/navy/armor icons when the click lands on a counter (open unit detail).
-		if _try_open_unit_at_world(world_pos):
+		if event.pressed and _try_open_unit_at_world(world_pos):
 			get_viewport().set_input_as_handled()
 			return
 		var pid := -1
@@ -1497,6 +1530,8 @@ func _handle_camera_input(delta: float) -> void:
 	# Edge-only block was insufficient — WASD still moved the map under MainMenu.
 	if MapViewInput.modal_blocks_map_nav(get_viewport()):
 		_is_middle_dragging = false
+		_left_pan_armed = false
+		_left_pan_active = false
 		return
 
 	var nav_delta := MapViewInput.motion_delta(delta)
@@ -1525,8 +1560,13 @@ func _handle_camera_input(delta: float) -> void:
 		if mouse_pos.y >= top_safe and mouse_pos.y < top_safe + edge_margin:
 			move_dir.y -= 1
 
-	# Middle / right mouse drag (pixel-based — works while paused). Drag up → camera north.
-	if _is_middle_dragging:
+	# Left-drag pan after slop (click still picks). Middle / right drag too.
+	if _left_pan_armed and not _left_pan_active:
+		var left_delta := get_viewport().get_mouse_position() - _left_press_screen
+		if left_delta.length_squared() >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+			_left_pan_active = true
+	# Middle / right / left-drag (pixel-based — works while paused). Drag up → camera north.
+	if _is_middle_dragging or _left_pan_active:
 		var current_mouse := get_viewport().get_mouse_position()
 		var drag_delta := current_mouse - _last_mouse_pos
 		if drag_delta.length_squared() > 0.01:
@@ -12151,6 +12191,8 @@ func _dismiss_inspector_and_restore_input() -> void:
 		_refresh_selected_unit_chip()
 	_corridor_click_armed = false
 	_is_middle_dragging = false
+	_left_pan_armed = false
+	_left_pan_active = false
 	if has_method("_hide_oob_strip"):
 		_hide_oob_strip()
 	var vp := get_viewport()

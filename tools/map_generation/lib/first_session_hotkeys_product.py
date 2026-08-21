@@ -39,6 +39,7 @@ HOTKEYS: List[Dict[str, str]] = [
     {"key": "I", "action": "Toggle EquipmentFlow glyphs", "group": "war"},
     {"key": "G", "action": "Supply corridor hub → front", "group": "war"},
     {"key": "Ctrl+click", "action": "Assault adjacent enemy (formation selected)", "group": "war"},
+    {"key": "Left-drag", "action": "Pan map (click still picks)", "group": "nav"},
     {"key": "Home", "action": "Center Europe", "group": "nav"},
     {"key": "Shift+Home", "action": "Fit full world", "group": "nav"},
     {"key": "End", "action": "Focus Asia", "group": "nav"},
@@ -175,6 +176,11 @@ def build_first_session_hotkeys_product(
             and "func _apply_home_key" in ren
             and "func _input" in ren
             and ren.find("KEY_HOME") < ren.find("func _unhandled_input")
+        )
+        wiring["left_drag_pan"] = (
+            "_left_pan_armed" in ren
+            and "_left_pan_active" in ren
+            and "LEFT_PAN_SLOP_PX" in ren
         )
 
         for k, v in wiring.items():
