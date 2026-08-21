@@ -37,6 +37,7 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
             "ctrl_click_starts_battle",
             "g_hang_safe",
             "inspector_close_restores",
+            "i_hang_safe",
             "strategic_pick_skip",
             "march_api",
             "battle_api",

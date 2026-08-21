@@ -154,6 +154,19 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     )
     wiring["inspector_close_restores"] = close_ok
     (passes if close_ok else fails).append("inspector_close_restores")
+
+    toggle_fn = _slice(ren, "toggle_equipment_flow_glyphs")
+    i_no_setup = bool(toggle_fn) and "_setup_strategic_flow_layer" not in toggle_fn
+    i_mark = "event.keycode == KEY_I and not event.ctrl_pressed"
+    i_pos = ren.find(i_mark)
+    i_block = ren[i_pos : i_pos + 900] if i_pos >= 0 else ""
+    i_dismiss = "_dismiss_inspector_and_restore_input" in i_block
+    input_fn = _slice(ren, "_input")
+    esc_in_input = "KEY_ESCAPE" in input_fn and "_dismiss_inspector_and_restore_input" in input_fn
+    i_ok = i_no_setup and i_dismiss and esc_in_input
+    wiring["i_hang_safe"] = i_ok
+    (passes if i_ok else fails).append("i_hang_safe")
+
     strat_skip = bool(pick_fn) and "_unit_counters_want_visible" in pick_fn
     wiring["strategic_pick_skip"] = strat_skip
     (passes if strat_skip else fails).append("strategic_pick_skip")

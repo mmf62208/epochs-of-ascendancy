@@ -199,7 +199,7 @@ func _collect_routes() -> Array:
 			out.append(plan)
 			if out.size() >= max_routes:
 				break
-	if out.is_empty() and typeof(MapManager) != TYPE_NIL and _province_count < 3000:
+	if out.is_empty() and typeof(MapManager) != TYPE_NIL and _province_count > 0 and _province_count < 3000:
 		# Fallback synthetic corridors — skip on world_accurate (get_contested_provinces walks 3520).
 		var contested: Dictionary = {}
 		if MapManager.has_method("get_contested_provinces"):

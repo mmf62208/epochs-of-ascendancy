@@ -958,6 +958,31 @@ const WHEEL_TERRAIN_REFRESH_MS := 180
 
 
 func _input(event: InputEvent) -> void:
+	# Esc / I must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_ESCAPE and _inspector_stack_blocking_input():
+			_dismiss_inspector_and_restore_input()
+			get_viewport().set_input_as_handled()
+			return
+		if (
+			event.keycode == KEY_I
+			and not event.ctrl_pressed
+			and not event.alt_pressed
+			and not event.shift_pressed
+			and _inspector_stack_blocking_input()
+		):
+			_dismiss_inspector_and_restore_input()
+			var ong_i: bool = toggle_equipment_flow_glyphs()
+			var gq_i: Dictionary = get_equipment_flow_glyph_query()
+			_show_map_layer_toast(
+				"Equipment flow glyphs %s · tier %s · max %s · Shift+I=WarLoop" % [
+					"ON" if ong_i else "OFF",
+					str(gq_i.get("tier_name", "?")),
+					str((gq_i.get("lod_policy", {}) as Dictionary).get("max_glyphs", "?")),
+				]
+			)
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventMouseButton and event.pressed:
 		# Wheel zoom even when GUI has focus on non-scroll chrome (legend can steal wheel —
 		# if mouse is over map / empty space, always zoom). ScrollContainers still get wheel
@@ -1093,9 +1118,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				show_first_session_war_path()
 				get_viewport().set_input_as_handled()
 				return
+			# Unstick leftover inspector / unit card / tooltip so Close and map keys stay live.
+			_dismiss_inspector_and_restore_input()
 			var ong: bool = toggle_equipment_flow_glyphs()
-			if hover_tooltip != null and hover_tooltip.has_method("hide_tooltip"):
-				hover_tooltip.hide_tooltip()
 			var gq: Dictionary = get_equipment_flow_glyph_query()
 			_show_map_layer_toast(
 				"Equipment flow glyphs %s · tier %s · max %s · Shift+I=WarLoop" % [
@@ -12100,6 +12125,10 @@ func _dismiss_inspector_and_restore_input() -> void:
 	if ui != null:
 		var unit_pop := ui.get_node_or_null("UnitDetailPopup")
 		if unit_pop != null:
+			if unit_pop is CanvasItem:
+				(unit_pop as CanvasItem).visible = false
+			if unit_pop is Control:
+				(unit_pop as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 			unit_pop.queue_free()
 	if hover_tooltip != null:
 		if hover_tooltip.has_method("hide_tooltip"):
@@ -18068,9 +18097,8 @@ func toggle_equipment_flow_glyphs() -> bool:
 			_strategic_flow_layer.equipment_flow_glyphs_enabled = show_equipment_flow_glyphs
 		if _strategic_flow_layer.has_method("refresh"):
 			_strategic_flow_layer.refresh()
-	elif show_strategic_flow_overlay:
-		# Hang-class: never sync-build the 3520-board flow overlay on the I key frame.
-		call_deferred("_setup_strategic_flow_layer")
+	# Hang-class: I never builds the 3520-board flow overlay (sync or deferred).
+	# WarLoop may arm show_strategic_flow_overlay; U is the overlay surface.
 	return show_equipment_flow_glyphs
 
 
