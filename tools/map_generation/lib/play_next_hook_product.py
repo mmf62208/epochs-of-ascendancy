@@ -12,6 +12,9 @@ PANEL_GD = ROOT / "scripts" / "ui" / "OrderCommandPanel.gd"
 REN_GD = ROOT / "scripts" / "map" / "MapRenderer.gd"
 AAR_GD = ROOT / "scripts" / "combat" / "LandBattleAar.gd"
 BM_GD = ROOT / "scripts" / "combat" / "BattleManager.gd"
+TM_GD = ROOT / "scripts" / "technology" / "TechnologyManager.gd"
+RHC_GD = ROOT / "scripts" / "production" / "ResourceHarvestCalculator.gd"
+HARNESS_GD = ROOT / "scripts" / "core" / "HeadlessWorldAccurateUnitOrderLoopTest.gd"
 
 AAR_CAPTURE_GOODS = ("oil", "steel", "coal")
 AAR_GOOD_VERBS = {"oil": "pumping", "steel": "mining", "coal": "mining"}
@@ -55,8 +58,17 @@ def recommend_from_hook(hint: str) -> str:
     return "unpause"
 
 
+def _optional_days(f: Mapping[str, Any], key: str) -> float:
+    if key not in f or f[key] is None or f[key] == "":
+        return 99.0
+    try:
+        return float(f[key])
+    except (TypeError, ValueError):
+        return 99.0
+
+
 def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    """War first, then organize-ready, dry fuel, shortage — idle unpause last."""
+    """War first, then organize-ready, dry fuel, shortage, completing bars — idle last."""
     f = facts if isinstance(facts, dict) else {}
     aar_pid = int(f.get("aar_next_pid", -1) or -1)
     if aar_pid > 0:
@@ -135,6 +147,28 @@ def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
             "fid": "",
             "hint": "TOE lines cannot pay steel",
         }
+    rleft = _optional_days(f, "research_days_left")
+    if rleft <= 1.001:
+        rname = str(f.get("research_name") or "").strip()
+        return {
+            "ok": True,
+            "action": "tech_done",
+            "source": "research",
+            "label": "Research completes tomorrow",
+            "fid": str(f.get("research_id") or ""),
+            "hint": rname or "Research completes tomorrow",
+        }
+    fleft = _optional_days(f, "focus_days_left")
+    if fleft <= 1.001:
+        fname = str(f.get("focus_name") or f.get("focus_id") or "").strip()
+        return {
+            "ok": True,
+            "action": "focus_done",
+            "source": "focus",
+            "label": "Focus completes tomorrow",
+            "fid": str(f.get("focus_id") or ""),
+            "hint": fname or "Focus completes tomorrow",
+        }
     if bool(f.get("paused")):
         return {
             "ok": True,
@@ -168,6 +202,10 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("hook_api")
     else:
         fails.append("hook_api")
+    if "func rank_from_snapshot" in hook:
+        passes.append("gd_rank_from_snapshot")
+    else:
+        fails.append("gd_rank_from_snapshot")
     if "PlayNextHook" in panel and "Next:" in panel:
         passes.append("panel_shows_next")
     else:
@@ -259,13 +297,7 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("hook_reads_economy")
     else:
         fails.append("hook_reads_economy")
-    harness = (
-        (ROOT / "scripts" / "core" / "HeadlessWorldAccurateUnitOrderLoopTest.gd").read_text(
-            encoding="utf-8"
-        )
-        if (ROOT / "scripts" / "core" / "HeadlessWorldAccurateUnitOrderLoopTest.gd").is_file()
-        else ""
-    )
+    harness = HARNESS_GD.read_text(encoding="utf-8") if HARNESS_GD.is_file() else ""
     if "PlayNextHook" in harness and "send_trained" in harness:
         passes.append("harness_train_next")
     else:
@@ -274,6 +306,58 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("harness_capture_economy")
     else:
         fails.append("harness_capture_economy")
+    research = rank_next_beat({"research_days_left": 1})
+    if str(research.get("action")) == "tech_done" and str(research.get("source")) == "research":
+        passes.append("research_beats_idle")
+    else:
+        fails.append("research_beats_idle")
+    focus = rank_next_beat({"focus_days_left": 1})
+    if str(focus.get("action")) == "focus_done" and str(focus.get("source")) == "focus":
+        passes.append("focus_beats_idle")
+    else:
+        fails.append("focus_beats_idle")
+    far = rank_next_beat({"research_days_left": 5, "focus_days_left": 12})
+    if str(far.get("source")) == "idle":
+        passes.append("far_research_stays_idle")
+    else:
+        fails.append("far_research_stays_idle")
+    war_bars = rank_next_beat(
+        {
+            "has_open_battle": True,
+            "battle_hook": "They break tomorrow — Press",
+            "research_days_left": 1,
+            "focus_days_left": 1,
+        }
+    )
+    if str(war_bars.get("action")) == "press" and str(war_bars.get("source")) == "land_battle":
+        passes.append("war_beats_completing")
+    else:
+        fails.append("war_beats_completing")
+    short_bars = rank_next_beat(
+        {"steel_stock": 0.0, "has_vehicle": True, "research_days_left": 1, "focus_days_left": 1}
+    )
+    if str(short_bars.get("action")) == "shortage":
+        passes.append("shortage_beats_research")
+    else:
+        fails.append("shortage_beats_research")
+    if "tech_done" in hook and "focus_done" in hook:
+        passes.append("gd_completing_actions")
+    else:
+        fails.append("gd_completing_actions")
+    tm = TM_GD.read_text(encoding="utf-8") if TM_GD.is_file() else ""
+    if "func completing_snapshot" in tm:
+        passes.append("tm_completing_snapshot")
+    else:
+        fails.append("tm_completing_snapshot")
+    rhc = RHC_GD.read_text(encoding="utf-8") if RHC_GD.is_file() else ""
+    if "DEVELOP_COMPLETES_INSTANT" in rhc and "func develop_days_remaining" in rhc:
+        passes.append("develop_instant")
+    else:
+        fails.append("develop_instant")
+    if "rank_from_snapshot" in harness and "tech_done" in harness:
+        passes.append("harness_completing")
+    else:
+        fails.append("harness_completing")
     ok = len(fails) == 0
     return {
         "ok": ok,

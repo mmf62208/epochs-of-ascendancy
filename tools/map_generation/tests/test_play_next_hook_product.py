@@ -76,6 +76,41 @@ class TestPlayNextHookProduct(unittest.TestCase):
         self.assertEqual(nxt.get("source"), "aar")
         self.assertIn("oil", str(nxt.get("hint", "")).lower())
 
+    def test_completing_bars_rank(self) -> None:
+        tech = rank_next_beat({"research_days_left": 1})
+        self.assertEqual(tech.get("action"), "tech_done")
+        self.assertEqual(tech.get("source"), "research")
+        self.assertIn("research", str(tech.get("label", "")).lower())
+        foc = rank_next_beat({"focus_days_left": 1})
+        self.assertEqual(foc.get("action"), "focus_done")
+        self.assertEqual(foc.get("source"), "focus")
+        idle = rank_next_beat({"research_days_left": 5, "focus_days_left": 12})
+        self.assertEqual(idle.get("source"), "idle")
+        war = rank_next_beat(
+            {
+                "has_open_battle": True,
+                "battle_hook": "They break tomorrow — Press",
+                "research_days_left": 1,
+                "focus_days_left": 1,
+            }
+        )
+        self.assertEqual(war.get("action"), "press")
+        short = rank_next_beat(
+            {
+                "steel_stock": 0.0,
+                "has_vehicle": True,
+                "research_days_left": 1,
+            }
+        )
+        self.assertEqual(short.get("action"), "shortage")
+        train = rank_next_beat(
+            {
+                "training": [{"fid": "u1", "days_left": 1}],
+                "research_days_left": 1,
+            }
+        )
+        self.assertEqual(train.get("action"), "send_trained")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -585,6 +585,38 @@ func get_active_research_count(country_tag: String) -> int:
 	return (_ensure_country(country_tag.strip_edges().to_upper())["active"] as Array).size()
 
 
+## Tag-scoped completing-bar snapshot for NEXT. No world/province scan.
+func completing_snapshot(country_tag: String = "GER") -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "GER"
+	var state := _ensure_country(tag)
+	var best_left := 99.0
+	var best_id := ""
+	var best_name := ""
+	var n := 0
+	for slot in state["active"] as Array:
+		if n >= 8:
+			break
+		n += 1
+		if typeof(slot) != TYPE_DICTIONARY:
+			continue
+		var entry: Dictionary = slot
+		var total := maxf(float(entry.get("total_days", 1.0)), 0.001)
+		var progress := float(entry.get("progress_days", 0.0))
+		var left := maxf(total - progress, 0.0)
+		if left < best_left:
+			best_left = left
+			best_id = str(entry.get("tech_id", ""))
+			best_name = _tech_display_name(best_id)
+	return {
+		"research_days_left": best_left,
+		"tech_id": best_id,
+		"name": best_name,
+		"focus_days_left": 99.0,
+	}
+
+
 func get_daily_rp(country_tag: String) -> float:
 	var tag := country_tag.strip_edges().to_upper()
 	var state := _ensure_country(tag)

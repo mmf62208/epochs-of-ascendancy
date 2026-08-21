@@ -74,6 +74,7 @@ func _run() -> void:
 		return
 	_test_front_chips()
 	_test_organize()
+	_test_completing_bars()
 	_test_designer_field()
 	_test_era_resources()
 	_test_march_and_assault()
@@ -913,6 +914,72 @@ func _test_organize() -> void:
 		_fail("refit did not complete")
 		return
 	_pass("refit ready org=%.2f" % float(rf.get("organization")))
+
+
+func _test_completing_bars() -> void:
+	var hook_scr: Script = load("res://scripts/ui/PlayNextHook.gd") as Script
+	if hook_scr == null or not hook_scr.has_method("rank_from_snapshot"):
+		_fail("PlayNextHook.rank_from_snapshot missing")
+		return
+	var tech: Dictionary = hook_scr.call("rank_from_snapshot", {"research_days_left": 1.0}) as Dictionary
+	if str(tech.get("action", "unpause")) == "unpause":
+		_fail("NEXT idle while research 1d left: %s" % str(tech))
+		return
+	if str(tech.get("action", "")) != "tech_done":
+		_fail("NEXT research want tech_done got %s" % str(tech))
+		return
+	_pass("NEXT research completing action=%s source=%s" % [str(tech.get("action")), str(tech.get("source"))])
+	var foc: Dictionary = hook_scr.call("rank_from_snapshot", {"focus_days_left": 1.0}) as Dictionary
+	if str(foc.get("action", "")) != "focus_done":
+		_fail("NEXT focus want focus_done got %s" % str(foc))
+		return
+	_pass("NEXT focus completing action=%s" % str(foc.get("action")))
+	var war: Dictionary = hook_scr.call("rank_from_snapshot", {
+		"has_open_battle": true,
+		"battle_hook": "They break tomorrow — Press",
+		"research_days_left": 1.0,
+		"focus_days_left": 1.0,
+	}) as Dictionary
+	if str(war.get("action", "")) != "press":
+		_fail("war should beat completing bars got %s" % str(war))
+		return
+	_pass("war beats completing bars")
+	var tm: Node = _autoload("TechnologyManager")
+	if tm == null or not tm.has_method("completing_snapshot"):
+		_fail("TechnologyManager.completing_snapshot missing")
+		return
+	var snap0: Dictionary = tm.call("completing_snapshot", ATT_TAG) as Dictionary
+	if not ("country_state" in tm):
+		_fail("TechnologyManager.country_state missing")
+		return
+	var cs: Dictionary = tm.country_state
+	if not cs.has(ATT_TAG):
+		_fail("completing_snapshot did not ensure GER")
+		return
+	var ger: Dictionary = cs[ATT_TAG] as Dictionary
+	if not ger.has("active") or typeof(ger["active"]) != TYPE_ARRAY:
+		ger["active"] = []
+	var active: Array = ger["active"]
+	active.append({
+		"tech_id": "near_done_test",
+		"progress_days": 0.0,
+		"total_days": 1.0,
+	})
+	var snap: Dictionary = tm.call("completing_snapshot", ATT_TAG) as Dictionary
+	if float(snap.get("research_days_left", 99.0)) > 1.001:
+		_fail("TM completing_snapshot days_left want <=1 got %s (before=%s)" % [str(snap), str(snap0)])
+		if not active.is_empty():
+			active.remove_at(active.size() - 1)
+		return
+	_pass("TM completing_snapshot days=%.2f" % float(snap.get("research_days_left", 99)))
+	var rec: Dictionary = hook_scr.call("recommend", ATT_TAG) as Dictionary
+	if not active.is_empty():
+		active.remove_at(active.size() - 1)
+	var rec_src := str(rec.get("source", "idle"))
+	if str(rec.get("action", "unpause")) == "unpause" and rec_src in ["idle", "clock"]:
+		_fail("NEXT idle while GER research 1d left: %s" % str(rec))
+		return
+	_pass("recommend live action=%s source=%s" % [str(rec.get("action")), rec_src])
 
 
 func _test_era_resources() -> void:

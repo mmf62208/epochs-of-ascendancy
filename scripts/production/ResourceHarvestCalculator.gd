@@ -450,6 +450,7 @@ static func is_endgame_source_year_ok(source_key: String, scenario_year: int = 0
 ## Painted deposits are 1936-baseline. 1918 extracts less oil/aluminum; 2026 more oil, less coal.
 const ERA_OMIT_THRESHOLD := 0.25
 const DEVELOP_MAX_LEVEL := 3
+const DEVELOP_COMPLETES_INSTANT := true
 const DEVELOP_BONUS_PER_LEVEL := 0.35
 const DEVELOP_STEEL_BASE := 8.0
 const DEVELOP_STEEL_PER_LEVEL := 4.0
@@ -572,6 +573,11 @@ static func build_develop_resource_action(
 		"bonus_after": development_mult(cur + 1),
 		"year": scenario_year,
 	}
+
+
+## Levels apply immediately (pay steel → +1). NEXT does not invent a multi-day mine.
+static func develop_days_remaining(_development: Dictionary = {}, _key: String = "") -> float:
+	return -1.0
 
 
 static func compute_developed_income(resources: Dictionary, development: Dictionary = {}) -> Dictionary:
