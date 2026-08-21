@@ -170,6 +170,12 @@ def build_first_session_hotkeys_product(
         )
         wiring["help_lists_warloop"] = "WarLoop" in menu or "Shift+I" in menu or "first_session" in menu.lower()
         wiring["default_ger"] = 'setup_solo_play("GER")' in runner or "DEFAULT_PLAYER_TAG" in runner
+        wiring["home_in_input"] = (
+            "KEY_HOME" in ren
+            and "func _apply_home_key" in ren
+            and "func _input" in ren
+            and ren.find("KEY_HOME") < ren.find("func _unhandled_input")
+        )
 
         for k, v in wiring.items():
             if v:

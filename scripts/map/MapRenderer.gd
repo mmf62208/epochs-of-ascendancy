@@ -959,9 +959,24 @@ var _pending_terrain_zoom_refresh: bool = false
 const WHEEL_TERRAIN_REFRESH_MS := 180
 
 
+func _apply_home_key(shift_pressed: bool) -> void:
+	# Home must stay cheap: recenter/fit only — no 3520 rebuild.
+	ensure_world_navigation_ready()
+	if shift_pressed:
+		fit_camera_to_full_world()
+	else:
+		center_europe_in_world_view()
+		if typeof(DebugOverlay) != TYPE_NIL:
+			DebugOverlay.toast_map_debug("Map: Europe · WASD/edge/MMB pan · wheel zoom · Shift+Home=world")
+
+
 func _input(event: InputEvent) -> void:
-	# Esc / I must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
+	# Esc / I / Home must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
 	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_HOME:
+			_apply_home_key(event.shift_pressed)
+			get_viewport().set_input_as_handled()
+			return
 		if event.keycode == KEY_ESCAPE and _inspector_stack_blocking_input():
 			_dismiss_inspector_and_restore_input()
 			get_viewport().set_input_as_handled()
@@ -1232,13 +1247,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		# Home: re-center Europe · End: Asia focus · Shift+Home: full world fit
 		if event.keycode == KEY_HOME:
-			ensure_world_navigation_ready()
-			if event.shift_pressed:
-				fit_camera_to_full_world()
-			else:
-				center_europe_in_world_view()
-				if typeof(DebugOverlay) != TYPE_NIL:
-					DebugOverlay.toast_map_debug("Map: Europe · WASD/edge/MMB pan · wheel zoom · Shift+Home=world")
+			_apply_home_key(event.shift_pressed)
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_END:
