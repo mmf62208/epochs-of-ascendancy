@@ -75,6 +75,9 @@ class TestFirstSessionAssaultSurfaceProduct(unittest.TestCase):
             "notify_uses_target_pid",
             "notify_includes_from_pid",
             "busy_clears_in_post_ui_light",
+            "owner_change_no_full_border",
+            "owner_change_no_full_mesh",
+            "owner_change_no_label_bfs",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
         self.assertEqual(list(p.get("fail") or []), [], msg=p)

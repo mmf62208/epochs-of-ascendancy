@@ -596,24 +596,26 @@ func _connect_map_manager_signals() -> void:
 func _on_map_province_data_changed(province_id: int, what: String) -> void:
 	if what not in ["effects", "development", "infrastructure", "owner", "controller", "all", "infrastructure_project", "settlement", "welfare", "policy", "burden"]:
 		return
+	var owner_flip := what in ["owner", "controller", "all"]
 	if provinces.has(province_id):
 		_refresh_single_province_fill(province_id)
-		# If the info panel is open on this province, refresh the investment section live
-		if _is_info_panel_visible():
+		# Inspector rebuild is heavy; skip on capture/resolve owner flips.
+		if _is_info_panel_visible() and not owner_flip:
 			show_info_panel(provinces[province_id])
 	if _hover_fill_province_id == province_id:
 		_apply_hover_fill(province_id, true)
-	if what in ["owner", "controller", "all"]:
+	if owner_flip:
 		if typeof(MapManager) != TYPE_NIL:
 			var live: Province = MapManager.get_province(province_id)
 			if live != null and provinces.has(province_id):
 				provinces[province_id].owner_tag = live.owner_tag
 				provinces[province_id].controller_tag = live.controller_tag
-		_update_country_borders()
-		_rebuild_province_mesh_layer()
-		# Nation names follow era ownership / control (debounced — avoid rebuild per province in mass transfers).
-		_schedule_political_labels_rebuild()
-	_update_riot_markers()  # live update for riot ignition/spread in monthly (even if no explicit data_changed for riot, force on owner events + full)
+		# Hang-class: capture/resolve used to rebuild the whole 3520-board
+		# (borders + mesh + labels) on this signal and freeze F5 after
+		# "open land battles resolved". Pid fill is enough; LOD/mode still
+		# redraws frontiers.
+		return
+	_update_riot_markers()  # monthly riot ignition/spread, not capture
 
 
 func _connect_trade_manager_signals_for_map_layers() -> void:

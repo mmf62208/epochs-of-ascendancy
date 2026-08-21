@@ -46,6 +46,7 @@ def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
     post = _gd_func_slice(renderer_src, "_assault_post_ui_light")
     pin = _gd_func_slice(renderer_src, "_try_open_unit_at_world")
     attack_btn = _gd_func_slice(renderer_src, "_update_attack_button")
+    owner_fn = _gd_func_slice(renderer_src, "_on_map_province_data_changed")
 
     fail_idx = exec_after.find('if not bool(assault.get("success"')
     fail_has_busy_clear = False
@@ -86,6 +87,14 @@ def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
         "attack_visible_disabled": bool(attack_btn)
         and "disabled" in attack_btn
         and "visible = true" in attack_btn,
+        "owner_change_no_full_border": bool(owner_fn)
+        and "_update_country_borders" not in owner_fn
+        and "force_border_update" not in owner_fn,
+        "owner_change_no_full_mesh": bool(owner_fn)
+        and "_rebuild_province_mesh_layer" not in owner_fn,
+        "owner_change_no_label_bfs": bool(owner_fn)
+        and "_schedule_political_labels_rebuild" not in owner_fn
+        and "_rebuild_political_labels" not in owner_fn,
     }
 
 ASSAULT_STEPS: List[str] = [

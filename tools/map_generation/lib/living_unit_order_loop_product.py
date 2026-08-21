@@ -168,6 +168,27 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     wiring["i_hang_safe"] = i_ok
     (passes if i_ok else fails).append("i_hang_safe")
 
+    owner_fn = _slice(ren, "_on_map_province_data_changed")
+    post_fn = _slice(ren, "_assault_post_ui_light")
+    notify_fn = _slice(bm, "_notify_map_refresh")
+    tick_fn = _slice(bm, "_tick_one_open_land_battle")
+    resolve_ok = (
+        bool(owner_fn)
+        and "_refresh_single_province_fill" in owner_fn
+        and "owner_flip" in owner_fn
+        and "_update_country_borders()" not in owner_fn
+        and "_rebuild_province_mesh_layer()" not in owner_fn
+        and "_schedule_political_labels_rebuild()" not in owner_fn
+        and bool(post_fn)
+        and "_refresh_province_fill_pids" in post_fn
+        and bool(notify_fn)
+        and "refresh_after_capture_light" in notify_fn
+        and bool(tick_fn)
+        and "execute_province_assault" in tick_fn
+    )
+    wiring["resolve_hang_safe"] = resolve_ok
+    (passes if resolve_ok else fails).append("resolve_hang_safe")
+
     strat_skip = bool(pick_fn) and "_unit_counters_want_visible" in pick_fn
     wiring["strategic_pick_skip"] = strat_skip
     (passes if strat_skip else fails).append("strategic_pick_skip")

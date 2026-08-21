@@ -38,6 +38,7 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
             "g_hang_safe",
             "inspector_close_restores",
             "i_hang_safe",
+            "resolve_hang_safe",
             "strategic_pick_skip",
             "march_api",
             "battle_api",
