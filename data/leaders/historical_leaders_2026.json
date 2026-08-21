@@ -21,7 +21,8 @@
         "political_general": 1
       },
       "birth_year": 1968,
-      "start_year": 2025
+      "start_year": 2025,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_chairman_joint_chiefs_2026.png"
     },
     {
       "leader_id": "usa_army_chief_2026",
@@ -41,7 +42,8 @@
         "combined_arms_master": 1
       },
       "birth_year": 1972,
-      "start_year": 2024
+      "start_year": 2024,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_army_chief_2026.png"
     },
     {
       "leader_id": "usa_navy_chief_2026",
@@ -102,7 +104,8 @@
         "combined_arms_master": 1
       },
       "birth_year": 1978,
-      "start_year": 2025
+      "start_year": 2025,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_deputy_army_2026.png"
     },
     {
       "leader_id": "usa_richardson_2026",
@@ -122,7 +125,8 @@
         "methodical": 1
       },
       "birth_year": 1972,
-      "start_year": 2022
+      "start_year": 2022,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_richardson_2026.png"
     },
     {
       "leader_id": "usa_mendez_2026",
@@ -143,7 +147,7 @@
       },
       "birth_year": 1976,
       "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/elena_vargas_navy.png"
+      "portrait": "res://assets/graphics/portraits/leaders/usa_mendez_2026.png"
     },
     {
       "leader_id": "usa_raizin_cain_2026",
@@ -163,7 +167,8 @@
         "aggressive": 3
       },
       "birth_year": 1975,
-      "start_year": 2022
+      "start_year": 2022,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_raizin_cain_2026.png"
     },
     {
       "leader_id": "usa_whitmore_2026",
@@ -183,7 +188,8 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2023
+      "start_year": 2023,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_whitmore_2026.png"
     },
     {
       "leader_id": "usa_monroe_2026",
@@ -203,7 +209,8 @@
         "methodical": 2
       },
       "birth_year": 1970,
-      "start_year": 2024
+      "start_year": 2024,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_monroe_2026.png"
     },
     {
       "leader_id": "usa_chen_2026",
@@ -224,7 +231,7 @@
       },
       "birth_year": 1980,
       "start_year": 2024,
-      "portrait": "res://assets/graphics/portraits/leaders/marcus_hale_air.png"
+      "portrait": "res://assets/graphics/portraits/leaders/usa_chen_2026.png"
     },
     {
       "leader_id": "ger_weber_2026",
@@ -471,7 +478,8 @@
         "cautious": 2
       },
       "birth_year": 1977,
-      "start_year": 2023
+      "start_year": 2023,
+      "portrait": "res://assets/graphics/portraits/leaders/jap_sato_2026.png"
     },
     {
       "leader_id": "jap_tanaka_2026",
@@ -491,7 +499,8 @@
         "bold": 1
       },
       "birth_year": 1974,
-      "start_year": 2022
+      "start_year": 2022,
+      "portrait": "res://assets/graphics/portraits/leaders/jap_tanaka_2026.png"
     },
     {
       "leader_id": "ind_sharma_2026",
@@ -615,7 +624,7 @@
     },
     {
       "leader_id": "tur_yilmaz_2026",
-      "name": "Mehmet Y\u0131lmaz",
+      "name": "Mehmet Yılmaz",
       "country_tag": "TUR",
       "leader_type": "general",
       "attack_skill": 6,
@@ -674,7 +683,7 @@
     },
     {
       "leader_id": "spa_garcia_2026",
-      "name": "Carlos Garc\u00eda",
+      "name": "Carlos García",
       "country_tag": "SPA",
       "leader_type": "general",
       "attack_skill": 6,
@@ -1194,7 +1203,7 @@
       },
       "birth_year": 1971,
       "start_year": 2018,
-      "portrait": "res://assets/graphics/portraits/leaders/victoria_lane_space.png"
+      "portrait": "res://assets/graphics/portraits/leaders/spa_nav_cmd_2026.png"
     },
     {
       "leader_id": "spa_air_cmd_2026",
@@ -1215,7 +1224,7 @@
       },
       "birth_year": 1971,
       "start_year": 2023,
-      "portrait": "res://assets/graphics/portraits/leaders/victoria_lane_space.png"
+      "portrait": "res://assets/graphics/portraits/leaders/spa_air_cmd_2026.png"
     },
     {
       "leader_id": "tur_nav_cmd_2026",
@@ -2475,7 +2484,8 @@
         "combined_arms_master": 1
       },
       "birth_year": 1971,
-      "start_year": 2025
+      "start_year": 2025,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_gen2_2026.png"
     },
     {
       "leader_id": "usa_nav2_2026",
@@ -2495,7 +2505,8 @@
         "cautious": 1
       },
       "birth_year": 1974,
-      "start_year": 2024
+      "start_year": 2024,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_nav2_2026.png"
     },
     {
       "leader_id": "usa_air2_2026",
@@ -2515,7 +2526,8 @@
         "methodical": 1
       },
       "birth_year": 1979,
-      "start_year": 2023
+      "start_year": 2023,
+      "portrait": "res://assets/graphics/portraits/leaders/usa_air2_2026.png"
     },
     {
       "leader_id": "ger_gen2_2026",
@@ -2865,7 +2877,8 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2020
+      "start_year": 2020,
+      "portrait": "res://assets/graphics/portraits/leaders/jap_nav2_2026.png"
     },
     {
       "leader_id": "jap_air2_2026",
@@ -3214,7 +3227,7 @@
       },
       "birth_year": 1973,
       "start_year": 2020,
-      "portrait": "res://assets/graphics/portraits/leaders/elena_vargas_navy.png"
+      "portrait": "res://assets/graphics/portraits/leaders/spa_navy_2026.png"
     },
     {
       "leader_id": "spa_air_2026",
