@@ -110,6 +110,15 @@ class TestPlayNextHookProduct(unittest.TestCase):
             }
         )
         self.assertEqual(train.get("action"), "send_trained")
+        dry = rank_next_beat(
+            {
+                "dry_fuel": [{"fid": "u2"}],
+                "fuel_stock": 0,
+                "oil_stock": 0,
+                "research_days_left": 1,
+            }
+        )
+        self.assertEqual(dry.get("action"), "refuel")
 
 
 if __name__ == "__main__":

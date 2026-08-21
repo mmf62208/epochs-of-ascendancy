@@ -577,7 +577,9 @@ static func build_develop_resource_action(
 
 ## Levels apply immediately (pay steel → +1). NEXT does not invent a multi-day mine.
 static func develop_days_remaining(_development: Dictionary = {}, _key: String = "") -> float:
-	return -1.0
+	if DEVELOP_COMPLETES_INSTANT:
+		return -1.0
+	return 0.0
 
 
 static func compute_developed_income(resources: Dictionary, development: Dictionary = {}) -> Dictionary:

@@ -944,6 +944,33 @@ func _test_completing_bars() -> void:
 		_fail("war should beat completing bars got %s" % str(war))
 		return
 	_pass("war beats completing bars")
+	var train: Dictionary = hook_scr.call("rank_from_snapshot", {
+		"training": [{"fid": "u1", "days_left": 1.0}],
+		"research_days_left": 1.0,
+	}) as Dictionary
+	if str(train.get("action", "")) != "send_trained":
+		_fail("organize should beat completing bars got %s" % str(train))
+		return
+	_pass("organize beats completing bars")
+	var fuel: Dictionary = hook_scr.call("rank_from_snapshot", {
+		"dry_fuel": [{"fid": "u2"}],
+		"fuel_stock": 0.0,
+		"oil_stock": 0.0,
+		"research_days_left": 1.0,
+	}) as Dictionary
+	if str(fuel.get("action", "")) != "refuel":
+		_fail("fuel should beat completing bars got %s" % str(fuel))
+		return
+	_pass("fuel beats completing bars")
+	var short: Dictionary = hook_scr.call("rank_from_snapshot", {
+		"steel_stock": 0.0,
+		"has_vehicle": true,
+		"research_days_left": 1.0,
+	}) as Dictionary
+	if str(short.get("action", "")) != "shortage":
+		_fail("shortage should beat completing bars got %s" % str(short))
+		return
+	_pass("shortage beats completing bars")
 	var tm: Node = _autoload("TechnologyManager")
 	if tm == null or not tm.has_method("completing_snapshot"):
 		_fail("TechnologyManager.completing_snapshot missing")
@@ -975,11 +1002,10 @@ func _test_completing_bars() -> void:
 	var rec: Dictionary = hook_scr.call("recommend", ATT_TAG) as Dictionary
 	if not active.is_empty():
 		active.remove_at(active.size() - 1)
-	var rec_src := str(rec.get("source", "idle"))
-	if str(rec.get("action", "unpause")) == "unpause" and rec_src in ["idle", "clock"]:
-		_fail("NEXT idle while GER research 1d left: %s" % str(rec))
+	if str(rec.get("action", "")) != "tech_done" or str(rec.get("source", "")) != "research":
+		_fail("recommend live want tech_done/research got %s" % str(rec))
 		return
-	_pass("recommend live action=%s source=%s" % [str(rec.get("action")), rec_src])
+	_pass("recommend live action=%s source=%s" % [str(rec.get("action")), str(rec.get("source"))])
 
 
 func _test_era_resources() -> void:

@@ -340,6 +340,25 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("shortage_beats_research")
     else:
         fails.append("shortage_beats_research")
+    train_bars = rank_next_beat(
+        {"training": [{"fid": "u1", "days_left": 1}], "research_days_left": 1}
+    )
+    if str(train_bars.get("action")) == "send_trained":
+        passes.append("train_beats_research")
+    else:
+        fails.append("train_beats_research")
+    fuel_bars = rank_next_beat(
+        {
+            "dry_fuel": [{"fid": "u2"}],
+            "fuel_stock": 0,
+            "oil_stock": 0,
+            "research_days_left": 1,
+        }
+    )
+    if str(fuel_bars.get("action")) == "refuel":
+        passes.append("fuel_beats_research")
+    else:
+        fails.append("fuel_beats_research")
     if "tech_done" in hook and "focus_done" in hook:
         passes.append("gd_completing_actions")
     else:
@@ -358,6 +377,15 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("harness_completing")
     else:
         fails.append("harness_completing")
+    if (
+        '"dry_fuel"' in harness
+        and "send_trained" in harness
+        and "shortage" in harness
+        and "research_days_left" in harness
+    ):
+        passes.append("harness_higher_beats_completing")
+    else:
+        fails.append("harness_higher_beats_completing")
     ok = len(fails) == 0
     return {
         "ok": ok,
