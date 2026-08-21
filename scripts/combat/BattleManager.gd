@@ -1453,6 +1453,9 @@ func _record_land_aar(battle: Dictionary, winner: String, to_id: int) -> void:
 		"fid": fid,
 		"from_id": stage,
 		"tag": tag,
+		"peace_pid": to_id if winner == "attacker" else -1,
+		"peace_winner": tag if winner == "attacker" else "",
+		"peace_loser": str(battle.get("def_tag", "")),
 	}
 	var log_result := {
 		"winner": winner,

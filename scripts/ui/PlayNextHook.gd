@@ -137,6 +137,58 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			"to_id": int(ch.get("pid", -1)),
 			"source": "choke",
 		}
+	var peace_pid := int(f.get("peace_pid", -1))
+	if peace_pid > 0:
+		return {
+			"ok": true,
+			"action": "settle_peace",
+			"label": "Settle the peace",
+			"hint": "Annex the captured province at the conference",
+			"fid": str(f.get("aar_fid", "")),
+			"to_id": peace_pid,
+			"source": "peace",
+			"winner": str(f.get("peace_winner", "")),
+			"loser": str(f.get("peace_loser", "")),
+		}
+	var occ_v: Variant = f.get("occupation", {})
+	if occ_v is Dictionary and int((occ_v as Dictionary).get("pid", 0)) > 0:
+		var occ: Dictionary = occ_v as Dictionary
+		var resist := float(occ.get("resistance", 0.0))
+		var place := str(occ.get("place", "occupied land")).strip_edges()
+		if place.is_empty():
+			place = "occupied land"
+		var occ_line := "Occupied %s · resistance %.0f%%" % [place, resist * 100.0]
+		return {
+			"ok": true,
+			"action": "occupation_unrest",
+			"label": occ_line,
+			"hint": occ_line,
+			"fid": "",
+			"to_id": int(occ.get("pid", -1)),
+			"source": "occupation",
+		}
+	var wpid := int(f.get("war_goal_pid", -1))
+	if wpid > 0:
+		if not bool(f.get("war_justified", false)):
+			return {
+				"ok": true,
+				"action": "justify",
+				"label": "Justify the war goal",
+				"hint": "Justify a claim before declaring war",
+				"fid": "",
+				"to_id": wpid,
+				"source": "war_goal",
+			}
+		if not bool(f.get("war_declared", false)):
+			return {
+				"ok": true,
+				"action": "declare",
+				"label": "Declare war",
+				"hint": "War goal justified — declare",
+				"fid": "",
+				"to_id": wpid,
+				"source": "war_goal",
+			}
 	if bool(f.get("any_open_battle", false)) or bool(f.get("has_open_battle", false)):
 		return {
 			"ok": true,
@@ -213,6 +265,48 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 				"summary": str(wp.get("toast", r.get("hint", "WarLoop"))),
 			}
 		return {"ok": true, "action": "show_war_loop", "summary": str(r.get("hint", "WarLoop"))}
+	if action == "justify" and typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_justify"):
+		var jpid := int(r.get("to_id", 1))
+		var justified: Dictionary = GameData.apply_war_goal_justify(jpid)
+		return {
+			"ok": bool(justified.get("ok", false)),
+			"action": "justify",
+			"summary": str(justified.get("summary", r.get("hint", "Justify the war goal"))),
+		}
+	if action == "declare" and typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_execute"):
+		var dpid := int(r.get("to_id", 1))
+		var declared: Dictionary = GameData.apply_war_goal_execute(dpid)
+		return {
+			"ok": bool(declared.get("ok", false)),
+			"action": "declare",
+			"summary": str(declared.get("summary", r.get("hint", "Declare war"))),
+		}
+	if action == "settle_peace" and typeof(GameData) != TYPE_NIL \
+			and GameData.has_method("apply_peace_conference_settlement_live"):
+		var pid := int(r.get("to_id", -1))
+		var winner := str(r.get("winner", "")).strip_edges().to_upper()
+		var loser := str(r.get("loser", "")).strip_edges().to_upper()
+		if winner.is_empty():
+			winner = "GER"
+		if loser.is_empty():
+			loser = "FRA"
+		if pid > 0:
+			var settled: Dictionary = GameData.apply_peace_conference_settlement_live(
+				winner, loser, pid, true, false, 0.0, true
+			)
+			_show_occupation_overlay()
+			return {
+				"ok": bool(settled.get("ok", false)),
+				"action": "settle_peace",
+				"summary": str(settled.get("summary", "Peace annex applied")),
+			}
+	if action == "occupation_unrest":
+		_show_occupation_overlay()
+		return {
+			"ok": true,
+			"action": "occupation_unrest",
+			"summary": str(r.get("hint", r.get("label", "Occupation unrest"))),
+		}
 	if action == "unpause" and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(false)
 		return {"ok": true, "action": "unpause", "summary": str(r.get("hint", "Unpause"))}
@@ -239,6 +333,14 @@ static func _action_label(action: String) -> String:
 			return "Focus completes tomorrow"
 		"choke_flag":
 			return "Channel choke flagged"
+		"settle_peace":
+			return "Settle the peace"
+		"occupation_unrest":
+			return "Occupation unrest"
+		"justify":
+			return "Justify the war goal"
+		"declare":
+			return "Declare war"
 		"show_war_loop":
 			return "WarLoop · B Fronts · Ctrl+click"
 		_:
@@ -311,7 +413,93 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 		if dleft >= 0.0:
 			facts["develop_days_left"] = dleft
 	facts["fleet_choke"] = _fleet_choke_row(tag)
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("peek_last_land_aar"):
+		var peace_aar: Dictionary = BattleManager.peek_last_land_aar()
+		if not peace_aar.is_empty():
+			facts["peace_pid"] = int(peace_aar.get("peace_pid", -1))
+			facts["peace_winner"] = str(peace_aar.get("peace_winner", tag))
+			facts["peace_loser"] = str(peace_aar.get("peace_loser", ""))
+	facts["occupation"] = _occupation_row(tag)
+	var wg: Dictionary = _war_goal_row(tag)
+	facts["war_goal_pid"] = int(wg.get("pid", -1))
+	facts["war_justified"] = bool(wg.get("justified", false))
+	facts["war_declared"] = bool(wg.get("declared", false))
 	return facts
+
+
+static func _show_occupation_overlay() -> void:
+	var tree := Engine.get_main_loop() as SceneTree
+	var mr: Node = null
+	if tree != null:
+		mr = tree.get_first_node_in_group("map_renderer")
+		if mr == null and tree.current_scene != null:
+			mr = tree.current_scene.find_child("MapRenderer", true, false)
+	if mr != null and mr.has_method("set_occupation_overlay_visible"):
+		mr.call("set_occupation_overlay_visible", true)
+		if mr.get("_occupation_layer") != null:
+			var layer: Object = mr.get("_occupation_layer")
+			if layer != null and "include_non_contested_heatmap" in layer:
+				layer.include_non_contested_heatmap = true
+			if layer != null and layer.has_method("set_mapmode"):
+				layer.call("set_mapmode", "resistance")
+
+
+static func _occupation_row(tag: String) -> Dictionary:
+	var empty := {}
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province"):
+		return empty
+	# Known living theaters only — never walk the 3520 board.
+	var pids: Array = [710739, 902598]
+	var store: Dictionary = {}
+	if typeof(GameData) != TYPE_NIL and GameData.get("peace_state") is Dictionary:
+		var ps: Dictionary = GameData.peace_state
+		if ps.get("occupation_province") is Dictionary:
+			store = ps["occupation_province"]
+	for raw in pids:
+		var pid := int(raw)
+		var p: Object = MapManager.get_province(pid)
+		if p == null:
+			continue
+		var owner := str(p.get("owner_tag")).strip_edges().to_upper()
+		var ctrl := str(p.get("controller_tag")).strip_edges().to_upper()
+		var seeded := store.has(str(pid))
+		var occupied := not owner.is_empty() and not ctrl.is_empty() and owner != ctrl
+		if not occupied and not seeded:
+			continue
+		if ctrl != tag and owner != tag:
+			continue
+		var resist := 0.55
+		if seeded and store[str(pid)] is Dictionary:
+			resist = float((store[str(pid)] as Dictionary).get("resistance_level", resist))
+		elif occupied and typeof(GameData) != TYPE_NIL and GameData.has_method("get_occupation_province_state"):
+			var st: Dictionary = GameData.get_occupation_province_state(pid)
+			resist = float(st.get("resistance_level", resist))
+		var place := str(p.get("name")).strip_edges()
+		if place.is_empty():
+			place = "#%d" % pid
+		return {"pid": pid, "resistance": resist, "place": place, "owner": owner, "controller": ctrl}
+	return empty
+
+
+static func _war_goal_row(tag: String) -> Dictionary:
+	var out := {"pid": -1, "justified": false, "declared": false}
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_war_goal_state"):
+		var st: Dictionary = GameData.get_war_goal_state()
+		out["justified"] = bool(st.get("justified", false))
+		out["declared"] = int(st.get("pushes", 0)) > 0
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province"):
+		return out
+	var target := 710739 if tag == "GER" else (902598 if tag == "JAP" else -1)
+	if target <= 0:
+		return out
+	var p: Object = MapManager.get_province(target)
+	if p == null:
+		return out
+	var owner := str(p.get("owner_tag")).strip_edges().to_upper()
+	if owner.is_empty() or owner == tag:
+		return out
+	out["pid"] = target
+	return out
 
 
 static func _fleet_choke_row(tag: String) -> Dictionary:

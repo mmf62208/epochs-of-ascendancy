@@ -91,6 +91,7 @@ func _run() -> void:
 	_test_completing_bars()
 	_test_designer_field()
 	_test_era_resources()
+	_test_peace_occupation()
 	_test_march_and_assault()
 	_test_chi_jap_theater()
 	_cleanup()
@@ -1381,6 +1382,105 @@ func _test_era_resources() -> void:
 	fra_p.set("controller_tag", DEF_TAG)
 	if "fuel_level" in designed:
 		designed.set("fuel_level", 1.0)
+
+
+func _test_peace_occupation() -> void:
+	var hook_scr: Script = load("res://scripts/ui/PlayNextHook.gd") as Script
+	if hook_scr == null or not hook_scr.has_method("rank_from_snapshot") or not hook_scr.has_method("apply"):
+		_fail("PlayNextHook rank/apply missing")
+		return
+	var just_rec: Dictionary = hook_scr.call("rank_from_snapshot", {
+		"war_goal_pid": FRA_FRONT,
+		"war_justified": false,
+	}) as Dictionary
+	if str(just_rec.get("action", "")) != "justify":
+		_fail("NEXT justify want justify got %s" % str(just_rec))
+		return
+	var just_out: Dictionary = hook_scr.call("apply", just_rec) as Dictionary
+	var gd: Node = _autoload("GameData")
+	if gd == null or not gd.has_method("apply_war_goal_justify"):
+		_fail("GameData.apply_war_goal_justify missing")
+		return
+	if not bool(just_out.get("ok", false)):
+		_fail("living justify apply not ok: %s" % str(just_out))
+		return
+	if not gd.has_method("get_war_goal_state"):
+		_fail("get_war_goal_state missing")
+		return
+	var wg: Dictionary = gd.call("get_war_goal_state") as Dictionary
+	if not bool(wg.get("justified", false)):
+		_fail("war goal not justified after NEXT apply: %s" % str(wg))
+		return
+	_pass("living justify justified pid=%d" % FRA_FRONT)
+	var dec_rec: Dictionary = hook_scr.call("rank_from_snapshot", {
+		"war_goal_pid": FRA_FRONT,
+		"war_justified": true,
+		"war_declared": false,
+	}) as Dictionary
+	if str(dec_rec.get("action", "")) != "declare":
+		_fail("NEXT declare want declare got %s" % str(dec_rec))
+		return
+	var dec_out: Dictionary = hook_scr.call("apply", dec_rec) as Dictionary
+	if not bool(dec_out.get("ok", false)):
+		_fail("living declare apply not ok: %s" % str(dec_out))
+		return
+	wg = gd.call("get_war_goal_state") as Dictionary
+	if int(wg.get("pushes", 0)) < 1:
+		_fail("war goal not declared (pushes): %s" % str(wg))
+		return
+	_pass("living declare pushes=%d" % int(wg.get("pushes", 0)))
+	var fra_p: Object = _mm.call("get_province", FRA_FRONT) if _mm.has_method("get_province") else null
+	if fra_p == null:
+		_fail("FRA front missing for peace transfer")
+		return
+	fra_p.set("owner_tag", DEF_TAG)
+	fra_p.set("controller_tag", DEF_TAG)
+	if not gd.has_method("apply_peace_conference_settlement_live"):
+		_fail("apply_peace_conference_settlement_live missing")
+		return
+	var settled: Dictionary = gd.call(
+		"apply_peace_conference_settlement_live",
+		ATT_TAG, DEF_TAG, FRA_FRONT, true, false, 0.0, true
+	) as Dictionary
+	print("  [INFO] peace settlement %s" % str(settled))
+	if not bool(settled.get("ok", false)):
+		_fail("peace settlement not ok: %s" % str(settled))
+		return
+	var owner := str(fra_p.get("owner_tag")).strip_edges().to_upper()
+	if owner != ATT_TAG:
+		_fail("peace transfer owner want %s got %s" % [ATT_TAG, owner])
+		return
+	_pass("peace transfer owner %s pid=%d" % [owner, FRA_FRONT])
+	if not gd.has_method("get_occupation_province_state"):
+		_fail("get_occupation_province_state missing")
+		return
+	var occ: Dictionary = gd.call("get_occupation_province_state", FRA_FRONT) as Dictionary
+	var resist := float(occ.get("resistance_level", 0.0))
+	if resist <= 0.0:
+		_fail("occupation resistance missing after settlement: %s" % str(occ))
+		return
+	_pass("occupation resistance %.0f%% policy=%s" % [resist * 100.0, str(occ.get("policy", ""))])
+	var unrest: Dictionary = hook_scr.call("rank_from_snapshot", {
+		"occupation": {"pid": FRA_FRONT, "resistance": resist, "place": str(fra_p.get("name"))},
+	}) as Dictionary
+	if str(unrest.get("action", "")) != "occupation_unrest":
+		_fail("NEXT occupation unrest want occupation_unrest got %s" % str(unrest))
+		return
+	if "resistance" not in str(unrest.get("label", "")).to_lower():
+		_fail("NEXT occupation missing resistance: %s" % str(unrest))
+		return
+	_pass("NEXT occupation unrest %s" % str(unrest.get("label", "")))
+	var aar_scr: Script = load("res://scripts/combat/LandBattleAar.gd") as Script
+	if aar_scr != null and aar_scr.has_method("economy_sentence"):
+		var eco := str(aar_scr.call("economy_sentence", fra_p.get("resources"), 1936, DEF_TAG, ATT_TAG))
+		if "oil" not in eco.to_lower() or "0.65" not in eco:
+			_fail("occupier harvest sentence lost after peace: %s" % eco)
+			return
+		_pass("occupy harvest sentence still %s" % eco)
+	fra_p.set("owner_tag", DEF_TAG)
+	fra_p.set("controller_tag", DEF_TAG)
+	if _bm != null and _bm.has_method("clear_last_land_aar"):
+		_bm.call("clear_last_land_aar")
 
 
 func _test_march_and_assault() -> void:

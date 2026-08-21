@@ -15,6 +15,8 @@ BM_GD = ROOT / "scripts" / "combat" / "BattleManager.gd"
 TM_GD = ROOT / "scripts" / "technology" / "TechnologyManager.gd"
 RHC_GD = ROOT / "scripts" / "production" / "ResourceHarvestCalculator.gd"
 HARNESS_GD = ROOT / "scripts" / "core" / "HeadlessWorldAccurateUnitOrderLoopTest.gd"
+PEACE_WIN_GD = ROOT / "scripts" / "ui" / "PeaceConferenceWindow.gd"
+GDATA_GD = ROOT / "scripts" / "autoload" / "GameData.gd"
 
 AAR_CAPTURE_GOODS = ("oil", "steel", "coal")
 AAR_GOOD_VERBS = {"oil": "pumping", "steel": "mining", "coal": "mining"}
@@ -180,6 +182,61 @@ def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
             "fid": str(choke.get("fid") or ""),
             "hint": sentence,
         }
+    try:
+        peace_pid = int(f.get("peace_pid") or 0)
+    except (TypeError, ValueError):
+        peace_pid = 0
+    if peace_pid > 0:
+        return {
+            "ok": True,
+            "action": "settle_peace",
+            "source": "peace",
+            "label": "Settle the peace",
+            "fid": str(f.get("aar_fid") or ""),
+            "to_id": peace_pid,
+            "hint": "Annex the captured province at the conference",
+            "winner": str(f.get("peace_winner") or ""),
+            "loser": str(f.get("peace_loser") or ""),
+        }
+    occ = f.get("occupation") or {}
+    if isinstance(occ, dict) and int(occ.get("pid") or 0) > 0:
+        try:
+            resist = float(occ.get("resistance") or 0.0)
+        except (TypeError, ValueError):
+            resist = 0.0
+        place = str(occ.get("place") or "occupied land").strip() or "occupied land"
+        occ_line = "Occupied %s · resistance %.0f%%" % (place, resist * 100.0)
+        return {
+            "ok": True,
+            "action": "occupation_unrest",
+            "source": "occupation",
+            "label": occ_line,
+            "hint": occ_line,
+            "to_id": int(occ.get("pid") or 0),
+        }
+    try:
+        wpid = int(f.get("war_goal_pid") or 0)
+    except (TypeError, ValueError):
+        wpid = 0
+    if wpid > 0:
+        if not bool(f.get("war_justified")):
+            return {
+                "ok": True,
+                "action": "justify",
+                "source": "war_goal",
+                "label": "Justify the war goal",
+                "hint": "Justify a claim before declaring war",
+                "to_id": wpid,
+            }
+        if not bool(f.get("war_declared")):
+            return {
+                "ok": True,
+                "action": "declare",
+                "source": "war_goal",
+                "label": "Declare war",
+                "hint": "War goal justified — declare",
+                "to_id": wpid,
+            }
     if bool(f.get("any_open_battle")) or bool(f.get("has_open_battle")):
         return {
             "ok": True,
@@ -399,6 +456,88 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("harness_completing")
     else:
         fails.append("harness_completing")
+    justify = rank_next_beat({"war_goal_pid": 710739, "war_justified": False})
+    if str(justify.get("action")) == "justify" and str(justify.get("source")) == "war_goal":
+        passes.append("justify_beats_idle")
+    else:
+        fails.append("justify_beats_idle")
+    declare = rank_next_beat(
+        {"war_goal_pid": 710739, "war_justified": True, "war_declared": False}
+    )
+    if str(declare.get("action")) == "declare" and str(declare.get("source")) == "war_goal":
+        passes.append("declare_after_justify")
+    else:
+        fails.append("declare_after_justify")
+    war_goal_bars = rank_next_beat(
+        {
+            "has_open_battle": True,
+            "battle_hook": "They break tomorrow — Press",
+            "war_goal_pid": 710739,
+        }
+    )
+    if str(war_goal_bars.get("action")) == "press":
+        passes.append("war_beats_justify")
+    else:
+        fails.append("war_beats_justify")
+    oil_beats_peace = rank_next_beat(
+        {
+            "aar_economy": "Now pumping oil (occupied ×0.65).",
+            "peace_pid": 710739,
+            "war_goal_pid": 710739,
+        }
+    )
+    if str(oil_beats_peace.get("source")) == "aar" and "oil" in str(
+        oil_beats_peace.get("label", "")
+    ).lower():
+        passes.append("oil_beats_peace")
+    else:
+        fails.append("oil_beats_peace")
+    settle = rank_next_beat({"peace_pid": 710739, "peace_winner": "GER", "peace_loser": "FRA"})
+    if str(settle.get("action")) == "settle_peace" and str(settle.get("source")) == "peace":
+        passes.append("peace_beats_idle")
+    else:
+        fails.append("peace_beats_idle")
+    unrest = rank_next_beat(
+        {"occupation": {"pid": 710739, "resistance": 0.55, "place": "Bas-Rhin"}}
+    )
+    if (
+        str(unrest.get("action")) == "occupation_unrest"
+        and "resistance" in str(unrest.get("label", "")).lower()
+    ):
+        passes.append("occupation_unrest_beats_idle")
+    else:
+        fails.append("occupation_unrest_beats_idle")
+    if "apply_war_goal_justify" in hook and "war_goal_justify_day" not in hook:
+        passes.append("gd_justify_not_day_button")
+    else:
+        fails.append("gd_justify_not_day_button")
+    if "apply_peace_conference_settlement_live" in hook and "settle_peace" in hook:
+        passes.append("gd_settle_peace_api")
+    else:
+        fails.append("gd_settle_peace_api")
+    if "occupation_unrest" in hook and "set_occupation_overlay_visible" in hook:
+        passes.append("gd_occupation_overlay")
+    else:
+        fails.append("gd_occupation_overlay")
+    peace_win = PEACE_WIN_GD.read_text(encoding="utf-8") if PEACE_WIN_GD.is_file() else ""
+    if "apply_peace_conference_settlement_live" in peace_win and "func apply_living_transfer" in peace_win:
+        passes.append("window_living_transfer")
+    else:
+        fails.append("window_living_transfer")
+    gdata = GDATA_GD.read_text(encoding="utf-8") if GDATA_GD.is_file() else ""
+    if "func apply_peace_conference_settlement_live" in gdata and "apply_occupation_policy_live" in gdata:
+        passes.append("gd_settlement_seeds_occupation")
+    else:
+        fails.append("gd_settlement_seeds_occupation")
+    if (
+        "apply_peace_conference_settlement_live" in harness
+        and "peace transfer owner" in harness
+        and "occupation resistance" in harness
+        and "0.65" in harness
+    ):
+        passes.append("harness_peace_occupation")
+    else:
+        fails.append("harness_peace_occupation")
     if (
         '"dry_fuel"' in harness
         and "send_trained" in harness

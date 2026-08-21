@@ -22,6 +22,25 @@ extends Window
 
 const PLAYER_FALLBACK := "USA"
 
+## Maginot-scale annex: same GameData settlement the NEXT chip / headless harness call.
+## Does not pop UI. occupation_zone seeds unrest via apply_occupation_policy_live.
+static func apply_living_transfer(
+	winner_tag: String = "GER",
+	loser_tag: String = "FRA",
+	province_id: int = 710739
+) -> Dictionary:
+	if typeof(GameData) == TYPE_NIL or not GameData.has_method("apply_peace_conference_settlement_live"):
+		return {"ok": false, "reason": "no settlement api"}
+	var w := winner_tag.strip_edges().to_upper()
+	var l := loser_tag.strip_edges().to_upper()
+	if w.is_empty():
+		w = "GER"
+	if l.is_empty():
+		l = "FRA"
+	var pid := province_id if province_id > 0 else 710739
+	return GameData.apply_peace_conference_settlement_live(w, l, pid, true, false, 0.0, true)
+
+
 var _player_tag: String = PLAYER_FALLBACK
 var _current_leverage: int = 0
 var _selected_terms: Dictionary = {}
@@ -182,6 +201,12 @@ func _build_ui() -> void:
 	resolve_btn.pressed.connect(_on_resolve_pressed)
 	main_vbox.add_child(resolve_btn)
 
+	var annex_btn := Button.new()
+	annex_btn.text = "Annex captured province (living Maginot / CHI–JAP transfer)"
+	RetrowaveTheme.style_secondary_button(annex_btn)
+	annex_btn.pressed.connect(_on_living_annex_pressed)
+	main_vbox.add_child(annex_btn)
+
 	# Summary area
 	summary_label = Label.new()
 	summary_label.text = "Conference not yet resolved. Choose terms above and resolve."
@@ -290,6 +315,12 @@ func _on_resolve_pressed() -> void:
 
 	summary_label.text = text
 
+	var living: Dictionary = _apply_captured_living_transfer()
+	if bool(living.get("ok", false)):
+		summary_label.text += "\nLiving annex: pid %s owner → %s (occupation unrest seeded)." % [
+			str(living.get("province_id", "")), str(living.get("winner_tag", _player_tag))
+		]
+
 	# Toast via existing system
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast("1918 Peace Conference resolved. Check summary.", 6.0)
@@ -298,6 +329,40 @@ func _on_resolve_pressed() -> void:
 
 	# Post-resolve: open Policy/Law for ensuing-years policy work (replaces removed PeaceTreatyPhasesDemo).
 	_open_policy_law_screen()
+
+
+func _on_living_annex_pressed() -> void:
+	var living: Dictionary = _apply_captured_living_transfer()
+	if bool(living.get("ok", false)):
+		summary_label.text = "Living annex applied · pid %s · winner %s (occupation unrest seeded)." % [
+			str(living.get("province_id", "")), str(living.get("winner_tag", _player_tag))
+		]
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast(str(summary_label.text), 5.0)
+	else:
+		summary_label.text = "No captured province to annex (%s)." % str(living.get("reason", "none"))
+
+
+func _apply_captured_living_transfer() -> Dictionary:
+	var pid := -1
+	var winner := _player_tag.strip_edges().to_upper()
+	var loser := ""
+	if winner.is_empty():
+		winner = "GER"
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("peek_last_land_aar"):
+		var aar: Dictionary = BattleManager.peek_last_land_aar()
+		pid = int(aar.get("peace_pid", aar.get("from_id", -1)))
+		var w := str(aar.get("peace_winner", aar.get("tag", ""))).strip_edges().to_upper()
+		if not w.is_empty():
+			winner = w
+		loser = str(aar.get("peace_loser", aar.get("defender_tag", ""))).strip_edges().to_upper()
+	if pid <= 0:
+		pid = 710739 if winner == "GER" else (902598 if winner == "JAP" else -1)
+	if pid <= 0:
+		return {"ok": false, "reason": "no captured pid"}
+	if loser.is_empty():
+		loser = "FRA" if winner == "GER" else "CHI"
+	return apply_living_transfer(winner, loser, pid)
 
 func _populate_continuation_ui(pending: Dictionary) -> void:
 	# Clear previous

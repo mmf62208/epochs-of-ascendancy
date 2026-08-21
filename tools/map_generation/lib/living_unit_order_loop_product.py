@@ -20,6 +20,9 @@ MAP_MANAGER = ROOT / "scripts" / "map" / "MapManager.gd"
 HOOK_GD = ROOT / "scripts" / "ui" / "PlayNextHook.gd"
 LEADER_MANAGER = ROOT / "scripts" / "leaders" / "LeaderManager.gd"
 STRIP_GD = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
+PEACE_WIN = ROOT / "scripts" / "ui" / "PeaceConferenceWindow.gd"
+GDATA_GD = ROOT / "scripts" / "autoload" / "GameData.gd"
+INSIGHT_GD = ROOT / "scripts" / "map" / "ProvinceInsight.gd"
 
 GER_FRONT = 710173
 FRA_FRONT = 710739
@@ -154,6 +157,31 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     )
     wiring["air_region_cas"] = wing_ok
     (passes if wing_ok else fails).append("air_region_cas")
+
+    gdata = GDATA_GD.read_text(encoding="utf-8") if GDATA_GD.is_file() else ""
+    peace_win = PEACE_WIN.read_text(encoding="utf-8") if PEACE_WIN.is_file() else ""
+    insight = INSIGHT_GD.read_text(encoding="utf-8") if INSIGHT_GD.is_file() else ""
+    apply_slice = _slice(hook, "apply")
+    peace_ok = (
+        "func apply_peace_conference_settlement_live" in gdata
+        and "apply_occupation_policy_live" in _slice(gdata, "apply_peace_conference_settlement_live")
+        and "func apply_living_transfer" in peace_win
+        and "apply_peace_conference_settlement_live" in peace_win
+        and "apply_war_goal_justify" in apply_slice
+        and "war_goal_justify_day" not in apply_slice
+        and "apply_war_goal_execute" in apply_slice
+        and "war_goal_execute_day" not in apply_slice
+        and "settle_peace" in hook
+        and "occupation_unrest" in hook
+        and "set_occupation_overlay_visible" in hook
+        and "build_occupation_visual_chip_bbcode" in insight
+        and "apply_peace_conference_settlement_live" in harness
+        and "peace transfer owner" in harness
+        and "occupation resistance" in harness
+        and "0.65" in harness
+    )
+    wiring["peace_occupation"] = peace_ok
+    (passes if peace_ok else fails).append("peace_occupation")
 
     chrome = _slice(ren, "_attach_unit_counter_chrome")
     chrome_ok = (

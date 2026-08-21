@@ -144,6 +144,29 @@ class TestPlayNextHookProduct(unittest.TestCase):
             }
         )
         self.assertEqual(war_beats_choke.get("action"), "press")
+        justify = rank_next_beat({"war_goal_pid": 710739, "war_justified": False})
+        self.assertEqual(justify.get("action"), "justify")
+        self.assertEqual(justify.get("source"), "war_goal")
+        declare = rank_next_beat(
+            {"war_goal_pid": 710739, "war_justified": True, "war_declared": False}
+        )
+        self.assertEqual(declare.get("action"), "declare")
+        settle = rank_next_beat({"peace_pid": 710739})
+        self.assertEqual(settle.get("action"), "settle_peace")
+        unrest = rank_next_beat(
+            {"occupation": {"pid": 710739, "resistance": 0.55, "place": "Bas-Rhin"}}
+        )
+        self.assertEqual(unrest.get("action"), "occupation_unrest")
+        self.assertIn("resistance", str(unrest.get("label", "")).lower())
+        oil_first = rank_next_beat(
+            {
+                "aar_economy": "Now pumping oil (occupied ×0.65).",
+                "peace_pid": 710739,
+                "war_goal_pid": 710739,
+            }
+        )
+        self.assertEqual(oil_first.get("source"), "aar")
+        self.assertIn("oil", str(oil_first.get("label", "")).lower())
 
 
 if __name__ == "__main__":

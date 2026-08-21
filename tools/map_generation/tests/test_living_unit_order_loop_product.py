@@ -46,6 +46,7 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
             "sea_hop_api",
             "choke_flag",
             "air_region_cas",
+            "peace_occupation",
             "chip_str_num",
             "inverse_zoom_scale",
             "chip_on_centroid",
