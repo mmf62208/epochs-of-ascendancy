@@ -22046,13 +22046,13 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 
 ## One land division per major on a named hex. Not a 3520 scan.
 func _station_world_major_oob_chips() -> Dictionary:
-	# CHI–JAP live edge 902505 (CHI) — 903951 (JAP). Capitals from world_accurate.json.
+	# CHI–JAP live edge 902598 (CHI) — 903981 (JAP, rear 903966). Capitals from world_accurate.json.
 	var rows: Array = [
 		{"tag": "ENG", "pid": 711414, "design": "m4_sherman_medium_tank"},
 		{"tag": "USA", "pid": 800792, "design": "m4_sherman_medium_tank"},
 		{"tag": "SOV", "pid": 903534, "design": "t34_medium_tank"},
 		{"tag": "ITA", "pid": 710963, "design": "cv33_tankette"},
-		{"tag": "JAP", "pid": 903951, "design": "jap_armor_1936"},
+		{"tag": "JAP", "pid": 903981, "design": "jap_armor_1936"},
 		{"tag": "POL", "pid": 711112, "design": "pol_armor_1936"},
 	]
 	var out: Dictionary = {}

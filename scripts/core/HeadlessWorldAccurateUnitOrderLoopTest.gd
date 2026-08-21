@@ -9,8 +9,10 @@ extends SceneTree
 const GER_FRONT := 710173
 const FRA_FRONT := 710739
 const GER_REAR := 710176  # Rastatt — GER land neighbor of Baden-Baden
-const JAP_FRONT := 903951  # CHI–JAP live edge (CHI 902505)
-const CHI_FRONT := 902505
+const JAP_FRONT := 903981  # CHI–JAP live edge (CHI 902598); rear 903966
+const CHI_FRONT := 902598
+const JAP_REAR := 903966
+const CHI_FID := "uol_chi_jap"
 const ATT_TAG := "GER"
 const DEF_TAG := "FRA"
 const JAP_TAG := "JAP"
@@ -82,6 +84,7 @@ func _run() -> void:
 	_test_designer_field()
 	_test_era_resources()
 	_test_march_and_assault()
+	_test_chi_jap_theater()
 	_cleanup()
 
 
@@ -103,6 +106,7 @@ func _setup_maginot_map() -> bool:
 		{"id": GER_REAR, "tag": ATT_TAG, "name": "Rastatt GER rear"},
 		{"id": JAP_FRONT, "tag": JAP_TAG, "name": "JAP CHI-JAP edge"},
 		{"id": CHI_FRONT, "tag": CHI_TAG, "name": "CHI vs JAP edge"},
+		{"id": JAP_REAR, "tag": JAP_TAG, "name": "JAP CHI-JAP rear"},
 	]
 	var provs: Dictionary = {}
 	var countries: Dictionary = {
@@ -152,7 +156,7 @@ func _setup_maginot_map() -> bool:
 	else:
 		_fail("initialize_from_map_data missing")
 		return false
-	_pass("map fixture GER %d / rear %d / FRA %d / JAP %d / CHI %d" % [GER_FRONT, GER_REAR, FRA_FRONT, JAP_FRONT, CHI_FRONT])
+	_pass("map fixture GER %d / rear %d / FRA %d / JAP %d / CHI %d / JAP rear %d" % [GER_FRONT, GER_REAR, FRA_FRONT, JAP_FRONT, CHI_FRONT, JAP_REAR])
 	return true
 
 
@@ -181,6 +185,7 @@ func _setup_formations() -> bool:
 	_make_form(GER_FID, ATT_TAG, ATT_DESIGN, GER_FRONT)
 	_make_form(GER_FID_2, ATT_TAG, ATT_DESIGN, GER_REAR)
 	_make_form(FRA_FID, DEF_TAG, DEF_DESIGN, FRA_FRONT)
+	_make_form(CHI_FID, CHI_TAG, DEF_DESIGN, CHI_FRONT)
 	if _failures > 0:
 		return false
 	_pass("seeded GER/FRA land formations")
@@ -203,7 +208,7 @@ func _setup_map_renderer_pins() -> bool:
 		_mr.container = container
 	root.add_child(_mr)
 
-	var pids: Array = [GER_FRONT, FRA_FRONT, GER_REAR, JAP_FRONT, CHI_FRONT]
+	var pids: Array = [GER_FRONT, FRA_FRONT, GER_REAR, JAP_FRONT, CHI_FRONT, JAP_REAR]
 	for pid_v in pids:
 		var pid := int(pid_v)
 		var gp = _mm.call("get_province", pid) if _mm.has_method("get_province") else null
@@ -1286,11 +1291,50 @@ func _test_march_and_assault() -> void:
 		_pass("start_land_battle opened=%s" % str(opened.get("opened", false)))
 
 
+func _test_chi_jap_theater() -> void:
+	var jap_f: Object = null
+	if _lm != null and _lm.has_method("get_formations_for_country"):
+		for jf in _lm.call("get_formations_for_country", JAP_TAG):
+			if jf == null or not ("stationed_province_id" in jf):
+				continue
+			if int(jf.stationed_province_id) == JAP_FRONT:
+				jap_f = jf
+				break
+	if jap_f == null:
+		_fail("CHI-JAP skipped — no JAP land on %d" % JAP_FRONT)
+		return
+	var fid := str(jap_f.formation_id)
+	var mv_scr: Script = load("res://scripts/formations/FormationMovement.gd") as Script
+	if mv_scr == null:
+		_fail("FormationMovement.gd missing")
+		return
+	var marched: Dictionary = mv_scr.call("enqueue_own_land_march", fid, JAP_REAR, JAP_TAG)
+	print("  [INFO] CHI-JAP march dest=%d %s" % [JAP_REAR, str(marched)])
+	if not bool(marched.get("ok", false)):
+		_fail("CHI-JAP enqueue_own_land_march not ok: %s" % str(marched.get("reason", marched)))
+		return
+	_pass("CHI-JAP march hops=%s dest=%d" % [str(marched.get("hops", "?")), JAP_REAR])
+	jap_f.stationed_province_id = JAP_FRONT
+	if not _bm.has_method("start_land_battle"):
+		_fail("start_land_battle missing")
+		return
+	var opened: Dictionary = _bm.call("start_land_battle", JAP_TAG, CHI_FRONT, JAP_FRONT, fid)
+	print("  [INFO] CHI-JAP start_land_battle %s" % str(opened))
+	if not bool(opened.get("success", false)):
+		_fail("CHI-JAP start_land_battle not ok: %s" % str(opened.get("reason", opened)))
+		return
+	if bool(opened.get("instant", false)) or not bool(opened.get("opened", false)):
+		_fail("CHI-JAP expected opened battle, got instant/empty: %s" % str(opened))
+		return
+	_pass("CHI-JAP start_land_battle opened")
+
+
 func _cleanup_forms() -> void:
 	if _lm != null and "formations" in _lm:
 		_lm.formations.erase(GER_FID)
 		_lm.formations.erase(GER_FID_2)
 		_lm.formations.erase(FRA_FID)
+		_lm.formations.erase(CHI_FID)
 
 
 func _cleanup() -> void:

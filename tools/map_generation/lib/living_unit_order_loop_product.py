@@ -19,8 +19,9 @@ TIME_MANAGER = ROOT / "scripts" / "autoload" / "TimeManager.gd"
 
 GER_FRONT = 710173
 FRA_FRONT = 710739
-JAP_FRONT = 903951
-CHI_FRONT = 902505
+JAP_FRONT = 903981
+CHI_FRONT = 902598
+JAP_REAR = 903966
 
 
 def _slice(src: str, func_name: str) -> str:
@@ -247,7 +248,9 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "710173" in harness
         and "710739" in harness
         and str(JAP_FRONT) in harness
+        and str(CHI_FRONT) in harness
         and "JAP DemoUnitIcon pickable" in harness
+        and "CHI-JAP start_land_battle opened" in harness
         and "enqueue_own_land_march" in harness
         and "start_land_battle" in harness
         and "ensure_playable_front_chips" in harness

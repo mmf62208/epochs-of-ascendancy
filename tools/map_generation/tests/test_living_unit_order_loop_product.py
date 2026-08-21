@@ -23,8 +23,8 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
     def test_front_ids(self) -> None:
         self.assertEqual(GER_FRONT, 710173)
         self.assertEqual(FRA_FRONT, 710739)
-        self.assertEqual(JAP_FRONT, 903951)
-        self.assertEqual(CHI_FRONT, 902505)
+        self.assertEqual(JAP_FRONT, 903981)
+        self.assertEqual(CHI_FRONT, 902598)
 
     def test_product_wiring(self) -> None:
         p = build_living_unit_order_loop_product(check_wiring=True)
