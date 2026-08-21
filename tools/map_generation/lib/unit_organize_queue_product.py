@@ -370,6 +370,8 @@ def build_unit_organize_queue_product(*, check_wiring: bool = True) -> Dict[str,
         _ok("popup_deploy", "_deploy_option" in pop)
         _ok("popup_existing_apply", "_apply_stored_template" in pop)
         _ok("enqueue_stamps_comp", "_stamp_formation_composition" in lm)
+        pm_src = (ROOT / "scripts" / "autoload" / "ProductionManager.gd").read_text(encoding="utf-8") if (ROOT / "scripts" / "autoload" / "ProductionManager.gd").is_file() else ""
+        _ok("toe_reinforce_share", "reinforce_unit_toe_from_stockpile" in pm_src and "organize_equip_share" in pm_src)
         _ok("tm_tick", "tick_organize_day" in tm)
         _ok("on_official_quick", "test_unit_organize_queue_product" in gates)
         _ok("harness_organize", "enqueue_organize" in harness and "tick_organize_day" in harness)

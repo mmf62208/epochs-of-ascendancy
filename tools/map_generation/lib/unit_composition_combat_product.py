@@ -851,6 +851,8 @@ def build_unit_composition_combat_product(*, check_wiring: bool = True) -> Dict[
         dm = (ROOT / "scripts" / "production" / "DesignManager.gd").read_text(encoding="utf-8") if (ROOT / "scripts" / "production" / "DesignManager.gd").is_file() else ""
         _ok("design_persist", "func composition_from_design" in dm and "composition_blob_from_data" in dm)
         _ok("field_from_design", "composition_from_design" in lm and "_stamp_formation_composition" in lm)
+        _ok("toe_industry", "func produce_toe_equipment" in (ROOT / "scripts" / "autoload" / "ProductionManager.gd").read_text(encoding="utf-8") if (ROOT / "scripts" / "autoload" / "ProductionManager.gd").is_file() else "")
+        _ok("harness_industry", "produce_toe_equipment" in harness and "reinforce_unit_toe_from_stockpile" in harness)
 
     ok = len(fails) == 0
     return {

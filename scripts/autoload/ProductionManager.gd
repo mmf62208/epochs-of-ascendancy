@@ -958,6 +958,9 @@ func get_formation_required_equipment(formation_id: String) -> Dictionary:
 	var f: Formation = LeaderManager.get_formation(formation_id) if LeaderManager.has_method("get_formation") else null
 	if f == null:
 		return {}
+	var toe: Dictionary = get_formation_toe(formation_id)
+	if not toe.is_empty():
+		return toe
 	var did := str(f.design_id).strip_edges() if "design_id" in f else ""
 	if did.is_empty():
 		return {}
@@ -1134,12 +1137,18 @@ func reinforce_all_units(required_map: Dictionary) -> Dictionary:
 func daily_reinforcement_tick(required_map: Dictionary) -> Dictionary:
 	var flows: Dictionary = advance_equipment_flows(1.0)
 	# RF2 path: ship deficits via EquipmentFlow (in transit — not force-deliver).
-	# Instant stockpile top-up is intentionally skipped so reinforce takes time.
 	var via_flow: Dictionary = demand_reinforce_tick_via_flow(required_map, {"force_deliver": false})
+	var toe_from_stockpile: Dictionary = {}
+	for unit_id in required_map:
+		var uid := str(unit_id)
+		if uid.is_empty() or uid.begins_with("_"):
+			continue
+		toe_from_stockpile[uid] = reinforce_unit_toe_from_stockpile(uid)
 	var reinf := {
 		"units": {},
 		"equipment_flows": flows,
 		"via_flow": via_flow,
+		"toe_from_stockpile": toe_from_stockpile,
 		"instant_topup": false,
 		"model": "reinforce_experience_logistics_ledger",
 	}
@@ -2064,6 +2073,7 @@ func credit_production_complete_to_stockpile(
 		units = int(calc.stock_units_on_complete(dclass, completes, batch))
 	elif batch >= 1:
 		units = completes * batch
+	eid = resolve_toe_equipment_id(eid)
 	var before := get_country_equipment_amount(tag, eid)
 	add_to_country_equipment_stockpile(tag, eid, units)
 	var after := get_country_equipment_amount(tag, eid)
@@ -2203,6 +2213,163 @@ func get_country_equipment_amount(country_tag: String, equipment_id: String) -> 
 	if not country_equipment_stockpiles.has(tag):
 		return 0
 	return int((country_equipment_stockpiles[tag] as Dictionary).get(eid, 0))
+
+
+const TOE_RESOURCE_COST := {
+	"infantry_equipment": {"steel": 1.0, "coal": 1.0},
+	"trucks": {"steel": 2.0, "rubber": 1.0, "oil": 1.0},
+	"tanks": {"steel": 4.0, "oil": 1.0, "chromium": 1.0},
+	"artillery": {"steel": 3.0, "tungsten": 1.0},
+	"motorcycles": {"steel": 1.0, "rubber": 1.0},
+	"halftracks": {"steel": 3.0, "rubber": 1.0, "oil": 1.0},
+	"recon_equipment": {"steel": 1.0},
+	"support_equipment": {"steel": 1.0},
+	"anti_tank": {"steel": 2.0, "tungsten": 1.0},
+	"anti_air": {"steel": 2.0, "aluminum": 1.0},
+}
+
+
+func resolve_toe_equipment_id(raw: String) -> String:
+	var key := raw.strip_edges().to_lower()
+	if TOE_RESOURCE_COST.has(key):
+		return key
+	match key:
+		"truck", "motorized":
+			return "trucks"
+		"tank", "armor":
+			return "tanks"
+		"gun", "guns":
+			return "artillery"
+		"rifle", "rifles", "infantry":
+			return "infantry_equipment"
+		"motorcycle":
+			return "motorcycles"
+		"halftrack", "half-track":
+			return "halftracks"
+		"recon":
+			return "recon_equipment"
+		"engineer":
+			return "support_equipment"
+		"at":
+			return "anti_tank"
+		"aa":
+			return "anti_air"
+		_:
+			return raw.strip_edges()
+
+
+func toe_resource_cost(equipment_id: String, count: int = 1) -> Dictionary:
+	var key := resolve_toe_equipment_id(equipment_id)
+	var n := maxi(0, count)
+	var base: Dictionary = TOE_RESOURCE_COST.get(key, {"steel": 1.0}) as Dictionary
+	var out: Dictionary = {}
+	for r in base.keys():
+		out[str(r)] = float(base[r]) * float(n)
+	return out
+
+
+func get_formation_toe(formation_id: String) -> Dictionary:
+	if formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return {}
+	var f: Formation = LeaderManager.get_formation(formation_id) if LeaderManager.has_method("get_formation") else null
+	if f == null:
+		return {}
+	return LandCombatPower.equipment_toe(LandCombatPower.composition_from_formation(f))
+
+
+func unit_toe_fill_ratio(formation_id: String) -> float:
+	var toe: Dictionary = get_formation_toe(formation_id)
+	if toe.is_empty():
+		return 1.0
+	var have_stock: Dictionary = get_unit_equipment_stock(formation_id)
+	var need := 0
+	var have := 0
+	for k in toe.keys():
+		var n := int(toe[k])
+		if n <= 0:
+			continue
+		need += n
+		have += mini(n, maxi(0, int(have_stock.get(k, 0))))
+	if need <= 0:
+		return 1.0
+	return float(have) / float(need)
+
+
+func produce_toe_equipment(country_tag: String, equipment_id: String, count: int = 1) -> Dictionary:
+	var tag := country_tag.strip_edges().to_upper()
+	var key := resolve_toe_equipment_id(equipment_id)
+	var n := maxi(0, count)
+	var before := get_country_equipment_amount(tag, key)
+	if tag.is_empty() or key.is_empty() or n <= 0:
+		return {"ok": false, "error": "bad_args", "added": 0, "stock_after": before, "equipment_id": key}
+	var cost: Dictionary = toe_resource_cost(key, n)
+	if not can_afford(cost):
+		return {
+			"ok": false,
+			"error": "no_resources",
+			"added": 0,
+			"stock_after": before,
+			"equipment_id": key,
+			"cost": cost,
+		}
+	if not pay_cost(cost):
+		return {"ok": false, "error": "pay_failed", "added": 0, "stock_after": before, "equipment_id": key}
+	var credit: Dictionary = credit_production_complete_to_stockpile(tag, key, n, {"batch_size": 1, "design_class": key})
+	return {
+		"ok": bool(credit.get("ok", false)),
+		"equipment_id": key,
+		"added": int(credit.get("stock_units", 0)),
+		"stock_before": before,
+		"stock_after": int(credit.get("after", before)),
+		"resources_paid": cost,
+		"credit": credit,
+	}
+
+
+func reinforce_unit_toe_from_stockpile(formation_id: String, share: float = -1.0) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var toe: Dictionary = get_formation_toe(fid)
+	var fill_before := unit_toe_fill_ratio(fid)
+	if fid.is_empty() or toe.is_empty():
+		return {"ok": false, "moved": {}, "fill_before": fill_before, "fill_after": fill_before, "error": "no_toe"}
+	var sh := share
+	if sh < 0.0:
+		sh = 1.0
+		if typeof(LeaderManager) != TYPE_NIL:
+			var f: Formation = LeaderManager.get_formation(fid) if LeaderManager.has_method("get_formation") else null
+			var training := f != null and "is_training" in f and bool(f.is_training)
+			if LeaderManager.has_method("organize_equip_share"):
+				sh = float(LeaderManager.organize_equip_share(training))
+	sh = clampf(sh, 0.0, 1.0)
+	var required: Dictionary = {}
+	var have_stock: Dictionary = get_unit_equipment_stock(fid)
+	for k in toe.keys():
+		var need := int(toe[k])
+		if need <= 0:
+			continue
+		var have := int(have_stock.get(k, 0))
+		var gap := need - have
+		if gap <= 0:
+			continue
+		var want := maxi(1, int(ceil(float(gap) * 0.25 * sh)))
+		want = mini(want, gap)
+		required[str(k)] = have + want
+	var fulfilled: Dictionary = {}
+	if not required.is_empty():
+		fulfilled = auto_reinforce_unit_from_stockpile(fid, required)
+	var fill_after := unit_toe_fill_ratio(fid)
+	if fill_after > fill_before + 0.001 and typeof(LeaderManager) != TYPE_NIL:
+		var form: Formation = LeaderManager.get_formation(fid) if LeaderManager.has_method("get_formation") else null
+		if form != null and "strength" in form and float(form.strength) < 0.99:
+			var gain := clampf((fill_after - fill_before) * 0.4, 0.0, 0.08)
+			form.strength = clampf(float(form.strength) + gain, 0.0, 1.0)
+	return {
+		"ok": true,
+		"moved": fulfilled,
+		"fill_before": fill_before,
+		"fill_after": fill_after,
+		"share": sh,
+	}
 
 
 ## Shipped recovery path: land formations pull missing design equipment from country stockpile,

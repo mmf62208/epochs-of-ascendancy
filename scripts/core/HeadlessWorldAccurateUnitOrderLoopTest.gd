@@ -568,6 +568,72 @@ func _test_designer_field() -> void:
 			_fail("formation save missing fuel_level")
 			return
 		_pass("formation save mobility=truck inf=3 fuel_level")
+	var pm: Node = _autoload("ProductionManager")
+	if pm == null or not pm.has_method("produce_toe_equipment") or not pm.has_method("reinforce_unit_toe_from_stockpile"):
+		_fail("produce_toe_equipment / reinforce_unit_toe_from_stockpile missing")
+		return
+	var toe: Dictionary = pm.call("get_formation_toe", _designed_fid)
+	if not toe.has("trucks") or not toe.has("tanks") or not toe.has("artillery"):
+		_fail("designed TOE missing factory keys: %s" % str(toe))
+		return
+	_pass("designed TOE keys %s" % str(toe.keys()))
+	if pm.has_method("clear_unit_equipment_stock"):
+		pm.call("clear_unit_equipment_stock", _designed_fid)
+	var short: Dictionary = {}
+	for k in toe.keys():
+		short[str(k)] = maxi(0, int(float(int(toe[k])) / 5.0))
+	pm.call("set_unit_equipment_stock", _designed_fid, short)
+	if pm.has_method("set_country_equipment_stockpile"):
+		pm.call("set_country_equipment_stockpile", ATT_TAG, {})
+	var fill0 := float(pm.call("unit_toe_fill_ratio", _designed_fid))
+	var empty_r: Dictionary = pm.call("reinforce_unit_toe_from_stockpile", _designed_fid, 1.0)
+	var fill_empty := float(pm.call("unit_toe_fill_ratio", _designed_fid))
+	if fill_empty > fill0 + 0.001:
+		_fail("empty stock invented fill %.3f → %.3f %s" % [fill0, fill_empty, str(empty_r)])
+		return
+	_pass("empty stockpile no fill (%.2f)" % fill0)
+	if pm.has_method("add_stockpile"):
+		pm.call("add_stockpile", {
+			"steel": 400.0, "coal": 80.0, "rubber": 60.0, "oil": 60.0, "chromium": 40.0, "tungsten": 40.0,
+		})
+	for k in toe.keys():
+		var made: Dictionary = pm.call("produce_toe_equipment", ATT_TAG, str(k), 12)
+		if not bool(made.get("ok", false)):
+			_fail("produce_toe_equipment %s failed: %s" % [str(k), str(made)])
+			return
+	var ger_trucks := int(pm.call("get_country_equipment_amount", ATT_TAG, "trucks"))
+	if ger_trucks < 12:
+		_fail("stockpile trucks after produce want >=12 got %d" % ger_trucks)
+		return
+	_pass("stockpile credited trucks=%d tanks=%d" % [
+		ger_trucks, int(pm.call("get_country_equipment_amount", ATT_TAG, "tanks")),
+	])
+	var filled: Dictionary = pm.call("reinforce_unit_toe_from_stockpile", _designed_fid, 1.0)
+	var fill1 := float(pm.call("unit_toe_fill_ratio", _designed_fid))
+	if fill1 <= fill0 + 0.001:
+		_fail("reinforce did not raise fill %.3f → %.3f %s" % [fill0, fill1, str(filled)])
+		return
+	_pass("reinforce-from-stockpile fill %.2f → %.2f" % [fill0, fill1])
+	if pm.has_method("get_save_data"):
+		var psave: Dictionary = pm.call("get_save_data")
+		if not psave.has("country_equipment_stockpiles") or not psave.has("unit_equipment_stock"):
+			_fail("production save missing stockpile keys")
+			return
+		_pass("production save stockpile round-trip keys")
+	var attr_scr2: Script = load("res://scripts/combat/LandBattleAttrition.gd") as Script
+	if attr_scr2 != null and attr_scr2.has_method("apply_daily_to_formation"):
+		var loss_i: Dictionary = attr_scr2.call("apply_daily_to_formation", _designed_fid, 0.10)
+		if int(loss_i.get("manpower_lost", 0)) <= 0:
+			_fail("combat day after stockpile reinforce wrote no men: %s" % str(loss_i))
+			return
+		var plain_i := str(loss_i.get("plain", ""))
+		if "rifles" not in plain_i and "trucks" not in plain_i and "tanks" not in plain_i and "artillery" not in plain_i:
+			_fail("combat day should write stockpile equipment not demo-only: %s" % plain_i)
+			return
+		_pass("combat wrote stockpile equip %s" % plain_i)
+		designed.set("strength", 1.0)
+		if "fuel_level" in designed:
+			designed.set("fuel_level", 1.0)
 	if _mr.has_method("ensure_playable_front_chips"):
 		_mr.call("ensure_playable_front_chips", false)
 	var ger_f: Object = _ger_on_front()

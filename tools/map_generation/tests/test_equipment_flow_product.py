@@ -8,13 +8,18 @@ from equipment_flow_product import (
     amount_after_interdict,
     build_equipment_flow_primary_command_product,
     build_equipment_stock_reinforce_primary_command_product,
+    build_toe_industry_loop_product,
     demand_deficit,
     effective_interdict_loss,
     esr_primary_command_dead_audit,
+    factory_output_keys,
     primary_command_dead_audit,
+    produce_to_stockpile,
+    reinforce_from_stockpile,
     stock_units_on_complete,
     symbol_for_mode,
 )
+from unit_composition_combat_product import compose
 
 class TestEquipmentFlow(unittest.TestCase):
     def test_interdict_math(self):
@@ -61,6 +66,39 @@ class TestEquipmentFlow(unittest.TestCase):
         pm = (ROOT / "scripts/autoload/ProductionManager.gd").read_text(encoding="utf-8")
         self.assertIn("func credit_production_complete_to_stockpile", pm)
         self.assertIn("func demand_reinforce_tick_via_flow", pm)
+
+    def test_toe_industry_loop(self):
+        designed = compose(
+            mobility="truck",
+            armor="medium_tank",
+            support="artillery",
+            infantry_bns=3,
+            tank_bns=1,
+        )
+        toe = designed.get("equipment") or {}
+        keys = factory_output_keys(toe)
+        for need in ("infantry_equipment", "trucks", "tanks", "artillery"):
+            self.assertIn(need, keys)
+        res = {"steel": 200.0, "coal": 50.0, "rubber": 40.0, "oil": 40.0, "chromium": 20.0, "tungsten": 20.0}
+        stock = {}
+        prod = produce_to_stockpile(res, stock, "trucks", 8)
+        self.assertTrue(prod["ok"], prod)
+        self.assertEqual(int(prod["stock_after"]), 8)
+        empty = reinforce_from_stockpile({}, {}, toe, 1.0)
+        self.assertEqual(empty.get("moved") or {}, {})
+        self.assertLessEqual(float(empty["fill_after"]), float(empty["fill_before"]) + 1e-9)
+        short = {k: max(0, int(v) // 5) for k, v in toe.items()}
+        filled = reinforce_from_stockpile(short, prod["stock"], toe, 1.0)
+        self.assertTrue(filled.get("moved"), filled)
+        self.assertGreater(float(filled["fill_after"]), float(filled["fill_before"]))
+        no_res = produce_to_stockpile({}, {}, "tanks", 4)
+        self.assertFalse(no_res["ok"])
+        self.assertEqual(int(no_res["added"]), 0)
+        p = build_toe_industry_loop_product()
+        self.assertTrue(p.get("ok"), p)
+        self.assertEqual(list(p.get("fail") or []), [], p)
+        esr = build_equipment_stock_reinforce_primary_command_product()
+        self.assertTrue(esr.get("toe_ok"), esr)
 
 if __name__ == "__main__":
     unittest.main()
