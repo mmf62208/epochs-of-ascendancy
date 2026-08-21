@@ -35,6 +35,32 @@ static func format_line(
 	return "Battle ended at %s" % name
 
 
+## One captured pid only. Era-visible oil/steel/coal via harvest scale; occupied ×0.65.
+static func economy_sentence(
+	resources: Dictionary,
+	year: int = 1936,
+	owner: String = "",
+	controller: String = "",
+) -> String:
+	if resources.is_empty():
+		return ""
+	var scaled: Dictionary = ResourceHarvestCalculator.scale_deposits_for_year(resources, year)
+	var best := ""
+	var best_amt := 0.0
+	for k in ["oil", "steel", "coal"]:
+		var amt := float(scaled.get(k, 0.0))
+		if amt > best_amt:
+			best = k
+			best_amt = amt
+	if best.is_empty():
+		return ""
+	var verb := "pumping" if best == "oil" else "mining"
+	var occ := float(ResourceHarvestCalculator.occupation_harvest_mult(owner, controller))
+	if occ < 0.999:
+		return "Now %s %s (occupied ×%.2f)." % [verb, best, occ]
+	return "Now %s %s." % [verb, best]
+
+
 static func pick_next_enemy_hex(from_id: int, attacker_tag: String) -> int:
 	if from_id <= 0 or typeof(MapManager) == TYPE_NIL:
 		return -1

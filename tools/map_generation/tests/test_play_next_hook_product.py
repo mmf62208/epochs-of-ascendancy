@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from play_next_hook_product import (  # noqa: E402
     build_play_next_hook_product,
+    capture_economy_sentence,
     rank_next_beat,
     recommend_from_hook,
 )
@@ -41,6 +42,26 @@ class TestPlayNextHookProduct(unittest.TestCase):
             }
         )
         self.assertEqual(war.get("action"), "press")
+
+    def test_capture_economy_sentence(self) -> None:
+        occupied = capture_economy_sentence({"oil": 3.0}, 1936, "FRA", "GER")
+        self.assertIn("oil", occupied.lower())
+        self.assertIn("pumping", occupied)
+        self.assertIn("0.65", occupied)
+        own = capture_economy_sentence({"steel": 2.0}, 1936, "GER", "GER")
+        self.assertIn("steel", own.lower())
+        self.assertNotIn("0.65", own)
+        self.assertEqual(capture_economy_sentence({}, 1936, "FRA", "GER"), "")
+        hidden = capture_economy_sentence({"uranium": 2.0}, 1936, "FRA", "GER")
+        self.assertEqual(hidden, "")
+        eco = rank_next_beat(
+            {
+                "aar_economy": "Now pumping oil (occupied ×0.65).",
+                "training": [{"fid": "u1", "days_left": 1}],
+            }
+        )
+        self.assertEqual(eco.get("source"), "aar")
+        self.assertIn("oil", str(eco.get("label", "")).lower())
 
 
 if __name__ == "__main__":

@@ -21,6 +21,17 @@ static func recommend(player_tag: String = "GER") -> Dictionary:
 				"to_id": int(aar.get("next_pid", -1)),
 				"source": "aar",
 			}
+		var eco := str(aar.get("economy", "")).strip_edges()
+		if not eco.is_empty():
+			return {
+				"ok": true,
+				"action": "unpause",
+				"label": eco.trim_suffix("."),
+				"hint": str(aar.get("line", eco)),
+				"fid": str(aar.get("fid", "")),
+				"to_id": int(aar.get("from_id", -1)),
+				"source": "aar",
+			}
 	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_open_land_battles"):
 		var battles: Array = BattleManager.get_open_land_battles()
 		for raw in battles:

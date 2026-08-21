@@ -1,6 +1,6 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-21 (L1 land loop + living units + organize + composition + industry TOE + era resources + occupier harvest + **NEXT daily command beat** · `--quick` green · board ~3520 · M6 human-only open)  
+**Date:** 2026-08-21 (L1 land loop + living units + organize + composition + industry TOE + era resources + occupier harvest + **NEXT daily command beat** + **capture AAR economy** · `--quick` green · board ~3520 · M6 human-only open)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
 **How to keep going:** 5-step protocol in §0. Next human: F5 §0b 3–15 + a 20d unpause (M6 notes). Next machine: only playtest-driven shipped-path fixes. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
@@ -53,6 +53,7 @@ Every Cursor / Grok / human session on this tree:
 - **L1 stance / tomorrow hook (machine):** card **Press** / **Hold** / Withdraw. River/fort extra Press cost. Toast when they **break tomorrow** or a **reinforce arrives tomorrow**.
 - **L1 Next chip (machine):** `PlayNextHook` ranks war-loop first (Hold if unit arrives tomorrow, Press if they break tomorrow), then **training ready tomorrow**, **dry tanks / empty fuel**, **steel shortage** — idle unpause last. Map **NEXT** chip + play-strip “Next: …” apply stance, refuel, or unpause. Headless: NEXT is `send_trained` with 1d left on organize, not idle.
 - **L1 after-action (machine):** fight end writes one line (`Took X · N days · loss — Press Y next?`). NEXT chip starts the follow-on assault. Board **~3520**.
+- **L1 capture AAR economy (machine):** attacker-win AAR appends era-visible oil/steel/coal (`Now pumping oil (occupied ×0.65).`) via harvest holder + `scale_deposits_for_year` on the captured pid only. NEXT hint carries the line. Headless occupy FRA `710739` oil asserts AAR/NEXT names oil.
 - **L1 AI battle start (machine):** budgeted **1** `start_land_battle` / day on a live border (personality + vs-player bonus). Never `execute_province_assault`. Killswitch `EOA_AI_LAND_BATTLES=0`. Full `simulate_daily_ai_combat` stays off in F5.
 - **L1 land_war save (machine):** `SaveLoadManager` blob `land_war` round-trips open battles (org/stance/days) + march queues + last AAR. Legacy saves without the key stay empty-ok.
 - **L1 long-session save (machine):** `validate_long_session_save` requires metadata/time/map/leaders/infra/land_war/production. Gather always emits `land_war` shape; `save_game_detailed` refuses a missing key. `is_in_combat` already on leaders.

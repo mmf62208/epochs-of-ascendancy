@@ -2,12 +2,46 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Mapping, Optional
+
+from era_resource_deposits_product import occupation_harvest_mult, scale_deposits_for_year
 
 ROOT = Path(__file__).resolve().parents[3]
 HOOK_GD = ROOT / "scripts" / "ui" / "PlayNextHook.gd"
 PANEL_GD = ROOT / "scripts" / "ui" / "OrderCommandPanel.gd"
 REN_GD = ROOT / "scripts" / "map" / "MapRenderer.gd"
+AAR_GD = ROOT / "scripts" / "combat" / "LandBattleAar.gd"
+BM_GD = ROOT / "scripts" / "combat" / "BattleManager.gd"
+
+AAR_CAPTURE_GOODS = ("oil", "steel", "coal")
+AAR_GOOD_VERBS = {"oil": "pumping", "steel": "mining", "coal": "mining"}
+
+
+def capture_economy_sentence(
+    resources: Optional[Mapping[str, Any]] = None,
+    year: int = 1936,
+    owner: str = "",
+    controller: str = "",
+) -> str:
+    """Era-visible oil/steel/coal on the captured hex. Occupied uses harvest ×0.65."""
+    scaled = scale_deposits_for_year(resources or {}, int(year))
+    best = ""
+    best_amt = 0.0
+    for key in AAR_CAPTURE_GOODS:
+        try:
+            amt = float(scaled.get(key) or 0.0)
+        except (TypeError, ValueError):
+            amt = 0.0
+        if amt > best_amt:
+            best = key
+            best_amt = amt
+    if not best:
+        return ""
+    verb = AAR_GOOD_VERBS.get(best, "taking")
+    occ = float(occupation_harvest_mult(owner, controller))
+    if occ < 0.999:
+        return "Now %s %s (occupied ×%.2f)." % (verb, best, occ)
+    return "Now %s %s." % (verb, best)
 
 
 def recommend_from_hook(hint: str) -> str:
@@ -33,6 +67,17 @@ def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
             "label": "Press the next hex",
             "fid": str(f.get("aar_fid") or ""),
             "to_id": aar_pid,
+            "hint": str(f.get("aar_line") or ""),
+        }
+    eco = str(f.get("aar_economy") or "").strip()
+    if eco:
+        return {
+            "ok": True,
+            "action": "unpause",
+            "source": "aar",
+            "label": eco.rstrip("."),
+            "fid": str(f.get("aar_fid") or ""),
+            "hint": str(f.get("aar_line") or eco),
         }
     hook = str(f.get("battle_hook") or "")
     if hook or bool(f.get("has_open_battle")):
@@ -166,6 +211,40 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("gd_organize_fuel")
     else:
         fails.append("gd_organize_fuel")
+    occ_oil = capture_economy_sentence({"oil": 3.0}, 1936, "FRA", "GER")
+    if "oil" in occ_oil.lower() and "0.65" in occ_oil and "pumping" in occ_oil:
+        passes.append("occupy_oil_sentence")
+    else:
+        fails.append("occupy_oil_sentence")
+    own_steel = capture_economy_sentence({"steel": 2.0}, 1936, "GER", "GER")
+    if "steel" in own_steel.lower() and "0.65" not in own_steel:
+        passes.append("own_steel_no_occ")
+    else:
+        fails.append("own_steel_no_occ")
+    eco_beat = rank_next_beat(
+        {
+            "aar_economy": "Now pumping oil (occupied ×0.65).",
+            "training": [{"fid": "u1", "days_left": 1}],
+        }
+    )
+    if str(eco_beat.get("source")) == "aar" and "oil" in str(eco_beat.get("label", "")).lower():
+        passes.append("aar_economy_beats_train")
+    else:
+        fails.append("aar_economy_beats_train")
+    aar_gd = AAR_GD.read_text(encoding="utf-8") if AAR_GD.is_file() else ""
+    bm_gd = BM_GD.read_text(encoding="utf-8") if BM_GD.is_file() else ""
+    if "func economy_sentence" in aar_gd and "scale_deposits_for_year" in aar_gd:
+        passes.append("gd_aar_economy")
+    else:
+        fails.append("gd_aar_economy")
+    if "economy_sentence" in bm_gd and "economy" in bm_gd:
+        passes.append("bm_appends_economy")
+    else:
+        fails.append("bm_appends_economy")
+    if 'aar.get("economy"' in hook:
+        passes.append("hook_reads_economy")
+    else:
+        fails.append("hook_reads_economy")
     harness = (
         (ROOT / "scripts" / "core" / "HeadlessWorldAccurateUnitOrderLoopTest.gd").read_text(
             encoding="utf-8"
@@ -177,6 +256,10 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("harness_train_next")
     else:
         fails.append("harness_train_next")
+    if "economy_sentence" in harness and ("pump" in harness or "oil" in harness):
+        passes.append("harness_capture_economy")
+    else:
+        fails.append("harness_capture_economy")
     ok = len(fails) == 0
     return {
         "ok": ok,

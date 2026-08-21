@@ -1013,6 +1013,46 @@ func _test_era_resources() -> void:
 		_fail("occupier GER did not harvest FRA oil")
 		return
 	_pass("occupier harvest oil=%.2f (FRA-owned, GER-held)" % oil_pre)
+	var aar_scr: Script = load("res://scripts/combat/LandBattleAar.gd") as Script
+	if aar_scr == null or not aar_scr.has_method("economy_sentence"):
+		_fail("LandBattleAar.economy_sentence missing")
+		return
+	var year := 1936
+	var tm_eco: Node = _autoload("TimeManager")
+	if tm_eco != null and tm_eco.has_method("get_current_year"):
+		year = int(tm_eco.call("get_current_year"))
+	var eco := str(aar_scr.call("economy_sentence", fra_p.get("resources"), year, DEF_TAG, ATT_TAG))
+	if "oil" not in eco.to_lower() and "pump" not in eco.to_lower():
+		_fail("occupy AAR economy missing oil: %s" % eco)
+		return
+	if "0.65" not in eco:
+		_fail("occupy AAR should mention ×0.65: %s" % eco)
+		return
+	_pass("occupy economy sentence %s" % eco)
+	if _bm.has_method("_record_land_aar"):
+		_bm.call("_record_land_aar", {
+			"att_tag": ATT_TAG,
+			"def_tag": DEF_TAG,
+			"att_fid": GER_FID,
+			"from_id": GER_FRONT,
+			"days_elapsed": 1,
+		}, "attacker", FRA_FRONT)
+	var aar_line := ""
+	if _bm.has_method("peek_last_land_aar"):
+		var aar: Dictionary = _bm.call("peek_last_land_aar")
+		aar_line = str(aar.get("line", ""))
+	var nxt_txt := ""
+	var hook_eco: Script = load("res://scripts/ui/PlayNextHook.gd") as Script
+	if hook_eco != null and hook_eco.has_method("recommend"):
+		var nxt_eco: Dictionary = hook_eco.call("recommend", ATT_TAG) as Dictionary
+		nxt_txt = "%s %s" % [str(nxt_eco.get("hint", "")), str(nxt_eco.get("label", ""))]
+	var blob := ("%s %s" % [aar_line, nxt_txt]).to_lower()
+	if "oil" not in blob and "pump" not in blob:
+		_fail("AAR/NEXT missing oil after occupy: aar=%s next=%s" % [aar_line, nxt_txt])
+		return
+	_pass("AAR/NEXT oil after occupy")
+	if _bm.has_method("clear_last_land_aar"):
+		_bm.call("clear_last_land_aar")
 	var designed: Object = _lm.call("get_formation", _designed_fid) if not _designed_fid.is_empty() and _lm.has_method("get_formation") else null
 	if designed == null or not pm.has_method("refuel_formation_from_stockpile"):
 		_fail("refuel_formation_from_stockpile missing")

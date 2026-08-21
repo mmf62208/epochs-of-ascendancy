@@ -1390,10 +1390,18 @@ func apply_last_land_aar_next() -> Dictionary:
 
 func _record_land_aar(battle: Dictionary, winner: String, to_id: int) -> void:
 	var place := "the hex"
+	var res: Dictionary = {}
+	var owner := ""
+	var ctrl := ""
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
 		var p: Province = MapManager.get_province(to_id)
 		if p != null:
 			place = p.name
+			if p.resources is Dictionary:
+				res = p.resources
+			owner = str(p.owner_tag)
+			if "controller_tag" in p:
+				ctrl = str(p.controller_tag)
 	var loss := ""
 	var fid := str(battle.get("att_fid", ""))
 	var def_loss := ""
@@ -1423,12 +1431,23 @@ func _record_land_aar(battle: Dictionary, winner: String, to_id: int) -> void:
 	var line := "Battle ended at %s" % place
 	if typeof(LandBattleAar) != TYPE_NIL:
 		line = LandBattleAar.format_line(winner, place, int(battle.get("days_elapsed", 0)), loss, next_place)
+	var economy := ""
+	if winner == "attacker" and not res.is_empty() and typeof(LandBattleAar) != TYPE_NIL:
+		var year := 1936
+		if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year"):
+			year = int(TimeManager.get_current_year())
+		if not tag.strip_edges().is_empty():
+			ctrl = tag
+		economy = LandBattleAar.economy_sentence(res, year, owner, ctrl)
+		if not economy.is_empty():
+			line = "%s %s" % [line, economy]
 	_last_land_aar = {
 		"winner": winner,
 		"place": place,
 		"days": int(battle.get("days_elapsed", 0)),
 		"loss": loss,
 		"line": line,
+		"economy": economy,
 		"next_pid": next_pid,
 		"next_place": next_place,
 		"fid": fid,
