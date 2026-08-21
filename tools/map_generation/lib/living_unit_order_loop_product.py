@@ -19,6 +19,8 @@ TIME_MANAGER = ROOT / "scripts" / "autoload" / "TimeManager.gd"
 
 GER_FRONT = 710173
 FRA_FRONT = 710739
+JAP_FRONT = 903951
+CHI_FRONT = 902505
 
 
 def _slice(src: str, func_name: str) -> str:
@@ -58,6 +60,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
             "wiring": wiring,
             "ger_front": GER_FRONT,
             "fra_front": FRA_FRONT,
+            "jap_front": JAP_FRONT,
             "summary": "living_unit_order_loop · FAIL · missing MapRenderer",
         }
 
@@ -68,9 +71,25 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and str(FRA_FRONT) in park
         and "stationed_province_id" in park
         and "_update_unit_icons_for_test" in park
+        and "_station_world_major_oob_chips" in park
     )
     wiring["park_maginot"] = park_ok
     (passes if park_ok else fails).append("park_maginot")
+
+    oob = _slice(ren, "_station_world_major_oob_chips")
+    oob_ok = (
+        bool(oob)
+        and str(JAP_FRONT) in oob
+        and "JAP" in oob
+        and "ENG" in oob
+        and "USA" in oob
+        and "SOV" in oob
+        and "ITA" in oob
+        and "POL" in oob
+        and "_station_major_land_chip" in oob
+    )
+    wiring["world_oob_majors"] = oob_ok
+    (passes if oob_ok else fails).append("world_oob_majors")
 
     chrome = _slice(ren, "_attach_unit_counter_chrome")
     chrome_ok = (
@@ -227,6 +246,8 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         bool(harness)
         and "710173" in harness
         and "710739" in harness
+        and str(JAP_FRONT) in harness
+        and "JAP DemoUnitIcon pickable" in harness
         and "enqueue_own_land_march" in harness
         and "start_land_battle" in harness
         and "ensure_playable_front_chips" in harness
@@ -252,6 +273,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         "status": "PASS" if ok else "FAIL",
         "ger_front": GER_FRONT,
         "fra_front": FRA_FRONT,
+        "jap_front": JAP_FRONT,
         "wiring": wiring,
         "pass": passes,
         "fail": fails,

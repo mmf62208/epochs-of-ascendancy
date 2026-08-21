@@ -9,8 +9,12 @@ extends SceneTree
 const GER_FRONT := 710173
 const FRA_FRONT := 710739
 const GER_REAR := 710176  # Rastatt — GER land neighbor of Baden-Baden
+const JAP_FRONT := 903951  # CHI–JAP live edge (CHI 902505)
+const CHI_FRONT := 902505
 const ATT_TAG := "GER"
 const DEF_TAG := "FRA"
+const JAP_TAG := "JAP"
+const CHI_TAG := "CHI"
 const GER_FID := "uol_ger_maginot"
 const FRA_FID := "uol_fra_maginot"
 const GER_FID_2 := "uol_ger_stack"
@@ -97,11 +101,15 @@ func _setup_maginot_map() -> bool:
 		{"id": GER_FRONT, "tag": ATT_TAG, "name": "Baden-Baden GER"},
 		{"id": FRA_FRONT, "tag": DEF_TAG, "name": "Bas-Rhin FRA"},
 		{"id": GER_REAR, "tag": ATT_TAG, "name": "Rastatt GER rear"},
+		{"id": JAP_FRONT, "tag": JAP_TAG, "name": "JAP CHI-JAP edge"},
+		{"id": CHI_FRONT, "tag": CHI_TAG, "name": "CHI vs JAP edge"},
 	]
 	var provs: Dictionary = {}
 	var countries: Dictionary = {
 		ATT_TAG: {"tag": ATT_TAG, "name": "Germany"},
 		DEF_TAG: {"tag": DEF_TAG, "name": "France"},
+		JAP_TAG: {"tag": JAP_TAG, "name": "Japan"},
+		CHI_TAG: {"tag": CHI_TAG, "name": "China"},
 	}
 	for row in rows:
 		var pid := int(row["id"])
@@ -144,7 +152,7 @@ func _setup_maginot_map() -> bool:
 	else:
 		_fail("initialize_from_map_data missing")
 		return false
-	_pass("map fixture GER %d / rear %d / FRA %d" % [GER_FRONT, GER_REAR, FRA_FRONT])
+	_pass("map fixture GER %d / rear %d / FRA %d / JAP %d / CHI %d" % [GER_FRONT, GER_REAR, FRA_FRONT, JAP_FRONT, CHI_FRONT])
 	return true
 
 
@@ -195,7 +203,7 @@ func _setup_map_renderer_pins() -> bool:
 		_mr.container = container
 	root.add_child(_mr)
 
-	var pids: Array = [GER_FRONT, FRA_FRONT, GER_REAR]
+	var pids: Array = [GER_FRONT, FRA_FRONT, GER_REAR, JAP_FRONT, CHI_FRONT]
 	for pid_v in pids:
 		var pid := int(pid_v)
 		var gp = _mm.call("get_province", pid) if _mm.has_method("get_province") else null
@@ -219,6 +227,14 @@ func _setup_map_renderer_pins() -> bool:
 		_fail("ensure_playable_front_chips not ok")
 		return false
 	_pass("ensure_playable_front_chips ok")
+	if parked is Dictionary:
+		if not bool(parked.get("jap_ok", false)):
+			_fail("world OOB JAP chip not stationed at %d" % JAP_FRONT)
+			return false
+		if int(parked.get("jap", 0)) != JAP_FRONT:
+			_fail("world OOB JAP pid want %d got %s" % [JAP_FRONT, str(parked.get("jap"))])
+			return false
+		_pass("world OOB JAP stationed pid=%d" % JAP_FRONT)
 	return true
 
 
@@ -275,6 +291,25 @@ func _test_front_chips() -> void:
 		_fail("no DemoUnitIcon node on %d" % GER_FRONT)
 		return
 	_pass("DemoUnitIcon on %d" % GER_FRONT)
+	var jap_on := false
+	if _lm != null and _lm.has_method("get_formations_for_country"):
+		for jf in _lm.call("get_formations_for_country", JAP_TAG):
+			if jf == null or not ("stationed_province_id" in jf):
+				continue
+			if int(jf.stationed_province_id) == JAP_FRONT:
+				jap_on = true
+				break
+	if not jap_on:
+		_fail("no JAP land stationed at %d" % JAP_FRONT)
+	else:
+		_pass("JAP land on %d" % JAP_FRONT)
+	var jap_chip: Node = _chip_on(JAP_FRONT)
+	if jap_chip == null:
+		_fail("no DemoUnitIcon on JAP %d" % JAP_FRONT)
+	elif not jap_chip.has_meta("formation_id") or str(jap_chip.get_meta("formation_id", "")).is_empty():
+		_fail("JAP chip missing formation_id")
+	else:
+		_pass("JAP DemoUnitIcon pickable on %d" % JAP_FRONT)
 	if not chip.has_meta("formation_id") or str(chip.get_meta("formation_id", "")).is_empty():
 		_fail("chip meta missing formation_id")
 		return

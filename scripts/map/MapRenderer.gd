@@ -22022,6 +22022,12 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	if fra_land.size() >= 2 and "stationed_province_id" in fra_land[1]:
 		fra_land[1].stationed_province_id = FRA_FRONT
 		result["fra"] = int(result["fra"]) + 1
+	# World OOB: one selectable land chip per remaining major (capitals + JAP on CHI–JAP).
+	# GER/FRA stay on Maginot above — do not steal those stacks.
+	var majors: Dictionary = _station_world_major_oob_chips()
+	result["majors"] = majors
+	result["jap"] = int((majors.get("JAP", {}) as Dictionary).get("pid", 0))
+	result["jap_ok"] = bool((majors.get("JAP", {}) as Dictionary).get("ok", false))
 	show_unit_counters = true
 	_update_unit_icons_for_test()
 	_sync_unit_counter_visibility()
@@ -22032,9 +22038,78 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 		_center_camera_on_province(GER_FRONT, "soft")
 		_toast_easy_unit_orders()
 	print(
-		"MapRenderer: playable front chips GER=%d FRA=%d pid=%d"
-		% [int(result["ger"]), int(result["fra"]), GER_FRONT]
+		"MapRenderer: playable front chips GER=%d FRA=%d pid=%d jap=%d"
+		% [int(result["ger"]), int(result["fra"]), GER_FRONT, int(result["jap"])]
 	)
+	return result
+
+
+## One land division per major on a named hex. Not a 3520 scan.
+func _station_world_major_oob_chips() -> Dictionary:
+	# CHI–JAP live edge 902505 (CHI) — 903951 (JAP). Capitals from world_accurate.json.
+	var rows: Array = [
+		{"tag": "ENG", "pid": 711414, "design": "m4_sherman_medium_tank"},
+		{"tag": "USA", "pid": 800792, "design": "m4_sherman_medium_tank"},
+		{"tag": "SOV", "pid": 903534, "design": "t34_medium_tank"},
+		{"tag": "ITA", "pid": 710963, "design": "cv33_tankette"},
+		{"tag": "JAP", "pid": 903951, "design": "jap_armor_1936"},
+		{"tag": "POL", "pid": 711112, "design": "pol_armor_1936"},
+	]
+	var out: Dictionary = {}
+	for row_v in rows:
+		var row: Dictionary = row_v as Dictionary
+		var tag := str(row.get("tag", "")).strip_edges().to_upper()
+		var pid := int(row.get("pid", 0))
+		var did := str(row.get("design", "")).strip_edges()
+		out[tag] = _station_major_land_chip(tag, pid, did)
+	return out
+
+
+func _land_formations_for_tag(tag: String) -> Array:
+	var out: Array = []
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+		return out
+	for f in LeaderManager.get_formations_for_country(tag):
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft == Formation.TYPE_DIVISION or ft == Formation.TYPE_GARRISON:
+			out.append(f)
+	return out
+
+
+func _station_major_land_chip(tag: String, pid: int, design_id: String) -> Dictionary:
+	var result := {"ok": false, "tag": tag, "pid": pid, "fid": ""}
+	if tag.is_empty() or pid <= 0:
+		return result
+	var land: Array = _land_formations_for_tag(tag)
+	var target: Object = null
+	for f in land:
+		if f == null or not ("stationed_province_id" in f):
+			continue
+		if int(f.stationed_province_id) == pid:
+			target = f
+			break
+	if target == null and not land.is_empty():
+		target = land[land.size() - 1]
+		if target != null and "stationed_province_id" in target:
+			target.stationed_province_id = pid
+	if target == null and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("field_designed_unit"):
+		var did := design_id.strip_edges()
+		if did.is_empty():
+			did = "panzer_iii_j_medium"
+		var fielded: Variant = LeaderManager.field_designed_unit(tag, did, pid, "land")
+		if fielded is Dictionary and bool((fielded as Dictionary).get("ok", false)):
+			result["fid"] = str((fielded as Dictionary).get("formation_id", ""))
+			result["ok"] = true
+			return result
+		return result
+	if target == null:
+		return result
+	if "design_id" in target and str(target.design_id).is_empty() and not design_id.is_empty():
+		target.design_id = design_id
+	result["fid"] = str(target.formation_id) if "formation_id" in target else ""
+	result["ok"] = true
 	return result
 
 
