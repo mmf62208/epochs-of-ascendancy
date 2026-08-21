@@ -15,6 +15,7 @@ FORMATION_MOVEMENT = ROOT / "scripts" / "formations" / "FormationMovement.gd"
 BATTLE_MANAGER = ROOT / "scripts" / "combat" / "BattleManager.gd"
 HARNESS = ROOT / "scripts" / "core" / "HeadlessWorldAccurateUnitOrderLoopTest.gd"
 GATES = ROOT / "tools" / "eoa_full_test_gates.sh"
+TIME_MANAGER = ROOT / "scripts" / "autoload" / "TimeManager.gd"
 
 GER_FRONT = 710173
 FRA_FRONT = 710739
@@ -45,6 +46,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     bm = BATTLE_MANAGER.read_text(encoding="utf-8") if BATTLE_MANAGER.is_file() else ""
     harness = HARNESS.read_text(encoding="utf-8") if HARNESS.is_file() else ""
     gates = GATES.read_text(encoding="utf-8") if GATES.is_file() else ""
+    tm = TIME_MANAGER.read_text(encoding="utf-8") if TIME_MANAGER.is_file() else ""
 
     if not ren:
         fails.append("missing_map_renderer")
@@ -198,6 +200,10 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and bool(supply_fn)
         and "_interactive_light_sim" in supply_fn
         and "is_interactive_light_sim" in _slice(bm, "_interactive_light_sim")
+        and "day_emit" in tm
+        and "day_ai" in tm
+        and "day_battles" in tm
+        and "_apply_attacker_win_capture_light" in _slice(bm, "start_land_battle")
     )
     wiring["resolve_hang_safe"] = resolve_ok
     (passes if resolve_ok else fails).append("resolve_hang_safe")

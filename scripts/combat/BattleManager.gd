@@ -503,6 +503,9 @@ func start_land_battle(
 	var def_tag := str(preview.get("defender_tag", "")).strip_edges().to_upper()
 	var def_divs: Array[Dictionary] = get_divisions_at_province(to_id, def_tag)
 	if def_divs.is_empty():
+		if _interactive_light_sim():
+			_apply_attacker_win_capture_light(tag, to_id, from_pid, fid)
+			return {"success": true, "instant": true, "opened": false, "light_capture": true}
 		var instant: Dictionary = execute_province_assault(tag, to_id, from_pid, fid)
 		instant["instant"] = true
 		instant["opened"] = false
@@ -517,6 +520,9 @@ func start_land_battle(
 	var def_pick := _pick_strongest_division(def_divs, target, def_tag)
 	var def_fid := str(def_pick.get("formation_id", "")).strip_edges()
 	if def_fid.is_empty():
+		if _interactive_light_sim():
+			_apply_attacker_win_capture_light(tag, to_id, from_pid, fid)
+			return {"success": true, "instant": true, "opened": false, "light_capture": true}
 		var instant_empty: Dictionary = execute_province_assault(tag, to_id, from_pid, fid)
 		instant_empty["instant"] = true
 		instant_empty["opened"] = false
@@ -670,6 +676,9 @@ func try_ai_start_land_battles(day_index: int = 0) -> Dictionary:
 				if dp != null and not bool(dp.is_sea):
 					dest_own = _province_controller_tag(dp) == tag2
 			if not dest_own:
+				continue
+			# Hang-class: F5 never BFS own-land paths for spare rear marches (16bbf1c +5d).
+			if _interactive_light_sim():
 				continue
 			if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
 				continue

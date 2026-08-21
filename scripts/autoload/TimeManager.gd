@@ -268,9 +268,22 @@ func advance_days(days: float) -> void:
 		total_days_elapsed += 1
 
 		if light:
-			# Calendar already on the new day — queue sim so TopInfoBar can return instantly.
+			# Calendar already on the new day — split sim across frames so a 6h-cap
+			# midnight crossing cannot freeze the clock at 22:00 (16bbf1c 20d).
 			_pending_sim_events.append({
-				"kind": "day",
+				"kind": "day_emit",
+				"year": current_year,
+				"month": current_month,
+				"day": current_day,
+			})
+			_pending_sim_events.append({
+				"kind": "day_ai",
+				"year": current_year,
+				"month": current_month,
+				"day": current_day,
+			})
+			_pending_sim_events.append({
+				"kind": "day_battles",
 				"year": current_year,
 				"month": current_month,
 				"day": current_day,
@@ -328,12 +341,26 @@ func _flush_sim_events() -> void:
 	var ev: Dictionary = _pending_sim_events.pop_front() as Dictionary
 	var kind := str(ev.get("kind", ""))
 	var n_res := 0
-	if kind == "day":
+	if kind == "day" or kind == "day_emit":
 		game_day_advanced.emit(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
-		# Budgeted non-player major AI (production/soft) — not full simulate_daily_ai_combat.
+		if kind == "day":
+			# Legacy single-event day (should not queue on F5).
+			_maybe_run_interactive_multi_ai()
+			_maybe_run_ai_infra_invest()
+			_maybe_run_ai_land_battle_starts()
+			_tick_own_land_marches()
+			n_res = _tick_open_land_battles()
+			if n_res > 0 and is_interactive_light_sim():
+				call_deferred("_tick_out_of_combat_recovery")
+				call_deferred("_tick_organize_queue")
+			else:
+				_tick_out_of_combat_recovery()
+				_tick_organize_queue()
+	elif kind == "day_ai":
 		_maybe_run_interactive_multi_ai()
 		_maybe_run_ai_infra_invest()
 		_maybe_run_ai_land_battle_starts()
+	elif kind == "day_battles":
 		_tick_own_land_marches()
 		n_res = _tick_open_land_battles()
 		if n_res > 0 and is_interactive_light_sim():
