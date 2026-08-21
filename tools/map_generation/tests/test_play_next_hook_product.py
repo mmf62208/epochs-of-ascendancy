@@ -28,7 +28,8 @@ class TestPlayNextHookProduct(unittest.TestCase):
 
     def test_rank_beats_idle(self) -> None:
         idle = rank_next_beat({})
-        self.assertEqual(idle.get("action"), "unpause")
+        self.assertEqual(idle.get("action"), "show_war_loop")
+        self.assertEqual(idle.get("source"), "first_session")
         train = rank_next_beat({"training": [{"fid": "u1", "days_left": 1}]})
         self.assertEqual(train.get("action"), "send_trained")
         self.assertEqual(train.get("source"), "organize")
@@ -85,7 +86,8 @@ class TestPlayNextHookProduct(unittest.TestCase):
         self.assertEqual(foc.get("action"), "focus_done")
         self.assertEqual(foc.get("source"), "focus")
         idle = rank_next_beat({"research_days_left": 5, "focus_days_left": 12})
-        self.assertEqual(idle.get("source"), "idle")
+        self.assertEqual(idle.get("source"), "first_session")
+        self.assertEqual(idle.get("action"), "show_war_loop")
         war = rank_next_beat(
             {
                 "has_open_battle": True,

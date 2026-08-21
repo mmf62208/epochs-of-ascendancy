@@ -1,7 +1,7 @@
 # scripts/ui/PlayNextHook.gd
 ## One recommended next beat for the play-strip / map chip.
 ## War first, then organize-ready, dry fuel, steel shortage, completing
-## research/focus — idle unpause last.
+## research/focus. Empty sit-down shows the first-session WarLoop path.
 class_name PlayNextHook
 extends RefCounted
 
@@ -122,24 +122,14 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			"to_id": -1,
 			"source": "focus",
 		}
-	if bool(f.get("paused", false)):
-		return {
-			"ok": true,
-			"action": "unpause",
-			"label": "Unpause a day",
-			"hint": "Advance the clock — marches and fights tick",
-			"fid": "",
-			"to_id": -1,
-			"source": "clock",
-		}
 	return {
 		"ok": true,
-		"action": "unpause",
-		"label": "One more day",
-		"hint": "Keep the clock running",
+		"action": "show_war_loop",
+		"label": "WarLoop · B Fronts · Ctrl+click",
+		"hint": "First-session path: chip · B · G · Ctrl+click assault",
 		"fid": "",
 		"to_id": -1,
-		"source": "idle",
+		"source": "first_session",
 	}
 
 
@@ -183,6 +173,21 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 			and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(false)
 		return {"ok": true, "action": action, "summary": str(r.get("hint", r.get("label", action)))}
+	if action == "show_war_loop":
+		var tree := Engine.get_main_loop() as SceneTree
+		var mr: Node = null
+		if tree != null:
+			mr = tree.get_first_node_in_group("map_renderer")
+			if mr == null and tree.current_scene != null:
+				mr = tree.current_scene.find_child("MapRenderer", true, false)
+		if mr != null and mr.has_method("show_first_session_war_path"):
+			var wp: Dictionary = mr.call("show_first_session_war_path")
+			return {
+				"ok": true,
+				"action": "show_war_loop",
+				"summary": str(wp.get("toast", r.get("hint", "WarLoop"))),
+			}
+		return {"ok": true, "action": "show_war_loop", "summary": str(r.get("hint", "WarLoop"))}
 	if action == "unpause" and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(false)
 		return {"ok": true, "action": "unpause", "summary": str(r.get("hint", "Unpause"))}
@@ -207,6 +212,8 @@ static func _action_label(action: String) -> String:
 			return "Research completes tomorrow"
 		"focus_done":
 			return "Focus completes tomorrow"
+		"show_war_loop":
+			return "WarLoop · B Fronts · Ctrl+click"
 		_:
 			return "Unpause a day"
 

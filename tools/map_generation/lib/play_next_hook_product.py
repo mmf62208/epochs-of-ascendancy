@@ -169,18 +169,12 @@ def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
             "fid": str(f.get("focus_id") or ""),
             "hint": fname or "Focus completes tomorrow",
         }
-    if bool(f.get("paused")):
-        return {
-            "ok": True,
-            "action": "unpause",
-            "source": "clock",
-            "label": "Unpause a day",
-        }
     return {
         "ok": True,
-        "action": "unpause",
-        "source": "idle",
-        "label": "One more day",
+        "action": "show_war_loop",
+        "source": "first_session",
+        "label": "WarLoop · B Fronts · Ctrl+click",
+        "hint": "First-session path: chip · B · G · Ctrl+click assault",
     }
 
 
@@ -214,11 +208,15 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("map_next_chip")
     else:
         fails.append("map_next_chip")
-    idle = rank_next_beat({})
-    if str(idle.get("action")) == "unpause" and str(idle.get("source")) == "idle":
-        passes.append("idle_last")
+    if "show_war_loop" in hook and "show_first_session_war_path" in hook:
+        passes.append("apply_warloop")
     else:
-        fails.append("idle_last")
+        fails.append("apply_warloop")
+    idle = rank_next_beat({})
+    if str(idle.get("action")) == "show_war_loop" and str(idle.get("source")) == "first_session":
+        passes.append("idle_shows_warloop")
+    else:
+        fails.append("idle_shows_warloop")
     train = rank_next_beat({"training": [{"fid": "u1", "days_left": 1}]})
     if str(train.get("action")) == "send_trained" and str(train.get("source")) == "organize":
         passes.append("train_beats_idle")
@@ -317,7 +315,7 @@ def build_play_next_hook_product() -> Dict[str, Any]:
     else:
         fails.append("focus_beats_idle")
     far = rank_next_beat({"research_days_left": 5, "focus_days_left": 12})
-    if str(far.get("source")) == "idle":
+    if str(far.get("source")) == "first_session" and str(far.get("action")) == "show_war_loop":
         passes.append("far_research_stays_idle")
     else:
         fails.append("far_research_stays_idle")
