@@ -75,6 +75,7 @@ func _run() -> void:
 	_test_front_chips()
 	_test_organize()
 	_test_designer_field()
+	_test_era_resources()
 	_test_march_and_assault()
 	_cleanup()
 
@@ -894,6 +895,73 @@ func _test_organize() -> void:
 		_fail("refit did not complete")
 		return
 	_pass("refit ready org=%.2f" % float(rf.get("organization")))
+
+
+func _test_era_resources() -> void:
+	var rhc: Script = load("res://scripts/production/ResourceHarvestCalculator.gd") as Script
+	if rhc == null or not rhc.has_method("scale_deposits_for_year"):
+		_fail("scale_deposits_for_year missing")
+		return
+	var baku := {"oil": 3.0}
+	var oil_18 := rhc.call("scale_deposits_for_year", baku, 1918) as Dictionary
+	var oil_36 := rhc.call("scale_deposits_for_year", baku, 1936) as Dictionary
+	var oil_26 := rhc.call("scale_deposits_for_year", baku, 2026) as Dictionary
+	if float(oil_18.get("oil", 0)) >= float(oil_36.get("oil", 0)):
+		_fail("1918 oil should be less than 1936")
+		return
+	if float(oil_36.get("oil", 0)) >= float(oil_26.get("oil", 0)):
+		_fail("1936 oil should be less than 2026")
+		return
+	var alum_18 := rhc.call("scale_deposits_for_year", {"aluminum": 2.0}, 1918) as Dictionary
+	if alum_18.has("aluminum"):
+		_fail("1918 should hide aluminum")
+		return
+	_pass("era oil 1918=%.2f 1936=%.2f 2026=%.2f" % [
+		float(oil_18.get("oil", 0)), float(oil_36.get("oil", 0)), float(oil_26.get("oil", 0)),
+	])
+	var p: Object = _mm.call("get_province", GER_FRONT) if _mm.has_method("get_province") else null
+	if p == null:
+		_fail("GER front province missing for resource stamp")
+		return
+	p.set("resources", {"oil": 3.0, "coal": 4.0, "steel": 3.0, "rubber": 2.0})
+	p.set("resource_development", {})
+	var pm: Node = _autoload("ProductionManager")
+	if pm == null or not pm.has_method("develop_province_resource"):
+		_fail("develop_province_resource missing")
+		return
+	if pm.has_method("add_stockpile"):
+		pm.call("add_stockpile", {"steel": 40.0})
+	var invent: Dictionary = pm.call("develop_province_resource", GER_FRONT, "aluminum")
+	if bool(invent.get("ok", false)):
+		_fail("invented aluminum on a province without bauxite")
+		return
+	var developed: Dictionary = pm.call("develop_province_resource", GER_FRONT, "oil")
+	if not bool(developed.get("ok", false)):
+		_fail("develop oil well failed: %s" % str(developed))
+		return
+	_pass("developed oil L%d" % int(developed.get("level", 0)))
+	var stock_before := 0.0
+	if "national_stockpile" in pm:
+		stock_before = float((pm.national_stockpile as Dictionary).get("oil", 0.0))
+	if pm.has_method("daily_resource_harvest_tick"):
+		pm.call("daily_resource_harvest_tick", 30.0)
+	var stock_after := stock_before
+	if "national_stockpile" in pm:
+		stock_after = float((pm.national_stockpile as Dictionary).get("oil", 0.0))
+	if stock_after <= stock_before + 0.001:
+		_fail("harvest did not credit factory-feed oil %.3f → %.3f" % [stock_before, stock_after])
+		return
+	_pass("harvest oil stock %.2f → %.2f" % [stock_before, stock_after])
+	if not rhc.has_method("compute_developed_income"):
+		_fail("compute_developed_income missing")
+		return
+	var fat := {"oil": 20.0}
+	var inc_bare: Dictionary = rhc.call("compute_developed_income", fat, {}) as Dictionary
+	var inc_dev: Dictionary = rhc.call("compute_developed_income", fat, {"oil": 1}) as Dictionary
+	if float(inc_dev.get("oil", 0)) <= float(inc_bare.get("oil", 0)):
+		_fail("developed well should raise oil feed bare=%s dev=%s" % [str(inc_bare), str(inc_dev)])
+		return
+	_pass("develop raises daily oil %.3f → %.3f" % [float(inc_bare.get("oil", 0)), float(inc_dev.get("oil", 0))])
 
 
 func _test_march_and_assault() -> void:

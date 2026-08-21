@@ -26,6 +26,7 @@ const _MapNextListHelpers := preload("res://scripts/map/MapNextListHelpers.gd")
 @export var infra_icon_size: float = 16.0
 @export var site_icon_size: float = 20.0
 @export var construction_ring_radius: float = 24.0
+var _resource_tex_cache: Dictionary = {}
 
 # === Phase 1 Map Generation Debug Visualization ===
 @export var show_proposed_splits: bool = false  # Only meaningful in debug builds
@@ -1439,8 +1440,38 @@ func resource_icon_min_zoom_for(primary: String) -> float:
             return RESOURCE_ZOOM_STRATEGIC
         "iron", "steel", "aluminum", "aluminium", "fissiles", "helium3", "antimatter", "energy":
             return RESOURCE_ZOOM_STRATEGIC
+        "chromium", "tungsten":
+            return RESOURCE_ZOOM_STRATEGIC
         _:
             return RESOURCE_ZOOM_BULK
+
+
+func icon_px_for_amount(amount: float) -> float:
+    return ResourceHarvestCalculator.icon_px_for_amount(amount)
+
+
+func _scenario_year() -> int:
+    if typeof(TimeManager) != TYPE_NIL and "current_year" in TimeManager:
+        return int(TimeManager.current_year)
+    return 1936
+
+
+func _era_scaled_resources(province: Province) -> Dictionary:
+    if province == null or not (province.resources is Dictionary):
+        return {}
+    var scaled: Dictionary = ResourceHarvestCalculator.scale_deposits_for_year(province.resources, _scenario_year())
+    if "resource_development" in province and province.resource_development is Dictionary:
+        scaled = ResourceHarvestCalculator.apply_development(scaled, province.resource_development)
+    return scaled
+
+
+func _resource_tex(key: String) -> Texture2D:
+    var k := key.strip_edges().to_lower()
+    if _resource_tex_cache.has(k):
+        return _resource_tex_cache[k] as Texture2D
+    var tex: Texture2D = HudIconLibrary.resource_icon(k, 24)
+    _resource_tex_cache[k] = tex
+    return tex
 
 
 func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
@@ -1465,24 +1496,25 @@ func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
         var province: Province = provinces[province_id]
         if province == null or province.is_sea:
             continue
-        if province.resources.is_empty():
+        var era_res: Dictionary = _era_scaled_resources(province)
+        if era_res.is_empty():
             continue
 
         var center = map_manager.get_province_centroid(province_id)
         var primary := ""
-        if "primary_resource" in province and str(province.primary_resource) != "":
-            primary = str(province.primary_resource)
-        else:
-            # Prefer strategic resources when present.
-            for key in ["oil", "coal", "iron", "steel", "uranium", "rare_earths", "rubber", "aluminum"]:
-                if province.resources.has(key) and float(province.resources[key]) > 0.0:
-                    primary = key
+        var primary_amt := 0.0
+        # Prefer strategic resources when present (era-scaled — 1918 hides aluminum/uranium).
+        for key in ["oil", "coal", "rubber", "steel", "iron", "aluminum", "chromium", "tungsten", "uranium", "rare_earths"]:
+            if era_res.has(key) and float(era_res[key]) > 0.0:
+                primary = key
+                primary_amt = float(era_res[key])
+                break
+        if primary == "":
+            for k in era_res:
+                if float(era_res[k]) > 0.0:
+                    primary = str(k)
+                    primary_amt = float(era_res[k])
                     break
-            if primary == "":
-                for k in province.resources:
-                    if float(province.resources[k]) > 0.0:
-                        primary = str(k)
-                        break
 
         if primary == "":
             continue
@@ -1490,10 +1522,17 @@ func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
             continue
 
         drawn += 1
+        var px := icon_px_for_amount(primary_amt)
+        var icon_pos = center + Vector2(12, 12)
+        var ring := Color(0.05, 0.05, 0.08, 0.55)
+        draw_circle(icon_pos, px * 0.62, ring)
+        var tex: Texture2D = _resource_tex(primary)
+        if tex != null:
+            var sz := Vector2(px, px)
+            draw_texture_rect(tex, Rect2(icon_pos - sz * 0.5, sz), false)
+            continue
         var symbol = "●"
         var col = Color(0.8, 0.8, 0.6, 0.9)
-        var ring := Color(0.05, 0.05, 0.08, 0.55)
-
         match primary.to_lower():
             "iron", "steel":
                 symbol = "⚙"
@@ -1513,6 +1552,12 @@ func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
             "aluminum", "aluminium":
                 symbol = "◇"
                 col = Color(0.75, 0.78, 0.85, 0.95)
+            "chromium":
+                symbol = "◆"
+                col = Color(0.55, 0.35, 0.85, 0.95)
+            "tungsten":
+                symbol = "◆"
+                col = Color(0.75, 0.55, 0.20, 0.95)
             "rare_earths", "semiconductors":
                 symbol = "◆"
                 col = Color(0.35, 0.85, 0.65, 0.95)
@@ -1522,11 +1567,7 @@ func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
             _:
                 symbol = "●"
                 col = Color(0.7, 0.65, 0.5, 0.85)
-
-        var icon_pos = center + Vector2(12, 12)
-        # Halo for contrast on light parchment underlay.
-        draw_circle(icon_pos, 6.0, ring)
-        draw_circle(icon_pos, 4.8, col)
+        draw_circle(icon_pos, px * 0.42, col)
         var font := ThemeDB.fallback_font
         if font:
             draw_string(font, icon_pos + Vector2(-5, 4), symbol, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color(1, 1, 1, 0.92))

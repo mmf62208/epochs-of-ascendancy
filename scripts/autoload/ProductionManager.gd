@@ -54,6 +54,8 @@ var _unit_equipment_stock: Dictionary = {}
 var equipment_production_reliability: Dictionary = {}
 ## One-shot auto-seed flag so daily harvest does not spam plants.
 var _resource_plants_seeded: bool = false
+## pid → {resource_key: develop_level 0–3}. Expand existing deposits; never invent geology.
+var province_resource_dev: Dictionary = {}
 
 var _equipment_shortage_tracker := EquipmentShortageTracker.new()
 
@@ -3365,6 +3367,7 @@ func get_save_data() -> Dictionary:
 		"national_equipment_stockpile": national_equipment_stockpile.duplicate(true),
 		"country_equipment_stockpiles": country_equipment_stockpiles.duplicate(true),
 		"unit_equipment_stock": _unit_equipment_stock.duplicate(true),
+		"province_resource_dev": province_resource_dev.duplicate(true),
 		"active_modifiers": _serialize_active_modifiers(),
 		"lines": lines_data,
 		# family experience, priority etc. can be added later if they prove important
@@ -3411,6 +3414,8 @@ func apply_save_data(data: Dictionary) -> void:
 		country_equipment_stockpiles = (data["country_equipment_stockpiles"] as Dictionary).duplicate(true)
 	if data.has("unit_equipment_stock"):
 		_unit_equipment_stock = (data["unit_equipment_stock"] as Dictionary).duplicate(true)
+	if data.has("province_resource_dev"):
+		province_resource_dev = (data["province_resource_dev"] as Dictionary).duplicate(true)
 	if data.has("active_modifiers"):
 		_restore_active_modifiers(data["active_modifiers"])
 
@@ -3498,11 +3503,33 @@ func daily_resource_harvest_tick(days: float = 1.0) -> Dictionary:
 					continue
 				if light and not player_tag_pref.is_empty() and tag != player_tag_pref:
 					continue
+				var year := 1936
+				if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year"):
+					year = int(TimeManager.get_current_year())
+				var scaled: Dictionary = res
+				if rhc.has_method("scale_deposits_for_year"):
+					scaled = rhc.scale_deposits_for_year(res, year)
+				if scaled.is_empty():
+					continue
 				owners[tag] = true
 				var plants: Array = []
 				if typeof(FactoryManager) != TYPE_NIL and FactoryManager.has_method("get_resource_plants_in_province") and pid > 0:
 					plants = FactoryManager.get_resource_plants_in_province(pid)
-				provinces_payload.append({"owner_tag": tag, "resources": res, "plants": plants})
+				var development: Dictionary = {}
+				if "resource_development" in p and p.resource_development is Dictionary:
+					development = (p.resource_development as Dictionary).duplicate()
+				var pid_s := str(pid)
+				if province_resource_dev.has(pid_s) and province_resource_dev[pid_s] is Dictionary:
+					var extra: Dictionary = province_resource_dev[pid_s] as Dictionary
+					for dk in extra:
+						development[str(dk)] = maxi(int(development.get(dk, 0)), int(extra[dk]))
+				provinces_payload.append({
+					"owner_tag": tag,
+					"resources": scaled,
+					"plants": plants,
+					"development": development,
+					"province_id": pid,
+				})
 				harvested += 1
 	for tag in owners:
 		unlocks_by_tag[tag] = _harvest_unlocks_for_tag(str(tag))
@@ -3540,6 +3567,54 @@ func daily_resource_harvest_tick(days: float = 1.0) -> Dictionary:
 	report["total_added"] = total_added
 	report["cohesion_events"] = cohesion_events
 	return report
+
+
+## Expand an existing era-visible deposit (mine/well). Pays steel. Does not invent geology.
+func develop_province_resource(province_id: int, resource_key: String = "") -> Dictionary:
+	var pid := int(province_id)
+	if pid <= 0 or typeof(MapManager) == TYPE_NIL:
+		return {"ok": false, "error": "no_province"}
+	var p: Province = MapManager.get_province(pid) if MapManager.has_method("get_province") else null
+	if p == null:
+		return {"ok": false, "error": "no_province"}
+	var res: Dictionary = p.resources if p.resources is Dictionary else {}
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	if rhc == null or not rhc.has_method("build_develop_resource_action"):
+		return {"ok": false, "error": "no_calculator"}
+	var year := 1936
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year"):
+		year = int(TimeManager.get_current_year())
+	var pid_s := str(pid)
+	var development: Dictionary = {}
+	if "resource_development" in p and p.resource_development is Dictionary:
+		development = (p.resource_development as Dictionary).duplicate()
+	if province_resource_dev.has(pid_s) and province_resource_dev[pid_s] is Dictionary:
+		var extra: Dictionary = province_resource_dev[pid_s] as Dictionary
+		for dk in extra:
+			development[str(dk)] = maxi(int(development.get(dk, 0)), int(extra[dk]))
+	var action: Dictionary = rhc.build_develop_resource_action(
+		res, resource_key, year, development, national_stockpile
+	) as Dictionary
+	if not bool(action.get("ok", false)):
+		return {"ok": false, "error": str(action.get("error", "invalid")), "action": action}
+	var cost: Dictionary = action.get("cost", {}) as Dictionary
+	if not pay_cost(cost):
+		return {"ok": false, "error": "pay_failed", "action": action}
+	var want := str(action.get("key", ""))
+	var after := int(action.get("level_after", 1))
+	development[want] = after
+	if "resource_development" in p:
+		p.resource_development = development
+	province_resource_dev[pid_s] = development.duplicate()
+	return {
+		"ok": true,
+		"province_id": pid,
+		"key": want,
+		"level": after,
+		"cost": cost,
+		"year": year,
+		"action": action,
+	}
 
 
 ## Bootstrap resource/energy plants from province deposits (once per session unless force).

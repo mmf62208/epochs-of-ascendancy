@@ -33,6 +33,8 @@ extends Resource
 @export var population: int = 0
 ## Resource tag -> numeric amount (e.g. iron, coal).
 @export var resources: Dictionary = {}
+## Resource tag -> develop level 0–3 (expand existing deposits; never invent).
+@export var resource_development: Dictionary = {}
 @export var victory_points: int = 0
 #endregion
 

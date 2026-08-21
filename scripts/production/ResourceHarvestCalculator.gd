@@ -211,8 +211,10 @@ static func compute_province_daily_income(
 	resources: Dictionary,
 	plants: Array = [],
 	unlocks: Dictionary = {},
+	development: Dictionary = {},
 ) -> Dictionary:
 	## Returns major → daily float income from one province's deposits + plants.
+	## Also credits HOI factory-feed keys (oil/coal/chromium/tungsten) so TOE lines can pay.
 	_load_rules()
 	var map := get_source_to_major_map()
 	var income: Dictionary = {}
@@ -235,7 +237,8 @@ static func compute_province_daily_income(
 		var boost: Dictionary = plant_boost_for_source(sk, plants, unlocks)
 		var mult := float(boost.get("multiplier", 0.35))
 		var tech_b := tech_major_bonus(major, unlocks)
-		var amount := base * mult * (1.0 + tech_b)
+		var lv_m := development_mult(int(development.get(sk, 0)))
+		var amount := base * mult * (1.0 + tech_b) * lv_m
 		income[major] = float(income.get(major, 0.0)) + amount
 		var also_fuel := float(boost.get("also_fuel_fraction", 0.0))
 		if also_fuel > 0.0 and major == "energy":
@@ -243,6 +246,9 @@ static func compute_province_daily_income(
 		var energy_by := float(boost.get("energy_byproduct", 0.0))
 		if energy_by > 0.0 and major == "fuel":
 			income["energy"] = float(income.get("energy", 0.0)) + amount * energy_by
+		# Factory-feed alias: oil→fuel major still needs an `oil` pile for TOE trucks/tanks.
+		if sk in FACTORY_FEED_KEYS and major != sk:
+			income[sk] = float(income.get(sk, 0.0)) + base * 0.35 * (1.0 + tech_b) * lv_m
 	# Synthetic fuel: convert a slice of energy income into fuel
 	var e2f := synthetic_fuel_fraction(unlocks)
 	if e2f > 0.0 and float(income.get("energy", 0.0)) > 0.0:
@@ -278,7 +284,8 @@ static func compute_national_daily_income(
 		var unlocks: Dictionary = unlocks_by_tag.get(tag, {}) as Dictionary if unlocks_by_tag.get(tag) is Dictionary else {}
 		var res: Dictionary = p.get("resources", {}) as Dictionary if p.get("resources") is Dictionary else {}
 		var plants: Array = p.get("plants", []) as Array if p.get("plants") is Array else []
-		var day_inc := compute_province_daily_income(res, plants, unlocks)
+		var development: Dictionary = p.get("development", {}) as Dictionary if p.get("development") is Dictionary else {}
+		var day_inc := compute_province_daily_income(res, plants, unlocks, development)
 		if not by_tag.has(tag):
 			by_tag[tag] = {}
 		merge_income(by_tag[tag], day_inc, 1.0)
@@ -438,6 +445,137 @@ static func is_endgame_source_year_ok(source_key: String, scenario_year: int = 0
 	if scenario_year <= 0:
 		return false
 	return scenario_year >= y
+
+
+## Painted deposits are 1936-baseline. 1918 extracts less oil/aluminum; 2026 more oil, less coal.
+const ERA_OMIT_THRESHOLD := 0.25
+const DEVELOP_MAX_LEVEL := 3
+const DEVELOP_BONUS_PER_LEVEL := 0.35
+const DEVELOP_STEEL_BASE := 8.0
+const DEVELOP_STEEL_PER_LEVEL := 4.0
+const FACTORY_FEED_KEYS := ["steel", "coal", "oil", "rubber", "aluminum", "chromium", "tungsten"]
+const ERA_SCALE := {
+	"coal": [1.20, 1.00, 0.65],
+	"iron": [0.90, 1.00, 1.10],
+	"steel": [0.65, 1.00, 1.20],
+	"oil": [0.32, 1.00, 1.80],
+	"rubber": [0.40, 1.00, 0.75],
+	"aluminum": [0.12, 1.00, 1.55],
+	"chromium": [0.35, 1.00, 1.25],
+	"tungsten": [0.28, 1.00, 1.30],
+	"uranium": [0.00, 0.08, 1.00],
+	"rare_earths": [0.00, 0.00, 1.00],
+}
+
+
+static func era_band_for_year(year: int) -> int:
+	var y := int(year)
+	if y <= 1924:
+		return 0
+	if y >= 2000:
+		return 2
+	return 1
+
+
+static func era_resource_scale(year: int, key: String) -> float:
+	var k := key.strip_edges().to_lower()
+	if not ERA_SCALE.has(k):
+		return 1.0
+	var row: Array = ERA_SCALE[k] as Array
+	var band := clampi(era_band_for_year(year), 0, 2)
+	if band >= row.size():
+		return 1.0
+	return float(row[band])
+
+
+static func scale_deposits_for_year(resources: Dictionary, year: int) -> Dictionary:
+	var out: Dictionary = {}
+	if resources.is_empty():
+		return out
+	for raw_key in resources:
+		var key := str(raw_key).strip_edges().to_lower()
+		var amt := float(resources[raw_key])
+		if amt <= 0.0:
+			continue
+		var scaled := amt * era_resource_scale(year, key)
+		if scaled < ERA_OMIT_THRESHOLD:
+			continue
+		out[key] = snappedf(scaled, 0.0001)
+	return out
+
+
+static func development_mult(level: int) -> float:
+	var lv := clampi(int(level), 0, DEVELOP_MAX_LEVEL)
+	return 1.0 + DEVELOP_BONUS_PER_LEVEL * float(lv)
+
+
+static func apply_development(resources: Dictionary, development: Dictionary = {}) -> Dictionary:
+	if resources.is_empty():
+		return {}
+	if development.is_empty():
+		return resources.duplicate()
+	var out: Dictionary = {}
+	for raw_key in resources:
+		var key := str(raw_key).strip_edges().to_lower()
+		var amt := float(resources[raw_key])
+		if amt <= 0.0:
+			continue
+		var lv := int(development.get(key, 0))
+		out[key] = snappedf(amt * development_mult(lv), 0.0001)
+	return out
+
+
+static func develop_cost(current_level: int = 0) -> Dictionary:
+	var lv := clampi(int(current_level), 0, DEVELOP_MAX_LEVEL)
+	return {"steel": DEVELOP_STEEL_BASE + DEVELOP_STEEL_PER_LEVEL * float(lv)}
+
+
+static func icon_px_for_amount(amount: float) -> float:
+	return clampf(10.0 + maxf(float(amount), 0.0) * 2.2, 10.0, 22.0)
+
+
+static func build_develop_resource_action(
+	resources: Dictionary,
+	key: String = "",
+	scenario_year: int = 1936,
+	development: Dictionary = {},
+	stockpile: Dictionary = {},
+) -> Dictionary:
+	var scaled := scale_deposits_for_year(resources, scenario_year)
+	var want := key.strip_edges().to_lower()
+	if want.is_empty():
+		var best := ""
+		var best_amt := 0.0
+		for k in scaled:
+			var a := float(scaled[k])
+			if a > best_amt:
+				best_amt = a
+				best = str(k)
+		want = best
+	if want.is_empty():
+		return {"ok": false, "error": "no_deposit"}
+	if float(scaled.get(want, 0.0)) <= 0.0:
+		return {"ok": false, "error": "not_visible", "key": want, "year": scenario_year}
+	var cur := int(development.get(want, 0))
+	if cur >= DEVELOP_MAX_LEVEL:
+		return {"ok": false, "error": "max_level", "key": want, "level": cur}
+	var cost: Dictionary = develop_cost(cur)
+	for rk in cost:
+		if float(stockpile.get(rk, 0.0)) + 0.001 < float(cost[rk]):
+			return {"ok": false, "error": "no_resources", "key": want, "cost": cost}
+	return {
+		"ok": true,
+		"key": want,
+		"level_before": cur,
+		"level_after": cur + 1,
+		"cost": cost,
+		"bonus_after": development_mult(cur + 1),
+		"year": scenario_year,
+	}
+
+
+static func compute_developed_income(resources: Dictionary, development: Dictionary = {}) -> Dictionary:
+	return compute_province_daily_income(resources, [], {}, development)
 
 
 ## Combat reliability scale from production shortage multiplier stamped on equipment.

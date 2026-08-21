@@ -18,6 +18,8 @@ RESOURCE_WEIGHTS: Dict[str, float] = {
     "steel": 1.4,
     "coal": 1.0,
     "iron": 1.2,
+    "uranium": 2.2,
+    "rare_earths": 2.1,
 }
 
 # Distinct hues (RGB 0–1) per strategic good.
@@ -30,6 +32,8 @@ RESOURCE_COLORS: Dict[str, Tuple[float, float, float]] = {
     "steel": (0.45, 0.50, 0.58),  # steel grey-blue
     "coal": (0.22, 0.20, 0.18),  # coal black
     "iron": (0.55, 0.32, 0.28),  # iron red-brown
+    "uranium": (0.42, 0.82, 0.32),  # nuclear green
+    "rare_earths": (0.30, 0.78, 0.62),  # teal
 }
 
 EMPTY_LAND = (0.18, 0.20, 0.24)  # dim slate — no strategic goods

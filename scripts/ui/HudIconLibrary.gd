@@ -52,6 +52,9 @@ const RES_KEYS := {
 	"chromium": "chromium",
 	"tungsten": "tungsten",
 	"oil": "fuel",
+	"iron": "steel",
+	"energy": "coal",
+	"petroleum": "fuel",
 }
 
 

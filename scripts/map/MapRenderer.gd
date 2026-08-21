@@ -48,6 +48,7 @@ const _TerrainTiles = preload("res://scripts/map/TerrainTileLibrary.gd")
 
 # Dynamically created infrastructure investment UI (MVP — matches engineers button pattern)
 var _btn_invest_infra: Button = null
+var _btn_develop_resource: Button = null
 var _label_invest_status: Label = null
 var _progress_invest: ProgressBar = null
 var _btn_cancel_invest: Button = null
@@ -14333,6 +14334,7 @@ static func resources_mapmode_color_from_dict(resources: Dictionary, is_sea: boo
 	var weights := {
 		"oil": 3.0, "rubber": 2.5, "chromium": 2.0, "tungsten": 2.0,
 		"aluminum": 1.8, "steel": 1.4, "coal": 1.0, "iron": 1.2,
+		"uranium": 2.2, "rare_earths": 2.1,
 	}
 	var hues := {
 		"oil": Color(0.12, 0.55, 0.28),
@@ -14343,6 +14345,8 @@ static func resources_mapmode_color_from_dict(resources: Dictionary, is_sea: boo
 		"steel": Color(0.45, 0.50, 0.58),
 		"coal": Color(0.22, 0.20, 0.18),
 		"iron": Color(0.55, 0.32, 0.28),
+		"uranium": Color(0.42, 0.82, 0.32),
+		"rare_earths": Color(0.30, 0.78, 0.62),
 	}
 	var best_key := ""
 	var best_score := 0.0
@@ -14377,7 +14381,25 @@ func _resources_mapmode_color_for_province(province: Province, base: Color) -> C
 	var res: Dictionary = {}
 	if "resources" in province and province.resources is Dictionary:
 		res = province.resources
+	res = _era_scaled_resources_for_province(province, res)
 	return resources_mapmode_color_from_dict(res, false, base)
+
+
+func _scenario_year() -> int:
+	if typeof(TimeManager) != TYPE_NIL and "current_year" in TimeManager:
+		return int(TimeManager.current_year)
+	return 1936
+
+
+func _era_scaled_resources_for_province(province: Province, resources: Dictionary) -> Dictionary:
+	var year := _scenario_year()
+	var scaled: Dictionary = ResourceHarvestCalculator.scale_deposits_for_year(resources, year)
+	var dev: Dictionary = {}
+	if province != null and "resource_development" in province and province.resource_development is Dictionary:
+		dev = province.resource_development
+	if not dev.is_empty():
+		scaled = ResourceHarvestCalculator.apply_development(scaled, dev)
+	return scaled
 
 
 ## M2: V3-style state fills from state_id (mirrors map_states_mapmode_product.states_mapmode_rgb).
@@ -15511,10 +15533,15 @@ func show_info_panel(province: Province) -> void:
 			+ conflict_note
 		)
 
-	var res_text := "Resources: "
-	if province.resources.size() > 0:
-		for key in province.resources:
-			res_text += "%s:%s " % [key, str(province.resources[key])]
+	var res_text := "Resources (%d): " % _scenario_year()
+	var era_res: Dictionary = _era_scaled_resources_for_province(province, province.resources if province.resources is Dictionary else {})
+	if era_res.size() > 0:
+		for key in era_res:
+			var lv := 0
+			if "resource_development" in province and province.resource_development is Dictionary:
+				lv = int(province.resource_development.get(key, 0))
+			var lv_s := " L%d" % lv if lv > 0 else ""
+			res_text += "%s:%s%s " % [key, str(snappedf(float(era_res[key]), 0.1)), lv_s]
 	else:
 		res_text += "None"
 	info_resources.text = res_text.strip_edges()
@@ -15537,6 +15564,7 @@ func show_info_panel(province: Province) -> void:
 
 	_update_station_engineers_button(province)
 	_update_infrastructure_investment_ui(province)
+	_update_develop_resource_ui(province)
 	_update_special_sites_ui(province)
 	_update_attack_button(province)
 	_update_settle_button(province)
@@ -16367,6 +16395,17 @@ func _ensure_infrastructure_investment_ui() -> void:
 			_btn_invest_infra.pressed.connect(_on_invest_infrastructure_pressed)
 		content.add_child(_btn_invest_infra)
 
+	if _btn_develop_resource == null or not is_instance_valid(_btn_develop_resource):
+		_btn_develop_resource = Button.new()
+		_btn_develop_resource.name = "BtnDevelopResource"
+		_btn_develop_resource.text = "Develop Mine / Well"
+		_btn_develop_resource.tooltip_text = "Expand an existing deposit (oil well, coal mine, bauxite pit). Costs steel. Cannot invent a resource that is not geologically present or not yet extracted in this era."
+		_btn_develop_resource.custom_minimum_size = Vector2(200, 28)
+		_btn_develop_resource.visible = false
+		if not _btn_develop_resource.pressed.is_connected(_on_develop_resource_pressed):
+			_btn_develop_resource.pressed.connect(_on_develop_resource_pressed)
+		content.add_child(_btn_develop_resource)
+
 	if _btn_cancel_invest == null or not is_instance_valid(_btn_cancel_invest):
 		_btn_cancel_invest = Button.new()
 		_btn_cancel_invest.name = "BtnCancelInvest"
@@ -16391,6 +16430,72 @@ func _ensure_infrastructure_investment_ui() -> void:
 		if not _btn_assign_agent.pressed.is_connected(_on_assign_agent_pressed):
 			_btn_assign_agent.pressed.connect(_on_assign_agent_pressed)
 		content.add_child(_btn_assign_agent)
+
+
+func _update_develop_resource_ui(province: Province) -> void:
+	_ensure_infrastructure_investment_ui()
+	if _btn_develop_resource == null:
+		return
+	if province == null or province.is_sea:
+		_btn_develop_resource.visible = false
+		return
+	var player_tag := _player_tag()
+	var owner := str(province.owner_tag)
+	var show_ui := not owner.is_empty() and owner == player_tag
+	var era_res: Dictionary = _era_scaled_resources_for_province(province, province.resources if province.resources is Dictionary else {})
+	if era_res.is_empty():
+		show_ui = false
+	_btn_develop_resource.visible = show_ui
+	if not show_ui:
+		return
+	var action: Dictionary = ResourceHarvestCalculator.build_develop_resource_action(
+		province.resources if province.resources is Dictionary else {},
+		"",
+		_scenario_year(),
+		province.resource_development if "resource_development" in province and province.resource_development is Dictionary else {},
+		ProductionManager.national_stockpile if typeof(ProductionManager) != TYPE_NIL else {},
+	)
+	if bool(action.get("ok", false)):
+		_btn_develop_resource.disabled = false
+		_btn_develop_resource.text = "Develop %s (L%d→L%d · %.0f steel)" % [
+			str(action.get("key", "deposit")).capitalize(),
+			int(action.get("level_before", 0)),
+			int(action.get("level_after", 1)),
+			float((action.get("cost", {}) as Dictionary).get("steel", 8.0)),
+		]
+		_btn_develop_resource.tooltip_text = "Expand this deposit. Extraction +35% per level (max 3). Era %d — goods not yet exploited stay hidden." % _scenario_year()
+	else:
+		_btn_develop_resource.disabled = true
+		var err := str(action.get("error", ""))
+		if err == "max_level":
+			_btn_develop_resource.text = "Mine fully developed"
+		elif err == "no_resources":
+			_btn_develop_resource.text = "Need steel to develop"
+		else:
+			_btn_develop_resource.text = "Cannot develop here"
+		_btn_develop_resource.tooltip_text = "Develop failed: %s" % err
+
+
+func _on_develop_resource_pressed() -> void:
+	if selected_province_id < 0:
+		return
+	if typeof(ProductionManager) == TYPE_NIL:
+		return
+	var result: Dictionary = ProductionManager.develop_province_resource(selected_province_id)
+	if bool(result.get("ok", false)):
+		var msg := "Developed %s to L%d on #%d" % [str(result.get("key", "")), int(result.get("level", 0)), selected_province_id]
+		print("[MapRenderer] ", msg)
+		if typeof(DebugOverlay) != TYPE_NIL:
+			DebugOverlay.toast_map_debug("⛏ " + msg)
+		if current_map_mode == "resources":
+			_refresh_single_province_fill(selected_province_id)
+		if provinces.has(selected_province_id):
+			show_info_panel(provinces[selected_province_id])
+	else:
+		var reason := str(result.get("error", "unknown"))
+		print("[MapRenderer] develop resource failed: ", reason)
+		if typeof(DebugOverlay) != TYPE_NIL:
+			DebugOverlay.toast_map_debug("⛏ Develop failed: " + reason)
 
 
 func _update_assign_agent_button(province: Province) -> void:
