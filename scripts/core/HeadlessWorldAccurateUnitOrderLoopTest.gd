@@ -962,6 +962,51 @@ func _test_era_resources() -> void:
 		_fail("developed well should raise oil feed bare=%s dev=%s" % [str(inc_bare), str(inc_dev)])
 		return
 	_pass("develop raises daily oil %.3f → %.3f" % [float(inc_bare.get("oil", 0)), float(inc_dev.get("oil", 0))])
+	var fra_p: Object = _mm.call("get_province", FRA_FRONT) if _mm.has_method("get_province") else null
+	if fra_p == null:
+		_fail("FRA front missing for occupier harvest")
+		return
+	fra_p.set("resources", {"oil": 3.0})
+	fra_p.set("owner_tag", DEF_TAG)
+	fra_p.set("controller_tag", ATT_TAG)
+	p.set("resources", {})
+	if "national_stockpile" in pm:
+		(pm.national_stockpile as Dictionary)["oil"] = 0.0
+		(pm.national_stockpile as Dictionary)["fuel"] = 0.0
+	var oil_pre := 0.0
+	if pm.has_method("daily_resource_harvest_tick"):
+		pm.call("daily_resource_harvest_tick", 30.0)
+	if "national_stockpile" in pm:
+		oil_pre = float((pm.national_stockpile as Dictionary).get("oil", 0.0))
+	if oil_pre <= 0.001:
+		_fail("occupier GER did not harvest FRA oil")
+		return
+	_pass("occupier harvest oil=%.2f (FRA-owned, GER-held)" % oil_pre)
+	var designed: Object = _lm.call("get_formation", _designed_fid) if not _designed_fid.is_empty() and _lm.has_method("get_formation") else null
+	if designed == null or not pm.has_method("refuel_formation_from_stockpile"):
+		_fail("refuel_formation_from_stockpile missing")
+		return
+	designed.set("fuel_level", 0.20)
+	if "national_stockpile" in pm:
+		(pm.national_stockpile as Dictionary)["fuel"] = 0.0
+		(pm.national_stockpile as Dictionary)["oil"] = 0.0
+	var dry_r: Dictionary = pm.call("refuel_formation_from_stockpile", _designed_fid, 0.10)
+	var dry_fuel := float(designed.get("fuel_level"))
+	if dry_fuel > 0.201:
+		_fail("empty fuel stock invented refill %.3f %s" % [dry_fuel, str(dry_r)])
+		return
+	_pass("empty fuel stock no refill (%.2f)" % dry_fuel)
+	if pm.has_method("add_stockpile"):
+		pm.call("add_stockpile", {"fuel": 8.0})
+	var wet_r: Dictionary = pm.call("refuel_formation_from_stockpile", _designed_fid, 0.10)
+	var wet_fuel := float(designed.get("fuel_level"))
+	if wet_fuel <= dry_fuel + 0.001:
+		_fail("stockpile did not refuel %.3f %s" % [wet_fuel, str(wet_r)])
+		return
+	_pass("stockpile refuel %.2f → %.2f" % [dry_fuel, wet_fuel])
+	fra_p.set("controller_tag", DEF_TAG)
+	if "fuel_level" in designed:
+		designed.set("fuel_level", 1.0)
 
 
 func _test_march_and_assault() -> void:

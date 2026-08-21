@@ -578,6 +578,58 @@ static func compute_developed_income(resources: Dictionary, development: Diction
 	return compute_province_daily_income(resources, [], {}, development)
 
 
+static func harvest_holder_tag(owner: String, controller: String = "") -> String:
+	var c := controller.strip_edges().to_upper()
+	if not c.is_empty():
+		return c
+	return owner.strip_edges().to_upper()
+
+
+static func occupation_harvest_mult(owner: String, controller: String = "") -> float:
+	var holder := harvest_holder_tag(owner, controller)
+	var own := owner.strip_edges().to_upper()
+	if holder.is_empty() or own.is_empty() or holder == own:
+		return 1.0
+	return 0.65
+
+
+static func refuel_from_stockpile(
+	fuel_level: float,
+	fuel_use: float,
+	stockpile: Dictionary = {},
+	amount: float = 0.10,
+) -> Dictionary:
+	var cur := clampf(float(fuel_level), 0.0, 1.0)
+	var use := maxf(float(fuel_use), 0.0)
+	if use <= 0.000000001:
+		return {"ok": true, "fuel_after": cur, "paid": 0.0, "drawn": {}, "reason": "foot"}
+	var gap := minf(maxf(float(amount), 0.0), 1.0 - cur)
+	if gap <= 0.000000001:
+		return {"ok": true, "fuel_after": cur, "paid": 0.0, "drawn": {}, "reason": "full"}
+	var need := (gap / 0.10) * 0.5
+	var have_fuel := maxf(float(stockpile.get("fuel", 0.0)), 0.0)
+	var have_oil := maxf(float(stockpile.get("oil", 0.0)), 0.0)
+	var have := have_fuel + have_oil
+	if have <= 0.000000001:
+		return {"ok": false, "fuel_after": cur, "paid": 0.0, "drawn": {}, "error": "empty_stock"}
+	var paid := minf(have, need)
+	var fill := paid / need if need > 0.0 else 0.0
+	var take_fuel := minf(have_fuel, paid)
+	var take_oil := paid - take_fuel
+	var drawn: Dictionary = {}
+	if take_fuel > 0.0:
+		drawn["fuel"] = take_fuel
+	if take_oil > 0.0:
+		drawn["oil"] = take_oil
+	return {
+		"ok": true,
+		"fuel_after": snappedf(cur + gap * fill, 0.0001),
+		"paid": snappedf(paid, 0.0001),
+		"drawn": drawn,
+		"reason": "refueled",
+	}
+
+
 ## Combat reliability scale from production shortage multiplier stamped on equipment.
 static func combat_reliability_from_production(production_reliability: float) -> float:
 	# Soft floor: never collapse combat from production alone below ~0.72 path.

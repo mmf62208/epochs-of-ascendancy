@@ -14,9 +14,11 @@ from era_resource_deposits_product import (  # noqa: E402
     apply_develop_resource,
     build_develop_resource_action,
     build_era_resource_industry_product,
+    harvest_by_holder,
     harvest_factory_feeds,
     harvest_nation,
     icon_px_for_amount,
+    refuel_from_stockpile,
     scale_deposits_for_year,
 )
 
@@ -53,6 +55,21 @@ class TestEraResourceDepositsProduct(unittest.TestCase):
         )
         self.assertGreater(float(nation.get("steel", 0)), 0.0)
         self.assertGreater(float(nation.get("oil", 0)), 0.0)
+
+    def test_occupier_and_refuel(self) -> None:
+        occ = harvest_by_holder(
+            [{"resources": BAKU_OIL, "owner_tag": "SOV", "controller_tag": "GER"}],
+            year=1936,
+            days=30.0,
+        )
+        self.assertGreater(float((occ.get("GER") or {}).get("oil", 0)), 0.0)
+        self.assertNotIn("SOV", occ)
+        dry = refuel_from_stockpile(0.20, 0.40, {}, 0.10)
+        self.assertFalse(dry.get("ok"))
+        self.assertAlmostEqual(float(dry.get("fuel_after", 1)), 0.20)
+        wet = refuel_from_stockpile(0.20, 0.40, {"fuel": 8.0}, 0.10)
+        self.assertTrue(wet.get("ok"))
+        self.assertGreater(float(wet.get("fuel_after", 0)), 0.20)
 
     def test_integrity_product(self) -> None:
         p = build_era_resource_industry_product()

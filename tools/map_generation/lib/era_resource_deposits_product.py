@@ -55,6 +55,8 @@ DEVELOP_BONUS_PER_LEVEL = 0.35
 DEVELOP_STEEL_BASE = 8.0
 DEVELOP_STEEL_PER_LEVEL = 4.0
 OMIT_THRESHOLD = 0.25
+OCCUPATION_HARVEST_MULT = 0.65
+REFUEL_STOCK_PER_TENTH = 0.5
 
 # Sample deposits used by the integrity product (1936-painted magnitudes).
 BAKU_OIL = {"oil": 3.0}
@@ -234,6 +236,7 @@ def harvest_factory_feeds(
     plants: Optional[list] = None,
     unlocks: Optional[Dict[str, Any]] = None,
     days: float = 1.0,
+    occupation_mult: float = 1.0,
 ) -> Dict[str, float]:
     """Daily (or multi-day) factory-feed + major income from era-scaled deposits."""
     scaled = scale_deposits_for_year(resources, year)
@@ -263,8 +266,103 @@ def harvest_factory_feeds(
     for major, bm in major_boost.items():
         if major in feeds and bm > 1.0 + 1e-9:
             feeds[major] = float(feeds[major]) * bm
-    d = max(0.0, float(days))
+    d = max(0.0, float(days)) * max(0.0, float(occupation_mult))
     return {k: round(v * d, 4) for k, v in feeds.items() if v > 0.0}
+
+
+def harvest_holder_tag(owner: str = "", controller: str = "") -> str:
+    c = str(controller or "").strip().upper()
+    if c:
+        return c
+    return str(owner or "").strip().upper()
+
+
+def occupation_harvest_mult(owner: str = "", controller: str = "") -> float:
+    holder = harvest_holder_tag(owner, controller)
+    own = str(owner or "").strip().upper()
+    if not holder or not own or holder == own:
+        return 1.0
+    return float(OCCUPATION_HARVEST_MULT)
+
+
+def harvest_by_holder(
+    provinces: Sequence[Mapping[str, Any]],
+    *,
+    year: int = 1936,
+    days: float = 1.0,
+) -> Dict[str, Dict[str, float]]:
+    """Controller (occupier) harvests; legal owner gets nothing while occupied."""
+    by_tag: Dict[str, Dict[str, float]] = {}
+    for p in provinces or []:
+        if not isinstance(p, Mapping):
+            continue
+        holder = harvest_holder_tag(str(p.get("owner_tag") or ""), str(p.get("controller_tag") or ""))
+        if not holder:
+            continue
+        res = p.get("resources") if isinstance(p.get("resources"), Mapping) else p
+        dev = p.get("development") if isinstance(p.get("development"), Mapping) else {}
+        plants = p.get("plants") if isinstance(p.get("plants"), list) else None
+        occ = occupation_harvest_mult(str(p.get("owner_tag") or ""), str(p.get("controller_tag") or ""))
+        inc = harvest_factory_feeds(
+            res, year=year, development=dev, plants=plants, days=days, occupation_mult=occ
+        )
+        if holder not in by_tag:
+            by_tag[holder] = {}
+        merge_income(by_tag[holder], inc)
+    return {t: {k: round(v, 4) for k, v in row.items()} for t, row in by_tag.items()}
+
+
+def refuel_from_stockpile(
+    fuel_level: float,
+    fuel_use: float,
+    stockpile: Optional[Mapping[str, Any]] = None,
+    amount: float = 0.10,
+) -> Dict[str, Any]:
+    """Fill formation fuel from national fuel (then oil). Empty stock invents nothing."""
+    cur = max(0.0, min(1.0, float(fuel_level)))
+    use = max(0.0, float(fuel_use))
+    stock = {str(k): float(v or 0.0) for k, v in (stockpile or {}).items()}
+    if use <= 1e-9:
+        return {
+            "ok": True,
+            "fuel_after": cur,
+            "paid": 0.0,
+            "stockpile": stock,
+            "reason": "foot",
+        }
+    gap = min(max(0.0, float(amount)), 1.0 - cur)
+    if gap <= 1e-9:
+        return {
+            "ok": True,
+            "fuel_after": cur,
+            "paid": 0.0,
+            "stockpile": stock,
+            "reason": "full",
+        }
+    need = (gap / 0.10) * float(REFUEL_STOCK_PER_TENTH)
+    have = max(0.0, float(stock.get("fuel", 0.0))) + max(0.0, float(stock.get("oil", 0.0)))
+    if have <= 1e-9:
+        return {
+            "ok": False,
+            "fuel_after": cur,
+            "paid": 0.0,
+            "stockpile": stock,
+            "error": "empty_stock",
+        }
+    paid = min(have, need)
+    fill = paid / need if need > 0.0 else 0.0
+    take_fuel = min(max(0.0, float(stock.get("fuel", 0.0))), paid)
+    stock["fuel"] = max(0.0, float(stock.get("fuel", 0.0)) - take_fuel)
+    rest = paid - take_fuel
+    if rest > 1e-9:
+        stock["oil"] = max(0.0, float(stock.get("oil", 0.0)) - rest)
+    return {
+        "ok": True,
+        "fuel_after": round(cur + gap * fill, 4),
+        "paid": round(paid, 4),
+        "stockpile": stock,
+        "reason": "refueled",
+    }
 
 
 def merge_income(target: Dict[str, float], add: Mapping[str, Any]) -> Dict[str, float]:
@@ -411,6 +509,27 @@ def build_era_resource_industry_product() -> Dict[str, Any]:
     hidden = build_develop_resource_action(BAUXITE, "aluminum", year=1918, stockpile={"steel": 40})
     _ok(passes, fails, "cannot_develop_hidden_1918_alum", not bool(hidden.get("ok")))
 
+    owned = harvest_factory_feeds(BAKU_OIL, year=1936, days=30.0)
+    occ = harvest_by_holder(
+        [{"resources": BAKU_OIL, "owner_tag": "SOV", "controller_tag": "GER"}],
+        year=1936,
+        days=30.0,
+    )
+    _ok(passes, fails, "occupier_gets_oil", float((occ.get("GER") or {}).get("oil", 0)) > 0.0)
+    _ok(passes, fails, "owner_gets_nothing_while_occupied", "SOV" not in occ)
+    _ok(
+        passes,
+        fails,
+        "occupied_oil_less_than_owned",
+        float((occ.get("GER") or {}).get("oil", 0)) < float(owned.get("oil", 0)),
+    )
+    dry = refuel_from_stockpile(0.20, 0.40, {}, 0.10)
+    _ok(passes, fails, "empty_fuel_stock_no_refill", not bool(dry.get("ok")) and abs(float(dry.get("fuel_after", 1)) - 0.20) < 1e-6)
+    wet = refuel_from_stockpile(0.20, 0.40, {"fuel": 8.0}, 0.10)
+    _ok(passes, fails, "stockpile_refuels", bool(wet.get("ok")) and float(wet.get("fuel_after", 0)) > 0.20)
+    foot = refuel_from_stockpile(0.20, 0.0, {}, 0.10)
+    _ok(passes, fails, "foot_no_fuel_draw", bool(foot.get("ok")) and str(foot.get("reason")) == "foot")
+
     # Wiring — shipped Godot path, not a dual package.
     rhc = (
         (ROOT / "scripts" / "production" / "ResourceHarvestCalculator.gd").read_text(encoding="utf-8")
@@ -463,6 +582,17 @@ def build_era_resource_industry_product() -> Dict[str, Any]:
         "hud_icons": "func resource_icon" in hud and "steel" in hud,
         "icon_pngs": (icons_dir / "steel_24.png").is_file() and (icons_dir / "fuel_24.png").is_file(),
         "harness_era": "scale_deposits_for_year" in harness and "develop_province_resource" in harness,
+        "harness_occupier": "controller_tag" in harness and "refuel_formation_from_stockpile" in harness,
+        "gd_occupier": "func harvest_holder_tag" in rhc and "func occupation_harvest_mult" in rhc,
+        "gd_refuel": "func refuel_from_stockpile" in rhc,
+        "pm_controller": "controller_tag" in pm and "occupation_harvest_mult" in pm,
+        "pm_refuel": "func refuel_formation_from_stockpile" in pm,
+        "tm_refuel": "refuel_formation_from_stockpile"
+        in (
+            (ROOT / "scripts" / "autoload" / "TimeManager.gd").read_text(encoding="utf-8")
+            if (ROOT / "scripts" / "autoload" / "TimeManager.gd").is_file()
+            else ""
+        ),
         "on_official_quick": "test_era_resource_deposits_product" in gates,
     }
     for name, ok in wiring.items():

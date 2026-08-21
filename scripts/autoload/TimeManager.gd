@@ -490,7 +490,11 @@ func _tick_out_of_combat_recovery() -> void:
 			if not marching:
 				var fuel_need := float(LandCombatPower.composition_from_formation(f).get("fuel_use", 0.0))
 				if fuel_need > 1e-9:
-					LandCombatPower.apply_fuel_resupply(f, 0.10)
+					if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("refuel_formation_from_stockpile"):
+						var rfid := str(f.formation_id) if "formation_id" in f else str(fid)
+						ProductionManager.refuel_formation_from_stockpile(rfid, 0.10)
+					else:
+						LandCombatPower.apply_fuel_resupply(f, 0.10)
 		var org := float(f.organization) if "organization" in f else 1.0
 		var plan := float(f.planning) if "planning" in f else 1.0
 		var strn := float(f.strength) if "strength" in f else 1.0

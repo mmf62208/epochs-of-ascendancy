@@ -3496,7 +3496,11 @@ func daily_resource_harvest_tick(days: float = 1.0) -> Dictionary:
 				var p: Province = (all_p as Dictionary)[pid_key] as Province
 				if p == null:
 					continue
-				var tag := str(p.owner_tag).strip_edges().to_upper()
+				var owner := str(p.owner_tag).strip_edges().to_upper()
+				var ctrl := str(p.controller_tag).strip_edges().to_upper() if "controller_tag" in p else ""
+				var tag := owner
+				if rhc.has_method("harvest_holder_tag"):
+					tag = str(rhc.harvest_holder_tag(owner, ctrl))
 				var res: Dictionary = p.resources if p.resources is Dictionary else {}
 				var pid := int(p.id) if "id" in p else int(pid_key)
 				if tag.is_empty() or res.is_empty():
@@ -3511,6 +3515,14 @@ func daily_resource_harvest_tick(days: float = 1.0) -> Dictionary:
 					scaled = rhc.scale_deposits_for_year(res, year)
 				if scaled.is_empty():
 					continue
+				var occ := 1.0
+				if rhc.has_method("occupation_harvest_mult"):
+					occ = float(rhc.occupation_harvest_mult(owner, ctrl))
+				if occ < 0.999:
+					var taxed: Dictionary = {}
+					for rk in scaled:
+						taxed[rk] = float(scaled[rk]) * occ
+					scaled = taxed
 				owners[tag] = true
 				var plants: Array = []
 				if typeof(FactoryManager) != TYPE_NIL and FactoryManager.has_method("get_resource_plants_in_province") and pid > 0:
@@ -3615,6 +3627,35 @@ func develop_province_resource(province_id: int, resource_key: String = "") -> D
 		"year": year,
 		"action": action,
 	}
+
+
+## Fill formation fuel_level from national fuel (then oil). Empty stock invents nothing. Foot skips.
+func refuel_formation_from_stockpile(formation_id: String, amount: float = 0.10) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return {"ok": false, "error": "no_formation"}
+	var f: Formation = LeaderManager.get_formation(fid) if LeaderManager.has_method("get_formation") else null
+	if f == null:
+		return {"ok": false, "error": "no_formation"}
+	var rhc = load("res://scripts/production/ResourceHarvestCalculator.gd")
+	if rhc == null or not rhc.has_method("refuel_from_stockpile"):
+		return {"ok": false, "error": "no_calculator"}
+	var use := 0.0
+	var cur := 1.0
+	if "fuel_level" in f:
+		cur = float(f.fuel_level)
+	var comp: Dictionary = LandCombatPower.composition_from_formation(f)
+	use = float(comp.get("fuel_use", 0.0))
+	var result: Dictionary = rhc.refuel_from_stockpile(cur, use, national_stockpile, amount) as Dictionary
+	if not bool(result.get("ok", false)):
+		return result
+	var drawn: Dictionary = result.get("drawn", {}) as Dictionary if result.get("drawn") is Dictionary else {}
+	for rk in drawn:
+		national_stockpile[str(rk)] = maxf(0.0, float(national_stockpile.get(rk, 0.0)) - float(drawn[rk]))
+	if "fuel_level" in f:
+		f.fuel_level = float(result.get("fuel_after", cur))
+	result["formation_id"] = fid
+	return result
 
 
 ## Bootstrap resource/energy plants from province deposits (once per session unless force).
