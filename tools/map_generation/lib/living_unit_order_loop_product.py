@@ -163,7 +163,8 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     i_dismiss = "_dismiss_inspector_and_restore_input" in i_block
     input_fn = _slice(ren, "_input")
     esc_in_input = "KEY_ESCAPE" in input_fn and "_dismiss_inspector_and_restore_input" in input_fn
-    i_ok = i_no_setup and i_dismiss and esc_in_input
+    i_in_input = "KEY_I" in input_fn and "_inspector_stack_blocking_input" in input_fn
+    i_ok = i_no_setup and i_dismiss and esc_in_input and i_in_input
     wiring["i_hang_safe"] = i_ok
     (passes if i_ok else fails).append("i_hang_safe")
 
