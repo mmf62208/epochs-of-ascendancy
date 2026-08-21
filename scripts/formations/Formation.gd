@@ -74,6 +74,8 @@ const LAND_MISSION_ARTILLERY_PREP := "ARTILLERY_PREP"  # Pre-bombard before assa
 @export var combat_log: Array[Dictionary] = []  # per-unit combat history: {date, province_id, result, key_factors: Array[String], leader: String, outcome: String} - follows unit like leader logs
 ## Map province where this formation is stationed (division movement / engineer repair).
 @export var stationed_province_id: int = -1
+## Air theater: player-assigned strategic region (0 = unassigned). CAS uses this vs the land battle hex region.
+@export var assigned_region_id: int = 0
 
 ## For air formations: current range/loadout config chosen by player (Ferry_Long_Range, Combat_Load, Escort_Balanced).
 ## Used by AircraftDesignSystem for effective range calculations.

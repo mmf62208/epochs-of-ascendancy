@@ -29,6 +29,19 @@ static func lines_for(formation: Object) -> PackedStringArray:
 	if "strength" in formation:
 		str_v = float(formation.get("strength"))
 	lines.append("Strength %.0f%%" % _as_percent(str_v))
+	var ft := str(formation.get("formation_type")) if "formation_type" in formation else ""
+	if ft == "air_wing" or ft == "air_squadron" or ft == "air_group":
+		var mission := str(formation.get("current_air_mission")) if "current_air_mission" in formation else "CAS"
+		if mission.strip_edges().is_empty():
+			mission = "CAS"
+		var rid := int(formation.get("assigned_region_id")) if "assigned_region_id" in formation else 0
+		var rng := str(formation.get("air_range_config")) if "air_range_config" in formation else "COMBAT_LOAD"
+		var fuel_pct := 100.0
+		if "fuel_level" in formation:
+			fuel_pct = clampf(float(formation.get("fuel_level")), 0.0, 1.0) * 100.0
+		lines.append(
+			"%s · region %d · range %s · fuel %.0f%%" % [mission, rid, rng, fuel_pct]
+		)
 	var comp: Dictionary = LandCombatPower.composition_from_formation(formation)
 	if bool(comp.get("has_composition", false)) or float(comp.get("armor", 0.0)) > 0.001:
 		var toe := int(comp.get("manpower", 0))

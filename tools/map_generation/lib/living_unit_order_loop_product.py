@@ -18,6 +18,8 @@ GATES = ROOT / "tools" / "eoa_full_test_gates.sh"
 TIME_MANAGER = ROOT / "scripts" / "autoload" / "TimeManager.gd"
 MAP_MANAGER = ROOT / "scripts" / "map" / "MapManager.gd"
 HOOK_GD = ROOT / "scripts" / "ui" / "PlayNextHook.gd"
+LEADER_MANAGER = ROOT / "scripts" / "leaders" / "LeaderManager.gd"
+STRIP_GD = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
 
 GER_FRONT = 710173
 FRA_FRONT = 710739
@@ -26,6 +28,8 @@ CHI_FRONT = 902598
 JAP_REAR = 903966
 ENG_CHANNEL = 950001
 ENG_NORTH_SEA = 950000
+MAGINOT_REGION = 100
+GER_CAPITAL = 710300
 
 
 def _slice(src: str, func_name: str) -> str:
@@ -78,6 +82,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "_update_unit_icons_for_test" in park
         and "_station_world_major_oob_chips" in park
         and "_station_eng_channel_fleet" in park
+        and "_station_ger_maginot_air_wing" in park
     )
     wiring["park_maginot"] = park_ok
     (passes if park_ok else fails).append("park_maginot")
@@ -132,6 +137,23 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     next_choke = "choke_flag" in hook and "fleet_choke" in hook
     wiring["choke_flag"] = choke_ok and g_flag and next_choke
     (passes if wiring["choke_flag"] else fails).append("choke_flag")
+
+    wing_fn = _slice(ren, "_station_ger_maginot_air_wing")
+    lm = LEADER_MANAGER.read_text(encoding="utf-8") if LEADER_MANAGER.is_file() else ""
+    strip = STRIP_GD.read_text(encoding="utf-8") if STRIP_GD.is_file() else ""
+    wing_ok = (
+        bool(wing_fn)
+        and str(MAGINOT_REGION) in wing_fn
+        and str(GER_CAPITAL) in wing_fn
+        and "assign_air_wing_to_region" in wing_fn
+        and "func assign_air_wing_to_region" in lm
+        and "func land_battle_cas_power" in bm
+        and "assigned_region_id" in _slice(bm, "_land_battle_cas")
+        and "range" in strip
+        and "fuel" in strip
+    )
+    wiring["air_region_cas"] = wing_ok
+    (passes if wing_ok else fails).append("air_region_cas")
 
     chrome = _slice(ren, "_attach_unit_counter_chrome")
     chrome_ok = (
@@ -296,6 +318,9 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "ENG fleet on sea hex" in harness
         and "ENG sea-hop ok" in harness
         and "Channel choke flagged" in harness
+        and "GER wing assigned Maginot-region" in harness
+        and "CAS-delta" in harness
+        and "range/fuel visible" in harness
         and "enqueue_own_land_march" in harness
         and "enqueue_own_sea_hop" in harness
         and "start_land_battle" in harness

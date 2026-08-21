@@ -22037,6 +22037,10 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	result["fleet"] = fleet
 	result["fleet_pid"] = int(fleet.get("pid", 0))
 	result["fleet_ok"] = bool(fleet.get("ok", false))
+	var wing: Dictionary = _station_ger_maginot_air_wing()
+	result["wing"] = wing
+	result["wing_ok"] = bool(wing.get("ok", false))
+	result["wing_region"] = int(wing.get("region_id", 0))
 	show_unit_counters = true
 	_update_unit_icons_for_test()
 	_sync_unit_counter_visibility()
@@ -22047,9 +22051,62 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 		_center_camera_on_province(GER_FRONT, "soft")
 		_toast_easy_unit_orders()
 	print(
-		"MapRenderer: playable front chips GER=%d FRA=%d pid=%d jap=%d fleet=%d"
-		% [int(result["ger"]), int(result["fra"]), GER_FRONT, int(result["jap"]), int(result["fleet_pid"])]
+		"MapRenderer: playable front chips GER=%d FRA=%d pid=%d jap=%d fleet=%d wing_r=%d"
+		% [
+			int(result["ger"]),
+			int(result["fra"]),
+			GER_FRONT,
+			int(result["jap"]),
+			int(result["fleet_pid"]),
+			int(result["wing_region"]),
+		]
 	)
+	return result
+
+
+## GER CAS wing assigned to Maginot strategic region 100 (Germany, contains 710173).
+func _station_ger_maginot_air_wing() -> Dictionary:
+	const REGION := 100
+	const BASE := 710300
+	const DESIGN := "bf109g_fighter"
+	var result := {"ok": false, "tag": "GER", "pid": BASE, "fid": "", "region_id": REGION}
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+		return result
+	var target: Object = null
+	for f in LeaderManager.get_formations_for_country("GER"):
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft != Formation.TYPE_AIR_WING and ft != Formation.TYPE_AIR_SQUADRON and ft != Formation.TYPE_AIR_GROUP:
+			continue
+		target = f
+		break
+	if target == null and LeaderManager.has_method("field_designed_unit"):
+		var fielded: Variant = LeaderManager.field_designed_unit("GER", DESIGN, BASE, "air")
+		if fielded is Dictionary and bool((fielded as Dictionary).get("ok", false)):
+			result["fid"] = str((fielded as Dictionary).get("formation_id", ""))
+			if LeaderManager.has_method("get_formation"):
+				target = LeaderManager.get_formation(result["fid"])
+	if target == null:
+		return result
+	if "stationed_province_id" in target:
+		target.stationed_province_id = BASE
+	var fid := str(target.formation_id) if "formation_id" in target else str(result.get("fid", ""))
+	if LeaderManager.has_method("assign_air_wing_to_region"):
+		var assigned: Variant = LeaderManager.assign_air_wing_to_region(fid, REGION, "CAS")
+		if assigned is Dictionary and bool((assigned as Dictionary).get("ok", false)):
+			result["ok"] = true
+			result["fid"] = fid
+			result["mission"] = str((assigned as Dictionary).get("mission", "CAS"))
+			result["range_config"] = str((assigned as Dictionary).get("range_config", ""))
+			result["fuel_level"] = float((assigned as Dictionary).get("fuel_level", 1.0))
+			return result
+	if "assigned_region_id" in target:
+		target.assigned_region_id = REGION
+	if "current_air_mission" in target:
+		target.current_air_mission = "CAS"
+	result["fid"] = fid
+	result["ok"] = not fid.is_empty()
 	return result
 
 

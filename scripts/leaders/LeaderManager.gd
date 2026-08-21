@@ -547,6 +547,43 @@ func field_designed_unit(
 	}
 
 
+## Player-assign an air wing to a strategic region and a CAS-class mission.
+func assign_air_wing_to_region(
+	formation_id: String,
+	region_id: int,
+	mission: String = "CAS",
+) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var rid := int(region_id)
+	var result := {"ok": false, "fid": fid, "region_id": rid, "mission": ""}
+	if fid.is_empty() or rid <= 0:
+		result["error"] = "bad_args"
+		return result
+	var f: Formation = get_formation(fid)
+	if f == null:
+		result["error"] = "unknown"
+		return result
+	var ft := str(f.formation_type) if "formation_type" in f else ""
+	if ft != Formation.TYPE_AIR_WING and ft != Formation.TYPE_AIR_SQUADRON and ft != Formation.TYPE_AIR_GROUP:
+		result["error"] = "not_air"
+		return result
+	if "assigned_region_id" in f:
+		f.assigned_region_id = rid
+	var m := mission.strip_edges().to_upper()
+	if m.is_empty():
+		m = "CAS"
+	if f.has_method("set_air_mission"):
+		f.set_air_mission(m)
+	elif "current_air_mission" in f:
+		f.current_air_mission = m
+	result["ok"] = true
+	result["mission"] = str(f.current_air_mission) if "current_air_mission" in f else m
+	result["range_config"] = str(f.air_range_config) if "air_range_config" in f else ""
+	result["fuel_level"] = float(f.fuel_level) if "fuel_level" in f else 1.0
+	result["station"] = int(f.stationed_province_id) if "stationed_province_id" in f else -1
+	return result
+
+
 func _stamp_formation_composition(f: Formation, extras: Dictionary) -> void:
 	if f == null:
 		return
@@ -3593,6 +3630,9 @@ func get_save_data() -> Dictionary:
 			"infantry_bns": int(f.get_meta("infantry_bns", 1)) if f.has_meta("infantry_bns") else 1,
 			"tank_bns": int(f.get_meta("tank_bns", 0)) if f.has_meta("tank_bns") else 0,
 			"fuel_level": float(f.fuel_level) if "fuel_level" in f else 1.0,
+			"assigned_region_id": int(f.assigned_region_id) if "assigned_region_id" in f else 0,
+			"current_air_mission": str(f.current_air_mission) if "current_air_mission" in f else "",
+			"air_range_config": str(f.air_range_config) if "air_range_config" in f else "",
 			"last_manpower_loss": int(f.last_manpower_loss) if "last_manpower_loss" in f else 0,
 		}
 
@@ -3733,6 +3773,12 @@ func apply_save_data(data: Dictionary) -> void:
 				f.set_meta("tank_bns", clampi(int(fd.get("tank_bns", 0)), 0, 3))
 			if "fuel_level" in f:
 				f.fuel_level = clampf(float(fd.get("fuel_level", 1.0)), 0.0, 1.0)
+			if "assigned_region_id" in f:
+				f.assigned_region_id = int(fd.get("assigned_region_id", 0))
+			if "current_air_mission" in f and str(fd.get("current_air_mission", "")).strip_edges() != "":
+				f.current_air_mission = str(fd.get("current_air_mission"))
+			if "air_range_config" in f and str(fd.get("air_range_config", "")).strip_edges() != "":
+				f.air_range_config = str(fd.get("air_range_config"))
 			if "last_manpower_loss" in f:
 				f.last_manpower_loss = int(fd.get("last_manpower_loss", 0))
 			if fd.get("combat_log") is Array:

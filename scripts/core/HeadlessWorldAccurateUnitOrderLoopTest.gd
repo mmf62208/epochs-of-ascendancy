@@ -21,6 +21,8 @@ const ENG_TAG := "ENG"
 const ENG_CHANNEL := 950001  # English Channel Zone choke
 const ENG_NORTH_SEA := 950000  # adjacent sea hop
 const ENG_FLEET_DESIGN := "king_george_v_class_bb"
+const GER_CAPITAL := 710300  # Berlin — Maginot region 100, not within 2 hops of 710739
+const MAGINOT_REGION := 100  # strategic region "Germany" contains 710173
 const GER_FID := "uol_ger_maginot"
 const FRA_FID := "uol_fra_maginot"
 const GER_FID_2 := "uol_ger_stack"
@@ -84,6 +86,7 @@ func _run() -> void:
 		return
 	_test_front_chips()
 	_test_eng_channel_fleet()
+	_test_ger_maginot_air_wing()
 	_test_organize()
 	_test_completing_bars()
 	_test_designer_field()
@@ -106,9 +109,10 @@ func _setup_maginot_map() -> bool:
 		adj_sys.call("load_adjacency", adj_path)
 
 	var rows: Array = [
-		{"id": GER_FRONT, "tag": ATT_TAG, "name": "Baden-Baden GER"},
-		{"id": FRA_FRONT, "tag": DEF_TAG, "name": "Bas-Rhin FRA"},
-		{"id": GER_REAR, "tag": ATT_TAG, "name": "Rastatt GER rear"},
+		{"id": GER_FRONT, "tag": ATT_TAG, "name": "Baden-Baden GER", "region": MAGINOT_REGION},
+		{"id": FRA_FRONT, "tag": DEF_TAG, "name": "Bas-Rhin FRA", "region": 106},
+		{"id": GER_REAR, "tag": ATT_TAG, "name": "Rastatt GER rear", "region": MAGINOT_REGION},
+		{"id": GER_CAPITAL, "tag": ATT_TAG, "name": "Berlin GER", "region": MAGINOT_REGION},
 		{"id": JAP_FRONT, "tag": JAP_TAG, "name": "JAP CHI-JAP edge"},
 		{"id": CHI_FRONT, "tag": CHI_TAG, "name": "CHI vs JAP edge"},
 		{"id": JAP_REAR, "tag": JAP_TAG, "name": "JAP CHI-JAP rear"},
@@ -136,6 +140,7 @@ func _setup_maginot_map() -> bool:
 		p.set("terrain", "sea" if sea else "plains")
 		p.set("name", str(row["name"]))
 		p.set("is_sea", sea)
+		p.set("strategic_region_id", int(row.get("region", 0)))
 		p.set("infrastructure", 4)
 		p.set("development_level", 3)
 		p.set("core_for", [str(row["tag"])])
@@ -217,7 +222,7 @@ func _setup_map_renderer_pins() -> bool:
 		_mr.container = container
 	root.add_child(_mr)
 
-	var pids: Array = [GER_FRONT, FRA_FRONT, GER_REAR, JAP_FRONT, CHI_FRONT, JAP_REAR, ENG_CHANNEL, ENG_NORTH_SEA]
+	var pids: Array = [GER_FRONT, FRA_FRONT, GER_REAR, GER_CAPITAL, JAP_FRONT, CHI_FRONT, JAP_REAR, ENG_CHANNEL, ENG_NORTH_SEA]
 	for pid_v in pids:
 		var pid := int(pid_v)
 		var gp = _mm.call("get_province", pid) if _mm.has_method("get_province") else null
@@ -256,6 +261,13 @@ func _setup_map_renderer_pins() -> bool:
 			_fail("ENG fleet pid want %d got %s" % [ENG_CHANNEL, str(parked.get("fleet_pid"))])
 			return false
 		_pass("ENG fleet parked on Channel %d" % ENG_CHANNEL)
+		if not bool(parked.get("wing_ok", false)):
+			_fail("GER Maginot air wing not assigned")
+			return false
+		if int(parked.get("wing_region", 0)) != MAGINOT_REGION:
+			_fail("GER wing region want %d got %s" % [MAGINOT_REGION, str(parked.get("wing_region"))])
+			return false
+		_pass("GER wing assigned Maginot region %d" % MAGINOT_REGION)
 	return true
 
 
@@ -537,6 +549,70 @@ func _test_eng_channel_fleet() -> void:
 			_fail("ENG NEXT want choke got %s" % str(rec.get("source")))
 		else:
 			_pass("ENG NEXT choke source=%s" % str(rec.get("source")))
+
+
+func _test_ger_maginot_air_wing() -> void:
+	var wing: Object = null
+	if _lm != null and _lm.has_method("get_formations_for_country"):
+		for f in _lm.call("get_formations_for_country", ATT_TAG):
+			if f == null:
+				continue
+			var ft := str(f.formation_type) if "formation_type" in f else ""
+			if ft != "air_wing" and ft != "air_squadron" and ft != "air_group":
+				continue
+			wing = f
+			break
+	if wing == null:
+		_fail("no GER air wing")
+		return
+	var rid := int(wing.assigned_region_id) if "assigned_region_id" in wing else 0
+	if rid != MAGINOT_REGION:
+		_fail("GER wing assigned region want %d got %d" % [MAGINOT_REGION, rid])
+		return
+	_pass("GER wing assigned Maginot-region %d" % rid)
+	var battle := {
+		"from_id": GER_FRONT,
+		"to_id": FRA_FRONT,
+		"att_tag": ATT_TAG,
+		"def_tag": DEF_TAG,
+	}
+	if _bm == null or not _bm.has_method("land_battle_cas_power"):
+		_fail("land_battle_cas_power missing")
+		return
+	var cas_on: Dictionary = _bm.call("land_battle_cas_power", battle)
+	var att_on := float(cas_on.get("cas_att", 0.0))
+	print("  [INFO] CAS assigned %s" % str(cas_on))
+	if att_on < 1.0:
+		_fail("assigned Maginot-region CAS want >0 got %s" % str(att_on))
+		return
+	if "assigned_region_id" in wing:
+		wing.assigned_region_id = 0
+	var cas_off: Dictionary = _bm.call("land_battle_cas_power", battle)
+	var att_off := float(cas_off.get("cas_att", 0.0))
+	print("  [INFO] CAS unassigned %s" % str(cas_off))
+	if att_off + 0.01 >= att_on:
+		_fail("CAS-delta missing assigned=%s unassigned=%s" % [str(att_on), str(att_off)])
+		return
+	_pass("CAS-delta assigned=%.1f vs unassigned=%.1f" % [att_on, att_off])
+	if "assigned_region_id" in wing:
+		wing.assigned_region_id = 2
+	var cas_wrong: Dictionary = _bm.call("land_battle_cas_power", battle)
+	if float(cas_wrong.get("cas_att", 0.0)) + 0.01 >= att_on:
+		_fail("wrong-region CAS still high: %s" % str(cas_wrong))
+		return
+	if "assigned_region_id" in wing:
+		wing.assigned_region_id = MAGINOT_REGION
+	var strip_scr: Script = load("res://scripts/ui/UnitCardCombatStrip.gd") as Script
+	if strip_scr == null:
+		_fail("UnitCardCombatStrip missing")
+		return
+	var lines: PackedStringArray = strip_scr.call("lines_for", wing)
+	var joined := " ".join(lines)
+	print("  [INFO] air card %s" % joined)
+	if "range" not in joined.to_lower() or "fuel" not in joined.to_lower():
+		_fail("air card missing range/fuel: %s" % joined)
+		return
+	_pass("GER wing range/fuel visible")
 
 
 func _test_designer_field() -> void:

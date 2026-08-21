@@ -14,8 +14,10 @@ from living_unit_order_loop_product import (  # noqa: E402
     ENG_CHANNEL,
     ENG_NORTH_SEA,
     FRA_FRONT,
+    GER_CAPITAL,
     GER_FRONT,
     JAP_FRONT,
+    MAGINOT_REGION,
     build_living_unit_order_loop_product,
     living_unit_order_loop_integrity,
 )
@@ -29,6 +31,8 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
         self.assertEqual(CHI_FRONT, 902598)
         self.assertEqual(ENG_CHANNEL, 950001)
         self.assertEqual(ENG_NORTH_SEA, 950000)
+        self.assertEqual(MAGINOT_REGION, 100)
+        self.assertEqual(GER_CAPITAL, 710300)
 
     def test_product_wiring(self) -> None:
         p = build_living_unit_order_loop_product(check_wiring=True)
@@ -41,6 +45,7 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
             "park_channel_fleet",
             "sea_hop_api",
             "choke_flag",
+            "air_region_cas",
             "chip_str_num",
             "inverse_zoom_scale",
             "chip_on_centroid",

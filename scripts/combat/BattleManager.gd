@@ -1609,6 +1609,11 @@ func _stamp_side_supply_plain(battle: Dictionary, arr_key: String, one_key: Stri
 			f.last_supply_plain = plain
 
 
+## Public CAS snapshot for a land battle dict (assigned-region + nearby station).
+func land_battle_cas_power(battle: Dictionary) -> Dictionary:
+	return _land_battle_cas(battle)
+
+
 func _land_battle_cas(battle: Dictionary) -> Dictionary:
 	var cas_att := 0.0
 	var cas_def := 0.0
@@ -1618,12 +1623,15 @@ func _land_battle_cas(battle: Dictionary) -> Dictionary:
 	if typeof(forms) != TYPE_DICTIONARY:
 		return {"cas_att": cas_att, "cas_def": cas_def}
 	var to_id := int(battle.get("to_id", -1))
+	var from_id := int(battle.get("from_id", -1))
 	var att_tag := str(battle.get("att_tag", "")).strip_edges().to_upper()
 	var def_tag := str(battle.get("def_tag", "")).strip_edges().to_upper()
 	var near := _pids_within_land_hops(to_id, 2)
-	var region_id := 0
+	var to_region := 0
+	var from_region := 0
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
-		region_id = int(MapManager.get_province_region_id(to_id))
+		to_region = int(MapManager.get_province_region_id(to_id))
+		from_region = int(MapManager.get_province_region_id(from_id))
 	for fid in forms:
 		var f: Formation = forms[fid] as Formation
 		if f == null or not _formation_is_air_wing(f):
@@ -1635,7 +1643,11 @@ func _land_battle_cas(battle: Dictionary) -> Dictionary:
 		if mission != "CAS" and mission != "CLOSE_AIR_SUPPORT" and mission != "INTERDICTION" and mission != "AIR_SUPERIORITY":
 			continue
 		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
-		if not _cas_station_in_range(sid, to_id, near, region_id):
+		var assigned := int(f.assigned_region_id) if "assigned_region_id" in f else 0
+		var region_hit := assigned > 0 and (
+			(to_region > 0 and assigned == to_region) or (from_region > 0 and assigned == from_region)
+		)
+		if not region_hit and not _cas_station_in_range(sid, to_id, near, to_region):
 			continue
 		var rdy := _formation_stat(f, "readiness", 1.0)
 		var cas_m := 1.2 if mission == "CAS" or mission == "CLOSE_AIR_SUPPORT" else 1.0

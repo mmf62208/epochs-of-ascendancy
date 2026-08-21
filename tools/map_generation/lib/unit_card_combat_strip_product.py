@@ -78,6 +78,21 @@ def lines_for(formation: Any) -> List[str]:
         except (TypeError, ValueError):
             str_v = 1.0
     out.append("Strength %.0f%%" % _as_percent(str_v))
+    ft = str(data.get("formation_type") or "").strip().lower()
+    if ft in ("air_wing", "air_squadron", "air_group"):
+        mission = str(data.get("current_air_mission") or "CAS").strip() or "CAS"
+        try:
+            rid = int(data.get("assigned_region_id") or 0)
+        except (TypeError, ValueError):
+            rid = 0
+        rng = str(data.get("air_range_config") or "COMBAT_LOAD").strip() or "COMBAT_LOAD"
+        try:
+            fuel_pct = float(data.get("fuel_level") if data.get("fuel_level") is not None else 1.0)
+        except (TypeError, ValueError):
+            fuel_pct = 1.0
+        if fuel_pct <= 1.5:
+            fuel_pct *= 100.0
+        out.append("%s · region %d · range %s · fuel %.0f%%" % (mission, rid, rng, fuel_pct))
     if "toe_fill" in data or "stock_rifles" in data:
         try:
             fill_pct = float(data.get("toe_fill") or 0.0) * 100.0
