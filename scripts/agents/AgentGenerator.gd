@@ -58,6 +58,9 @@ static func generate_agent(country_tag: String, year: int = 1936) -> Agent:
 		"res://assets/graphics/portraits/agents/double_agent.png",
 		"res://assets/graphics/portraits/agents/elite_spy.png",
 		"res://assets/graphics/portraits/agents/visionary_scientist.png",
+		"res://assets/graphics/portraits/agents/agent_male.png",
+		"res://assets/graphics/portraits/agents/agent_female.png",
+		"res://assets/graphics/portraits/agents/agent_italian.png",
 	]
 	agent.portrait_path = agent_portraits[randi() % agent_portraits.size()]
 
