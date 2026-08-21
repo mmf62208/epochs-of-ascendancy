@@ -1,0 +1,9 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+
+[deps]
+source_file="res://assets/graphics/portraits/leaders/ukr_nav_1936.png"
+
+[params]
+compress/mode=0

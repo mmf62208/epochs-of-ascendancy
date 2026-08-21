@@ -1,0 +1,9 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+
+[deps]
+source_file="res://assets/graphics/portraits/leaders/chl_gen_1936_64.png"
+
+[params]
+compress/mode=0
