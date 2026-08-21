@@ -280,9 +280,9 @@ static func show_minimap_munitions_detail(t: Tier) -> bool:
 static func nation_label_font_px(t: Tier) -> int:
 	match t:
 		Tier.STRATEGIC:
-			return 26
+			return 36
 		Tier.OPERATIONAL:
-			return 20
+			return 28
 		_:
 			return 16
 

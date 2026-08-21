@@ -399,6 +399,7 @@ func _build_nation_labels(province_centroids: Dictionary, provinces: Dictionary)
 		var lbl := _make_label(str(e["name"]), center, font_px, e["color"] as Color)
 		lbl.name = "NationLabel_%s" % tag
 		add_child(lbl)
+		_fit_and_center_label(lbl)
 		_nation_labels[tag] = lbl
 		nation_label_nodes.append(lbl)
 	_resolve_label_collisions(nation_label_nodes, 120.0)
@@ -429,6 +430,7 @@ func _build_region_labels(province_centroids: Dictionary) -> void:
 		var lbl := _make_label(rname, center, 16, Color(0.78, 0.82, 0.92, 0.9))
 		lbl.name = "RegionLabel_%d" % rid
 		add_child(lbl)
+		_fit_and_center_label(lbl)
 		_region_labels[rid] = lbl
 
 
@@ -504,6 +506,7 @@ func _build_state_labels(province_centroids: Dictionary, provinces: Dictionary) 
 		lbl.name = "StateLabel_%d" % sid
 		lbl.visible = false
 		add_child(lbl)
+		_fit_and_center_label(lbl)
 		_state_labels[sid] = lbl
 		state_nodes.append(lbl)
 	_resolve_label_collisions(state_nodes, 110.0)
@@ -660,11 +663,26 @@ func _make_label(text: String, pos: Vector2, font_px: int, col: Color) -> Label:
 	lbl.add_theme_font_size_override("font_size", maxi(font_px, 14))
 	lbl.add_theme_color_override("font_color", readable)
 	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 0.95))
-	lbl.add_theme_constant_override("outline_size", 5)
+	lbl.add_theme_constant_override("outline_size", 3)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.z_index = 12
+	lbl.clip_text = false
+	lbl.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
+	lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+	lbl.set_meta("label_anchor", pos)
 	return lbl
+
+
+func _fit_and_center_label(lbl: Label) -> void:
+	lbl.reset_size()
+	var ms := lbl.get_minimum_size()
+	lbl.custom_minimum_size = Vector2(ms.x + 16.0, ms.y + 10.0)
+	lbl.reset_size()
+	if lbl.has_meta("label_anchor"):
+		lbl.position = (lbl.get_meta("label_anchor") as Vector2) - lbl.size * 0.5
+	else:
+		lbl.position = lbl.position - lbl.size * 0.5
 
 
 func _apply_tier_visibility(tier: int) -> void:
@@ -689,6 +707,7 @@ func _apply_tier_visibility(tier: int) -> void:
 				var c := l.get_theme_color("font_color")
 				c.a = MapZoomLODScript.label_alpha_for_tier(tier, "nation")
 				l.add_theme_color_override("font_color", c)
+				_fit_and_center_label(l)
 	for rid_var in _region_labels.keys():
 		var lbl_r: Variant = _region_labels[rid_var]
 		if lbl_r is Label:
@@ -736,3 +755,4 @@ func _apply_state_label_visibility() -> void:
 			var c3 := l.get_theme_color("font_color")
 			c3.a = MapZoomLODScript.label_alpha_for_tier(_current_tier, "region")
 			l.add_theme_color_override("font_color", c3)
+			_fit_and_center_label(l)
