@@ -1183,7 +1183,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		# G must stay cheap on world_accurate: 3520 BFS / preview_player_route freezes the input frame.
 		if event.keycode == KEY_G and not event.ctrl_pressed and not event.alt_pressed:
-			_toast_easy_unit_orders()
+			_request_hang_safe_supply_corridor()
 			get_viewport().set_input_as_handled()
 			return
 		# First-session help toast (? or Shift+/)
@@ -1296,6 +1296,13 @@ func _unhandled_input(event: InputEvent) -> void:
 					_select_province(resolved_province, resolved_node)
 					get_viewport().set_input_as_handled()
 					return
+			# G click-to-show: hex pick draws a budgeted corridor (never on the G key frame).
+			if _corridor_click_armed and not event.ctrl_pressed:
+				_corridor_click_armed = false
+				_select_province(resolved_province, resolved_node)
+				call_deferred("_deferred_budgeted_supply_corridor", pid)
+				get_viewport().set_input_as_handled()
+				return
 			if _try_set_attack_staging(resolved_province):
 				pass  # still open inspector below
 			if supply_mode and _handle_supply_province_click(resolved_province):
@@ -1921,6 +1928,7 @@ var _live_border_fronts_cache: Array = []
 var _live_border_fronts_cache_msec: int = 0
 var _live_border_fronts_busy: bool = false
 const _LIVE_BORDER_FRONTS_CACHE_MS: int = 8000
+var _corridor_click_armed: bool = false
 
 ## Instant B path: use precomputed/cached targets only; pan camera; toast. No outline, no scan.
 func _run_live_border_fronts_instant() -> void:
@@ -2135,6 +2143,77 @@ func highlight_corridor_capital_to_selected() -> Dictionary:
 			tag = str(p.owner_tag)
 	var source := _resolve_corridor_source_for_tag(tag, target)
 	return highlight_supply_corridor(source, target, 7.0, tag)
+
+
+## G / click-to-show: toast + arm or defer. Never BFS or preview_player_route on this frame.
+func _request_hang_safe_supply_corridor() -> void:
+	var target := selected_province_id
+	if target <= 0 and not _live_border_fronts_cache.is_empty():
+		var row0: Dictionary = _live_border_fronts_cache[0] if _live_border_fronts_cache[0] is Dictionary else {}
+		target = int(row0.get("province_id", -1))
+	if target > 0:
+		var toast := "Supply corridor · drawing capital → %s…" % _province_display_name(target)
+		if typeof(DebugOverlay) != TYPE_NIL:
+			DebugOverlay.toast_map_debug(toast)
+		_show_inspector_toast(toast, 3.5)
+		call_deferred("_deferred_budgeted_supply_corridor", target)
+		return
+	_corridor_click_armed = true
+	var wait := "Supply corridor · click a front or capital to draw path"
+	if typeof(DebugOverlay) != TYPE_NIL:
+		DebugOverlay.toast_map_debug(wait)
+	_show_inspector_toast(wait, 5.0)
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast(wait, 5.0)
+	print("MapRenderer: G hang-safe · click-to-show corridor (no BFS this frame)")
+
+
+## One hop-capped land BFS + polyline. Skips preview_player_route and hub-rank BFS.
+func _deferred_budgeted_supply_corridor(target_id: int) -> void:
+	if target_id <= 0:
+		return
+	var tag := ""
+	if provinces.has(target_id):
+		var p: Province = provinces[target_id] as Province
+		if p != null:
+			tag = str(p.owner_tag)
+	if tag.is_empty():
+		tag = _player_tag()
+	var source := _cheap_corridor_source_for_tag(tag)
+	if source <= 0:
+		var no_hub := "Corridor: no capital hub for %s" % (tag if not tag.is_empty() else "?")
+		if typeof(DebugOverlay) != TYPE_NIL:
+			DebugOverlay.toast_map_debug(no_hub)
+		_show_inspector_toast(no_hub, 3.5, true)
+		return
+	var path: Array = []
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("find_land_path"):
+		path = MapManager.find_land_path(source, target_id, tag, 40)
+	if path.size() < 2:
+		var no_msg := "Corridor: no land path %s → %s (click a connected front)" % [
+			_province_display_name(source), _province_display_name(target_id)
+		]
+		if typeof(DebugOverlay) != TYPE_NIL:
+			DebugOverlay.toast_map_debug(no_msg)
+		_show_inspector_toast(no_msg, 4.0, true)
+		return
+	highlight_supply_route_path(path, 7.0)
+	var hops := maxi(0, path.size() - 1)
+	var toast := "Supply · %s → %s · %d hops" % [
+		_province_display_name(source), _province_display_name(target_id), hops
+	]
+	if typeof(DebugOverlay) != TYPE_NIL:
+		DebugOverlay.toast_map_debug(toast)
+	_show_inspector_toast(toast, 4.5)
+	print("MapRenderer: hang-safe corridor %d hops (no multimodal preview)" % hops)
+
+
+## Capital / first key hub only — no multi-hub BFS ranking (hang-safe G).
+func _cheap_corridor_source_for_tag(owner_tag: String) -> int:
+	var candidates: Array = _collect_supply_hub_candidates_for_tag(owner_tag)
+	if not candidates.is_empty():
+		return int(candidates[0])
+	return -1
 
 
 func _province_display_name(pid: int) -> String:
@@ -21895,7 +21974,7 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 		counter.z_as_relative = false
 		# Inverse-zoom: readable at Europe view, not 15px specks.
 		counter.scale = Vector2.ONE * _unit_counter_scale_for_zoom()
-		# LOD: compact at strategic zoom; hidden only when master toggle off (U).
+		# LOD: hidden at strategic so hex picks (capitals/fronts) win; visible operational+.
 		counter.visible = _unit_counters_want_visible()
 		# Store formation ref so map clicks can open unit detail.
 		if ff != null:

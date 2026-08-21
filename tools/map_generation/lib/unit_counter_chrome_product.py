@@ -1,7 +1,7 @@
-"""Unit counter chrome — HOI-like chip stats + compact strategic pick.
+"""Unit counter chrome — HOI-like chip stats + strategic cull.
 
 Grep/wiring gate: nation plate + org/str bars on DemoUnitIcon, docked HUD card,
-strategic chips stay pickable (LOD no longer hides the whole layer).
+strategic chips culled so capitals/fronts stay clickable; pin-first when visible.
 """
 from __future__ import annotations
 
@@ -52,28 +52,27 @@ def build_unit_counter_chrome_product(*, check_wiring: bool = True) -> Dict[str,
             "summary": "unit_counter_chrome · FAIL · missing MapRenderer",
         }
 
-    compact_ok = show_unit_counters(TIER_STRATEGIC, True) and unit_counter_compact(
+    cull_ok = (not show_unit_counters(TIER_STRATEGIC, True)) and unit_counter_compact(
         TIER_STRATEGIC
     )
-    wiring["strategic_compact_pickable"] = compact_ok
-    if compact_ok:
-        passes.append("strategic_compact_pickable")
+    wiring["strategic_cull"] = cull_ok
+    if cull_ok:
+        passes.append("strategic_cull")
     else:
-        fails.append("strategic_compact_pickable")
+        fails.append("strategic_cull")
 
     counters_slice = _gd_func_slice(lod, "show_unit_counters")
-    lod_no_hide = (
+    lod_cull = (
         bool(counters_slice)
-        and "return t != Tier.STRATEGIC" not in counters_slice
-        and "return true" in counters_slice
+        and "return t != Tier.STRATEGIC" in counters_slice
     )
     lod_compact_fn = "func unit_counter_compact" in lod
-    wiring["lod_no_strategic_hide"] = lod_no_hide
+    wiring["lod_strategic_cull"] = lod_cull
     wiring["lod_compact_fn"] = lod_compact_fn
-    if lod_no_hide:
-        passes.append("lod_no_strategic_hide")
+    if lod_cull:
+        passes.append("lod_strategic_cull")
     else:
-        fails.append("lod_no_strategic_hide")
+        fails.append("lod_strategic_cull")
     if lod_compact_fn:
         passes.append("lod_compact_fn")
     else:
@@ -138,7 +137,7 @@ def build_unit_counter_chrome_product(*, check_wiring: bool = True) -> Dict[str,
         fails.append("card_has_stats")
 
     pick_fn = _gd_func_slice(ren, "_pick_unit_formation_at_world")
-    # Compact chips stay visible; skip only truly hidden (master off).
+    # Hidden chips (strategic cull / master off) must not steal hex clicks.
     pick_ok = bool(pick_fn) and "not counter.visible" in pick_fn
     wiring["pick_skips_hidden_only"] = pick_ok
     if pick_ok:
@@ -158,7 +157,7 @@ def build_unit_counter_chrome_product(*, check_wiring: bool = True) -> Dict[str,
         fails.append("shift_u_before_plain_u")
 
     if not check_wiring:
-        ok = compact_ok and bars_ok
+        ok = cull_ok and bars_ok
     else:
         ok = len(fails) == 0
 
@@ -176,7 +175,7 @@ def build_unit_counter_chrome_product(*, check_wiring: bool = True) -> Dict[str,
             "map_unit_counter_lod_product",
             "unit_centric_pick_product",
         ],
-        "policy": "hoi_chip_org_str_plate_docked_card_strategic_compact_pickable",
+        "policy": "hoi_chip_org_str_plate_docked_card_strategic_cull_pin_first_when_visible",
         "operational_shows": show_unit_counters(TIER_OPERATIONAL, True),
     }
 

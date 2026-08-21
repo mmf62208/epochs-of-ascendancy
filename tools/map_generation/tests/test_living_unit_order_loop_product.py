@@ -35,7 +35,7 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
             "pin_before_hex",
             "click_own_land_marches",
             "ctrl_click_starts_battle",
-            "g_toast_only",
+            "g_hang_safe",
             "march_api",
             "battle_api",
             "f5_boot_and_qa",

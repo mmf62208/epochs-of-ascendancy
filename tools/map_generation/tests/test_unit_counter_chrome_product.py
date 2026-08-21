@@ -22,8 +22,8 @@ class TestUnitCounterChromeProduct(unittest.TestCase):
         self.assertEqual(list(p.get("fail") or []), [], msg=p)
         wiring = p.get("wiring") or {}
         for key in (
-            "strategic_compact_pickable",
-            "lod_no_strategic_hide",
+            "strategic_cull",
+            "lod_strategic_cull",
             "lod_compact_fn",
             "stat_bars",
             "nation_plate",

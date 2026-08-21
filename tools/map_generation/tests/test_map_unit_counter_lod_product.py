@@ -20,7 +20,7 @@ from map_unit_counter_lod_product import (  # noqa: E402
 
 class TestUnitCounterLod(unittest.TestCase):
     def test_policy(self) -> None:
-        self.assertTrue(show_unit_counters(TIER_STRATEGIC, True))
+        self.assertFalse(show_unit_counters(TIER_STRATEGIC, True))
         self.assertTrue(show_unit_counters(TIER_OPERATIONAL, True))
         self.assertTrue(show_unit_counters(TIER_TACTICAL, True))
         self.assertFalse(show_unit_counters(TIER_TACTICAL, False))

@@ -1,7 +1,7 @@
 """Unit counter (OOB pin) LOD policy — mirrors MapZoomLOD.show_unit_counters.
 
-Strategic = compact chips (still pickable). Operational/tactical = full chips.
-Master toggle off hides all zoom tiers.
+Strategic culls chips so capitals/fronts stay clickable. Operational/tactical = full chips.
+Master toggle off hides all zoom tiers. Pin-first pick applies only to visible chips.
 """
 from __future__ import annotations
 
@@ -21,7 +21,7 @@ TIER_TACTICAL = 2
 def show_unit_counters(tier: int, master_enabled: bool = True) -> bool:
     if not master_enabled:
         return False
-    return True
+    return int(tier) != TIER_STRATEGIC
 
 
 def unit_counter_compact(tier: int) -> bool:
@@ -31,10 +31,10 @@ def unit_counter_compact(tier: int) -> bool:
 def build_map_unit_counter_lod_product() -> Dict[str, Any]:
     passes: List[str] = []
     fails: List[str] = []
-    if show_unit_counters(TIER_STRATEGIC, True) is True:
-        passes.append("strategic_compact_shows")
+    if show_unit_counters(TIER_STRATEGIC, True) is False:
+        passes.append("strategic_culls")
     else:
-        fails.append("strategic_hidden")
+        fails.append("strategic_still_shows")
     if unit_counter_compact(TIER_STRATEGIC) and not unit_counter_compact(
         TIER_OPERATIONAL
     ):
@@ -77,11 +77,11 @@ def build_map_unit_counter_lod_product() -> Dict[str, Any]:
             _out.append(_ln)
         lod_fn_slice = "\n".join(_out)
     if "return t != Tier.STRATEGIC" in lod_fn_slice:
-        fails.append("lod_still_hides_strategic")
+        passes.append("lod_strategic_cull")
     elif "return true" in lod_fn_slice:
-        passes.append("lod_no_strategic_hide")
+        fails.append("lod_still_shows_strategic")
     else:
-        fails.append("lod_still_hides_strategic")
+        fails.append("lod_missing_strategic_cull")
     if "func toggle_unit_counters" in ren and "toggle_unit_counters()" in ren:
         passes.append("renderer_toggle")
     else:
@@ -94,6 +94,21 @@ def build_map_unit_counter_lod_product() -> Dict[str, Any]:
         passes.append("sync_vis")
     else:
         fails.append("missing_sync_vis")
+    pick_fn = ""
+    _pn = "func _pick_unit_formation_at_world"
+    _pi = ren.find(_pn)
+    if _pi >= 0:
+        _plines = ren[_pi:].splitlines()
+        _pout = [_plines[0]]
+        for _ln in _plines[1:]:
+            if _ln.startswith("func "):
+                break
+            _pout.append(_ln)
+        pick_fn = "\n".join(_pout)
+    if "not counter.visible" in pick_fn:
+        passes.append("hidden_pins_skip_hex")
+    else:
+        fails.append("hidden_pins_steal_hex")
 
     ok = len(fails) == 0
     return {
@@ -101,5 +116,5 @@ def build_map_unit_counter_lod_product() -> Dict[str, Any]:
         "pass": passes,
         "fail": fails,
         "summary": "unit_counter_lod · %s" % ("PASS" if ok else "FAIL"),
-        "policy": "strategic_compact_pickable_operational_full_master_toggle_U",
+        "policy": "strategic_cull_operational_full_master_toggle_U_hidden_pins_skip",
     }

@@ -123,10 +123,23 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     gi = ren.find("KEY_G")
     if gi >= 0:
         g_slice = ren[gi : gi + 400]
-    g_cheap = "KEY_G" in ren and "_toast_easy_unit_orders" in g_slice
-    g_no_bfs = "highlight_corridor_capital_to_selected" not in g_slice
-    wiring["g_toast_only"] = g_cheap and g_no_bfs
-    (passes if wiring["g_toast_only"] else fails).append("g_toast_only")
+    g_request = "_request_hang_safe_supply_corridor" in g_slice
+    g_no_sync_bfs = (
+        "highlight_corridor_capital_to_selected" not in g_slice
+        and "highlight_supply_corridor" not in g_slice
+        and "preview_player_route()" not in g_slice
+    )
+    deferred = _slice(ren, "_deferred_budgeted_supply_corridor")
+    deferred_ok = (
+        bool(deferred)
+        and "highlight_supply_route_path" in deferred
+        and "find_land_path" in deferred
+        and "preview_player_route()" not in deferred
+        and "highlight_supply_corridor" not in deferred
+    )
+    click_arm = "_corridor_click_armed" in ren
+    wiring["g_hang_safe"] = g_request and g_no_sync_bfs and deferred_ok and click_arm
+    (passes if wiring["g_hang_safe"] else fails).append("g_hang_safe")
 
     mv_ok = "func enqueue_own_land_march" in mv
     bm_ok = "func start_land_battle" in bm
