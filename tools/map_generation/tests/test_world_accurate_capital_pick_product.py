@@ -55,6 +55,17 @@ class TestWorldAccurateCapitalPickProduct(unittest.TestCase):
         self.assertIn("world_accurate.json", text)
         self.assertIn("get_province_at_world_pos", text)
 
+    def test_settle_title_uses_name_and_capital_snap(self) -> None:
+        """Play extra: Settle London/Devon by name; click near capital star picks capital."""
+        mm = (ROOT / "scripts" / "map" / "MapManager.gd").read_text(encoding="utf-8")
+        ren = (ROOT / "scripts" / "map" / "MapRenderer.gd").read_text(encoding="utf-8")
+        self.assertIn("func prefer_capital_province_at", mm)
+        self.assertIn("prefer_capital_province_at(world_pos, prefer_land_province_at", mm)
+        self.assertIn("711467", mm)
+        self.assertIn("711414", mm)
+        self.assertIn('Settle %s', ren)
+        self.assertNotIn('Settle #%d', ren)
+
     def test_key_provinces_are_owned_land_hubs(self) -> None:
         """HOI-style key industrial hubs must be land + owned by the scenario tag."""
         sc = json.loads((ROOT / "data" / "scenarios" / "world_accurate.json").read_text())

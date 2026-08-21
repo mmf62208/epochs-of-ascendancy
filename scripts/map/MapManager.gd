@@ -1069,8 +1069,8 @@ func get_province_at_world_pos(world_pos: Vector2, use_pick_grid: bool = true) -
 				if OS.is_stdout_verbose():
 					print(" [DEMO PICK] hit demo child vid=", hit, " of parent ", parent_v)
 				# Prefer land among containing polys before returning virtual/demo hits.
-				return prefer_land_province_at(world_pos, hit)
-		return prefer_land_province_at(world_pos, hit)
+				return prefer_capital_province_at(world_pos, prefer_land_province_at(world_pos, hit))
+		return prefer_capital_province_at(world_pos, prefer_land_province_at(world_pos, hit))
 
 	# Fallback (no grid): manual override geo check for demo children pick test, return synthetic vid
 	if _demo_geometry_override.has(82):
@@ -1097,7 +1097,7 @@ func get_province_at_world_pos(world_pos: Vector2, use_pick_grid: bool = true) -
 		if d < best_d:
 			best_d = d
 			best = pid
-	return prefer_land_province_at(world_pos, best)
+	return prefer_capital_province_at(world_pos, prefer_land_province_at(world_pos, best))
 
 
 ## Prefer land (or coastal land) over pure sea when several polys contain / compete for a click.
@@ -1139,6 +1139,39 @@ func prefer_land_province_at(world_pos: Vector2, primary_hit: int) -> int:
 		return primary_hit
 	if not sea_hits.is_empty():
 		return _prefer_nearest_centroid_province(sea_hits, world_pos)
+	return primary_hit
+
+
+## If the click is nearer a country capital star than the polygon hit, pick the capital.
+## Play: England click was Settle #711467 Devon, not London (711414).
+func prefer_capital_province_at(world_pos: Vector2, primary_hit: int) -> int:
+	if primary_hit < 0:
+		return primary_hit
+	var p: Province = _provinces.get(primary_hit)
+	if p == null or bool(p.is_sea):
+		return primary_hit
+	var tag := str(p.owner_tag).strip_edges().to_upper()
+	if tag.is_empty():
+		tag = str(p.controller_tag).strip_edges().to_upper()
+	if tag.is_empty():
+		return primary_hit
+	var cap_id := -1
+	var c: Variant = get_country(tag) if has_method("get_country") else null
+	if c is Object and "capital_province_id" in c:
+		cap_id = int(c.capital_province_id)
+	elif c is Dictionary:
+		cap_id = int((c as Dictionary).get("capital_province_id", -1))
+	if cap_id <= 0 or cap_id == primary_hit:
+		return primary_hit
+	var cap_c: Vector2 = _centroids.get(cap_id, Vector2.ZERO)
+	if cap_c == Vector2.ZERO:
+		return primary_hit
+	var hit_c: Vector2 = _centroids.get(primary_hit, Vector2.ZERO)
+	var d_cap := world_pos.distance_squared_to(cap_c)
+	var d_hit := world_pos.distance_squared_to(hit_c) if hit_c != Vector2.ZERO else INF
+	const SNAP2 := 784.0  # 28px capital-star snap
+	if d_cap <= SNAP2 and d_cap < d_hit:
+		return cap_id
 	return primary_hit
 
 

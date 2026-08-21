@@ -17298,8 +17298,11 @@ func _update_settle_button(province: Province) -> void:
 		_btn_settle.visible = false
 		return
 	_btn_settle.visible = true
-	_btn_settle.text = "🏠 Settle #%d (+0.35, now %.2f)" % [province.id, province.settlement_level]
-	_btn_settle.tooltip_text = "Settle this province now (real data). After click: vitality tint strengthens (cyan-green via characterize), inspector shows updated bonuses, combat def +2.5%/lev. Use with map modes (F3 vitality)."
+	var settle_nm := str(province.name).strip_edges()
+	if settle_nm.is_empty():
+		settle_nm = "#%d" % province.id
+	_btn_settle.text = "🏠 Settle %s (+0.35, now %.2f)" % [settle_nm, province.settlement_level]
+	_btn_settle.tooltip_text = "Settle %s (#%d) now (real data). After click: vitality tint strengthens (cyan-green via characterize), inspector shows updated bonuses, combat def +2.5%/lev. Use with map modes (F3 vitality)." % [settle_nm, province.id]
 
 
 func _on_settle_province_pressed() -> void:
