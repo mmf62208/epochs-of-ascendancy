@@ -1311,9 +1311,43 @@ func _interactive_light_sim() -> bool:
 
 
 func _deferred_resolve_attacker_win(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:
-	var exec: Dictionary = execute_province_assault(att_tag, to_id, from_id, att_fid)
-	if not bool(exec.get("success", false)):
-		_set_formation_in_combat(att_fid, false)
+	# Hang-class: F5 capture is data-only (no second resolve, no owner signal).
+	_apply_attacker_win_capture_light(att_tag, to_id, from_id, att_fid)
+
+
+func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:
+	var tag := att_tag.strip_edges().to_upper()
+	var def_tag := ""
+	if typeof(MapManager) != TYPE_NIL and to_id >= 0:
+		var live: Province = MapManager.get_province(to_id) if MapManager.has_method("get_province") else null
+		if live != null:
+			def_tag = _province_controller_tag(live)
+		if MapManager.has_method("update_province_owner"):
+			MapManager.update_province_owner(to_id, tag, tag, false, true)
+	if not att_fid.is_empty() and typeof(LeaderManager) != TYPE_NIL:
+		var f: Formation = LeaderManager.get_formation(att_fid) if LeaderManager.has_method("get_formation") else null
+		if f != null:
+			f.stationed_province_id = to_id
+			if "is_in_combat" in f:
+				f.is_in_combat = false
+	if not att_fid.is_empty() and typeof(SupplyManager) != TYPE_NIL:
+		SupplyManager.division_deployments[att_fid] = {
+			"province_id": to_id,
+			"country_tag": tag,
+			"order_type": "move_to_province",
+		}
+	var row := {
+		"defender_tag": def_tag,
+		"defender_formation_id": "",
+		"attacker_tag": tag,
+		"target_province_id": to_id,
+		"from_province_id": from_id,
+		"outcome": "attacker",
+		"winner": "attacker",
+	}
+	_displace_defender_from_captured_province(row, to_id)
+	_post_battle_news(row, true)
+	_notify_map_refresh(to_id, from_id, int(row.get("retreat_province_id", -1)))
 
 
 func peek_last_land_aar() -> Dictionary:
@@ -2072,7 +2106,7 @@ func _station_attacker_on_captured_province(
 		return
 	var tag := attacker_tag.strip_edges().to_upper()
 	var moved := false
-	if typeof(FormationMovement) != TYPE_NIL:
+	if typeof(FormationMovement) != TYPE_NIL and not _interactive_light_sim():
 		var res: Dictionary = FormationMovement.move_formation_to_province(
 			attacker_formation_id, target_pid, tag,
 		)
@@ -2141,7 +2175,7 @@ func _displace_defender_from_captured_province(result: Dictionary, captured_pid:
 			continue
 		if retreat_pid >= 0 and not def_tag.is_empty():
 			var moved := false
-			if typeof(FormationMovement) != TYPE_NIL:
+			if typeof(FormationMovement) != TYPE_NIL and not _interactive_light_sim():
 				var res: Dictionary = FormationMovement.move_formation_to_province(
 					move_fid, retreat_pid, def_tag,
 				)

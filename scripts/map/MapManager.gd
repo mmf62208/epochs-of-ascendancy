@@ -1362,6 +1362,7 @@ func update_province_owner(
 	new_owner: String,
 	new_controller: String = "",
 	skip_capture: bool = false,
+	skip_emit: bool = false,
 ) -> bool:
 	var p: Province = _provinces.get(province_id)
 	if p == null:
@@ -1374,7 +1375,8 @@ func update_province_owner(
 		p.controller_tag = new_controller
 		changed = true
 	if changed:
-		province_data_changed.emit(province_id, "owner")
+		if not skip_emit:
+			province_data_changed.emit(province_id, "owner")
 
 		if not skip_capture and typeof(FactoryManager) != TYPE_NIL:
 			FactoryManager.capture_province_factories(province_id, new_owner)

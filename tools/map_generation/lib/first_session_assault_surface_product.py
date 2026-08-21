@@ -97,7 +97,9 @@ def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
         and "_rebuild_political_labels" not in owner_fn,
         "resolve_capture_deferred_on_light": "_deferred_resolve_attacker_win" in battle_src
         and "call_deferred" in battle_src
-        and "func _deferred_resolve_attacker_win" in battle_src,
+        and "func _deferred_resolve_attacker_win" in battle_src
+        and "_apply_attacker_win_capture_light" in battle_src
+        and "func _apply_attacker_win_capture_light" in battle_src,
         "supply_no_bfs_on_light": "_interactive_light_sim" in battle_src
         and "is_interactive_light_sim" in battle_src,
     }

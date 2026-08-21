@@ -327,6 +327,7 @@ func _flush_sim_events() -> void:
 	# used to freeze the main thread for so long the clock looked stuck at Feb 28).
 	var ev: Dictionary = _pending_sim_events.pop_front() as Dictionary
 	var kind := str(ev.get("kind", ""))
+	var n_res := 0
 	if kind == "day":
 		game_day_advanced.emit(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
 		# Budgeted non-player major AI (production/soft) — not full simulate_daily_ai_combat.
@@ -334,7 +335,7 @@ func _flush_sim_events() -> void:
 		_maybe_run_ai_infra_invest()
 		_maybe_run_ai_land_battle_starts()
 		_tick_own_land_marches()
-		var n_res := _tick_open_land_battles()
+		n_res = _tick_open_land_battles()
 		if n_res > 0 and is_interactive_light_sim():
 			call_deferred("_tick_out_of_combat_recovery")
 			call_deferred("_tick_organize_queue")
@@ -348,7 +349,11 @@ func _flush_sim_events() -> void:
 		_emit_month_year_boundary(y, m, bool(ev.get("crossed_year", false)))
 
 	if not _pending_sim_events.is_empty():
-		_schedule_sim_flush()
+		if n_res > 0 and is_interactive_light_sim():
+			# Extra idle frame so F5 capture never shares a frame with the next day.
+			call_deferred("_schedule_sim_flush")
+		else:
+			_schedule_sim_flush()
 
 
 func _emit_month_year_boundary(year: int, month: int, crossed_year: bool) -> void:

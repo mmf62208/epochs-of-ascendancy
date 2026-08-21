@@ -190,7 +190,11 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "_deferred_resolve_attacker_win" in tick_fn
         and "call_deferred" in tick_fn
         and bool(deferred_fn)
-        and "execute_province_assault" in deferred_fn
+        and "_apply_attacker_win_capture_light" in deferred_fn
+        and "execute_province_assault" not in deferred_fn
+        and bool(_slice(bm, "_apply_attacker_win_capture_light"))
+        and "update_province_owner" in _slice(bm, "_apply_attacker_win_capture_light")
+        and "execute_province_assault" not in _slice(bm, "_apply_attacker_win_capture_light")
         and bool(supply_fn)
         and "_interactive_light_sim" in supply_fn
         and "is_interactive_light_sim" in _slice(bm, "_interactive_light_sim")
