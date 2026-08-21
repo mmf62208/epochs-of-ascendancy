@@ -614,6 +614,33 @@ func _test_designer_field() -> void:
 		_fail("reinforce did not raise fill %.3f → %.3f %s" % [fill0, fill1, str(filled)])
 		return
 	_pass("reinforce-from-stockpile fill %.2f → %.2f" % [fill0, fill1])
+	# Day tick must stay share-capped (not dump remaining TOE) and still fill design_id stock.
+	if pm.has_method("clear_unit_equipment_stock"):
+		pm.call("clear_unit_equipment_stock", _designed_fid)
+	pm.call("set_unit_equipment_stock", _designed_fid, short)
+	var fill_day0 := float(pm.call("unit_toe_fill_ratio", _designed_fid))
+	if pm.has_method("daily_formation_reinforce_from_stockpile"):
+		pm.call("daily_formation_reinforce_from_stockpile")
+	var fill_day1 := float(pm.call("unit_toe_fill_ratio", _designed_fid))
+	if fill_day1 >= 0.99:
+		_fail("day tick dumped full TOE fill %.3f → %.3f" % [fill_day0, fill_day1])
+		return
+	if fill_day1 <= fill_day0 + 0.001:
+		_fail("day tick share-capped TOE did not move fill %.3f → %.3f" % [fill_day0, fill_day1])
+		return
+	_pass("day tick share-capped fill %.2f → %.2f (not 1.0)" % [fill_day0, fill_day1])
+	if pm.has_method("add_to_country_equipment_stockpile"):
+		pm.call("add_to_country_equipment_stockpile", ATT_TAG, ATT_DESIGN, 4)
+	var panzer_stock: Dictionary = pm.call("get_unit_equipment_stock", GER_FID)
+	panzer_stock.erase(ATT_DESIGN)
+	pm.call("set_unit_equipment_stock", GER_FID, panzer_stock)
+	if pm.has_method("daily_formation_reinforce_from_stockpile"):
+		pm.call("daily_formation_reinforce_from_stockpile")
+	var panzer_after: Dictionary = pm.call("get_unit_equipment_stock", GER_FID)
+	if int(panzer_after.get(ATT_DESIGN, 0)) < 1:
+		_fail("design_id unit got 0 %s after day tick (stock=%s)" % [ATT_DESIGN, str(panzer_after)])
+		return
+	_pass("design_id unit received %s x%d" % [ATT_DESIGN, int(panzer_after.get(ATT_DESIGN, 0))])
 	if pm.has_method("get_save_data"):
 		var psave: Dictionary = pm.call("get_save_data")
 		if not psave.has("country_equipment_stockpiles") or not psave.has("unit_equipment_stock"):

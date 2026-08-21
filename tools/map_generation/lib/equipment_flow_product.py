@@ -476,7 +476,10 @@ def build_toe_industry_loop_product() -> Dict[str, Any]:
         "reinforce_api": "func reinforce_unit_toe_from_stockpile" in pm,
         "credit_api": "func credit_production_complete_to_stockpile" in pm,
         "save_stock": "country_equipment_stockpiles" in pm and "unit_equipment_stock" in pm,
-        "required_uses_toe": "equipment_toe" in pm and "func get_formation_required_equipment" in pm,
+        "required_uses_toe": "equipment_toe" in pm and "func get_formation_toe" in pm,
+        "design_id_required": "return {did: 1}" in pm,
+        "daily_share_capped": "reinforce_unit_toe_from_stockpile" in pm
+        and "func daily_formation_reinforce_from_stockpile" in pm,
     }
     for name, ok in wiring.items():
         (passes if ok else fails).append(name)

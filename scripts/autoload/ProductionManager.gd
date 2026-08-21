@@ -958,9 +958,6 @@ func get_formation_required_equipment(formation_id: String) -> Dictionary:
 	var f: Formation = LeaderManager.get_formation(formation_id) if LeaderManager.has_method("get_formation") else null
 	if f == null:
 		return {}
-	var toe: Dictionary = get_formation_toe(formation_id)
-	if not toe.is_empty():
-		return toe
 	var did := str(f.design_id).strip_edges() if "design_id" in f else ""
 	if did.is_empty():
 		return {}
@@ -2398,6 +2395,14 @@ func daily_formation_reinforce_from_stockpile() -> Dictionary:
 		if fid.is_empty():
 			continue
 		var tag := str(f.country_tag).strip_edges().to_upper() if "country_tag" in f else ""
+		# Composition TOE: share-capped (never dump full TOE on the day tick).
+		var toe_rep: Dictionary = reinforce_unit_toe_from_stockpile(fid)
+		if float(toe_rep.get("fill_after", 0.0)) > float(toe_rep.get("fill_before", 0.0)) + 0.001:
+			report["units_reinforced"] = int(report["units_reinforced"]) + 1
+			var moved_toe: Dictionary = toe_rep.get("moved", {}) as Dictionary
+			for mk in moved_toe.keys():
+				report["equipment_moved"] = int(report["equipment_moved"]) + int(moved_toe[mk])
+		# Legacy factory/OOB path: 1× design_id from country stockpile.
 		var required: Dictionary = get_formation_required_equipment(fid)
 		if required.is_empty():
 			continue

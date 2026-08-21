@@ -99,6 +99,10 @@ class TestEquipmentFlow(unittest.TestCase):
         self.assertEqual(list(p.get("fail") or []), [], p)
         esr = build_equipment_stock_reinforce_primary_command_product()
         self.assertTrue(esr.get("toe_ok"), esr)
+        pm = (ROOT / "scripts/autoload/ProductionManager.gd").read_text(encoding="utf-8")
+        self.assertIn("return {did: 1}", pm)
+        daily = pm.split("func daily_formation_reinforce_from_stockpile", 1)[-1]
+        self.assertIn("reinforce_unit_toe_from_stockpile", daily)
 
 if __name__ == "__main__":
     unittest.main()
