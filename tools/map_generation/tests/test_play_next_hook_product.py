@@ -62,6 +62,19 @@ class TestPlayNextHookProduct(unittest.TestCase):
         )
         self.assertEqual(eco.get("source"), "aar")
         self.assertIn("oil", str(eco.get("label", "")).lower())
+        nxt = rank_next_beat(
+            {
+                "aar_next_pid": 710000,
+                "aar_economy": "Now pumping oil (occupied ×0.65).",
+                "aar_line": (
+                    "Took Bas-Rhin · 1 day — Press Haguenau next? "
+                    "Now pumping oil (occupied ×0.65)."
+                ),
+            }
+        )
+        self.assertEqual(nxt.get("action"), "next_hex")
+        self.assertEqual(nxt.get("source"), "aar")
+        self.assertIn("oil", str(nxt.get("hint", "")).lower())
 
 
 if __name__ == "__main__":

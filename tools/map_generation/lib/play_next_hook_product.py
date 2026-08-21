@@ -231,6 +231,20 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("aar_economy_beats_train")
     else:
         fails.append("aar_economy_beats_train")
+    war_next = rank_next_beat(
+        {
+            "aar_next_pid": 710000,
+            "aar_economy": "Now pumping oil (occupied ×0.65).",
+            "aar_line": (
+                "Took Bas-Rhin · 1 day — Press Haguenau next? "
+                "Now pumping oil (occupied ×0.65)."
+            ),
+        }
+    )
+    if str(war_next.get("action")) == "next_hex" and str(war_next.get("source")) == "aar":
+        passes.append("next_hex_beats_economy")
+    else:
+        fails.append("next_hex_beats_economy")
     aar_gd = AAR_GD.read_text(encoding="utf-8") if AAR_GD.is_file() else ""
     bm_gd = BM_GD.read_text(encoding="utf-8") if BM_GD.is_file() else ""
     if "func economy_sentence" in aar_gd and "scale_deposits_for_year" in aar_gd:

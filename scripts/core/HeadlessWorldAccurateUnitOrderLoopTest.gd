@@ -1022,7 +1022,7 @@ func _test_era_resources() -> void:
 	if tm_eco != null and tm_eco.has_method("get_current_year"):
 		year = int(tm_eco.call("get_current_year"))
 	var eco := str(aar_scr.call("economy_sentence", fra_p.get("resources"), year, DEF_TAG, ATT_TAG))
-	if "oil" not in eco.to_lower() and "pump" not in eco.to_lower():
+	if "oil" not in eco.to_lower():
 		_fail("occupy AAR economy missing oil: %s" % eco)
 		return
 	if "0.65" not in eco:
@@ -1037,19 +1037,33 @@ func _test_era_resources() -> void:
 			"from_id": GER_FRONT,
 			"days_elapsed": 1,
 		}, "attacker", FRA_FRONT)
+	if str(fra_p.get("owner_tag")).strip_edges().to_upper() != DEF_TAG:
+		_fail("occupy AAR mutated owner want FRA got %s" % str(fra_p.get("owner_tag")))
+		return
+	if str(fra_p.get("controller_tag")).strip_edges().to_upper() != ATT_TAG:
+		_fail("occupy AAR mutated controller want GER got %s" % str(fra_p.get("controller_tag")))
+		return
 	var aar_line := ""
+	var aar_eco := ""
 	if _bm.has_method("peek_last_land_aar"):
 		var aar: Dictionary = _bm.call("peek_last_land_aar")
 		aar_line = str(aar.get("line", ""))
+		aar_eco = str(aar.get("economy", ""))
+	var shipped := ("%s %s" % [aar_line, aar_eco]).to_lower()
+	if "oil" not in shipped:
+		_fail("AAR missing oil after occupy: aar=%s eco=%s" % [aar_line, aar_eco])
+		return
+	if "0.65" not in shipped:
+		_fail("AAR missing ×0.65 after occupy: aar=%s eco=%s" % [aar_line, aar_eco])
+		return
 	var nxt_txt := ""
 	var hook_eco: Script = load("res://scripts/ui/PlayNextHook.gd") as Script
 	if hook_eco != null and hook_eco.has_method("recommend"):
 		var nxt_eco: Dictionary = hook_eco.call("recommend", ATT_TAG) as Dictionary
 		nxt_txt = "%s %s" % [str(nxt_eco.get("hint", "")), str(nxt_eco.get("label", ""))]
-	var blob := ("%s %s" % [aar_line, nxt_txt]).to_lower()
-	if "oil" not in blob and "pump" not in blob:
-		_fail("AAR/NEXT missing oil after occupy: aar=%s next=%s" % [aar_line, nxt_txt])
-		return
+		if "oil" not in nxt_txt.to_lower():
+			_fail("NEXT missing oil after occupy: %s" % nxt_txt)
+			return
 	_pass("AAR/NEXT oil after occupy")
 	if _bm.has_method("clear_last_land_aar"):
 		_bm.call("clear_last_land_aar")
