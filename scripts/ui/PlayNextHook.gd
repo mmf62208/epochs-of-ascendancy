@@ -122,6 +122,16 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			"to_id": -1,
 			"source": "focus",
 		}
+	if bool(f.get("any_open_battle", false)) or bool(f.get("has_open_battle", false)):
+		return {
+			"ok": true,
+			"action": "unpause",
+			"label": "Open fight",
+			"hint": "A land battle is live — completing bars / fights outrank WarLoop copy",
+			"fid": str(f.get("battle_fid", "")),
+			"to_id": int(f.get("battle_to_id", -1)),
+			"source": "land_battle",
+		}
 	return {
 		"ok": true,
 		"action": "show_war_loop",
@@ -243,6 +253,7 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 		for raw in battles:
 			if typeof(raw) != TYPE_DICTIONARY:
 				continue
+			facts["any_open_battle"] = true
 			var b: Dictionary = raw
 			if str(b.get("att_tag", "")).to_upper() != tag:
 				continue

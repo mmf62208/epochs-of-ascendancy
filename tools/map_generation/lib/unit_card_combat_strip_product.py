@@ -78,6 +78,14 @@ def lines_for(formation: Any) -> List[str]:
         except (TypeError, ValueError):
             str_v = 1.0
     out.append("Strength %.0f%%" % _as_percent(str_v))
+    if "toe_fill" in data or "stock_rifles" in data:
+        try:
+            fill_pct = float(data.get("toe_fill") or 0.0) * 100.0
+        except (TypeError, ValueError):
+            fill_pct = 0.0
+        rifles = int(data.get("stock_rifles") or 0)
+        trucks = int(data.get("stock_trucks") or 0)
+        out.append("Fill %.0f%% · stock rifles %d · trucks %d" % (fill_pct, rifles, trucks))
     if bool(data.get("is_training")):
         try:
             prog = float(data.get("training_progress", 0.0) or 0.0)
@@ -207,11 +215,19 @@ def build_unit_card_combat_strip_product(*, check_wiring: bool = True) -> Dict[s
     wiring["day_label_extras"] = extras_ok
     (passes if extras_ok else fails).append("day_label_extras")
 
+    stock = lines_for({"toe_fill": 0.28, "stock_rifles": 12, "stock_trucks": 4})
+    stock_ok = any("Fill" in x and "stock" in x for x in stock)
+    wiring["stockpile_toe_line"] = stock_ok
+    (passes if stock_ok else fails).append("stockpile_toe_line")
+
     if check_wiring:
         gd = STRIP_GD.read_text(encoding="utf-8") if STRIP_GD.is_file() else ""
         strip_ok = _gd_has_strip(gd)
         wiring["gd_strip"] = strip_ok
         (passes if strip_ok else fails).append("gd_strip")
+        fill_ok = "_stockpile_toe_line" in gd and "unit_toe_fill_ratio" in gd
+        wiring["gd_stockpile_toe"] = fill_ok
+        (passes if fill_ok else fails).append("gd_stockpile_toe")
 
         bubble = BUBBLE_GD.read_text(encoding="utf-8") if BUBBLE_GD.is_file() else ""
         bubble_ok = _gd_has_bubble_chips(bubble)

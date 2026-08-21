@@ -61,6 +61,9 @@ static func lines_for(formation: Object) -> PackedStringArray:
 				bits.append("%s %d" % [short, int(toe_eq[k])])
 			if not bits.is_empty():
 				lines.append("TOE " + " · ".join(bits))
+		var stock_line := _stockpile_toe_line(formation)
+		if not stock_line.is_empty():
+			lines.append(stock_line)
 	if "last_manpower_loss" in formation:
 		var men_l := int(formation.get("last_manpower_loss"))
 		if men_l > 0 and "last_equip_loss_plain" not in formation:
@@ -102,6 +105,37 @@ static func lines_for(formation: Object) -> PackedStringArray:
 
 static func bbcode_for(formation: Object) -> String:
 	return "\n".join(lines_for(formation))
+
+
+
+static func _stockpile_toe_line(formation: Object) -> String:
+	if typeof(ProductionManager) == TYPE_NIL:
+		return ""
+	var fid := ""
+	if "formation_id" in formation:
+		fid = str(formation.get("formation_id")).strip_edges()
+	if fid.is_empty():
+		return ""
+	var fill := 0.0
+	if ProductionManager.has_method("unit_toe_fill_ratio"):
+		fill = float(ProductionManager.unit_toe_fill_ratio(fid))
+	var tag := ""
+	if "country_tag" in formation:
+		tag = str(formation.get("country_tag")).strip_edges().to_upper()
+	var rifles := 0
+	var trucks := 0
+	if not tag.is_empty() and ProductionManager.has_method("get_country_equipment_stockpile"):
+		var st: Dictionary = ProductionManager.get_country_equipment_stockpile(tag)
+		rifles = int(st.get("rifles", st.get("infantry_equipment", 0)))
+		trucks = int(st.get("trucks", st.get("truck", 0)))
+	var last := ""
+	if "last_stockpile_toe_plain" in ProductionManager:
+		last = str(ProductionManager.last_stockpile_toe_plain).strip_edges()
+	if fill <= 0.0 and rifles <= 0 and trucks <= 0 and last.is_empty():
+		return ""
+	if last.is_empty():
+		return "Fill %.0f%% · stock rifles %d · trucks %d" % [fill * 100.0, rifles, trucks]
+	return last
 
 
 static func xp_band(xp: float) -> String:

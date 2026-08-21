@@ -28,6 +28,8 @@ const STANCE_TAG := "stance"
 const RETOOLING_RULES_PATH := "res://data/production/retooling_similarity.json"
 
 var production_stance: String = "balanced"
+## Last factory→stockpile→TOE beat (unit card / toast).
+var last_stockpile_toe_plain: String = ""
 
 ## Active production lines: line_id -> ProductionLine
 var _lines: Dictionary = {}
@@ -2452,6 +2454,13 @@ func daily_formation_reinforce_from_stockpile() -> Dictionary:
 				(report["xp_events"] as Array).append(man)
 			elif float(f.strength) > old_s + 0.001:
 				report["strength_recovered"] = int(report["strength_recovered"]) + 1
+	if int(report["units_reinforced"]) > 0 or int(report["equipment_moved"]) > 0:
+		last_stockpile_toe_plain = "Stockpile → TOE · %d units · %d eq" % [
+			int(report["units_reinforced"]),
+			int(report["equipment_moved"]),
+		]
+		if typeof(DebugOverlay) != TYPE_NIL and DebugOverlay.has_method("toast_map_debug"):
+			DebugOverlay.toast_map_debug(last_stockpile_toe_plain)
 	return report
 
 

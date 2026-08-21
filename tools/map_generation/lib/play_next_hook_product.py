@@ -169,6 +169,14 @@ def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
             "fid": str(f.get("focus_id") or ""),
             "hint": fname or "Focus completes tomorrow",
         }
+    if bool(f.get("any_open_battle")) or bool(f.get("has_open_battle")):
+        return {
+            "ok": True,
+            "action": "unpause",
+            "source": "land_battle",
+            "label": "Open fight",
+            "hint": "A land battle is live — fights outrank WarLoop copy",
+        }
     return {
         "ok": True,
         "action": "show_war_loop",
@@ -217,6 +225,11 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("idle_shows_warloop")
     else:
         fails.append("idle_shows_warloop")
+    world_fight = rank_next_beat({"any_open_battle": True})
+    if str(world_fight.get("source")) == "land_battle" and str(world_fight.get("label")) == "Open fight":
+        passes.append("any_fight_beats_warloop")
+    else:
+        fails.append("any_fight_beats_warloop")
     train = rank_next_beat({"training": [{"fid": "u1", "days_left": 1}]})
     if str(train.get("action")) == "send_trained" and str(train.get("source")) == "organize":
         passes.append("train_beats_idle")
