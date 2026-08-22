@@ -277,6 +277,8 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "_skip_quit_autosave" in _slice(save_src, "_notification")
         and "advance_living_playtest_days" in harness
         and "playtest clock advanced" in harness
+        and "advanced < 5" in harness
+        and "never_execute" in harness
         and "playtest clock AAR" in harness
         and "f5_flush" in harness
         and "_seed_maginot_clock_battle" in harness
