@@ -125,6 +125,20 @@ func initialize_from_scenario_start_date(start_date_str: String) -> void:
 func get_current_year() -> int:
 	return current_year
 
+
+## Living era boot: 1918 / 1936 / 2026. Unknown years fall back to 1936 (default Maginot).
+func boot_living_era(year: int) -> Dictionary:
+	var y := int(year)
+	if y != 1918 and y != 1936 and y != 2026:
+		y = 1936
+	initialize_from_scenario_start_date("%04d-01-01" % y)
+	return {
+		"ok": true,
+		"year": current_year,
+		"era": y,
+		"live": true,
+	}
+
 func get_current_month() -> int:
 	return current_month
 

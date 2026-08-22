@@ -243,13 +243,12 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 	if action == "send_trained" and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(false)
 		return {"ok": true, "action": "send_trained", "summary": str(r.get("hint", "Training ready"))}
-	if action == "shortage" and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
-		TimeManager.set_paused(false)
-		return {"ok": true, "action": "shortage", "summary": str(r.get("hint", "Shortage"))}
-	if action in ["tech_done", "focus_done"] and typeof(TimeManager) != TYPE_NIL \
-			and TimeManager.has_method("set_paused"):
-		TimeManager.set_paused(false)
-		return {"ok": true, "action": action, "summary": str(r.get("hint", r.get("label", action)))}
+	if action == "shortage":
+		return _open_living_surface("production", r)
+	if action == "tech_done":
+		return _open_living_surface("research", r)
+	if action == "focus_done":
+		return _open_living_surface("focus", r)
 	if action == "show_war_loop":
 		var tree := Engine.get_main_loop() as SceneTree
 		var mr: Node = null
@@ -311,6 +310,36 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 		TimeManager.set_paused(false)
 		return {"ok": true, "action": "unpause", "summary": str(r.get("hint", "Unpause"))}
 	return {"ok": false, "action": action, "summary": "Nothing to apply"}
+
+
+## NEXT chip: open the living research / focus / production surface (not unpause-only).
+## Headless has no TopInfoBar — still reports the same panel the F5 chip would open.
+static func _open_living_surface(kind: String, rec: Dictionary) -> Dictionary:
+	var k := kind.strip_edges().to_lower()
+	if k == "shortage":
+		k = "production"
+	if k == "tech_done" or k == "technology":
+		k = "research"
+	if k == "focus_done":
+		k = "focus"
+	var ui_opened := false
+	var tree := Engine.get_main_loop() as SceneTree
+	var bar: Node = null
+	if tree != null:
+		bar = tree.get_first_node_in_group("top_info_bar")
+	if bar != null and bar.has_method("open_living_surface"):
+		var ui: Dictionary = bar.call("open_living_surface", k)
+		ui_opened = bool(ui.get("ok", false))
+	return {
+		"ok": true,
+		"action": str(rec.get("action", k)),
+		"panel": k,
+		"opened": k,
+		"surface": k,
+		"unpause_only": false,
+		"ui_opened": ui_opened,
+		"summary": "Open %s" % k,
+	}
 
 
 static func _action_label(action: String) -> String:

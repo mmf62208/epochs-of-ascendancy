@@ -23,6 +23,7 @@ STRIP_GD = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
 PEACE_WIN = ROOT / "scripts" / "ui" / "PeaceConferenceWindow.gd"
 GDATA_GD = ROOT / "scripts" / "autoload" / "GameData.gd"
 INSIGHT_GD = ROOT / "scripts" / "map" / "ProvinceInsight.gd"
+TOP_BAR = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
 
 GER_FRONT = 710173
 FRA_FRONT = 710739
@@ -205,6 +206,32 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     )
     wiring["ai_take_land"] = ai_ok
     (passes if ai_ok else fails).append("ai_take_land")
+
+    tm_src = TIME_MANAGER.read_text(encoding="utf-8") if TIME_MANAGER.is_file() else ""
+    top_bar = TOP_BAR.read_text(encoding="utf-8") if TOP_BAR.is_file() else ""
+    runner = TEST_RUNNER.read_text(encoding="utf-8") if TEST_RUNNER.is_file() else runner
+    nation_ok = (
+        "func boot_living_player" in lm
+        and "LIVING_PLAYER_TAGS" in lm
+        and '"ENG"' in lm
+        and "func boot_living_era" in tm_src
+        and "1918" in _slice(tm_src, "boot_living_era")
+        and "2026" in _slice(tm_src, "boot_living_era")
+        and "func open_living_surface" in top_bar
+        and "func _open_living_surface" in hook
+        and "unpause_only" in hook
+        and "_open_living_surface" in apply_slice
+        and "tech_done" in apply_slice
+        and "EOA_PLAYER_TAG" in runner
+        and "EOA_START_YEAR" in runner
+        and "boot_living_player" in harness
+        and "boot_living_era" in harness
+        and "NEXT tech_done opens research" in harness
+        and "NEXT shortage opens production" in harness
+        and "living nation pick ENG" in harness
+    )
+    wiring["nation_era_next"] = nation_ok
+    (passes if nation_ok else fails).append("nation_era_next")
 
     chrome = _slice(ren, "_attach_unit_counter_chrome")
     chrome_ok = (

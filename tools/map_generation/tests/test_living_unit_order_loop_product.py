@@ -48,6 +48,7 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
             "air_region_cas",
             "peace_occupation",
             "ai_take_land",
+            "nation_era_next",
             "chip_str_num",
             "inverse_zoom_scale",
             "chip_on_centroid",

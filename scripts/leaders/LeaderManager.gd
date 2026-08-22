@@ -1849,10 +1849,35 @@ func _remove_leader(leader_id: String, cause: String, is_death: bool) -> void:
 # LEADER REPLACEMENT (vacancy queue + auto-fallback)
 # ============================================
 
+const LIVING_PLAYER_TAGS := ["GER", "ENG", "USA", "SOV", "JAP", "FRA", "ITA", "POL"]
+
+
 func set_player_country_tag(tag: String) -> void:
 	player_country_tag = tag.strip_edges().to_upper()
 	if typeof(SupplyManager) != TYPE_NIL:
 		SupplyManager.player_tag = player_country_tag
+
+
+## Living nation pick. Default first-session stays GER Maginot when tag is empty/unknown.
+func boot_living_player(tag: String) -> Dictionary:
+	var t := tag.strip_edges().to_upper()
+	var defaulted := false
+	if t.is_empty() or not LIVING_PLAYER_TAGS.has(t):
+		t = "GER"
+		defaulted = true
+	set_player_country_tag(t)
+	var tree := get_tree()
+	if tree != null:
+		var bar: Node = tree.get_first_node_in_group("top_info_bar")
+		if bar != null and "player_country_tag" in bar:
+			bar.player_country_tag = t
+	return {
+		"ok": true,
+		"player_tag": t,
+		"default_ger": t == "GER",
+		"defaulted": defaulted,
+		"live": true,
+	}
 
 
 func get_player_country_tag() -> String:

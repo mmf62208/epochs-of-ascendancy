@@ -95,6 +95,7 @@ func _run() -> void:
 	_test_march_and_assault()
 	_test_chi_jap_theater()
 	_test_ai_take_land()
+	_test_nation_era_next()
 	_cleanup()
 
 
@@ -1678,6 +1679,95 @@ func _test_ai_take_land() -> void:
 			_fail("Maginot GER front owner drifted %s → %s" % [ger_owner0, ger_own])
 			return
 		_pass("Maginot GER front still %s" % ger_own)
+
+
+func _test_nation_era_next() -> void:
+	if _lm == null or not _lm.has_method("boot_living_player"):
+		_fail("boot_living_player missing")
+		return
+	var eng: Dictionary = _lm.call("boot_living_player", "ENG") as Dictionary
+	if str(eng.get("player_tag", "")) != "ENG":
+		_fail("living nation pick ENG got %s" % str(eng))
+		return
+	if str(_lm.call("get_player_country_tag")) != "ENG":
+		_fail("player tag did not stick ENG got %s" % str(_lm.call("get_player_country_tag")))
+		return
+	_pass("living nation pick ENG (not default GER)")
+	var bad: Dictionary = _lm.call("boot_living_player", "ZZZ") as Dictionary
+	if str(bad.get("player_tag", "")) != "GER" or not bool(bad.get("defaulted", false)):
+		_fail("unknown tag should default GER: %s" % str(bad))
+		return
+	_lm.call("boot_living_player", "ENG")
+	var tm: Node = _autoload("TimeManager")
+	if tm == null or not tm.has_method("boot_living_era"):
+		_fail("boot_living_era missing")
+		return
+	var y18: Dictionary = tm.call("boot_living_era", 1918) as Dictionary
+	if int(y18.get("year", 0)) != 1918 or int(tm.call("get_current_year")) != 1918:
+		_fail("era boot 1918 got %s year=%s" % [str(y18), str(tm.call("get_current_year"))])
+		return
+	_pass("era boot year=1918")
+	var rhc: Script = load("res://scripts/production/ResourceHarvestCalculator.gd") as Script
+	if rhc == null or not rhc.has_method("scale_deposits_for_year"):
+		_fail("scale_deposits_for_year missing")
+		return
+	var year := int(tm.call("get_current_year"))
+	var oil_18 := float((rhc.call("scale_deposits_for_year", {"oil": 3.0}, year) as Dictionary).get("oil", 0.0))
+	tm.call("boot_living_era", 1936)
+	var oil_36 := float((rhc.call("scale_deposits_for_year", {"oil": 3.0}, int(tm.call("get_current_year"))) as Dictionary).get("oil", 0.0))
+	tm.call("boot_living_era", 2026)
+	var oil_26 := float((rhc.call("scale_deposits_for_year", {"oil": 3.0}, int(tm.call("get_current_year"))) as Dictionary).get("oil", 0.0))
+	if oil_18 >= oil_36 or oil_36 >= oil_26:
+		_fail("era oil 1918=%.2f 1936=%.2f 2026=%.2f" % [oil_18, oil_36, oil_26])
+		return
+	_pass("era oil 1918=%.2f < 1936=%.2f < 2026=%.2f" % [oil_18, oil_36, oil_26])
+	tm.call("boot_living_era", 1918)
+	var alum_18: Dictionary = rhc.call("scale_deposits_for_year", {"aluminum": 36.0}, int(tm.call("get_current_year"))) as Dictionary
+	if alum_18.has("aluminum"):
+		_fail("1918 era boot still shows painted aluminum")
+		return
+	_pass("1918 era boot omits painted aluminum")
+	tm.call("boot_living_era", 1936)
+	var hook_scr: Script = load("res://scripts/ui/PlayNextHook.gd") as Script
+	if hook_scr == null or not hook_scr.has_method("apply"):
+		_fail("PlayNextHook.apply missing")
+		return
+	var tech_rec: Dictionary = hook_scr.call("rank_from_snapshot", {"research_days_left": 1.0}) as Dictionary
+	var tech_out: Dictionary = hook_scr.call("apply", tech_rec) as Dictionary
+	print("  [INFO] NEXT tech_done apply %s" % str(tech_out))
+	if str(tech_out.get("panel", tech_out.get("opened", ""))) != "research":
+		_fail("NEXT tech_done should open research got %s" % str(tech_out))
+		return
+	if bool(tech_out.get("unpause_only", true)):
+		_fail("NEXT tech_done unpause-only: %s" % str(tech_out))
+		return
+	_pass("NEXT tech_done opens research")
+	var foc_rec: Dictionary = hook_scr.call("rank_from_snapshot", {"focus_days_left": 1.0}) as Dictionary
+	var foc_out: Dictionary = hook_scr.call("apply", foc_rec) as Dictionary
+	if str(foc_out.get("panel", foc_out.get("opened", ""))) != "focus":
+		_fail("NEXT focus_done should open focus got %s" % str(foc_out))
+		return
+	if bool(foc_out.get("unpause_only", true)):
+		_fail("NEXT focus_done unpause-only: %s" % str(foc_out))
+		return
+	_pass("NEXT focus_done opens focus")
+	var sh_rec: Dictionary = hook_scr.call("rank_from_snapshot", {
+		"steel_stock": 0.0,
+		"has_vehicle": true,
+	}) as Dictionary
+	var sh_out: Dictionary = hook_scr.call("apply", sh_rec) as Dictionary
+	if str(sh_out.get("panel", sh_out.get("opened", ""))) != "production":
+		_fail("NEXT shortage should open production got %s" % str(sh_out))
+		return
+	if bool(sh_out.get("unpause_only", true)):
+		_fail("NEXT shortage unpause-only: %s" % str(sh_out))
+		return
+	_pass("NEXT shortage opens production")
+	_lm.call("boot_living_player", ATT_TAG)
+	if str(_lm.call("get_player_country_tag")) != ATT_TAG:
+		_fail("restore GER player tag failed")
+		return
+	_pass("restored default GER Maginot player tag")
 
 
 func _cleanup_forms() -> void:

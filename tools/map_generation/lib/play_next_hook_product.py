@@ -547,6 +547,27 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("harness_higher_beats_completing")
     else:
         fails.append("harness_higher_beats_completing")
+    if "func _open_living_surface" in hook and "unpause_only" in hook:
+        passes.append("gd_open_living_surface")
+    else:
+        fails.append("gd_open_living_surface")
+    apply_src = hook
+    if (
+        '_open_living_surface("research"' in apply_src
+        and '_open_living_surface("focus"' in apply_src
+        and '_open_living_surface("production"' in apply_src
+    ):
+        passes.append("gd_next_opens_panels")
+    else:
+        fails.append("gd_next_opens_panels")
+    if (
+        "NEXT tech_done opens research" in harness
+        and "NEXT focus_done opens focus" in harness
+        and "NEXT shortage opens production" in harness
+    ):
+        passes.append("harness_next_panels")
+    else:
+        fails.append("harness_next_panels")
     ok = len(fails) == 0
     return {
         "ok": ok,

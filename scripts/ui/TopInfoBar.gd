@@ -1177,6 +1177,48 @@ func _on_hotseat_end_turn() -> void:
 	_refresh_hotseat_banner()
 
 
+## Living NEXT / nation-era boot: open production, research, or focus (TechnologyScreen).
+func open_living_surface(kind: String) -> Dictionary:
+	var k := kind.strip_edges().to_lower()
+	if k in ["shortage", "industry"]:
+		k = "production"
+	if k in ["tech_done", "technology"]:
+		k = "research"
+	if k in ["focus_done"]:
+		k = "focus"
+	match k:
+		"production":
+			_on_production_pressed()
+			return {"ok": true, "panel": "production", "live": true}
+		"research":
+			_on_technology_pressed()
+			return {"ok": true, "panel": "research", "live": true}
+		"focus":
+			_on_technology_pressed()
+			return {"ok": true, "panel": "focus", "live": true}
+		_:
+			return {"ok": false, "panel": k, "live": true}
+
+
+func set_living_player_nation(tag: String) -> Dictionary:
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("boot_living_player"):
+		var out: Dictionary = LeaderManager.boot_living_player(tag)
+		player_country_tag = str(out.get("player_tag", tag)).strip_edges().to_upper()
+		return out
+	player_country_tag = tag.strip_edges().to_upper()
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("set_player_country_tag"):
+		LeaderManager.set_player_country_tag(player_country_tag)
+	return {"ok": true, "player_tag": player_country_tag, "live": true}
+
+
+func set_living_era(year: int) -> Dictionary:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("boot_living_era"):
+		var out: Dictionary = TimeManager.boot_living_era(year)
+		_update_date_time()
+		return out
+	return {"ok": false, "year": year}
+
+
 func _on_production_pressed() -> void:
 	# Multi-window: do not close other overlays; re-click toggles this screen only.
 	_toggle_screen(

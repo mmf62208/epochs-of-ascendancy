@@ -573,10 +573,24 @@ func _ensure_game_interactive() -> void:
 		var lm_graph := get_node_or_null("/root/LeaderManager")
 		if lm_graph != null and lm_graph.has_method("set_player_country_tag"):
 			lm_graph.call("set_player_country_tag", "GER")
+		var env_tag := OS.get_environment("EOA_PLAYER_TAG").strip_edges().to_upper()
+		if env_tag in ["ENG", "USA", "SOV", "JAP", "FRA", "ITA", "POL"]:
+			player_tag = env_tag
+			if lm_graph != null and lm_graph.has_method("boot_living_player"):
+				lm_graph.call("boot_living_player", env_tag)
+			elif lm_graph != null and lm_graph.has_method("set_player_country_tag"):
+				lm_graph.call("set_player_country_tag", env_tag)
+			if typeof(SessionPlayers) != TYPE_NIL and SessionPlayers.has_method("setup_solo_play"):
+				SessionPlayers.setup_solo_play(player_tag)
+		var env_year := OS.get_environment("EOA_START_YEAR").strip_edges()
+		if env_year in ["1918", "1936", "2026"]:
+			var tm_era := get_node_or_null("/root/TimeManager")
+			if tm_era != null and tm_era.has_method("boot_living_era"):
+				tm_era.call("boot_living_era", int(env_year))
 		var top_bar_hs := get_node_or_null("UILayer/TopInfoBar")
 		if top_bar_hs:
 			if "player_country_tag" in top_bar_hs:
-				top_bar_hs.player_country_tag = "GER"
+				top_bar_hs.player_country_tag = player_tag
 			if top_bar_hs.has_method("_refresh_hotseat_visibility"):
 				top_bar_hs.call("_refresh_hotseat_visibility")
 		# One-shot first-session onboarding toast (after load paints).
@@ -2072,6 +2086,10 @@ func _run_continued_system_demos() -> void:
 
 
 func _resolve_player_tag() -> String:
+	var env := OS.get_environment("EOA_PLAYER_TAG").strip_edges().to_upper()
+	if env in ["ENG", "USA", "SOV", "JAP", "FRA", "ITA", "POL"]:
+		player_tag = env
+		return env
 	var tag := player_tag
 	if loader == null:
 		return tag
