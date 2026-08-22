@@ -1821,6 +1821,9 @@ func _test_playtest_clock() -> void:
 	if not bool(clock.get("news", false)):
 		_fail("playtest clock must post capture news: %s" % str(clock))
 		return
+	if not bool(clock.get("f5_flush", false)):
+		_fail("playtest clock must drain F5 day_emit/day_ai/day_battles flush: %s" % str(clock))
+		return
 	var aar: Dictionary = {}
 	if _bm != null and _bm.has_method("peek_last_land_aar"):
 		aar = _bm.call("peek_last_land_aar") as Dictionary

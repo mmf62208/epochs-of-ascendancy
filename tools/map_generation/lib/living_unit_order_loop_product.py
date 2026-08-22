@@ -241,6 +241,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     (passes if nation_ok else fails).append("nation_era_next")
 
     clock_fn = _slice(tm_src, "advance_living_playtest_days")
+    drain_fn = _slice(tm_src, "_drain_living_f5_flush")
     tick_one = _slice(bm, "_tick_one_open_land_battle")
     capture_light = _slice(bm, "_apply_attacker_win_capture_light")
     next_hex = _slice(
@@ -253,12 +254,16 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         bool(clock_fn)
         and "never_execute" in clock_fn
         and "execute_province_assault" not in clock_fn
+        and "advance_days(" in clock_fn
+        and "_drain_living_f5_flush" in clock_fn
+        and "_flush_sim_events" in drain_fn
+        and "f5_flush" in clock_fn
         and "_living_playtest_clock" in tm_src
         and "_living_playtest_clock" in _slice(tm_src, "is_interactive_light_sim")
         and "day_emit" in tm_src
         and "day_battles" in tm_src
-        and "game_day_advanced.emit" in clock_fn
-        and "_tick_open_land_battles" in clock_fn
+        and "game_day_advanced.emit" in tm_src
+        and "_tick_open_land_battles" in tm_src
         and '"aar"' in clock_fn
         and '"news"' in clock_fn
         and "_record_land_aar" in tick_one
@@ -270,6 +275,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "advance_living_playtest_days" in harness
         and "playtest clock advanced" in harness
         and "playtest clock AAR" in harness
+        and "f5_flush" in harness
         and "_seed_maginot_clock_battle" in harness
         and "execute_province_assault" not in _slice(bm, "try_ai_start_land_battles")
         and "_living_playtest_clock" in mm_src

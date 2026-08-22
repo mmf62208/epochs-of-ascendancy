@@ -77,8 +77,9 @@ var _accumulated_game_hours: float = 0.0
 ## so a heavy listener cannot freeze the clock at Feb 28 (main thread never returns to TopInfoBar).
 var _pending_sim_events: Array = []
 var _sim_flush_scheduled: bool = false
-## Compact 5–10d playtest clock: light capture (no execute BFS-retreat), sync calendar.
+## Compact 5–10d playtest clock: light capture (no execute BFS-retreat), F5 flush.
 var _living_playtest_clock: bool = false
+var _draining_f5_flush: bool = false
 ## Soft budget (ms) for deferred sim work per frame — keeps pan/hover live past month ends.
 const INTERACTIVE_SIM_FLUSH_BUDGET_MS := 10
 
@@ -337,7 +338,8 @@ func advance_days(days: float) -> void:
 		_schedule_sim_flush()
 
 
-## Maginot living 5–10d unpause: calendar + marches + land ticks, light capture not execute.
+## Maginot / PLAYTEST item 14: drive the real F5 1x path (advance_days + split
+## day_emit / day_ai / day_battles flush). Light capture, never execute.
 func advance_living_playtest_days(days: int = 5) -> Dictionary:
 	var n := clampi(int(days), 1, 10)
 	var start := total_days_elapsed
@@ -346,33 +348,14 @@ func advance_living_playtest_days(days: int = 5) -> Dictionary:
 	var was_paused := paused
 	paused = false
 	_living_playtest_clock = true
-	for _i in n:
-		current_day += 1
-		var crossed_month := false
-		var crossed_year := false
-		var days_in_month := _get_days_in_month(current_month, current_year)
-		if current_day > days_in_month:
-			current_day = 1
-			current_month += 1
-			crossed_month = true
-			if current_month > 12:
-				current_month = 1
-				current_year += 1
-				crossed_year = true
-		total_days_elapsed += 1
-		game_day_advanced.emit(current_year, current_month, current_day)
-		_tick_own_land_marches()
-		_tick_open_land_battles()
-		_tick_out_of_combat_recovery()
-		_tick_organize_queue()
-		if crossed_month:
-			_emit_month_year_boundary(current_year, current_month, crossed_year)
+	advance_days(float(n))
+	var flushed := _drain_living_f5_flush(n)
 	_living_playtest_clock = false
 	paused = was_paused
 	var advanced := total_days_elapsed - start
 	print(
-		"TimeManager: living playtest clock +%d days → %04d-%02d-%02d (elapsed=%d)"
-		% [advanced, current_year, current_month, current_day, total_days_elapsed]
+		"TimeManager: living F5 unpause +%d days flushed=%d → %04d-%02d-%02d (elapsed=%d)"
+		% [advanced, flushed, current_year, current_month, current_day, total_days_elapsed]
 	)
 	return {
 		"ok": advanced >= 5,
@@ -389,7 +372,22 @@ func advance_living_playtest_days(days: int = 5) -> Dictionary:
 		"battles_ticked": true,
 		"aar": true,
 		"news": true,
+		"f5_flush": true,
+		"flushed": flushed,
 	}
+
+
+func _drain_living_f5_flush(days: int) -> int:
+	# Maginot -s has no idle frames we wait on. Drain the same one-event queue F5 uses.
+	_draining_f5_flush = true
+	var flushed := 0
+	var cap := maxi(8, int(days) * 6 + 16)
+	while flushed < cap and not _pending_sim_events.is_empty():
+		_flush_sim_events()
+		flushed += 1
+	_draining_f5_flush = false
+	_sim_flush_scheduled = false
+	return flushed
 
 
 func _schedule_sim_flush() -> void:
@@ -446,7 +444,7 @@ func _flush_sim_events() -> void:
 		print("TimeManager: flushing month boundary %04d-%02d (interactive, isolated frame)" % [y, m])
 		_emit_month_year_boundary(y, m, bool(ev.get("crossed_year", false)))
 
-	if not _pending_sim_events.is_empty():
+	if not _pending_sim_events.is_empty() and not _draining_f5_flush:
 		if n_res > 0 and is_interactive_light_sim():
 			# Extra idle frame so F5 capture never shares a frame with the next day.
 			call_deferred("_schedule_sim_flush")
