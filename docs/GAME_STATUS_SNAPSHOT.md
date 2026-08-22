@@ -28,7 +28,7 @@ Every Cursor / Grok / human session on this tree:
 |------|--------|
 | **Human** | Not required for units. When you do open the map: Maginot chips sit on the hex (centroid), player is GER. M6 20d/60d still open. |
 | **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS** (organize/train/priority included). Soft 30fps still FAIL honest. |
-| **GitHub** | `origin/main` @ `8515b3e` (playtest clock ≥5d / never_execute gated). Play branch `eoa/l1-war-loop-slice` matches. Do not force-push over June Cursor history. |
+| **GitHub** | `origin/main` @ `27d2a08` (hang-safe 20d Maginot F5 clock). Play branch `eoa/l1-war-loop-slice` matches. Do not force-push over June Cursor history. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
 
