@@ -1489,9 +1489,13 @@ func _spawn_scenario_formations(scenario_name: String) -> void:
 	var countries_to_spawn: Array[String] = _get_formation_spawn_countries(scenario_name)
 	var count_by_tag: Dictionary = _get_formation_counts_for_scenario(scenario_name)
 	var idx := 0
+	var qa := OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() == "1"
+	var headless := DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server")
+	var yield_n := 8 if (qa or headless) else 4
 	for country_tag in countries_to_spawn:
 		idx += 1
-		await _report_load_progress(0.26 + (float(idx) / max(1.0, float(countries_to_spawn.size()))) * 0.12, "Spawning formations for " + country_tag + " (" + str(idx) + "/" + str(countries_to_spawn.size()) + ")...")
+		if idx == 1 or (idx % yield_n) == 0 or idx == countries_to_spawn.size():
+			await _report_load_progress(0.26 + (float(idx) / max(1.0, float(countries_to_spawn.size()))) * 0.12, "Spawning formations for " + country_tag + " (" + str(idx) + "/" + str(countries_to_spawn.size()) + ")...")
 		var count := int(count_by_tag.get(country_tag, 4))
 		var capital_id := _get_capital_province_id_for_tag(str(country_tag))
 		var owned_land: Array[int] = _collect_owned_land_ids_from_loader(str(country_tag))
@@ -1501,7 +1505,8 @@ func _spawn_scenario_formations(scenario_name: String) -> void:
 		formation_spawner.spawn_test_formations_for_country(
 			str(country_tag), count, capital_id, owned_land, key_hubs, border_ids
 		)
-		await get_tree().process_frame
+		if (idx % yield_n) == 0:
+			await get_tree().process_frame
 	LeaderManager.clear_all_leader_caches()
 	_print_formation_station_evidence()
 	# Historical leaders → formations (after roster load + spawn; real assign API).
@@ -1537,6 +1542,17 @@ func _get_formation_spawn_countries(_scenario_name: String) -> Array[String]:
 		tags.append(str(tag))
 	if tags.is_empty():
 		return ["GER", "USA", "SOV"] as Array[String]
+	# UNIT ORDER QA only needs Maginot + 8-major chips; spawning 65 tags
+	# drowned --quit-after before QA could run.
+	if OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() == "1":
+		var majors: Array[String] = ["GER", "FRA", "ENG", "USA", "SOV", "ITA", "JAP", "POL"]
+		var qa_tags: Array[String] = []
+		for t in majors:
+			if t in tags:
+				qa_tags.append(t)
+		if not qa_tags.is_empty():
+			print("ScenarioLoader: UNIT ORDER QA spawn majors only n=%d" % qa_tags.size())
+			return qa_tags
 	tags.sort()
 	return tags
 

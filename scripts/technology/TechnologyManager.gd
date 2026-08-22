@@ -1997,6 +1997,14 @@ func _apply_completed_techs_in_order(
 	var pending := tech_ids.duplicate()
 	var tcount := 0
 	var yield_every := 2 if during_scenario_load else 5
+	# Headless / UNIT ORDER QA: a process_frame every 2 techs on the 3520 board
+	# drowned F5 boot (--quit-after never reached QA). Graphical load still yields.
+	if (
+		DisplayServer.get_name() == "headless"
+		or OS.has_feature("dedicated_server")
+		or OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() == "1"
+	):
+		yield_every = 128 if during_scenario_load else 32
 	for _attempt in range(32):
 		if pending.is_empty():
 			return

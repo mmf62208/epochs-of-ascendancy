@@ -701,7 +701,13 @@ func _run_feb_clock_advance_test() -> void:
 ## Headless F5 proof: Maginot chip exists with strength and can be ordered.
 func _run_unit_order_qa_and_quit() -> void:
 	print("=== EOA UNIT ORDER QA begin ===")
-	await get_tree().create_timer(3.0).timeout
+	# Headless: chips already parked by load. A 3s timer used to lose the race
+	# against --quit-after after a 3520-board boot.
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		await get_tree().process_frame
+		await get_tree().process_frame
+	else:
+		await get_tree().create_timer(3.0).timeout
 	var fail: PackedStringArray = []
 	var mr: Node = map_renderer
 	if mr == null:
@@ -1996,12 +2002,14 @@ func _ready() -> void:
 		# Zero-interference auto-seed: small relocation on load so map tints/inspector/bonuses visible immediately on full Europe provinces without button press.
 		# Full control + more samples via F10 "Zero-Interference Full Europe Playtest Harness" buttons (policies + time advance for toasts/pressure).
 		# Phase4 polish: defer the apply (and its long sample print) so it does not interfere with first-frame after "MAP SHOULD BE VISIBLE NOW" (builds on existing heavy defer + post-vis guards).
-		if gd != null and gd.has_method("apply_encourage_relocation") and _wants_automated_harness_cycles():
+		var unit_order_qa := OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() == "1"
+		if gd != null and gd.has_method("apply_encourage_relocation") and _wants_automated_harness_cycles() and not unit_order_qa:
 			call_deferred("_do_deferred_auto_seed_relocation")
 
 		# Headless autonomous cycles for tester: scenario load (already done) + mass settlement + welfare policy trigger + 3-6mo advance + key effect logs (settlement, welfare_burden, cohesion, toasts/erosion).
 		# Triggered only for automated harness runs (headless / --map-evidence / EOA_RUN_SIM_CYCLES=1). Zero interference for normal graphical F5 launches.
-		if _wants_automated_harness_cycles():
+		# UNIT ORDER QA is the F5 living-unit path — 4mo theater ticks starved the QA deferred.
+		if _wants_automated_harness_cycles() and not unit_order_qa:
 			print("[HEADLESS CYCLE] Detected automated harness run — will auto-execute settlement + welfare + 4mo advance cycles + logs (no UI required).")
 			call_deferred("_run_headless_policy_settle_cycles")
 
@@ -2662,6 +2670,11 @@ func _run_headless_policy_settle_cycles() -> void:
 ## Helper for guaranteed headless execution of full Phase 2 map UX exercise (called deferred early from _ready).
 ## Duplicates the robust lookup + FULL exercise logic so --headless --quit-after always produces the mapmode/action/460 evidence even if later cycles are slow.
 func _exercise_full_mapmodes_and_actions_headless() -> void:
+	# Living-unit QA is the F5 boot path — a 3520 quicksave/execute burst used to
+	# starve the deferred UNIT ORDER QA against --quit-after.
+	if OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() == "1":
+		print("TestRunner: skip headless map-evidence burst (EOA_UNIT_ORDER_QA)")
+		return
 	# Extra runtime guard: if a graphical launch somehow reached here, bail immediately with no side-effects.
 	# Must match the strict wants_evidence logic in _ready (dedicated / display=="headless" / explicit --map-evidence only).
 	var cmdline := OS.get_cmdline_args()

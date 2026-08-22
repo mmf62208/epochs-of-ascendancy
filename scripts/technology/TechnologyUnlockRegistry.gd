@@ -49,8 +49,13 @@ func apply_unlock(
 			_append_unique(state, "rule_flags", str(unlock.get("flag", "")))
 		"resource":
 			_apply_resource_unlock(state, unlock)
-		"building", "equipment_module":
+		"building":
 			_store_deferred_unlock(state, unlock_type, unlock)
+		"equipment_module", "module_unlock":
+			# Trees use module_unlock (ids/category); SCHEMA uses equipment_module.
+			# Both are known — never warn. F5 starting-tech grant used to flood
+			# Unhandled unlock type 'module_unlock' for every country and drown QA.
+			_apply_module_unlock(state, unlock)
 		"division_template":
 			_apply_division_template_unlock(state, unlock)
 			_store_deferred_unlock(state, unlock_type, unlock)
@@ -80,6 +85,21 @@ func _apply_unit_design_unlock(state: Dictionary, unlock: Dictionary) -> void:
 		ids.append(str(unlock.get("template_id", "")))
 	for template_id in ids:
 		_append_unique(state, "unlocked_unit_designs", template_id)
+
+
+func _apply_module_unlock(state: Dictionary, unlock: Dictionary) -> void:
+	_store_deferred_unlock(state, "equipment_module", unlock)
+	var ids: Array = []
+	if unlock.has("module_ids"):
+		for raw in unlock.get("module_ids", []) as Array:
+			ids.append(str(raw))
+	elif unlock.has("module_id"):
+		ids.append(str(unlock.get("module_id", "")))
+	var cat := str(unlock.get("module_category", "")).strip_edges()
+	if not cat.is_empty():
+		ids.append("category:%s" % cat)
+	for mid in ids:
+		_append_unique(state, "unlocked_equipment_modules", mid)
 
 
 func _apply_division_template_unlock(state: Dictionary, unlock: Dictionary) -> void:

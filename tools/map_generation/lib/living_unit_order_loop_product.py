@@ -11,6 +11,7 @@ from typing import Any, Dict, List
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 TEST_RUNNER = ROOT / "scripts" / "core" / "TestRunner.gd"
+SCENARIO_LOADER = ROOT / "scripts" / "core" / "ScenarioLoader.gd"
 FORMATION_MOVEMENT = ROOT / "scripts" / "formations" / "FormationMovement.gd"
 BATTLE_MANAGER = ROOT / "scripts" / "combat" / "BattleManager.gd"
 HARNESS = ROOT / "scripts" / "core" / "HeadlessWorldAccurateUnitOrderLoopTest.gd"
@@ -27,6 +28,8 @@ TOP_BAR = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
 AAR_GD = ROOT / "scripts" / "combat" / "LandBattleAar.gd"
 LEADER_EVENT_UI = ROOT / "scripts" / "ui" / "LeaderEventUI.gd"
 SAVE_LOAD = ROOT / "scripts" / "autoload" / "SaveLoadManager.gd"
+TECH_UNLOCK = ROOT / "scripts" / "technology" / "TechnologyUnlockRegistry.gd"
+TECH_MGR = ROOT / "scripts" / "technology" / "TechnologyManager.gd"
 
 GER_FRONT = 710173
 FRA_FRONT = 710739
@@ -283,6 +286,38 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     wiring["playtest_clock"] = clock_ok
     (passes if clock_ok else fails).append("playtest_clock")
 
+    unlock_src = TECH_UNLOCK.read_text(encoding="utf-8") if TECH_UNLOCK.is_file() else ""
+    # apply_unlock is a prefix of apply_unlocks — slice on the exact signature.
+    apply_i = unlock_src.find("func apply_unlock(")
+    apply_fn = unlock_src[apply_i:] if apply_i >= 0 else ""
+    if apply_fn:
+        nxt = apply_fn.find("\nfunc ", 1)
+        if nxt > 0:
+            apply_fn = apply_fn[:nxt]
+    module_fn = _slice(unlock_src, "_apply_module_unlock")
+    unlock_ok = (
+        bool(apply_fn)
+        and '"module_unlock"' in apply_fn
+        and "_apply_module_unlock" in apply_fn
+        and apply_fn.find('"module_unlock"') < apply_fn.find("push_warning")
+        and "func _apply_module_unlock" in unlock_src
+        and "unlocked_equipment_modules" in module_fn
+        and "module_ids" in module_fn
+        and "yield_every" in _slice(
+            TECH_MGR.read_text(encoding="utf-8") if TECH_MGR.is_file() else "",
+            "_apply_completed_techs_in_order",
+        )
+        and "EOA_UNIT_ORDER_QA" in _slice(
+            TECH_MGR.read_text(encoding="utf-8") if TECH_MGR.is_file() else "",
+            "_apply_completed_techs_in_order",
+        )
+        and "UNIT ORDER QA spawn majors" in (
+            SCENARIO_LOADER.read_text(encoding="utf-8") if SCENARIO_LOADER.is_file() else ""
+        )
+    )
+    wiring["f5_boot_unlocks"] = unlock_ok
+    (passes if unlock_ok else fails).append("f5_boot_unlocks")
+
     chrome = _slice(ren, "_attach_unit_counter_chrome")
     chrome_ok = (
         bool(chrome)
@@ -430,7 +465,16 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     (passes if mv_ok else fails).append("march_api")
     (passes if bm_ok else fails).append("battle_api")
 
-    boot = "ensure_playable_front_chips" in runner and "EOA_UNIT_ORDER_QA" in runner
+    qa_fn = _slice(runner, "_run_unit_order_qa_and_quit")
+    evidence_fn = _slice(runner, "_exercise_full_mapmodes_and_actions_headless")
+    boot = (
+        "ensure_playable_front_chips" in runner
+        and "EOA_UNIT_ORDER_QA" in runner
+        and "process_frame" in qa_fn
+        and "skip headless map-evidence burst" in evidence_fn
+        and "unit_order_qa" in runner
+        and "not unit_order_qa" in runner
+    )
     wiring["f5_boot_and_qa"] = boot
     (passes if boot else fails).append("f5_boot_and_qa")
 
