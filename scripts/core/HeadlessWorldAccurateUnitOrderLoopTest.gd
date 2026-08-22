@@ -1797,14 +1797,14 @@ func _test_playtest_clock() -> void:
 	var start := 0
 	if tm.has_method("get_total_days_elapsed"):
 		start = int(tm.call("get_total_days_elapsed"))
-	var clock: Dictionary = tm.call("advance_living_playtest_days", 5) as Dictionary
+	var clock: Dictionary = tm.call("advance_living_playtest_days", 20) as Dictionary
 	print("  [INFO] playtest clock %s" % str(clock))
 	var advanced := int(clock.get("days", 0))
 	var elapsed := start
 	if tm.has_method("get_total_days_elapsed"):
 		elapsed = int(tm.call("get_total_days_elapsed"))
-	if not bool(clock.get("ok", false)) or advanced < 5 or (elapsed - start) < 5:
-		_fail("playtest clock want ≥5 days got %s elapsed %d→%d" % [str(clock), start, elapsed])
+	if not bool(clock.get("ok", false)) or advanced < 20 or (elapsed - start) < 20:
+		_fail("playtest clock want ≥20 days got %s elapsed %d→%d" % [str(clock), start, elapsed])
 		return
 	if not bool(clock.get("never_execute", false)):
 		_fail("playtest clock must stay off execute_province_assault: %s" % str(clock))

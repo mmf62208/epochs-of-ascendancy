@@ -275,9 +275,12 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "func _should_skip_toast_ui" in news_ui
         and "func _skip_quit_autosave" in save_src
         and "_skip_quit_autosave" in _slice(save_src, "_notification")
+        and "clampi(int(days), 1, 20)" in clock_fn
+        and "_living_playtest_clock" in _slice(tm_src, "_maybe_run_ai_land_battle_starts")
+        and "_living_playtest_clock" in _slice(save_src, "_on_day_advanced_for_autosave")
         and "advance_living_playtest_days" in harness
         and "playtest clock advanced" in harness
-        and "advanced < 5" in harness
+        and "advanced < 20" in harness
         and "never_execute" in harness
         and "playtest clock AAR" in harness
         and "f5_flush" in harness

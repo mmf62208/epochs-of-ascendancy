@@ -77,7 +77,7 @@ var _accumulated_game_hours: float = 0.0
 ## so a heavy listener cannot freeze the clock at Feb 28 (main thread never returns to TopInfoBar).
 var _pending_sim_events: Array = []
 var _sim_flush_scheduled: bool = false
-## Compact 5–10d playtest clock: light capture (no execute BFS-retreat), F5 flush.
+## Compact 5–20d playtest clock: light capture (no execute BFS-retreat), F5 flush.
 var _living_playtest_clock: bool = false
 var _draining_f5_flush: bool = false
 ## Soft budget (ms) for deferred sim work per frame — keeps pan/hover live past month ends.
@@ -341,7 +341,7 @@ func advance_days(days: float) -> void:
 ## Maginot / PLAYTEST item 14: drive the real F5 1x path (advance_days + split
 ## day_emit / day_ai / day_battles flush). Light capture, never execute.
 func advance_living_playtest_days(days: int = 5) -> Dictionary:
-	var n := clampi(int(days), 1, 10)
+	var n := clampi(int(days), 1, 20)
 	var start := total_days_elapsed
 	var from_day := current_day
 	var from_month := current_month
@@ -358,7 +358,7 @@ func advance_living_playtest_days(days: int = 5) -> Dictionary:
 		% [advanced, flushed, current_year, current_month, current_day, total_days_elapsed]
 	)
 	return {
-		"ok": advanced >= 5,
+		"ok": advanced >= n,
 		"days": advanced,
 		"elapsed": total_days_elapsed,
 		"from_day": from_day,
@@ -527,6 +527,10 @@ func _maybe_run_ai_infra_invest() -> void:
 ## Budgeted AI start_land_battle (max 1/day). Same F5 light-sim gate as multi-AI.
 ## Killswitch: EOA_AI_LAND_BATTLES=0 (also skipped when interactive multi-AI is off).
 func _maybe_run_ai_land_battle_starts() -> void:
+	if _living_playtest_clock:
+		# Compact 20d Maginot clock ticks open fights only — new AI assaults
+		# were opening extra fronts (and execute-risk on empty hexes).
+		return
 	if OS.get_environment("EOA_AI_LAND_BATTLES").strip_edges() == "0":
 		return
 	if not _should_run_interactive_multi_ai():
