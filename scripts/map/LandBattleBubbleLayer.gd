@@ -136,11 +136,14 @@ func _bubble_pos(entry: Dictionary) -> Vector2:
 func _centroid_of(pid: int) -> Vector2:
 	if pid < 0:
 		return Vector2(INF, INF)
-	if _centroids.has(pid):
-		return _as_vec(_centroids[pid])
-	var key := str(pid)
-	if _centroids.has(key):
-		return _as_vec(_centroids[key])
+	# TypedDictionary[int] errors on has(String). Always coerce to int first.
+	var want := int(pid)
+	if _centroids.has(want):
+		return _as_vec(_centroids[want])
+	# Untyped maps may store string keys — walk keys; never has(String) on a typed int dict.
+	for k in _centroids.keys():
+		if int(k) == want:
+			return _as_vec(_centroids[k])
 	return Vector2(INF, INF)
 
 

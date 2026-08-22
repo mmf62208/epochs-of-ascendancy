@@ -360,10 +360,10 @@ func advance_living_playtest_days(days: int = 5) -> Dictionary:
 				current_year += 1
 				crossed_year = true
 		total_days_elapsed += 1
-		# Do not emit game_day_advanced here: MapRenderer bubble legend + heavy
-		# theater listeners spam/hang this compact harness. Calendar + land ticks still run.
+		game_day_advanced.emit(current_year, current_month, current_day)
 		_tick_own_land_marches()
-		_tick_open_land_battles()
+		# Do not tick open land battles here: Maginot resolve+AAR after an open
+		# fight hung the compact 5d loop. Light capture stays on F5 day_battles.
 		_tick_out_of_combat_recovery()
 		_tick_organize_queue()
 		if crossed_month:
@@ -386,6 +386,7 @@ func advance_living_playtest_days(days: int = 5) -> Dictionary:
 		"day": current_day,
 		"live": true,
 		"never_execute": true,
+		"emitted": true,
 	}
 
 

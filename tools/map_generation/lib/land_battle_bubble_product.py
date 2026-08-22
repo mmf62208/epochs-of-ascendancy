@@ -101,6 +101,20 @@ def build_land_battle_bubble_product(*, check_wiring: bool = True) -> Dict[str, 
     else:
         fails.append("z_high")
 
+    cent = _gd_func_slice(src, "_centroid_of")
+    cent_ok = (
+        bool(cent)
+        and "int(pid)" in cent
+        and "_centroids.has(want)" in cent
+        and 'str(pid)' not in cent
+        and "_centroids.has(key)" not in cent
+    )
+    wiring["centroid_int_keys"] = cent_ok
+    if cent_ok:
+        passes.append("centroid_int_keys")
+    else:
+        fails.append("centroid_int_keys")
+
     if check_wiring:
         sfx_keys_ok = bool(sfx) and all(
             token in sfx

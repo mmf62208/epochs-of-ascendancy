@@ -1806,6 +1806,9 @@ func _test_playtest_clock() -> void:
 	if not bool(clock.get("never_execute", false)):
 		_fail("playtest clock must stay off execute_province_assault: %s" % str(clock))
 		return
+	if not bool(clock.get("emitted", false)):
+		_fail("playtest clock must emit game_day_advanced: %s" % str(clock))
+		return
 	var ger_p: Object = _mm.call("get_province", GER_FRONT) if _mm.has_method("get_province") else null
 	if ger_p != null and str(ger_p.get("owner_tag")).strip_edges().to_upper() != ATT_TAG:
 		_fail("playtest clock drifted Maginot GER owner")
