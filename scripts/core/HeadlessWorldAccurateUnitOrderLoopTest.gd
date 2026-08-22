@@ -1835,6 +1835,29 @@ func _test_playtest_clock() -> void:
 	if ger_p != null and str(ger_p.get("owner_tag")).strip_edges().to_upper() != ATT_TAG:
 		_fail("playtest clock drifted Maginot GER owner")
 		return
+	var sl: Node = _autoload("SaveLoadManager")
+	if sl == null or not sl.has_method("living_playtest_saveload_roundtrip"):
+		_fail("living_playtest_saveload_roundtrip missing")
+		return
+	var rt: Dictionary = sl.call("living_playtest_saveload_roundtrip") as Dictionary
+	print("  [INFO] playtest clock save/load %s" % str(rt))
+	if not bool(rt.get("ok", false)):
+		_fail("playtest clock save/load not ok: %s" % str(rt))
+		return
+	if int(rt.get("elapsed_saved", 0)) < 20 or int(rt.get("elapsed_restored", 0)) < 20:
+		_fail("playtest clock save/load elapsed want ≥20 got %s" % str(rt))
+		return
+	if not bool(rt.get("never_execute", false)):
+		_fail("playtest clock save/load must stay off execute: %s" % str(rt))
+		return
+	if bool(rt.get("aar_saved", false)) and not bool(rt.get("aar_restored", false)):
+		_fail("playtest clock save/load dropped land_war AAR: %s" % str(rt))
+		return
+	ger_p = _mm.call("get_province", GER_FRONT) if _mm.has_method("get_province") else null
+	if ger_p != null and str(ger_p.get("owner_tag")).strip_edges().to_upper() != ATT_TAG:
+		_fail("playtest clock save/load drifted Maginot GER owner")
+		return
+	_pass("playtest clock save/load elapsed=%d AAR restored" % int(rt.get("elapsed_restored", 0)))
 	_pass("playtest clock advanced %d days (elapsed=%d)" % [advanced, elapsed])
 
 

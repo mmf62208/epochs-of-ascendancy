@@ -287,6 +287,12 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "_seed_maginot_clock_battle" in harness
         and "execute_province_assault" not in _slice(bm, "try_ai_start_land_battles")
         and "_living_playtest_clock" in mm_src
+        and "func living_playtest_saveload_roundtrip" in save_src
+        and "_gather_save_data" in _slice(save_src, "living_playtest_saveload_roundtrip")
+        and "_apply_save_data" in _slice(save_src, "living_playtest_saveload_roundtrip")
+        and "execute_province_assault" not in _slice(save_src, "living_playtest_saveload_roundtrip")
+        and "living_playtest_saveload_roundtrip" in harness
+        and "playtest clock save/load" in harness
     )
     wiring["playtest_clock"] = clock_ok
     (passes if clock_ok else fails).append("playtest_clock")

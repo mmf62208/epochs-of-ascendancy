@@ -215,6 +215,41 @@ func _skip_quit_autosave() -> bool:
 		return true
 	return false
 
+
+## PLAYTEST §0b 13 on the living Maginot 20d clock: gather time+land_war+map via
+## the shipped save blob, mutate elapsed/AAR, apply. Never execute_province_assault.
+func living_playtest_saveload_roundtrip() -> Dictionary:
+	var blob: Dictionary = _gather_save_data()
+	if blob.is_empty() or not blob.has("land_war") or not blob.has("time"):
+		return {"ok": false, "reason": "gather incomplete", "never_execute": true}
+	var t: Dictionary = blob["time"] as Dictionary
+	var saved_elapsed := int(t.get("total_days_elapsed", 0))
+	var lw: Dictionary = blob["land_war"] as Dictionary
+	var saved_aar: Dictionary = {}
+	if lw.get("last_aar") is Dictionary:
+		saved_aar = (lw["last_aar"] as Dictionary).duplicate()
+	if typeof(TimeManager) != TYPE_NIL:
+		TimeManager.total_days_elapsed = 0
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("clear_last_land_aar"):
+		BattleManager.clear_last_land_aar()
+	_apply_save_data(blob)
+	var restored := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		restored = int(TimeManager.get_total_days_elapsed())
+	var aar_now: Dictionary = {}
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("peek_last_land_aar"):
+		aar_now = BattleManager.peek_last_land_aar()
+	var aar_ok := saved_aar.is_empty() or not aar_now.is_empty()
+	return {
+		"ok": restored == saved_elapsed and saved_elapsed > 0 and aar_ok,
+		"elapsed_saved": saved_elapsed,
+		"elapsed_restored": restored,
+		"aar_saved": not saved_aar.is_empty(),
+		"aar_restored": not aar_now.is_empty(),
+		"land_war": true,
+		"never_execute": true,
+	}
+
 ## OS absolute path for user://saves/ (DirAccess absolute APIs are flaky with user:// alone).
 func get_saves_dir_global() -> String:
 	return ProjectSettings.globalize_path(SAVE_DIR)
@@ -626,13 +661,18 @@ func _apply_save_data(data: Dictionary) -> void:
 		var mr_refresh := get_tree().get_first_node_in_group("map_renderer") if get_tree() != null else null
 		if mr_refresh == null:
 			mr_refresh = get_node_or_null("/root/WorldMap")
-		if mr_refresh and mr_refresh.has_method("force_full_map_refresh"):
-			mr_refresh.call_deferred("force_full_map_refresh")
-		elif mr_refresh and mr_refresh.has_method("_refresh_province_fill_colors"):
-			mr_refresh.call_deferred("_refresh_province_fill_colors")
-		# Also nudge MapManager for pick/centroid if needed post heavy apply (safe no-op if no method)
-		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("_recompute_centroids_and_bounds"):
-			MapManager.call("_recompute_centroids_and_bounds")
+		var headless_load := (
+			DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server")
+		)
+		if not headless_load:
+			if mr_refresh and mr_refresh.has_method("force_full_map_refresh"):
+				mr_refresh.call_deferred("force_full_map_refresh")
+			elif mr_refresh and mr_refresh.has_method("_refresh_province_fill_colors"):
+				mr_refresh.call_deferred("_refresh_province_fill_colors")
+			# Also nudge MapManager for pick/centroid if needed post heavy apply (safe no-op if no method)
+			if typeof(MapManager) != TYPE_NIL and MapManager.has_method("_recompute_centroids_and_bounds"):
+				MapManager.call("_recompute_centroids_and_bounds")
+		# Headless Maginot -s: deferred full-board refresh hung quit after RESULT=PASS.
 
 	# Weather after map (provinces) + time; restores dynamic snow/ground/events from save (layer snow_potential re-applied via provinces on load)
 	if data.has("weather") and typeof(WeatherManager) != TYPE_NIL:
