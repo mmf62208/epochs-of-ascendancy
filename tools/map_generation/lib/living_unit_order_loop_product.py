@@ -247,6 +247,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "day_emit" in tm_src
         and "day_battles" in tm_src
         and "game_day_advanced.emit" in clock_fn
+        and "_tick_open_land_battles" in clock_fn
         and "advance_living_playtest_days" in harness
         and "playtest clock advanced" in harness
         and "execute_province_assault" not in _slice(bm, "try_ai_start_land_battles")

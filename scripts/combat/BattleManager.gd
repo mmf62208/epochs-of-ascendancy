@@ -1293,11 +1293,17 @@ func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
 		var att_tag := str(battle.get("att_tag", ""))
 		var att_fid := str(battle.get("att_fid", ""))
 		if _interactive_light_sim():
-			# Hang-class: capture/UI never runs on the sim tick. 20d on 15f3e1d
-			# stalled after "open land battles resolved=1" when execute was inline.
-			call_deferred("_deferred_resolve_attacker_win", att_tag, to_id, from_id, att_fid)
-			ev["success"] = true
-			ev["deferred_capture"] = true
+			# Hang-class: F5 capture stays deferred so the day tick returns.
+			# Compact playtest clock is already a sync loop — apply light capture
+			# now (no execute, no land-path BFS) so idle deferred cannot BFS later.
+			if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+				_apply_attacker_win_capture_light(att_tag, to_id, from_id, att_fid)
+				ev["success"] = true
+				ev["deferred_capture"] = false
+			else:
+				call_deferred("_deferred_resolve_attacker_win", att_tag, to_id, from_id, att_fid)
+				ev["success"] = true
+				ev["deferred_capture"] = true
 		else:
 			var exec: Dictionary = execute_province_assault(att_tag, to_id, from_id, att_fid)
 			ev["success"] = bool(exec.get("success", false))
@@ -1306,8 +1312,10 @@ func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
 	else:
 		# Defender hold or draw: no owner flip.
 		_finish_land_battle_hold(battle)
-	_record_land_aar(battle, winner, to_id)
-	ev["aar"] = peek_last_land_aar()
+	# Compact playtest clock: skip AAR next-hex scan (full-adj walk hung Maginot 5d).
+	if not (typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock"))):
+		_record_land_aar(battle, winner, to_id)
+		ev["aar"] = peek_last_land_aar()
 	return ev
 
 
@@ -1355,6 +1363,9 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		"winner": "attacker",
 	}
 	_displace_defender_from_captured_province(row, to_id)
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+		# Compact clock: skip news + map refresh (those hung Maginot after CAPTURE RETREAT).
+		return
 	_post_battle_news(row, true)
 	_notify_map_refresh(to_id, from_id, int(row.get("retreat_province_id", -1)))
 
