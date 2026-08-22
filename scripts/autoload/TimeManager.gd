@@ -387,6 +387,8 @@ func advance_living_playtest_days(days: int = 5) -> Dictionary:
 		"never_execute": true,
 		"emitted": true,
 		"battles_ticked": true,
+		"aar": true,
+		"news": true,
 	}
 
 

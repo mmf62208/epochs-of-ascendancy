@@ -1791,6 +1791,9 @@ func _test_playtest_clock() -> void:
 		return
 	if tm.has_method("set_paused"):
 		tm.call("set_paused", false)
+	_seed_maginot_clock_battle()
+	if _bm != null and _bm.has_method("clear_last_land_aar"):
+		_bm.call("clear_last_land_aar")
 	var start := 0
 	if tm.has_method("get_total_days_elapsed"):
 		start = int(tm.call("get_total_days_elapsed"))
@@ -1812,11 +1815,64 @@ func _test_playtest_clock() -> void:
 	if not bool(clock.get("battles_ticked", false)):
 		_fail("playtest clock must tick open land battles: %s" % str(clock))
 		return
+	if not bool(clock.get("aar", false)):
+		_fail("playtest clock must record hang-safe AAR: %s" % str(clock))
+		return
+	if not bool(clock.get("news", false)):
+		_fail("playtest clock must post capture news: %s" % str(clock))
+		return
+	var aar: Dictionary = {}
+	if _bm != null and _bm.has_method("peek_last_land_aar"):
+		aar = _bm.call("peek_last_land_aar") as Dictionary
+	if aar.is_empty() or str(aar.get("line", "")).strip_edges().is_empty():
+		_fail("playtest clock AAR empty after Maginot fight: %s" % str(aar))
+		return
+	_pass("playtest clock AAR %s" % str(aar.get("line", "")))
 	var ger_p: Object = _mm.call("get_province", GER_FRONT) if _mm.has_method("get_province") else null
 	if ger_p != null and str(ger_p.get("owner_tag")).strip_edges().to_upper() != ATT_TAG:
 		_fail("playtest clock drifted Maginot GER owner")
 		return
 	_pass("playtest clock advanced %d days (elapsed=%d)" % [advanced, elapsed])
+
+
+func _seed_maginot_clock_battle() -> void:
+	var ger_p: Object = _mm.call("get_province", GER_FRONT) if _mm.has_method("get_province") else null
+	var fra_p: Object = _mm.call("get_province", FRA_FRONT) if _mm.has_method("get_province") else null
+	if ger_p != null:
+		ger_p.set("owner_tag", ATT_TAG)
+		ger_p.set("controller_tag", ATT_TAG)
+	if fra_p != null:
+		fra_p.set("owner_tag", DEF_TAG)
+		fra_p.set("controller_tag", DEF_TAG)
+	var ger_f: Object = _ger_on_front()
+	if ger_f != null:
+		ger_f.stationed_province_id = GER_FRONT
+	var fra_f: Object = null
+	if _lm != null and _lm.has_method("get_formation"):
+		fra_f = _lm.call("get_formation", FRA_FID)
+	if fra_f != null and "stationed_province_id" in fra_f:
+		fra_f.stationed_province_id = FRA_FRONT
+	if _bm == null or not _bm.has_method("start_land_battle"):
+		return
+	# Headless is_interactive_light_sim is false — empty FRA would execute_province_assault.
+	if fra_f == null:
+		print("  [INFO] clock seed skipped (no FRA stack)")
+		return
+	var fid := GER_FID
+	if ger_f != null and "formation_id" in ger_f:
+		fid = str(ger_f.formation_id)
+	var opened: Dictionary = _bm.call("start_land_battle", ATT_TAG, FRA_FRONT, GER_FRONT, fid)
+	print("  [INFO] clock seed battle %s" % str(opened))
+	if "_open_land_battles" in _bm:
+		for raw in _bm._open_land_battles:
+			if typeof(raw) != TYPE_DICTIONARY:
+				continue
+			var battle: Dictionary = raw
+			if int(battle.get("to_id", -1)) != FRA_FRONT:
+				continue
+			battle["att_org"] = 0.50
+			battle["def_org"] = 0.18
+			break
 
 
 func _cleanup_forms() -> void:

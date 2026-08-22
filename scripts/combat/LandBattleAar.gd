@@ -67,8 +67,6 @@ static func pick_next_enemy_hex(from_id: int, attacker_tag: String) -> int:
 	var tag := attacker_tag.strip_edges().to_upper()
 	if not MapManager.has_method("get_adjacent_provinces"):
 		return -1
-	var best := -1
-	var best_n := 999
 	for nb in MapManager.get_adjacent_provinces(from_id, true):
 		var pid := int(nb)
 		var p: Province = MapManager.get_province(pid) if MapManager.has_method("get_province") else null
@@ -79,13 +77,7 @@ static func pick_next_enemy_hex(from_id: int, attacker_tag: String) -> int:
 			ctrl = str(p.owner_tag).strip_edges().to_upper()
 		if ctrl == tag or ctrl.is_empty():
 			continue
-		# Prefer a hex that still has a defender (a real fight), else any enemy.
-		var n := 0
-		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
-			n = BattleManager.get_divisions_at_province(pid, ctrl).size()
-		if best < 0 or n < best_n:
-			best = pid
-			best_n = n
-			if n > 0:
-				return pid
-	return best
+		# Hang-class: first adjacent enemy is enough. A per-neighbor division roster
+		# walk hung the Maginot 5d clock / F5 1x capture AAR.
+		return pid
+	return -1

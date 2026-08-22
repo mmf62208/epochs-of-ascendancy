@@ -24,6 +24,9 @@ PEACE_WIN = ROOT / "scripts" / "ui" / "PeaceConferenceWindow.gd"
 GDATA_GD = ROOT / "scripts" / "autoload" / "GameData.gd"
 INSIGHT_GD = ROOT / "scripts" / "map" / "ProvinceInsight.gd"
 TOP_BAR = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
+AAR_GD = ROOT / "scripts" / "combat" / "LandBattleAar.gd"
+LEADER_EVENT_UI = ROOT / "scripts" / "ui" / "LeaderEventUI.gd"
+SAVE_LOAD = ROOT / "scripts" / "autoload" / "SaveLoadManager.gd"
 
 GER_FRONT = 710173
 FRA_FRONT = 710739
@@ -238,6 +241,14 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     (passes if nation_ok else fails).append("nation_era_next")
 
     clock_fn = _slice(tm_src, "advance_living_playtest_days")
+    tick_one = _slice(bm, "_tick_one_open_land_battle")
+    capture_light = _slice(bm, "_apply_attacker_win_capture_light")
+    next_hex = _slice(
+        AAR_GD.read_text(encoding="utf-8") if AAR_GD.is_file() else "",
+        "pick_next_enemy_hex",
+    )
+    news_ui = LEADER_EVENT_UI.read_text(encoding="utf-8") if LEADER_EVENT_UI.is_file() else ""
+    save_src = SAVE_LOAD.read_text(encoding="utf-8") if SAVE_LOAD.is_file() else ""
     clock_ok = (
         bool(clock_fn)
         and "never_execute" in clock_fn
@@ -248,8 +259,18 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "day_battles" in tm_src
         and "game_day_advanced.emit" in clock_fn
         and "_tick_open_land_battles" in clock_fn
+        and '"aar"' in clock_fn
+        and '"news"' in clock_fn
+        and "_record_land_aar" in tick_one
+        and "_post_battle_news" in capture_light
+        and "get_divisions_at_province" not in next_hex
+        and "func _should_skip_toast_ui" in news_ui
+        and "func _skip_quit_autosave" in save_src
+        and "_skip_quit_autosave" in _slice(save_src, "_notification")
         and "advance_living_playtest_days" in harness
         and "playtest clock advanced" in harness
+        and "playtest clock AAR" in harness
+        and "_seed_maginot_clock_battle" in harness
         and "execute_province_assault" not in _slice(bm, "try_ai_start_land_battles")
         and "_living_playtest_clock" in mm_src
     )

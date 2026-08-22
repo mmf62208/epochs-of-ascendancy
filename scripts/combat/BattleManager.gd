@@ -1312,10 +1312,9 @@ func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
 	else:
 		# Defender hold or draw: no owner flip.
 		_finish_land_battle_hold(battle)
-	# Compact playtest clock: skip AAR next-hex scan (full-adj walk hung Maginot 5d).
-	if not (typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock"))):
-		_record_land_aar(battle, winner, to_id)
-		ev["aar"] = peek_last_land_aar()
+	# Compact playtest clock still records AAR (next-hex is adjacent-only, hang-safe).
+	_record_land_aar(battle, winner, to_id)
+	ev["aar"] = peek_last_land_aar()
 	return ev
 
 
@@ -1363,10 +1362,11 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		"winner": "attacker",
 	}
 	_displace_defender_from_captured_province(row, to_id)
-	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
-		# Compact clock: skip news + map refresh (those hung Maginot after CAPTURE RETREAT).
-		return
+	# News history is cheap; toast UI is skipped headless / during compact clock.
 	_post_battle_news(row, true)
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+		# Compact clock: skip deferred map refresh (Maginot quit hung on renderer).
+		return
 	_notify_map_refresh(to_id, from_id, int(row.get("retreat_province_id", -1)))
 
 

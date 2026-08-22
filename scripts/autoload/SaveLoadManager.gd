@@ -192,6 +192,8 @@ func _notification(what: int) -> void:
 		# Guard against double-fire during shutdown.
 		if not has_meta("autosave_on_quit_done"):
 			set_meta("autosave_on_quit_done", true)
+			if _skip_quit_autosave():
+				return
 			var res := save_game_detailed("autosave")
 			if res.get("ok", false):
 				print("SaveLoadManager: Autosaved on exit/quit -> autosave.json")
@@ -199,6 +201,16 @@ func _notification(what: int) -> void:
 				push_warning("SaveLoadManager: Quit autosave failed: %s" % res.get("error", "unknown"))
 				# No toast on shutdown to avoid UI issues
 		# Do not block exit
+
+
+func _skip_quit_autosave() -> bool:
+	# Maginot -s / year multi-AI: save_game_detailed on EXIT_TREE hung after RESULT=PASS.
+	# Graphical F5 quit still autosaves. Calendar 7d autosave is a separate path.
+	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
+		return true
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return true
+	return false
 
 ## OS absolute path for user://saves/ (DirAccess absolute APIs are flaky with user:// alone).
 func get_saves_dir_global() -> String:

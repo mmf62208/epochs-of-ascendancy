@@ -235,7 +235,19 @@ func post_news(title: String, body: String, category: String = "general") -> voi
 	if news_history.size() > MAX_NEWS_ITEMS:
 		news_history.pop_front()
 	news_posted.emit(entry)
+	if _should_skip_toast_ui():
+		return
 	_show_toast(entry)
+
+
+func _should_skip_toast_ui() -> bool:
+	# Headless Maginot / -s harness: toast timers + CanvasLayer hung quit after RESULT=PASS.
+	# Graphical F5 1x still shows capture toasts (PLAYTEST item 14).
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return true
+	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+		return true
+	return false
 
 
 func get_recent_news(limit: int = 10) -> Array[Dictionary]:
