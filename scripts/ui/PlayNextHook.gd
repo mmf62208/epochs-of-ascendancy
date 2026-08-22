@@ -6,8 +6,11 @@ class_name PlayNextHook
 extends RefCounted
 
 
-static func recommend(player_tag: String = "GER") -> Dictionary:
-	return rank_from_snapshot(_gather_facts(player_tag))
+static func recommend(player_tag: String = "") -> Dictionary:
+	var tag := _living_player_tag(player_tag)
+	var rec: Dictionary = rank_from_snapshot(_gather_facts(tag))
+	rec["player_tag"] = tag
+	return rec
 
 
 ## Same ranker as tools/map_generation/lib/play_next_hook_product.rank_next_beat.
@@ -213,7 +216,7 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 static func apply(rec: Dictionary = {}) -> Dictionary:
 	var r: Dictionary = rec
 	if r.is_empty():
-		r = recommend()
+		r = recommend(_living_player_tag())
 	var action := str(r.get("action", "unpause"))
 	var fid := str(r.get("fid", ""))
 	if action == "next_hex" and typeof(BattleManager) != TYPE_NIL \
@@ -310,6 +313,17 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 		TimeManager.set_paused(false)
 		return {"ok": true, "action": "unpause", "summary": str(r.get("hint", "Unpause"))}
 	return {"ok": false, "action": action, "summary": "Nothing to apply"}
+
+
+static func _living_player_tag(player_tag: String = "") -> String:
+	var tag := player_tag.strip_edges().to_upper()
+	if not tag.is_empty():
+		return tag
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		tag = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		if not tag.is_empty():
+			return tag
+	return "GER"
 
 
 ## NEXT chip: open the living research / focus / production surface (not unpause-only).

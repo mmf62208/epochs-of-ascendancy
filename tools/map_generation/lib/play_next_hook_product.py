@@ -568,6 +568,18 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("harness_next_panels")
     else:
         fails.append("harness_next_panels")
+    if "func _living_player_tag" in hook and "get_player_country_tag" in hook:
+        passes.append("gd_living_player_tag")
+    else:
+        fails.append("gd_living_player_tag")
+    if "NEXT zero-arg recommend player_tag=ENG" in harness:
+        passes.append("harness_zero_arg_recommend_eng")
+    else:
+        fails.append("harness_zero_arg_recommend_eng")
+    if "recommend(_player_tag())" in ren:
+        passes.append("map_chip_passes_living_tag")
+    else:
+        fails.append("map_chip_passes_living_tag")
     ok = len(fails) == 0
     return {
         "ok": ok,

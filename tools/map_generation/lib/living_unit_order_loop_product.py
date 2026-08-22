@@ -229,6 +229,10 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "NEXT tech_done opens research" in harness
         and "NEXT shortage opens production" in harness
         and "living nation pick ENG" in harness
+        and "NEXT zero-arg recommend player_tag=ENG" in harness
+        and "func _living_player_tag" in hook
+        and "get_player_country_tag" in _slice(hook, "_living_player_tag")
+        and "recommend(_player_tag())" in ren
     )
     wiring["nation_era_next"] = nation_ok
     (passes if nation_ok else fails).append("nation_era_next")

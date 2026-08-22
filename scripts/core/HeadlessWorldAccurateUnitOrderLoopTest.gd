@@ -1698,6 +1698,19 @@ func _test_nation_era_next() -> void:
 		_fail("unknown tag should default GER: %s" % str(bad))
 		return
 	_lm.call("boot_living_player", "ENG")
+	var hook_live: Script = load("res://scripts/ui/PlayNextHook.gd") as Script
+	if hook_live == null or not hook_live.has_method("recommend"):
+		_fail("PlayNextHook.recommend missing")
+		return
+	var live_rec: Dictionary = hook_live.call("recommend") as Dictionary
+	print("  [INFO] NEXT zero-arg recommend %s" % str(live_rec))
+	if str(live_rec.get("player_tag", "")) != "ENG":
+		_fail("NEXT zero-arg recommend not ENG-scoped got %s" % str(live_rec))
+		return
+	if str(live_rec.get("action", "")) == "justify" and int(live_rec.get("to_id", -1)) == FRA_FRONT:
+		_fail("NEXT zero-arg recommend still GER Maginot justify: %s" % str(live_rec))
+		return
+	_pass("NEXT zero-arg recommend player_tag=ENG action=%s" % str(live_rec.get("action", "")))
 	var tm: Node = _autoload("TimeManager")
 	if tm == null or not tm.has_method("boot_living_era"):
 		_fail("boot_living_era missing")

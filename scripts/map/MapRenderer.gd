@@ -18366,13 +18366,14 @@ func _refresh_next_hook_chip() -> void:
 		ui.add_child(_next_hook_chip)
 		_next_hook_chip.pressed.connect(func() -> void:
 			if typeof(PlayNextHook) != TYPE_NIL:
-				var out: Dictionary = PlayNextHook.apply()
+				var rec_apply: Dictionary = PlayNextHook.recommend(_player_tag())
+				var out: Dictionary = PlayNextHook.apply(rec_apply)
 				_show_inspector_toast(str(out.get("summary", "Next")), 3.5)
 				_refresh_next_hook_chip()
 		)
 	var rec: Dictionary = {}
 	if typeof(PlayNextHook) != TYPE_NIL:
-		rec = PlayNextHook.recommend()
+		rec = PlayNextHook.recommend(_player_tag())
 	var hint := str(rec.get("hint", "Unpause a day"))
 	_next_hook_chip.text = "NEXT · %s" % str(rec.get("label", "Unpause a day"))
 	_next_hook_chip.tooltip_text = hint

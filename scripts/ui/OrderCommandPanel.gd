@@ -1197,7 +1197,12 @@ func _rebuild_play_mode_strip() -> void:
 	_add_apply_button("[8] Checkpoint save", "save_resume_checkpoint", true)
 	var rec: Dictionary = {}
 	if typeof(PlayNextHook) != TYPE_NIL:
-		rec = PlayNextHook.recommend()
+		var living := "GER"
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+			var pt := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+			if not pt.is_empty():
+				living = pt
+		rec = PlayNextHook.recommend(living)
 	var rec_hint := str(rec.get("hint", "Unpause a day"))
 	var rec_label := "Next: %s" % str(rec.get("label", "Unpause a day"))
 	_add_plain_label(rec_hint, 220)
