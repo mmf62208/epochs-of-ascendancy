@@ -4578,8 +4578,8 @@ func _collect_live_border_assault_targets_impl(tag: String, cap: int) -> Array:
 		if str(own_p.owner_tag).strip_edges().to_upper() != tag:
 			continue
 		var own_pid := int(pid)
-		# Defer colonial / RoW until Europe scanned: skip 900k+ first pass
-		if own_pid >= 900000:
+		# Europe-first for GER theater. JAP/CHI live on RoW 900k+ (CHI–JAP).
+		if own_pid >= 900000 and tag != "JAP" and tag != "CHI":
 			continue
 		scanned += 1
 		# Use raw neighbors (no land-cache rebuild / Array conversion spam).
@@ -4606,6 +4606,8 @@ func _collect_live_border_assault_targets_impl(tag: String, cap: int) -> Array:
 				dfn = 55.0
 			elif ot == "SOV":
 				dfn = 90.0
+			elif ot == "CHI":
+				dfn = 80.0
 			var row := {
 				"province_id": eid,
 				"from_province_id": own_pid,
@@ -4647,6 +4649,22 @@ func _collect_live_border_assault_targets_impl(tag: String, cap: int) -> Array:
 	# Emergency Maginot/Polish seeds if budget expired with nothing (must never return empty for GER).
 	if out.is_empty() and tag == "GER":
 		out = _emergency_ger_front_seeds()
+	if out.is_empty() and tag == "JAP":
+		out = _emergency_jap_front_seeds()
+	return out
+
+
+## CHI–JAP living edge when RoW scan misses (903981 → 902598). Hang-safe: no board walk.
+func _emergency_jap_front_seeds() -> Array:
+	var seeds: Array = [
+		{"province_id": 902598, "from_province_id": 903981, "defender_tag": "CHI", "defender_power": 80.0, "name": "CHI vs JAP edge"},
+	]
+	var out: Array = []
+	for s in seeds:
+		var pid := int(s.get("province_id", -1))
+		var from_pid := int(s.get("from_province_id", -1))
+		if pid > 0 and from_pid > 0 and _provinces.has(pid) and _provinces.has(from_pid):
+			out.append(s)
 	return out
 
 

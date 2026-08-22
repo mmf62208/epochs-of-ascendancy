@@ -10,10 +10,12 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from land_battle_ai_campaign_product import (  # noqa: E402
+    CHI_FRONT,
     GER_FRONT_STAGING,
     HARD_MAX_FOLLOW_ON,
     HARD_MAX_MARCHES_PER_DAY,
     HARD_MAX_STARTS_PER_DAY,
+    JAP_FRONT,
     build_land_battle_ai_campaign_product,
     ger_rear_march_opp,
     land_battle_ai_campaign_integrity,
@@ -31,6 +33,11 @@ class TestLandBattleAiCampaignProduct(unittest.TestCase):
         self.assertTrue(p.get("ok"), msg=p)
         self.assertEqual(p.get("killswitch"), "EOA_AI_LAND_BATTLES=0")
         self.assertEqual(p.get("policy"), "spare_march_to_front_plus_one_follow_on_start")
+        self.assertIn("jap_chi_live_border", p.get("pass") or [])
+        self.assertIn("harness_second_theater_owner", p.get("pass") or [])
+        self.assertEqual(JAP_FRONT, 903981)
+        self.assertEqual(CHI_FRONT, 902598)
+        self.assertNotEqual(CHI_FRONT, 710739)
 
     def test_integrity(self) -> None:
         g = land_battle_ai_campaign_integrity()

@@ -94,6 +94,7 @@ func _run() -> void:
 	_test_peace_occupation()
 	_test_march_and_assault()
 	_test_chi_jap_theater()
+	_test_ai_take_land()
 	_cleanup()
 
 
@@ -1583,6 +1584,100 @@ func _test_chi_jap_theater() -> void:
 		_fail("CHI-JAP expected opened battle, got instant/empty: %s" % str(opened))
 		return
 	_pass("CHI-JAP start_land_battle opened")
+
+
+func _test_ai_take_land() -> void:
+	if _bm == null or not _bm.has_method("try_ai_start_land_battles"):
+		_fail("try_ai_start_land_battles missing")
+		return
+	OS.set_environment("EOA_AI_LAND_BATTLES", "0")
+	var killed: Dictionary = _bm.call("try_ai_start_land_battles", 0) as Dictionary
+	OS.set_environment("EOA_AI_LAND_BATTLES", "")
+	if not bool(killed.get("skipped", false)) and str(killed.get("reason", "")) != "killswitch":
+		_fail("killswitch EOA_AI_LAND_BATTLES=0 did not skip starts: %s" % str(killed))
+		return
+	_pass("AI land-battle killswitch skips starts")
+	var jap_f: Object = null
+	if _lm != null and _lm.has_method("get_formations_for_country"):
+		for jf in _lm.call("get_formations_for_country", JAP_TAG):
+			if jf == null or not ("stationed_province_id" in jf):
+				continue
+			if int(jf.stationed_province_id) == JAP_FRONT:
+				jap_f = jf
+				break
+	if jap_f == null:
+		_fail("CHI-JAP AI skipped — no JAP land on %d" % JAP_FRONT)
+		return
+	var jap_fid := str(jap_f.formation_id)
+	if _bm.has_method("withdraw_from_land_battle"):
+		var wd: Dictionary = _bm.call("withdraw_from_land_battle", jap_fid) as Dictionary
+		print("  [INFO] CHI-JAP withdraw for AI start %s" % str(wd))
+	if _bm.has_method("tick_open_land_battles"):
+		_bm.call("tick_open_land_battles", 1.0)
+	jap_f.stationed_province_id = JAP_FRONT
+	if "is_in_combat" in jap_f:
+		jap_f.is_in_combat = false
+	var chi_f: Object = null
+	if _lm.has_method("get_formation"):
+		chi_f = _lm.call("get_formation", CHI_FID)
+	if chi_f != null:
+		chi_f.stationed_province_id = CHI_FRONT
+		if "is_in_combat" in chi_f:
+			chi_f.is_in_combat = false
+	var chi_p: Object = _mm.call("get_province", CHI_FRONT) if _mm.has_method("get_province") else null
+	if chi_p == null:
+		_fail("CHI pid %d missing for AI take-land" % CHI_FRONT)
+		return
+	chi_p.set("owner_tag", CHI_TAG)
+	chi_p.set("controller_tag", CHI_TAG)
+	var ger_p: Object = _mm.call("get_province", GER_FRONT) if _mm.has_method("get_province") else null
+	var ger_owner0 := str(ger_p.get("owner_tag")).strip_edges().to_upper() if ger_p != null else ATT_TAG
+	if _mm.has_method("collect_live_border_assault_targets"):
+		var borders: Array = _mm.call("collect_live_border_assault_targets", JAP_TAG, 4)
+		print("  [INFO] JAP live borders %s" % str(borders))
+	var started: Dictionary = _bm.call("try_ai_start_land_battles", 0) as Dictionary
+	print("  [INFO] try_ai_start_land_battles %s" % str(started))
+	if bool(started.get("skipped", false)):
+		_fail("AI start skipped with killswitch off: %s" % str(started))
+		return
+	var started_rows: Array = started.get("started", []) as Array
+	var chi_started := false
+	for raw in started_rows:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		if int(row.get("to_id", -1)) == CHI_FRONT and str(row.get("tag", "")).to_upper() == JAP_TAG:
+			chi_started = true
+			break
+	if not chi_started:
+		_fail("AI did not open CHI-JAP (to=%d): %s" % [CHI_FRONT, str(started)])
+		return
+	_pass("AI opened CHI-JAP start_land_battle to=%d" % CHI_FRONT)
+	if int(started.get("to_id", CHI_FRONT)) == FRA_FRONT:
+		_fail("AI take-land used Maginot pid as proof")
+		return
+	# Headless is not F5 light-sim: daily attacker-win would call execute_province_assault
+	# and BFS-retreat on the full adjacency table (hang-class). Use the Maginot capture
+	# path the F5 tick defers to.
+	if not _bm.has_method("_apply_attacker_win_capture_light"):
+		_fail("_apply_attacker_win_capture_light missing")
+		return
+	_bm.call("_apply_attacker_win_capture_light", JAP_TAG, CHI_FRONT, JAP_FRONT, jap_fid)
+	var owner := str(chi_p.get("owner_tag")).strip_edges().to_upper()
+	if owner != JAP_TAG:
+		_fail("second theater owner want JAP on %d got %s" % [CHI_FRONT, owner])
+		return
+	if CHI_FRONT == FRA_FRONT or CHI_FRONT == GER_FRONT:
+		_fail("second theater proof pid must not be Maginot")
+		return
+	_pass("CHI-JAP AI take-land owner %s pid=%d" % [owner, CHI_FRONT])
+	_pass("second theater owner changed pid=%d (not Maginot %d)" % [CHI_FRONT, FRA_FRONT])
+	if ger_p != null:
+		var ger_own := str(ger_p.get("owner_tag")).strip_edges().to_upper()
+		if ger_own != ger_owner0 and ger_own != ATT_TAG:
+			_fail("Maginot GER front owner drifted %s → %s" % [ger_owner0, ger_own])
+			return
+		_pass("Maginot GER front still %s" % ger_own)
 
 
 func _cleanup_forms() -> void:

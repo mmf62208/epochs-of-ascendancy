@@ -183,6 +183,29 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     wiring["peace_occupation"] = peace_ok
     (passes if peace_ok else fails).append("peace_occupation")
 
+    try_ai = _slice(bm, "try_ai_start_land_battles")
+    follow_ai = _slice(bm, "try_ai_follow_on_after_win")
+    mm_src = MAP_MANAGER.read_text(encoding="utf-8") if MAP_MANAGER.is_file() else mm
+    ai_ok = (
+        bool(try_ai)
+        and "start_land_battle" in try_ai
+        and "execute_province_assault" not in try_ai
+        and "EOA_AI_LAND_BATTLES" in try_ai
+        and bool(follow_ai)
+        and "execute_province_assault" not in follow_ai
+        and "_emergency_jap_front_seeds" in mm_src
+        and str(CHI_FRONT) in mm_src
+        and str(JAP_FRONT) in mm_src
+        and 'tag != "JAP"' in mm_src
+        and "try_ai_start_land_battles" in harness
+        and "CHI-JAP AI take-land" in harness
+        and "second theater owner" in harness
+        and "killswitch" in harness
+        and str(CHI_FRONT) in harness
+    )
+    wiring["ai_take_land"] = ai_ok
+    (passes if ai_ok else fails).append("ai_take_land")
+
     chrome = _slice(ren, "_attach_unit_counter_chrome")
     chrome_ok = (
         bool(chrome)

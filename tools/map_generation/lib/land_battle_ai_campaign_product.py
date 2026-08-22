@@ -16,6 +16,11 @@ ROOT = Path(__file__).resolve().parents[3]
 AI_GD = ROOT / "scripts" / "combat" / "LandBattleAi.gd"
 BM_GD = ROOT / "scripts" / "combat" / "BattleManager.gd"
 FM_GD = ROOT / "scripts" / "formations" / "FormationMovement.gd"
+MM_GD = ROOT / "scripts" / "map" / "MapManager.gd"
+HARNESS_GD = ROOT / "scripts" / "core" / "HeadlessWorldAccurateUnitOrderLoopTest.gd"
+
+JAP_FRONT = 903981
+CHI_FRONT = 902598
 
 HARD_MAX_MARCHES_PER_DAY = 1
 HARD_MAX_FOLLOW_ON = 1
@@ -487,6 +492,27 @@ def build_land_battle_ai_campaign_product() -> Dict[str, Any]:
         passes.append("bm_killswitch")
     else:
         fails.append("bm_killswitch")
+    mm = MM_GD.read_text(encoding="utf-8") if MM_GD.is_file() else ""
+    if (
+        "_emergency_jap_front_seeds" in mm
+        and str(CHI_FRONT) in mm
+        and str(JAP_FRONT) in mm
+        and 'tag != "JAP"' in mm
+    ):
+        passes.append("jap_chi_live_border")
+    else:
+        fails.append("jap_chi_live_border")
+    harness = HARNESS_GD.read_text(encoding="utf-8") if HARNESS_GD.is_file() else ""
+    if (
+        "try_ai_start_land_battles" in harness
+        and "CHI-JAP AI take-land" in harness
+        and "second theater owner" in harness
+        and str(CHI_FRONT) in harness
+        and str(JAP_FRONT) in harness
+    ):
+        passes.append("harness_second_theater_owner")
+    else:
+        fails.append("harness_second_theater_owner")
 
     ok = len(fails) == 0
     return {

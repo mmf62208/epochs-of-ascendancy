@@ -47,6 +47,7 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
             "choke_flag",
             "air_region_cas",
             "peace_occupation",
+            "ai_take_land",
             "chip_str_num",
             "inverse_zoom_scale",
             "chip_on_centroid",
