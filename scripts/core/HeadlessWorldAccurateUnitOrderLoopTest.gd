@@ -96,6 +96,7 @@ func _run() -> void:
 	_test_chi_jap_theater()
 	_test_ai_take_land()
 	_test_nation_era_next()
+	_test_playtest_clock()
 	_cleanup()
 
 
@@ -1781,6 +1782,35 @@ func _test_nation_era_next() -> void:
 		_fail("restore GER player tag failed")
 		return
 	_pass("restored default GER Maginot player tag")
+
+
+func _test_playtest_clock() -> void:
+	var tm: Node = _autoload("TimeManager")
+	if tm == null or not tm.has_method("advance_living_playtest_days"):
+		_fail("advance_living_playtest_days missing")
+		return
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", false)
+	var start := 0
+	if tm.has_method("get_total_days_elapsed"):
+		start = int(tm.call("get_total_days_elapsed"))
+	var clock: Dictionary = tm.call("advance_living_playtest_days", 5) as Dictionary
+	print("  [INFO] playtest clock %s" % str(clock))
+	var advanced := int(clock.get("days", 0))
+	var elapsed := start
+	if tm.has_method("get_total_days_elapsed"):
+		elapsed = int(tm.call("get_total_days_elapsed"))
+	if not bool(clock.get("ok", false)) or advanced < 5 or (elapsed - start) < 5:
+		_fail("playtest clock want ≥5 days got %s elapsed %d→%d" % [str(clock), start, elapsed])
+		return
+	if not bool(clock.get("never_execute", false)):
+		_fail("playtest clock must stay off execute_province_assault: %s" % str(clock))
+		return
+	var ger_p: Object = _mm.call("get_province", GER_FRONT) if _mm.has_method("get_province") else null
+	if ger_p != null and str(ger_p.get("owner_tag")).strip_edges().to_upper() != ATT_TAG:
+		_fail("playtest clock drifted Maginot GER owner")
+		return
+	_pass("playtest clock advanced %d days (elapsed=%d)" % [advanced, elapsed])
 
 
 func _cleanup_forms() -> void:

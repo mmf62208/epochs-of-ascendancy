@@ -49,6 +49,7 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
             "peace_occupation",
             "ai_take_land",
             "nation_era_next",
+            "playtest_clock",
             "chip_str_num",
             "inverse_zoom_scale",
             "chip_on_centroid",

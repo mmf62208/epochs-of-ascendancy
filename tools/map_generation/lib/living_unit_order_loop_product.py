@@ -237,6 +237,23 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     wiring["nation_era_next"] = nation_ok
     (passes if nation_ok else fails).append("nation_era_next")
 
+    clock_fn = _slice(tm_src, "advance_living_playtest_days")
+    clock_ok = (
+        bool(clock_fn)
+        and "never_execute" in clock_fn
+        and "execute_province_assault" not in clock_fn
+        and "_living_playtest_clock" in tm_src
+        and "_living_playtest_clock" in _slice(tm_src, "is_interactive_light_sim")
+        and "day_emit" in tm_src
+        and "day_battles" in tm_src
+        and "advance_living_playtest_days" in harness
+        and "playtest clock advanced" in harness
+        and "execute_province_assault" not in _slice(bm, "try_ai_start_land_battles")
+        and "_living_playtest_clock" in mm_src
+    )
+    wiring["playtest_clock"] = clock_ok
+    (passes if clock_ok else fails).append("playtest_clock")
+
     chrome = _slice(ren, "_attach_unit_counter_chrome")
     chrome_ok = (
         bool(chrome)

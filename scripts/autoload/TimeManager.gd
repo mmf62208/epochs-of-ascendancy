@@ -77,6 +77,8 @@ var _accumulated_game_hours: float = 0.0
 ## so a heavy listener cannot freeze the clock at Feb 28 (main thread never returns to TopInfoBar).
 var _pending_sim_events: Array = []
 var _sim_flush_scheduled: bool = false
+## Compact 5–10d playtest clock: light capture (no execute BFS-retreat), sync calendar.
+var _living_playtest_clock: bool = false
 ## Soft budget (ms) for deferred sim work per frame — keeps pan/hover live past month ends.
 const INTERACTIVE_SIM_FLUSH_BUDGET_MS := 10
 
@@ -335,6 +337,58 @@ func advance_days(days: float) -> void:
 		_schedule_sim_flush()
 
 
+## Maginot living 5–10d unpause: calendar + marches + land ticks, light capture not execute.
+func advance_living_playtest_days(days: int = 5) -> Dictionary:
+	var n := clampi(int(days), 1, 10)
+	var start := total_days_elapsed
+	var from_day := current_day
+	var from_month := current_month
+	var was_paused := paused
+	paused = false
+	_living_playtest_clock = true
+	for _i in n:
+		current_day += 1
+		var crossed_month := false
+		var crossed_year := false
+		var days_in_month := _get_days_in_month(current_month, current_year)
+		if current_day > days_in_month:
+			current_day = 1
+			current_month += 1
+			crossed_month = true
+			if current_month > 12:
+				current_month = 1
+				current_year += 1
+				crossed_year = true
+		total_days_elapsed += 1
+		# Do not emit game_day_advanced here: MapRenderer bubble legend + heavy
+		# theater listeners spam/hang this compact harness. Calendar + land ticks still run.
+		_tick_own_land_marches()
+		_tick_open_land_battles()
+		_tick_out_of_combat_recovery()
+		_tick_organize_queue()
+		if crossed_month:
+			_emit_month_year_boundary(current_year, current_month, crossed_year)
+	_living_playtest_clock = false
+	paused = was_paused
+	var advanced := total_days_elapsed - start
+	print(
+		"TimeManager: living playtest clock +%d days → %04d-%02d-%02d (elapsed=%d)"
+		% [advanced, current_year, current_month, current_day, total_days_elapsed]
+	)
+	return {
+		"ok": advanced >= 5,
+		"days": advanced,
+		"elapsed": total_days_elapsed,
+		"from_day": from_day,
+		"from_month": from_month,
+		"year": current_year,
+		"month": current_month,
+		"day": current_day,
+		"live": true,
+		"never_execute": true,
+	}
+
+
 func _schedule_sim_flush() -> void:
 	if _sim_flush_scheduled:
 		return
@@ -582,6 +636,8 @@ func _tick_out_of_combat_recovery() -> void:
 
 ## True for normal graphical F5 play — keep day ticks light so HUD/map stay responsive.
 func is_interactive_light_sim() -> bool:
+	if _living_playtest_clock:
+		return true
 	if OS.get_environment("EOA_UI_SMOKE").strip_edges() == "1":
 		return true
 	if OS.get_environment("EOA_HEAVY_DAILY").strip_edges() == "1":
