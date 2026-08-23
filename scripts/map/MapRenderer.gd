@@ -11,6 +11,7 @@ const _StrategicFlowOverlayLayerScr = preload("res://scripts/map/StrategicFlowOv
 const _BattleIndicatorOverlayLayerScr = preload("res://scripts/map/BattleIndicatorOverlayLayer.gd")
 const _DomainOpsOverlayLayerScr = preload("res://scripts/map/DomainOpsOverlayLayer.gd")
 const _LeaderStationOverlayLayerScr = preload("res://scripts/map/LeaderStationOverlayLayer.gd")
+const _UnitChipTextScr = preload("res://scripts/map/UnitChipText.gd")
 const _ConstructionProgressOverlayLayerScr = preload("res://scripts/map/ConstructionProgressOverlayLayer.gd")
 const RoutePackQRScr = preload("res://scripts/ui/RoutePackQR.gd")
 const _SFX_PATHS := {
@@ -14247,41 +14248,14 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 		if fk == "capital" or icon_i >= icon_dirs.size():
 			continue
 		var offs: Vector2 = icon_dirs[icon_i]
-		# Pass 9–13: fort/port/airfield use retrowave Sprite2D chips; other features keep emoji Labels.
 		var feat_lv := 0
 		if province.special_features.has(feature):
 			feat_lv = int(province.special_features[feature])
 		var feat_damaged := _province_feature_is_damaged(province, fk)
-		var tex_path := _special_feature_sprite_path(fk, feat_lv, feat_damaged)
-		if not tex_path.is_empty() and ResourceLoader.exists(tex_path):
-			var spr := Sprite2D.new()
-			spr.texture = load(tex_path) as Texture2D
-			spr.centered = true
-			spr.z_index = ProvinceMapVisuals.Z_MAP_GLYPH
-			# ~16px on-map footprint (source is 32px); hangar/heavy/major slightly larger.
-			var base_px := 16.0
-			if "hangar" in tex_path or "heavy" in tex_path or "major" in tex_path:
-				base_px = 18.0
-			elif "strip" in tex_path or "bunker" in tex_path or "jetty" in tex_path:
-				base_px = 14.0
-			if feat_damaged:
-				spr.modulate = Color(1.0, 0.82, 0.75, 1.0)
-
-			if spr.texture != null:
-				var tw := float(spr.texture.get_width())
-				if tw > 1.0:
-					spr.scale = Vector2.ONE * (base_px / tw)
-			spr.position = center + offs
-			spr.set_meta(META_MAP_GLYPH_OFFS, offs)
-			spr.set_meta(&"_map_feature_sprite", true)
-			spr.set_meta(&"_map_feature_key", fk)
-			spr.set_meta(&"_map_feature_level", feat_lv)
-			node.add_child(spr)
-			# Pass 16/17: airfield repair / construction progress ring (live-refreshed on day tick).
-			if _feature_key_is_airfield(fk):
-				var ring_p := _airfield_progress_for_province(province, feat_damaged)
-				if ring_p >= 0.0:
-					_attach_feature_progress_ring(node, center + offs, ring_p, feat_damaged, province.id)
+		# Clean political: never stamp retrowave fort/port/airfield chips — they read as
+		# unclickable dummy units (GER bunker hex spam) and freeze pan on ~3520.
+		if not _special_feature_sprite_path(fk, feat_lv, feat_damaged).is_empty():
+			continue
 		else:
 			var icon := Label.new()
 			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -16713,7 +16687,7 @@ func _update_develop_resource_ui(province: Province) -> void:
 			int(action.get("level_after", 1)),
 			float((action.get("cost", {}) as Dictionary).get("steel", 8.0)),
 		]
-		_btn_develop_resource.tooltip_text = "Expand this deposit. Extraction +35% per level (max 3). Era %d — goods not yet exploited stay hidden." % _scenario_year()
+		_btn_develop_resource.tooltip_text = "Expand this deposit. Extraction +35%% per level (max 3). Era %d — goods not yet exploited stay hidden." % _scenario_year()
 	else:
 		_btn_develop_resource.disabled = true
 		var err := str(action.get("error", ""))
@@ -17398,7 +17372,7 @@ func _update_settle_button(province: Province) -> void:
 	if settle_nm.is_empty():
 		settle_nm = "#%d" % province.id
 	_btn_settle.text = "🏠 Settle %s (+0.35, now %.2f)" % [settle_nm, province.settlement_level]
-	_btn_settle.tooltip_text = "Settle %s (#%d) now (real data). After click: vitality tint strengthens (cyan-green via characterize), inspector shows updated bonuses, combat def +2.5%/lev. Use with map modes (F3 vitality)." % [settle_nm, province.id]
+	_btn_settle.tooltip_text = "Settle %s (#%d) now (real data). After click: vitality tint strengthens (cyan-green via characterize), inspector shows updated bonuses, combat def +2.5%%/lev. Use with map modes (F3 vitality)." % [settle_nm, province.id]
 
 
 func _on_settle_province_pressed() -> void:
@@ -19333,20 +19307,15 @@ func _unit_letter_color(letter: String) -> Color:
 			return Color(0.95, 0.96, 0.92, 0.96)
 
 
-func _make_unit_type_letter(letter: String) -> Label:
-	var lab := Label.new()
+func _make_unit_type_letter(letter: String) -> Node2D:
+	var lab: Node2D = _UnitChipTextScr.new() as Node2D
 	lab.name = "TypeLetter"
 	var L := letter if not letter.is_empty() else "I"
-	lab.text = L
-	lab.position = Vector2(-20, -20)
-	lab.size = Vector2(18, 18)
-	lab.custom_minimum_size = Vector2(18, 18)
+	lab.set("text", L)
+	lab.set("font_size", 15)
+	lab.set("font_color", _unit_letter_color(L))
+	lab.position = Vector2(-20, -8)
 	lab.z_index = 3
-	lab.add_theme_font_size_override("font_size", 15)
-	lab.add_theme_color_override("font_color", _unit_letter_color(L))
-	lab.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.07, 1.0))
-	lab.add_theme_constant_override("outline_size", 4)
-	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return lab
 
 
@@ -19452,22 +19421,18 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 			rdy_v = float(ff.readiness)
 	counter.add_child(_make_unit_stat_bars(org_v, str_v, rdy_v))
 	if ff != null and "leader_id" in ff and str(ff.leader_id).strip_edges() != "":
-		var mark := Label.new()
+		var mark: Node2D = _UnitChipTextScr.new() as Node2D
 		mark.name = "LeaderMark"
 		var lname := str(ff.leader_id)
 		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_leader"):
 			var L: Variant = LeaderManager.get_leader(str(ff.leader_id))
 			if L != null and L is Object and "name" in L:
 				lname = str(L.name)
-		mark.text = lname.substr(0, 1).to_upper() if not lname.is_empty() else "*"
-		mark.position = Vector2(14, 8)
-		mark.size = Vector2(14, 14)
+		mark.set("text", lname.substr(0, 1).to_upper() if not lname.is_empty() else "*")
+		mark.set("font_size", 10)
+		mark.set("font_color", Color(0.92, 0.94, 0.98, 0.95))
+		mark.position = Vector2(14, 10)
 		mark.z_index = 3
-		mark.add_theme_font_size_override("font_size", 10)
-		mark.add_theme_color_override("font_color", Color(0.92, 0.94, 0.98, 0.95))
-		mark.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.07, 1.0))
-		mark.add_theme_constant_override("outline_size", 3)
-		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		counter.add_child(mark)
 	if ff != null and "is_in_combat" in ff and bool(ff.is_in_combat):
 		var pulse := Polygon2D.new()
@@ -19487,32 +19452,22 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 		train.color = Color(0.92, 0.74, 0.22, 0.30)
 		train.z_index = 4
 		counter.add_child(train)
-	var str_lab := Label.new()
+	var str_lab: Node2D = _UnitChipTextScr.new() as Node2D
 	str_lab.name = "StrNum"
-	str_lab.text = "%d" % int(round(clampf(str_v, 0.0, 1.0) * 100.0))
-	str_lab.position = Vector2(4, -20)
-	str_lab.size = Vector2(22, 16)
-	str_lab.custom_minimum_size = Vector2(22, 16)
-	str_lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	str_lab.set("text", "%d" % int(round(clampf(str_v, 0.0, 1.0) * 100.0)))
+	str_lab.set("font_size", 13)
+	str_lab.set("font_color", Color(0.99, 0.90, 0.38, 1.0))
+	str_lab.set("align_right", true)
+	str_lab.position = Vector2(20, -8)
 	str_lab.z_index = 3
-	str_lab.add_theme_font_size_override("font_size", 13)
-	str_lab.add_theme_color_override("font_color", Color(0.99, 0.90, 0.38, 1.0))
-	str_lab.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.07, 1.0))
-	str_lab.add_theme_constant_override("outline_size", 4)
-	str_lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	counter.add_child(str_lab)
-	var desig := Label.new()
+	var desig: Node2D = _UnitChipTextScr.new() as Node2D
 	desig.name = "Designation"
-	desig.text = _unit_counter_designation(ff)
-	desig.position = Vector2(-20, 6)
-	desig.size = Vector2(40, 14)
-	desig.custom_minimum_size = Vector2(40, 14)
+	desig.set("text", _unit_counter_designation(ff))
+	desig.set("font_size", 9)
+	desig.set("font_color", Color(0.96, 0.97, 0.92, 1.0))
+	desig.position = Vector2(-20, 10)
 	desig.z_index = 3
-	desig.add_theme_font_size_override("font_size", 9)
-	desig.add_theme_color_override("font_color", Color(0.96, 0.97, 0.92, 1.0))
-	desig.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.07, 1.0))
-	desig.add_theme_constant_override("outline_size", 3)
-	desig.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	counter.add_child(desig)
 	if ff != null and "formation_id" in ff:
 		counter.set_meta("formation_id", str(ff.formation_id))
@@ -22570,18 +22525,8 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			if ResourceLoader.exists(tex_path):
 				tex = load(tex_path) as Texture2D
 			tex_cache[tex_path] = tex
-		var owner_for_sheet := force_tag
-		if owner_for_sheet.is_empty() and p != null:
-			owner_for_sheet = p.owner_tag
-		# Sheet atlas only when retrowave chip missing (legacy NATO sheet path).
+		# Do not atlas-crop nato_counters_sheet onto map chips (64px cells hide chrome).
 		var using_retrowave := tex_path.begins_with("res://assets/graphics/units/retrowave/")
-		if not using_retrowave and _nato_sheet_tex != null and tex != null and (owner_for_sheet in ["GER", "SOV", "FRA", "ENG", "USA"] or "tank" in arch or "armor" in arch or "medium" in arch or "heavy" in arch):
-			var reg := _get_nato_sheet_region(owner_for_sheet, arch, era_folder)
-			if reg.size.x > 0:
-				var atlas := AtlasTexture.new()
-				atlas.atlas = _nato_sheet_tex
-				atlas.region = reg
-				tex = atlas as Texture2D
 		var nation_tag := force_tag
 		if nation_tag.is_empty() and p != null:
 			nation_tag = p.owner_tag
@@ -22597,8 +22542,8 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			spr.z_index = 1
 			# NATO glyph keeps its own colors; nation identity is the plate, not a modulate wash.
 			spr.modulate = Color.WHITE
-			# Pass 6: fan-out 2–4 icons when stack is modest; large stacks use primary + badge.
-			var fan := mini(stack_n, 4) if stack_n > 1 else 1
+			# One living plate per hex; stack count is the badge (fan-out looked like dummy units).
+			var fan := 1
 			if fan <= 1:
 				counter.add_child(spr)
 				if not nation_tag.is_empty():

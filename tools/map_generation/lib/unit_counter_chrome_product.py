@@ -141,6 +141,34 @@ def build_unit_counter_chrome_product(*, check_wiring: bool = True) -> Dict[str,
     else:
         fails.append("land_nato_not_retrowave")
 
+    create_fn = _gd_func_slice(ren, "_create_province_node")
+    no_dummy_furniture = (
+        "unclickable dummy units" in create_fn
+        and "continue" in create_fn
+        and "_special_feature_sprite_path" in create_fn
+    )
+    wiring["no_retrowave_feature_dummy_units"] = no_dummy_furniture
+    if no_dummy_furniture:
+        passes.append("no_retrowave_feature_dummy_units")
+    else:
+        fails.append("no_retrowave_feature_dummy_units")
+
+    no_sheet = "Do not atlas-crop nato_counters_sheet" in _gd_func_slice(
+        ren, "_rebuild_demo_unit_icons"
+    )
+    wiring["no_nato_sheet_on_chips"] = no_sheet
+    if no_sheet:
+        passes.append("no_nato_sheet_on_chips")
+    else:
+        fails.append("no_nato_sheet_on_chips")
+
+    chip_text_ok = "UnitChipText.gd" in ren and "_UnitChipTextScr" in attach_fn
+    wiring["chip_text_not_control"] = chip_text_ok
+    if chip_text_ok:
+        passes.append("chip_text_not_control")
+    else:
+        fails.append("chip_text_not_control")
+
     popup = _gd_func_slice(ren, "_show_unit_detail_popup")
     dock_ok = bool(popup) and (
         "unit_card_dock" in popup or "UNIT_CARD_DOCK" in popup
