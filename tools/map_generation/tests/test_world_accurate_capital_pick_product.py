@@ -63,8 +63,29 @@ class TestWorldAccurateCapitalPickProduct(unittest.TestCase):
         self.assertIn("prefer_capital_province_at(world_pos, prefer_land_province_at", mm)
         self.assertIn("711467", mm)
         self.assertIn("711414", mm)
+        self.assertIn("func _capital_star_snap_radius_sq", mm)
+        self.assertIn("_get_camera_zoom", mm)
+        self.assertIn("func _capital_star_pid_at", ren)
+        self.assertIn("_capital_star_pid_at(world_pos_arm)", ren)
         self.assertIn('Settle %s', ren)
         self.assertNotIn('Settle #%d', ren)
+
+    def test_nested_city_capitals_are_named_and_tiny(self) -> None:
+        """City-within-city capitals must exist as named land owned by the major."""
+        p = build_world_accurate_capital_pick_product()
+        by_tag = {s["tag"]: s for s in p.get("samples") or []}
+        eng = by_tag["ENG"]
+        usa = by_tag["USA"]
+        ita = by_tag["ITA"]
+        self.assertEqual(int(eng["province_id"]), 711414)
+        self.assertIn("london", str(eng.get("name") or "").lower())
+        self.assertEqual(int(usa["province_id"]), 800792)
+        self.assertIn("columbia", str(usa.get("name") or "").lower())
+        self.assertEqual(int(ita["province_id"]), 710963)
+        self.assertIn("roma", str(ita.get("name") or "").lower())
+        self.assertFalse(eng.get("is_water"))
+        self.assertFalse(usa.get("is_water"))
+        self.assertFalse(ita.get("is_water"))
 
     def test_key_provinces_are_owned_land_hubs(self) -> None:
         """HOI-style key industrial hubs must be land + owned by the scenario tag."""

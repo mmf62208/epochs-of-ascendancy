@@ -1166,6 +1166,9 @@ func prefer_land_province_at(world_pos: Vector2, primary_hit: int) -> int:
 		else:
 			land_hits.append(pid)
 	if not land_hits.is_empty():
+		for pid in land_hits:
+			if _pid_is_national_capital(pid):
+				return pid
 		return _prefer_nearest_centroid_province(land_hits, world_pos)
 	if primary_hit >= 0:
 		return primary_hit
@@ -1175,36 +1178,69 @@ func prefer_land_province_at(world_pos: Vector2, primary_hit: int) -> int:
 
 
 ## If the click is nearer a country capital star than the polygon hit, pick the capital.
-## Play: England click was Settle #711467 Devon, not London (711414).
+## Play: England click was Settle Devon (711467), not London (711414). Nested City of London /
+## DC / Roma polygons are a few world-units across; the gold star is ~28 screen px, so
+## snap radius is zoom-aware (not a 28-world-unit disk that vanishes at Europe zoom).
 func prefer_capital_province_at(world_pos: Vector2, primary_hit: int) -> int:
-	if primary_hit < 0:
+	var snap2 := _capital_star_snap_radius_sq()
+	var best_cap := -1
+	var best_d := snap2
+	for tag_v in _countries.keys():
+		var cap_id := _capital_pid_for_country_variant(_countries[tag_v])
+		if cap_id <= 0:
+			continue
+		var cap_c: Vector2 = _centroids.get(cap_id, Vector2.ZERO)
+		if cap_c == Vector2.ZERO:
+			continue
+		var d := world_pos.distance_squared_to(cap_c)
+		if d <= best_d:
+			best_d = d
+			best_cap = cap_id
+	if best_cap <= 0:
 		return primary_hit
+	if primary_hit < 0:
+		return best_cap
 	var p: Province = _provinces.get(primary_hit)
 	if p == null or bool(p.is_sea):
-		return primary_hit
-	var tag := str(p.owner_tag).strip_edges().to_upper()
-	if tag.is_empty():
-		tag = str(p.controller_tag).strip_edges().to_upper()
-	if tag.is_empty():
-		return primary_hit
-	var cap_id := -1
-	var c: Variant = get_country(tag) if has_method("get_country") else null
-	if c is Object and "capital_province_id" in c:
-		cap_id = int(c.capital_province_id)
-	elif c is Dictionary:
-		cap_id = int((c as Dictionary).get("capital_province_id", -1))
-	if cap_id <= 0 or cap_id == primary_hit:
-		return primary_hit
-	var cap_c: Vector2 = _centroids.get(cap_id, Vector2.ZERO)
-	if cap_c == Vector2.ZERO:
+		return best_cap
+	if best_cap == primary_hit:
 		return primary_hit
 	var hit_c: Vector2 = _centroids.get(primary_hit, Vector2.ZERO)
-	var d_cap := world_pos.distance_squared_to(cap_c)
 	var d_hit := world_pos.distance_squared_to(hit_c) if hit_c != Vector2.ZERO else INF
-	const SNAP2 := 784.0  # 28px capital-star snap
-	if d_cap <= SNAP2 and d_cap < d_hit:
-		return cap_id
+	if best_d < d_hit:
+		return best_cap
 	return primary_hit
+
+
+func _pid_is_national_capital(pid: int) -> bool:
+	if pid <= 0:
+		return false
+	for tag_v in _countries.keys():
+		if _capital_pid_for_country_variant(_countries[tag_v]) == pid:
+			return true
+	return false
+
+
+func _capital_pid_for_country_variant(c: Variant) -> int:
+	if c is Object and "capital_province_id" in c:
+		return int(c.capital_province_id)
+	if c is Dictionary:
+		return int((c as Dictionary).get("capital_province_id", -1))
+	return -1
+
+
+## Gold star is ~28–36 screen px. City of London bbox is ~3 world units — a fixed
+## 28-world-unit snap (784) is only ~4 screen px at Europe zoom and misses the star.
+func _capital_star_snap_radius_sq() -> float:
+	var zoom := 0.22
+	var tree := get_tree()
+	if tree != null:
+		for mr in tree.get_nodes_in_group("map_renderer"):
+			if mr != null and mr.has_method("_get_camera_zoom"):
+				zoom = maxf(0.05, float(mr.call("_get_camera_zoom")))
+				break
+	var world_r := clampf(40.0 / zoom, 56.0, 360.0)
+	return world_r * world_r
 
 
 ## True when province is tagged sea/ocean domain (terrain or name ocean-grid).

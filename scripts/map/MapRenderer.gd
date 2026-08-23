@@ -1303,6 +1303,19 @@ func _unhandled_input(event: InputEvent) -> void:
 				_left_pan_active = false
 				return
 			var world_pos_arm := _screen_to_world(get_viewport().get_mouse_position())
+			# Nested capitals (City of London / DC / Roma): gold star wins over a
+			# colocated OOB chip so click-the-star opens the capital, not the unit.
+			# Ctrl/Shift keep pin-first for assault staging.
+			if (
+				not event.ctrl_pressed
+				and not event.shift_pressed
+				and _capital_star_pid_at(world_pos_arm) > 0
+			):
+				_left_pan_armed = true
+				_left_pan_active = false
+				_left_press_screen = get_viewport().get_mouse_position()
+				_last_mouse_pos = _left_press_screen
+				return
 			# Chip click stays immediate so unit cards do not wait on mouse-up.
 			if _try_open_unit_at_world(world_pos_arm):
 				_left_pan_armed = false
@@ -15918,6 +15931,13 @@ func _on_oob_strip_formation_focused(formation_id: String) -> void:
 	print("MapRenderer: OOB strip focus ", formation_id)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug("Unit: %s" % formation_id)
+
+
+## Gold-star hit: City of London / DC / Roma are smaller than the star glyph.
+func _capital_star_pid_at(world_pos: Vector2) -> int:
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("prefer_capital_province_at"):
+		return -1
+	return int(MapManager.prefer_capital_province_at(world_pos, -1))
 
 
 ## Click navy/armor/infantry map counters → select unit for move/assault + detail card.
