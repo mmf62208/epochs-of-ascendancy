@@ -120,6 +120,27 @@ def build_unit_counter_chrome_product(*, check_wiring: bool = True) -> Dict[str,
     else:
         fails.append("type_letter")
 
+    desig_ok = (
+        "func _unit_counter_designation" in ren
+        and "Designation" in attach_fn
+        and "_unit_counter_designation" in attach_fn
+    )
+    wiring["designation"] = desig_ok
+    if desig_ok:
+        passes.append("designation")
+    else:
+        fails.append("designation")
+
+    land_nato_ok = (
+        "infantry" in _gd_func_slice(ren, "_prefer_retrowave_unit_icon")
+        and "opaque dark plates" in _gd_func_slice(ren, "_prefer_retrowave_unit_icon")
+    )
+    wiring["land_nato_not_retrowave"] = land_nato_ok
+    if land_nato_ok:
+        passes.append("land_nato_not_retrowave")
+    else:
+        fails.append("land_nato_not_retrowave")
+
     popup = _gd_func_slice(ren, "_show_unit_detail_popup")
     dock_ok = bool(popup) and (
         "unit_card_dock" in popup or "UNIT_CARD_DOCK" in popup

@@ -333,6 +333,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     chrome_ok = (
         bool(chrome)
         and "StrNum" in chrome
+        and "Designation" in chrome
         and "_make_unit_stat_bars" in chrome
         and "OrgBar" in _slice(ren, "_make_unit_stat_bars")
     )

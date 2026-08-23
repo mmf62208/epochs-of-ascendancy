@@ -1303,9 +1303,16 @@ func _unhandled_input(event: InputEvent) -> void:
 				_left_pan_active = false
 				return
 			var world_pos_arm := _screen_to_world(get_viewport().get_mouse_position())
-			# Nested capitals (City of London / DC / Roma): gold star wins over a
-			# colocated OOB chip so click-the-star opens the capital, not the unit.
-			# Ctrl/Shift keep pin-first for assault staging.
+			# Living chip wins over a colocated gold star (London/DC/Roma OOB). Nested
+			# capital snap still runs on hex pick when this press missed a unit.
+			# Chip click stays immediate so unit cards do not wait on mouse-up.
+			if _try_open_unit_at_world(world_pos_arm):
+				_left_pan_armed = false
+				_left_pan_active = false
+				get_viewport().set_input_as_handled()
+				return
+			# Nested capitals: gold-star snap for hex pick (City of London / DC / Roma)
+			# when the click missed a unit chip. Ctrl/Shift keep immediate assault/debug.
 			if (
 				not event.ctrl_pressed
 				and not event.shift_pressed
@@ -1315,12 +1322,6 @@ func _unhandled_input(event: InputEvent) -> void:
 				_left_pan_active = false
 				_left_press_screen = get_viewport().get_mouse_position()
 				_last_mouse_pos = _left_press_screen
-				return
-			# Chip click stays immediate so unit cards do not wait on mouse-up.
-			if _try_open_unit_at_world(world_pos_arm):
-				_left_pan_armed = false
-				_left_pan_active = false
-				get_viewport().set_input_as_handled()
 				return
 			# Ctrl/Shift keep immediate pick (assault / debug / engineers).
 			if not event.ctrl_pressed and not event.shift_pressed:
@@ -19145,14 +19146,22 @@ func _get_interesting_province_ids() -> Dictionary:
 
 
 ## Prefer world-class retrowave unit chips when available; fall back to nato/ww2|modern paths.
+## Land NATO glyphs stay NATO — retrowave 32s are opaque dark plates that hide org/str chrome.
 func _prefer_retrowave_unit_icon(tex_path: String) -> String:
 	var p := tex_path.strip_edges()
 	if p.is_empty():
 		return p
+	var file := p.get_file()  # e.g. infantry_32.png
+	var stem := file.get_basename().replace("_32", "").replace("_64", "")
+	# Land NATO stays NATO: retrowave 32s are opaque dark plates that hide org/str chrome.
+	if stem in [
+		"infantry", "artillery", "rocket", "logistics",
+		"light_tank", "medium_tank", "heavy_tank",
+	]:
+		return p
 	# Already a retrowave path (e.g. frigate).
 	if p.begins_with("res://assets/graphics/units/retrowave/") and ResourceLoader.exists(p):
 		return p
-	var file := p.get_file()  # e.g. infantry_32.png
 	# Map cruiser nato path → retrowave cruiser (file may not exist under nato/cruiser).
 	if "battleship" in file:
 		var bb := "res://assets/graphics/units/retrowave/battleship_32.png"
@@ -19181,7 +19190,7 @@ func _prefer_retrowave_unit_icon(tex_path: String) -> String:
 	return p
 
 
-## Keep chips ~36–44 screen px at Europe zoom (old lerp left 15px specks).
+## Keep chips ~48–58 screen px at Europe zoom so org/str/designation stay readable.
 func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 	var z := z_override
 	if z < 0.0:
@@ -19191,9 +19200,17 @@ func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 			z = maxf(cam.zoom.x, cam.zoom.y)
 		elif container:
 			z = absf(container.scale.x)
-	var screen_px := lerpf(36.0, 44.0, clampf((z - 0.2) / 1.6, 0.0, 1.0))
+	var screen_px := lerpf(48.0, 58.0, clampf((z - 0.2) / 1.6, 0.0, 1.0))
 	var target := screen_px / (32.0 * maxf(z, 0.04))
 	return clampf(target, 0.35, 16.0)
+
+
+## Offset living chips off the capital star so both stay distinct click targets.
+func _unit_chip_offset_for_pid(pid: int) -> Vector2:
+	var p: Province = provinces.get(pid) as Province if provinces.has(pid) else null
+	if p != null and p.has_method("has_feature") and p.has_feature("capital"):
+		return Vector2(22, -28)
+	return Vector2(0, -12)
 
 
 func _sync_unit_counter_scales(z: float = -1.0) -> void:
@@ -19252,30 +19269,27 @@ func toggle_unit_counters() -> bool:
 	return show_unit_counters
 
 
-## Nation-color frame around map unit counters (keeps retrowave chip colors intact).
+## Thin nation-color outline around the living plate (no fat glow halo).
 func _make_unit_nation_frame(col: Color) -> Node2D:
 	var root := Node2D.new()
 	root.name = "NationFrame"
-	var s := 17.0
+	var s := 22.0
+	var h := 20.0
 	var pts := PackedVector2Array([
-		Vector2(-s, -s), Vector2(s, -s), Vector2(s, s), Vector2(-s, s), Vector2(-s, -s),
+		Vector2(-s, -h), Vector2(s, -h), Vector2(s, h), Vector2(-s, h), Vector2(-s, -h),
 	])
-	var glow := Line2D.new()
-	glow.name = "Glow"
-	glow.width = 4.5
-	glow.default_color = Color(col.r, col.g, col.b, 0.32)
-	glow.joint_mode = Line2D.LINE_JOINT_ROUND
-	glow.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	glow.end_cap_mode = Line2D.LINE_CAP_ROUND
-	glow.points = pts
-	root.add_child(glow)
 	var line := Line2D.new()
 	line.name = "Frame"
-	line.width = 1.8
-	line.default_color = Color(col.r, col.g, col.b, 0.95)
-	line.joint_mode = Line2D.LINE_JOINT_ROUND
-	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	line.width = 1.6
+	line.default_color = Color(
+		clampf(col.r * 0.45 + 0.55, 0.0, 1.0),
+		clampf(col.g * 0.45 + 0.55, 0.0, 1.0),
+		clampf(col.b * 0.45 + 0.55, 0.0, 1.0),
+		0.95
+	)
+	line.joint_mode = Line2D.LINE_JOINT_SHARP
+	line.begin_cap_mode = Line2D.LINE_CAP_BOX
+	line.end_cap_mode = Line2D.LINE_CAP_BOX
 	line.points = pts
 	root.add_child(line)
 	return root
@@ -19324,23 +19338,44 @@ func _make_unit_type_letter(letter: String) -> Label:
 	lab.name = "TypeLetter"
 	var L := letter if not letter.is_empty() else "I"
 	lab.text = L
-	lab.position = Vector2(-8, -12)
-	lab.add_theme_font_size_override("font_size", 16)
+	lab.position = Vector2(-20, -20)
+	lab.size = Vector2(18, 18)
+	lab.custom_minimum_size = Vector2(18, 18)
+	lab.z_index = 3
+	lab.add_theme_font_size_override("font_size", 15)
 	lab.add_theme_color_override("font_color", _unit_letter_color(L))
 	lab.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.07, 1.0))
-	lab.add_theme_constant_override("outline_size", 3)
+	lab.add_theme_constant_override("outline_size", 4)
 	lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	return lab
 
 
-## HOI-style nation color plate behind the NATO glyph (readable at compact zoom).
-func _make_unit_nation_plate(col: Color) -> ColorRect:
-	var plate := ColorRect.new()
+func _poly_bar(origin: Vector2, size: Vector2) -> PackedVector2Array:
+	return PackedVector2Array([
+		origin,
+		origin + Vector2(size.x, 0.0),
+		origin + size,
+		origin + Vector2(0.0, size.y),
+	])
+
+
+## HOI-style nation color plate behind the NATO glyph (Polygon2D — never GUI-blocks).
+func _make_unit_nation_plate(col: Color) -> Polygon2D:
+	var plate := Polygon2D.new()
 	plate.name = "NationPlate"
-	plate.size = Vector2(40, 34)
-	plate.position = Vector2(-20, -16)
-	plate.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	plate.color = Color(col.r * 0.55, col.g * 0.55, col.b * 0.55, 0.92)
+	var hw := 22.0
+	var hh := 20.0
+	plate.polygon = PackedVector2Array([
+		Vector2(-hw, -hh), Vector2(hw, -hh), Vector2(hw, hh), Vector2(-hw, hh),
+	])
+	# Floor so even dark tags (GER grey) read as a counter, not a black speck.
+	plate.color = Color(
+		clampf(col.r * 0.62 + 0.16, 0.18, 0.92),
+		clampf(col.g * 0.62 + 0.16, 0.18, 0.92),
+		clampf(col.b * 0.62 + 0.16, 0.18, 0.92),
+		0.96
+	)
+	plate.z_index = -1
 	return plate
 
 
@@ -19348,57 +19383,59 @@ func _make_unit_nation_plate(col: Color) -> ColorRect:
 func _make_unit_stat_bars(org_v: float, str_v: float, rdy_v: float = 1.0) -> Node2D:
 	var root := Node2D.new()
 	root.name = "StatBars"
-	root.position = Vector2(-20, 18)
+	root.position = Vector2(-22, 20)
+	root.z_index = 3
 	var org_c := clampf(org_v, 0.0, 1.0)
 	var str_c := clampf(str_v, 0.0, 1.0)
 	var rdy_c := clampf(rdy_v, 0.0, 1.0)
-	var bg := ColorRect.new()
+	var bg := Polygon2D.new()
 	bg.name = "BarBg"
-	bg.size = Vector2(40, 16)
-	bg.position = Vector2(0, 0)
-	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	bg.color = Color(0.06, 0.07, 0.1, 0.88)
+	bg.polygon = _poly_bar(Vector2.ZERO, Vector2(44, 14))
+	bg.color = Color(0.06, 0.07, 0.1, 0.92)
 	root.add_child(bg)
-	var org_bar := ColorRect.new()
+	var org_bar := Polygon2D.new()
 	org_bar.name = "OrgBar"
-	org_bar.size = Vector2(maxf(2.0, 40.0 * org_c), 5)
-	org_bar.position = Vector2(0, 0)
-	org_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	org_bar.color = Color(0.28, 0.82, 0.42, 0.95)
+	org_bar.polygon = _poly_bar(Vector2(0, 0), Vector2(maxf(3.0, 44.0 * org_c), 4))
+	org_bar.color = Color(0.28, 0.82, 0.42, 0.98)
 	root.add_child(org_bar)
-	var str_bar := ColorRect.new()
+	var str_bar := Polygon2D.new()
 	str_bar.name = "StrBar"
-	str_bar.size = Vector2(maxf(2.0, 40.0 * str_c), 5)
-	str_bar.position = Vector2(0, 5)
-	str_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	str_bar.color = Color(0.95, 0.72, 0.22, 0.95)
+	str_bar.polygon = _poly_bar(Vector2(0, 5), Vector2(maxf(3.0, 44.0 * str_c), 4))
+	str_bar.color = Color(0.95, 0.72, 0.22, 0.98)
 	root.add_child(str_bar)
-	var rdy_bar := ColorRect.new()
+	var rdy_bar := Polygon2D.new()
 	rdy_bar.name = "RdyBar"
-	rdy_bar.size = Vector2(maxf(2.0, 40.0 * rdy_c), 5)
-	rdy_bar.position = Vector2(0, 10)
-	rdy_bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	rdy_bar.color = Color(0.38, 0.78, 0.95, 0.95)
+	rdy_bar.polygon = _poly_bar(Vector2(0, 10), Vector2(maxf(3.0, 44.0 * rdy_c), 4))
+	rdy_bar.color = Color(0.38, 0.78, 0.95, 0.98)
 	root.add_child(rdy_bar)
 	return root
 
 
-## Plate + org/str on every DemoUnitIcon (call from rebuild; sprites stay on top).
+func _unit_counter_designation(formation: Object) -> String:
+	if formation == null:
+		return ""
+	var n := ""
+	if "name" in formation:
+		n = str(formation.name).strip_edges()
+	if n.is_empty() and "design_id" in formation:
+		n = str(formation.design_id).strip_edges().replace("_", " ")
+	if n.is_empty() and "formation_id" in formation:
+		n = str(formation.formation_id).strip_edges()
+	n = n.replace("_", " ")
+	if n.length() > 11:
+		n = n.substr(0, 10) + "."
+	return n
+
+
+## Plate + org/str + designation on every DemoUnitIcon (call from rebuild; sprites stay on top).
 func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color) -> void:
 	if counter == null:
 		return
-	var old_plate := counter.get_node_or_null("NationPlate")
-	if old_plate != null:
-		counter.remove_child(old_plate)
-		old_plate.free()
-	var old_bars := counter.get_node_or_null("StatBars")
-	if old_bars != null:
-		counter.remove_child(old_bars)
-		old_bars.free()
-	var old_letter := counter.get_node_or_null("TypeLetter")
-	if old_letter != null:
-		counter.remove_child(old_letter)
-		old_letter.free()
+	for child_name in ["NationPlate", "StatBars", "TypeLetter", "LeaderMark", "StrNum", "Designation", "CombatPulse", "TrainPulse"]:
+		var old_n := counter.get_node_or_null(child_name)
+		if old_n != null:
+			counter.remove_child(old_n)
+			old_n.free()
 	var plate := _make_unit_nation_plate(nation_col)
 	counter.add_child(plate)
 	counter.move_child(plate, 0)
@@ -19414,10 +19451,6 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 		if "readiness" in ff:
 			rdy_v = float(ff.readiness)
 	counter.add_child(_make_unit_stat_bars(org_v, str_v, rdy_v))
-	var old_lead := counter.get_node_or_null("LeaderMark")
-	if old_lead != null:
-		counter.remove_child(old_lead)
-		old_lead.free()
 	if ff != null and "leader_id" in ff and str(ff.leader_id).strip_edges() != "":
 		var mark := Label.new()
 		mark.name = "LeaderMark"
@@ -19427,7 +19460,9 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 			if L != null and L is Object and "name" in L:
 				lname = str(L.name)
 		mark.text = lname.substr(0, 1).to_upper() if not lname.is_empty() else "*"
-		mark.position = Vector2(-18, 6)
+		mark.position = Vector2(14, 8)
+		mark.size = Vector2(14, 14)
+		mark.z_index = 3
 		mark.add_theme_font_size_override("font_size", 10)
 		mark.add_theme_color_override("font_color", Color(0.92, 0.94, 0.98, 0.95))
 		mark.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.07, 1.0))
@@ -19435,31 +19470,50 @@ func _attach_unit_counter_chrome(counter: Node2D, ff: Object, nation_col: Color)
 		mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		counter.add_child(mark)
 	if ff != null and "is_in_combat" in ff and bool(ff.is_in_combat):
-		var pulse := ColorRect.new()
+		var pulse := Polygon2D.new()
 		pulse.name = "CombatPulse"
-		pulse.size = Vector2(44, 38)
-		pulse.position = Vector2(-22, -18)
-		pulse.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		pulse.polygon = PackedVector2Array([
+			Vector2(-23, -21), Vector2(23, -21), Vector2(23, 21), Vector2(-23, 21),
+		])
 		pulse.color = Color(0.95, 0.35, 0.18, 0.28)
+		pulse.z_index = 4
 		counter.add_child(pulse)
 	elif ff != null and "is_training" in ff and bool(ff.is_training):
-		var train := ColorRect.new()
+		var train := Polygon2D.new()
 		train.name = "TrainPulse"
-		train.size = Vector2(44, 38)
-		train.position = Vector2(-22, -18)
-		train.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		train.polygon = PackedVector2Array([
+			Vector2(-23, -21), Vector2(23, -21), Vector2(23, 21), Vector2(-23, 21),
+		])
 		train.color = Color(0.92, 0.74, 0.22, 0.30)
+		train.z_index = 4
 		counter.add_child(train)
 	var str_lab := Label.new()
 	str_lab.name = "StrNum"
 	str_lab.text = "%d" % int(round(clampf(str_v, 0.0, 1.0) * 100.0))
-	str_lab.position = Vector2(8, -10)
-	str_lab.add_theme_font_size_override("font_size", 14)
+	str_lab.position = Vector2(4, -20)
+	str_lab.size = Vector2(22, 16)
+	str_lab.custom_minimum_size = Vector2(22, 16)
+	str_lab.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	str_lab.z_index = 3
+	str_lab.add_theme_font_size_override("font_size", 13)
 	str_lab.add_theme_color_override("font_color", Color(0.99, 0.90, 0.38, 1.0))
 	str_lab.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.07, 1.0))
 	str_lab.add_theme_constant_override("outline_size", 4)
 	str_lab.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	counter.add_child(str_lab)
+	var desig := Label.new()
+	desig.name = "Designation"
+	desig.text = _unit_counter_designation(ff)
+	desig.position = Vector2(-20, 6)
+	desig.size = Vector2(40, 14)
+	desig.custom_minimum_size = Vector2(40, 14)
+	desig.z_index = 3
+	desig.add_theme_font_size_override("font_size", 9)
+	desig.add_theme_color_override("font_color", Color(0.96, 0.97, 0.92, 1.0))
+	desig.add_theme_color_override("font_outline_color", Color(0.04, 0.04, 0.07, 1.0))
+	desig.add_theme_constant_override("outline_size", 3)
+	desig.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	counter.add_child(desig)
 	if ff != null and "formation_id" in ff:
 		counter.set_meta("formation_id", str(ff.formation_id))
 		counter.set_meta("formation", ff)
@@ -22330,10 +22384,10 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 
 		var counter := Node2D.new()
 		counter.name = "DemoUnitIcon_" + str(id)
-		# Province nodes sit at origin; chips must use the same centroid as capital stars.
-		var chip_pos := Vector2(0, -8)
+		# Province nodes sit at origin; chips use centroid, offset off capital stars.
+		var chip_pos := _unit_chip_offset_for_pid(id)
 		if province_centroids.has(id):
-			chip_pos = (province_centroids[id] as Vector2) + Vector2(0, -8)
+			chip_pos = (province_centroids[id] as Vector2) + _unit_chip_offset_for_pid(id)
 		counter.position = chip_pos
 		counter.z_index = 28
 		counter.z_as_relative = false
@@ -22538,18 +22592,11 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			var spr := Sprite2D.new()
 			spr.texture = tex
 			spr.centered = true
-			# Retrowave chips keep full-color art; nation identity is a frame, not a full modulate wash.
-			if using_retrowave:
-				spr.modulate = Color.WHITE
-			else:
-				var use_nation_color = (
-					"tank" in arch or "armored" in arch or "truck" in arch or "infantry" in arch
-					or "light_tank" in arch or "medium_tank" in arch or "heavy_tank" in arch
-					or "amphib" in arch or ftype.is_empty() or "division" in ftype.to_lower()
-					or "garrison" in ftype.to_lower()
-				)
-				if use_nation_color and not nation_tag.is_empty():
-					spr.modulate = nation_col
+			spr.position = Vector2(0, -2)
+			spr.scale = Vector2(0.82, 0.82)
+			spr.z_index = 1
+			# NATO glyph keeps its own colors; nation identity is the plate, not a modulate wash.
+			spr.modulate = Color.WHITE
 			# Pass 6: fan-out 2–4 icons when stack is modest; large stacks use primary + badge.
 			var fan := mini(stack_n, 4) if stack_n > 1 else 1
 			if fan <= 1:
@@ -22562,12 +22609,9 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			if stack_n > 1:
 				counter.add_child(_make_formation_stack_badge(stack_n))
 		else:
-			var bg := ColorRect.new()
-			bg.size = Vector2(20, 16)
-			bg.position = Vector2(-10, -8)
-			bg.color = Color(0.1, 0.12, 0.18, 0.9)
-			counter.add_child(bg)
 			_attach_unit_counter_chrome(counter, ff, nation_col)
+			if not nation_tag.is_empty():
+				counter.add_child(_make_unit_nation_frame(nation_col))
 			if stack_n > 1:
 				counter.add_child(_make_formation_stack_badge(stack_n))
 		_demo_unit_icon_pids.append(id)
@@ -22682,11 +22726,9 @@ func _add_unit_stack_fanout(
 						sample_tex = load(path2) as Texture2D
 						tex_cache[path2] = sample_tex
 			spr.texture = sample_tex if sample_tex else primary_tex
-			if using_retrowave:
-				spr.modulate = Color.WHITE
-			else:
-				spr.modulate = nation_col
+			spr.modulate = Color.WHITE
 		spr.position = offsets[i]
+		spr.scale = Vector2(0.82, 0.82)
 		spr.z_index = i
 		counter.add_child(spr)
 	if not nation_tag.is_empty():
@@ -22751,6 +22793,7 @@ func _make_formation_stack_badge(count: int) -> Node2D:
 	lbl.add_theme_color_override("font_color", Color(0.2, 0.95, 1.0, 1.0))
 	lbl.position = Vector2(-10, -9)
 	lbl.size = Vector2(20, 18)
+	lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	root.add_child(lbl)
 	_stack_badge_pulse_nodes.append(root)
 	return root

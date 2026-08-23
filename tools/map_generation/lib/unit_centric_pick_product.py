@@ -82,15 +82,23 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
 
     # 1) Pin branch first: _try_open_unit_at_world before hex resolve.
     pin_first = False
+    chip_before_star = False
     if spatial:
         i_pin = spatial.find("_try_open_unit_at_world")
         i_hex = spatial.find("get_province_at_world_pos")
+        i_star = spatial.find("_capital_star_pid_at")
         pin_first = i_pin >= 0 and i_hex >= 0 and i_pin < i_hex
+        chip_before_star = i_pin >= 0 and i_star >= 0 and i_pin < i_star
     wiring["pin_before_hex"] = pin_first
     if pin_first:
         passes.append("pin_before_hex")
     else:
         fails.append("pin_before_hex")
+    wiring["chip_before_capital_star"] = chip_before_star
+    if chip_before_star:
+        passes.append("chip_before_capital_star")
+    else:
+        fails.append("chip_before_capital_star")
 
     # 2) Hit disk ≥48 px / zoom with floor ≥20 world units.
     hit_ok = _hit_radius_ok(pick_fn)

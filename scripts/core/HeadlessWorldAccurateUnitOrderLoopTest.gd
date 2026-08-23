@@ -374,6 +374,15 @@ func _test_front_chips() -> void:
 			_fail("GER panzer TypeLetter want A got %s" % lt)
 		else:
 			_pass("TypeLetter=%s" % lt)
+	var desig: Node = chip.get_node_or_null("Designation")
+	if desig == null:
+		_fail("chip missing Designation")
+	else:
+		var ds := str(desig.get("text") if "text" in desig else "").strip_edges()
+		if ds.is_empty():
+			_fail("chip Designation empty")
+		else:
+			_pass("Designation=%s" % ds)
 	var pwr: Script = load("res://scripts/combat/LandCombatPower.gd") as Script
 	if pwr == null or not pwr.has_method("xp_power_mult"):
 		_fail("LandCombatPower.xp_power_mult missing")
