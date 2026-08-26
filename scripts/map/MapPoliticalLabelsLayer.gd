@@ -659,14 +659,15 @@ func _make_label(text: String, pos: Vector2, font_px: int, col: Color) -> Label:
 	# Readable on bright solid fills (GER red / FRA blue): light text + strong dark outline (HOI/EU4).
 	var readable := Color(0.96, 0.97, 1.0, 0.96)
 	# Keep a hint of nation hue in the text without washing into the fill.
-	readable = readable.lerp(Color(col.r, col.g, col.b, 1.0), 0.18)
+	readable = readable.lerp(Color(col.r, col.g, col.b, 1.0), 0.08)
 	lbl.add_theme_font_size_override("font_size", maxi(font_px, 14))
 	lbl.add_theme_color_override("font_color", readable)
 	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 0.95))
-	lbl.add_theme_constant_override("outline_size", 3)
+	lbl.add_theme_constant_override("outline_size", 4)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	lbl.z_index = 12
+	lbl.z_as_relative = false
+	lbl.z_index = 40
 	lbl.clip_text = false
 	lbl.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 	lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -705,7 +706,7 @@ func _apply_tier_visibility(tier: int) -> void:
 			if show_n:
 				l.add_theme_font_size_override("font_size", nation_px)
 				var c := l.get_theme_color("font_color")
-				c.a = MapZoomLODScript.label_alpha_for_tier(tier, "nation")
+				c.a = 0.96
 				l.add_theme_color_override("font_color", c)
 				_fit_and_center_label(l)
 	for rid_var in _region_labels.keys():

@@ -77,6 +77,8 @@ var _roster_filters_initialized: bool = false
 var _mission_filters_initialized: bool = false
 var _detail_progress_row: HBoxContainer
 var _highlight_ops_pulse: bool = false
+var _portrait_picker_agent_id: String = ""
+var _portrait_file_dialog: FileDialog = null
 
 const AGENT_HEADER_SPECS: Array[Dictionary] = [
 	{"text": "Name", "width": 130},
@@ -100,6 +102,17 @@ const STATUS_SORT_ORDER := {
 	"available": 2,
 	"inactive": 3,
 }
+
+const AGENT_STOCK_PORTRAITS: PackedStringArray = [
+	"res://assets/graphics/portraits/agents/agent_male.png",
+	"res://assets/graphics/portraits/agents/agent_female.png",
+	"res://assets/graphics/portraits/agents/agent_italian.png",
+	"res://assets/graphics/portraits/agents/double_agent.png",
+	"res://assets/graphics/portraits/agents/elite_spy.png",
+	"res://assets/graphics/portraits/agents/visionary_scientist.png",
+]
+const AGENT_PORTRAIT_SLOT_FRAME := "res://assets/graphics/ui/agent_portrait_slot_frame.png"
+const AGENT_PORTRAIT_USER_DIR := "user://agent_portraits"
 
 
 func _ready() -> void:
@@ -507,20 +520,11 @@ func _create_agent_row(summary: Dictionary) -> PanelContainer:
 	row.add_theme_constant_override("separation", 8)
 	outer.add_child(row)
 
-	# Portrait
+	# Portrait slot — click the 36px face (picker stays on this card).
 	var apath := str(summary.get("portrait_path", ""))
-	if not apath.is_empty():
-		var ptex := TextureRect.new()
-		ptex.custom_minimum_size = Vector2(36, 36)
-		ptex.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
-		ptex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		if ResourceLoader.exists(apath):
-			var tex := load(apath) as Texture2D
-			if tex:
-				ptex.texture = tex
-		else:
-			ptex.modulate = Color(0.6, 0.6, 0.7)
-		row.add_child(ptex)
+	row.add_child(_make_agent_portrait_slot(agent_id, apath))
+	if _portrait_picker_agent_id == agent_id and not agent_id.is_empty():
+		outer.add_child(_make_agent_portrait_picker(agent_id))
 
 	var text_col := VBoxContainer.new()
 	text_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -1399,3 +1403,236 @@ func _row_label(text: String, min_width: int) -> Label:
 	label.clip_text = true
 	RetrowaveTheme.style_row_label(label)
 	return label
+
+
+func _make_agent_portrait_slot(agent_id: String, stock_path: String) -> Control:
+	var wrap := Control.new()
+	wrap.custom_minimum_size = Vector2(36, 36)
+	wrap.mouse_filter = Control.MOUSE_FILTER_STOP
+	wrap.tooltip_text = "Click the face to change this agent's portrait."
+	var face := TextureRect.new()
+	face.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	face.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	face.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var tex := _load_agent_face_texture(agent_id, stock_path)
+	if tex != null:
+		face.texture = tex
+	else:
+		face.modulate = Color(0.6, 0.6, 0.7)
+	wrap.add_child(face)
+	if ResourceLoader.exists(AGENT_PORTRAIT_SLOT_FRAME):
+		var frame := TextureRect.new()
+		frame.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		frame.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		frame.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		frame.texture = load(AGENT_PORTRAIT_SLOT_FRAME) as Texture2D
+		wrap.add_child(frame)
+	wrap.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton and ev.pressed and ev.button_index == MOUSE_BUTTON_LEFT:
+			_toggle_agent_portrait_picker(agent_id)
+			wrap.accept_event()
+	)
+	return wrap
+
+
+func _make_agent_portrait_picker(agent_id: String) -> PanelContainer:
+	var panel := PanelContainer.new()
+	panel.name = "PortraitPicker"
+	RetrowaveTheme.style_detail_panel_flat(panel)
+	var col := VBoxContainer.new()
+	col.add_theme_constant_override("separation", 6)
+	panel.add_child(col)
+	var faces := HBoxContainer.new()
+	faces.add_theme_constant_override("separation", 4)
+	col.add_child(faces)
+	for path in AGENT_STOCK_PORTRAITS:
+		var btn := TextureButton.new()
+		btn.custom_minimum_size = Vector2(32, 32)
+		btn.ignore_texture_size = true
+		btn.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+		if ResourceLoader.exists(path):
+			btn.texture_normal = load(path) as Texture2D
+		btn.tooltip_text = path.get_file().get_basename().replace("_", " ")
+		btn.pressed.connect(_on_stock_portrait_picked.bind(agent_id, path))
+		faces.add_child(btn)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	col.add_child(actions)
+	var import_btn := Button.new()
+	import_btn.text = "Import"
+	import_btn.tooltip_text = "Copy a PNG into user://agent_portraits for this agent only."
+	RetrowaveTheme.style_primary_button(import_btn)
+	import_btn.pressed.connect(_on_import_portrait_pressed.bind(agent_id))
+	actions.add_child(import_btn)
+	var reset_btn := Button.new()
+	reset_btn.text = "Reset"
+	reset_btn.tooltip_text = "Restore this agent's stock face. Other agents unchanged."
+	RetrowaveTheme.style_secondary_button(reset_btn)
+	reset_btn.pressed.connect(_on_reset_portrait_pressed.bind(agent_id))
+	actions.add_child(reset_btn)
+	return panel
+
+
+func _toggle_agent_portrait_picker(agent_id: String) -> void:
+	if agent_id.is_empty():
+		return
+	if _portrait_picker_agent_id == agent_id:
+		_portrait_picker_agent_id = ""
+	else:
+		_portrait_picker_agent_id = agent_id
+	_populate_agents()
+
+
+func _safe_portrait_agent_id(agent_id: String) -> String:
+	var re := RegEx.new()
+	re.compile("[^A-Za-z0-9_-]")
+	return re.sub(agent_id, "", true)
+
+
+func _custom_portrait_user_path(agent_id: String) -> String:
+	var sid := _safe_portrait_agent_id(agent_id)
+	if sid.is_empty():
+		return ""
+	return "%s/%s.png" % [AGENT_PORTRAIT_USER_DIR, sid]
+
+
+func _stock_sidecar_path(agent_id: String) -> String:
+	var sid := _safe_portrait_agent_id(agent_id)
+	if sid.is_empty():
+		return ""
+	return "%s/%s.stock" % [AGENT_PORTRAIT_USER_DIR, sid]
+
+
+func _load_agent_face_texture(agent_id: String, stock_path: String) -> Texture2D:
+	var custom := _custom_portrait_user_path(agent_id)
+	if not custom.is_empty() and FileAccess.file_exists(custom):
+		var img := Image.new()
+		if img.load(custom) == OK and img.get_width() > 0:
+			return ImageTexture.create_from_image(img)
+	if not stock_path.is_empty() and ResourceLoader.exists(stock_path):
+		return load(stock_path) as Texture2D
+	return null
+
+
+func _ensure_portrait_user_dir() -> bool:
+	var d := DirAccess.open("user://")
+	if d == null:
+		return false
+	if not d.dir_exists("agent_portraits"):
+		return d.make_dir("agent_portraits") == OK
+	return true
+
+
+func _remember_original_stock(agent_id: String, current_stock: String) -> void:
+	var side := _stock_sidecar_path(agent_id)
+	if side.is_empty() or FileAccess.file_exists(side):
+		return
+	if current_stock.is_empty() or not current_stock.begins_with("res://assets/graphics/portraits/agents/"):
+		return
+	if not _ensure_portrait_user_dir():
+		return
+	var f := FileAccess.open(side, FileAccess.WRITE)
+	if f == null:
+		return
+	f.store_string(current_stock)
+	f.close()
+
+
+func _on_stock_portrait_picked(agent_id: String, stock_path: String) -> void:
+	if not stock_path.begins_with("res://assets/graphics/portraits/agents/"):
+		return
+	if typeof(AgentManager) == TYPE_NIL:
+		return
+	var agent: Agent = AgentManager.get_agent(agent_id)
+	if agent == null:
+		return
+	_remember_original_stock(agent_id, agent.portrait_path)
+	agent.portrait_path = stock_path
+	_delete_custom_portrait(agent_id)
+	AgentManager.invalidate_agent_cache(country_tag)
+	_populate_agents()
+
+
+func _on_reset_portrait_pressed(agent_id: String) -> void:
+	_delete_custom_portrait(agent_id)
+	var side := _stock_sidecar_path(agent_id)
+	if typeof(AgentManager) != TYPE_NIL:
+		var agent: Agent = AgentManager.get_agent(agent_id)
+		if agent != null and not side.is_empty() and FileAccess.file_exists(side):
+			var orig := FileAccess.get_file_as_string(side).strip_edges()
+			if orig.begins_with("res://assets/graphics/portraits/agents/"):
+				agent.portrait_path = orig
+		AgentManager.invalidate_agent_cache(country_tag)
+	_populate_agents()
+
+
+func _delete_custom_portrait(agent_id: String) -> void:
+	var path := _custom_portrait_user_path(agent_id)
+	if path.is_empty() or path.begins_with("res://") or not FileAccess.file_exists(path):
+		return
+	var abs_path := ProjectSettings.globalize_path(path).replace("\\", "/")
+	var res_abs := ProjectSettings.globalize_path("res://").replace("\\", "/")
+	if abs_path.begins_with(res_abs):
+		return
+	DirAccess.remove_absolute(abs_path)
+
+
+func _on_import_portrait_pressed(agent_id: String) -> void:
+	_portrait_picker_agent_id = agent_id
+	if _portrait_file_dialog == null or not is_instance_valid(_portrait_file_dialog):
+		_portrait_file_dialog = FileDialog.new()
+		_portrait_file_dialog.file_mode = FileDialog.FILE_MODE_OPEN_FILE
+		_portrait_file_dialog.access = FileDialog.ACCESS_FILESYSTEM
+		_portrait_file_dialog.filters = PackedStringArray(["*.png ; PNG image"])
+		_portrait_file_dialog.title = "Import agent portrait (PNG → user:// only)"
+		_portrait_file_dialog.use_native_dialog = true
+		_portrait_file_dialog.exclusive = true
+		add_child(_portrait_file_dialog)
+		_portrait_file_dialog.file_selected.connect(_on_portrait_file_selected)
+	_portrait_file_dialog.popup_centered_ratio(0.55)
+
+
+func _on_portrait_file_selected(src_path: String) -> void:
+	var agent_id := _portrait_picker_agent_id
+	if agent_id.is_empty():
+		return
+	if not _import_portrait_png(agent_id, src_path):
+		if feedback_hint != null:
+			feedback_hint.text = "Portrait import failed — PNG copies to user://agent_portraits only (never res://)."
+		return
+	if typeof(AgentManager) != TYPE_NIL:
+		var agent: Agent = AgentManager.get_agent(agent_id)
+		if agent != null:
+			_remember_original_stock(agent_id, agent.portrait_path)
+		AgentManager.invalidate_agent_cache(country_tag)
+	_populate_agents()
+
+
+func _import_portrait_png(agent_id: String, src_path: String) -> bool:
+	var dest := _custom_portrait_user_path(agent_id)
+	if dest.is_empty() or dest.begins_with("res://"):
+		return false
+	if src_path.is_empty() or not src_path.to_lower().ends_with(".png"):
+		return false
+	var dest_abs := ProjectSettings.globalize_path(dest).replace("\\", "/")
+	var res_abs := ProjectSettings.globalize_path("res://").replace("\\", "/")
+	if dest_abs.begins_with(res_abs) or "/assets/" in dest_abs:
+		return false
+	if not _ensure_portrait_user_dir():
+		return false
+	var img := Image.new()
+	if img.load(src_path) != OK or img.get_width() < 1:
+		return false
+	var bytes := FileAccess.get_file_as_bytes(src_path)
+	if bytes.size() < 8:
+		return false
+	var f := FileAccess.open(dest, FileAccess.WRITE)
+	if f == null:
+		return false
+	f.store_buffer(bytes)
+	f.close()
+	if dest.begins_with("res://"):
+		return false
+	return FileAccess.file_exists(dest)

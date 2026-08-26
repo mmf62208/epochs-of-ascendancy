@@ -63,8 +63,8 @@ static func lines_for(formation: Object) -> PackedStringArray:
 			% [float(comp.get("width", 2.0)), fuel_pct]
 		)
 		var toe_eq: Dictionary = LandCombatPower.equipment_toe(comp)
+		var bits: PackedStringArray = PackedStringArray()
 		if not toe_eq.is_empty():
-			var bits: PackedStringArray = PackedStringArray()
 			var keys: Array = toe_eq.keys()
 			keys.sort()
 			for k in keys:
@@ -72,11 +72,9 @@ static func lines_for(formation: Object) -> PackedStringArray:
 					break
 				var short := str(k).replace("_equipment", "").replace("_", " ")
 				bits.append("%s %d" % [short, int(toe_eq[k])])
-			if not bits.is_empty():
-				lines.append("TOE " + " · ".join(bits))
-		var stock_line := _stockpile_toe_line(formation)
-		if not stock_line.is_empty():
-			lines.append(stock_line)
+		var promoted := fill_toe_promoted_line(formation, bits)
+		if not promoted.is_empty():
+			lines.append(promoted)
 	if "last_manpower_loss" in formation:
 		var men_l := int(formation.get("last_manpower_loss"))
 		if men_l > 0 and "last_equip_loss_plain" not in formation:
@@ -118,6 +116,33 @@ static func lines_for(formation: Object) -> PackedStringArray:
 
 static func bbcode_for(formation: Object) -> String:
 	return "\n".join(lines_for(formation))
+
+
+static func fill_toe_promoted_line(formation: Object, toe_bits: PackedStringArray) -> String:
+	var fill := _toe_fill_ratio(formation)
+	var bits := toe_bits
+	if bits.is_empty() and fill <= 0.0:
+		var stock := _stockpile_toe_line(formation)
+		if stock.is_empty():
+			return ""
+	if bits.is_empty():
+		return "Fill %.0f%%" % [fill * 100.0]
+	return "Fill %.0f%% · TOE %s" % [fill * 100.0, " · ".join(bits)]
+
+
+static func fill_toe_is_dry(formation: Object) -> bool:
+	return _toe_fill_ratio(formation) < 0.50
+
+
+static func _toe_fill_ratio(formation: Object) -> float:
+	if formation == null or ProductionManager == null:
+		return 0.0
+	var fid := ""
+	if "formation_id" in formation:
+		fid = str(formation.get("formation_id")).strip_edges()
+	if fid.is_empty() or not ProductionManager.has_method("unit_toe_fill_ratio"):
+		return 0.0
+	return float(ProductionManager.unit_toe_fill_ratio(fid))
 
 
 

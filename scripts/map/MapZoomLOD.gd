@@ -298,7 +298,7 @@ static func region_label_font_px(t: Tier) -> int:
 static func label_alpha_for_tier(t: Tier, kind: String) -> float:
 	match kind:
 		"nation":
-			return 0.92 if t == Tier.STRATEGIC else 0.78
+			return 0.96
 		"region":
 			return 0.88
 		"province":

@@ -16253,12 +16253,12 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var panel := PanelContainer.new()
 	panel.name = "UnitDetailPopup"
 	panel.z_index = 70
-	panel.clip_contents = true
-	panel.custom_minimum_size = Vector2(320, 220)
+	panel.clip_contents = false
+	panel.custom_minimum_size = Vector2(320, 360)
 	RetrowaveTheme.style_detail_panel_flat(panel)
 	# Docked HOI-style unit card (bottom-left). UNIT_CARD_DOCK / unit_card_dock — not a mouse popup.
 	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
-	var dock := Vector2(18.0, maxf(64.0, vp.y - 276.0))
+	var dock := Vector2(18.0, maxf(64.0, vp.y - 416.0))
 	panel.position = dock
 	panel.set_meta("unit_card_dock", true)
 	ui.add_child(panel)
@@ -16312,7 +16312,28 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	if fuel_v >= 0.0:
 		lines.append("Fuel: %.0f%%" % (fuel_v * 100.0))
 	if typeof(UnitCardCombatStrip) != TYPE_NIL:
-		lines.append_array(UnitCardCombatStrip.lines_for(formation))
+		var strip_lines: PackedStringArray = UnitCardCombatStrip.lines_for(formation)
+		var promoted := ""
+		var rest: PackedStringArray = PackedStringArray()
+		for ln in strip_lines:
+			if promoted.is_empty() and str(ln).begins_with("Fill "):
+				promoted = str(ln)
+			else:
+				rest.append(ln)
+		if not promoted.is_empty():
+			var fill_lbl := Label.new()
+			fill_lbl.text = promoted
+			fill_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			fill_lbl.custom_minimum_size = Vector2(290, 0)
+			var dry := false
+			if UnitCardCombatStrip.has_method("fill_toe_is_dry"):
+				dry = bool(UnitCardCombatStrip.fill_toe_is_dry(formation))
+			fill_lbl.add_theme_color_override(
+				"font_color", RetrowaveTheme.WARNING if dry else RetrowaveTheme.CYAN
+			)
+			fill_lbl.add_theme_font_size_override("font_size", 16)
+			vbox.add_child(fill_lbl)
+		lines.append_array(rest)
 	if not fid.is_empty():
 		lines.append("ID: %s" % fid)
 	# Stack at this province (one pin; cycle via [ ] or card buttons).
@@ -18357,7 +18378,9 @@ func _refresh_next_hook_chip() -> void:
 		_next_hook_chip.position = Vector2(18, 52)
 		_next_hook_chip.custom_minimum_size = Vector2(420, 28)
 		if typeof(RetrowaveTheme) != TYPE_NIL:
-			RetrowaveTheme.style_secondary_button(_next_hook_chip)
+			RetrowaveTheme.style_primary_button(_next_hook_chip)
+			_next_hook_chip.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 1.0))
+			_next_hook_chip.add_theme_constant_override("outline_size", 3)
 		ui.add_child(_next_hook_chip)
 		_next_hook_chip.pressed.connect(func() -> void:
 			if typeof(PlayNextHook) != TYPE_NIL:
