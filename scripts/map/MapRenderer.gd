@@ -999,6 +999,48 @@ func _input(event: InputEvent) -> void:
 			_request_hang_safe_supply_corridor()
 			get_viewport().set_input_as_handled()
 			return
+		# Mapmodes in _input so toolbar/search focus cannot swallow F2–F4 / Ctrl+F9.
+		if event.keycode == KEY_F1:
+			set_map_mode("political")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F2:
+			set_map_mode("strain")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F3:
+			set_map_mode("vitality")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F4:
+			set_map_mode("development")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F5:
+			set_map_mode("supply")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F6:
+			set_map_mode("loyalty")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F7:
+			set_map_mode("infra")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F8:
+			set_map_mode("weather")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F9:
+			if event.ctrl_pressed:
+				set_map_mode("terrain")
+			elif event.shift_pressed:
+				set_map_mode("states")
+			else:
+				set_map_mode("resources")
+			get_viewport().set_input_as_handled()
+			return
 		if event.keycode == KEY_ESCAPE and _inspector_stack_blocking_input():
 			_dismiss_inspector_and_restore_input()
 			get_viewport().set_input_as_handled()
@@ -1008,7 +1050,6 @@ func _input(event: InputEvent) -> void:
 			and not event.ctrl_pressed
 			and not event.alt_pressed
 			and not event.shift_pressed
-			and _inspector_stack_blocking_input()
 		):
 			_dismiss_inspector_and_restore_input()
 			var ong_i: bool = toggle_equipment_flow_glyphs()
@@ -1082,6 +1123,7 @@ func _refresh_terrain_zoom_light() -> void:
 	# Pass 7: resync unit counter scales + LOD visibility without full icon rebuild.
 	_sync_unit_counter_scales(z)
 	_sync_unit_counter_visibility(z)
+	_sync_capital_star_scales(z)
 	# Do not rebuild 3520 fills on a wheel notch — LOD/counters only. Fill bucket
 	# updates happen on mapmode change / boot, not per zoom tick (Rhine chip carpet hang).
 
@@ -1307,6 +1349,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Pass 10: F8 weather ground-state mapmode (dry/mud/snow/storm fills).
 		if event.keycode == KEY_F8:
 			set_map_mode("weather")
+			get_viewport().set_input_as_handled()
+			return
 		# F9 — resources; Shift+F9 — states; Ctrl+F9 — terrain (modifiers first so plain F9 does not clobber)
 		if event.keycode == KEY_F9:
 			if event.ctrl_pressed:
@@ -1355,8 +1399,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Capital gold star wins over a colocated chip (Berlin Air Wing, London boroughs).
 		# Star click inspects the capital and does not arm MARCH.
 		if not event.shift_pressed:
-			var star_pid := _capital_star_pid_at(world_pos)
-			if star_pid > 0 and provinces.has(star_pid):
+			var star_pid := _resolve_map_pick_pid(world_pos)
+			if star_pid > 0 and _capital_star_pid_at(world_pos) == star_pid and provinces.has(star_pid):
 				if not selected_formation_id.is_empty():
 					selected_formation_id = ""
 					_refresh_selected_unit_chip()
@@ -11943,6 +11987,7 @@ func set_map_mode(mode: String = "political") -> void:
 	if m == current_map_mode and m != "infra" and m != "naval":
 		return
 	current_map_mode = m
+	_sync_mapmode_toolbar()
 	# Clear secondary stack tints unless re-applied by preset.
 	debug_tint_mode_secondary = ""
 	debug_tint_mode_secondaries.clear()
@@ -12020,6 +12065,8 @@ func set_map_mode(mode: String = "political") -> void:
 	else:
 		debug_tint_mode = "strain" if m == "strain" else ("vitality" if m == "vitality" else ("development" if m == "development" else ("loyalty" if m == "loyalty" else ("infra" if m == "infra" else ("region_control" if m == "region_control" else ("naval" if m == "naval" else ""))))))
 	# Stream 2: state name labels on states mapmode (operational zoom).
+	if m == "states":
+		_schedule_political_labels_rebuild()
 	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 		if _political_labels_layer.has_method("set_map_mode_context"):
 			_political_labels_layer.call("set_map_mode_context", m)
@@ -12084,6 +12131,13 @@ func _apply_map_mode_visuals() -> void:
 		# F1: always re-assert full capital star set after any mesh/cull path.
 		call_deferred("_force_all_province_nodes_visible")
 		call_deferred("_ensure_capital_stars_visible")
+
+
+func _sync_mapmode_toolbar() -> void:
+	if _map_mode_toolbar == null or not is_instance_valid(_map_mode_toolbar):
+		return
+	if _map_mode_toolbar.has_method("set_mode"):
+		_map_mode_toolbar.call("set_mode", current_map_mode, false)
 
 
 ## Mapmode / F1: every province node visible (undo viewport cull holes).
@@ -12165,8 +12219,33 @@ func _ensure_capital_stars_visible() -> void:
 		if not has_star:
 			_add_capital_star_to_node(node, int(pid))
 			n_stars += 1
+	_sync_capital_star_scales()
 	if n_stars > 0:
 		print("MapRenderer: capital stars visible n=%d" % n_stars)
+
+
+func _capital_star_font_px() -> int:
+	var z := _get_camera_zoom()
+	if z <= MapZoomLODScript.STRATEGIC_MAX_ZOOM:
+		return 0  # hide at world/strategic — nation labels own that band
+	# ~16 screen px at operational Europe zoom; clamp so Maginot does not grow a carpet.
+	return int(clampf(16.0 / maxf(z, 0.35), 11.0, 20.0))
+
+
+func _sync_capital_star_scales(_z: float = -1.0) -> void:
+	var px := _capital_star_font_px()
+	for pid in province_nodes.keys():
+		var node: Node2D = province_nodes[pid] as Node2D
+		if node == null:
+			continue
+		for child in node.get_children():
+			if not (child is Label) or not (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
+				continue
+			var star := child as Label
+			star.visible = px > 0
+			if px > 0:
+				star.add_theme_font_size_override("font_size", px)
+				star.set_meta(META_MAP_GLYPH_PX, px)
 
 
 func _add_capital_star_to_node(node: Node2D, pid: int) -> void:
@@ -12178,14 +12257,16 @@ func _add_capital_star_to_node(node: Node2D, pid: int) -> void:
 	star.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	star.z_as_relative = false
 	star.z_index = 40
-	star.add_theme_font_size_override("font_size", 30)
+	var px := _capital_star_font_px()
+	star.add_theme_font_size_override("font_size", px)
 	# Bright gold fill + thick dark+white outline so stars read on yellow (BEL) and light paints.
 	star.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
 	star.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05, 1.0))
-	star.add_theme_constant_override("outline_size", 8)
+	star.add_theme_constant_override("outline_size", 6)
 	star.modulate = Color(1.0, 1.0, 1.0, 1.0)
-	star.set_meta(META_MAP_GLYPH_PX, 30)
+	star.set_meta(META_MAP_GLYPH_PX, px)
 	star.set_meta(META_MAP_GLYPH_CAPITAL, true)
+	star.visible = px > 0
 	star.reset_size()
 	var sms := star.get_minimum_size()
 	star.position = center - sms * 0.5
@@ -15725,11 +15806,7 @@ func _update_spatial_hover() -> void:
 
 	var world_pos := _screen_to_world(mouse_screen)
 
-	var pid := -1
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
-		pid = MapManager.get_province_at_world_pos(world_pos, true)
-		if MapManager.has_method("resolve_pick_province_id"):
-			pid = MapManager.resolve_pick_province_id(pid)
+	var pid := _resolve_map_pick_pid(world_pos)
 	var new_hover_province: Province = null
 	if pid >= 0 and provinces.has(pid):
 		new_hover_province = provinces[pid]
@@ -16044,6 +16121,19 @@ func _capital_star_pid_at(world_pos: Vector2) -> int:
 	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("prefer_capital_province_at"):
 		return -1
 	return int(MapManager.prefer_capital_province_at(world_pos, -1))
+
+
+## Same resolve for hover tooltip and click (capital star disk, then hex pick).
+func _resolve_map_pick_pid(world_pos: Vector2) -> int:
+	var star_pid := _capital_star_pid_at(world_pos)
+	if star_pid > 0:
+		return star_pid
+	var pid := -1
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
+		pid = MapManager.get_province_at_world_pos(world_pos, true)
+		if MapManager.has_method("resolve_pick_province_id"):
+			pid = MapManager.resolve_pick_province_id(pid)
+	return pid
 
 
 ## Click navy/armor/infantry map counters → select unit for move/assault + detail card.
@@ -18353,6 +18443,8 @@ func toggle_strategic_flow_overlay() -> bool:
 
 func toggle_equipment_flow_glyphs() -> bool:
 	show_equipment_flow_glyphs = not show_equipment_flow_glyphs
+	if show_equipment_flow_glyphs:
+		_ensure_equipment_glyph_layer_cheap()
 	if _strategic_flow_layer != null and is_instance_valid(_strategic_flow_layer):
 		if _strategic_flow_layer.has_method("set_equipment_flow_glyphs_enabled"):
 			_strategic_flow_layer.set_equipment_flow_glyphs_enabled(show_equipment_flow_glyphs)
@@ -18360,11 +18452,27 @@ func toggle_equipment_flow_glyphs() -> bool:
 			_strategic_flow_layer.equipment_flow_glyphs_enabled = show_equipment_flow_glyphs
 		if _strategic_flow_layer.has_method("refresh"):
 			_strategic_flow_layer.refresh()
-	elif show_strategic_flow_overlay:
-		# Overlay armed (WarLoop / U) but layer missing — budgeted path, never full setup.
-		_request_hang_safe_warloop_flow()
 	# Hang-class: I never builds the 3520-board flow overlay (sync or deferred).
 	return show_equipment_flow_glyphs
+
+
+## Glyph-only layer: existing centroids + budgeted empty routes. Never BFS / get_all_routes.
+func _ensure_equipment_glyph_layer_cheap() -> void:
+	if container == null:
+		return
+	if _strategic_flow_layer == null or not is_instance_valid(_strategic_flow_layer):
+		_strategic_flow_layer = _StrategicFlowOverlayLayerScr.new()
+	# Hang-class: never setup() / get_all_routes / BFS on the I key frame.
+	if _strategic_flow_layer.has_method("setup_budgeted"):
+		_strategic_flow_layer.setup_budgeted(province_centroids, [])
+	if "show_equipment_flows" in _strategic_flow_layer:
+		_strategic_flow_layer.show_equipment_flows = true
+	if "show_land_supply" in _strategic_flow_layer:
+		_strategic_flow_layer.show_land_supply = false
+	if "show_sea_lanes" in _strategic_flow_layer:
+		_strategic_flow_layer.show_sea_lanes = false
+	add_overlay_layer("StrategicFlowOverlay", _strategic_flow_layer, 4)
+	_sync_strategic_flow_lod(_map_lod_tier)
 
 
 ## Force EquipmentFlow glyphs ON and master flow overlay visible (first-session war path).

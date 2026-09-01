@@ -101,6 +101,18 @@ class TestFirstSessionHotkeysProduct(unittest.TestCase):
             "capital_star_disk_wins",
             "berlin_search_submit",
             "ice_ocean_ata",
+            "fkeys_in_input",
+            "toolbar_follows_mode",
+            "toolbar_set_mode",
+            "operational_covers_europe_home",
+            "i_glyphs_in_input",
+            "i_glyph_layer_cheap",
+            "i_transport_art_not_blob",
+            "hover_pid_equals_click",
+            "no_strategic_region_placeholder",
+            "insight_strips_placeholder",
+            "no_industry_carpet_at_europe",
+            "capital_star_lod",
         ):
             self.assertTrue(p.get("wiring", {}).get(key), msg=(key, p.get("wiring"), p.get("fail")))
 

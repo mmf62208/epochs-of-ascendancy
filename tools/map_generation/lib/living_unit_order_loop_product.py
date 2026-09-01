@@ -591,15 +591,21 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     (passes if close_ok else fails).append("inspector_close_restores")
 
     toggle_fn = _slice(ren, "toggle_equipment_flow_glyphs")
+    cheap_fn = _slice(ren, "_ensure_equipment_glyph_layer_cheap")
     i_no_setup = bool(toggle_fn) and "_setup_strategic_flow_layer" not in toggle_fn
-    i_mark = "event.keycode == KEY_I and not event.ctrl_pressed"
-    i_pos = ren.find(i_mark)
-    i_block = ren[i_pos : i_pos + 900] if i_pos >= 0 else ""
-    i_dismiss = "_dismiss_inspector_and_restore_input" in i_block
     input_fn = _slice(ren, "_input")
+    i_pos = input_fn.find("KEY_I")
+    i_block = input_fn[i_pos : i_pos + 900] if i_pos >= 0 else ""
+    i_dismiss = "_dismiss_inspector_and_restore_input" in i_block
     esc_in_input = "KEY_ESCAPE" in input_fn and "_dismiss_inspector_and_restore_input" in input_fn
-    i_in_input = "KEY_I" in input_fn and "_inspector_stack_blocking_input" in input_fn
-    i_ok = i_no_setup and i_dismiss and esc_in_input and i_in_input
+    i_in_input = "KEY_I" in input_fn and "toggle_equipment_flow_glyphs" in input_fn
+    i_cheap = (
+        bool(cheap_fn)
+        and "setup_budgeted" in cheap_fn
+        and "_setup_strategic_flow_layer" not in cheap_fn
+        and "_ensure_equipment_glyph_layer_cheap" in toggle_fn
+    )
+    i_ok = i_no_setup and i_dismiss and esc_in_input and i_in_input and i_cheap
     wiring["i_hang_safe"] = i_ok
     (passes if i_ok else fails).append("i_hang_safe")
 

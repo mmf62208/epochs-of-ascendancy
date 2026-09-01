@@ -20,6 +20,11 @@ TOP_INFO = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
 MAIN_MENU = ROOT / "scripts" / "ui" / "MainMenu.gd"
 TEST_RUNNER = ROOT / "scripts" / "core" / "TestRunner.gd"
 SEARCH_GD = ROOT / "scripts" / "ui" / "map" / "MapProvinceSearch.gd"
+TOOLBAR_GD = ROOT / "scripts" / "ui" / "map" / "MapModeToolbar.gd"
+ZOOM_LOD = ROOT / "scripts" / "map" / "MapZoomLOD.gd"
+FLOW_LAYER = ROOT / "scripts" / "map" / "StrategicFlowOverlayLayer.gd"
+INFRA_LAYER = ROOT / "scripts" / "map" / "InfrastructureOverlayLayer.gd"
+INSIGHT_GD = ROOT / "scripts" / "map" / "ProvinceInsight.gd"
 BOARD_DIR = ROOT / "data" / "provinces_world_accurate"
 
 # Named first-session camera capitals (world_accurate).
@@ -414,6 +419,72 @@ def build_first_session_hotkeys_product(
             and "_camera_nudge_gen" in ren
             and "func _nudge_camera_after_panel" in ren
         )
+        # P1: F-keys live in _input via set_map_mode; toolbar highlight follows.
+        wiring["fkeys_in_input"] = (
+            'KEY_F1' in input_fn
+            and 'set_map_mode("political")' in input_fn
+            and 'set_map_mode("strain")' in input_fn
+            and 'set_map_mode("vitality")' in input_fn
+            and 'set_map_mode("development")' in input_fn
+            and 'set_map_mode("terrain")' in input_fn
+            and 'set_map_mode("states")' in input_fn
+            and 'set_map_mode("resources")' in input_fn
+            and "event.ctrl_pressed" in input_fn
+        )
+        wiring["toolbar_follows_mode"] = (
+            "func _sync_mapmode_toolbar" in ren
+            and "_sync_mapmode_toolbar()" in _slice_func(ren, "set_map_mode")
+            and 'call("set_mode", current_map_mode, false)' in ren
+        )
+        tb = TOOLBAR_GD.read_text(encoding="utf-8") if TOOLBAR_GD.is_file() else ""
+        wiring["toolbar_set_mode"] = (
+            "func set_mode" in tb and "notify_renderer" in tb and '"terrain"' in tb
+        )
+        lod = ZOOM_LOD.read_text(encoding="utf-8") if ZOOM_LOD.is_file() else ""
+        wiring["operational_covers_europe_home"] = (
+            "OPERATIONAL_MAX_ZOOM" in lod and "1.55" in lod
+        )
+        wiring["i_glyphs_in_input"] = (
+            "KEY_I" in input_fn
+            and "toggle_equipment_flow_glyphs" in input_fn
+            and "_inspector_stack_blocking_input()" not in input_fn[input_fn.find("KEY_I") : input_fn.find("KEY_I") + 220]
+        )
+        wiring["i_glyph_layer_cheap"] = (
+            "func _ensure_equipment_glyph_layer_cheap" in ren
+            and "setup_budgeted" in _slice_func(ren, "_ensure_equipment_glyph_layer_cheap")
+            and "_setup_strategic_flow_layer" not in _slice_func(ren, "toggle_equipment_flow_glyphs")
+            and "_setup_strategic_flow_layer" not in _slice_func(ren, "_ensure_equipment_glyph_layer_cheap")
+            and "preview_player_route()" not in _slice_func(ren, "toggle_equipment_flow_glyphs")
+        )
+        lyr = FLOW_LAYER.read_text(encoding="utf-8") if FLOW_LAYER.is_file() else ""
+        wiring["i_transport_art_not_blob"] = (
+            "func _transport_glyph_tex" in lyr
+            and "logistics_32.png" in lyr
+            and "draw_circle(pos, 4.0 * s, col)" not in lyr
+            and "never a blob" in lyr
+        )
+        wiring["hover_pid_equals_click"] = "func _resolve_map_pick_pid" in ren and "_resolve_map_pick_pid(world_pos)" in _slice_func(
+            ren, "_update_spatial_hover"
+        )
+        mm = MAP_MANAGER.read_text(encoding="utf-8") if MAP_MANAGER.is_file() else ""
+        sr_fn = _slice_func(mm, "get_strategic_region_name")
+        wiring["no_strategic_region_placeholder"] = (
+            bool(sr_fn)
+            and 'return "Strategic Region %d"' not in sr_fn
+            and "begins_with(" in sr_fn
+        )
+        insight = INSIGHT_GD.read_text(encoding="utf-8") if INSIGHT_GD.is_file() else ""
+        wiring["insight_strips_placeholder"] = 'begins_with("Strategic Region ")' in insight
+        infra = INFRA_LAYER.read_text(encoding="utf-8") if INFRA_LAYER.is_file() else ""
+        wiring["no_industry_carpet_at_europe"] = (
+            "industry_layer.visible = infra_mode or z > 1.55" in infra
+            or "industry_layer.visible = infra_mode or z > 1.55" in infra.replace("\t", "")
+        )
+        wiring["capital_star_lod"] = (
+            "func _capital_star_font_px" in ren
+            and "func _sync_capital_star_scales" in ren
+            and "STRATEGIC_MAX_ZOOM" in _slice_func(ren, "_capital_star_font_px")
+        )
 
         for k, v in wiring.items():
             if v:
@@ -456,6 +527,15 @@ def build_first_session_hotkeys_product(
             "TestRunner GER default",
         ],
     }
+
+
+def _slice_func(src: str, func_name: str) -> str:
+    needle = "func %s" % func_name
+    i = src.find(needle)
+    if i < 0:
+        return ""
+    nxt = src.find("\nfunc ", i + 1)
+    return src[i : nxt if nxt > 0 else i + 4000]
 
 
 def first_session_hotkeys_integrity(**kwargs: Any) -> Dict[str, Any]:

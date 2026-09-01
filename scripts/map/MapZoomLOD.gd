@@ -7,7 +7,9 @@ enum Tier { STRATEGIC, OPERATIONAL, TACTICAL }
 
 # Camera zoom bands (aligned with docs/MAP_SYSTEM_DESIGN.md §4.2, scaled for THEATER_SCALE canvas).
 const STRATEGIC_MAX_ZOOM: float = 0.55
-const OPERATIONAL_MAX_ZOOM: float = 1.22
+# Europe Home frame (~Berlin+Paris+Rome) lands ~1.3; keep that as operational so
+# states names and first-session LOD match the human Europe view (not tactical).
+const OPERATIONAL_MAX_ZOOM: float = 1.55
 const TACTICAL_MIN_ZOOM: float = 0.8 / MapCanvasConfig.THEATER_SCALE
 
 

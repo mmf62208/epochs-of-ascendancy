@@ -60,6 +60,8 @@ var road_layer: Node2D
 var rail_layer: Node2D
 var city_layer: Node2D
 var sites_layer: Node2D  # For airfields, ports, shipyards etc. as toggleable/editable vector elements (runways, docks) in addition to the icon drawing in _draw.
+## Quiet player factory/port/airfield marks. Visible at operational zoom even when show_sites is off.
+var industry_layer: Node2D
 
 ## Era band for sparse 1918 vs default 1936 vs dense 2026+ infra visualization.
 var _last_era_band: int = -1
@@ -72,6 +74,7 @@ const BUILD_CITY_NODES := false
 const DRAW_CITY_FALLBACK := false  # When BUILD_CITY_NODES off, skip per-province grey rect fallback (was 472×N rects per redraw).
 const MAX_LAYER_PROVINCES := 120
 const MAX_CITY_BUILDINGS_PER_PROVINCE := 4
+var _player_industry_marks: Array = []
 
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
@@ -133,6 +136,13 @@ func _ensure_sub_layers():
             sites_layer.name = "SitesLayer"
             sites_layer.z_index = 4
             add_child(sites_layer)
+    if industry_layer == null:
+        industry_layer = get_node_or_null("PlayerIndustryMarks")
+        if industry_layer == null:
+            industry_layer = IndustryMarksDraw.new()
+            industry_layer.name = "PlayerIndustryMarks"
+            industry_layer.z_index = 5
+            add_child(industry_layer)
 
 func _apply_layer_visibilities():
     _update_sub_layer_visibilities()
@@ -166,8 +176,19 @@ func _update_sub_layer_visibilities() -> void:
         if sites_layer:
             var site_z := float(MapZoomLODScript.site_marker_min_zoom_for_board(board_n))
             sites_layer.visible = show_sites and z > site_z
+            if industry_layer:
+                # Quiet player industry: tactical or Infra mapmode only — not a GER carpet at Europe zoom.
+                var infra_mode := false
+                var mr = get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+                if mr != null:
+                    infra_mode = str(mr.get("current_map_mode")) == "infra"
+                industry_layer.visible = infra_mode or z > 1.55
     elif sites_layer:
         sites_layer.visible = show_sites and z > 0.32
+        if industry_layer:
+            industry_layer.visible = z > 0.32
+    elif industry_layer:
+        industry_layer.visible = z > 0.32
     _maybe_rebuild_for_era_change()
 
 
@@ -640,13 +661,12 @@ func rebuild_sites_layer():
     for k in kids:
         sites_layer.remove_child(k)
         k.queue_free()
-
-    if not show_sites:
-        return
+    _player_industry_marks = []
 
     if map_manager == null:
         return
 
+    var player := _living_player_tag()
     var provinces = _get_provinces_for_layers()
     for pid in provinces:
         var p: Province = provinces[pid]
@@ -667,8 +687,20 @@ func rebuild_sites_layer():
                     has_factory = true
                 elif site.site_type == SpecialSite.SiteType.OIL_REFINERY:
                     has_refinery = true
+        var owner := str(p.owner_tag).strip_edges().to_upper()
+        if owner == player and (has_factory or has_port or has_air or has_refinery):
+            if _player_industry_marks.size() < 32:
+                _player_industry_marks.append({
+                    "pid": int(pid),
+                    "center": center,
+                    "factory": has_factory,
+                    "port": has_port,
+                    "air": has_air,
+                    "refinery": has_refinery,
+                })
+        if not show_sites:
+            continue
         if has_air:
-            # Simple crossed runway
             var rlen := 18.0
             var rw1 := Line2D.new()
             rw1.points = [center + Vector2(-rlen, 0), center + Vector2(rlen, 0)]
@@ -679,7 +711,7 @@ func rebuild_sites_layer():
             rw1.set_meta("type", "runway")
             sites_layer.add_child(rw1)
             var rw2 := Line2D.new()
-            rw2.points = [center + Vector2(0, -rlen*0.6), center + Vector2(0, rlen*0.6)]
+            rw2.points = [center + Vector2(0, -rlen * 0.6), center + Vector2(0, rlen * 0.6)]
             rw2.width = 2.0
             rw2.default_color = Color(0.25, 0.25, 0.35, 0.9)
             rw2.z_index = 4
@@ -687,7 +719,6 @@ func rebuild_sites_layer():
             rw2.set_meta("type", "runway")
             sites_layer.add_child(rw2)
         if has_port:
-            # Simple dock / pier representation
             var dock := Line2D.new()
             dock.points = [center + Vector2(-12, 8), center + Vector2(12, 8), center + Vector2(8, 14), center + Vector2(-8, 14), center + Vector2(-12, 8)]
             dock.width = 2.5
@@ -696,7 +727,6 @@ func rebuild_sites_layer():
             dock.set_meta("province_id", pid)
             dock.set_meta("type", "dock")
             sites_layer.add_child(dock)
-            # Small anchor-ish mark
             var anc := Line2D.new()
             anc.points = [center + Vector2(0, 4), center + Vector2(0, 12)]
             anc.width = 1.5
@@ -705,50 +735,8 @@ func rebuild_sites_layer():
             anc.set_meta("province_id", pid)
             anc.set_meta("type", "anchor")
             sites_layer.add_child(anc)
-        if has_factory:
-            # Factory: main building + chimney
-            var fact := ColorRect.new()
-            fact.size = Vector2(10, 8)
-            fact.position = center - fact.size * 0.5
-            fact.color = Color(0.2, 0.2, 0.22, 0.8)
-            fact.z_index = 4
-            fact.set_meta("province_id", pid)
-            fact.set_meta("type", "factory")
-            sites_layer.add_child(fact)
-            var chim := Line2D.new()
-            chim.points = [center + Vector2(2, -4), center + Vector2(2, -10)]
-            chim.width = 1.5
-            chim.default_color = Color(0.15, 0.15, 0.15, 0.9)
-            chim.z_index = 4
-            chim.set_meta("province_id", pid)
-            chim.set_meta("type", "chimney")
-            sites_layer.add_child(chim)
-        if has_refinery:
-            # Refinery: a couple of tank circles (approximated with small rects + line) + pipe
-            var t1 := ColorRect.new()
-            t1.size = Vector2(6, 6)
-            t1.position = center + Vector2(-8, -3)
-            t1.color = Color(0.18, 0.18, 0.2, 0.85)
-            t1.z_index = 4
-            t1.set_meta("province_id", pid)
-            t1.set_meta("type", "tank")
-            sites_layer.add_child(t1)
-            var t2 := ColorRect.new()
-            t2.size = Vector2(5, 5)
-            t2.position = center + Vector2(3, -2)
-            t2.color = Color(0.18, 0.18, 0.2, 0.85)
-            t2.z_index = 4
-            t2.set_meta("province_id", pid)
-            t2.set_meta("type", "tank")
-            sites_layer.add_child(t2)
-            var pipe := Line2D.new()
-            pipe.points = [center + Vector2(-5, 0), center + Vector2(5, 1)]
-            pipe.width = 1.2
-            pipe.default_color = Color(0.25, 0.25, 0.28, 0.8)
-            pipe.z_index = 4
-            pipe.set_meta("province_id", pid)
-            pipe.set_meta("type", "pipe")
-            sites_layer.add_child(pipe)
+    if industry_layer != null and industry_layer.has_method("setup_marks"):
+        industry_layer.call("setup_marks", _player_industry_marks)
 
 func rebuild_all_infra_layers():
     _last_era_band = _get_era_band(_get_map_year())
@@ -773,6 +761,22 @@ func rebuild_all_infra_layers():
                 set_meta("last_infra_layer_counts", curr)
                 var era_label := str(_get_era_infra_profile().get("label", "standard"))
                 print("InfrastructureOverlayLayer: Dynamic infra layers built (era=%s roads:%d rail-ties:%d cities:%d sites:%d). Toggle with R/T/C/Y or F10." % [era_label, road_count, rail_count, city_count, site_count])
+
+
+func _living_player_tag() -> String:
+    if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+        return str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+    return "GER"
+
+
+func _pid_is_starved(pid: int) -> bool:
+    var tree := get_tree()
+    if tree == null:
+        return false
+    var layer := tree.get_first_node_in_group("factory_status")
+    if layer != null and layer.has_method("has_marker"):
+        return bool(layer.call("has_marker", pid))
+    return false
 
 
 func rebuild_roads_rails_sites_only() -> void:
@@ -1650,3 +1654,43 @@ func _draw_proposed_splits(zoom: float = 1.0):
     if zoom > 0.9:
         var hint := "RAW PROPOSED SPLITS (from Python generator) — orange = high naval value"
         draw_string(font, Vector2(80, 48), hint, HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.3, 0.9, 0.95, 0.6))
+
+
+## Child of InfrastructureOverlayLayer. Visible is zoom-toggled like SitesLayer so
+## operational zoom paints without relying on parent _draw (which does not rerun on zoom).
+class IndustryMarksDraw extends Node2D:
+    var marks: Array = []
+
+    func setup_marks(rows: Array) -> void:
+        marks = rows.duplicate()
+        queue_redraw()
+
+    func _pid_is_starved(pid: int) -> bool:
+        var tree := get_tree()
+        if tree == null:
+            return false
+        var layer := tree.get_first_node_in_group("factory_status")
+        if layer != null and layer.has_method("has_marker"):
+            return bool(layer.call("has_marker", pid))
+        return false
+
+    func _draw() -> void:
+        if marks.is_empty():
+            return
+        for row_v in marks:
+            if typeof(row_v) != TYPE_DICTIONARY:
+                continue
+            var row: Dictionary = row_v
+            var pid := int(row.get("pid", -1))
+            var center: Vector2 = row.get("center", Vector2.ZERO)
+            var starved := _pid_is_starved(pid)
+            if bool(row.get("factory", false)) and not starved:
+                draw_rect(Rect2(center - Vector2(5, 4), Vector2(10, 8)), Color(0.2, 0.2, 0.22, 0.8))
+                draw_line(center + Vector2(2, -4), center + Vector2(2, -10), Color(0.15, 0.15, 0.15, 0.9), 1.5)
+            if bool(row.get("refinery", false)) and not starved:
+                draw_rect(Rect2(center + Vector2(-8, -3), Vector2(6, 6)), Color(0.18, 0.18, 0.2, 0.85))
+                draw_rect(Rect2(center + Vector2(3, -2), Vector2(5, 5)), Color(0.18, 0.18, 0.2, 0.85))
+            if bool(row.get("port", false)):
+                draw_line(center + Vector2(-12, 8), center + Vector2(12, 8), Color(0.3, 0.28, 0.25, 0.85), 2.2)
+            if bool(row.get("air", false)):
+                draw_line(center + Vector2(-10, 0), center + Vector2(10, 0), Color(0.25, 0.25, 0.35, 0.9), 2.0)

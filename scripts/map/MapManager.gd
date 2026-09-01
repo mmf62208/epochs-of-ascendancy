@@ -788,8 +788,9 @@ func get_strategic_region_name(region_id: int) -> String:
 		return ""
 	var r: Dictionary = _lookup_strategic_region_dict(region_id)
 	var n := str(r.get("name", "")).strip_edges()
-	if n.is_empty():
-		return "Strategic Region %d" % region_id
+	# Never invent "Strategic Region N" placeholders (seas were labeled that on hover).
+	if n.is_empty() or n.begins_with("Strategic Region "):
+		return ""
 	return n
 
 
