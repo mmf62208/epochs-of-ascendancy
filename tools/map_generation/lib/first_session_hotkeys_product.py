@@ -374,6 +374,26 @@ def build_first_session_hotkeys_product(
             and "_left_pan_active" in ren
             and "LEFT_PAN_SLOP_PX" in ren
         )
+        dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
+        wiring["close_does_not_cull"] = (
+            "_force_all_province_nodes_visible" in dismiss_fn
+            and "_clear_viewport_culling" in dismiss_fn
+        )
+        wiring["search_i_not_stolen"] = (
+            "func _gui_text_field_has_focus" in ren
+            and "_gui_text_field_has_focus()" in input_fn
+        )
+        wiring["g_not_self_path"] = (
+            "func _corridor_front_target_for_tag" in ren
+            and "710173" in _slice_func(ren, "_corridor_front_target_for_tag")
+            and "target == source" in _slice_func(ren, "_request_hang_safe_supply_corridor")
+        )
+        wiring["end_tokyo_chi_pad"] = "Vector2(1100.0, 800.0)" in _slice_func(ren, "_focus_asia_view")
+        wiring["open_fight_sheet"] = (
+            "func _open_fight_from_formation_id" in ren
+            and "Open fight" in ren
+            and "start_land_battle" in _slice_func(ren, "_try_execute_province_attack")
+        )
         wiring["wheel_no_full_fill"] = (
             bool(light_fn)
             and "_refresh_province_fill_colors" not in light_fn

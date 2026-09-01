@@ -9,6 +9,14 @@ static func lines_for(formation: Object) -> PackedStringArray:
 	var lines: PackedStringArray = PackedStringArray()
 	if formation == null:
 		return lines
+	# Promote Fill · TOE above XP/plan so the fold clip still shows equipment (Play P0).
+	var comp_early: Dictionary = LandCombatPower.composition_from_formation(formation)
+	var fold := _fill_toe_fold_line(formation, comp_early)
+	if fold.is_empty():
+		fold = _fill_percent_line(formation)
+	if fold.is_empty():
+		fold = "Fill 100% · TOE —"
+	lines.append(fold)
 	var xp := 48.0
 	if "combat_experience" in formation:
 		xp = float(formation.get("combat_experience"))
@@ -46,16 +54,6 @@ static func lines_for(formation: Object) -> PackedStringArray:
 			lines.append("CAS assigned · Unassign")
 		else:
 			lines.append("CAS unassigned · Assign")
-	var comp: Dictionary = LandCombatPower.composition_from_formation(formation)
-	if bool(comp.get("has_composition", false)) or float(comp.get("armor", 0.0)) > 0.001:
-		# Fold: Fill + TOE first. Speed / Armor / Men / Width / Fuel live on tooltip.
-		var fold := _fill_toe_fold_line(formation, comp)
-		if not fold.is_empty():
-			lines.append(fold)
-	else:
-		var fill_only := _fill_percent_line(formation)
-		if not fill_only.is_empty():
-			lines.append(fill_only)
 	if "last_manpower_loss" in formation:
 		var men_l := int(formation.get("last_manpower_loss"))
 		if men_l > 0 and "last_equip_loss_plain" not in formation:
@@ -161,7 +159,10 @@ static func _fill_ratio_for(formation: Object) -> float:
 static func _fill_percent_line(formation: Object) -> String:
 	var fill := _fill_ratio_for(formation)
 	if fill < 0.0:
-		return ""
+		if formation != null and "strength" in formation:
+			fill = clampf(float(formation.get("strength")), 0.0, 2.0)
+		else:
+			fill = 1.0
 	return "Fill %.0f%%" % (fill * 100.0)
 
 

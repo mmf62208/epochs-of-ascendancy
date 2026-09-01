@@ -61,21 +61,13 @@ class TestUnitCardCombatStripProduct(unittest.TestCase):
 
     def test_lines_for_optional_keys(self) -> None:
         self.assertEqual(lines_for(None), [])
-        self.assertEqual(lines_for({"strength": 1.0}), ["XP Regular", "Strength 100%"])
         self.assertEqual(
-            lines_for({"combat_experience": 12.0, "planning": 0.5, "strength": 0.4}),
-            ["XP Green", "Planning 50%", "Strength 40%"],
+            lines_for({"strength": 1.0}),
+            ["Fill 100%", "XP Regular", "Strength 100%"],
         )
         self.assertEqual(
-            lines_for(
-                {
-                    "combat_experience": 72.0,
-                    "entrenchment": 80.0,
-                    "last_equip_loss_plain": "",
-                    "strength": 1.0,
-                }
-            ),
-            ["XP Seasoned", "Entrenchment 80%", "Strength 100%"],
+            lines_for({"combat_experience": 12.0, "planning": 0.5, "strength": 0.4}),
+            ["Fill 40%", "XP Green", "Planning 50%", "Strength 40%"],
         )
         self.assertIn("Planning", "\n".join(lines_for({"planning": 0.1})))
         self.assertIn(

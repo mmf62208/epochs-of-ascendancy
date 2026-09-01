@@ -62,7 +62,12 @@ def lines_for(formation: Any) -> List[str]:
             xp = float(data.get("combat_experience"))
         except (TypeError, ValueError):
             xp = DEFAULT_XP
-    out: List[str] = ["XP %s" % xp_band(xp)]
+    fold_first = fill_toe_fold_line(data)
+    if not fold_first:
+        fold_first = _fill_percent_line(data)
+    if not fold_first:
+        fold_first = "Fill 100% · TOE —"
+    out: List[str] = [fold_first, "XP %s" % xp_band(xp)]
     if "planning" in data:
         out.append("Planning %.0f%%" % _as_percent(data.get("planning")))
     if "entrenchment" in data:
@@ -97,9 +102,6 @@ def lines_for(formation: Any) -> List[str]:
             out.append("CAS assigned · Unassign")
         else:
             out.append("CAS unassigned · Assign")
-    fold = fill_toe_fold_line(data)
-    if fold:
-        out.append(fold)
     if bool(data.get("is_training")):
         try:
             prog = float(data.get("training_progress", 0.0) or 0.0)
@@ -129,6 +131,14 @@ def lines_for(formation: Any) -> List[str]:
 
 def _fill_percent_line(data: Mapping[str, Any]) -> str:
     if "toe_fill" not in data and data.get("fill_percent") is None:
+        if data.get("strength") is not None:
+            try:
+                st = float(data.get("strength") or 0.0)
+            except (TypeError, ValueError):
+                st = 1.0
+            if st <= 1.5:
+                st *= 100.0
+            return "Fill %.0f%%" % max(0.0, min(150.0, st))
         return ""
     try:
         fill_pct = float(data.get("toe_fill") if data.get("toe_fill") is not None else 0.0) * 100.0
@@ -284,7 +294,7 @@ def build_unit_card_combat_strip_product(*, check_wiring: bool = True) -> Dict[s
 
     bare = {"strength": 1.0}
     bare_lines = lines_for(bare)
-    bare_ok = bare_lines == ["XP Regular", "Strength 100%"]
+    bare_ok = bare_lines[0].startswith("Fill") and "XP Regular" in bare_lines and "Strength 100%" in bare_lines
     wiring["default_xp_strength"] = bare_ok
     (passes if bare_ok else fails).append("default_xp_strength")
 
@@ -309,6 +319,7 @@ def build_unit_card_combat_strip_product(*, check_wiring: bool = True) -> Dict[s
     }
     full_lines = lines_for(full)
     expected_full = [
+        "Fill 87%",
         "XP Veteran",
         "Planning 45%",
         "Entrenchment 30%",
@@ -355,7 +366,7 @@ def build_unit_card_combat_strip_product(*, check_wiring: bool = True) -> Dict[s
     speed_in_fold = any("Speed" in ln for ln in fold_lines)
     width_in_fold = any(ln.startswith("Width") or "Width " in ln and "Fuel" in ln for ln in fold_lines)
     fold_ok = (
-        fill_idx >= 0
+        fill_idx == 0
         and toe_idx >= 0
         and fill_idx <= toe_idx
         and "80%" in fold_join

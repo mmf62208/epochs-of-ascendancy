@@ -91,14 +91,27 @@ func _resolve_search_pid(q: String) -> int:
 	if _names.has(q):
 		return int(_names[q])
 	# Prefer exact capital aliases (Berlin / Paris / Roma / Tokyo / London).
-	for name_key in _names.keys():
-		if str(name_key) == q:
-			return int(_names[name_key])
+	const CAPITALS := {
+		"berlin": 710300,
+		"paris": 710707,
+		"roma": 710963,
+		"rome": 710963,
+		"tokyo": 903995,
+		"london": 711414,
+	}
+	if CAPITALS.has(q):
+		return int(CAPITALS[q])
+	for cap_key in CAPITALS.keys():
+		if str(cap_key).begins_with(q) and q.length() >= 3:
+			return int(CAPITALS[cap_key])
+	var prefix_pid := -1
 	for name_key in _names.keys():
 		var nk := str(name_key)
-		if nk.begins_with(q) or q in nk:
+		if nk.begins_with(q):
 			return int(_names[name_key])
-	return -1
+		if prefix_pid < 0 and q in nk:
+			prefix_pid = int(_names[name_key])
+	return prefix_pid
 
 
 func select_province_by_id(pid: int) -> void:

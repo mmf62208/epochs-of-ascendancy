@@ -120,6 +120,11 @@ class TestFirstSessionHotkeysProduct(unittest.TestCase):
             "no_const_preload_optional_layers",
             "living_diplomacy_api",
             "living_campaign_pick_api",
+            "close_does_not_cull",
+            "search_i_not_stolen",
+            "g_not_self_path",
+            "end_tokyo_chi_pad",
+            "open_fight_sheet",
         ):
             self.assertTrue(p.get("wiring", {}).get(key), msg=(key, p.get("wiring"), p.get("fail")))
 
