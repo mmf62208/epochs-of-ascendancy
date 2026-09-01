@@ -13,7 +13,9 @@ from unit_card_combat_strip_product import (  # noqa: E402
     bbcode_for,
     build_unit_card_combat_strip_product,
     day_label_extras,
+    fill_toe_fold_line,
     lines_for,
+    tooltip_lines_for,
     unit_card_combat_strip_integrity,
     xp_band,
 )
@@ -31,7 +33,12 @@ class TestUnitCardCombatStripProduct(unittest.TestCase):
             "full_strip",
             "null_empty",
             "day_label_extras",
+            "stockpile_toe_line",
+            "fold_fill_toe_before_stats",
+            "tooltip_speed_width",
             "gd_strip",
+            "gd_stockpile_toe",
+            "gd_fold_fill_toe_tooltip_stats",
             "gd_bubble_cas_p",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
@@ -93,12 +100,49 @@ class TestUnitCardCombatStripProduct(unittest.TestCase):
         self.assertEqual(day_label_extras({"cas_def": 0.1, "planning_used": True}), "CAS P")
         self.assertEqual(day_label_extras({"planning_used": False}), "")
 
+    def test_fold_promotes_fill_and_toe(self) -> None:
+        land = {
+            "strength": 1.0,
+            "toe_fill": 0.80,
+            "equipment": {"infantry_equipment": 80, "tanks": 12},
+            "speed": 4.0,
+            "armor": 0.12,
+            "manpower": 10000,
+            "width": 9.0,
+            "fuel_level": 0.7,
+        }
+        fold = lines_for(land)
+        text = "\n".join(fold)
+        self.assertIn("Fill 80%", text)
+        self.assertIn("TOE", text)
+        self.assertIn("infantry 80", text)
+        self.assertIn("tanks 12", text)
+        self.assertTrue(
+            text.find("Fill") <= text.find("TOE"),
+            msg=text,
+        )
+        self.assertNotIn("Speed", text)
+        self.assertNotIn("Width", text)
+        self.assertEqual(
+            fill_toe_fold_line(land),
+            "Fill 80% · TOE infantry 80 · tanks 12",
+        )
+        tips = tooltip_lines_for(land)
+        tip_text = "\n".join(tips)
+        self.assertIn("Speed 4.0", tip_text)
+        self.assertIn("Width", tip_text)
+        self.assertIn("Fuel", tip_text)
+        self.assertIn("Armor", tip_text)
+
     def test_gd_greps(self) -> None:
         path = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
         self.assertTrue(path.is_file())
         src = path.read_text(encoding="utf-8")
         self.assertIn("class_name UnitCardCombatStrip", src)
         self.assertIn("func lines_for", src)
+        self.assertIn("func tooltip_lines_for", src)
+        self.assertIn("_fill_toe_fold_line", src)
+        self.assertIn("Fill %.0f%%", src)
         self.assertIn("combat_experience", src)
         self.assertTrue(
             "last_equip_loss_plain" in src or "Planning" in src,

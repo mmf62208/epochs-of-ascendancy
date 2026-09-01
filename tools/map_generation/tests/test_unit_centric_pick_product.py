@@ -35,7 +35,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         wiring = p.get("wiring") or {}
         for key in (
             "pin_before_hex",
-            "chip_before_capital_star",
+            "capital_star_before_chip",
             "hit_radius_48_floor_20",
             "pin_select_no_inspector",
             "selected_frame_hook",

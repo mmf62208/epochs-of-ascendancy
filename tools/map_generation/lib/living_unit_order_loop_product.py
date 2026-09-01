@@ -22,6 +22,8 @@ HOOK_GD = ROOT / "scripts" / "ui" / "PlayNextHook.gd"
 LEADER_MANAGER = ROOT / "scripts" / "leaders" / "LeaderManager.gd"
 STRIP_GD = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
 PEACE_WIN = ROOT / "scripts" / "ui" / "PeaceConferenceWindow.gd"
+MAIN_MENU = ROOT / "scripts" / "ui" / "MainMenu.gd"
+TITLE_BOOT = ROOT / "scripts" / "ui" / "LivingTitleBoot.gd"
 GDATA_GD = ROOT / "scripts" / "autoload" / "GameData.gd"
 INSIGHT_GD = ROOT / "scripts" / "map" / "ProvinceInsight.gd"
 TOP_BAR = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
@@ -40,6 +42,38 @@ ENG_CHANNEL = 950001
 ENG_NORTH_SEA = 950000
 MAGINOT_REGION = 100
 GER_CAPITAL = 710300
+
+
+def living_clock_skips_ai_starts(tm_src: str) -> bool:
+    """True when _maybe_run_ai_land_battle_starts returns before try_ai on the living clock."""
+    fn = _slice(tm_src, "_maybe_run_ai_land_battle_starts")
+    i = fn.find("_living_playtest_clock")
+    j = fn.find("try_ai_start_land_battles")
+    if j < 0:
+        return True
+    if i < 0:
+        return False
+    return i < j and "return" in fn[i:j]
+
+
+def living_clock_skips_occupation_ticks(tm_src: str) -> bool:
+    """True when the living F5 clock never ticks occupation unrest."""
+    maybe = _slice(tm_src, "_maybe_tick_occupation_unrest")
+    flush = _slice(tm_src, "_flush_sim_events")
+    clock = _slice(tm_src, "advance_living_playtest_days")
+    if "apply_occupation_daily_tick_live" not in maybe:
+        return True
+    if "_maybe_tick_occupation_unrest" not in flush:
+        return True
+    if "occupation_tick_n" not in clock:
+        return True
+    i = maybe.find("_living_playtest_clock")
+    j = maybe.find("apply_occupation_daily_tick_live")
+    if j < 0:
+        return True
+    if i >= 0 and i < j and "return" in maybe[i:j]:
+        return True
+    return False
 
 
 def _slice(src: str, func_name: str) -> str:
@@ -93,6 +127,8 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "_station_world_major_oob_chips" in park
         and "_station_eng_channel_fleet" in park
         and "_station_ger_maginot_air_wing" in park
+        and "_station_world_major_air_chips" in park
+        and "_station_world_major_fleet_chips" in park
     )
     wiring["park_maginot"] = park_ok
     (passes if park_ok else fails).append("park_maginot")
@@ -137,14 +173,24 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     mm = MAP_MANAGER.read_text(encoding="utf-8") if MAP_MANAGER.is_file() else ""
     hook = HOOK_GD.read_text(encoding="utf-8") if HOOK_GD.is_file() else ""
     choke_fn = _slice(mm, "flag_naval_choke")
+    live_choke = _slice(mm, "living_choke_state")
     choke_ok = (
         bool(choke_fn)
         and "has_strategic_chokepoint" in choke_fn
         and "get_chokepoint_or_river_supply_bonus" in choke_fn
         and "choke flagged" in choke_fn
+        and bool(live_choke)
+        and "off-station" in live_choke
+        and "supply bite" in live_choke
+        and "0.85" in live_choke
     )
     g_flag = "flag_naval_choke" in _slice(ren, "_request_hang_safe_supply_corridor")
-    next_choke = "choke_flag" in hook and "fleet_choke" in hook
+    next_choke = (
+        "choke_flag" in hook
+        and "fleet_choke" in hook
+        and "living_choke_state" in hook
+        and "stationed_province_id" in _slice(hook, "apply")
+    )
     wiring["choke_flag"] = choke_ok and g_flag and next_choke
     (passes if wiring["choke_flag"] else fails).append("choke_flag")
 
@@ -157,13 +203,39 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and str(GER_CAPITAL) in wing_fn
         and "assign_air_wing_to_region" in wing_fn
         and "func assign_air_wing_to_region" in lm
+        and "func unassign_air_wing" in lm
         and "func land_battle_cas_power" in bm
         and "assigned_region_id" in _slice(bm, "_land_battle_cas")
         and "range" in strip
         and "fuel" in strip
+        and "Unassign" in strip
+        and "Assign CAS" in _slice(ren, "_show_unit_detail_popup")
+        and "Unassign CAS" in _slice(ren, "_show_unit_detail_popup")
+        and "assign_cas" in hook
+        and "unassign_cas" in hook
+        and "NEXT assign CAS" in harness
+        and "NEXT unassign CAS" in harness
+        and "Channel off-station supply bite" in harness
+        and "NEXT stationed Channel fleet" in harness
     )
     wiring["air_region_cas"] = wing_ok
     (passes if wing_ok else fails).append("air_region_cas")
+
+    air8 = _slice(ren, "_station_world_major_air_chips")
+    nav8 = _slice(ren, "_station_world_major_fleet_chips")
+    tags8 = ("GER", "FRA", "ENG", "USA", "SOV", "ITA", "JAP", "POL")
+    air8_ok = (
+        bool(air8)
+        and "air" in air8
+        and all(t in air8 for t in tags8)
+        and bool(nav8)
+        and "naval" in nav8
+        and all(t in nav8 for t in tags8)
+        and str(ENG_CHANNEL) in nav8
+        and str(GER_CAPITAL) in air8
+    )
+    wiring["world_oob_air_naval"] = air8_ok
+    (passes if air8_ok else fails).append("world_oob_air_naval")
 
     gdata = GDATA_GD.read_text(encoding="utf-8") if GDATA_GD.is_file() else ""
     peace_win = PEACE_WIN.read_text(encoding="utf-8") if PEACE_WIN.is_file() else ""
@@ -172,8 +244,14 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     peace_ok = (
         "func apply_peace_conference_settlement_live" in gdata
         and "apply_occupation_policy_live" in _slice(gdata, "apply_peace_conference_settlement_live")
+        and "func apply_occupation_daily_tick_live" in gdata
         and "func apply_living_transfer" in peace_win
+        and "func open_living_sheet" in peace_win
+        and "func apply_from_sheet" in peace_win
         and "apply_peace_conference_settlement_live" in peace_win
+        and "DisplayServer.get_name() == \"headless\"" in _slice(peace_win, "open_living_sheet")
+        and "open_living_sheet" in apply_slice
+        and "apply_peace_conference_settlement_live" not in apply_slice
         and "apply_war_goal_justify" in apply_slice
         and "war_goal_justify_day" not in apply_slice
         and "apply_war_goal_execute" in apply_slice
@@ -182,10 +260,15 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "occupation_unrest" in hook
         and "set_occupation_overlay_visible" in hook
         and "build_occupation_visual_chip_bbcode" in insight
-        and "apply_peace_conference_settlement_live" in harness
+        and "apply_from_sheet" in harness
+        and "peace conference opened" in harness
         and "peace transfer owner" in harness
         and "occupation resistance" in harness
         and "0.65" in harness
+        and "occupation unrest tick" in harness
+        and "func _maybe_tick_occupation_unrest" in tm
+        and "apply_occupation_daily_tick_live" in _slice(tm, "_maybe_tick_occupation_unrest")
+        and not living_clock_skips_occupation_ticks(tm)
     )
     wiring["peace_occupation"] = peace_ok
     (passes if peace_ok else fails).append("peace_occupation")
@@ -216,6 +299,8 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     tm_src = TIME_MANAGER.read_text(encoding="utf-8") if TIME_MANAGER.is_file() else ""
     top_bar = TOP_BAR.read_text(encoding="utf-8") if TOP_BAR.is_file() else ""
     runner = TEST_RUNNER.read_text(encoding="utf-8") if TEST_RUNNER.is_file() else runner
+    menu = MAIN_MENU.read_text(encoding="utf-8") if MAIN_MENU.is_file() else ""
+    title = TITLE_BOOT.read_text(encoding="utf-8") if TITLE_BOOT.is_file() else ""
     nation_ok = (
         "func boot_living_player" in lm
         and "LIVING_PLAYER_TAGS" in lm
@@ -230,6 +315,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "tech_done" in apply_slice
         and "EOA_PLAYER_TAG" in runner
         and "EOA_START_YEAR" in runner
+        and 'setup_solo_play("GER")' in runner
         and "boot_living_player" in harness
         and "boot_living_era" in harness
         and "NEXT tech_done opens research" in harness
@@ -239,9 +325,77 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "func _living_player_tag" in hook
         and "get_player_country_tag" in _slice(hook, "_living_player_tag")
         and "recommend(_player_tag())" in ren
+        and "func apply_living_campaign_pick" in menu
+        and "func living_campaign_pick_facts" in menu
+        and "LIVING_CC_NATIONS" in menu
+        and '"GER"' in menu
+        and '"ENG"' in menu
+        and '"FRA"' in menu
+        and '"JAP"' in menu
+        and "1918" in menu
+        and "2026" in menu
+        and "CAMPAIGN" in menu
+        and "boot_living_player" in _slice(menu, "apply_living_campaign_pick")
+        and "boot_living_era" in _slice(menu, "apply_living_campaign_pick")
+        and "CC campaign pick JAP 2026" in harness
+        and "CC campaign pick FRA 1918" in harness
+        and "CC unknown pick defaults GER 1936" in harness
+        and "restored default GER Maginot player tag" in harness
+        and bool(title)
+        and "func should_show_living_title" in title
+        and "func apply_living_title_boot" in title
+        and "EOA_SKIP_TITLE" in title
+        and "EOA_UNIT_ORDER_QA" in title
+        and "headless" in title
+        and "load_game_detailed" in title
+        and "Begin ·" in title
+        and '"USA"' in title
+        and "func _show_living_title_boot" in runner
+        and "should_show_living_title" in runner
+        and "title boot skipped headless" in harness
+        and "title boot new ENG 1918" in harness
     )
     wiring["nation_era_next"] = nation_ok
     (passes if nation_ok else fails).append("nation_era_next")
+
+    map_pick_fn = _slice(title, "apply_playable_country_from_province")
+    tag_fn = _slice(title, "playable_tag_from_province")
+    title_pick_fn = _slice(ren, "_try_living_title_map_pick")
+    map_sel_ok = (
+        bool(map_pick_fn)
+        and "apply_living_title_boot" in map_pick_fn
+        and "playable_tag_from_province" in map_pick_fn
+        and bool(tag_fn)
+        and "get_province" in tag_fn
+        and "owner_tag" in tag_fn
+        and "LIVING_TITLE_NATIONS" in tag_fn
+        and "MOUSE_FILTER_IGNORE" in title
+        and "select_from_province" in title
+        and bool(title_pick_fn)
+        and "select_from_province" in title_pick_fn
+        and "LivingTitleBoot" in title_pick_fn
+        and "_try_living_title_map_pick" in _slice(ren, "_unhandled_input")
+        and "map pick not playable CHI" in harness
+        and "map pick FRA land" in harness
+        and "map pick GER capital" in harness
+        and "map pick JAP land" in harness
+        and str(CHI_FRONT) in harness
+        and str(FRA_FRONT) in harness
+        and str(GER_CAPITAL) in harness
+        and str(JAP_FRONT) in harness
+        and "func living_diplomacy_from_province" in hook
+        and "func send_agent_to_province" in hook
+        and "func apply_living_trade" in hook
+        and "establish_network" in hook
+        and "create_offer" in hook
+        and "apply_vector_delta" in hook
+        and "map influence FRA" in harness
+        and "send agent to FRA" in harness
+        and "map trade FRA" in harness
+        and "_toast_living_diplomacy_pick" in ren
+    )
+    wiring["map_country_select"] = map_sel_ok
+    (passes if map_sel_ok else fails).append("map_country_select")
 
     clock_fn = _slice(tm_src, "advance_living_playtest_days")
     drain_fn = _slice(tm_src, "_drain_living_f5_flush")
@@ -276,7 +430,10 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "func _skip_quit_autosave" in save_src
         and "_skip_quit_autosave" in _slice(save_src, "_notification")
         and "clampi(int(days), 1, 20)" in clock_fn
-        and "_living_playtest_clock" in _slice(tm_src, "_maybe_run_ai_land_battle_starts")
+        and "try_ai_start_land_battles" in _slice(tm_src, "_maybe_run_ai_land_battle_starts")
+        and not living_clock_skips_ai_starts(tm_src)
+        and "ai_land_started_n" in clock_fn
+        and "ai_started_to_ids" in clock_fn
         and "_living_playtest_clock" in _slice(save_src, "_on_day_advanced_for_autosave")
         and "advance_living_playtest_days" in harness
         and "playtest clock advanced" in harness
@@ -293,6 +450,11 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "execute_province_assault" not in _slice(save_src, "living_playtest_saveload_roundtrip")
         and "living_playtest_saveload_roundtrip" in harness
         and "playtest clock save/load" in harness
+        and "playtest clock AI land start" in harness
+        and "ai_land_started_n" in harness
+        and "occupation_tick_n" in clock_fn
+        and not living_clock_skips_occupation_ticks(tm_src)
+        and "playtest clock occupation unrest tick" in harness
     )
     wiring["playtest_clock"] = clock_ok
     (passes if clock_ok else fails).append("playtest_clock")
@@ -364,6 +526,12 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     )
     wiring["pin_before_hex"] = pin_first
     (passes if pin_first else fails).append("pin_before_hex")
+    star_before = (
+        "_capital_star_pid_at" in spatial
+        and spatial.find("_capital_star_pid_at") < spatial.find("_try_open_unit_at_world")
+    )
+    wiring["capital_star_before_chip"] = star_before
+    (passes if star_before else fails).append("capital_star_before_chip")
 
     move = _slice(ren, "_try_move_selected_unit_to_province")
     move_ok = bool(move) and "enqueue_own_land_march" in move
@@ -380,9 +548,16 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     (passes if ctrl_ok else fails).append("ctrl_click_starts_battle")
 
     g_slice = ""
-    gi = ren.find("KEY_G")
+    input_i = ren.find("func _input")
+    unh_i = ren.find("func _unhandled_input")
+    input_fn = ren[input_i:unh_i] if input_i >= 0 and unh_i > input_i else ""
+    gi = input_fn.find("KEY_G")
     if gi >= 0:
-        g_slice = ren[gi : gi + 400]
+        g_slice = input_fn[gi : gi + 400]
+    else:
+        gi = ren.find("KEY_G")
+        if gi >= 0:
+            g_slice = ren[gi : gi + 400]
     g_request = "_request_hang_safe_supply_corridor" in g_slice
     g_no_sync_bfs = (
         "highlight_corridor_capital_to_selected" not in g_slice
@@ -427,6 +602,31 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     i_ok = i_no_setup and i_dismiss and esc_in_input and i_in_input
     wiring["i_hang_safe"] = i_ok
     (passes if i_ok else fails).append("i_hang_safe")
+
+    war_fn = _slice(ren, "show_first_session_war_path")
+    req_fn = _slice(ren, "_request_hang_safe_warloop_flow")
+    flow_fn = _slice(ren, "_deferred_budgeted_warloop_flow")
+    arm_fn = _slice(ren, "_arm_budgeted_flow_layer")
+    war_ok = (
+        bool(war_fn)
+        and "_request_hang_safe_warloop_flow" in war_fn
+        and "_setup_strategic_flow_layer(" not in war_fn
+        and "preview_player_route()" not in war_fn
+        and bool(req_fn)
+        and "call_deferred" in req_fn
+        and "_deferred_budgeted_warloop_flow" in req_fn
+        and "preview_player_route()" not in req_fn
+        and bool(flow_fn)
+        and "find_land_path" in flow_fn
+        and "preview_player_route()" not in flow_fn
+        and "get_contested_provinces" not in flow_fn
+        and "_setup_strategic_flow_layer(" not in flow_fn
+        and bool(arm_fn)
+        and "setup_budgeted" in arm_fn
+        and "get_contested_provinces" not in arm_fn
+    )
+    wiring["warloop_hang_safe"] = war_ok
+    (passes if war_ok else fails).append("warloop_hang_safe")
 
     owner_fn = _slice(ren, "_on_map_province_data_changed")
     post_fn = _slice(ren, "_assault_post_ui_light")

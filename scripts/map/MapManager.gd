@@ -652,6 +652,71 @@ func flag_naval_choke(pid: int) -> Dictionary:
 	return result
 
 
+## On-station fleet holds the strait (full choke bonus). Off-station bites supply.
+## Formation scan cap 48 — never walk the 3520 board.
+func living_choke_state(pid: int = 950001, tag: String = "ENG") -> Dictionary:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		t = "ENG"
+	var flagged: Dictionary = flag_naval_choke(pid)
+	var out := {
+		"ok": bool(flagged.get("ok", false)),
+		"pid": int(pid),
+		"name": str(flagged.get("name", "")),
+		"on_station": false,
+		"bite": false,
+		"bonus": 1.0,
+		"held_bonus": float(flagged.get("bonus", 1.0)),
+		"fid": "",
+		"sentence": str(flagged.get("sentence", "")),
+		"tag": t,
+	}
+	if not bool(out.get("ok", false)):
+		return out
+	var held := float(out.get("held_bonus", 1.18))
+	if held < 1.001:
+		held = 1.18
+	var bite_mult := 0.85
+	var on := false
+	var fid := ""
+	if typeof(LeaderManager) != TYPE_NIL and ("formations" in LeaderManager):
+		var forms: Variant = LeaderManager.formations
+		if typeof(forms) == TYPE_DICTIONARY:
+			var scanned := 0
+			for key in (forms as Dictionary):
+				if scanned >= 48:
+					break
+				scanned += 1
+				var f: Object = (forms as Dictionary)[key]
+				if f == null:
+					continue
+				if str(f.get("country_tag")).strip_edges().to_upper() != t:
+					continue
+				var ft := str(f.formation_type) if "formation_type" in f else ""
+				if ft != "fleet" and ft != "task_force" and ft != "ship":
+					continue
+				if fid.is_empty() and "formation_id" in f:
+					fid = str(f.formation_id)
+				var sp := int(f.get("stationed_province_id")) if "stationed_province_id" in f else -1
+				if sp == int(pid):
+					on = true
+					if "formation_id" in f:
+						fid = str(f.formation_id)
+					break
+	out["on_station"] = on
+	out["bite"] = not on
+	out["fid"] = fid
+	out["bonus"] = held if on else bite_mult
+	var pname := str(out.get("name", "Channel"))
+	if pname.is_empty():
+		pname = "Channel"
+	if on:
+		out["sentence"] = "%s held (supply ×%.2f)" % [pname, held]
+	else:
+		out["sentence"] = "%s off-station · supply bite ×%.2f" % [pname, bite_mult]
+	return out
+
+
 func has_strategic_chokepoint(pid: int) -> bool:
 	if pid in _naval_chokepoint_ids:
 		return true
@@ -1198,18 +1263,9 @@ func prefer_capital_province_at(world_pos: Vector2, primary_hit: int) -> int:
 			best_cap = cap_id
 	if best_cap <= 0:
 		return primary_hit
-	if primary_hit < 0:
-		return best_cap
-	var p: Province = _provinces.get(primary_hit)
-	if p == null or bool(p.is_sea):
-		return best_cap
-	if best_cap == primary_hit:
-		return primary_hit
-	var hit_c: Vector2 = _centroids.get(primary_hit, Vector2.ZERO)
-	var d_hit := world_pos.distance_squared_to(hit_c) if hit_c != Vector2.ZERO else INF
-	if best_d < d_hit:
-		return best_cap
-	return primary_hit
+	# Gold-star disk wins even when the click sits on a neighbouring borough
+	# polygon (London 711414 over Wandsworth) or a colocated chip hex.
+	return best_cap
 
 
 func _pid_is_national_capital(pid: int) -> bool:

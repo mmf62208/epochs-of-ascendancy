@@ -13,6 +13,8 @@ const _DomainOpsOverlayLayerScr = preload("res://scripts/map/DomainOpsOverlayLay
 const _LeaderStationOverlayLayerScr = preload("res://scripts/map/LeaderStationOverlayLayer.gd")
 const _UnitChipTextScr = preload("res://scripts/map/UnitChipText.gd")
 const _ConstructionProgressOverlayLayerScr = preload("res://scripts/map/ConstructionProgressOverlayLayer.gd")
+const _FactoryStatusLayerScr = preload("res://scripts/map/FactoryStatusLayer.gd")
+const _AgentPresenceLayerScr = preload("res://scripts/map/AgentPresenceLayer.gd")
 const RoutePackQRScr = preload("res://scripts/ui/RoutePackQR.gd")
 const _SFX_PATHS := {
 	"select": "res://Sound FX Starter Pack Vol. 1/UI & Menus/Select.wav",
@@ -340,6 +342,8 @@ var _land_battle_bubble_layer: Node2D = null
 var _domain_ops_layer = null
 var _leader_station_layer = null
 var _construction_progress_layer = null
+var _factory_status_layer = null
+var _agent_presence_layer = null
 #endregion
 #region Perf profile (gap-closure Phase 1)
 @export var enable_perf_profile: bool = false
@@ -986,6 +990,15 @@ func _input(event: InputEvent) -> void:
 			_apply_home_key(event.shift_pressed)
 			get_viewport().set_input_as_handled()
 			return
+		if event.keycode == KEY_END:
+			ensure_world_navigation_ready()
+			_focus_asia_view()
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_G and not event.ctrl_pressed and not event.alt_pressed:
+			_request_hang_safe_supply_corridor()
+			get_viewport().set_input_as_handled()
+			return
 		if event.keycode == KEY_ESCAPE and _inspector_stack_blocking_input():
 			_dismiss_inspector_and_restore_input()
 			get_viewport().set_input_as_handled()
@@ -1009,17 +1022,40 @@ func _input(event: InputEvent) -> void:
 			)
 			get_viewport().set_input_as_handled()
 			return
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton:
 		# Wheel zoom even when GUI has focus on non-scroll chrome (legend can steal wheel —
 		# if mouse is over map / empty space, always zoom). ScrollContainers still get wheel
 		# when hovered via normal GUI order; we only force-zoom when not over a ScrollContainer.
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		if event.pressed and (
+			event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN
+		):
 			if _wheel_should_zoom_map():
 				var factor := (1.0 + zoom_speed * 1.35) if event.button_index == MOUSE_BUTTON_WHEEL_UP else (1.0 - zoom_speed * 1.35)
 				_zoom_toward_mouse(factor)
-				# NEVER call full _refresh_terrain_zoom_aware() per notch — that looped all
-				# 2665 province fills every wheel tick and made scroll feel broken/glitchy.
+				# NEVER call full _refresh_terrain_zoom_aware() / 3520 fill rebuild per notch.
 				_schedule_light_terrain_zoom_refresh()
+				get_viewport().set_input_as_handled()
+		elif event.button_index == MOUSE_BUTTON_MIDDLE or event.button_index == MOUSE_BUTTON_RIGHT:
+			# MMB/right-drag pan in _input so GUI focus cannot kill pan.
+			if MapViewInput.modal_blocks_map_nav(get_viewport()):
+				_is_middle_dragging = false
+			elif event.pressed:
+				_is_middle_dragging = true
+				_middle_drag_start = get_viewport().get_mouse_position()
+				_last_mouse_pos = _middle_drag_start
+				get_viewport().set_input_as_handled()
+			else:
+				_is_middle_dragging = false
+		elif event.button_index == MOUSE_BUTTON_LEFT and not event.ctrl_pressed and not event.shift_pressed:
+			if MapViewInput.modal_blocks_map_nav(get_viewport()):
+				_left_pan_armed = false
+				_left_pan_active = false
+			elif event.pressed and _wheel_should_zoom_map():
+				_left_pan_armed = true
+				_left_pan_active = false
+				_left_press_screen = get_viewport().get_mouse_position()
+				_last_mouse_pos = _left_press_screen
+			elif not event.pressed and _left_pan_active:
 				get_viewport().set_input_as_handled()
 
 
@@ -1046,14 +1082,8 @@ func _refresh_terrain_zoom_light() -> void:
 	# Pass 7: resync unit counter scales + LOD visibility without full icon rebuild.
 	_sync_unit_counter_scales(z)
 	_sync_unit_counter_visibility(z)
-	# Bucketed fill repaint only when zoom crossed a band (existing system).
-	if fill_zoom_bucket_size > 0.0:
-		var bucket := int(floor(z / fill_zoom_bucket_size))
-		if bucket != _fill_color_zoom_bucket:
-			_fill_color_zoom_bucket = bucket
-			_fill_zoom_at_last_paint = z
-			# Deferred so this wheel event returns immediately.
-			call_deferred("_refresh_province_fill_colors")
+	# Do not rebuild 3520 fills on a wheel notch — LOD/counters only. Fill bucket
+	# updates happen on mapmode change / boot, not per zoom tick (Rhine chip carpet hang).
 
 
 func _wheel_should_zoom_map() -> bool:
@@ -1205,7 +1235,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			terrain_layer_stack.toggle_vegetation()
 			get_viewport().set_input_as_handled()
 			return
-		if event.keycode == KEY_S and terrain_layer_stack:  # S = persistent peak snow (NASA/DEM mask; seasonal snow via WeatherOverlay)
+		if event.keycode == KEY_S and event.shift_pressed and terrain_layer_stack:
+			# Bare S is WASD pan south. Snow is Shift+S so pan stays live.
 			terrain_layer_stack.toggle_snow_mask()
 			var on := terrain_layer_stack.is_snow_mask_user_visible() if terrain_layer_stack.has_method("is_snow_mask_user_visible") else false
 			_show_map_layer_toast("Peak snow (persistent): %s — Alps/Himalayas/Arctic; seasonal snow via weather later" % ("ON" if on else "OFF"))
@@ -1303,28 +1334,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				_left_pan_armed = false
 				_left_pan_active = false
 				return
-			var world_pos_arm := _screen_to_world(get_viewport().get_mouse_position())
-			# Living chip wins over a colocated gold star (London/DC/Roma OOB). Nested
-			# capital snap still runs on hex pick when this press missed a unit.
-			# Chip click stays immediate so unit cards do not wait on mouse-up.
-			if _try_open_unit_at_world(world_pos_arm):
-				_left_pan_armed = false
-				_left_pan_active = false
-				get_viewport().set_input_as_handled()
-				return
-			# Nested capitals: gold-star snap for hex pick (City of London / DC / Roma)
-			# when the click missed a unit chip. Ctrl/Shift keep immediate assault/debug.
-			if (
-				not event.ctrl_pressed
-				and not event.shift_pressed
-				and _capital_star_pid_at(world_pos_arm) > 0
-			):
-				_left_pan_armed = true
-				_left_pan_active = false
-				_left_press_screen = get_viewport().get_mouse_position()
-				_last_mouse_pos = _left_press_screen
-				return
 			# Ctrl/Shift keep immediate pick (assault / debug / engineers).
+			# Plain press arms pan so Rhine chip-carpet drags pan instead of jump-zoom.
 			if not event.ctrl_pressed and not event.shift_pressed:
 				_left_pan_armed = true
 				_left_pan_active = false
@@ -1341,8 +1352,31 @@ func _unhandled_input(event: InputEvent) -> void:
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				return
 		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
-		# Prefer unit/navy/armor icons when the click lands on a counter (open unit detail).
-		if event.pressed and _try_open_unit_at_world(world_pos):
+		# Capital gold star wins over a colocated chip (Berlin Air Wing, London boroughs).
+		# Star click inspects the capital and does not arm MARCH.
+		if not event.shift_pressed:
+			var star_pid := _capital_star_pid_at(world_pos)
+			if star_pid > 0 and provinces.has(star_pid):
+				if not selected_formation_id.is_empty():
+					selected_formation_id = ""
+					_refresh_selected_unit_chip()
+				var star_province: Province = provinces[star_pid] as Province
+				var star_node: Node2D = _province_node(star_pid)
+				if _try_living_title_map_pick(star_pid):
+					get_viewport().set_input_as_handled()
+					return
+				if event.ctrl_pressed:
+					if _try_execute_province_attack(star_pid, star_province):
+						get_viewport().set_input_as_handled()
+						return
+				_toast_living_diplomacy_pick(star_pid)
+				_select_province(star_province, star_node)
+				_center_camera_on_province(star_pid, "soft")
+				show_info_panel(star_province)
+				get_viewport().set_input_as_handled()
+				return
+		# Chip after star (pin-before-hex still holds for Maginot / non-capital hexes).
+		if _try_open_unit_at_world(world_pos):
 			get_viewport().set_input_as_handled()
 			return
 		var pid := -1
@@ -1359,6 +1393,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 		if pid >= 0 and provinces.has(pid):
+			if _try_living_title_map_pick(pid):
+				get_viewport().set_input_as_handled()
+				return
+			_toast_living_diplomacy_pick(pid)
 			_selected_coarse_id = 0  # clear any coarse when detailed province selected
 			var resolved_province: Province = provinces[pid] as Province
 			var resolved_node: Node2D = _province_node(pid)
@@ -1761,6 +1799,9 @@ func _layout_info_panel_inner() -> void:
 	if info_panel == null or not (info_panel is Control):
 		return
 	var ip := info_panel as Control
+	if not ip.visible:
+		ip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return
 	ip.clip_contents = true
 	ip.mouse_filter = Control.MOUSE_FILTER_STOP
 	RetrowaveTheme.style_info_panel_flat(ip)
@@ -2260,6 +2301,9 @@ func _request_hang_safe_supply_corridor() -> void:
 		if typeof(DebugOverlay) != TYPE_NIL:
 			DebugOverlay.toast_map_debug(toast)
 		_show_inspector_toast(toast, 3.5)
+		var vp_g := get_viewport()
+		if vp_g != null:
+			vp_g.gui_release_focus()
 		call_deferred("_deferred_budgeted_supply_corridor", target)
 		return
 	_corridor_click_armed = true
@@ -12177,6 +12221,9 @@ func hide_info_panel() -> void:
 	_camera_nudge_gen += 1
 	if info_panel and info_panel is CanvasItem:
 		info_panel.visible = false
+		if info_panel is Control:
+			(info_panel as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+			(info_panel as Control).release_focus()
 	elif info_panel != null:
 		push_warning("MapRenderer: hide_info_panel called on non-CanvasItem (got " + str(info_panel.get_script() if info_panel.get_script() else info_panel.get_class()) + ")")
 	if _province_id_badge != null:
@@ -12223,6 +12270,9 @@ func _dismiss_inspector_and_restore_input() -> void:
 	var vp := get_viewport()
 	if vp != null:
 		vp.gui_release_focus()
+		# Re-enable map input in case a leftover Control ate unhandled events.
+		set_process_input(true)
+		set_process_unhandled_input(true)
 	print("MapRenderer: inspector Close restored input")
 
 
@@ -12524,6 +12574,8 @@ func _boot_political_map_complete() -> void:
 	_refresh_province_fill_colors(true)
 	_restore_land_poly_visibility()
 	_ensure_capital_stars_visible()
+	if _map_search != null and _map_search.has_method("rebuild_index"):
+		_map_search.call("rebuild_index")
 	var ol := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol != null and ol.has_method("queue_redraw"):
 		ol.queue_redraw()
@@ -12678,6 +12730,8 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 	_setup_domain_ops_layer()
 	_setup_leader_station_layer()
 	_setup_construction_progress_layer()
+	_setup_factory_status_layer()
+	_setup_agent_presence_layer()
 	_setup_agent_layer()
 	_setup_infrastructure_overlay_layer()
 	call_deferred("_setup_terrain_layer_stack")
@@ -13811,15 +13865,12 @@ func center_europe_in_world_view() -> void:
 	set_meta("full_world_underlay_active", true)
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam:
-		var focus := _resolve_europe_focus_center()
-		var frame := _resolve_europe_focus_rect(focus)
-		if fill_viewport_on_load:
-			fit_camera_to_bounds(frame, focus, MapCanvasConfig.EUROPE_VIEW_FILL_RATIO)
-		else:
-			cam.global_position = _apply_camera_bounds(focus)
-			cam.zoom = Vector2.ONE * (0.35 * MapCanvasConfig.THEATER_SCALE)
+		var frame := _resolve_europe_focus_rect(Vector2.ZERO)
+		var focus := frame.get_center()
+		# Always re-fit (not pan-only) so a zoom-out red void recovers on first Home.
+		fit_camera_to_bounds(frame, focus, MapCanvasConfig.EUROPE_VIEW_FILL_RATIO)
 	_clamp_camera_to_theater()
-	print("MapRenderer: centered on Europe (GIS-aware focus) inside world view")
+	print("MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view")
 
 
 ## Sync pan theater + underlay for GIS boards (equirect underlay, full Asia pan).
@@ -13831,54 +13882,110 @@ func _sync_theater_bounds_to_map_data() -> void:
 	_fit_background_to_bounds()
 
 
-func _resolve_europe_focus_center() -> Vector2:
-	# Capitals known on world_accurate (scaled by MapManager centroids if available).
-	var candidates: Array[int] = [710300, 710707, 711414, 710963]  # GER FRA ENG ITA
+func _centroid_for_pid(pid: int) -> Vector2:
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
-		for pid in candidates:
-			var c: Vector2 = MapManager.get_province_centroid(pid)
-			if c != Vector2.ZERO and c.length_squared() > 1.0:
-				return c
-	if province_centroids.has(710300):
-		return province_centroids[710300] as Vector2
-	# Fallback legacy Europe theater center (pre-GIS boards).
-	return MapCanvasConfig.europe_world_center()
+		var c: Vector2 = MapManager.get_province_centroid(pid)
+		if c != Vector2.ZERO and c.length_squared() > 1.0:
+			return c
+	if province_centroids.has(pid):
+		var pc: Vector2 = province_centroids[pid] as Vector2
+		if pc != Vector2.ZERO:
+			return pc
+	return Vector2.ZERO
 
 
-func _resolve_europe_focus_rect(center: Vector2) -> Rect2:
-	# ~continental Europe framing around focus (GIS world canvas units, post-scale).
-	var half := Vector2(2200.0, 1600.0) * 0.5
-	var r := Rect2(center - half, half * 2.0)
-	# Clamp into theater so fit_camera never frames outside the map.
+func _frame_rect_from_points(pts: Array[Vector2], min_pad: Vector2 = Vector2(280.0, 200.0)) -> Rect2:
+	if pts.is_empty():
+		return Rect2()
+	var min_p := pts[0]
+	var max_p := pts[0]
+	for p in pts:
+		min_p.x = minf(min_p.x, p.x)
+		min_p.y = minf(min_p.y, p.y)
+		max_p.x = maxf(max_p.x, p.x)
+		max_p.y = maxf(max_p.y, p.y)
+	var span := max_p - min_p
+	var pad := Vector2(
+		maxf(min_pad.x, span.x * 0.45),
+		maxf(min_pad.y, span.y * 0.45)
+	)
+	return Rect2(min_p - pad, (max_p + pad) - (min_p - pad))
+
+
+func _resolve_europe_focus_center() -> Vector2:
+	return _resolve_europe_focus_rect(Vector2.ZERO).get_center()
+
+
+func _resolve_europe_focus_rect(_center: Vector2) -> Rect2:
+	# Berlin + Paris + Rome — not first-nonzero (that can land on Scandinavia fallback).
+	var pids: Array[int] = [710300, 710707, 710963]
+	var pts: Array[Vector2] = []
+	for pid in pids:
+		var c := _centroid_for_pid(pid)
+		if c != Vector2.ZERO:
+			pts.append(c)
+	var r := _frame_rect_from_points(pts)
+	if r.size.x < 80.0 or r.size.y < 80.0:
+		var fb := _centroid_for_pid(710300)
+		if fb == Vector2.ZERO:
+			fb = MapCanvasConfig.europe_world_center()
+		r = Rect2(fb - Vector2(520, 380), Vector2(1040, 760))
 	var b := _current_theater_bounds
 	if b.size.x > 0.0:
-		r = r.intersection(b)
-		if r.size.x < 100.0 or r.size.y < 100.0:
-			r = b
+		var hit := r.intersection(b)
+		# Never replace a valid Europe frame with the full-world theater (void Home).
+		if hit.size.x >= 80.0 and hit.size.y >= 80.0:
+			r = hit
 	return r
 
 
+func _resolve_chi_capital_centroid() -> Vector2:
+	# Sparse CHI names are "CHN North" etc. Prefer a CHI-owned cell west of Tokyo.
+	var tokyo := _centroid_for_pid(903995)
+	var best := Vector2.ZERO
+	var best_d := INF
+	var owned: Array = []
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):
+		owned = MapManager.get_provinces_by_owner("CHI")
+	for pid_v in owned:
+		var c := _centroid_for_pid(int(pid_v))
+		if c == Vector2.ZERO:
+			continue
+		if tokyo != Vector2.ZERO and c.x >= tokyo.x:
+			continue
+		var d := c.distance_squared_to(tokyo) if tokyo != Vector2.ZERO else c.x
+		if d < best_d:
+			best_d = d
+			best = c
+	if best != Vector2.ZERO:
+		return best
+	for pid in [902496, 902487, 902505]:
+		var c2 := _centroid_for_pid(pid)
+		if c2 != Vector2.ZERO:
+			return c2
+	return Vector2.ZERO
+
+
 func _focus_asia_view() -> void:
-	# JAP capital / East Asia sample on world_accurate
-	var focus := Vector2.ZERO
-	var candidates: Array[int] = [903995, 903986, 904007, 903534]  # JAP hubs + SOV sample
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
-		for pid in candidates:
-			var c: Vector2 = MapManager.get_province_centroid(pid)
-			if c != Vector2.ZERO and c.length_squared() > 1.0:
-				focus = c
-				break
+	# Tokyo + a CHI capital — never first-nonzero that can land on empty USSR (903534).
+	var tokyo := _centroid_for_pid(903995)
+	var chi := _resolve_chi_capital_centroid()
+	var pts: Array[Vector2] = []
+	if tokyo != Vector2.ZERO:
+		pts.append(tokyo)
+	if chi != Vector2.ZERO:
+		pts.append(chi)
+	var frame := _frame_rect_from_points(pts, Vector2(360.0, 280.0))
+	var focus := frame.get_center() if frame.size.x > 80.0 else tokyo
 	if focus == Vector2.ZERO:
-		# East side of content bounds
 		var b := _current_theater_bounds
-		focus = Vector2(b.position.x + b.size.x * 0.78, b.position.y + b.size.y * 0.42)
-	var half := Vector2(2800.0, 2000.0) * 0.5
-	var frame := Rect2(focus - half, half * 2.0)
+		focus = Vector2(b.position.x + b.size.x * 0.82, b.position.y + b.size.y * 0.38)
+		frame = Rect2(focus - Vector2(700, 520), Vector2(1400, 1040))
 	if _current_theater_bounds.size.x > 0.0:
-		frame = frame.intersection(_current_theater_bounds)
-		if frame.size.x < 100.0:
-			frame = _current_theater_bounds
-	fit_camera_to_bounds(frame, focus, 0.9)
+		var hit := frame.intersection(_current_theater_bounds)
+		if hit.size.x >= 80.0 and hit.size.y >= 80.0:
+			frame = hit
+	fit_camera_to_bounds(frame, frame.get_center(), 0.9)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug("Map: Asia focus · Home=Europe · Shift+Home=full world")
 
@@ -14373,6 +14480,8 @@ func _calculate_centroid(points: PackedVector2Array) -> Vector2:
 
 
 func _get_province_color(province: Province) -> Color:
+	if _is_ice_ocean_visual(province) and _wants_clean_political_fills():
+		return ice_ocean_fill_color()
 	var base := _political_province_base_color(province)
 	var clean := _wants_clean_political_fills()
 	var c := _characterize_province_fill(base, province, _overlay_base_character_blend())
@@ -14502,7 +14611,26 @@ func _supply_depot_mix_amount() -> float:
 	return clampf(supply_depot_fill_blend, 0.12, 0.55)
 
 
+func _is_ice_ocean_visual(province: Province) -> bool:
+	if province == null:
+		return false
+	var pid := int(province.id)
+	if pid == 902133 or pid == 902134:
+		return true
+	var nm := str(province.name).strip_edges().to_lower()
+	if "antarctica" in nm or nm.begins_with("ata ") or nm == "ata region":
+		return true
+	return false
+
+
+static func ice_ocean_fill_color() -> Color:
+	# Pale ice / ocean — not ENG political red.
+	return Color(0.70, 0.82, 0.90, 1.0)
+
+
 func _political_province_base_color(province: Province) -> Color:
+	if _is_ice_ocean_visual(province):
+		return ice_ocean_fill_color()
 	var land_fallback := Color(0.34, 0.34, 0.41, 0.86)
 	var sea_fallback := Color(0.16, 0.33, 0.47, 0.88)
 	if province.owner_tag.is_empty() or not countries.has(province.owner_tag):
@@ -15301,6 +15429,7 @@ func _select_province(province: Province, node: Node2D) -> void:
 	_update_supply_legend_text()
 	_update_compare_hint_label()
 	_play_map_action_flair_select(province)
+	_toast_factory_shortage_if_starved(province.id)
 
 
 func _nudge_camera_after_panel(province_id: int, gen: int) -> void:
@@ -15638,6 +15767,8 @@ func show_info_panel(province: Province) -> void:
 		return
 	_layout_map_ui()
 	info_panel.visible = true
+	if info_panel is Control:
+		(info_panel as Control).mouse_filter = Control.MOUSE_FILTER_STOP
 	_layout_info_panel_inner()
 	# After panel is visible, nudge once so selection sits in the free map band.
 	# Dismiss bumps _camera_nudge_gen so a Close cannot leave this as a teleport.
@@ -15916,6 +16047,25 @@ func _capital_star_pid_at(world_pos: Vector2) -> int:
 
 
 ## Click navy/armor/infantry map counters → select unit for move/assault + detail card.
+func _toast_living_diplomacy_pick(pid: int) -> void:
+	var dip: Dictionary = PlayNextHook.living_diplomacy_from_province(pid, _player_tag())
+	if bool(dip.get("ok", false)):
+		_show_inspector_toast(str(dip.get("sentence", "Influence")), 3.5)
+
+
+## Title boot: click playable land/capital on the political map (panel stays a list too).
+func _try_living_title_map_pick(pid: int) -> bool:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
+	if boot == null:
+		return false
+	if boot.has_method("select_from_province"):
+		boot.call("select_from_province", pid)
+	return true
+
+
 func _try_open_unit_at_world(world_pos: Vector2) -> bool:
 	var fo := _pick_unit_formation_at_world(world_pos)
 	if fo == null:
@@ -16309,10 +16459,11 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		"Org %.0f%% · Str %.0f%% · Rdy %.0f%% · XP %.0f%%"
 		% [org_v * 100.0, str_v * 100.0, rdy_v * 100.0, xp_v * 100.0]
 	)
-	if fuel_v >= 0.0:
-		lines.append("Fuel: %.0f%%" % (fuel_v * 100.0))
 	if typeof(UnitCardCombatStrip) != TYPE_NIL:
 		lines.append_array(UnitCardCombatStrip.lines_for(formation))
+		var tips: PackedStringArray = UnitCardCombatStrip.tooltip_lines_for(formation)
+		if not tips.is_empty():
+			body.tooltip_text = "\n".join(tips)
 	if not fid.is_empty():
 		lines.append("ID: %s" % fid)
 	# Stack at this province (one pin; cycle via [ ] or card buttons).
@@ -16426,6 +16577,38 @@ func _show_unit_detail_popup(formation: Object) -> void:
 				_show_unit_detail_popup(formation)
 			)
 			cmd_row.add_child(as_btn)
+	var is_air := ftype == "air_wing" or ftype == "air_squadron" or ftype == "air_group"
+	if is_air and typeof(LeaderManager) != TYPE_NIL:
+		var air_rid := int(formation.get("assigned_region_id")) if "assigned_region_id" in formation else 0
+		if air_rid > 0 and LeaderManager.has_method("unassign_air_wing"):
+			var un_btn := Button.new()
+			un_btn.text = "Unassign CAS"
+			un_btn.focus_mode = Control.FOCUS_NONE
+			un_btn.tooltip_text = "Pull this wing off the land-fight region."
+			RetrowaveTheme.style_secondary_button(un_btn)
+			un_btn.pressed.connect(func() -> void:
+				LeaderManager.unassign_air_wing(fid)
+				_show_inspector_toast("CAS unassigned · %s" % name_s, 3.0)
+				_show_unit_detail_popup(formation)
+			)
+			cmd_row.add_child(un_btn)
+		elif air_rid <= 0 and LeaderManager.has_method("assign_air_wing_to_region"):
+			var cas_rid := 100
+			if pid >= 0 and provinces.has(pid):
+				var ap: Province = provinces[pid] as Province
+				if ap != null and "strategic_region_id" in ap and int(ap.strategic_region_id) > 0:
+					cas_rid = int(ap.strategic_region_id)
+			var cas_btn := Button.new()
+			cas_btn.text = "Assign CAS"
+			cas_btn.focus_mode = Control.FOCUS_NONE
+			cas_btn.tooltip_text = "Assign this wing's CAS to the land-fight region."
+			RetrowaveTheme.style_secondary_button(cas_btn)
+			cas_btn.pressed.connect(func() -> void:
+				LeaderManager.assign_air_wing_to_region(fid, cas_rid, "CAS")
+				_show_inspector_toast("CAS assigned · region %d" % cas_rid, 3.0)
+				_show_unit_detail_popup(formation)
+			)
+			cmd_row.add_child(cas_btn)
 
 	if stack_divs.size() > 1:
 		var stack_row := HBoxContainer.new()
@@ -18159,7 +18342,12 @@ func _sync_strategic_flow_lod(tier: int) -> void:
 
 func toggle_strategic_flow_overlay() -> bool:
 	show_strategic_flow_overlay = not show_strategic_flow_overlay
-	_setup_strategic_flow_layer()
+	if show_strategic_flow_overlay:
+		# C1: U-on never builds the full 3520 overlay on this frame.
+		_request_hang_safe_warloop_flow()
+	else:
+		remove_overlay_layer("StrategicFlowOverlay")
+		_strategic_flow_layer = null
 	return show_strategic_flow_overlay
 
 
@@ -18172,8 +18360,10 @@ func toggle_equipment_flow_glyphs() -> bool:
 			_strategic_flow_layer.equipment_flow_glyphs_enabled = show_equipment_flow_glyphs
 		if _strategic_flow_layer.has_method("refresh"):
 			_strategic_flow_layer.refresh()
+	elif show_strategic_flow_overlay:
+		# Overlay armed (WarLoop / U) but layer missing — budgeted path, never full setup.
+		_request_hang_safe_warloop_flow()
 	# Hang-class: I never builds the 3520-board flow overlay (sync or deferred).
-	# WarLoop may arm show_strategic_flow_overlay; U is the overlay surface.
 	return show_equipment_flow_glyphs
 
 
@@ -18297,10 +18487,76 @@ func show_first_session_war_path(country_tag: String = "") -> Dictionary:
 		lines.append(toast)
 		lines.append("WarLoop: B fronts · I flow · G corridor · Ctrl+click assault")
 		_map_mode_toolbar.call("set_fronts_legend", "\n".join(lines))
-	print("MapRenderer: WarLoop toast · %s · fronts=%d (no flow overlay — press I later)" % [tag, n_fronts])
-	# Do not build StrategicFlowOverlay here. Deferred setup still froze the next frame
-	# on world_accurate (get_contested_provinces + first _draw). I-toggle is the flow surface.
+	print("MapRenderer: WarLoop toast · %s · fronts=%d (budgeted flow next frame)" % [tag, n_fronts])
+	# C1: toast this frame; hop-capped capital→front corridor next frame. Never full overlay.
+	_request_hang_safe_warloop_flow()
 	return result
+
+
+## Shift+I / WarLoop / U-on: toast already shown; defer hop-capped corridor.
+func _request_hang_safe_warloop_flow() -> void:
+	show_equipment_flow_glyphs = true
+	show_strategic_flow_overlay = true
+	call_deferred("_deferred_budgeted_warloop_flow")
+
+
+## One hop-capped land BFS + centroid subset. Never preview_player_route / contested walk.
+func _deferred_budgeted_warloop_flow() -> void:
+	if not show_strategic_flow_overlay:
+		return
+	var tag := _player_tag()
+	var target := 0
+	if not _live_border_fronts_cache.is_empty():
+		var row0: Dictionary = _live_border_fronts_cache[0] if _live_border_fronts_cache[0] is Dictionary else {}
+		target = int(row0.get("from_province_id", 0))
+		if target <= 0:
+			target = int(row0.get("province_id", 0))
+	if target <= 0:
+		target = selected_province_id
+	var source := _cheap_corridor_source_for_tag(tag)
+	var path: Array = []
+	if source > 0 and target > 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("find_land_path"):
+		path = MapManager.find_land_path(source, target, tag, 40)
+	var cents: Dictionary = {}
+	var routes: Array = []
+	if path.size() >= 2:
+		for pid_v in path:
+			var pid := int(pid_v)
+			if province_centroids.has(pid):
+				cents[pid] = province_centroids[pid]
+		routes.append({"path": path, "sea": false, "trade": false})
+	elif source > 0 and target > 0:
+		if province_centroids.has(source):
+			cents[source] = province_centroids[source]
+		if province_centroids.has(target):
+			cents[target] = province_centroids[target]
+		if cents.size() >= 2:
+			routes.append({"path": [source, target], "sea": false, "trade": false})
+	elif source > 0 and province_centroids.has(source):
+		cents[source] = province_centroids[source]
+	_arm_budgeted_flow_layer(cents, routes)
+
+
+## Create/reuse the flow layer with only the budgeted corridor. No contested scan.
+func _arm_budgeted_flow_layer(centroids: Dictionary, routes: Array) -> void:
+	if not show_strategic_flow_overlay or container == null:
+		remove_overlay_layer("StrategicFlowOverlay")
+		_strategic_flow_layer = null
+		return
+	if _strategic_flow_layer == null or not is_instance_valid(_strategic_flow_layer):
+		_strategic_flow_layer = _StrategicFlowOverlayLayerScr.new()
+	if _strategic_flow_layer.has_method("setup_budgeted"):
+		_strategic_flow_layer.setup_budgeted(centroids, routes)
+	if "max_routes" in _strategic_flow_layer:
+		_strategic_flow_layer.max_routes = 4
+	if "show_equipment_flows" in _strategic_flow_layer:
+		_strategic_flow_layer.show_equipment_flows = true
+	if _strategic_flow_layer.has_method("set_equipment_flow_glyphs_enabled"):
+		_strategic_flow_layer.set_equipment_flow_glyphs_enabled(show_equipment_flow_glyphs)
+	elif "equipment_flow_glyphs_enabled" in _strategic_flow_layer:
+		_strategic_flow_layer.equipment_flow_glyphs_enabled = show_equipment_flow_glyphs
+	_sync_strategic_flow_lod(_map_lod_tier)
+	add_overlay_layer("StrategicFlowOverlay", _strategic_flow_layer, 4)
 
 
 func get_equipment_flow_glyph_query() -> Dictionary:
@@ -18464,6 +18720,38 @@ func toggle_leader_station_overlay() -> bool:
 	return show_leader_station_overlay
 
 
+func _setup_factory_status_layer() -> void:
+	if container == null:
+		remove_overlay_layer("FactoryStatus")
+		_factory_status_layer = null
+		return
+	if _factory_status_layer == null or not is_instance_valid(_factory_status_layer):
+		_factory_status_layer = _FactoryStatusLayerScr.new()
+	var centroids := province_centroids
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_centroids"):
+		centroids = MapManager.get_all_centroids()
+	if _factory_status_layer.has_method("setup"):
+		_factory_status_layer.setup(centroids, _player_tag())
+	add_overlay_layer("FactoryStatus", _factory_status_layer, 9)
+
+
+func _toast_factory_shortage_if_starved(pid: int) -> void:
+	if _factory_status_layer == null or not is_instance_valid(_factory_status_layer):
+		return
+	if not _factory_status_layer.has_method("get_marker"):
+		return
+	var row: Dictionary = _factory_status_layer.get_marker(pid)
+	if row.is_empty():
+		return
+	var key := str(row.get("missing_key", "")).strip_edges()
+	if key.is_empty():
+		return
+	var toast := "Factory · %s short · open production" % key
+	if typeof(DebugOverlay) != TYPE_NIL:
+		DebugOverlay.toast_map_debug(toast)
+	_show_inspector_toast(toast, 3.5)
+
+
 func _setup_construction_progress_layer() -> void:
 	if not show_construction_progress_overlay or container == null:
 		remove_overlay_layer("ConstructionProgressOverlay")
@@ -18495,6 +18783,21 @@ func get_phase23_overlay_stats() -> Dictionary:
 		"lower_vert": MapZoomLOD.use_lower_vert_fallback(MapZoomLOD.tier_for_zoom(MapZoomLOD.read_camera_zoom(get_viewport())), provinces.size()),
 		"target_frame_ms": MapZoomLOD.target_frame_ms_mid_hardware(),
 	}
+
+
+func _setup_agent_presence_layer() -> void:
+	if container == null:
+		remove_overlay_layer("AgentPresence")
+		_agent_presence_layer = null
+		return
+	if _agent_presence_layer == null or not is_instance_valid(_agent_presence_layer):
+		_agent_presence_layer = _AgentPresenceLayerScr.new()
+	var centroids := province_centroids
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_centroids"):
+		centroids = MapManager.get_all_centroids()
+	if _agent_presence_layer.has_method("setup"):
+		_agent_presence_layer.setup(centroids, _player_tag())
+	add_overlay_layer("AgentPresence", _agent_presence_layer, 7)
 
 
 func _setup_agent_layer() -> void:
@@ -22063,6 +22366,10 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	result["majors"] = majors
 	result["jap"] = int((majors.get("JAP", {}) as Dictionary).get("pid", 0))
 	result["jap_ok"] = bool((majors.get("JAP", {}) as Dictionary).get("ok", false))
+	var wings: Dictionary = _station_world_major_air_chips()
+	var fleets: Dictionary = _station_world_major_fleet_chips()
+	result["wings"] = wings
+	result["fleets"] = fleets
 	var fleet: Dictionary = _station_eng_channel_fleet()
 	result["fleet"] = fleet
 	result["fleet_pid"] = int(fleet.get("pid", 0))
@@ -22193,6 +22500,91 @@ func flag_choke_for_pid(pid: int) -> Dictionary:
 		_show_inspector_toast(sentence, 3.5)
 		print("MapRenderer: ", sentence)
 	return flagged
+
+
+## One air wing per major at a named capital/base. Not a 3520 scan.
+func _station_world_major_air_chips() -> Dictionary:
+	var rows: Array = [
+		{"tag": "GER", "pid": 710300, "design": "bf109g_fighter"},
+		{"tag": "FRA", "pid": 710739, "design": "bf109g_fighter"},
+		{"tag": "ENG", "pid": 711414, "design": "bf109g_fighter"},
+		{"tag": "USA", "pid": 800792, "design": "bf109g_fighter"},
+		{"tag": "SOV", "pid": 903534, "design": "bf109g_fighter"},
+		{"tag": "ITA", "pid": 710963, "design": "bf109g_fighter"},
+		{"tag": "JAP", "pid": 903981, "design": "bf109g_fighter"},
+		{"tag": "POL", "pid": 711112, "design": "bf109g_fighter"},
+	]
+	var out: Dictionary = {}
+	for row_v in rows:
+		var row: Dictionary = row_v as Dictionary
+		out[str(row.get("tag", ""))] = _station_major_domain_chip(
+			str(row.get("tag", "")),
+			int(row.get("pid", 0)),
+			str(row.get("design", "")),
+			"air",
+		)
+	return out
+
+
+## One fleet per major on a named home sea. Channel stays ENG 950001.
+func _station_world_major_fleet_chips() -> Dictionary:
+	var rows: Array = [
+		{"tag": "GER", "pid": 950000, "design": "king_george_v_class_bb"},
+		{"tag": "FRA", "pid": 950000, "design": "king_george_v_class_bb"},
+		{"tag": "ENG", "pid": 950001, "design": "king_george_v_class_bb"},
+		{"tag": "USA", "pid": 950001, "design": "king_george_v_class_bb"},
+		{"tag": "SOV", "pid": 950000, "design": "king_george_v_class_bb"},
+		{"tag": "ITA", "pid": 950001, "design": "king_george_v_class_bb"},
+		{"tag": "JAP", "pid": 950000, "design": "king_george_v_class_bb"},
+		{"tag": "POL", "pid": 950001, "design": "king_george_v_class_bb"},
+	]
+	var out: Dictionary = {}
+	for row_v in rows:
+		var row: Dictionary = row_v as Dictionary
+		out[str(row.get("tag", ""))] = _station_major_domain_chip(
+			str(row.get("tag", "")),
+			int(row.get("pid", 0)),
+			str(row.get("design", "")),
+			"naval",
+		)
+	return out
+
+
+func _station_major_domain_chip(tag: String, pid: int, design_id: String, domain: String) -> Dictionary:
+	var result := {"ok": false, "tag": tag, "pid": pid, "fid": "", "domain": domain}
+	if tag.is_empty() or pid <= 0:
+		return result
+	var want_air := domain == "air"
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+		return result
+	var target: Object = null
+	for f in LeaderManager.get_formations_for_country(tag):
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		var is_air := ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_AIR_SQUADRON or ft == Formation.TYPE_AIR_GROUP
+		var is_fleet := ft == Formation.TYPE_FLEET or ft == Formation.TYPE_TASK_FORCE or ft == Formation.TYPE_SHIP
+		if want_air and not is_air:
+			continue
+		if not want_air and not is_fleet:
+			continue
+		if "stationed_province_id" in f and int(f.stationed_province_id) == pid:
+			target = f
+			break
+		if target == null:
+			target = f
+	if target != null and "stationed_province_id" in target:
+		target.stationed_province_id = pid
+		result["fid"] = str(target.formation_id) if "formation_id" in target else ""
+		result["ok"] = true
+		return result
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("field_designed_unit"):
+		var did := design_id.strip_edges()
+		var fielded: Variant = LeaderManager.field_designed_unit(tag, did, pid, domain)
+		if fielded is Dictionary and bool((fielded as Dictionary).get("ok", false)):
+			result["fid"] = str((fielded as Dictionary).get("formation_id", ""))
+			result["ok"] = true
+	return result
 
 
 ## One land division per major on a named hex. Not a 3520 scan.
