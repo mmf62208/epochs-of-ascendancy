@@ -194,7 +194,8 @@ def home_europe_frame(
 ) -> Optional[Tuple[float, float, float, float]]:
     cents = dict(centroids or load_board_centroids())
     pts = [cents[pid] for pid in HOME_EUROPE_PIDS if pid in cents]
-    return frame_rect_from_points(pts)
+    # Continental pad — a 0.45 bbox around the three cities is a postage-stamp grey void.
+    return frame_rect_from_points(pts, min_pad_x=1100.0, min_pad_y=800.0)
 
 
 def chi_capital_pid(
@@ -384,6 +385,18 @@ def build_first_session_hotkeys_product(
             and "710963" in ren
             and "func _frame_rect_from_points" in ren
             and "func _resolve_europe_focus_rect" in ren
+            and "Vector2(1100.0, 800.0)" in _slice_func(ren, "_resolve_europe_focus_rect")
+        )
+        boot_fn = _slice_func(ren, "_boot_political_map_complete")
+        wiring["boot_recenters_europe"] = (
+            "center_europe_in_world_view" in boot_fn
+            and "_ensure_ocean_floor" in boot_fn
+            and "_apply_clean_political_clear_color" in boot_fn
+        )
+        wiring["home_defers_until_capitals"] = (
+            "_europe_focus_retry" in ren
+            and "pts.size() < 2" in _slice_func(ren, "_resolve_europe_focus_rect")
+            and "europe_world_center" not in _slice_func(ren, "_resolve_europe_focus_rect")
         )
         wiring["end_tokyo_chi_not_sov"] = (
             "903995" in ren

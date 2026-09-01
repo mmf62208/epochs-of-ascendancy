@@ -113,6 +113,8 @@ class TestFirstSessionHotkeysProduct(unittest.TestCase):
             "insight_strips_placeholder",
             "no_industry_carpet_at_europe",
             "capital_star_lod",
+            "boot_recenters_europe",
+            "home_defers_until_capitals",
         ):
             self.assertTrue(p.get("wiring", {}).get(key), msg=(key, p.get("wiring"), p.get("fail")))
 
@@ -126,6 +128,9 @@ class TestFirstSessionHotkeysProduct(unittest.TestCase):
         self.assertIsNotNone(home)
         for pid in HOME_EUROPE_PIDS:
             self.assertTrue(rect_contains(home, cents[pid]), msg=(pid, home, cents[pid]))
+        # Must be continental, not a postage-stamp zoom that reads as a grey hole.
+        self.assertGreaterEqual(float(home[2]), 1800.0, msg=home)
+        self.assertGreaterEqual(float(home[3]), 1200.0, msg=home)
         asia = asia_end_frame(cents)
         self.assertIsNotNone(asia.get("rect"))
         self.assertIsNotNone(asia.get("tokyo"))

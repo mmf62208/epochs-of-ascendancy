@@ -360,6 +360,7 @@ var _agent_layer: AgentNetworkLayer = null
 var weather_layer: Node = null  # WeatherOverlayLayer when present (grand high-res snow/blackout etc.)
 var terrain_layer_stack: TerrainLayerStack = null  # NASA/NE real-world layers when built
 var _world_class_bootstrapped: bool = false
+var _europe_focus_retry: int = 0
 
 var _btn_station_engineers: Button = null
 
@@ -12655,6 +12656,12 @@ func _boot_political_map_complete() -> void:
 	_refresh_province_fill_colors(true)
 	_restore_land_poly_visibility()
 	_ensure_capital_stars_visible()
+	# Centroids exist now — frame Europe. An earlier deferred center (empty centroids)
+	# used europe_world_center and left the camera on grey clear (underlay is hidden).
+	_ensure_ocean_floor()
+	_apply_clean_political_clear_color()
+	center_europe_in_world_view()
+	_force_all_province_nodes_visible()
 	if _map_search != null and _map_search.has_method("rebuild_index"):
 		_map_search.call("rebuild_index")
 	var ol := get_overlay_layer("InfrastructureOverlayLayer")
@@ -13121,6 +13128,11 @@ func _sync_viewport_culling(force: bool = false) -> void:
 		visible_pids[_hover_province.id] = true
 	for pid in _get_interesting_province_ids().keys():
 		visible_pids[int(pid)] = true
+
+	# Empty in-rect query (camera not framed yet) must not hide the whole board —
+	# that is the grey-screen boot: underlay off + default clear + all polys culled.
+	if visible_pids.is_empty():
+		return
 
 	for pid_var in province_nodes.keys():
 		var pid := int(pid_var)
@@ -13944,9 +13956,16 @@ func debug_focus_coarse_territory(terr_name: String = "Africa") -> void:
 func center_europe_in_world_view() -> void:
 	_sync_theater_bounds_to_map_data()
 	set_meta("full_world_underlay_active", true)
+	var frame := _resolve_europe_focus_rect(Vector2.ZERO)
+	if frame.size.x < 80.0 or frame.size.y < 80.0:
+		# Capitals not in memory yet — do not aim at europe_world_center (grey void).
+		if _europe_focus_retry < 12:
+			_europe_focus_retry += 1
+			call_deferred("center_europe_in_world_view")
+		return
+	_europe_focus_retry = 0
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam:
-		var frame := _resolve_europe_focus_rect(Vector2.ZERO)
 		var focus := frame.get_center()
 		# Always re-fit (not pan-only) so a zoom-out red void recovers on first Home.
 		fit_camera_to_bounds(frame, focus, MapCanvasConfig.EUROPE_VIEW_FILL_RATIO)
@@ -14005,17 +14024,16 @@ func _resolve_europe_focus_rect(_center: Vector2) -> Rect2:
 		var c := _centroid_for_pid(pid)
 		if c != Vector2.ZERO:
 			pts.append(c)
-	var r := _frame_rect_from_points(pts)
-	if r.size.x < 80.0 or r.size.y < 80.0:
-		var fb := _centroid_for_pid(710300)
-		if fb == Vector2.ZERO:
-			fb = MapCanvasConfig.europe_world_center()
-		r = Rect2(fb - Vector2(520, 380), Vector2(1040, 760))
+	if pts.size() < 2:
+		return Rect2()
+	# Continental pad (old Home was 2200×1600 around one capital). A 0.45 bbox
+	# around the three cities is a postage stamp and looks like a grey hole.
+	var r := _frame_rect_from_points(pts, Vector2(1100.0, 800.0))
 	var b := _current_theater_bounds
 	if b.size.x > 0.0:
 		var hit := r.intersection(b)
 		# Never replace a valid Europe frame with the full-world theater (void Home).
-		if hit.size.x >= 80.0 and hit.size.y >= 80.0:
+		if hit.size.x >= 80.0 and hit.size.y >= 80.0 and hit.size.x < b.size.x * 0.85:
 			r = hit
 	return r
 
