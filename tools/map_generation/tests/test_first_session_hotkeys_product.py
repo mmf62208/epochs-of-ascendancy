@@ -115,6 +115,11 @@ class TestFirstSessionHotkeysProduct(unittest.TestCase):
             "capital_star_lod",
             "boot_recenters_europe",
             "home_defers_until_capitals",
+            "factory_status_layer_file",
+            "agent_presence_layer_file",
+            "no_const_preload_optional_layers",
+            "living_diplomacy_api",
+            "living_campaign_pick_api",
         ):
             self.assertTrue(p.get("wiring", {}).get(key), msg=(key, p.get("wiring"), p.get("fail")))
 

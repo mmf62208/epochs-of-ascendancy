@@ -13,8 +13,9 @@ const _DomainOpsOverlayLayerScr = preload("res://scripts/map/DomainOpsOverlayLay
 const _LeaderStationOverlayLayerScr = preload("res://scripts/map/LeaderStationOverlayLayer.gd")
 const _UnitChipTextScr = preload("res://scripts/map/UnitChipText.gd")
 const _ConstructionProgressOverlayLayerScr = preload("res://scripts/map/ConstructionProgressOverlayLayer.gd")
-const _FactoryStatusLayerScr = preload("res://scripts/map/FactoryStatusLayer.gd")
-const _AgentPresenceLayerScr = preload("res://scripts/map/AgentPresenceLayer.gd")
+## Loaded in _ready — missing scripts must not fail MapRenderer parse (grey TestScenario).
+var _FactoryStatusLayerScr: Script = null
+var _AgentPresenceLayerScr: Script = null
 const RoutePackQRScr = preload("res://scripts/ui/RoutePackQR.gd")
 const _SFX_PATHS := {
 	"select": "res://Sound FX Starter Pack Vol. 1/UI & Menus/Select.wav",
@@ -415,8 +416,16 @@ var _map_mode_apply_scheduled: bool = false
 var _last_mesh_zoom_bucket: int = -999
 
 
+func _load_optional_script(path: String) -> Script:
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return null
+	return load(path) as Script
+
+
 func _ready():
 	add_to_group("map_renderer")
+	_FactoryStatusLayerScr = _load_optional_script("res://scripts/map/FactoryStatusLayer.gd")
+	_AgentPresenceLayerScr = _load_optional_script("res://scripts/map/AgentPresenceLayer.gd")
 	_ensure_perf()
 	_wire_info_panel_refs()
 	if btn_close == null:
@@ -18852,6 +18861,8 @@ func _setup_factory_status_layer() -> void:
 		_factory_status_layer = null
 		return
 	if _factory_status_layer == null or not is_instance_valid(_factory_status_layer):
+		if _FactoryStatusLayerScr == null:
+			return
 		_factory_status_layer = _FactoryStatusLayerScr.new()
 	var centroids := province_centroids
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_centroids"):
@@ -18917,6 +18928,8 @@ func _setup_agent_presence_layer() -> void:
 		_agent_presence_layer = null
 		return
 	if _agent_presence_layer == null or not is_instance_valid(_agent_presence_layer):
+		if _AgentPresenceLayerScr == null:
+			return
 		_agent_presence_layer = _AgentPresenceLayerScr.new()
 	var centroids := province_centroids
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_centroids"):

@@ -398,6 +398,19 @@ def build_first_session_hotkeys_product(
             and "pts.size() < 2" in _slice_func(ren, "_resolve_europe_focus_rect")
             and "europe_world_center" not in _slice_func(ren, "_resolve_europe_focus_rect")
         )
+        factory_gd = ROOT / "scripts" / "map" / "FactoryStatusLayer.gd"
+        agent_gd = ROOT / "scripts" / "map" / "AgentPresenceLayer.gd"
+        wiring["factory_status_layer_file"] = factory_gd.is_file()
+        wiring["agent_presence_layer_file"] = agent_gd.is_file()
+        wiring["no_const_preload_optional_layers"] = (
+            'preload("res://scripts/map/FactoryStatusLayer.gd")' not in ren
+            and 'preload("res://scripts/map/AgentPresenceLayer.gd")' not in ren
+            and "_load_optional_script" in ren
+        )
+        hook = (ROOT / "scripts" / "ui" / "PlayNextHook.gd").read_text(encoding="utf-8")
+        menu_src = menu
+        wiring["living_diplomacy_api"] = "func living_diplomacy_from_province" in hook
+        wiring["living_campaign_pick_api"] = "func apply_living_campaign_pick" in menu_src
         wiring["end_tokyo_chi_not_sov"] = (
             "903995" in ren
             and "func _resolve_chi_capital_centroid" in ren
