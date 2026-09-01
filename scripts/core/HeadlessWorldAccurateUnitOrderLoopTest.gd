@@ -1450,10 +1450,19 @@ func _test_peace_occupation() -> void:
 	if not gd.has_method("apply_peace_conference_settlement_live"):
 		_fail("apply_peace_conference_settlement_live missing")
 		return
-	var settled: Dictionary = gd.call(
-		"apply_peace_conference_settlement_live",
-		ATT_TAG, DEF_TAG, FRA_FRONT, true, false, 0.0, true
-	) as Dictionary
+	var peace_win: Script = load("res://scripts/ui/PeaceConferenceWindow.gd") as Script
+	if peace_win == null or not peace_win.has_method("open_living_sheet") or not peace_win.has_method("apply_from_sheet"):
+		_fail("PeaceConferenceWindow open_living_sheet/apply_from_sheet missing")
+		return
+	var sheet: Dictionary = peace_win.call("open_living_sheet", ATT_TAG, DEF_TAG, FRA_FRONT) as Dictionary
+	if not bool(sheet.get("ok", false)):
+		_fail("peace conference sheet not ok: %s" % str(sheet))
+		return
+	if "peace conference opened" not in str(sheet.get("title", "")).to_lower():
+		_fail("peace conference opened title missing: %s" % str(sheet))
+		return
+	_pass("peace conference opened pid=%d" % int(sheet.get("province_id", FRA_FRONT)))
+	var settled: Dictionary = peace_win.call("apply_from_sheet", sheet) as Dictionary
 	print("  [INFO] peace settlement %s" % str(settled))
 	if not bool(settled.get("ok", false)):
 		_fail("peace settlement not ok: %s" % str(settled))

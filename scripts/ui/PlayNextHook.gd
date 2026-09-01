@@ -5,6 +5,9 @@
 class_name PlayNextHook
 extends RefCounted
 
+## settle_peace opens PeaceConferenceWindow.open_living_sheet.
+## Annex is apply_from_sheet → apply_peace_conference_settlement_live (not in apply()).
+
 ## Last foreign named hex the player clicked (toast / map pick). Never a 3520 scan.
 static var last_diplomacy_pid: int = -1
 
