@@ -2450,7 +2450,10 @@ func _draw_hang_safe_corridor_line(from_id: int, to_id: int) -> void:
 	line.end_cap_mode = Line2D.LINE_CAP_ROUND
 	line.points = PackedVector2Array([a, b])
 	line.z_index = 26
-	add_child(line)
+	if container != null:
+		container.add_child(line)
+	else:
+		add_child(line)
 	_supply_corridor_line = line
 	var toast := "Supply · %s → %s" % [_province_display_name(from_id), _province_display_name(to_id)]
 	if typeof(DebugOverlay) != TYPE_NIL:
