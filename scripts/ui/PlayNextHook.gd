@@ -1015,15 +1015,18 @@ static func _fleet_choke_row(tag: String) -> Dictionary:
 	if tag != "ENG" and tag != "GBR":
 		return empty
 	var st: Dictionary = MapManager.living_choke_state(pid, tag)
-	if not bool(st.get("ok", false)) or not bool(st.get("bite", false)):
+	if not bool(st.get("ok", false)):
 		return empty
+	# ENG Channel NEXT whenever the strait is a living choke. Off-station bites;
+	# on-station still names the choke so Maginot recommend("ENG") is not CAS leak
+	# after the fleet is parked back on 950001.
 	return {
 		"fid": str(st.get("fid", "")),
 		"pid": pid,
-		"sentence": str(st.get("sentence", "Channel off-station · supply bite")),
+		"sentence": str(st.get("sentence", "Channel choke flagged")),
 		"bonus": float(st.get("bonus", 0.85)),
-		"bite": true,
-		"on_station": false,
+		"bite": bool(st.get("bite", false)),
+		"on_station": bool(st.get("on_station", false)),
 	}
 
 
