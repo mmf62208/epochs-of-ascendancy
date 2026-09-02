@@ -217,6 +217,11 @@ var _last_mouse_pos := Vector2.ZERO
 ## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
 var _inspector_held_closed := false
 var _camera_nudge_gen := 0
+## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
+var _viewport_cull_suspend_until_msec: int = 0
+var _viewport_cull_hold_after_close: bool = false
+## End: keep Tokyo + CHI capital stars visible even at strategic zoom.
+var _asia_end_force_star_pids: Dictionary = {}
 
 var provinces: Dictionary[int, Province] = {}
 var geometry: Dictionary = {}
@@ -982,8 +987,21 @@ var _pending_terrain_zoom_refresh: bool = false
 const WHEEL_TERRAIN_REFRESH_MS := 180
 
 
+func _left_drag_exceeded_slop() -> bool:
+	if _left_pan_active:
+		return true
+	if not _left_pan_armed:
+		return false
+	var vp := get_viewport()
+	if vp == null:
+		return false
+	var delta := vp.get_mouse_position() - _left_press_screen
+	return delta.length_squared() >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
+
+
 func _apply_home_key(shift_pressed: bool) -> void:
 	# Home must stay cheap: recenter/fit only — no 3520 rebuild.
+	_asia_end_force_star_pids.clear()
 	ensure_world_navigation_ready()
 	if shift_pressed:
 		fit_camera_to_full_world()
@@ -1120,8 +1138,15 @@ func _input(event: InputEvent) -> void:
 					_left_pan_active = false
 					_left_press_screen = get_viewport().get_mouse_position()
 					_last_mouse_pos = _left_press_screen
-			elif not event.pressed and _left_pan_active:
-				get_viewport().set_input_as_handled()
+			elif not event.pressed:
+				var did_left_pan := _left_drag_exceeded_slop()
+				_left_pan_armed = false
+				_left_pan_active = false
+				if did_left_pan:
+					get_viewport().set_input_as_handled()
+	if event is InputEventMouseMotion and _left_pan_armed and not _left_pan_active:
+		if _left_drag_exceeded_slop():
+			_left_pan_active = true
 
 
 func _schedule_light_terrain_zoom_refresh() -> void:
@@ -1413,7 +1438,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_last_mouse_pos = _left_press_screen
 				return
 		else:
-			var did_left_pan := _left_pan_active
+			var did_left_pan := _left_drag_exceeded_slop()
 			_left_pan_armed = false
 			_left_pan_active = false
 			if did_left_pan:
@@ -1687,10 +1712,8 @@ func _handle_camera_input(delta: float) -> void:
 			move_dir.y -= 1
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
-	if _left_pan_armed and not _left_pan_active:
-		var left_delta := get_viewport().get_mouse_position() - _left_press_screen
-		if left_delta.length_squared() >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
-			_left_pan_active = true
+	if _left_pan_armed and not _left_pan_active and _left_drag_exceeded_slop():
+		_left_pan_active = true
 	# Middle / right / left-drag (pixel-based — works while paused). Drag up → camera north.
 	if _is_middle_dragging or _left_pan_active:
 		var current_mouse := get_viewport().get_mouse_position()
@@ -2102,9 +2125,8 @@ func force_map_tint_demo(mode: String = "") -> void:
 func highlight_supply_route_path(province_path: Array, seconds: float = 4.5) -> void:
 	if province_path.is_empty():
 		return
-	if not supply_mode:
-		_toggle_supply_overlay()
-	_setup_supply_layer()
+	# G / hang-safe: polyline only. Never toggle supply mode or refresh 3520 outlines.
+	_ensure_corridor_polyline_layer()
 	if supply_map_layer == null:
 		return
 	var pts: PackedVector2Array = PackedVector2Array()
@@ -2118,14 +2140,27 @@ func highlight_supply_route_path(province_path: Array, seconds: float = 4.5) -> 
 				pts.append(c)
 	if pts.size() < 2:
 		return
+	if "corridor_focus_only" in supply_map_layer:
+		supply_map_layer.corridor_focus_only = true
 	if supply_map_layer.has_method("highlight_route_points"):
 		supply_map_layer.call("highlight_route_points", pts, seconds)
-	# Bright-yellow road edges along this corridor (infra overlay); mute everything else.
-	var ol := get_overlay_layer("InfrastructureOverlayLayer")
-	if ol != null and ol.has_method("set_supply_corridor_path"):
-		ol.call("set_supply_corridor_path", province_path)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug("Route highlight · %d provinces" % province_path.size())
+
+
+## Cheap Line2D host for G. Does not _toggle_supply_overlay or _refresh_supply_routes.
+func _ensure_corridor_polyline_layer() -> void:
+	if container == null:
+		return
+	if supply_map_layer == null or not is_instance_valid(supply_map_layer):
+		supply_map_layer = SupplyMapLayer.new()
+		supply_map_layer.name = "SupplyMapLayer"
+		if "corridor_focus_only" in supply_map_layer:
+			supply_map_layer.corridor_focus_only = true
+		container.add_child(supply_map_layer)
+	supply_map_layer.visible = true
+	supply_map_layer.z_index = 60
+	supply_map_layer.set_process(true)
 
 
 ## Phase C: player-facing multi-front / live border assault targets.
@@ -2365,11 +2400,12 @@ func _request_hang_safe_supply_corridor() -> void:
 			tag = str(sel_p.owner_tag)
 	var source := _cheap_corridor_source_for_tag(tag)
 	# Never self-path capital → capital (Play: "Corridor: no land path Berlin → Berlin").
+	# Do not scan live borders on this frame (3520 hang). GER Maginot is the named proof.
 	if target <= 0 or target == source:
-		target = _corridor_front_target_for_tag(tag, source)
-	if target <= 0 and not _live_border_fronts_cache.is_empty():
-		var row0: Dictionary = _live_border_fronts_cache[0] if _live_border_fronts_cache[0] is Dictionary else {}
-		target = int(row0.get("province_id", -1))
+		if tag == "GER" and source != 710173:
+			target = 710173
+		else:
+			target = -1
 	if target > 0 and target != source:
 		var toast := "Supply corridor · drawing capital → %s…" % _province_display_name(target)
 		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint") \
@@ -2413,7 +2449,7 @@ func _deferred_budgeted_supply_corridor(target_id: int) -> void:
 			DebugOverlay.toast_map_debug(no_hub)
 		_show_inspector_toast(no_hub, 3.5, true)
 		return
-	if target_id == source:
+	if target_id <= 0 or target_id == source:
 		target_id = _corridor_front_target_for_tag(tag, source)
 		if target_id <= 0 or target_id == source:
 			var self_msg := "Corridor: click a front (not the capital) · G draws capital → front"
@@ -12303,14 +12339,16 @@ func _sync_capital_star_scales(_z: float = -1.0) -> void:
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null:
 			continue
+		var force := _asia_end_force_star_pids.has(int(pid))
+		var use_px := 16 if force and px <= 0 else px
 		for child in node.get_children():
 			if not (child is Label) or not (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
 				continue
 			var star := child as Label
-			star.visible = px > 0
-			if px > 0:
-				star.add_theme_font_size_override("font_size", px)
-				star.set_meta(META_MAP_GLYPH_PX, px)
+			star.visible = use_px > 0
+			if use_px > 0:
+				star.add_theme_font_size_override("font_size", use_px)
+				star.set_meta(META_MAP_GLYPH_PX, use_px)
 
 
 func _add_capital_star_to_node(node: Node2D, pid: int) -> void:
@@ -12391,10 +12429,22 @@ func _inspector_stack_blocking_input() -> bool:
 func _dismiss_inspector_and_restore_input() -> void:
 	hide_info_panel()
 	# Close must not cull fills/chips/labels (Play: dark-blue void until Home).
+	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 800
+	_viewport_cull_hold_after_close = true
 	_force_all_province_nodes_visible()
 	_clear_viewport_culling()
+	_restore_land_poly_visibility()
+	_ensure_ocean_floor()
+	_apply_clean_political_clear_color()
+	var hold_cam := get_viewport().get_camera_2d() if get_viewport() else null
+	if hold_cam != null:
+		_last_viewport_cull_pos = hold_cam.global_position
+		_last_viewport_cull_zoom = _get_camera_zoom()
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui != null:
+		var fight_sheet := ui.get_node_or_null("OpenFightSheet")
+		if fight_sheet != null:
+			fight_sheet.queue_free()
 		var unit_pop := ui.get_node_or_null("UnitDetailPopup")
 		if unit_pop != null:
 			if unit_pop is CanvasItem:
@@ -13158,6 +13208,16 @@ func _get_camera_world_rect(margin_ratio: float = 0.10) -> Rect2:
 
 
 func _sync_viewport_culling(force: bool = false) -> void:
+	if Time.get_ticks_msec() < _viewport_cull_suspend_until_msec:
+		return
+	if _viewport_cull_hold_after_close:
+		var hold_cam := get_viewport().get_camera_2d() if get_viewport() else null
+		if hold_cam != null:
+			var hold_moved := hold_cam.global_position.distance_squared_to(_last_viewport_cull_pos) > 160000.0
+			var hold_zoomed := absf(_get_camera_zoom() - _last_viewport_cull_zoom) > 0.08
+			if not hold_moved and not hold_zoomed and _last_viewport_cull_zoom > 0.0:
+				return
+		_viewport_cull_hold_after_close = false
 	var prov_count := province_nodes.size()
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_count"):
 		prov_count = maxi(prov_count, int(MapManager.get_province_count()))
@@ -14105,16 +14165,17 @@ func _resolve_europe_focus_rect(_center: Vector2) -> Rect2:
 	return r
 
 
-func _resolve_chi_capital_centroid() -> Vector2:
-	# Sparse CHI names are "CHN North" etc. Prefer a CHI-owned cell west of Tokyo.
+func _resolve_chi_capital_pid() -> int:
+	# Sparse CHI names are "CHN North/East/West". Prefer a CHI-owned cell west of Tokyo.
 	var tokyo := _centroid_for_pid(903995)
-	var best := Vector2.ZERO
+	var best_pid := -1
 	var best_d := INF
 	var owned: Array = []
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):
 		owned = MapManager.get_provinces_by_owner("CHI")
 	for pid_v in owned:
-		var c := _centroid_for_pid(int(pid_v))
+		var pid := int(pid_v)
+		var c := _centroid_for_pid(pid)
 		if c == Vector2.ZERO:
 			continue
 		if tokyo != Vector2.ZERO and c.x >= tokyo.x:
@@ -14122,19 +14183,52 @@ func _resolve_chi_capital_centroid() -> Vector2:
 		var d := c.distance_squared_to(tokyo) if tokyo != Vector2.ZERO else c.x
 		if d < best_d:
 			best_d = d
-			best = c
-	if best != Vector2.ZERO:
-		return best
+			best_pid = pid
+	if best_pid > 0:
+		return best_pid
 	for pid in [902496, 902487, 902505]:
-		var c2 := _centroid_for_pid(pid)
-		if c2 != Vector2.ZERO:
-			return c2
-	return Vector2.ZERO
+		if _centroid_for_pid(pid) != Vector2.ZERO:
+			return pid
+	return -1
+
+
+func _resolve_chi_capital_centroid() -> Vector2:
+	return _centroid_for_pid(_resolve_chi_capital_pid())
+
+
+func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
+	_asia_end_force_star_pids.clear()
+	for pid in [tokyo_pid, chi_pid]:
+		if pid <= 0:
+			continue
+		_asia_end_force_star_pids[pid] = true
+		var node: Node2D = _province_node(pid)
+		if node == null:
+			continue
+		node.visible = true
+		var has_star := false
+		for child in node.get_children():
+			if child is Label and (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
+				has_star = true
+				var star := child as Label
+				star.visible = true
+				star.add_theme_font_size_override("font_size", 16)
+				star.modulate = Color(1.0, 1.0, 1.0, 1.0)
+				star.z_index = 40
+				break
+		if not has_star:
+			_add_capital_star_to_node(node, pid)
+			for child2 in node.get_children():
+				if child2 is Label and (child2 as Label).has_meta(META_MAP_GLYPH_CAPITAL):
+					(child2 as Label).visible = true
+					(child2 as Label).add_theme_font_size_override("font_size", 16)
+	_sync_capital_star_scales()
 
 
 func _focus_asia_view() -> void:
 	# Tokyo + a CHI capital — never first-nonzero that can land on empty USSR (903534).
 	var tokyo := _centroid_for_pid(903995)
+	var chi_pid := _resolve_chi_capital_pid()
 	var chi := _resolve_chi_capital_centroid()
 	var pts: Array[Vector2] = []
 	if tokyo != Vector2.ZERO:
@@ -14154,7 +14248,7 @@ func _focus_asia_view() -> void:
 			frame = hit
 	fit_camera_to_bounds(frame, frame.get_center(), 0.9)
 	_last_hover_mouse = Vector2(-99999, -99999)
-	_sync_capital_star_scales()
+	_force_asia_end_capital_stars(903995, chi_pid)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug("Map: Asia · Tokyo + China capital · Home=Europe")
 
@@ -17526,15 +17620,19 @@ func _open_fight_from_formation_id(fid: String) -> void:
 		return
 	selected_formation_id = fid
 	attack_staging_province_id = from_pid
-	var enemy_pid := _adjacent_enemy_province_id(from_pid)
-	if enemy_pid <= 0 or not provinces.has(enemy_pid):
-		_show_inspector_toast("Open fight · march next to an enemy, then Open fight / Ctrl+click", 4.0, true)
-		return
-	_try_execute_province_attack(enemy_pid, provinces[enemy_pid] as Province)
+	var unit_tag := _player_tag()
+	if "country_tag" in fo:
+		var ft := str(fo.get("country_tag")).strip_edges().to_upper()
+		if not ft.is_empty():
+			unit_tag = ft
+	var enemy_pid := _adjacent_enemy_province_id(from_pid, unit_tag)
+	_show_open_fight_sheet(fid, fo, from_pid, enemy_pid, unit_tag)
 
 
-func _adjacent_enemy_province_id(from_pid: int) -> int:
-	var tag := _player_tag()
+func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
+	var tag := owner_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = _player_tag()
 	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
 		return -1
 	var adj: Array = MapManager.get_adjacent_provinces(from_pid, true)
@@ -17549,6 +17647,136 @@ func _adjacent_enemy_province_id(from_pid: int) -> int:
 		if not ot.is_empty() and ot != tag:
 			return pid
 	return -1
+
+
+func _show_open_fight_sheet(
+	fid: String,
+	formation: Object,
+	from_pid: int,
+	enemy_pid: int,
+	attacker_tag: String
+) -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	var old := ui.get_node_or_null("OpenFightSheet")
+	if old != null:
+		old.queue_free()
+	var att_name := str(formation.get("display_name")) if formation != null and "display_name" in formation else fid
+	if att_name.strip_edges().is_empty() and formation != null and "name" in formation:
+		att_name = str(formation.get("name"))
+	if att_name.strip_edges().is_empty():
+		att_name = "Division"
+	var from_name := _province_display_name(from_pid)
+	var def_tag := ""
+	var def_name := "no adjacent enemy"
+	var terrain := ""
+	var atk_p := 0.0
+	var def_p := 0.0
+	var odds := 0.0
+	var rec := ""
+	var can_ok := false
+	var can_reason := "March next to an enemy hex"
+	if enemy_pid > 0 and provinces.has(enemy_pid) and provinces.has(from_pid):
+		var tp: Province = provinces[enemy_pid] as Province
+		var fp: Province = provinces[from_pid] as Province
+		if tp != null:
+			def_tag = str(tp.owner_tag).strip_edges().to_upper()
+			def_name = str(tp.name)
+			terrain = str(tp.terrain)
+		if typeof(ProvinceInsight) != TYPE_NIL and fp != null and tp != null:
+			var pre: Dictionary = ProvinceInsight.get_battle_preview(fp, tp)
+			atk_p = float(pre.get("attack_power", 0.0))
+			def_p = float(pre.get("defense_power", 0.0))
+			odds = float(pre.get("odds_attacker_win", 0.0))
+			var card_v: Variant = pre.get("assault_card", {})
+			if card_v is Dictionary:
+				rec = str((card_v as Dictionary).get("recommendation", ""))
+		if typeof(BattleManager) != TYPE_NIL:
+			var can_pre: Dictionary = BattleManager.can_assault_province(attacker_tag, enemy_pid, from_pid)
+			can_ok = bool(can_pre.get("ok", false))
+			can_reason = str(can_pre.get("reason", can_reason))
+	var panel := PanelContainer.new()
+	panel.name = "OpenFightSheet"
+	panel.z_index = 75
+	panel.clip_contents = true
+	panel.custom_minimum_size = Vector2(360, 240)
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_detail_panel_flat(panel)
+	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
+	panel.position = Vector2(18.0, maxf(64.0, vp.y - 420.0))
+	ui.add_child(panel)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	panel.add_child(margin)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	margin.add_child(vbox)
+	var title_row := HBoxContainer.new()
+	vbox.add_child(title_row)
+	var title := Label.new()
+	title.text = "Open fight"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_title(title, RetrowaveTheme.CYAN)
+	title.add_theme_font_size_override("font_size", 16)
+	title_row.add_child(title)
+	var close_btn := Button.new()
+	close_btn.text = "Close"
+	close_btn.focus_mode = Control.FOCUS_NONE
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_secondary_button(close_btn)
+	close_btn.pressed.connect(func() -> void:
+		if is_instance_valid(panel):
+			panel.queue_free()
+	)
+	title_row.add_child(close_btn)
+	var body := Label.new()
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size = Vector2(330, 0)
+	var lines: PackedStringArray = PackedStringArray()
+	lines.append("Attacker · %s · %s @ %s" % [attacker_tag, att_name, from_name])
+	if enemy_pid > 0:
+		lines.append("Defender · %s · %s" % [def_tag, def_name])
+		if not terrain.is_empty():
+			lines.append("Terrain · %s" % terrain.capitalize())
+		if atk_p > 0.0 or def_p > 0.0:
+			lines.append("Power · %.0f vs %.0f · odds ~%.0f%%" % [atk_p, def_p, odds])
+		if not rec.is_empty():
+			lines.append(rec)
+		if not can_ok:
+			lines.append("Blocked · %s" % can_reason)
+	else:
+		lines.append("Defender · —")
+		lines.append("No adjacent enemy. March next to a hostile hex, then Open fight.")
+	body.text = "\n".join(lines)
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_body_label(body)
+	vbox.add_child(body)
+	if enemy_pid > 0 and can_ok and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_land_battle"):
+		var start_btn := Button.new()
+		start_btn.text = "Start battle"
+		start_btn.focus_mode = Control.FOCUS_NONE
+		if typeof(RetrowaveTheme) != TYPE_NIL:
+			RetrowaveTheme.style_primary_button(start_btn)
+		var start_fid := fid
+		var start_to := enemy_pid
+		var start_from := from_pid
+		var start_tag := attacker_tag
+		start_btn.pressed.connect(func() -> void:
+			var assault: Dictionary = BattleManager.start_land_battle(start_tag, start_to, start_from, start_fid)
+			if bool(assault.get("opened", false)) or bool(assault.get("success", false)):
+				_sync_land_battle_bubbles()
+				_show_inspector_toast("Open fight · battle opened", 4.0)
+				if is_instance_valid(panel):
+					panel.queue_free()
+			else:
+				_show_inspector_toast(str(assault.get("reason", "Attack failed")), 3.2, true)
+		)
+		vbox.add_child(start_btn)
 
 
 func _try_execute_province_attack(target_pid: int, target_province: Province) -> bool:
@@ -17622,7 +17850,7 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	var assault: Dictionary = {}
 	# Multi-day open (HOI front) when start_land_battle exists; execute_province_assault is resolve-only.
 	if BattleManager.has_method("start_land_battle"):
-		assault = BattleManager.start_land_battle(p_tag, target_pid, from_pid)
+		assault = BattleManager.start_land_battle(p_tag, target_pid, from_pid, selected_formation_id)
 	else:
 		assault = BattleManager.execute_province_assault(p_tag, target_pid, from_pid)
 	push_map_assault_marker(target_pid, "engage", 0.75)

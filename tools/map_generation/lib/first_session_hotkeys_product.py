@@ -373,11 +373,14 @@ def build_first_session_hotkeys_product(
             "_left_pan_armed" in ren
             and "_left_pan_active" in ren
             and "LEFT_PAN_SLOP_PX" in ren
+            and "func _left_drag_exceeded_slop" in ren
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         wiring["close_does_not_cull"] = (
             "_force_all_province_nodes_visible" in dismiss_fn
             and "_clear_viewport_culling" in dismiss_fn
+            and "_restore_land_poly_visibility" in dismiss_fn
+            and "_viewport_cull_suspend_until_msec" in dismiss_fn
         )
         wiring["search_i_not_stolen"] = (
             "func _gui_text_field_has_focus" in ren
@@ -388,10 +391,17 @@ def build_first_session_hotkeys_product(
             and "710173" in _slice_func(ren, "_corridor_front_target_for_tag")
             and "target == source" in _slice_func(ren, "_request_hang_safe_supply_corridor")
         )
-        wiring["end_tokyo_chi_pad"] = "Vector2(1100.0, 800.0)" in _slice_func(ren, "_focus_asia_view")
+        wiring["end_tokyo_chi_pad"] = (
+            "Vector2(1100.0, 800.0)" in _slice_func(ren, "_focus_asia_view")
+            and "func _force_asia_end_capital_stars" in ren
+            and "_force_asia_end_capital_stars" in _slice_func(ren, "_focus_asia_view")
+        )
         wiring["open_fight_sheet"] = (
             "func _open_fight_from_formation_id" in ren
             and "Open fight" in ren
+            and "func _show_open_fight_sheet" in ren
+            and "Attacker" in _slice_func(ren, "_show_open_fight_sheet")
+            and "Defender" in _slice_func(ren, "_show_open_fight_sheet")
             and "start_land_battle" in _slice_func(ren, "_try_execute_province_attack")
         )
         wiring["wheel_no_full_fill"] = (
