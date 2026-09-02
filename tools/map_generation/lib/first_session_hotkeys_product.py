@@ -398,7 +398,7 @@ def build_first_session_hotkeys_product(
             and "is_mouse_button_pressed" in _slice_func(ren, "_begin_left_map_gesture")
             and "_left_ready_for_still_click" in _slice_func(ren, "_begin_left_map_gesture")
             and "_left_ready_for_still_click" in _slice_func(ren, "_mark_left_pan_blocked_pick")
-            and "_left_ready_for_still_click" in _slice_func(ren, "_apply_home_key")
+            and "_arm_still_click_after_pan" in _slice_func(ren, "_apply_home_key")
             and "_left_release_screen" in _slice_func(ren, "_begin_left_map_gesture")
             and "_left_release_screen" in _slice_func(ren, "_end_left_button_down")
             and "_left_map_pick_blocked" in _slice_func(ren, "_unhandled_input")
