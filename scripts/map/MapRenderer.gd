@@ -2404,6 +2404,12 @@ func highlight_corridor_capital_to_selected() -> Dictionary:
 ## G: toast + defer only. Never BFS / collect_live_border / preview_player_route on this frame.
 func _request_hang_safe_supply_corridor() -> void:
 	var toast := "Supply corridor · drawing capital → front…"
+	# Named Channel choke only — never scan 3520 or BFS on this frame.
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("flag_naval_choke"):
+		if MapManager.has_method("has_strategic_chokepoint") and MapManager.has_strategic_chokepoint(950001):
+			var fl: Dictionary = MapManager.flag_naval_choke(950001)
+			if bool(fl.get("ok", false)):
+				toast = "%s · %s" % [toast, str(fl.get("sentence", "choke flagged"))]
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug(toast)
 	_show_inspector_toast(toast, 3.5)
