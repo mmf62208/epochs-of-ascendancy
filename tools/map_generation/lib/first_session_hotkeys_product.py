@@ -379,6 +379,8 @@ def build_first_session_hotkeys_product(
             and "_left_pan_committed" in ren
             and "func _arm_left_map_press" in ren
             and "func _map_click_should_skip_pick" in ren
+            and "func _left_gesture_moved_camera" in ren
+            and "_left_press_cam_pos" in ren
             and "InputEventMouseMotion" in input_fn
             and "_left_skip_next_pick" in input_fn
         )
@@ -402,6 +404,9 @@ def build_first_session_hotkeys_product(
             and "_camera_is_held" in _slice_func(ren, "_center_camera_on_province")
             and "_camera_is_held" in _slice_func(ren, "_show_coarse_territory_info")
             and "_camera_is_held" in _slice_func(ren, "_clamp_camera_to_theater")
+            and "_camera_is_held" in _slice_func(ren, "focus_province_by_id")
+            and "_close_suppress_edge" in _slice_func(ren, "_handle_camera_input")
+            and "key_dir" in _slice_func(ren, "_handle_camera_input")
             and "supply_mode" in _slice_func(ren, "_select_province")
             and "_refresh_supply_highlights" in _slice_func(ren, "_select_province")
             and "ACTION_MODE_BUTTON_PRESS" in ren

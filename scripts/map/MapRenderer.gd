@@ -234,6 +234,12 @@ var _close_camera_lock_pos := Vector2.ZERO
 var _close_camera_lock_zoom := Vector2.ONE
 var _close_click_guard := false
 var _close_release_seen := false
+## Close button sits in the north edge-pan strip — suppress edge until the mouse leaves that click.
+var _close_suppress_edge := false
+var _close_click_screen := Vector2.ZERO
+## Camera at left-press; pick is skipped if this gesture moved the camera (flags can be reset).
+var _left_press_cam_pos := Vector2.ZERO
+var _left_press_cam_valid := false
 var _camera_nudge_gen := 0
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
 var _viewport_cull_suspend_until_msec: int = 0
@@ -1025,11 +1031,22 @@ func _left_drag_exceeded_slop() -> bool:
 
 
 func _map_click_should_skip_pick() -> bool:
-	if _close_click_guard or _left_pan_committed:
+	if _close_click_guard or _left_pan_committed or _left_gesture_moved_camera():
 		return true
 	if _left_skip_next_pick or _left_gesture_panned or _left_slop_latched or _left_pan_active:
 		return true
 	return _left_drag_exceeded_slop()
+
+
+func _left_gesture_moved_camera() -> bool:
+	if _left_pan_committed:
+		return true
+	if not _left_press_cam_valid:
+		return false
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	if cam == null:
+		return false
+	return cam.global_position.distance_squared_to(_left_press_cam_pos) > 4.0
 
 
 func _lock_close_camera() -> void:
@@ -1041,6 +1058,9 @@ func _lock_close_camera() -> void:
 		_close_camera_locked = true
 	_close_click_guard = true
 	_close_release_seen = false
+	_close_suppress_edge = true
+	var vp: Viewport = get_viewport()
+	_close_click_screen = vp.get_mouse_position() if vp != null else Vector2.ZERO
 
 
 func _unlock_close_camera() -> void:
@@ -1065,8 +1085,13 @@ func _note_close_button_release() -> void:
 
 
 func _finish_close_click_guard_on_new_press() -> void:
-	if _close_click_guard and _close_release_seen:
+	# New map press (after Close release) is the only unlock — leftover north-strip
+	# cursor must not edge-pan Europe→Greenland.
+	if _close_click_guard and not _close_release_seen:
+		return
+	if _close_click_guard or _close_suppress_edge or _close_camera_locked:
 		_close_click_guard = false
+		_close_suppress_edge = false
 		_unlock_close_camera()
 		_hold_camera_until_msec = 0
 		_map_pick_block_until_msec = 0
@@ -1083,12 +1108,17 @@ func _arm_left_map_press() -> void:
 	_left_gesture_panned = false
 	_left_skip_next_pick = false
 	_left_pan_committed = false
+	_left_press_cam_valid = false
 	_left_press_screen = get_viewport().get_mouse_position()
 	_last_mouse_pos = _left_press_screen
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	if cam != null:
+		_left_press_cam_pos = cam.global_position
+		_left_press_cam_valid = true
 
 
 func _camera_is_held() -> bool:
-	if _close_camera_locked or _close_click_guard:
+	if _close_camera_locked or _close_click_guard or _close_suppress_edge:
 		return true
 	var now: int = Time.get_ticks_msec()
 	return now < _hold_camera_until_msec or now < _map_pick_block_until_msec
@@ -1129,6 +1159,7 @@ func _apply_home_key(shift_pressed: bool) -> void:
 	_unlock_close_camera()
 	_close_click_guard = false
 	_close_release_seen = false
+	_close_suppress_edge = false
 	_hold_camera_until_msec = 0
 	_inspector_held_closed = false
 	_map_pick_block_until_msec = 0
@@ -1249,6 +1280,8 @@ func _input(event: InputEvent) -> void:
 		):
 			if _wheel_should_zoom_map():
 				_unlock_close_camera()
+				_close_click_guard = false
+				_close_suppress_edge = false
 				var factor := (1.0 + zoom_speed * 1.35) if event.button_index == MOUSE_BUTTON_WHEEL_UP else (1.0 - zoom_speed * 1.35)
 				_zoom_toward_mouse(factor)
 				# NEVER call full _refresh_terrain_zoom_aware() / 3520 fill rebuild per notch.
@@ -1265,8 +1298,14 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 			else:
 				_is_middle_dragging = false
-		elif event.button_index == MOUSE_BUTTON_LEFT and not event.ctrl_pressed and not event.shift_pressed:
-			if MapViewInput.modal_blocks_map_nav(get_viewport()):
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			# Any new press (incl. ctrl/shift) starts a fresh gesture so a later click still picks.
+			if event.pressed and not _left_pan_armed:
+				_left_pan_committed = false
+				_left_press_cam_valid = false
+			if event.ctrl_pressed or event.shift_pressed:
+				pass
+			elif MapViewInput.modal_blocks_map_nav(get_viewport()):
 				_left_pan_armed = false
 				_left_pan_active = false
 			elif event.pressed:
@@ -1622,9 +1661,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			_left_slop_latched = false
 			_left_gesture_panned = false
 			_left_pan_committed = false
+			# Keep _left_press_cam_valid — hard skip below still sees camera-delta after flag reset.
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				return
 			if _gui_blocks_map_pick():
+				get_viewport().set_input_as_handled()
+				return
+		# Hard skip before capital-star snap: a drag that already panned must not pick
+		# (Play: Oslo inspector opened after a North Sea pan; flags can be reset before this path).
+		if not event.ctrl_pressed and not event.shift_pressed:
+			if _map_click_should_skip_pick() or _left_gesture_moved_camera():
+				_left_pan_armed = false
+				_left_pan_active = false
 				get_viewport().set_input_as_handled()
 				return
 		_release_search_focus()
@@ -1879,26 +1927,42 @@ func _handle_camera_input(delta: float) -> void:
 	var moved := false
 
 	# WASD / Arrow keys (simulation pause must not freeze map navigation)
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):    move_dir.y -= 1
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  move_dir.y += 1
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  move_dir.x -= 1
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): move_dir.x += 1
+	var key_dir: Vector2 = Vector2.ZERO
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):    key_dir.y -= 1
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  key_dir.y += 1
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  key_dir.x -= 1
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): key_dir.x += 1
 
 	# Edge scrolling: left/right/bottom + north band just below top HUD (not over the bar itself).
-	if not MapViewInput.edge_pan_blocked_by_gui(get_viewport()):
-		var mouse_pos := get_viewport().get_mouse_position()
+	# Inspector Close sits in that north strip. On 17cf047 leftover cursor became edge-north,
+	# called _unlock_close_camera(), then flew Europe→Greenland at pan_speed (~2600).
+	# Lock+reassert cannot win if edge-pan unlocks first — do not compute edge while Close-held.
+	var edge_dir: Vector2 = Vector2.ZERO
+	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
+	if _close_suppress_edge:
+		var top_safe_hold: float = _map_nav_top_clearance()
+		var still_in_north_band: bool = mouse_pos.y < top_safe_hold + edge_margin + 24.0
+		if not still_in_north_band:
+			_close_suppress_edge = false
+	if (
+		not _close_camera_locked
+		and not _close_click_guard
+		and not _close_suppress_edge
+		and not MapViewInput.edge_pan_blocked_by_gui(get_viewport())
+	):
 		var viewport_size := get_viewport().get_visible_rect().size
 		if mouse_pos.x < edge_margin:
-			move_dir.x -= 1
+			edge_dir.x -= 1
 		elif mouse_pos.x > viewport_size.x - edge_margin:
-			move_dir.x += 1
+			edge_dir.x += 1
 		if mouse_pos.y > viewport_size.y - edge_margin:
-			move_dir.y += 1
+			edge_dir.y += 1
 		# Pan north via a strip *under* the HUD (not raw y=0 — bar is full-width PASS chrome
 		# and re-enabling true top-edge pan thrashed world_full when hovering 1x/Prod).
 		var top_safe := _map_nav_top_clearance()
 		if mouse_pos.y >= top_safe and mouse_pos.y < top_safe + edge_margin:
-			move_dir.y -= 1
+			edge_dir.y -= 1
+	move_dir = key_dir + edge_dir
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
 	if _left_pan_armed and not _left_pan_active and _left_drag_exceeded_slop():
@@ -1931,17 +1995,22 @@ func _handle_camera_input(delta: float) -> void:
 		_last_mouse_pos = current_mouse
 
 	if move_dir != Vector2.ZERO:
-		_unlock_close_camera()
-		_close_click_guard = false
-		if _camera_is_held():
-			_hold_camera_until_msec = 0
-			_inspector_held_closed = false
-			_map_pick_block_until_msec = 0
-		move_dir = move_dir.normalized()
-		# edge_scroll_speed for edge/WASD feel; pan_speed kept as alias baseline
-		var speed := maxf(pan_speed, edge_scroll_speed)
-		cam.global_position += move_dir * speed * nav_delta / cam.zoom.x
-		moved = true
+		if key_dir != Vector2.ZERO:
+			_unlock_close_camera()
+			_close_click_guard = false
+			_close_suppress_edge = false
+			if _camera_is_held():
+				_hold_camera_until_msec = 0
+				_inspector_held_closed = false
+				_map_pick_block_until_msec = 0
+		elif _close_camera_locked or _close_click_guard or _close_suppress_edge:
+			move_dir = Vector2.ZERO
+		if move_dir != Vector2.ZERO:
+			move_dir = move_dir.normalized()
+			# edge_scroll_speed for edge/WASD feel; pan_speed kept as alias baseline
+			var speed: float = maxf(pan_speed, edge_scroll_speed)
+			cam.global_position += move_dir * speed * nav_delta / cam.zoom.x
+			moved = true
 
 	# Flush debounced terrain zoom after wheel burst settles.
 	if _pending_terrain_zoom_refresh and Time.get_ticks_msec() - _wheel_zoom_terrain_at_msec >= WHEEL_TERRAIN_REFRESH_MS:
@@ -14596,6 +14665,7 @@ func _focus_asia_view() -> void:
 	_unlock_close_camera()
 	_close_click_guard = false
 	_close_release_seen = false
+	_close_suppress_edge = false
 	_hold_camera_until_msec = 0
 	_inspector_held_closed = false
 	_map_pick_block_until_msec = 0
@@ -16019,7 +16089,7 @@ func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> b
 	var cam := get_node_or_null("MapCamera") as Camera2D
 	if cam == null:
 		cam = get_viewport().get_camera_2d() if get_viewport() else null
-	if cam != null and pos != Vector2.ZERO:
+	if cam != null and pos != Vector2.ZERO and not _camera_is_held():
 		var tactical_z := clampf(2.4 * MapCanvasConfig.THEATER_SCALE, min_zoom, max_zoom)
 		cam.global_position = _apply_camera_bounds(pos)
 		var zm := zoom_mode.strip_edges().to_lower()
