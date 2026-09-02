@@ -1005,11 +1005,11 @@ const WHEEL_TERRAIN_REFRESH_MS := 180
 func _left_drag_exceeded_slop() -> bool:
 	if _left_pan_active or _left_slop_latched or _left_gesture_panned:
 		return true
-	var vp := get_viewport()
+	var vp: Viewport = get_viewport()
 	if vp == null:
 		return false
 	# Measure from the original press even if _input already cleared _left_pan_armed.
-	var delta := vp.get_mouse_position() - _left_press_screen
+	var delta: Vector2 = vp.get_mouse_position() - _left_press_screen
 	if delta.length_squared() >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
 		_left_slop_latched = true
 		return true
@@ -1024,12 +1024,12 @@ func _map_click_should_skip_pick() -> bool:
 
 func _camera_is_held() -> bool:
 	# Time-boxed only. Do not latch on _inspector_held_closed — that blocked every later hex pick.
-	var now := Time.get_ticks_msec()
+	var now: int = Time.get_ticks_msec()
 	return now < _hold_camera_until_msec or now < _map_pick_block_until_msec
 
 
 func _mouse_over_close_control() -> bool:
-	var vp := get_viewport()
+	var vp: Viewport = get_viewport()
 	if vp == null:
 		return false
 	var hov: Control = vp.gui_get_hovered_control()
@@ -1046,7 +1046,7 @@ func _mouse_over_close_control() -> bool:
 
 
 func _release_search_focus() -> void:
-	var vp := get_viewport()
+	var vp: Viewport = get_viewport()
 	if vp == null:
 		return
 	var fo: Control = vp.gui_get_focus_owner()
