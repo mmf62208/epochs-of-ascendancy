@@ -386,6 +386,11 @@ def build_first_session_hotkeys_product(
             and "func _begin_left_map_gesture" in ren
             and "_left_gesture_dragged" in ren
             and "_left_btn_down" in ren
+            and "func _left_map_pick_blocked" in ren
+            and "_left_map_pick_blocked" in _slice_func(ren, "_on_province_input")
+            and "_left_map_pick_blocked" in _slice_func(ren, "_show_coarse_territory_info")
+            and "LEFT_PAN_PICK_BLOCK_MS" not in ren
+            and "_left_block_pick_until_msec" not in ren
             and "InputEventMouseMotion" in input_fn
             and "_left_gesture_dragged" in input_fn
         )

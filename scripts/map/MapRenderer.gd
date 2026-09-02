@@ -1038,6 +1038,11 @@ func _begin_left_map_gesture() -> void:
 	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
 	if _left_btn_down:
 		return
+	# Duplicate pressed=true at the release hex after _end_left_button_down (Play: #950208 / Asia coarse).
+	# Do not reset _left_gesture_dragged — this is still the pan gesture's input burst.
+	if _left_gesture_dragged:
+		_left_btn_down = true
+		return
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
 	_left_btn_down = true
@@ -1060,6 +1065,9 @@ func _begin_left_map_gesture() -> void:
 
 func _note_left_gesture_motion() -> void:
 	if not _left_btn_down:
+		# Never _begin here after a pan — that reset dragged and the release hex picked.
+		if _left_gesture_dragged:
+			return
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			_begin_left_map_gesture()
 		else:
@@ -1078,7 +1086,21 @@ func _end_left_button_down() -> void:
 	_left_btn_down = false
 	_left_pan_armed = false
 	_left_pan_active = false
-	# Keep _left_gesture_dragged until the next _begin_left_map_gesture.
+	# Keep _left_gesture_dragged through this frame's Area2D / duplicate press, then idle-clear.
+	if _left_gesture_dragged:
+		call_deferred("_clear_left_gesture_dragged_if_idle")
+
+
+func _clear_left_gesture_dragged_if_idle() -> void:
+	if _left_btn_down:
+		return
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return
+	_left_gesture_dragged = false
+
+
+func _left_map_pick_blocked() -> bool:
+	return _left_gesture_dragged
 
 
 func _accumulate_left_drag_slop() -> void:
@@ -1360,6 +1382,11 @@ func _input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
 				_begin_left_map_gesture()
+				# Duplicate pressed=true after _end must not start a still-click pick.
+				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+					_mark_left_pan_blocked_pick()
+					get_viewport().set_input_as_handled()
+					return
 			if event.ctrl_pressed or event.shift_pressed:
 				pass
 			elif MapViewInput.modal_blocks_map_nav(get_viewport()):
@@ -1680,7 +1707,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if event.pressed:
 				_begin_left_map_gesture()
 			_note_left_gesture_motion()
-			if _left_gesture_dragged:
+			if _left_map_pick_blocked():
 				if not event.pressed:
 					_end_left_button_down()
 				get_viewport().set_input_as_handled()
@@ -1731,8 +1758,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 		# Gesture-scoped skip before capital-star snap / hex pick / title boot.
+		# Use _left_map_pick_blocked (no _note/_begin) so skip-check cannot reset slop.
 		if not event.ctrl_pressed and not event.shift_pressed:
-			if _left_gesture_dragged or _map_click_should_skip_pick() or _left_gesture_moved_camera():
+			if _left_map_pick_blocked() or _left_gesture_moved_camera():
 				_end_left_button_down()
 				_mark_left_pan_blocked_pick()
 				get_viewport().set_input_as_handled()
@@ -1761,7 +1789,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					if _try_execute_province_attack(star_pid, star_province):
 						get_viewport().set_input_as_handled()
 						return
-				if not event.ctrl_pressed and not event.shift_pressed and _map_click_should_skip_pick():
+				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
 					get_viewport().set_input_as_handled()
 					return
 				_toast_living_diplomacy_pick(star_pid)
@@ -1784,6 +1812,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			# Gives grand strategy world map the feel that every area has a clickable territory/region, even if detailed provs are Europe-focused for current scenario.
 			var ctid := _hit_coarse_territory(world_pos)
 			if ctid != 0:
+				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+					get_viewport().set_input_as_handled()
+					return
 				_show_coarse_territory_info(ctid, true)
 				get_viewport().set_input_as_handled()
 				return
@@ -1815,12 +1846,18 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 			# Unit move: selected pin + click friendly province.
 			if not selected_formation_id.is_empty() and not event.ctrl_pressed:
+				if _left_map_pick_blocked():
+					get_viewport().set_input_as_handled()
+					return
 				if _try_move_selected_unit_to_province(resolved_province):
 					_select_province(resolved_province, resolved_node)
 					get_viewport().set_input_as_handled()
 					return
 			# G click-to-show: hex pick draws a budgeted corridor (never on the G key frame).
 			if _corridor_click_armed and not event.ctrl_pressed:
+				if _left_map_pick_blocked():
+					get_viewport().set_input_as_handled()
+					return
 				_corridor_click_armed = false
 				_select_province(resolved_province, resolved_node)
 				call_deferred("_deferred_budgeted_supply_corridor", pid)
@@ -1829,6 +1866,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _try_set_attack_staging(resolved_province):
 				pass  # still open inspector below
 			if supply_mode and _handle_supply_province_click(resolved_province):
+				if _left_map_pick_blocked():
+					get_viewport().set_input_as_handled()
+					return
 				_select_province(resolved_province, resolved_node)
 				get_viewport().set_input_as_handled()
 				return
@@ -1837,7 +1877,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_unit_pick_strategic_hint_shown = true
 				_show_inspector_toast("Click a unit chip to command (Shift+U toggles counters).", 3.5)
 			# Select first (outline immediately); center + left inspector (avoid covering selection).
-			if not event.ctrl_pressed and not event.shift_pressed and _map_click_should_skip_pick():
+			if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
 				get_viewport().set_input_as_handled()
 				return
 			_select_province(resolved_province, resolved_node)
@@ -14398,6 +14438,10 @@ func _hit_coarse_territory(world_pos: Vector2) -> int:
 ## [param focus_camera]: only true on explicit user click / F10 focus — never on panel refresh.
 ## Auto-teleport on every refresh was thrashing the camera (Africa re-select on each data_changed) and hard-crashing while panning.
 func _show_coarse_territory_info(terr_id: int, focus_camera: bool = false) -> void:
+	# Mouse click only: a left-drag that already exceeded 8px must not open coarse inspector.
+	# focus_camera=false refreshes (data_changed) stay live.
+	if focus_camera and _left_map_pick_blocked():
+		return
 	if not _coarse_territories.has(terr_id) or info_panel == null:
 		return
 	var info: Dictionary = _coarse_territories[terr_id]
@@ -16107,13 +16151,17 @@ func _terrain_palette_multipliers(terrain_key: String) -> Vector3:
 # ====================== INTERACTION ======================
 
 func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, province: Province, node: Node2D):
+	# Area2D / sea-hex writer: this button-down already exceeded 8px — do not select.
+	# Check before use_spatial_picking so a leftover Area2D cannot open the inspector.
+	if _left_map_pick_blocked():
+		return
 	# When pure spatial picking is active (no Area2D or ignoring it), this handler should not fire for hover/selection.
 	# The unhandled_input path above handles clicks.
 	if use_spatial_picking:
 		return
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if _map_click_should_skip_pick():
+		if _left_map_pick_blocked() or _map_click_should_skip_pick():
 			return
 		var resolved_province := province
 		var resolved_node := node
