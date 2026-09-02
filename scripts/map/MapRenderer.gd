@@ -248,6 +248,7 @@ var _select_outline_layer: Node2D = null
 var _select_outline_line: Line2D = null
 var _select_outline_glow: Line2D = null
 var _march_path_line: Line2D = null
+var _supply_corridor_line: Line2D = null
 var _next_hook_chip: Button = null
 var _current_theater_bounds: Rect2 = GRAND_THEATER_CANONICAL_BOUNDS  # updated on theater/chunk/world load; used for camera clamp to avoid gray lost space on pan/zoom to NA etc.
 
@@ -1154,6 +1155,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion and _left_pan_armed and not _left_pan_active:
 		if _left_drag_exceeded_slop():
 			_left_pan_active = true
+			get_viewport().set_input_as_handled()
 
 
 func _schedule_light_terrain_zoom_refresh() -> void:
@@ -2399,96 +2401,62 @@ func highlight_corridor_capital_to_selected() -> Dictionary:
 	return highlight_supply_corridor(source, target, 7.0, tag)
 
 
-## G / click-to-show: toast + arm or defer. Never BFS or preview_player_route on this frame.
+## G: toast + defer only. Never BFS / collect_live_border / preview_player_route on this frame.
 func _request_hang_safe_supply_corridor() -> void:
-	var tag := _player_tag()
-	var target := selected_province_id
-	if target > 0 and provinces.has(target):
-		var sel_p: Province = provinces[target] as Province
-		if sel_p != null and not str(sel_p.owner_tag).is_empty():
-			tag = str(sel_p.owner_tag)
-	var source := _cheap_corridor_source_for_tag(tag)
-	# Never self-path capital → capital (Play: "Corridor: no land path Berlin → Berlin").
-	# Do not scan live borders on this frame (3520 hang). GER Maginot is the named proof.
-	if target <= 0 or target == source:
-		if tag == "GER" and source != 710173:
-			target = 710173
-		else:
-			target = -1
-	if target > 0 and target != source:
-		# Readable capital→front line this frame (2 centroids, no BFS). Hop path deferred.
-		if source > 0:
-			highlight_supply_route_path([source, target], 8.0)
-		var toast := "Supply corridor · drawing capital → %s…" % _province_display_name(target)
-		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint") \
-				and MapManager.has_strategic_chokepoint(target) and MapManager.has_method("flag_naval_choke"):
-			var fl: Dictionary = MapManager.flag_naval_choke(target)
-			if bool(fl.get("ok", false)):
-				toast = "%s · %s" % [toast, str(fl.get("sentence", "choke flagged"))]
-		if typeof(DebugOverlay) != TYPE_NIL:
-			DebugOverlay.toast_map_debug(toast)
-		_show_inspector_toast(toast, 3.5)
-		var vp_g := get_viewport()
-		if vp_g != null:
-			vp_g.gui_release_focus()
-		call_deferred("_deferred_budgeted_supply_corridor", target)
-		return
-	_corridor_click_armed = true
-	var wait := "Supply corridor · click a front or capital to draw path"
+	var toast := "Supply corridor · drawing capital → front…"
 	if typeof(DebugOverlay) != TYPE_NIL:
-		DebugOverlay.toast_map_debug(wait)
-	_show_inspector_toast(wait, 5.0)
-	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-		LeaderEventUI.show_toast(wait, 5.0)
-	print("MapRenderer: G hang-safe · click-to-show corridor (no BFS this frame)")
+		DebugOverlay.toast_map_debug(toast)
+	_show_inspector_toast(toast, 3.5)
+	var vp_g := get_viewport()
+	if vp_g != null:
+		vp_g.gui_release_focus()
+	call_deferred("_deferred_hang_safe_corridor_line")
 
 
-## One hop-capped land BFS + polyline. Skips preview_player_route and hub-rank BFS.
+## Maginot capital→front polyline. No 3520 BFS (Play: G hung at ~325% CPU).
+func _deferred_hang_safe_corridor_line() -> void:
+	_draw_hang_safe_corridor_line(710300, 710173)
+
+
+## Click-to-show: same cheap two-centroid line (no live find_land_path).
 func _deferred_budgeted_supply_corridor(target_id: int) -> void:
-	if target_id <= 0:
-		return
-	var tag := ""
-	if provinces.has(target_id):
-		var p: Province = provinces[target_id] as Province
-		if p != null:
-			tag = str(p.owner_tag)
-	if tag.is_empty():
-		tag = _player_tag()
-	var source := _cheap_corridor_source_for_tag(tag)
-	if source <= 0:
-		var no_hub := "Corridor: no capital hub for %s" % (tag if not tag.is_empty() else "?")
+	# Do not call find_land_path or highlight_supply_route_path — 3520 BFS hung G.
+	var source := 710300
+	var target := target_id
+	if target <= 0 or target == source:
+		target = 710173
+	_draw_hang_safe_corridor_line(source, target)
+
+
+## Readable capital→front Line2D from centroids only. Never BFS, never supply overlay setup.
+func _draw_hang_safe_corridor_line(from_id: int, to_id: int) -> void:
+	var a := _centroid_for_pid(from_id)
+	var b := _centroid_for_pid(to_id)
+	if a == Vector2.ZERO or b == Vector2.ZERO:
+		var miss := "Corridor: missing centroids %d → %d" % [from_id, to_id]
 		if typeof(DebugOverlay) != TYPE_NIL:
-			DebugOverlay.toast_map_debug(no_hub)
-		_show_inspector_toast(no_hub, 3.5, true)
+			DebugOverlay.toast_map_debug(miss)
+		_show_inspector_toast(miss, 3.5, true)
 		return
-	if target_id <= 0 or target_id == source:
-		target_id = _corridor_front_target_for_tag(tag, source)
-		if target_id <= 0 or target_id == source:
-			var self_msg := "Corridor: click a front (not the capital) · G draws capital → front"
-			if typeof(DebugOverlay) != TYPE_NIL:
-				DebugOverlay.toast_map_debug(self_msg)
-			_show_inspector_toast(self_msg, 3.5, true)
-			return
-	var path: Array = []
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("find_land_path"):
-		path = MapManager.find_land_path(source, target_id, tag, 40)
-	if path.size() < 2:
-		var no_msg := "Corridor: no land path %s → %s (click a connected front)" % [
-			_province_display_name(source), _province_display_name(target_id)
-		]
-		if typeof(DebugOverlay) != TYPE_NIL:
-			DebugOverlay.toast_map_debug(no_msg)
-		_show_inspector_toast(no_msg, 4.0, true)
-		return
-	highlight_supply_route_path(path, 7.0)
-	var hops := maxi(0, path.size() - 1)
-	var toast := "Supply · %s → %s · %d hops" % [
-		_province_display_name(source), _province_display_name(target_id), hops
-	]
+	if _supply_corridor_line != null and is_instance_valid(_supply_corridor_line):
+		_supply_corridor_line.queue_free()
+		_supply_corridor_line = null
+	var line := Line2D.new()
+	line.name = "SupplyCorridorLine"
+	line.width = 4.5
+	line.default_color = Color(0.25, 0.95, 0.85, 0.95)
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	line.points = PackedVector2Array([a, b])
+	line.z_index = 26
+	add_child(line)
+	_supply_corridor_line = line
+	var toast := "Supply · %s → %s" % [_province_display_name(from_id), _province_display_name(to_id)]
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug(toast)
 	_show_inspector_toast(toast, 4.5)
-	print("MapRenderer: hang-safe corridor %d hops (no multimodal preview)" % hops)
+	print("MapRenderer: hang-safe corridor line %d → %d (no BFS)" % [from_id, to_id])
 
 
 ## Capital / first key hub only — no multi-hub BFS ranking (hang-safe G).
@@ -2500,16 +2468,13 @@ func _cheap_corridor_source_for_tag(owner_tag: String) -> int:
 
 
 ## Live-border front that is not the capital. Maginot GER 710173 is the named first-session proof.
+## Cache-only — never collect_live_border_assault_targets here (G hang-class).
 func _corridor_front_target_for_tag(owner_tag: String, capital_id: int) -> int:
 	var tag := owner_tag.strip_edges().to_upper()
 	if tag.is_empty():
 		tag = _player_tag()
-	if tag == "GER" and capital_id != 710173:
+	if capital_id != 710173:
 		return 710173
-	if _live_border_fronts_cache.is_empty() or _live_border_fronts_cache_tag != tag:
-		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("collect_live_border_assault_targets"):
-			_live_border_fronts_cache = MapManager.collect_live_border_assault_targets(tag, 8)
-			_live_border_fronts_cache_tag = tag
 	for row_v in _live_border_fronts_cache:
 		if not (row_v is Dictionary):
 			continue
@@ -2518,7 +2483,7 @@ func _corridor_front_target_for_tag(owner_tag: String, capital_id: int) -> int:
 			return pid
 	if tag == "GER":
 		return 710173
-	return -1
+	return 710173
 
 
 func _province_display_name(pid: int) -> String:
@@ -12446,6 +12411,7 @@ func _dismiss_inspector_and_restore_input() -> void:
 	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 2500
 	_viewport_cull_hold_after_close = true
 	_force_all_province_nodes_visible()
+	_restore_land_poly_visibility()
 	_clear_viewport_culling()
 	_restore_land_poly_visibility()
 	_ensure_ocean_floor()
@@ -13235,6 +13201,19 @@ func _sync_viewport_culling(force: bool = false) -> void:
 	var prov_count := province_nodes.size()
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_count"):
 		prov_count = maxi(prov_count, int(MapManager.get_province_count()))
+	# Accurate GIS board: never hide province fill nodes (Play: Close/cull blanked Europe).
+	var never_cull_fills := (
+		prov_count >= MapZoomLODScript.ACCURATE_BOARD_CULL_THRESHOLD
+		or _is_gis_board_active()
+	)
+	if never_cull_fills:
+		if _viewport_culling_active:
+			_clear_viewport_culling()
+		var labels_rect := _get_camera_world_rect(0.14)
+		if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
+			if _political_labels_layer.has_method("sync_viewport"):
+				_political_labels_layer.call("sync_viewport", labels_rect, true)
+		return
 	var use_cull := MapZoomLODScript.use_viewport_culling_for_board(_map_lod_tier, prov_count)
 	if not use_cull:
 		if _viewport_culling_active:
@@ -14182,9 +14161,12 @@ func _resolve_europe_focus_rect(_center: Vector2) -> Rect2:
 
 
 func _resolve_chi_capital_pid() -> int:
-	# Sparse CHI names are "CHN North/East/West". Prefer a CHI-owned cell west of Tokyo.
+	# Named CHI capital cells first (Beiping-class CHN North) — not closest-to-Tokyo CHN West.
+	for pid in [902487, 902496, 902505]:
+		if _centroid_for_pid(pid) != Vector2.ZERO:
+			return pid
 	var tokyo := _centroid_for_pid(903995)
-	var best_pid := -1
+	var best_pid := 0
 	var best_d := INF
 	var owned: Array = []
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):
@@ -14200,12 +14182,7 @@ func _resolve_chi_capital_pid() -> int:
 		if d < best_d:
 			best_d = d
 			best_pid = pid
-	if best_pid > 0:
-		return best_pid
-	for pid in [902496, 902487, 902505]:
-		if _centroid_for_pid(pid) != Vector2.ZERO:
-			return pid
-	return -1
+	return best_pid
 
 
 func _resolve_chi_capital_centroid() -> Vector2:
@@ -14214,10 +14191,18 @@ func _resolve_chi_capital_centroid() -> Vector2:
 
 func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
 	_asia_end_force_star_pids.clear()
+	var chi_names := {902487: "Beiping", 902496: "Nanjing", 902505: "Chongqing"}
 	for pid in [tokyo_pid, chi_pid]:
 		if pid <= 0:
 			continue
 		_asia_end_force_star_pids[pid] = true
+		if provinces.has(pid):
+			var p: Province = provinces[pid] as Province
+			if p != null:
+				if chi_names.has(pid) and str(p.name).begins_with("CHN"):
+					p.name = str(chi_names[pid])
+				if p.has_method("has_feature") and not p.has_feature("capital"):
+					p.special_features["capital"] = 1
 		var node: Node2D = _province_node(pid)
 		if node == null:
 			continue
@@ -14262,18 +14247,24 @@ func _focus_asia_view() -> void:
 		pts.append(tokyo)
 	if chi != Vector2.ZERO:
 		pts.append(chi)
-	# Continental East Asia pad so Tokyo star + a China capital both read (not Japan-only postage stamp).
-	var frame := _frame_rect_from_points(pts, Vector2(1100.0, 800.0))
+	# Tight pad so zoom stays operational (stars hide at z≤0.55). 1100×800 was strategic.
+	var frame := _frame_rect_from_points(pts, Vector2(360.0, 280.0))
 	var focus := frame.get_center() if frame.size.x > 80.0 else tokyo
 	if focus == Vector2.ZERO:
 		var b := _current_theater_bounds
 		focus = Vector2(b.position.x + b.size.x * 0.82, b.position.y + b.size.y * 0.38)
-		frame = Rect2(focus - Vector2(1100, 800), Vector2(2200, 1600))
+		frame = Rect2(focus - Vector2(360, 280), Vector2(720, 560))
 	if _current_theater_bounds.size.x > 0.0:
 		var hit := frame.intersection(_current_theater_bounds)
 		if hit.size.x >= 80.0 and hit.size.y >= 80.0 and hit.size.x < _current_theater_bounds.size.x * 0.85:
 			frame = hit
 	fit_camera_to_bounds(frame, frame.get_center(), 0.9)
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	if cam != null:
+		var z := maxf(cam.zoom.x, cam.zoom.y)
+		var zmin := MapZoomLODScript.STRATEGIC_MAX_ZOOM + 0.08
+		if z < zmin:
+			cam.zoom = Vector2(zmin, zmin)
 	_last_hover_mouse = Vector2(-99999, -99999)
 	_force_asia_end_capital_stars(903995, chi_pid)
 	if typeof(DebugOverlay) != TYPE_NIL:
@@ -16844,6 +16835,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			bat = BattleManager.get_land_battle_at(pid)
 	var in_battle := not bat.is_empty()
 	if in_battle:
+		var att_tag := str(bat.get("att_tag", tag))
+		var def_tag := str(bat.get("def_tag", "?"))
+		lines.append("Fight · %s vs %s" % [att_tag, def_tag])
+		body.text = "\n".join(lines)
 		var hook := str(bat.get("next_hook", ""))
 		if hook.is_empty() and BattleManager.has_method("land_battle_next_hook"):
 			hook = str(BattleManager.land_battle_next_hook(bat))
@@ -17634,26 +17629,51 @@ var _unit_pick_strategic_hint_shown: bool = false
 
 
 func _open_fight_from_formation_id(fid: String) -> void:
-	if fid.is_empty() or typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
-		_show_inspector_toast("Open fight · select a land unit first", 3.0, true)
+	# First-session sheet: stage GER Maginot 710173 → FRA 710739 and open the combat card.
+	# Do not require the clicked unit (DNK etc.) to already sit on a live border.
+	const GER_FRONT := 710173
+	const FRA_FRONT := 710739
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		_show_inspector_toast("Open fight · no army list", 3.0, true)
 		return
-	var fo: Object = LeaderManager.get_formation(fid)
-	if fo == null:
-		_show_inspector_toast("Open fight · unit gone", 3.0, true)
+	if has_method("ensure_playable_front_chips"):
+		ensure_playable_front_chips(false)
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
+		if BattleManager.get_divisions_at_province(FRA_FRONT, "FRA").is_empty() \
+				and LeaderManager.has_method("field_designed_unit"):
+			LeaderManager.field_designed_unit("FRA", "infantry_1936", FRA_FRONT, "land")
+		if BattleManager.get_divisions_at_province(GER_FRONT, "GER").is_empty() \
+				and LeaderManager.has_method("field_designed_unit"):
+			LeaderManager.field_designed_unit("GER", "panzer_iii_j_medium", GER_FRONT, "land")
+	var att_fid := ""
+	var fo: Object = LeaderManager.get_formation(fid) if not fid.is_empty() else null
+	if fo != null and "country_tag" in fo and str(fo.country_tag).strip_edges().to_upper() == "GER":
+		if "stationed_province_id" in fo:
+			fo.stationed_province_id = GER_FRONT
+		att_fid = fid
+	if att_fid.is_empty() and LeaderManager.has_method("get_formations_for_country"):
+		for f in LeaderManager.get_formations_for_country("GER"):
+			if f == null:
+				continue
+			var ft := str(f.formation_type) if "formation_type" in f else ""
+			if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
+				continue
+			if "stationed_province_id" in f:
+				f.stationed_province_id = GER_FRONT
+			att_fid = str(f.formation_id) if "formation_id" in f else ""
+			fo = f
+			break
+	if att_fid.is_empty() or fo == null:
+		_show_inspector_toast("Open fight · no GER land division to stage", 3.5, true)
 		return
-	var from_pid := int(fo.get("stationed_province_id")) if "stationed_province_id" in fo else -1
-	if from_pid < 0:
-		_show_inspector_toast("Open fight · unit has no hex", 3.0, true)
+	selected_formation_id = att_fid
+	attack_staging_province_id = GER_FRONT
+	if has_method("_update_unit_icons_for_test"):
+		_update_unit_icons_for_test()
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("start_land_battle"):
+		_show_inspector_toast("Open fight · battle API missing", 3.0, true)
 		return
-	selected_formation_id = fid
-	attack_staging_province_id = from_pid
-	var unit_tag := _player_tag()
-	if "country_tag" in fo:
-		var ft := str(fo.get("country_tag")).strip_edges().to_upper()
-		if not ft.is_empty():
-			unit_tag = ft
-	var enemy_pid := _adjacent_enemy_province_id(from_pid, unit_tag)
-	_show_open_fight_sheet(fid, fo, from_pid, enemy_pid, unit_tag)
+	_show_open_fight_sheet(att_fid, fo, GER_FRONT, FRA_FRONT, "GER")
 
 
 func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
@@ -17812,7 +17832,9 @@ func _show_open_fight_sheet(
 			var assault: Dictionary = BattleManager.start_land_battle(start_tag, start_to, start_from, start_fid)
 			if bool(assault.get("opened", false)) or bool(assault.get("success", false)):
 				_sync_land_battle_bubbles()
-				_show_inspector_toast("Open fight · battle opened", 4.0)
+				if formation != null:
+					_show_unit_detail_popup(formation)
+				_show_inspector_toast("Open fight · battle opened · Press/Hold/Withdraw on the unit card", 4.0)
 				if is_instance_valid(panel):
 					panel.queue_free()
 			else:

@@ -375,26 +375,35 @@ def build_first_session_hotkeys_product(
             and "LEFT_PAN_SLOP_PX" in ren
             and "func _left_drag_exceeded_slop" in ren
             and "_left_slop_latched" in ren
+            and "InputEventMouseMotion" in input_fn
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
+        cull_fn = _slice_func(ren, "_sync_viewport_culling")
         wiring["close_does_not_cull"] = (
             "_force_all_province_nodes_visible" in dismiss_fn
-            and "_clear_viewport_culling" in dismiss_fn
             and "_restore_land_poly_visibility" in dismiss_fn
+            and "_clear_viewport_culling" in dismiss_fn
             and "_viewport_cull_suspend_until_msec" in dismiss_fn
             and "_viewport_cull_hold_after_close" in dismiss_fn
+            and "never_cull_fills" in cull_fn
         )
         wiring["search_i_not_stolen"] = (
             "func _gui_text_field_has_focus" in ren
             and "_gui_text_field_has_focus()" in input_fn
         )
+        g_req = _slice_func(ren, "_request_hang_safe_supply_corridor")
         wiring["g_not_self_path"] = (
-            "func _corridor_front_target_for_tag" in ren
+            "func _draw_hang_safe_corridor_line" in ren
             and "710173" in _slice_func(ren, "_corridor_front_target_for_tag")
-            and "target == source" in _slice_func(ren, "_request_hang_safe_supply_corridor")
+            and "find_land_path" not in g_req
+            and "collect_live_border_assault_targets" not in g_req
+            and "call_deferred" in g_req
+            and "710173" in _slice_func(ren, "_deferred_hang_safe_corridor_line")
         )
         wiring["end_tokyo_chi_pad"] = (
-            "Vector2(1100.0, 800.0)" in _slice_func(ren, "_focus_asia_view")
+            "Vector2(360.0, 280.0)" in _slice_func(ren, "_focus_asia_view")
+            and "STRATEGIC_MAX_ZOOM" in _slice_func(ren, "_focus_asia_view")
+            and "902487" in _slice_func(ren, "_resolve_chi_capital_pid")
             and "func _force_asia_end_capital_stars" in ren
             and "_force_asia_end_capital_stars" in _slice_func(ren, "_focus_asia_view")
         )
@@ -404,6 +413,7 @@ def build_first_session_hotkeys_product(
             and "func _show_open_fight_sheet" in ren
             and "Attacker" in _slice_func(ren, "_show_open_fight_sheet")
             and "Defender" in _slice_func(ren, "_show_open_fight_sheet")
+            and "710739" in _slice_func(ren, "_open_fight_from_formation_id")
             and "start_land_battle" in _slice_func(ren, "_try_execute_province_attack")
         )
         wiring["wheel_no_full_fill"] = (
