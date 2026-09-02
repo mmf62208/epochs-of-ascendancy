@@ -253,6 +253,9 @@ var _left_release_frame: int = -1
 ## Screen pos of last left release — leftover pressed=true at this hex is still THIS drag.
 var _left_release_screen: Vector2 = Vector2.ZERO
 var _left_release_screen_valid: bool = false
+## After a drag, leftover pressed=true looks like a real click (Input is down).
+## Do not reset slop until Home/End/wheel/WASD or 8px of mouse-up motion.
+var _left_ready_for_still_click: bool = true
 var _camera_nudge_gen := 0
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
 var _viewport_cull_suspend_until_msec: int = 0
@@ -1043,6 +1046,25 @@ func _left_slop_is_drag() -> bool:
 	return _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
 
 
+func _arm_still_click_after_pan() -> void:
+	_left_ready_for_still_click = true
+	_left_btn_down = false
+
+
+func _note_mouse_up_arms_still_click() -> void:
+	if _left_ready_for_still_click or _left_btn_down:
+		return
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return
+	if not _left_release_screen_valid:
+		return
+	var vp_arm: Viewport = get_viewport()
+	if vp_arm == null:
+		return
+	if vp_arm.get_mouse_position().distance_squared_to(_left_release_screen) >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+		_arm_still_click_after_pan()
+
+
 func _begin_left_map_gesture(new_press: bool = false) -> void:
 	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
 	if _left_btn_down:
@@ -1050,16 +1072,24 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
 	var physically_down: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-	# Leftover pressed=true while the physical button is up is still THIS drag —
-	# even if the cursor moved ≥8px from `_left_release_screen` (689d530
-	# away_from_release reset slop and picked Cornwall / East Asia coarse).
-	if new_press and not physically_down:
+	# Leftover pressed=true has Input down — it is not a still-click. 56b5479
+	# reset-on-physical-down wiped slop and picked Steinburg / East Asia coarse.
+	# Keep slop until Home/End/wheel/WASD or 8px of mouse-up motion.
+	if not _left_ready_for_still_click:
+		if (
+			_left_gesture_dragged
+			or _left_slop_is_drag()
+			or _left_skip_next_pick
+			or _left_pan_committed
+			or _left_release_screen_valid
+		):
+			_left_btn_down = true
+			return
+	elif new_press and not physically_down:
 		_left_btn_down = true
 		return
-	if _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick:
-		if new_press and physically_down:
-			pass
-		else:
+	if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
+		if not _left_ready_for_still_click:
 			_left_btn_down = true
 			return
 	_left_btn_down = true
@@ -1102,10 +1132,6 @@ func _note_left_gesture_motion() -> void:
 
 
 func _end_left_button_down() -> void:
-	# Synthetic release while the button is still held must not end THIS drag
-	# (mid-drag `_end` then leftover `_begin(true)` reset slop).
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		return
 	_left_btn_down = false
 	_left_pan_armed = false
 	_left_pan_active = false
@@ -1114,24 +1140,35 @@ func _end_left_button_down() -> void:
 	if vp_end != null:
 		_left_release_screen = vp_end.get_mouse_position()
 		_left_release_screen_valid = true
-	# Keep slop/dragged/_left_skip_next_pick. Leftover pressed=true (physical up)
-	# must not start slop 0. A later real physical press resets in `_begin`.
+	# Keep slop/dragged/committed. Leftover pressed=true must not reset slop
+	# (`_left_ready_for_still_click` stays false until Home or mouse-up motion).
 
 
 func _allow_left_pan_skip_to_die() -> void:
-	# Do not clear slop/dragged (idle-clear / extra-frame / away-from-release
-	# all let leftover `_begin(true)` start slop 0). `_left_release_frame` marks
-	# the last real button-up. Skip dies only on a real physical left-down.
+	# Do not clear slop/dragged. Arm a later still-click only via mouse-up motion
+	# or Home/End/wheel/WASD — never leftover `_begin(true)`.
 	if _left_btn_down:
 		return
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		return
 	if _left_release_frame < 0:
 		return
+	_note_mouse_up_arms_still_click()
 
 
 func _left_map_pick_blocked() -> bool:
-	return _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick
+	if (
+		_left_gesture_dragged
+		or _left_slop_is_drag()
+		or _left_skip_next_pick
+		or _left_pan_committed
+		or _left_slop_latched
+		or _left_gesture_panned
+	):
+		if not _left_ready_for_still_click:
+			return true
+		return _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick
+	return false
 
 
 func _accumulate_left_drag_slop() -> void:
@@ -1144,6 +1181,7 @@ func _mark_left_pan_blocked_pick() -> void:
 	_left_skip_next_pick = true
 	_left_gesture_panned = true
 	_left_slop_latched = true
+	_left_ready_for_still_click = false
 
 
 func _map_click_should_skip_pick() -> bool:
@@ -1268,6 +1306,7 @@ func _release_search_focus() -> void:
 
 func _apply_home_key(shift_pressed: bool) -> void:
 	# Home must stay cheap: recenter/fit only — no 3520 rebuild.
+	_arm_still_click_after_pan()
 	_unlock_close_camera()
 	_close_click_guard = false
 	_close_release_seen = false
@@ -1308,6 +1347,7 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_END:
+			_arm_still_click_after_pan()
 			_unlock_close_camera()
 			_close_click_guard = false
 			_close_release_seen = false
@@ -1391,6 +1431,7 @@ func _input(event: InputEvent) -> void:
 			event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN
 		):
 			if _wheel_should_zoom_map():
+				_arm_still_click_after_pan()
 				_unlock_close_camera()
 				_close_click_guard = false
 				_close_suppress_edge = false
@@ -1445,6 +1486,7 @@ func _input(event: InputEvent) -> void:
 					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
 	if event is InputEventMouseMotion:
+		_note_mouse_up_arms_still_click()
 		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			_note_left_gesture_motion()
 		if _left_pan_armed and not _left_pan_active and _left_drag_exceeded_slop():
@@ -2149,6 +2191,7 @@ func _handle_camera_input(delta: float) -> void:
 
 	if move_dir != Vector2.ZERO:
 		if key_dir != Vector2.ZERO:
+			_arm_still_click_after_pan()
 			_unlock_close_camera()
 			_close_click_guard = false
 			_close_suppress_edge = false
