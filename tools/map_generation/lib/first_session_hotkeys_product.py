@@ -390,6 +390,8 @@ def build_first_session_hotkeys_product(
             and "_left_map_pick_blocked" in _slice_func(ren, "_on_province_input")
             and "_left_map_pick_blocked" in _slice_func(ren, "_show_coarse_territory_info")
             and "new_press" in _slice_func(ren, "_begin_left_map_gesture")
+            and "_left_skip_next_pick" in _slice_func(ren, "_begin_left_map_gesture")
+            and "func _allow_left_pan_skip_to_die" in ren
             and "_clear_left_gesture_dragged_if_idle" not in ren
             and "LEFT_PAN_PICK_BLOCK_MS" not in ren
             and "_left_block_pick_until_msec" not in ren

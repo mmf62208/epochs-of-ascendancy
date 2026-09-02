@@ -1038,11 +1038,16 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
 	if _left_btn_down:
 		return
-	# _note / _arm after a pan must not start a slop-0 gesture (Play: #950208 / Asia / Sarthe).
+	# Duplicate pressed=true at the release hex is still THIS drag (Play: Orne / Sarthe / #950208).
+	# Do not start a slop-0 button-down while _left_skip_next_pick says the skip must live.
+	if _left_gesture_dragged and _left_skip_next_pick:
+		_left_btn_down = true
+		return
+	# _note / _arm after a pan must not start a slop-0 gesture.
 	if _left_gesture_dragged and not new_press:
 		_left_btn_down = true
 		return
-	# Genuine MouseButton press: new button-down, slop starts at 0. Only skip clear.
+	# Later click after a real button-up: skip was allowed to die. New button-down, slop 0.
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
 	_left_btn_down = true
@@ -1086,8 +1091,19 @@ func _end_left_button_down() -> void:
 	_left_btn_down = false
 	_left_pan_armed = false
 	_left_pan_active = false
-	# Do not idle-clear _left_gesture_dragged (Play: Sarthe pick after Atlantic pan).
-	# Skip stays until the next genuine _begin_left_map_gesture (new button-down, slop 0).
+	# Keep _left_gesture_dragged. Duplicate pressed=true must not start slop 0.
+	# Skip may die in _process after this frame's input, once the button is fully up.
+
+
+func _allow_left_pan_skip_to_die() -> void:
+	# After input (including duplicate press/release of THIS drag). Not idle-clear of dragged.
+	# A later click may then _begin(true) with slop 0. Same-frame leftover still has skip_next.
+	if _left_btn_down:
+		return
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return
+	if _left_gesture_dragged:
+		_left_skip_next_pick = false
 
 
 func _left_map_pick_blocked() -> bool:
@@ -1926,6 +1942,7 @@ func _process(delta: float) -> void:
 	# Reassert the Close-time GIS camera (not europe_center) so pick-center / clamp cannot teleport.
 	_handle_camera_input(delta)
 	_reassert_locked_close_camera()
+	_allow_left_pan_skip_to_die()
 	# GIS dual-map watchdog: re-lock canvas identity + equirect underlay every ~0.5s while playing.
 	if _is_gis_board_active() and Engine.get_process_frames() % 30 == 0:
 		_reassert_gis_single_canvas()
