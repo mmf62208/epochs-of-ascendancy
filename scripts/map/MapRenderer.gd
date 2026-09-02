@@ -254,7 +254,8 @@ var _left_release_frame: int = -1
 var _left_release_screen: Vector2 = Vector2.ZERO
 var _left_release_screen_valid: bool = false
 ## After a drag, leftover pressed=true looks like a real click (Input is down).
-## Do not reset slop until Home/End/wheel/WASD or 8px of mouse-up motion.
+## Do not reset slop until Home/End/wheel/WASD. Mouse-up motion must not arm
+## (1680687 8px mouse-up armed leftover and picked Ille-et-Vilaine).
 var _left_ready_for_still_click: bool = true
 var _camera_nudge_gen := 0
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
@@ -1052,17 +1053,9 @@ func _arm_still_click_after_pan() -> void:
 
 
 func _note_mouse_up_arms_still_click() -> void:
-	if _left_ready_for_still_click or _left_btn_down:
-		return
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		return
-	if not _left_release_screen_valid:
-		return
-	var vp_arm: Viewport = get_viewport()
-	if vp_arm == null:
-		return
-	if vp_arm.get_mouse_position().distance_squared_to(_left_release_screen) >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
-		_arm_still_click_after_pan()
+	# 1680687: 8px of mouse-up motion after `_end` armed leftover pressed=true
+	# and picked Ille-et-Vilaine. Do not arm here. Home/End/wheel/WASD only.
+	return
 
 
 func _begin_left_map_gesture(new_press: bool = false) -> void:
@@ -1072,20 +1065,13 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
 	var physically_down: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-	# Leftover pressed=true has Input down — it is not a still-click. 56b5479
-	# reset-on-physical-down wiped slop and picked Steinburg / East Asia coarse.
-	# Keep slop until Home/End/wheel/WASD or 8px of mouse-up motion.
+	# Leftover pressed=true has Input down. Never reset slop until Home/End/wheel/WASD
+	# (`_left_ready_for_still_click`). Mouse-up 8px / `_left_release_screen` must not arm
+	# (1680687 Ille-et-Vilaine).
 	if not _left_ready_for_still_click:
-		if (
-			_left_gesture_dragged
-			or _left_slop_is_drag()
-			or _left_skip_next_pick
-			or _left_pan_committed
-			or _left_release_screen_valid
-		):
-			_left_btn_down = true
-			return
-	elif new_press and not physically_down:
+		_left_btn_down = true
+		return
+	if new_press and not physically_down:
 		_left_btn_down = true
 		return
 	if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
@@ -1141,34 +1127,26 @@ func _end_left_button_down() -> void:
 		_left_release_screen = vp_end.get_mouse_position()
 		_left_release_screen_valid = true
 	# Keep slop/dragged/committed. Leftover pressed=true must not reset slop
-	# (`_left_ready_for_still_click` stays false until Home or mouse-up motion).
+	# (`_left_ready_for_still_click` stays false until Home/End/wheel/WASD).
 
 
 func _allow_left_pan_skip_to_die() -> void:
-	# Do not clear slop/dragged. Arm a later still-click only via mouse-up motion
-	# or Home/End/wheel/WASD — never leftover `_begin(true)`.
+	# Do not clear slop/dragged. Do not arm on mouse-up motion (1680687).
+	# Home/End/wheel/WASD arm a later still-click (Berlin after Home).
 	if _left_btn_down:
 		return
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		return
 	if _left_release_frame < 0:
 		return
-	_note_mouse_up_arms_still_click()
 
 
 func _left_map_pick_blocked() -> bool:
-	if (
-		_left_gesture_dragged
-		or _left_slop_is_drag()
-		or _left_skip_next_pick
-		or _left_pan_committed
-		or _left_slop_latched
-		or _left_gesture_panned
-	):
-		if not _left_ready_for_still_click:
-			return true
-		return _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick
-	return false
+	# After a drag, block every mouse writer until Home/End/wheel/WASD.
+	# Leftover `_begin(true)` must not be able to clear this (1680687).
+	if not _left_ready_for_still_click:
+		return true
+	return _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick
 
 
 func _accumulate_left_drag_slop() -> void:
