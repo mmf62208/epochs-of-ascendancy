@@ -383,9 +383,11 @@ def build_first_session_hotkeys_product(
             and "_left_press_cam_pos" in ren
             and "func _accumulate_left_drag_slop" in ren
             and "_left_max_slop_sq" in ren
-            and "_left_block_pick_until_msec" in ren
+            and "func _begin_left_map_gesture" in ren
+            and "_left_gesture_dragged" in ren
+            and "_left_btn_down" in ren
             and "InputEventMouseMotion" in input_fn
-            and "_left_skip_next_pick" in input_fn
+            and "_left_gesture_dragged" in input_fn
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")

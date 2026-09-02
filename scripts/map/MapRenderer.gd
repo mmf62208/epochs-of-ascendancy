@@ -244,9 +244,10 @@ var _left_press_cam_valid := false
 var _left_origin_screen: Vector2 = Vector2.ZERO
 var _left_origin_valid: bool = false
 var _left_max_slop_sq: float = 0.0
-## After a real pan, ignore a synthetic still-click at the release hex (Play: A Coruña).
-var _left_block_pick_until_msec: int = 0
-const LEFT_PAN_PICK_BLOCK_MS := 400
+## This left-button-down: once slop exceeds 8px, THIS release cannot pick (no time-box).
+var _left_btn_down: bool = false
+var _left_gesture_dragged: bool = false
+var _left_gesture_origin: Vector2 = Vector2.ZERO
 var _camera_nudge_gen := 0
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
 var _viewport_cull_suspend_until_msec: int = 0
@@ -1024,53 +1025,78 @@ const WHEEL_TERRAIN_REFRESH_MS := 180
 
 
 func _left_drag_exceeded_slop() -> bool:
-	_accumulate_left_drag_slop()
-	if _left_pan_committed or _left_pan_active or _left_slop_latched or _left_gesture_panned:
+	_note_left_gesture_motion()
+	if _left_gesture_dragged or _left_pan_committed or _left_pan_active or _left_slop_latched or _left_gesture_panned:
 		return true
 	if _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
-		_left_slop_latched = true
-		return true
-	var vp: Viewport = get_viewport()
-	if vp == null:
-		return false
-	# Measure from the original press even if _input already cleared _left_pan_armed.
-	var origin: Vector2 = _left_origin_screen if _left_origin_valid else _left_press_screen
-	var delta: Vector2 = vp.get_mouse_position() - origin
-	if delta.length_squared() >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
 		_left_slop_latched = true
 		return true
 	return false
 
 
-func _accumulate_left_drag_slop() -> void:
+func _begin_left_map_gesture() -> void:
+	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
+	if _left_btn_down:
+		return
+	var vp: Viewport = get_viewport()
+	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	_left_btn_down = true
+	_left_gesture_dragged = false
+	_left_gesture_origin = mouse
+	_left_origin_screen = mouse
+	_left_origin_valid = true
+	_left_max_slop_sq = 0.0
+	_left_press_screen = mouse
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_skip_next_pick = false
+	_left_pan_committed = false
+	_left_press_cam_valid = false
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	if cam != null:
+		_left_press_cam_pos = cam.global_position
+		_left_press_cam_valid = true
+
+
+func _note_left_gesture_motion() -> void:
+	if not _left_btn_down:
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_begin_left_map_gesture()
+		else:
+			return
 	var vp: Viewport = get_viewport()
 	if vp == null:
 		return
-	var left_down: bool = _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-	if not left_down:
-		return
-	if not _left_origin_valid:
-		_left_origin_screen = _left_press_screen if _left_press_screen != Vector2.ZERO else vp.get_mouse_position()
-		_left_origin_valid = true
-		_left_max_slop_sq = 0.0
-	var slop_sq: float = vp.get_mouse_position().distance_squared_to(_left_origin_screen)
+	var slop_sq: float = vp.get_mouse_position().distance_squared_to(_left_gesture_origin)
 	if slop_sq > _left_max_slop_sq:
 		_left_max_slop_sq = slop_sq
-	if _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+	if slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
 		_mark_left_pan_blocked_pick()
 
 
+func _end_left_button_down() -> void:
+	_left_btn_down = false
+	_left_pan_armed = false
+	_left_pan_active = false
+	# Keep _left_gesture_dragged until the next _begin_left_map_gesture.
+
+
+func _accumulate_left_drag_slop() -> void:
+	_note_left_gesture_motion()
+
+
 func _mark_left_pan_blocked_pick() -> void:
+	_left_gesture_dragged = true
 	_left_pan_committed = true
 	_left_skip_next_pick = true
 	_left_gesture_panned = true
 	_left_slop_latched = true
-	_left_block_pick_until_msec = Time.get_ticks_msec() + LEFT_PAN_PICK_BLOCK_MS
 
 
 func _map_click_should_skip_pick() -> bool:
-	_accumulate_left_drag_slop()
-	if Time.get_ticks_msec() < _left_block_pick_until_msec:
+	_note_left_gesture_motion()
+	# Gesture-scoped: this button-down already exceeded 8px — this release cannot select.
+	if _left_gesture_dragged:
 		return true
 	if _close_click_guard or _left_pan_committed or _left_gesture_moved_camera():
 		return true
@@ -1141,30 +1167,13 @@ func _finish_close_click_guard_on_new_press() -> void:
 
 
 func _arm_left_map_press() -> void:
-	# Duplicate press mid-drag must not reset slop / committed (Play: release still picked).
-	if _left_pan_armed:
-		return
+	# Mid-drag re-arm must not reset the button-down origin (Play: Finistère after 80px).
+	_begin_left_map_gesture()
 	_left_pan_armed = true
-	_left_pan_active = false
-	_left_press_screen = get_viewport().get_mouse_position()
-	_last_mouse_pos = _left_press_screen
-	# Synthetic still-click after a pan (Play: A Coruña) — keep origin / skip.
-	if Time.get_ticks_msec() < _left_block_pick_until_msec or _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+	if not _left_pan_active:
+		_last_mouse_pos = get_viewport().get_mouse_position()
+	if _left_gesture_dragged:
 		_mark_left_pan_blocked_pick()
-		return
-	# Fresh press — new gesture. Previous drag's committed flag must not block this click.
-	_left_slop_latched = false
-	_left_gesture_panned = false
-	_left_skip_next_pick = false
-	_left_pan_committed = false
-	_left_press_cam_valid = false
-	_left_origin_screen = _left_press_screen
-	_left_origin_valid = true
-	_left_max_slop_sq = 0.0
-	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
-	if cam != null:
-		_left_press_cam_pos = cam.global_position
-		_left_press_cam_valid = true
 
 
 func _camera_is_held() -> bool:
@@ -1349,12 +1358,8 @@ func _input(event: InputEvent) -> void:
 			else:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
-			# Any new press (incl. ctrl/shift) starts a fresh gesture so a later click still picks.
-			# Do not reset during the post-pan block — that re-arm is the A Coruña still-click.
-			if event.pressed and not _left_pan_armed:
-				if Time.get_ticks_msec() >= _left_block_pick_until_msec:
-					_left_pan_committed = false
-					_left_press_cam_valid = false
+			if event.pressed:
+				_begin_left_map_gesture()
 			if event.ctrl_pressed or event.shift_pressed:
 				pass
 			elif MapViewInput.modal_blocks_map_nav(get_viewport()):
@@ -1372,18 +1377,16 @@ func _input(event: InputEvent) -> void:
 				if _wheel_should_zoom_map() or not _gui_text_field_has_focus():
 					_arm_left_map_press()
 			elif not event.pressed:
-				var did_left_pan := _map_click_should_skip_pick()
-				_left_pan_armed = false
-				_left_pan_active = false
+				_note_left_gesture_motion()
+				var did_left_pan: bool = _left_gesture_dragged or _map_click_should_skip_pick()
+				_end_left_button_down()
 				_note_close_button_release()
 				if did_left_pan:
-					_left_skip_next_pick = true
-					_left_gesture_panned = true
+					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
-				# Keep slop/gesture/committed until _unhandled_input skips the pick.
 	if event is InputEventMouseMotion:
-		if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-			_accumulate_left_drag_slop()
+		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_note_left_gesture_motion()
 		if _left_pan_armed and not _left_pan_active and _left_drag_exceeded_slop():
 			_left_pan_active = true
 			_mark_left_pan_blocked_pick()
@@ -1673,6 +1676,15 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dismiss_inspector_and_restore_input()
 			get_viewport().set_input_as_handled()
 			return
+		if not event.ctrl_pressed and not event.shift_pressed:
+			if event.pressed:
+				_begin_left_map_gesture()
+			_note_left_gesture_motion()
+			if _left_gesture_dragged:
+				if not event.pressed:
+					_end_left_button_down()
+				get_viewport().set_input_as_handled()
+				return
 		if event.pressed and _close_click_guard:
 			if _close_release_seen:
 				_finish_close_click_guard_on_new_press()
@@ -1701,31 +1713,27 @@ func _unhandled_input(event: InputEvent) -> void:
 				_arm_left_map_press()
 				return
 		else:
-			var did_left_pan := _map_click_should_skip_pick()
-			_left_pan_armed = false
-			_left_pan_active = false
+			var did_left_pan: bool = _left_gesture_dragged or _map_click_should_skip_pick()
+			_end_left_button_down()
 			_note_close_button_release()
 			if did_left_pan:
-				# Do not clear _left_pan_committed — the next press is the only reset.
+				_mark_left_pan_blocked_pick()
 				get_viewport().set_input_as_handled()
 				return
+			# Still-click: old skip flags must not leak, but _left_gesture_dragged stays false.
 			_left_skip_next_pick = false
 			_left_slop_latched = false
 			_left_gesture_panned = false
 			_left_pan_committed = false
-			# Keep _left_press_cam_valid — hard skip below still sees camera-delta after flag reset.
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				return
 			if _gui_blocks_map_pick():
 				get_viewport().set_input_as_handled()
 				return
-		# Hard skip before capital-star snap / hex pick / title boot.
-		# Play 297e8bd: Atlantic 20px pan still opened A Coruña — flags reset then re-armed
-		# at the release hex so camera-delta looked like a still-click.
+		# Gesture-scoped skip before capital-star snap / hex pick / title boot.
 		if not event.ctrl_pressed and not event.shift_pressed:
-			if _map_click_should_skip_pick() or _left_gesture_moved_camera():
-				_left_pan_armed = false
-				_left_pan_active = false
+			if _left_gesture_dragged or _map_click_should_skip_pick() or _left_gesture_moved_camera():
+				_end_left_button_down()
 				_mark_left_pan_blocked_pick()
 				get_viewport().set_input_as_handled()
 				return
