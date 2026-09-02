@@ -1384,6 +1384,7 @@ func _input(event: InputEvent) -> void:
 				_begin_left_map_gesture()
 				# Duplicate pressed=true after _end must not start a still-click pick.
 				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+					_arm_left_map_press()
 					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
 					return
@@ -1708,7 +1709,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_begin_left_map_gesture()
 			_note_left_gesture_motion()
 			if _left_map_pick_blocked():
-				if not event.pressed:
+				if event.pressed:
+					_arm_left_map_press()
+				else:
 					_end_left_button_down()
 				get_viewport().set_input_as_handled()
 				return
