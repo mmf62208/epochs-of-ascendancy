@@ -728,7 +728,7 @@ func _apply_tier_visibility(tier: int) -> void:
 		if lbl is Label:
 			var l := lbl as Label
 			var force := l.has_meta("force_visible") and bool(l.get_meta("force_visible"))
-			var anchor := l.position
+			var anchor: Vector2 = l.position
 			if l.has_meta("label_anchor"):
 				anchor = l.get_meta("label_anchor") as Vector2
 			var in_view := (
