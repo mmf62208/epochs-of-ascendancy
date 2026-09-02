@@ -1034,7 +1034,7 @@ func _map_click_should_skip_pick() -> bool:
 
 func _lock_close_camera() -> void:
 	# Snapshot the live GIS camera BEFORE hide/pick. Legacy europe_center() is Greenland on this board.
-	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
 		_close_camera_lock_pos = cam.global_position
 		_close_camera_lock_zoom = cam.zoom
@@ -1050,7 +1050,7 @@ func _unlock_close_camera() -> void:
 func _reassert_locked_close_camera() -> void:
 	if not _close_camera_locked:
 		return
-	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	if cam == null:
 		return
 	if cam.global_position.distance_squared_to(_close_camera_lock_pos) > 0.25:
@@ -1108,7 +1108,7 @@ func _mouse_over_close_control() -> bool:
 			if n is BaseButton and (n as CanvasItem).visible:
 				return true
 		if n is BaseButton and (n as CanvasItem).visible:
-			var txt := (n as BaseButton).text.strip_edges().to_lower()
+			var txt: String = (n as BaseButton).text.strip_edges().to_lower()
 			if txt == "close":
 				return true
 		n = n.get_parent()
@@ -1134,7 +1134,7 @@ func _apply_home_key(shift_pressed: bool) -> void:
 	_map_pick_block_until_msec = 0
 	_asia_end_force_star_pids.clear()
 	_asia_end_china_anchor = Vector2.ZERO
-	var end_overlay := (container if container != null else self).get_node_or_null("AsiaEndStarOverlay")
+	var end_overlay: Node = (container if container != null else self).get_node_or_null("AsiaEndStarOverlay")
 	if end_overlay != null:
 		end_overlay.queue_free()
 	ensure_world_navigation_ready()
@@ -14508,8 +14508,8 @@ func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
 
 
 func _ensure_asia_end_star_overlay() -> Node2D:
-	var host := container if container != null else self
-	var overlay := host.get_node_or_null("AsiaEndStarOverlay") as Node2D
+	var host: Node2D = container if container != null else self
+	var overlay: Node2D = host.get_node_or_null("AsiaEndStarOverlay") as Node2D
 	if overlay != null and is_instance_valid(overlay):
 		return overlay
 	overlay = Node2D.new()
@@ -14521,7 +14521,7 @@ func _ensure_asia_end_star_overlay() -> Node2D:
 
 
 func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
-	var overlay := _ensure_asia_end_star_overlay()
+	var overlay: Node2D = _ensure_asia_end_star_overlay()
 	if overlay == null:
 		return
 	for child in overlay.get_children():
@@ -14536,7 +14536,7 @@ func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
 		var center: Vector2 = _centroid_for_pid(pid)
 		if center == Vector2.ZERO:
 			continue
-		var star := Label.new()
+		var star: Label = Label.new()
 		star.name = "AsiaEndStar_%d" % pid
 		star.text = "★"
 		star.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -14549,9 +14549,9 @@ func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
 		star.set_meta(META_MAP_GLYPH_CAPITAL, true)
 		star.set_meta(META_MAP_GLYPH_PX, 32)
 		# Beiping: sit above garrison/division chips (Play: first End hid the CHI star).
-		var extra := Vector2(0.0, -18.0) if pid == 902487 else Vector2.ZERO
+		var extra: Vector2 = Vector2(0.0, -18.0) if pid == 902487 else Vector2.ZERO
 		star.reset_size()
-		var sms := star.get_minimum_size()
+		var sms: Vector2 = star.get_minimum_size()
 		star.position = center - sms * 0.5 + extra
 		overlay.add_child(star)
 		star.reset_size()
