@@ -375,23 +375,33 @@ def build_first_session_hotkeys_product(
             and "LEFT_PAN_SLOP_PX" in ren
             and "func _left_drag_exceeded_slop" in ren
             and "_left_slop_latched" in ren
+            and "_left_gesture_panned" in ren
+            and "func _map_click_should_skip_pick" in ren
             and "InputEventMouseMotion" in input_fn
             and "_left_skip_next_pick" in input_fn
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")
+        process_fn = _slice_func(ren, "_process")
         wiring["close_does_not_cull"] = (
             "never_cull_fills" in cull_fn
             and "_map_pick_block_until_msec" in dismiss_fn
             and "_hold_camera_now" in dismiss_fn
-            and "_restore_held_camera" in dismiss_fn
+            and "_restore_held_camera" not in dismiss_fn
+            and "_restore_held_camera" not in process_fn
             and "_ensure_ocean_floor" not in dismiss_fn
             and "_center_camera_on_province" not in dismiss_fn
+            and "_clamp_camera_to_theater" not in dismiss_fn
             and "_force_all_province_nodes_visible" not in dismiss_fn
             and "func _gui_blocks_map_pick" in ren
+            and "func _camera_is_held" in ren
+            and "_camera_is_held" in _slice_func(ren, "_center_camera_on_province")
+            and "_camera_is_held" in _slice_func(ren, "_show_coarse_territory_info")
+            and "_camera_is_held" in _slice_func(ren, "_clamp_camera_to_theater")
             and "supply_mode" in _slice_func(ren, "_select_province")
             and "_refresh_supply_highlights" in _slice_func(ren, "_select_province")
-            and "_restore_held_camera" in _slice_func(ren, "_process")
+            and "ACTION_MODE_BUTTON_PRESS" in ren
+            and "func _release_search_focus" in ren
         )
         wiring["search_i_not_stolen"] = (
             "func _gui_text_field_has_focus" in ren
@@ -411,9 +421,11 @@ def build_first_session_hotkeys_product(
             and "902487" in _slice_func(ren, "_resolve_chi_capital_pid")
             and "func _force_asia_end_capital_stars" in ren
             and "_force_asia_end_capital_stars" in _slice_func(ren, "_focus_asia_view")
-            and "force_nation_label_at" in _slice_func(ren, "_focus_asia_view")
+            and "_pin_asia_end_china_label" in _slice_func(ren, "_focus_asia_view")
+            and "force_nation_label_at" in _slice_func(ren, "_pin_asia_end_china_label")
             and "902487" in _slice_func(ren, "_force_asia_end_capital_stars")
             and "AsiaEndStarHost" in _slice_func(ren, "_force_asia_end_capital_stars")
+            and "China" in _slice_func(ren, "_pin_asia_end_china_label")
         )
         open_fn = _slice_func(ren, "_open_fight_from_formation_id")
         wiring["open_fight_sheet"] = (

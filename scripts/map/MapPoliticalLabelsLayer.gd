@@ -636,9 +636,13 @@ func _resolve_label_collisions(labels: Array, min_sep: float) -> void:
 			var la: Label = labels[i] as Label
 			if la == null:
 				continue
+			if la.has_meta("force_visible") and bool(la.get_meta("force_visible")):
+				continue
 			for j in range(i + 1, labels.size()):
 				var lb: Label = labels[j] as Label
 				if lb == null:
+					continue
+				if lb.has_meta("force_visible") and bool(lb.get_meta("force_visible")):
 					continue
 				var delta := la.position - lb.position
 				var dist := delta.length()
@@ -695,7 +699,9 @@ func force_nation_label_at(tag: String, world_pos: Vector2, display_name: String
 	lbl.set_meta("label_anchor", world_pos)
 	lbl.set_meta("force_visible", true)
 	lbl.visible = true
-	lbl.z_index = 14
+	lbl.z_index = 22
+	lbl.add_theme_font_size_override("font_size", 26)
+	lbl.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	_fit_and_center_label(lbl)
 
 
@@ -722,10 +728,14 @@ func _apply_tier_visibility(tier: int) -> void:
 		if lbl is Label:
 			var l := lbl as Label
 			var force := l.has_meta("force_visible") and bool(l.get_meta("force_visible"))
+			var anchor := l.position
+			if l.has_meta("label_anchor"):
+				anchor = l.get_meta("label_anchor") as Vector2
 			var in_view := (
 				force
 				or not _viewport_culling_active
 				or _viewport_rect.size == Vector2.ZERO
+				or _viewport_rect.has_point(anchor)
 				or _viewport_rect.has_point(l.position)
 			)
 			l.visible = (show_n or force) and in_view

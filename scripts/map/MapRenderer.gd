@@ -217,12 +217,12 @@ const LEFT_PAN_SLOP_PX := 8.0
 var _left_slop_latched := false
 ## Skip the hex pick on the release that ends a left-drag pan (Play: drag also picked).
 var _left_skip_next_pick := false
+## True once this left-drag actually moved the camera (release must not pick).
+var _left_gesture_panned := false
 ## Close click-through: ignore map picks until this msec (Play: Iberia→Greenland).
 var _map_pick_block_until_msec: int = 0
-## Close/Esc: freeze camera so a same-frame hex pick cannot teleport to Greenland.
+## Close/Esc: do not move the camera (no snapshot restore — that still teleported).
 var _hold_camera_until_msec: int = 0
-var _hold_camera_pos := Vector2.ZERO
-var _hold_camera_zoom := Vector2.ONE
 var _last_mouse_pos := Vector2.ZERO
 ## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
 var _inspector_held_closed := false
@@ -232,6 +232,8 @@ var _viewport_cull_suspend_until_msec: int = 0
 var _viewport_cull_hold_after_close: bool = false
 ## End: keep Tokyo + CHI capital stars visible even at strategic zoom.
 var _asia_end_force_star_pids: Dictionary = {}
+## End: pin the China nation label so viewport cull / rebuild cannot drop it.
+var _asia_end_china_anchor := Vector2.ZERO
 
 var provinces: Dictionary[int, Province] = {}
 var geometry: Dictionary = {}
@@ -454,6 +456,7 @@ func _ready():
 		btn_close.process_mode = Node.PROCESS_MODE_ALWAYS
 		btn_close.focus_mode = Control.FOCUS_NONE
 		btn_close.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn_close.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		if not btn_close.pressed.is_connected(_on_close_pressed):
 			btn_close.pressed.connect(_on_close_pressed)
 	else:
@@ -1000,13 +1003,12 @@ const WHEEL_TERRAIN_REFRESH_MS := 180
 
 
 func _left_drag_exceeded_slop() -> bool:
-	if _left_pan_active or _left_slop_latched:
+	if _left_pan_active or _left_slop_latched or _left_gesture_panned:
 		return true
-	if not _left_pan_armed:
-		return false
 	var vp := get_viewport()
 	if vp == null:
 		return false
+	# Measure from the original press even if _input already cleared _left_pan_armed.
 	var delta := vp.get_mouse_position() - _left_press_screen
 	if delta.length_squared() >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
 		_left_slop_latched = true
@@ -1014,9 +1016,51 @@ func _left_drag_exceeded_slop() -> bool:
 	return false
 
 
+func _map_click_should_skip_pick() -> bool:
+	if _left_skip_next_pick or _left_gesture_panned or _left_slop_latched or _left_pan_active:
+		return true
+	return _left_drag_exceeded_slop()
+
+
+func _camera_is_held() -> bool:
+	# Time-boxed only. Do not latch on _inspector_held_closed — that blocked every later hex pick.
+	var now := Time.get_ticks_msec()
+	return now < _hold_camera_until_msec or now < _map_pick_block_until_msec
+
+
+func _mouse_over_close_control() -> bool:
+	var vp := get_viewport()
+	if vp == null:
+		return false
+	var hov: Control = vp.gui_get_hovered_control()
+	if hov == null:
+		return false
+	var n: Node = hov
+	while n != null:
+		var nn := str(n.name)
+		if nn == "BtnClose" or nn == "CloseSupplyLegend" or nn.begins_with("Close"):
+			if n is BaseButton and (n as CanvasItem).visible:
+				return true
+		n = n.get_parent()
+	return false
+
+
+func _release_search_focus() -> void:
+	var vp := get_viewport()
+	if vp == null:
+		return
+	var fo: Control = vp.gui_get_focus_owner()
+	if fo is LineEdit or fo is TextEdit or fo is CodeEdit:
+		vp.gui_release_focus()
+
+
 func _apply_home_key(shift_pressed: bool) -> void:
 	# Home must stay cheap: recenter/fit only — no 3520 rebuild.
+	_hold_camera_until_msec = 0
+	_inspector_held_closed = false
+	_map_pick_block_until_msec = 0
 	_asia_end_force_star_pids.clear()
+	_asia_end_china_anchor = Vector2.ZERO
 	ensure_world_navigation_ready()
 	if shift_pressed:
 		fit_camera_to_full_world()
@@ -1146,26 +1190,35 @@ func _input(event: InputEvent) -> void:
 				_left_pan_armed = false
 				_left_pan_active = false
 			elif event.pressed:
+				# Close on press so the release cannot pick the hex under the button.
+				if _mouse_over_close_control() and _inspector_stack_blocking_input():
+					_dismiss_inspector_and_restore_input()
+					get_viewport().set_input_as_handled()
+					return
 				# Arm pan on the map even if a HUD Control is hovered (search/toolbar).
 				# LineEdit/Scroll still keep their own drag via _wheel_should_zoom_map false path below.
 				if _wheel_should_zoom_map() or not _gui_text_field_has_focus():
 					_left_pan_armed = true
 					_left_pan_active = false
 					_left_slop_latched = false
+					_left_gesture_panned = false
+					_left_skip_next_pick = false
 					_left_press_screen = get_viewport().get_mouse_position()
 					_last_mouse_pos = _left_press_screen
 			elif not event.pressed:
-				var did_left_pan := _left_drag_exceeded_slop()
+				var did_left_pan := _map_click_should_skip_pick()
 				_left_pan_armed = false
 				_left_pan_active = false
 				if did_left_pan:
 					_left_skip_next_pick = true
+					_left_gesture_panned = true
 					get_viewport().set_input_as_handled()
-				# Keep _left_slop_latched until _unhandled_input skips the pick.
+				# Keep slop/gesture latches until _unhandled_input skips the pick.
 	if event is InputEventMouseMotion and _left_pan_armed and not _left_pan_active:
 		if _left_drag_exceeded_slop():
 			_left_pan_active = true
 			_left_skip_next_pick = true
+			_left_gesture_panned = true
 			get_viewport().set_input_as_handled()
 
 
@@ -1444,7 +1497,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		if Time.get_ticks_msec() < _map_pick_block_until_msec:
+		if _camera_is_held() or Time.get_ticks_msec() < _map_pick_block_until_msec:
+			get_viewport().set_input_as_handled()
+			return
+		if _mouse_over_close_control():
+			if _inspector_stack_blocking_input():
+				_dismiss_inspector_and_restore_input()
 			get_viewport().set_input_as_handled()
 			return
 		if event.pressed:
@@ -1452,37 +1510,40 @@ func _unhandled_input(event: InputEvent) -> void:
 				_left_pan_armed = false
 				_left_pan_active = false
 				return
-			# Snapshot before Close/chip release so a click-through pick cannot keep a Greenland jump.
-			if _inspector_stack_blocking_input() or _is_mouse_over_blocking_ui():
-				_hold_camera_now()
 			# Ctrl/Shift keep immediate pick (assault / debug / engineers) unless the cursor is on Close.
 			if (event.ctrl_pressed or event.shift_pressed) and _gui_blocks_map_pick():
 				get_viewport().set_input_as_handled()
 				return
 			# Plain press arms pan so Rhine chip-carpet drags pan instead of jump-zoom.
 			if not event.ctrl_pressed and not event.shift_pressed:
+				if not _left_pan_armed:
+					_left_press_screen = get_viewport().get_mouse_position()
+					_last_mouse_pos = _left_press_screen
+					_left_slop_latched = false
+					_left_gesture_panned = false
+					_left_skip_next_pick = false
 				_left_pan_armed = true
 				_left_pan_active = false
-				_left_slop_latched = false
-				_left_skip_next_pick = false
-				_left_press_screen = get_viewport().get_mouse_position()
-				_last_mouse_pos = _left_press_screen
 				return
 		else:
-			var did_left_pan := _left_skip_next_pick or _left_drag_exceeded_slop()
+			var did_left_pan := _map_click_should_skip_pick()
 			_left_pan_armed = false
 			_left_pan_active = false
-			_left_slop_latched = false
-			_left_skip_next_pick = false
 			if did_left_pan:
+				_left_skip_next_pick = false
+				_left_slop_latched = false
+				_left_gesture_panned = false
 				get_viewport().set_input_as_handled()
 				return
+			_left_skip_next_pick = false
+			_left_slop_latched = false
+			_left_gesture_panned = false
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				return
 			if _gui_blocks_map_pick():
-				_restore_held_camera()
 				get_viewport().set_input_as_handled()
 				return
+		_release_search_focus()
 		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
 		# Land division chips beat capital stars (Play: chips opened Praha inspector).
 		# Air/fleet still lose to stars (Berlin star vs Air Wing PASS).
@@ -1627,8 +1688,8 @@ func _process(delta: float) -> void:
 		sim_paused = true
 
 	# Camera always — pan/zoom/edge must work while paused (looking at map is the playtest path).
+	# Do not snapshot-restore here: writing a held camera teleported Europe→Greenland.
 	_handle_camera_input(delta)
-	_restore_held_camera()
 	# GIS dual-map watchdog: re-lock canvas identity + equirect underlay every ~0.5s while playing.
 	if _is_gis_board_active() and Engine.get_process_frames() % 30 == 0:
 		_reassert_gis_single_canvas()
@@ -1762,11 +1823,27 @@ func _handle_camera_input(delta: float) -> void:
 		var current_mouse := get_viewport().get_mouse_position()
 		var drag_delta := current_mouse - _last_mouse_pos
 		if drag_delta.length_squared() > 0.01:
-			cam.global_position -= drag_delta * middle_mouse_pan_speed / cam.zoom.x
-			moved = true
+			if _camera_is_held() and _left_pan_active and _left_skip_next_pick:
+				# Leftover Close click — do not slide the camera.
+				_left_pan_active = false
+				_left_pan_armed = false
+			else:
+				if _camera_is_held() and _left_pan_active:
+					_hold_camera_until_msec = 0
+					_inspector_held_closed = false
+					_map_pick_block_until_msec = 0
+				cam.global_position -= drag_delta * middle_mouse_pan_speed / cam.zoom.x
+				moved = true
+				if _left_pan_active:
+					_left_gesture_panned = true
+					_left_skip_next_pick = true
 		_last_mouse_pos = current_mouse
 
 	if move_dir != Vector2.ZERO:
+		if _camera_is_held():
+			_hold_camera_until_msec = 0
+			_inspector_held_closed = false
+			_map_pick_block_until_msec = 0
 		move_dir = move_dir.normalized()
 		# edge_scroll_speed for edge/WASD feel; pan_speed kept as alias baseline
 		var speed := maxf(pan_speed, edge_scroll_speed)
@@ -12358,7 +12435,7 @@ func _sync_capital_star_scales(_z: float = -1.0) -> void:
 		if node == null:
 			continue
 		var force := _asia_end_force_star_pids.has(int(pid))
-		var use_px := 16 if force and px <= 0 else px
+		var use_px := 20 if force and px <= 0 else px
 		for child in node.get_children():
 			if not (child is Label) or not (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
 				continue
@@ -12460,32 +12537,12 @@ func _gui_blocks_map_pick() -> bool:
 
 
 func _hold_camera_now() -> void:
+	# Hold only — never snapshot-write. Restore of a stale/wrong camera teleported to Greenland.
+	_hold_camera_until_msec = Time.get_ticks_msec() + 900
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
-	if cam == null:
-		return
-	_hold_camera_pos = cam.global_position
-	_hold_camera_zoom = cam.zoom
-	_hold_camera_until_msec = Time.get_ticks_msec() + 750
-	_last_viewport_cull_pos = cam.global_position
-	_last_viewport_cull_zoom = _get_camera_zoom()
-
-
-func _restore_held_camera() -> void:
-	var cam := get_viewport().get_camera_2d() if get_viewport() else null
-	if cam == null:
-		return
-	if Time.get_ticks_msec() >= _hold_camera_until_msec:
-		return
-	if _hold_camera_pos == Vector2.ZERO and _hold_camera_zoom == Vector2.ONE:
-		return
-	# User pan/WASD/edge: drop the hold. Only undo teleport-scale jumps (Iberia→Greenland).
-	if _left_pan_active or _is_middle_dragging:
-		_hold_camera_until_msec = 0
-		return
-	if cam.global_position.distance_squared_to(_hold_camera_pos) < 40000.0:
-		return
-	cam.global_position = _hold_camera_pos
-	cam.zoom = _hold_camera_zoom
+	if cam != null:
+		_last_viewport_cull_pos = cam.global_position
+		_last_viewport_cull_zoom = _get_camera_zoom()
 
 
 ## Inspector Close / Esc / unit-card Close: hide stack and restore map keys/clicks.
@@ -12494,15 +12551,15 @@ func _dismiss_inspector_and_restore_input() -> void:
 	hide_info_panel()
 	_camera_nudge_gen += 1
 	# Accurate fills already stay painted (never_cull_fills). Do not 3520-restore,
-	# ocean-floor, or clamp camera (Play: Close jumped Iberia→Greenland; 282% CPU).
+	# ocean-floor, clamp, or write the camera (Play: snapshot restore jumped to Greenland).
 	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 2500
 	_viewport_cull_hold_after_close = true
-	_map_pick_block_until_msec = Time.get_ticks_msec() + 500
+	_map_pick_block_until_msec = Time.get_ticks_msec() + 800
 	_left_skip_next_pick = true
+	_left_gesture_panned = true
 	_left_pan_armed = false
 	_left_pan_active = false
-	_left_slop_latched = false
-	_restore_held_camera()
+	_left_slop_latched = true
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui != null:
 		var fight_sheet := ui.get_node_or_null("OpenFightSheet")
@@ -13176,6 +13233,15 @@ func _rebuild_political_labels() -> void:
 		layer.call("set_map_mode_context", current_map_mode)
 	if layer.has_method("sync_tier"):
 		layer.call("sync_tier", _map_lod_tier)
+	_pin_asia_end_china_label()
+
+
+func _pin_asia_end_china_label() -> void:
+	if _asia_end_china_anchor == Vector2.ZERO:
+		return
+	var layer := _ensure_political_labels_layer()
+	if layer != null and layer.has_method("force_nation_label_at"):
+		layer.call("force_nation_label_at", "CHI", _asia_end_china_anchor, "China")
 
 
 func _sync_political_labels_tier(tier: int) -> void:
@@ -13184,6 +13250,7 @@ func _sync_political_labels_tier(tier: int) -> void:
 			_political_labels_layer.call("set_map_mode_context", current_map_mode)
 		if _political_labels_layer.has_method("sync_tier"):
 			_political_labels_layer.call("sync_tier", tier)
+	_pin_asia_end_china_label()
 
 
 func _ensure_region_highlight_layer() -> Node2D:
@@ -13294,6 +13361,7 @@ func _sync_viewport_culling(force: bool = false) -> void:
 		if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 			if _political_labels_layer.has_method("sync_viewport"):
 				_political_labels_layer.call("sync_viewport", labels_rect, true)
+		_pin_asia_end_china_label()
 		return
 	var use_cull := MapZoomLODScript.use_viewport_culling_for_board(_map_lod_tier, prov_count)
 	if not use_cull:
@@ -13347,6 +13415,7 @@ func _sync_viewport_culling(force: bool = false) -> void:
 	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 		if _political_labels_layer.has_method("sync_viewport"):
 			_political_labels_layer.call("sync_viewport", world_rect, true)
+	_pin_asia_end_china_label()
 
 
 func _clear_viewport_culling() -> void:
@@ -13635,6 +13704,8 @@ func auto_update_theater_from_camera() -> void:
 
 ## Clamp or wrap camera within current theater bounds (wrap enables seamless toroidal pan for tactical refinement).
 func _clamp_camera_to_theater() -> void:
+	if _camera_is_held():
+		return
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam == null:
 		return
@@ -14135,7 +14206,8 @@ func _show_coarse_territory_info(terr_id: int, focus_camera: bool = false) -> vo
 	if info_national:
 		info_national.text = "Inspector: Coarse World Territory. F10 can focus the camera on this region."
 	# Camera only on explicit focus (user click once). Re-shows must not re-teleport.
-	if focus_camera and first_select:
+	# Close hold: never recenter a coarse rect (NA/Atlantic center looks like Greenland).
+	if focus_camera and first_select and not _camera_is_held():
 		var cam := get_viewport().get_camera_2d() if get_viewport() else null
 		if cam:
 			var r: Rect2 = info.rect
@@ -14279,7 +14351,8 @@ func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
 	# Always stamp Tokyo + Beiping (Play: CHI star missing when only the resolved pid was used).
 	var stamp: Array[int] = []
 	var seen_stamp: Dictionary = {}
-	for pid in [tokyo_pid, 902487, chi_pid]:
+	# 902487 first so Beiping is never dropped when chi_pid aliases another cell.
+	for pid in [902487, tokyo_pid, chi_pid]:
 		if pid > 0 and not seen_stamp.has(pid):
 			seen_stamp[pid] = true
 			stamp.append(pid)
@@ -14309,21 +14382,22 @@ func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
 				has_star = true
 				var star := child as Label
 				star.visible = true
-				star.add_theme_font_size_override("font_size", 16)
+				star.add_theme_font_size_override("font_size", 20)
 				star.modulate = Color(1.0, 1.0, 1.0, 1.0)
-				star.z_index = 40
+				star.z_index = 50
 				star.reset_size()
 				var sms0 := star.get_minimum_size()
 				if center != Vector2.ZERO:
 					star.position = center - sms0 * 0.5
 				break
 		if not has_star:
-			_add_capital_star_to_node(node, pid, 16)
+			_add_capital_star_to_node(node, pid, 20)
 			for child2 in node.get_children():
 				if child2 is Label and (child2 as Label).has_meta(META_MAP_GLYPH_CAPITAL):
 					var st2 := child2 as Label
 					st2.visible = true
-					st2.add_theme_font_size_override("font_size", 16)
+					st2.add_theme_font_size_override("font_size", 20)
+					st2.z_index = 50
 					st2.reset_size()
 					var sms2 := st2.get_minimum_size()
 					if center != Vector2.ZERO:
@@ -14349,21 +14423,26 @@ func _focus_asia_view() -> void:
 		pts.append(tokyo)
 	if chi != Vector2.ZERO:
 		pts.append(chi)
-	# Pad west/south of Beiping so the China nation label + star sit in-frame.
+	# Pad west/south of Beiping so the China nation label + star sit in-frame
+	# (landmass centroid alone sat on the left edge and viewport-cull hid "China").
 	if chi != Vector2.ZERO:
-		pts.append(chi + Vector2(-260.0, 80.0))
+		pts.append(chi + Vector2(-700.0, 420.0))
+		pts.append(chi + Vector2(-180.0, 220.0))
 		pts.append(chi + Vector2(80.0, -80.0))
-	var frame := _frame_rect_from_points(pts, Vector2(480.0, 360.0))
+	var frame := _frame_rect_from_points(pts, Vector2(720.0, 520.0))
 	var focus := frame.get_center() if frame.size.x > 80.0 else tokyo
 	if focus == Vector2.ZERO:
 		var b := _current_theater_bounds
 		focus = Vector2(b.position.x + b.size.x * 0.82, b.position.y + b.size.y * 0.38)
-		frame = Rect2(focus - Vector2(480, 360), Vector2(960, 720))
+		frame = Rect2(focus - Vector2(720, 520), Vector2(1440, 1040))
 	if _current_theater_bounds.size.x > 0.0:
 		var hit := frame.intersection(_current_theater_bounds)
 		if hit.size.x >= 80.0 and hit.size.y >= 80.0 and hit.size.x < _current_theater_bounds.size.x * 0.85:
 			frame = hit
-	fit_camera_to_bounds(frame, frame.get_center(), 0.9)
+	_hold_camera_until_msec = 0
+	_inspector_held_closed = false
+	_map_pick_block_until_msec = 0
+	fit_camera_to_bounds(frame, frame.get_center(), 0.88)
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
 		var z := maxf(cam.zoom.x, cam.zoom.y)
@@ -14373,8 +14452,12 @@ func _focus_asia_view() -> void:
 	_last_hover_mouse = Vector2(-99999, -99999)
 	_force_asia_end_capital_stars(903995, chi_pid)
 	var label_at := chi if chi != Vector2.ZERO else _centroid_for_pid(902487)
-	if label_at != Vector2.ZERO and _political_labels_layer != null and _political_labels_layer.has_method("force_nation_label_at"):
-		_political_labels_layer.call("force_nation_label_at", "CHI", label_at, "China")
+	if label_at != Vector2.ZERO:
+		# South-west of Beiping onto the North China Plain — not under Tokyo/Beiping chips.
+		_asia_end_china_anchor = label_at + Vector2(-90.0, 160.0)
+	else:
+		_asia_end_china_anchor = Vector2.ZERO
+	_pin_asia_end_china_label()
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug("Map: Asia · Tokyo + Beiping/CHI · Home=Europe")
 
@@ -15797,7 +15880,8 @@ func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> b
 
 
 func _select_province(province: Province, node: Node2D) -> void:
-	_inspector_held_closed = false
+	if not _camera_is_held():
+		_inspector_held_closed = false
 	if selected_province_id >= 0 and selected_province_id != province.id:
 		_set_selection_outline(selected_province_id, false)
 
@@ -15826,7 +15910,7 @@ func _select_province(province: Province, node: Node2D) -> void:
 func _nudge_camera_after_panel(province_id: int, gen: int) -> void:
 	if gen != _camera_nudge_gen:
 		return
-	if _inspector_held_closed:
+	if _camera_is_held() or _inspector_held_closed:
 		return
 	if info_panel == null or not (info_panel is CanvasItem) or not (info_panel as CanvasItem).visible:
 		return
@@ -15836,13 +15920,9 @@ func _nudge_camera_after_panel(province_id: int, gen: int) -> void:
 ## Pan/zoom so the province sits in the free map area (right of left-docked inspector).
 ## zoom_mode: "soft" (gentle zoom-in) | "keep" (pan only) | "tactical" (closer).
 func _center_camera_on_province(province_id: int, zoom_mode: String = "soft") -> void:
-	if Time.get_ticks_msec() < _hold_camera_until_msec:
+	if _camera_is_held():
 		return
 	if province_id < 0:
-		return
-	# Close/Esc hold: a same-frame hex pick must not teleport (Play: Greenland).
-	if _inspector_held_closed or Time.get_ticks_msec() < _hold_camera_until_msec:
-		_restore_held_camera()
 		return
 	var pos: Vector2 = province_centroids.get(province_id, Vector2.ZERO) as Vector2
 	if pos == Vector2.ZERO and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
@@ -16159,8 +16239,9 @@ func show_info_panel(province: Province) -> void:
 		push_warning("MapRenderer: info_panel is not a CanvasItem (type=" + str(info_panel.get_class()) + ", script=" + str(info_panel.get_script()) + ") — cannot show inspector. Check scene NodePath exports for the MapRenderer or wiring in _wire_info_panel_refs.")
 		return
 
-	if _inspector_held_closed:
+	if _camera_is_held():
 		return
+	_inspector_held_closed = false
 	_layout_map_ui()
 	info_panel.visible = true
 	if info_panel is Control:
@@ -20232,6 +20313,9 @@ func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 
 ## Offset living chips off the capital star so both stay distinct click targets.
 func _unit_chip_offset_for_pid(pid: int) -> Vector2:
+	# Beiping 902487: keep the CHI capital star clear of garrison/division chips.
+	if pid == 902487:
+		return Vector2(36, -40)
 	var p: Province = provinces.get(pid) as Province if provinces.has(pid) else null
 	if p != null and p.has_method("has_feature") and p.has_feature("capital"):
 		return Vector2(22, -28)
