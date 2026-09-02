@@ -248,8 +248,11 @@ var _left_max_slop_sq: float = 0.0
 var _left_btn_down: bool = false
 var _left_gesture_dragged: bool = false
 var _left_gesture_origin: Vector2 = Vector2.ZERO
-## Process frame of last `_end_left_button_down`. Skip dies only after this plus one extra frame.
+## Process frame of last `_end_left_button_down`.
 var _left_release_frame: int = -1
+## Screen pos of last left release — leftover pressed=true at this hex is still THIS drag.
+var _left_release_screen: Vector2 = Vector2.ZERO
+var _left_release_screen_valid: bool = false
 var _camera_nudge_gen := 0
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
 var _viewport_cull_suspend_until_msec: int = 0
@@ -1044,18 +1047,19 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
 	if _left_btn_down:
 		return
-	# Leftover pressed=true (new_press) after a real drag is still THIS drag — land, sea,
-	# or coarse. Keep slop/dragged/_left_skip_next_pick. 4c45074 `_begin(true)` after
-	# skip_next died started slop 0 and picked the release hex (Atlantic sea / East Asia water).
-	if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
-		_left_btn_down = true
-		return
-	if _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick:
-		_left_btn_down = true
-		return
-	# Later click after a real button-up: skip was allowed to die. New button-down, slop 0.
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	var away_from_release: bool = false
+	if _left_release_screen_valid:
+		away_from_release = mouse.distance_squared_to(_left_release_screen) >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
+	# Genuine later click away from this drag's release (Berlin after Home). Reset slop.
+	# Leftover pressed=true at the release hex is still THIS drag — do not start slop 0
+	# (Play: extra-frame skip-die then gold-star snap opened Paris from Atlantic water).
+	if new_press and away_from_release:
+		pass
+	elif _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick:
+		_left_btn_down = true
+		return
 	_left_btn_down = true
 	_left_gesture_dragged = false
 	_left_gesture_origin = mouse
@@ -1069,6 +1073,7 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	_left_pan_committed = false
 	_left_press_cam_valid = false
 	_left_release_frame = -1
+	_left_release_screen_valid = false
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
 		_left_press_cam_pos = cam.global_position
@@ -1099,28 +1104,25 @@ func _end_left_button_down() -> void:
 	_left_pan_armed = false
 	_left_pan_active = false
 	_left_release_frame = Engine.get_process_frames()
-	# Keep slop/dragged/_left_skip_next_pick. Leftover pressed=true must not start slop 0.
-	# Skip dies in `_process` after this release frame plus one extra frame (not 400ms).
+	var vp_end: Viewport = get_viewport()
+	if vp_end != null:
+		_left_release_screen = vp_end.get_mouse_position()
+		_left_release_screen_valid = true
+	# Keep slop/dragged/_left_skip_next_pick. Leftover pressed=true at this screen
+	# pos must not start slop 0. A later click away from here resets in `_begin`.
 
 
 func _allow_left_pan_skip_to_die() -> void:
-	# After input (including leftover press/release of THIS drag). Not idle-clear of dragged
-	# on the `_end` frame — that let leftover `_begin(true)` start slop 0 (Sarthe / #950183).
-	# Wait one extra process frame after the last real button-up, then a later click can
-	# `_begin(true)` with slop 0 (Praha / Berlin after Home).
+	# Do not clear slop/dragged here. Extra-frame clear let leftover `_begin(true)`
+	# start slop 0; zoom-aware gold-star snap then picked a capital (Play: Paris).
+	# `_left_release_frame` still marks the last real button-up. Skip dies only
+	# when `_begin(true)` sees a press away from `_left_release_screen`.
 	if _left_btn_down:
 		return
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		return
-	if _left_release_frame >= 0 and Engine.get_process_frames() <= _left_release_frame + 1:
+	if _left_release_frame < 0:
 		return
-	_left_skip_next_pick = false
-	_left_gesture_dragged = false
-	_left_max_slop_sq = 0.0
-	_left_slop_latched = false
-	_left_gesture_panned = false
-	_left_pan_committed = false
-	_left_release_frame = -1
 
 
 func _left_map_pick_blocked() -> bool:
@@ -1802,7 +1804,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		# Capital gold star wins over a colocated air/fleet chip.
 		# Star click inspects the capital and does not arm MARCH.
+		# THIS drag already exceeded 8px: do not snap-select any capital
+		# (Play: Atlantic pan opened Paris via zoom-aware star disk).
 		if not event.shift_pressed:
+			if not event.ctrl_pressed and _left_map_pick_blocked():
+				get_viewport().set_input_as_handled()
+				return
 			var star_pid := _resolve_map_pick_pid(world_pos)
 			if star_pid > 0 and _capital_star_pid_at(world_pos) == star_pid and provinces.has(star_pid):
 				if not selected_formation_id.is_empty():
@@ -1810,6 +1817,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					_refresh_selected_unit_chip()
 				var star_province: Province = provinces[star_pid] as Province
 				var star_node: Node2D = _province_node(star_pid)
+				if not event.ctrl_pressed and _left_map_pick_blocked():
+					get_viewport().set_input_as_handled()
+					return
 				if _try_living_title_map_pick(star_pid):
 					get_viewport().set_input_as_handled()
 					return
@@ -1847,6 +1857,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 		if pid >= 0 and provinces.has(pid):
+			if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+				get_viewport().set_input_as_handled()
+				return
 			if _try_living_title_map_pick(pid):
 				get_viewport().set_input_as_handled()
 				return

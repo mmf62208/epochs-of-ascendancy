@@ -124,7 +124,7 @@ EOA_RUN_FULL_LEADER_TESTS=1 godot --headless --path . res://scenes/TestScenario.
 | Full 1918/2026/1936 roster reload | ⏭ Skipped unless `EOA_RUN_FULL_LEADER_TESTS=1` |
 
 **Interactive checks (F5):**
-- Province click → scrollable InfoPanel; Close/Esc keep Europe framed (north-strip edge-pan must not unlock/fly to Greenland; no Home required) and keep fills; left-drag pan must not pick land or sea or coarse (leftover `pressed=true` keeps slop/dragged/skip; skip dies only after button-up plus one extra frame; `_left_map_pick_blocked` on `_on_province_input` / coarse / hex+star); End shows Tokyo + Beiping/CHI overlay star + China label
+- Province click → scrollable InfoPanel; Close/Esc keep Europe framed (north-strip edge-pan must not unlock/fly to Greenland; no Home required) and keep fills; left-drag pan must not pick land or sea or coarse or capital-star snap (leftover `pressed=true` at release screen keeps slop; `_begin(true)` resets only when press is away from release; `_left_map_pick_blocked` on `_on_province_input` / coarse / hex+star before `_select_province`); End shows Tokyo + Beiping/CHI overlay star + China label
 - **F10** debug overlay: full-width buttons, no horizontal scroll; drag title; resize **⤡**
 - Menu open/close restores pause + speed on TopInfoBar
 
