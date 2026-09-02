@@ -219,6 +219,10 @@ var _left_slop_latched := false
 var _left_skip_next_pick := false
 ## Close click-through: ignore map picks until this msec (Play: Iberia→Greenland).
 var _map_pick_block_until_msec: int = 0
+## Close/Esc: freeze camera so a same-frame hex pick cannot teleport to Greenland.
+var _hold_camera_until_msec: int = 0
+var _hold_camera_pos := Vector2.ZERO
+var _hold_camera_zoom := Vector2.ONE
 var _last_mouse_pos := Vector2.ZERO
 ## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
 var _inspector_held_closed := false
@@ -302,6 +306,7 @@ var attack_staging_province_id: int = -1
 var _last_combat_outcome_text: String = ""
 
 var _btn_attack: Button = null
+var _btn_open_fight: Button = null
 var border_layer: Node2D = null
 var _border_lod_tier_built: int = -999  # last tier used when frontiers were rebuilt
 var _political_labels_layer: Node2D = null
@@ -1447,7 +1452,13 @@ func _unhandled_input(event: InputEvent) -> void:
 				_left_pan_armed = false
 				_left_pan_active = false
 				return
-			# Ctrl/Shift keep immediate pick (assault / debug / engineers).
+			# Snapshot before Close/chip release so a click-through pick cannot keep a Greenland jump.
+			if _inspector_stack_blocking_input() or _is_mouse_over_blocking_ui():
+				_hold_camera_now()
+			# Ctrl/Shift keep immediate pick (assault / debug / engineers) unless the cursor is on Close.
+			if (event.ctrl_pressed or event.shift_pressed) and _gui_blocks_map_pick():
+				get_viewport().set_input_as_handled()
+				return
 			# Plain press arms pan so Rhine chip-carpet drags pan instead of jump-zoom.
 			if not event.ctrl_pressed and not event.shift_pressed:
 				_left_pan_armed = true
@@ -1468,10 +1479,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				return
+			if _gui_blocks_map_pick():
+				_restore_held_camera()
+				get_viewport().set_input_as_handled()
+				return
 		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
 		# Land division chips beat capital stars (Play: chips opened Praha inspector).
 		# Air/fleet still lose to stars (Berlin star vs Air Wing PASS).
-		if _try_open_land_unit_at_world(world_pos):
+		if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed):
 			get_viewport().set_input_as_handled()
 			return
 		# Capital gold star wins over a colocated air/fleet chip.
@@ -12354,7 +12369,9 @@ func _sync_capital_star_scales(_z: float = -1.0) -> void:
 
 
 func _add_capital_star_to_node(node: Node2D, pid: int, force_px: int = 0) -> void:
-	var center: Vector2 = province_centroids.get(pid, Vector2.ZERO) as Vector2
+	var center: Vector2 = _centroid_for_pid(pid)
+	if center == Vector2.ZERO:
+		center = province_centroids.get(pid, Vector2.ZERO) as Vector2
 	if center == Vector2.ZERO:
 		return
 	var star := Label.new()
@@ -12424,28 +12441,61 @@ func _inspector_stack_blocking_input() -> bool:
 	if info_panel != null and info_panel is CanvasItem and (info_panel as CanvasItem).visible:
 		return true
 	var ui := get_node_or_null("UI") as CanvasLayer
-	if ui != null and ui.get_node_or_null("UnitDetailPopup") != null:
+	if ui != null:
+		if ui.get_node_or_null("UnitDetailPopup") != null:
+			return true
+		if ui.get_node_or_null("OpenFightSheet") != null:
+			return true
+	return false
+
+
+func _gui_blocks_map_pick() -> bool:
+	# Close/Esc click-through must not hex-pick (Play: Iberia→Greenland + Mid Pacific tooltip).
+	if Time.get_ticks_msec() < _map_pick_block_until_msec:
+		return true
+	if _is_mouse_over_blocking_ui():
 		return true
 	return false
 
 
+func _hold_camera_now() -> void:
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	if cam == null:
+		return
+	_hold_camera_pos = cam.global_position
+	_hold_camera_zoom = cam.zoom
+	_hold_camera_until_msec = Time.get_ticks_msec() + 750
+	_last_viewport_cull_pos = cam.global_position
+	_last_viewport_cull_zoom = _get_camera_zoom()
+
+
+func _restore_held_camera() -> void:
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	if cam == null:
+		return
+	if Time.get_ticks_msec() >= _hold_camera_until_msec:
+		return
+	if _hold_camera_pos == Vector2.ZERO and _hold_camera_zoom == Vector2.ONE:
+		return
+	cam.global_position = _hold_camera_pos
+	cam.zoom = _hold_camera_zoom
+
+
 ## Inspector Close / Esc / unit-card Close: hide stack and restore map keys/clicks.
 func _dismiss_inspector_and_restore_input() -> void:
+	_hold_camera_now()
 	hide_info_panel()
 	_camera_nudge_gen += 1
 	# Accurate fills already stay painted (never_cull_fills). Do not 3520-restore,
 	# ocean-floor, or clamp camera (Play: Close jumped Iberia→Greenland; 282% CPU).
 	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 2500
 	_viewport_cull_hold_after_close = true
-	_map_pick_block_until_msec = Time.get_ticks_msec() + 400
+	_map_pick_block_until_msec = Time.get_ticks_msec() + 220
 	_left_skip_next_pick = true
 	_left_pan_armed = false
 	_left_pan_active = false
 	_left_slop_latched = false
-	var hold_cam := get_viewport().get_camera_2d() if get_viewport() else null
-	if hold_cam != null:
-		_last_viewport_cull_pos = hold_cam.global_position
-		_last_viewport_cull_zoom = _get_camera_zoom()
+	_restore_held_camera()
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui != null:
 		var fight_sheet := ui.get_node_or_null("OpenFightSheet")
@@ -14185,6 +14235,9 @@ func _resolve_europe_focus_rect(_center: Vector2) -> Rect2:
 
 
 func _resolve_chi_capital_pid() -> int:
+	# First End must prefer Beiping (902487) even when the renderer centroid dict is stale.
+	if provinces.has(902487) or _centroid_for_pid(902487) != Vector2.ZERO:
+		return 902487
 	# Named CHI capital cells first (Beiping-class CHN North) — not closest-to-Tokyo CHN West.
 	for pid in [902487, 902496, 902505]:
 		if _centroid_for_pid(pid) != Vector2.ZERO:
@@ -14216,21 +14269,33 @@ func _resolve_chi_capital_centroid() -> Vector2:
 func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
 	_asia_end_force_star_pids.clear()
 	var chi_names := {902487: "Beiping", 902496: "Nanjing", 902505: "Chongqing"}
-	for pid in [tokyo_pid, chi_pid]:
-		if pid <= 0:
-			continue
+	# Always stamp Tokyo + Beiping (Play: CHI star missing when only the resolved pid was used).
+	var stamp: Array[int] = []
+	var seen_stamp: Dictionary = {}
+	for pid in [tokyo_pid, 902487, chi_pid]:
+		if pid > 0 and not seen_stamp.has(pid):
+			seen_stamp[pid] = true
+			stamp.append(pid)
+	for pid in stamp:
 		_asia_end_force_star_pids[pid] = true
 		if provinces.has(pid):
 			var p: Province = provinces[pid] as Province
 			if p != null:
-				if chi_names.has(pid) and str(p.name).begins_with("CHN"):
+				if chi_names.has(pid) and (str(p.name).begins_with("CHN") or str(p.name).strip_edges().is_empty()):
 					p.name = str(chi_names[pid])
 				if p.has_method("has_feature") and not p.has_feature("capital"):
 					p.special_features["capital"] = 1
 		var node: Node2D = _province_node(pid)
 		if node == null:
-			continue
+			var host := container if container != null else self
+			node = Node2D.new()
+			node.name = "AsiaEndStarHost_%d" % pid
+			host.add_child(node)
+			province_nodes[pid] = node
 		node.visible = true
+		var center: Vector2 = _centroid_for_pid(pid)
+		if center != Vector2.ZERO:
+			province_centroids[pid] = center
 		var has_star := false
 		for child in node.get_children():
 			if child is Label and (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
@@ -14242,9 +14307,8 @@ func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
 				star.z_index = 40
 				star.reset_size()
 				var sms0 := star.get_minimum_size()
-				var c0: Vector2 = province_centroids.get(pid, Vector2.ZERO) as Vector2
-				if c0 != Vector2.ZERO:
-					star.position = c0 - sms0 * 0.5
+				if center != Vector2.ZERO:
+					star.position = center - sms0 * 0.5
 				break
 		if not has_star:
 			_add_capital_star_to_node(node, pid, 16)
@@ -14255,31 +14319,39 @@ func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
 					st2.add_theme_font_size_override("font_size", 16)
 					st2.reset_size()
 					var sms2 := st2.get_minimum_size()
-					var c2: Vector2 = province_centroids.get(pid, Vector2.ZERO) as Vector2
-					if c2 != Vector2.ZERO:
-						st2.position = c2 - sms2 * 0.5
+					if center != Vector2.ZERO:
+						st2.position = center - sms2 * 0.5
 	_sync_capital_star_scales()
 
 
 func _focus_asia_view() -> void:
-	# Tokyo + a CHI capital — never first-nonzero that can land on empty USSR (903534).
+	# Tokyo + Beiping/CHI — never first-nonzero that can land on empty USSR (903534).
 	var tokyo := _centroid_for_pid(903995)
-	var chi_pid := _resolve_chi_capital_pid()
-	var chi := _resolve_chi_capital_centroid()
+	var chi_pid := 902487
+	var resolved := _resolve_chi_capital_pid()
+	if resolved > 0:
+		chi_pid = resolved
+	var chi := _centroid_for_pid(chi_pid)
+	if chi == Vector2.ZERO:
+		chi = _resolve_chi_capital_centroid()
+	if chi == Vector2.ZERO:
+		chi = _centroid_for_pid(902487)
+		chi_pid = 902487
 	var pts: Array[Vector2] = []
 	if tokyo != Vector2.ZERO:
 		pts.append(tokyo)
 	if chi != Vector2.ZERO:
 		pts.append(chi)
-	# Pad west of Beiping so the China nation label sits in-frame without strategic zoom.
+	# Pad west/south of Beiping so the China nation label + star sit in-frame.
 	if chi != Vector2.ZERO:
-		pts.append(chi + Vector2(-220.0, 40.0))
-	var frame := _frame_rect_from_points(pts, Vector2(420.0, 320.0))
+		pts.append(chi + Vector2(-260.0, 80.0))
+		pts.append(chi + Vector2(80.0, -80.0))
+	var frame := _frame_rect_from_points(pts, Vector2(480.0, 360.0))
 	var focus := frame.get_center() if frame.size.x > 80.0 else tokyo
 	if focus == Vector2.ZERO:
 		var b := _current_theater_bounds
 		focus = Vector2(b.position.x + b.size.x * 0.82, b.position.y + b.size.y * 0.38)
-		frame = Rect2(focus - Vector2(420, 320), Vector2(840, 640))
+		frame = Rect2(focus - Vector2(480, 360), Vector2(960, 720))
 	if _current_theater_bounds.size.x > 0.0:
 		var hit := frame.intersection(_current_theater_bounds)
 		if hit.size.x >= 80.0 and hit.size.y >= 80.0 and hit.size.x < _current_theater_bounds.size.x * 0.85:
@@ -14293,10 +14365,11 @@ func _focus_asia_view() -> void:
 			cam.zoom = Vector2(zmin, zmin)
 	_last_hover_mouse = Vector2(-99999, -99999)
 	_force_asia_end_capital_stars(903995, chi_pid)
-	if chi != Vector2.ZERO and _political_labels_layer != null and _political_labels_layer.has_method("force_nation_label_at"):
-		_political_labels_layer.call("force_nation_label_at", "CHI", chi, "China")
+	var label_at := chi if chi != Vector2.ZERO else _centroid_for_pid(902487)
+	if label_at != Vector2.ZERO and _political_labels_layer != null and _political_labels_layer.has_method("force_nation_label_at"):
+		_political_labels_layer.call("force_nation_label_at", "CHI", label_at, "China")
 	if typeof(DebugOverlay) != TYPE_NIL:
-		DebugOverlay.toast_map_debug("Map: Asia · Tokyo + China capital · Home=Europe")
+		DebugOverlay.toast_map_debug("Map: Asia · Tokyo + Beiping/CHI · Home=Europe")
 
 ## Alias per spec for center_europe_inside_world (ensures grand underlay base, Europe 471 polys + river children NW aligned, coarse rects always).
 func center_europe_inside_world() -> void:
@@ -15756,6 +15829,10 @@ func _nudge_camera_after_panel(province_id: int, gen: int) -> void:
 func _center_camera_on_province(province_id: int, zoom_mode: String = "soft") -> void:
 	if province_id < 0:
 		return
+	# Close/Esc hold: a same-frame hex pick must not teleport (Play: Greenland).
+	if _inspector_held_closed or Time.get_ticks_msec() < _hold_camera_until_msec:
+		_restore_held_camera()
+		return
 	var pos: Vector2 = province_centroids.get(province_id, Vector2.ZERO) as Vector2
 	if pos == Vector2.ZERO and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
 		pos = MapManager.get_province_centroid(province_id)
@@ -15862,6 +15939,9 @@ func _is_mouse_over_blocking_ui() -> bool:
 			"AgentAssignmentScreen",
 			"NationalSpiritsScreen",
 			"ProvinceHoverTooltip",
+			"OpenFightSheet",
+			"UnitDetailPopup",
+			"BtnClose",
 		]:
 			return true
 		if nn.ends_with("Screen") or nn.ends_with("Popup") or nn.ends_with("View"):
@@ -16217,6 +16297,12 @@ func show_info_panel(province: Province) -> void:
 	_update_develop_resource_ui(province)
 	_update_special_sites_ui(province)
 	_update_attack_button(province)
+	if _btn_open_fight != null and is_instance_valid(_btn_open_fight):
+		_btn_open_fight.visible = true
+	else:
+		_ensure_attack_button()
+		if _btn_open_fight != null:
+			_btn_open_fight.visible = true
 	_update_settle_button(province)
 	_update_assign_agent_button(province)
 	_refresh_oob_strip_for_province(province)
@@ -16248,6 +16334,8 @@ func _ensure_oob_strip() -> void:
 		_oob_strip.formation_focused.connect(_on_oob_strip_formation_focused)
 	if _oob_strip.has_signal("filter_mode_changed"):
 		_oob_strip.filter_mode_changed.connect(_on_oob_strip_filter_mode_changed)
+	if _oob_strip.has_signal("open_fight_requested"):
+		_oob_strip.open_fight_requested.connect(_on_oob_strip_open_fight)
 
 
 func _hide_oob_strip() -> void:
@@ -16283,12 +16371,9 @@ func _refresh_oob_strip_for_province(province: Province) -> void:
 					player_forms.append(fo)
 	else:
 		player_forms = forms
-	# Show when 2+ visible units under current filter, or 2+ total so All toggle is useful.
+	# Division fold: show for 1+ stationed units (Play: Praha chip had no fold).
 	var visible_n := player_forms.size() if player_only else forms.size()
-	if visible_n <= 1 and forms.size() <= 1:
-		_hide_oob_strip()
-		return
-	if player_only and player_forms.size() <= 1 and forms.size() < 2:
+	if visible_n <= 0 and forms.size() <= 0:
 		_hide_oob_strip()
 		return
 	if _oob_strip.has_method("show_for_province"):
@@ -16344,6 +16429,10 @@ func _on_oob_strip_formation_focused(formation_id: String) -> void:
 		DebugOverlay.toast_map_debug("Unit: %s" % formation_id)
 
 
+func _on_oob_strip_open_fight(formation_id: String) -> void:
+	_open_fight_from_formation_id(formation_id)
+
+
 ## Gold-star hit: City of London / DC / Roma are smaller than the star glyph.
 func _capital_star_pid_at(world_pos: Vector2) -> int:
 	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("prefer_capital_province_at"):
@@ -16384,7 +16473,7 @@ func _try_living_title_map_pick(pid: int) -> bool:
 	return true
 
 
-func _try_open_land_unit_at_world(world_pos: Vector2) -> bool:
+func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
 	var fo := _pick_unit_formation_at_world(world_pos)
 	if fo == null:
 		return false
@@ -16392,12 +16481,16 @@ func _try_open_land_unit_at_world(world_pos: Vector2) -> bool:
 	if ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_FLEET or ft == Formation.TYPE_SPACE_WING:
 		return false
 	_select_map_unit(fo)
-	_show_unit_detail_popup(fo)
 	# Pin click must not _select_province (3520 supply outlines hung input after chip).
 	var pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
 	if pid >= 0:
 		attack_staging_province_id = pid
 		debug_combat_attacker_province_id = pid
+	var fid := str(fo.formation_id) if "formation_id" in fo else ""
+	if ctrl_click:
+		_open_fight_from_formation_id(fid)
+		return true
+	_show_unit_detail_popup(fo)
 	return true
 
 
@@ -16645,7 +16738,13 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 		# Hidden pins (strategic LOD) must not steal hex clicks.
 		if not counter.visible:
 			continue
-		var d := world_pos.distance_squared_to(counter.global_position)
+		# Centroids live in pick/camera space; global_position can drift after Close.
+		var chip_pos: Vector2 = province_centroids.get(id, Vector2.ZERO) as Vector2
+		if chip_pos == Vector2.ZERO:
+			chip_pos = counter.global_position
+		else:
+			chip_pos += _unit_chip_offset_for_pid(id)
+		var d := world_pos.distance_squared_to(chip_pos)
 		if d > hit_r2:
 			continue
 		var fo: Object = null
@@ -17759,6 +17858,9 @@ func _show_open_fight_sheet(
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return
+	_hold_camera_now()
+	if info_panel != null and info_panel is CanvasItem:
+		(info_panel as CanvasItem).visible = false
 	var old := ui.get_node_or_null("OpenFightSheet")
 	if old != null:
 		old.queue_free()
@@ -17856,7 +17958,7 @@ func _show_open_fight_sheet(
 	if typeof(RetrowaveTheme) != TYPE_NIL:
 		RetrowaveTheme.style_body_label(body)
 	vbox.add_child(body)
-	if enemy_pid > 0 and can_ok and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_land_battle"):
+	if enemy_pid > 0 and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_land_battle"):
 		var start_btn := Button.new()
 		start_btn.text = "Start battle"
 		start_btn.focus_mode = Control.FOCUS_NONE
@@ -17888,6 +17990,9 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	if p_tag.is_empty():
 		_show_inspector_toast("Set player country (TopInfoBar) before attacking.", 3.0, true)
 		return true
+	# Play: Ctrl+click must open the Attacker/Defender sheet (not a toast / not a silent no-op).
+	_open_fight_from_formation_id(selected_formation_id)
+	return true
 
 	var from_pid := attack_staging_province_id
 	if from_pid < 0:
@@ -18035,24 +18140,38 @@ func _province_controlled_by(province: Province, country_tag: String) -> bool:
 func _ensure_attack_button() -> void:
 	if info_panel == null:
 		return
-	if _btn_attack != null and is_instance_valid(_btn_attack):
-		return
-	_btn_attack = Button.new()
-	_btn_attack.name = "BtnAttackProvince"
-	_btn_attack.text = "Attack (Ctrl+click target)"
-	_btn_attack.tooltip_text = (
-		"Select a friendly province with a division, then Ctrl+click an adjacent enemy province.\n"
-		+ "Or click this button while viewing an attackable neighbor."
-	)
-	_btn_attack.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_btn_attack.offset_left = 210.0
-	_btn_attack.offset_top = 8.0
-	_btn_attack.offset_right = 440.0
-	_btn_attack.offset_bottom = 32.0
-	_btn_attack.visible = false
-	if not _btn_attack.pressed.is_connected(_on_attack_province_pressed):
-		_btn_attack.pressed.connect(_on_attack_province_pressed)
-	info_panel.add_child(_btn_attack)
+	if _btn_attack == null or not is_instance_valid(_btn_attack):
+		_btn_attack = Button.new()
+		_btn_attack.name = "BtnAttackProvince"
+		_btn_attack.text = "Attack (Ctrl+click target)"
+		_btn_attack.tooltip_text = (
+			"Select a friendly province with a division, then Ctrl+click an adjacent enemy province.\n"
+			+ "Or click this button while viewing an attackable neighbor."
+		)
+		_btn_attack.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		_btn_attack.offset_left = 210.0
+		_btn_attack.offset_top = 8.0
+		_btn_attack.offset_right = 440.0
+		_btn_attack.offset_bottom = 32.0
+		_btn_attack.visible = false
+		if not _btn_attack.pressed.is_connected(_on_attack_province_pressed):
+			_btn_attack.pressed.connect(_on_attack_province_pressed)
+		info_panel.add_child(_btn_attack)
+	if _btn_open_fight == null or not is_instance_valid(_btn_open_fight):
+		_btn_open_fight = Button.new()
+		_btn_open_fight.name = "BtnOpenFight"
+		_btn_open_fight.text = "Open fight"
+		_btn_open_fight.tooltip_text = "Open Attacker/Defender sheet · Start battle (GER Maginot vs FRA)."
+		_btn_open_fight.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		_btn_open_fight.offset_left = 210.0
+		_btn_open_fight.offset_top = 34.0
+		_btn_open_fight.offset_right = 440.0
+		_btn_open_fight.offset_bottom = 58.0
+		_btn_open_fight.focus_mode = Control.FOCUS_NONE
+		_btn_open_fight.pressed.connect(func() -> void:
+			_open_fight_from_formation_id(selected_formation_id)
+		)
+		info_panel.add_child(_btn_open_fight)
 
 
 func _update_attack_button(province: Province) -> void:
@@ -21790,8 +21909,13 @@ func _pulse_amount_for_supply_role(role: String) -> float:
 
 
 func _refresh_supply_highlights() -> void:
+	# Hang-class: province pick must not walk 3520 outlines when supply overlay is off.
+	if not supply_mode and _supply_role_by_province.is_empty():
+		return
 	var roles := _supply_highlight_roles()
 	_supply_role_by_province = roles
+	if roles.is_empty() and not supply_mode:
+		return
 	for pid in province_nodes.keys():
 		var node := _province_node(int(pid))
 		if node == null:

@@ -383,9 +383,12 @@ def build_first_session_hotkeys_product(
         wiring["close_does_not_cull"] = (
             "never_cull_fills" in cull_fn
             and "_map_pick_block_until_msec" in dismiss_fn
+            and "_hold_camera_now" in dismiss_fn
+            and "_restore_held_camera" in dismiss_fn
             and "_ensure_ocean_floor" not in dismiss_fn
             and "_center_camera_on_province" not in dismiss_fn
             and "_force_all_province_nodes_visible" not in dismiss_fn
+            and "func _gui_blocks_map_pick" in ren
         )
         wiring["search_i_not_stolen"] = (
             "func _gui_text_field_has_focus" in ren
@@ -406,6 +409,8 @@ def build_first_session_hotkeys_product(
             and "func _force_asia_end_capital_stars" in ren
             and "_force_asia_end_capital_stars" in _slice_func(ren, "_focus_asia_view")
             and "force_nation_label_at" in _slice_func(ren, "_focus_asia_view")
+            and "902487" in _slice_func(ren, "_force_asia_end_capital_stars")
+            and "AsiaEndStarHost" in _slice_func(ren, "_force_asia_end_capital_stars")
         )
         open_fn = _slice_func(ren, "_open_fight_from_formation_id")
         wiring["open_fight_sheet"] = (
@@ -414,10 +419,14 @@ def build_first_session_hotkeys_product(
             and "func _show_open_fight_sheet" in ren
             and "Attacker" in _slice_func(ren, "_show_open_fight_sheet")
             and "Defender" in _slice_func(ren, "_show_open_fight_sheet")
+            and "Start battle" in _slice_func(ren, "_show_open_fight_sheet")
             and "710739" in open_fn
             and "ensure_playable_front_chips" not in open_fn
             and "func _try_open_land_unit_at_world" in ren
+            and "_open_fight_from_formation_id" in _slice_func(ren, "_try_open_land_unit_at_world")
+            and "_open_fight_from_formation_id" in _slice_func(ren, "_try_execute_province_attack")
             and "start_land_battle" in _slice_func(ren, "_try_execute_province_attack")
+            and "Division fold" in (ROOT / "scripts" / "ui" / "ProvinceOOBStrip.gd").read_text(encoding="utf-8")
         )
         wiring["wheel_no_full_fill"] = (
             bool(light_fn)
