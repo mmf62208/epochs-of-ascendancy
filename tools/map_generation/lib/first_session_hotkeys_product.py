@@ -374,6 +374,7 @@ def build_first_session_hotkeys_product(
             and "_left_pan_active" in ren
             and "LEFT_PAN_SLOP_PX" in ren
             and "func _left_drag_exceeded_slop" in ren
+            and "_left_slop_latched" in ren
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         wiring["close_does_not_cull"] = (
@@ -381,6 +382,7 @@ def build_first_session_hotkeys_product(
             and "_clear_viewport_culling" in dismiss_fn
             and "_restore_land_poly_visibility" in dismiss_fn
             and "_viewport_cull_suspend_until_msec" in dismiss_fn
+            and "_viewport_cull_hold_after_close" in dismiss_fn
         )
         wiring["search_i_not_stolen"] = (
             "func _gui_text_field_has_focus" in ren

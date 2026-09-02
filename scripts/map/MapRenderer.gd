@@ -213,6 +213,8 @@ var _left_pan_armed := false
 var _left_pan_active := false
 var _left_press_screen := Vector2.ZERO
 const LEFT_PAN_SLOP_PX := 8.0
+## Sticky slop so release still pans if _input cleared armed before _unhandled_input.
+var _left_slop_latched := false
 var _last_mouse_pos := Vector2.ZERO
 ## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
 var _inspector_held_closed := false
@@ -988,7 +990,7 @@ const WHEEL_TERRAIN_REFRESH_MS := 180
 
 
 func _left_drag_exceeded_slop() -> bool:
-	if _left_pan_active:
+	if _left_pan_active or _left_slop_latched:
 		return true
 	if not _left_pan_armed:
 		return false
@@ -996,7 +998,10 @@ func _left_drag_exceeded_slop() -> bool:
 	if vp == null:
 		return false
 	var delta := vp.get_mouse_position() - _left_press_screen
-	return delta.length_squared() >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
+	if delta.length_squared() >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+		_left_slop_latched = true
+		return true
+	return false
 
 
 func _apply_home_key(shift_pressed: bool) -> void:
@@ -1136,6 +1141,7 @@ func _input(event: InputEvent) -> void:
 				if _wheel_should_zoom_map() or not _gui_text_field_has_focus():
 					_left_pan_armed = true
 					_left_pan_active = false
+					_left_slop_latched = false
 					_left_press_screen = get_viewport().get_mouse_position()
 					_last_mouse_pos = _left_press_screen
 			elif not event.pressed:
@@ -1144,6 +1150,7 @@ func _input(event: InputEvent) -> void:
 				_left_pan_active = false
 				if did_left_pan:
 					get_viewport().set_input_as_handled()
+				_left_slop_latched = false
 	if event is InputEventMouseMotion and _left_pan_armed and not _left_pan_active:
 		if _left_drag_exceeded_slop():
 			_left_pan_active = true
@@ -1434,6 +1441,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if not event.ctrl_pressed and not event.shift_pressed:
 				_left_pan_armed = true
 				_left_pan_active = false
+				_left_slop_latched = false
 				_left_press_screen = get_viewport().get_mouse_position()
 				_last_mouse_pos = _left_press_screen
 				return
@@ -1441,6 +1449,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			var did_left_pan := _left_drag_exceeded_slop()
 			_left_pan_armed = false
 			_left_pan_active = false
+			_left_slop_latched = false
 			if did_left_pan:
 				get_viewport().set_input_as_handled()
 				return
@@ -2407,6 +2416,9 @@ func _request_hang_safe_supply_corridor() -> void:
 		else:
 			target = -1
 	if target > 0 and target != source:
+		# Readable capital→front line this frame (2 centroids, no BFS). Hop path deferred.
+		if source > 0:
+			highlight_supply_route_path([source, target], 8.0)
 		var toast := "Supply corridor · drawing capital → %s…" % _province_display_name(target)
 		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint") \
 				and MapManager.has_strategic_chokepoint(target) and MapManager.has_method("flag_naval_choke"):
@@ -12351,7 +12363,7 @@ func _sync_capital_star_scales(_z: float = -1.0) -> void:
 				star.set_meta(META_MAP_GLYPH_PX, use_px)
 
 
-func _add_capital_star_to_node(node: Node2D, pid: int) -> void:
+func _add_capital_star_to_node(node: Node2D, pid: int, force_px: int = 0) -> void:
 	var center: Vector2 = province_centroids.get(pid, Vector2.ZERO) as Vector2
 	if center == Vector2.ZERO:
 		return
@@ -12360,7 +12372,9 @@ func _add_capital_star_to_node(node: Node2D, pid: int) -> void:
 	star.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	star.z_as_relative = false
 	star.z_index = 40
-	var px := _capital_star_font_px()
+	var px := force_px if force_px > 0 else _capital_star_font_px()
+	if px <= 0 and force_px > 0:
+		px = force_px
 	star.add_theme_font_size_override("font_size", px)
 	# Bright gold fill + thick dark+white outline so stars read on yellow (BEL) and light paints.
 	star.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
@@ -12429,7 +12443,7 @@ func _inspector_stack_blocking_input() -> bool:
 func _dismiss_inspector_and_restore_input() -> void:
 	hide_info_panel()
 	# Close must not cull fills/chips/labels (Play: dark-blue void until Home).
-	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 800
+	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 2500
 	_viewport_cull_hold_after_close = true
 	_force_all_province_nodes_visible()
 	_clear_viewport_culling()
@@ -12532,7 +12546,7 @@ func _refresh_province_detail_visibility() -> void:
 		_fill_zoom_at_last_paint >= 0.0
 		and absf(current_zoom - _fill_zoom_at_last_paint) >= q * drift_frac
 	)
-	if bucket_changed or drift:
+	if (bucket_changed or drift) and not _viewport_cull_hold_after_close:
 		if bucket_changed:
 			_fill_color_zoom_bucket = b
 		_refresh_province_fill_colors()
@@ -13211,11 +13225,11 @@ func _sync_viewport_culling(force: bool = false) -> void:
 	if Time.get_ticks_msec() < _viewport_cull_suspend_until_msec:
 		return
 	if _viewport_cull_hold_after_close:
+		# Stay painted after Close. Only recull after a real user pan, not zoom jitter.
 		var hold_cam := get_viewport().get_camera_2d() if get_viewport() else null
 		if hold_cam != null:
-			var hold_moved := hold_cam.global_position.distance_squared_to(_last_viewport_cull_pos) > 160000.0
-			var hold_zoomed := absf(_get_camera_zoom() - _last_viewport_cull_zoom) > 0.08
-			if not hold_moved and not hold_zoomed and _last_viewport_cull_zoom > 0.0:
+			var hold_moved := hold_cam.global_position.distance_squared_to(_last_viewport_cull_pos) > 250000.0
+			if not hold_moved or _last_viewport_cull_pos.x < -90000.0:
 				return
 		_viewport_cull_hold_after_close = false
 	var prov_count := province_nodes.size()
@@ -13253,6 +13267,8 @@ func _sync_viewport_culling(force: bool = false) -> void:
 		visible_pids[selected_province_id] = true
 	if _hover_province != null:
 		visible_pids[_hover_province.id] = true
+	for pid in _asia_end_force_star_pids.keys():
+		visible_pids[int(pid)] = true
 	for pid in _get_interesting_province_ids().keys():
 		visible_pids[int(pid)] = true
 
@@ -14215,13 +14231,24 @@ func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
 				star.add_theme_font_size_override("font_size", 16)
 				star.modulate = Color(1.0, 1.0, 1.0, 1.0)
 				star.z_index = 40
+				star.reset_size()
+				var sms0 := star.get_minimum_size()
+				var c0: Vector2 = province_centroids.get(pid, Vector2.ZERO) as Vector2
+				if c0 != Vector2.ZERO:
+					star.position = c0 - sms0 * 0.5
 				break
 		if not has_star:
-			_add_capital_star_to_node(node, pid)
+			_add_capital_star_to_node(node, pid, 16)
 			for child2 in node.get_children():
 				if child2 is Label and (child2 as Label).has_meta(META_MAP_GLYPH_CAPITAL):
-					(child2 as Label).visible = true
-					(child2 as Label).add_theme_font_size_override("font_size", 16)
+					var st2 := child2 as Label
+					st2.visible = true
+					st2.add_theme_font_size_override("font_size", 16)
+					st2.reset_size()
+					var sms2 := st2.get_minimum_size()
+					var c2: Vector2 = province_centroids.get(pid, Vector2.ZERO) as Vector2
+					if c2 != Vector2.ZERO:
+						st2.position = c2 - sms2 * 0.5
 	_sync_capital_star_scales()
 
 
@@ -17636,6 +17663,7 @@ func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
 	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
 		return -1
 	var adj: Array = MapManager.get_adjacent_provinces(from_pid, true)
+	var hop2: Array = []
 	for pid_v in adj:
 		var pid := int(pid_v)
 		if not provinces.has(pid):
@@ -17646,6 +17674,20 @@ func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
 		var ot := str(p.owner_tag).strip_edges().to_upper()
 		if not ot.is_empty() and ot != tag:
 			return pid
+		hop2.append(pid)
+	# One extra hop (Milano → Swiss hinterland) — still not a 3520 scan.
+	for mid in hop2:
+		var adj2: Array = MapManager.get_adjacent_provinces(int(mid), true)
+		for pid2_v in adj2:
+			var pid2 := int(pid2_v)
+			if pid2 == from_pid or not provinces.has(pid2):
+				continue
+			var p2: Province = provinces[pid2] as Province
+			if p2 == null:
+				continue
+			var ot2 := str(p2.owner_tag).strip_edges().to_upper()
+			if not ot2.is_empty() and ot2 != tag:
+				return pid2
 	return -1
 
 
