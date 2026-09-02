@@ -1034,15 +1034,15 @@ func _left_drag_exceeded_slop() -> bool:
 	return false
 
 
-func _begin_left_map_gesture() -> void:
+func _begin_left_map_gesture(new_press: bool = false) -> void:
 	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
 	if _left_btn_down:
 		return
-	# Duplicate pressed=true at the release hex after _end_left_button_down (Play: #950208 / Asia coarse).
-	# Do not reset _left_gesture_dragged — this is still the pan gesture's input burst.
-	if _left_gesture_dragged:
+	# _note / _arm after a pan must not start a slop-0 gesture (Play: #950208 / Asia / Sarthe).
+	if _left_gesture_dragged and not new_press:
 		_left_btn_down = true
 		return
+	# Genuine MouseButton press: new button-down, slop starts at 0. Only skip clear.
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
 	_left_btn_down = true
@@ -1086,17 +1086,8 @@ func _end_left_button_down() -> void:
 	_left_btn_down = false
 	_left_pan_armed = false
 	_left_pan_active = false
-	# Keep _left_gesture_dragged through this frame's Area2D / duplicate press, then idle-clear.
-	if _left_gesture_dragged:
-		call_deferred("_clear_left_gesture_dragged_if_idle")
-
-
-func _clear_left_gesture_dragged_if_idle() -> void:
-	if _left_btn_down:
-		return
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		return
-	_left_gesture_dragged = false
+	# Do not idle-clear _left_gesture_dragged (Play: Sarthe pick after Atlantic pan).
+	# Skip stays until the next genuine _begin_left_map_gesture (new button-down, slop 0).
 
 
 func _left_map_pick_blocked() -> bool:
@@ -1381,8 +1372,9 @@ func _input(event: InputEvent) -> void:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed:
-				_begin_left_map_gesture()
-				# Duplicate pressed=true after _end must not start a still-click pick.
+				# Genuine new button-down (slop 0): only place the pan skip is cleared.
+				# Mid-drag no-ops because _left_btn_down is still true.
+				_begin_left_map_gesture(true)
 				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
 					_arm_left_map_press()
 					_mark_left_pan_blocked_pick()
@@ -1706,7 +1698,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
-				_begin_left_map_gesture()
+				_begin_left_map_gesture(true)
 			_note_left_gesture_motion()
 			if _left_map_pick_blocked():
 				if event.pressed:
