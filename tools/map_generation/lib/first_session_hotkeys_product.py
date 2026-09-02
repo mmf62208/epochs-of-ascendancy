@@ -376,6 +376,8 @@ def build_first_session_hotkeys_product(
             and "func _left_drag_exceeded_slop" in ren
             and "_left_slop_latched" in ren
             and "_left_gesture_panned" in ren
+            and "_left_pan_committed" in ren
+            and "func _arm_left_map_press" in ren
             and "func _map_click_should_skip_pick" in ren
             and "InputEventMouseMotion" in input_fn
             and "_left_skip_next_pick" in input_fn
@@ -387,6 +389,8 @@ def build_first_session_hotkeys_product(
             "never_cull_fills" in cull_fn
             and "_map_pick_block_until_msec" in dismiss_fn
             and "_hold_camera_now" in dismiss_fn
+            and "_lock_close_camera" in dismiss_fn
+            and "_reassert_locked_close_camera" in process_fn
             and "_restore_held_camera" not in dismiss_fn
             and "_restore_held_camera" not in process_fn
             and "_ensure_ocean_floor" not in dismiss_fn
@@ -402,6 +406,7 @@ def build_first_session_hotkeys_product(
             and "_refresh_supply_highlights" in _slice_func(ren, "_select_province")
             and "ACTION_MODE_BUTTON_PRESS" in ren
             and "func _release_search_focus" in ren
+            and "_dismiss_inspector_and_restore_input" in _slice_func(ren, "_show_open_fight_sheet")
         )
         wiring["search_i_not_stolen"] = (
             "func _gui_text_field_has_focus" in ren
@@ -425,6 +430,9 @@ def build_first_session_hotkeys_product(
             and "force_nation_label_at" in _slice_func(ren, "_pin_asia_end_china_label")
             and "902487" in _slice_func(ren, "_force_asia_end_capital_stars")
             and "AsiaEndStarHost" in _slice_func(ren, "_force_asia_end_capital_stars")
+            and "_stamp_asia_end_overlay_stars" in _slice_func(ren, "_force_asia_end_capital_stars")
+            and "AsiaEndStarOverlay" in _slice_func(ren, "_ensure_asia_end_star_overlay")
+            and "func _stamp_asia_end_overlay_stars" in ren
             and "China" in _slice_func(ren, "_pin_asia_end_china_label")
         )
         open_fn = _slice_func(ren, "_open_fight_from_formation_id")

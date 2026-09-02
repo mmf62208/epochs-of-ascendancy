@@ -219,6 +219,8 @@ var _left_slop_latched := false
 var _left_skip_next_pick := false
 ## True once this left-drag actually moved the camera (release must not pick).
 var _left_gesture_panned := false
+## Survives flag resets: set when left-drag actually pans; cleared only on the next press.
+var _left_pan_committed := false
 ## Close click-through: ignore map picks until this msec (Play: Iberia→Greenland).
 var _map_pick_block_until_msec: int = 0
 ## Close/Esc: do not move the camera (no snapshot restore — that still teleported).
@@ -226,6 +228,12 @@ var _hold_camera_until_msec: int = 0
 var _last_mouse_pos := Vector2.ZERO
 ## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
 var _inspector_held_closed := false
+## Live GIS camera at Close press — reassert every frame so europe_center / pick-center cannot teleport.
+var _close_camera_locked := false
+var _close_camera_lock_pos := Vector2.ZERO
+var _close_camera_lock_zoom := Vector2.ONE
+var _close_click_guard := false
+var _close_release_seen := false
 var _camera_nudge_gen := 0
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
 var _viewport_cull_suspend_until_msec: int = 0
@@ -1003,7 +1011,7 @@ const WHEEL_TERRAIN_REFRESH_MS := 180
 
 
 func _left_drag_exceeded_slop() -> bool:
-	if _left_pan_active or _left_slop_latched or _left_gesture_panned:
+	if _left_pan_committed or _left_pan_active or _left_slop_latched or _left_gesture_panned:
 		return true
 	var vp: Viewport = get_viewport()
 	if vp == null:
@@ -1017,13 +1025,71 @@ func _left_drag_exceeded_slop() -> bool:
 
 
 func _map_click_should_skip_pick() -> bool:
+	if _close_click_guard or _left_pan_committed:
+		return true
 	if _left_skip_next_pick or _left_gesture_panned or _left_slop_latched or _left_pan_active:
 		return true
 	return _left_drag_exceeded_slop()
 
 
+func _lock_close_camera() -> void:
+	# Snapshot the live GIS camera BEFORE hide/pick. Legacy europe_center() is Greenland on this board.
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	if cam != null:
+		_close_camera_lock_pos = cam.global_position
+		_close_camera_lock_zoom = cam.zoom
+		_close_camera_locked = true
+	_close_click_guard = true
+	_close_release_seen = false
+
+
+func _unlock_close_camera() -> void:
+	_close_camera_locked = false
+
+
+func _reassert_locked_close_camera() -> void:
+	if not _close_camera_locked:
+		return
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	if cam == null:
+		return
+	if cam.global_position.distance_squared_to(_close_camera_lock_pos) > 0.25:
+		cam.global_position = _close_camera_lock_pos
+	if cam.zoom.distance_squared_to(_close_camera_lock_zoom) > 0.0001:
+		cam.zoom = _close_camera_lock_zoom
+
+
+func _note_close_button_release() -> void:
+	if _close_click_guard:
+		_close_release_seen = true
+
+
+func _finish_close_click_guard_on_new_press() -> void:
+	if _close_click_guard and _close_release_seen:
+		_close_click_guard = false
+		_unlock_close_camera()
+		_hold_camera_until_msec = 0
+		_map_pick_block_until_msec = 0
+
+
+func _arm_left_map_press() -> void:
+	# Duplicate press mid-drag must not reset slop / committed (Play: release still picked).
+	if _left_pan_armed:
+		return
+	# Fresh press — new gesture. Previous drag's committed flag must not block this click.
+	_left_pan_armed = true
+	_left_pan_active = false
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_skip_next_pick = false
+	_left_pan_committed = false
+	_left_press_screen = get_viewport().get_mouse_position()
+	_last_mouse_pos = _left_press_screen
+
+
 func _camera_is_held() -> bool:
-	# Time-boxed only. Do not latch on _inspector_held_closed — that blocked every later hex pick.
+	if _close_camera_locked or _close_click_guard:
+		return true
 	var now: int = Time.get_ticks_msec()
 	return now < _hold_camera_until_msec or now < _map_pick_block_until_msec
 
@@ -1041,6 +1107,10 @@ func _mouse_over_close_control() -> bool:
 		if nn == "BtnClose" or nn == "CloseSupplyLegend" or nn.begins_with("Close"):
 			if n is BaseButton and (n as CanvasItem).visible:
 				return true
+		if n is BaseButton and (n as CanvasItem).visible:
+			var txt := (n as BaseButton).text.strip_edges().to_lower()
+			if txt == "close":
+				return true
 		n = n.get_parent()
 	return false
 
@@ -1056,11 +1126,17 @@ func _release_search_focus() -> void:
 
 func _apply_home_key(shift_pressed: bool) -> void:
 	# Home must stay cheap: recenter/fit only — no 3520 rebuild.
+	_unlock_close_camera()
+	_close_click_guard = false
+	_close_release_seen = false
 	_hold_camera_until_msec = 0
 	_inspector_held_closed = false
 	_map_pick_block_until_msec = 0
 	_asia_end_force_star_pids.clear()
 	_asia_end_china_anchor = Vector2.ZERO
+	var end_overlay := (container if container != null else self).get_node_or_null("AsiaEndStarOverlay")
+	if end_overlay != null:
+		end_overlay.queue_free()
 	ensure_world_navigation_ready()
 	if shift_pressed:
 		fit_camera_to_full_world()
@@ -1089,6 +1165,9 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_END:
+			_unlock_close_camera()
+			_close_click_guard = false
+			_close_release_seen = false
 			ensure_world_navigation_ready()
 			_focus_asia_view()
 			get_viewport().set_input_as_handled()
@@ -1169,6 +1248,7 @@ func _input(event: InputEvent) -> void:
 			event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN
 		):
 			if _wheel_should_zoom_map():
+				_unlock_close_camera()
 				var factor := (1.0 + zoom_speed * 1.35) if event.button_index == MOUSE_BUTTON_WHEEL_UP else (1.0 - zoom_speed * 1.35)
 				_zoom_toward_mouse(factor)
 				# NEVER call full _refresh_terrain_zoom_aware() / 3520 fill rebuild per notch.
@@ -1195,30 +1275,27 @@ func _input(event: InputEvent) -> void:
 					_dismiss_inspector_and_restore_input()
 					get_viewport().set_input_as_handled()
 					return
+				_finish_close_click_guard_on_new_press()
 				# Arm pan on the map even if a HUD Control is hovered (search/toolbar).
 				# LineEdit/Scroll still keep their own drag via _wheel_should_zoom_map false path below.
 				if _wheel_should_zoom_map() or not _gui_text_field_has_focus():
-					_left_pan_armed = true
-					_left_pan_active = false
-					_left_slop_latched = false
-					_left_gesture_panned = false
-					_left_skip_next_pick = false
-					_left_press_screen = get_viewport().get_mouse_position()
-					_last_mouse_pos = _left_press_screen
+					_arm_left_map_press()
 			elif not event.pressed:
 				var did_left_pan := _map_click_should_skip_pick()
 				_left_pan_armed = false
 				_left_pan_active = false
+				_note_close_button_release()
 				if did_left_pan:
 					_left_skip_next_pick = true
 					_left_gesture_panned = true
 					get_viewport().set_input_as_handled()
-				# Keep slop/gesture latches until _unhandled_input skips the pick.
+				# Keep slop/gesture/committed until _unhandled_input skips the pick.
 	if event is InputEventMouseMotion and _left_pan_armed and not _left_pan_active:
 		if _left_drag_exceeded_slop():
 			_left_pan_active = true
 			_left_skip_next_pick = true
 			_left_gesture_panned = true
+			_left_pan_committed = true
 			get_viewport().set_input_as_handled()
 
 
@@ -1457,6 +1534,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_END:
+			_unlock_close_camera()
+			_close_click_guard = false
+			_close_release_seen = false
 			ensure_world_navigation_ready()
 			_focus_asia_view()
 			get_viewport().set_input_as_handled()
@@ -1497,12 +1577,22 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
-		if _camera_is_held() or Time.get_ticks_msec() < _map_pick_block_until_msec:
-			get_viewport().set_input_as_handled()
-			return
 		if _mouse_over_close_control():
 			if _inspector_stack_blocking_input():
 				_dismiss_inspector_and_restore_input()
+			get_viewport().set_input_as_handled()
+			return
+		if event.pressed and _close_click_guard:
+			if _close_release_seen:
+				_finish_close_click_guard_on_new_press()
+			else:
+				get_viewport().set_input_as_handled()
+				return
+		if _close_click_guard or _camera_is_held() or Time.get_ticks_msec() < _map_pick_block_until_msec:
+			if not event.pressed:
+				_note_close_button_release()
+				_left_pan_armed = false
+				_left_pan_active = false
 			get_viewport().set_input_as_handled()
 			return
 		if event.pressed:
@@ -1516,28 +1606,22 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			# Plain press arms pan so Rhine chip-carpet drags pan instead of jump-zoom.
 			if not event.ctrl_pressed and not event.shift_pressed:
-				if not _left_pan_armed:
-					_left_press_screen = get_viewport().get_mouse_position()
-					_last_mouse_pos = _left_press_screen
-					_left_slop_latched = false
-					_left_gesture_panned = false
-					_left_skip_next_pick = false
-				_left_pan_armed = true
-				_left_pan_active = false
+				_finish_close_click_guard_on_new_press()
+				_arm_left_map_press()
 				return
 		else:
 			var did_left_pan := _map_click_should_skip_pick()
 			_left_pan_armed = false
 			_left_pan_active = false
+			_note_close_button_release()
 			if did_left_pan:
-				_left_skip_next_pick = false
-				_left_slop_latched = false
-				_left_gesture_panned = false
+				# Do not clear _left_pan_committed — the next press is the only reset.
 				get_viewport().set_input_as_handled()
 				return
 			_left_skip_next_pick = false
 			_left_slop_latched = false
 			_left_gesture_panned = false
+			_left_pan_committed = false
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				return
 			if _gui_blocks_map_pick():
@@ -1688,8 +1772,9 @@ func _process(delta: float) -> void:
 		sim_paused = true
 
 	# Camera always — pan/zoom/edge must work while paused (looking at map is the playtest path).
-	# Do not snapshot-restore here: writing a held camera teleported Europe→Greenland.
+	# Reassert the Close-time GIS camera (not europe_center) so pick-center / clamp cannot teleport.
 	_handle_camera_input(delta)
+	_reassert_locked_close_camera()
 	# GIS dual-map watchdog: re-lock canvas identity + equirect underlay every ~0.5s while playing.
 	if _is_gis_board_active() and Engine.get_process_frames() % 30 == 0:
 		_reassert_gis_single_canvas()
@@ -1818,16 +1903,21 @@ func _handle_camera_input(delta: float) -> void:
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
 	if _left_pan_armed and not _left_pan_active and _left_drag_exceeded_slop():
 		_left_pan_active = true
+		_left_pan_committed = true
+		_left_skip_next_pick = true
+		_left_gesture_panned = true
 	# Middle / right / left-drag (pixel-based — works while paused). Drag up → camera north.
 	if _is_middle_dragging or _left_pan_active:
 		var current_mouse := get_viewport().get_mouse_position()
 		var drag_delta := current_mouse - _last_mouse_pos
 		if drag_delta.length_squared() > 0.01:
-			if _camera_is_held() and _left_pan_active and _left_skip_next_pick:
+			if _close_click_guard and _left_pan_active:
 				# Leftover Close click — do not slide the camera.
 				_left_pan_active = false
 				_left_pan_armed = false
 			else:
+				if _is_middle_dragging or not _close_click_guard:
+					_unlock_close_camera()
 				if _camera_is_held() and _left_pan_active:
 					_hold_camera_until_msec = 0
 					_inspector_held_closed = false
@@ -1837,9 +1927,12 @@ func _handle_camera_input(delta: float) -> void:
 				if _left_pan_active:
 					_left_gesture_panned = true
 					_left_skip_next_pick = true
+					_left_pan_committed = true
 		_last_mouse_pos = current_mouse
 
 	if move_dir != Vector2.ZERO:
+		_unlock_close_camera()
+		_close_click_guard = false
 		if _camera_is_held():
 			_hold_camera_until_msec = 0
 			_inspector_held_closed = false
@@ -12435,7 +12528,7 @@ func _sync_capital_star_scales(_z: float = -1.0) -> void:
 		if node == null:
 			continue
 		var force := _asia_end_force_star_pids.has(int(pid))
-		var use_px := 20 if force and px <= 0 else px
+		var use_px := 32 if force else px
 		for child in node.get_children():
 			if not (child is Label) or not (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
 				continue
@@ -12444,6 +12537,9 @@ func _sync_capital_star_scales(_z: float = -1.0) -> void:
 			if use_px > 0:
 				star.add_theme_font_size_override("font_size", use_px)
 				star.set_meta(META_MAP_GLYPH_PX, use_px)
+				if force:
+					star.z_as_relative = false
+					star.z_index = 80
 
 
 func _add_capital_star_to_node(node: Node2D, pid: int, force_px: int = 0) -> void:
@@ -12537,7 +12633,7 @@ func _gui_blocks_map_pick() -> bool:
 
 
 func _hold_camera_now() -> void:
-	# Hold only — never snapshot-write. Restore of a stale/wrong camera teleported to Greenland.
+	# Hold only — never snapshot-write europe_center. Lock the live GIS camera instead.
 	_hold_camera_until_msec = Time.get_ticks_msec() + 900
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
@@ -12547,6 +12643,7 @@ func _hold_camera_now() -> void:
 
 ## Inspector Close / Esc / unit-card Close: hide stack and restore map keys/clicks.
 func _dismiss_inspector_and_restore_input() -> void:
+	_lock_close_camera()
 	_hold_camera_now()
 	hide_info_panel()
 	_camera_nudge_gen += 1
@@ -13885,6 +13982,8 @@ func _sync_camera_controller_wrap() -> void:
 
 ## Fit the active camera zoom so map bounds fill the viewport (reduces gray margins).
 func fit_camera_to_bounds(bounds: Rect2, center: Vector2, fill_ratio: float = -1.0) -> void:
+	if _close_camera_locked:
+		return
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam == null or bounds.size.x <= 0.0:
 		return
@@ -14382,27 +14481,82 @@ func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
 				has_star = true
 				var star := child as Label
 				star.visible = true
-				star.add_theme_font_size_override("font_size", 20)
+				star.add_theme_font_size_override("font_size", 32)
 				star.modulate = Color(1.0, 1.0, 1.0, 1.0)
-				star.z_index = 50
+				star.z_as_relative = false
+				star.z_index = 80
 				star.reset_size()
 				var sms0 := star.get_minimum_size()
 				if center != Vector2.ZERO:
 					star.position = center - sms0 * 0.5
 				break
 		if not has_star:
-			_add_capital_star_to_node(node, pid, 20)
+			_add_capital_star_to_node(node, pid, 32)
 			for child2 in node.get_children():
 				if child2 is Label and (child2 as Label).has_meta(META_MAP_GLYPH_CAPITAL):
 					var st2 := child2 as Label
 					st2.visible = true
-					st2.add_theme_font_size_override("font_size", 20)
-					st2.z_index = 50
+					st2.add_theme_font_size_override("font_size", 32)
+					st2.z_as_relative = false
+					st2.z_index = 80
 					st2.reset_size()
 					var sms2 := st2.get_minimum_size()
 					if center != Vector2.ZERO:
 						st2.position = center - sms2 * 0.5
+	_stamp_asia_end_overlay_stars(tokyo_pid, chi_pid)
 	_sync_capital_star_scales()
+
+
+func _ensure_asia_end_star_overlay() -> Node2D:
+	var host := container if container != null else self
+	var overlay := host.get_node_or_null("AsiaEndStarOverlay") as Node2D
+	if overlay != null and is_instance_valid(overlay):
+		return overlay
+	overlay = Node2D.new()
+	overlay.name = "AsiaEndStarOverlay"
+	overlay.z_as_relative = false
+	overlay.z_index = 90
+	host.add_child(overlay)
+	return overlay
+
+
+func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
+	var overlay := _ensure_asia_end_star_overlay()
+	if overlay == null:
+		return
+	for child in overlay.get_children():
+		child.queue_free()
+	var stamp: Array[int] = []
+	var seen: Dictionary = {}
+	for pid in [902487, tokyo_pid, chi_pid]:
+		if pid > 0 and not seen.has(pid):
+			seen[pid] = true
+			stamp.append(pid)
+	for pid in stamp:
+		var center: Vector2 = _centroid_for_pid(pid)
+		if center == Vector2.ZERO:
+			continue
+		var star := Label.new()
+		star.name = "AsiaEndStar_%d" % pid
+		star.text = "★"
+		star.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		star.z_as_relative = false
+		star.z_index = 90
+		star.add_theme_font_size_override("font_size", 32)
+		star.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
+		star.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05, 1.0))
+		star.add_theme_constant_override("outline_size", 8)
+		star.set_meta(META_MAP_GLYPH_CAPITAL, true)
+		star.set_meta(META_MAP_GLYPH_PX, 32)
+		# Beiping: sit above garrison/division chips (Play: first End hid the CHI star).
+		var extra := Vector2(0.0, -18.0) if pid == 902487 else Vector2.ZERO
+		star.reset_size()
+		var sms := star.get_minimum_size()
+		star.position = center - sms * 0.5 + extra
+		overlay.add_child(star)
+		star.reset_size()
+		sms = star.get_minimum_size()
+		star.position = center - sms * 0.5 + extra
 
 
 func _focus_asia_view() -> void:
@@ -14439,6 +14593,9 @@ func _focus_asia_view() -> void:
 		var hit := frame.intersection(_current_theater_bounds)
 		if hit.size.x >= 80.0 and hit.size.y >= 80.0 and hit.size.x < _current_theater_bounds.size.x * 0.85:
 			frame = hit
+	_unlock_close_camera()
+	_close_click_guard = false
+	_close_release_seen = false
 	_hold_camera_until_msec = 0
 	_inspector_held_closed = false
 	_map_pick_block_until_msec = 0
@@ -16956,13 +17113,13 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	title.add_theme_font_size_override("font_size", 16)
 	title_row.add_child(title)
 	var close_btn := Button.new()
+	close_btn.name = "BtnClose"
 	close_btn.text = "Close"
 	close_btn.focus_mode = Control.FOCUS_NONE
+	close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	RetrowaveTheme.style_secondary_button(close_btn)
 	close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
-	close_btn.pressed.connect(func() -> void:
-		_dismiss_inspector_and_restore_input()
-	)
+	close_btn.pressed.connect(_dismiss_inspector_and_restore_input)
 	title_row.add_child(close_btn)
 
 	if typeof(UnitCardCombatStrip) != TYPE_NIL:
@@ -18019,14 +18176,13 @@ func _show_open_fight_sheet(
 	title.add_theme_font_size_override("font_size", 16)
 	title_row.add_child(title)
 	var close_btn := Button.new()
+	close_btn.name = "BtnClose"
 	close_btn.text = "Close"
 	close_btn.focus_mode = Control.FOCUS_NONE
+	close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	if typeof(RetrowaveTheme) != TYPE_NIL:
 		RetrowaveTheme.style_secondary_button(close_btn)
-	close_btn.pressed.connect(func() -> void:
-		if is_instance_valid(panel):
-			panel.queue_free()
-	)
+	close_btn.pressed.connect(_dismiss_inspector_and_restore_input)
 	title_row.add_child(close_btn)
 	var body := Label.new()
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -20315,7 +20471,7 @@ func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 func _unit_chip_offset_for_pid(pid: int) -> Vector2:
 	# Beiping 902487: keep the CHI capital star clear of garrison/division chips.
 	if pid == 902487:
-		return Vector2(36, -40)
+		return Vector2(48, -52)
 	var p: Province = provinces.get(pid) as Province if provinces.has(pid) else null
 	if p != null and p.has_method("has_feature") and p.has_feature("capital"):
 		return Vector2(22, -28)
