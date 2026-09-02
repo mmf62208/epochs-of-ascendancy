@@ -215,6 +215,10 @@ var _left_press_screen := Vector2.ZERO
 const LEFT_PAN_SLOP_PX := 8.0
 ## Sticky slop so release still pans if _input cleared armed before _unhandled_input.
 var _left_slop_latched := false
+## Skip the hex pick on the release that ends a left-drag pan (Play: drag also picked).
+var _left_skip_next_pick := false
+## Close click-through: ignore map picks until this msec (Play: Iberia→Greenland).
+var _map_pick_block_until_msec: int = 0
 var _last_mouse_pos := Vector2.ZERO
 ## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
 var _inspector_held_closed := false
@@ -1150,11 +1154,13 @@ func _input(event: InputEvent) -> void:
 				_left_pan_armed = false
 				_left_pan_active = false
 				if did_left_pan:
+					_left_skip_next_pick = true
 					get_viewport().set_input_as_handled()
-				_left_slop_latched = false
+				# Keep _left_slop_latched until _unhandled_input skips the pick.
 	if event is InputEventMouseMotion and _left_pan_armed and not _left_pan_active:
 		if _left_drag_exceeded_slop():
 			_left_pan_active = true
+			_left_skip_next_pick = true
 			get_viewport().set_input_as_handled()
 
 
@@ -1433,6 +1439,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if Time.get_ticks_msec() < _map_pick_block_until_msec:
+			get_viewport().set_input_as_handled()
+			return
 		if event.pressed:
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				_left_pan_armed = false
@@ -1444,21 +1453,28 @@ func _unhandled_input(event: InputEvent) -> void:
 				_left_pan_armed = true
 				_left_pan_active = false
 				_left_slop_latched = false
+				_left_skip_next_pick = false
 				_left_press_screen = get_viewport().get_mouse_position()
 				_last_mouse_pos = _left_press_screen
 				return
 		else:
-			var did_left_pan := _left_drag_exceeded_slop()
+			var did_left_pan := _left_skip_next_pick or _left_drag_exceeded_slop()
 			_left_pan_armed = false
 			_left_pan_active = false
 			_left_slop_latched = false
+			_left_skip_next_pick = false
 			if did_left_pan:
 				get_viewport().set_input_as_handled()
 				return
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				return
 		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
-		# Capital gold star wins over a colocated chip (Berlin Air Wing, London boroughs).
+		# Land division chips beat capital stars (Play: chips opened Praha inspector).
+		# Air/fleet still lose to stars (Berlin star vs Air Wing PASS).
+		if _try_open_land_unit_at_world(world_pos):
+			get_viewport().set_input_as_handled()
+			return
+		# Capital gold star wins over a colocated air/fleet chip.
 		# Star click inspects the capital and does not arm MARCH.
 		if not event.shift_pressed:
 			var star_pid := _resolve_map_pick_pid(world_pos)
@@ -1481,7 +1497,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				show_info_panel(star_province)
 				get_viewport().set_input_as_handled()
 				return
-		# Chip after star (pin-before-hex still holds for Maginot / non-capital hexes).
+		# Remaining chips (air/fleet) after star.
 		if _try_open_unit_at_world(world_pos):
 			get_viewport().set_input_as_handled()
 			return
@@ -12416,15 +12432,16 @@ func _inspector_stack_blocking_input() -> bool:
 ## Inspector Close / Esc / unit-card Close: hide stack and restore map keys/clicks.
 func _dismiss_inspector_and_restore_input() -> void:
 	hide_info_panel()
-	# Close must not cull fills/chips/labels (Play: dark-blue void until Home).
+	_camera_nudge_gen += 1
+	# Accurate fills already stay painted (never_cull_fills). Do not 3520-restore,
+	# ocean-floor, or clamp camera (Play: Close jumped Iberia→Greenland; 282% CPU).
 	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 2500
 	_viewport_cull_hold_after_close = true
-	_force_all_province_nodes_visible()
-	_restore_land_poly_visibility()
-	_clear_viewport_culling()
-	_restore_land_poly_visibility()
-	_ensure_ocean_floor()
-	_apply_clean_political_clear_color()
+	_map_pick_block_until_msec = Time.get_ticks_msec() + 400
+	_left_skip_next_pick = true
+	_left_pan_armed = false
+	_left_pan_active = false
+	_left_slop_latched = false
 	var hold_cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if hold_cam != null:
 		_last_viewport_cull_pos = hold_cam.global_position
@@ -12451,8 +12468,6 @@ func _dismiss_inspector_and_restore_input() -> void:
 		_refresh_selected_unit_chip()
 	_corridor_click_armed = false
 	_is_middle_dragging = false
-	_left_pan_armed = false
-	_left_pan_active = false
 	if has_method("_hide_oob_strip"):
 		_hide_oob_strip()
 	var vp := get_viewport()
@@ -14256,13 +14271,15 @@ func _focus_asia_view() -> void:
 		pts.append(tokyo)
 	if chi != Vector2.ZERO:
 		pts.append(chi)
-	# Tight pad so zoom stays operational (stars hide at z≤0.55). 1100×800 was strategic.
-	var frame := _frame_rect_from_points(pts, Vector2(360.0, 280.0))
+	# Pad west of Beiping so the China nation label sits in-frame without strategic zoom.
+	if chi != Vector2.ZERO:
+		pts.append(chi + Vector2(-220.0, 40.0))
+	var frame := _frame_rect_from_points(pts, Vector2(420.0, 320.0))
 	var focus := frame.get_center() if frame.size.x > 80.0 else tokyo
 	if focus == Vector2.ZERO:
 		var b := _current_theater_bounds
 		focus = Vector2(b.position.x + b.size.x * 0.82, b.position.y + b.size.y * 0.38)
-		frame = Rect2(focus - Vector2(360, 280), Vector2(720, 560))
+		frame = Rect2(focus - Vector2(420, 320), Vector2(840, 640))
 	if _current_theater_bounds.size.x > 0.0:
 		var hit := frame.intersection(_current_theater_bounds)
 		if hit.size.x >= 80.0 and hit.size.y >= 80.0 and hit.size.x < _current_theater_bounds.size.x * 0.85:
@@ -14276,6 +14293,8 @@ func _focus_asia_view() -> void:
 			cam.zoom = Vector2(zmin, zmin)
 	_last_hover_mouse = Vector2(-99999, -99999)
 	_force_asia_end_capital_stars(903995, chi_pid)
+	if chi != Vector2.ZERO and _political_labels_layer != null and _political_labels_layer.has_method("force_nation_label_at"):
+		_political_labels_layer.call("force_nation_label_at", "CHI", chi, "China")
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug("Map: Asia · Tokyo + China capital · Home=Europe")
 
@@ -16365,6 +16384,23 @@ func _try_living_title_map_pick(pid: int) -> bool:
 	return true
 
 
+func _try_open_land_unit_at_world(world_pos: Vector2) -> bool:
+	var fo := _pick_unit_formation_at_world(world_pos)
+	if fo == null:
+		return false
+	var ft := str(fo.formation_type) if "formation_type" in fo else ""
+	if ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_FLEET or ft == Formation.TYPE_SPACE_WING:
+		return false
+	_select_map_unit(fo)
+	_show_unit_detail_popup(fo)
+	# Pin click must not _select_province (3520 supply outlines hung input after chip).
+	var pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	if pid >= 0:
+		attack_staging_province_id = pid
+		debug_combat_attacker_province_id = pid
+	return true
+
+
 func _try_open_unit_at_world(world_pos: Vector2) -> bool:
 	var fo := _pick_unit_formation_at_world(world_pos)
 	if fo == null:
@@ -16372,12 +16408,8 @@ func _try_open_unit_at_world(world_pos: Vector2) -> bool:
 	_select_map_unit(fo)
 	_show_unit_detail_popup(fo)
 	# Stage host province only — pin click must not open inspector (hang class).
-	var pid := -1
-	if "stationed_province_id" in fo:
-		pid = int(fo.stationed_province_id)
-	if pid >= 0 and provinces.has(pid):
-		var p: Province = provinces[pid] as Province
-		_select_province(p, _province_node(pid))
+	var pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	if pid >= 0:
 		attack_staging_province_id = pid
 		debug_combat_attacker_province_id = pid
 	return true
@@ -17640,13 +17672,12 @@ var _unit_pick_strategic_hint_shown: bool = false
 func _open_fight_from_formation_id(fid: String) -> void:
 	# First-session sheet: stage GER Maginot 710173 → FRA 710739 and open the combat card.
 	# Do not require the clicked unit (DNK etc.) to already sit on a live border.
+	# Cheap Maginot pair only — no world OOB rebuild (that hung input).
 	const GER_FRONT := 710173
 	const FRA_FRONT := 710739
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
 		_show_inspector_toast("Open fight · no army list", 3.0, true)
 		return
-	if has_method("ensure_playable_front_chips"):
-		ensure_playable_front_chips(false)
 	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
 		if BattleManager.get_divisions_at_province(FRA_FRONT, "FRA").is_empty() \
 				and LeaderManager.has_method("field_designed_unit"):
@@ -17677,8 +17708,6 @@ func _open_fight_from_formation_id(fid: String) -> void:
 		return
 	selected_formation_id = att_fid
 	attack_staging_province_id = GER_FRONT
-	if has_method("_update_unit_icons_for_test"):
-		_update_unit_icons_for_test()
 	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("start_land_battle"):
 		_show_inspector_toast("Open fight · battle API missing", 3.0, true)
 		return

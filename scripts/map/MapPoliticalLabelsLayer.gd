@@ -674,6 +674,31 @@ func _make_label(text: String, pos: Vector2, font_px: int, col: Color) -> Label:
 	return lbl
 
 
+func force_nation_label_at(tag: String, world_pos: Vector2, display_name: String = "") -> void:
+	if world_pos == Vector2.ZERO:
+		return
+	var t := tag.strip_edges().to_upper()
+	var name_s := display_name.strip_edges()
+	if name_s.is_empty():
+		name_s = _resolve_nation_display_name(t)
+	var lbl: Label = _nation_labels.get(t) as Label if _nation_labels.has(t) else null
+	if lbl == null or not is_instance_valid(lbl):
+		var col := Color(0.92, 0.22, 0.16, 0.96)
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
+			col = MapManager.get_country_color(t)
+		lbl = _make_label(name_s, world_pos, 24, col)
+		lbl.name = "NationLabel_%s" % t
+		add_child(lbl)
+		_nation_labels[t] = lbl
+	else:
+		lbl.text = name_s
+	lbl.set_meta("label_anchor", world_pos)
+	lbl.set_meta("force_visible", true)
+	lbl.visible = true
+	lbl.z_index = 14
+	_fit_and_center_label(lbl)
+
+
 func _fit_and_center_label(lbl: Label) -> void:
 	lbl.reset_size()
 	var ms := lbl.get_minimum_size()
@@ -696,12 +721,14 @@ func _apply_tier_visibility(tier: int) -> void:
 	for lbl in _nation_labels.values():
 		if lbl is Label:
 			var l := lbl as Label
+			var force := l.has_meta("force_visible") and bool(l.get_meta("force_visible"))
 			var in_view := (
-				not _viewport_culling_active
+				force
+				or not _viewport_culling_active
 				or _viewport_rect.size == Vector2.ZERO
 				or _viewport_rect.has_point(l.position)
 			)
-			l.visible = show_n and in_view
+			l.visible = (show_n or force) and in_view
 			if show_n:
 				l.add_theme_font_size_override("font_size", nation_px)
 				var c := l.get_theme_color("font_color")
