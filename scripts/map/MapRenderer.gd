@@ -248,6 +248,8 @@ var _left_max_slop_sq: float = 0.0
 var _left_btn_down: bool = false
 var _left_gesture_dragged: bool = false
 var _left_gesture_origin: Vector2 = Vector2.ZERO
+## Process frame of last `_end_left_button_down`. Skip dies only after this plus one extra frame.
+var _left_release_frame: int = -1
 var _camera_nudge_gen := 0
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
 var _viewport_cull_suspend_until_msec: int = 0
@@ -1034,17 +1036,21 @@ func _left_drag_exceeded_slop() -> bool:
 	return false
 
 
+func _left_slop_is_drag() -> bool:
+	return _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
+
+
 func _begin_left_map_gesture(new_press: bool = false) -> void:
 	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
 	if _left_btn_down:
 		return
-	# Duplicate pressed=true at the release hex is still THIS drag (Play: Orne / Sarthe / #950208).
-	# Do not start a slop-0 button-down while _left_skip_next_pick says the skip must live.
-	if _left_gesture_dragged and _left_skip_next_pick:
+	# Leftover pressed=true (new_press) after a real drag is still THIS drag — land, sea,
+	# or coarse. Keep slop/dragged/_left_skip_next_pick. 4c45074 `_begin(true)` after
+	# skip_next died started slop 0 and picked the release hex (Atlantic sea / East Asia water).
+	if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
 		_left_btn_down = true
 		return
-	# _note / _arm after a pan must not start a slop-0 gesture.
-	if _left_gesture_dragged and not new_press:
+	if _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick:
 		_left_btn_down = true
 		return
 	# Later click after a real button-up: skip was allowed to die. New button-down, slop 0.
@@ -1062,6 +1068,7 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	_left_skip_next_pick = false
 	_left_pan_committed = false
 	_left_press_cam_valid = false
+	_left_release_frame = -1
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
 		_left_press_cam_pos = cam.global_position
@@ -1091,23 +1098,33 @@ func _end_left_button_down() -> void:
 	_left_btn_down = false
 	_left_pan_armed = false
 	_left_pan_active = false
-	# Keep _left_gesture_dragged. Duplicate pressed=true must not start slop 0.
-	# Skip may die in _process after this frame's input, once the button is fully up.
+	_left_release_frame = Engine.get_process_frames()
+	# Keep slop/dragged/_left_skip_next_pick. Leftover pressed=true must not start slop 0.
+	# Skip dies in `_process` after this release frame plus one extra frame (not 400ms).
 
 
 func _allow_left_pan_skip_to_die() -> void:
-	# After input (including duplicate press/release of THIS drag). Not idle-clear of dragged.
-	# A later click may then _begin(true) with slop 0. Same-frame leftover still has skip_next.
+	# After input (including leftover press/release of THIS drag). Not idle-clear of dragged
+	# on the `_end` frame — that let leftover `_begin(true)` start slop 0 (Sarthe / #950183).
+	# Wait one extra process frame after the last real button-up, then a later click can
+	# `_begin(true)` with slop 0 (Praha / Berlin after Home).
 	if _left_btn_down:
 		return
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		return
-	if _left_gesture_dragged:
-		_left_skip_next_pick = false
+	if _left_release_frame >= 0 and Engine.get_process_frames() <= _left_release_frame + 1:
+		return
+	_left_skip_next_pick = false
+	_left_gesture_dragged = false
+	_left_max_slop_sq = 0.0
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_pan_committed = false
+	_left_release_frame = -1
 
 
 func _left_map_pick_blocked() -> bool:
-	return _left_gesture_dragged
+	return _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick
 
 
 func _accumulate_left_drag_slop() -> void:
