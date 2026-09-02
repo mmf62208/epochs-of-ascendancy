@@ -389,6 +389,9 @@ def build_first_session_hotkeys_product(
             and "_center_camera_on_province" not in dismiss_fn
             and "_force_all_province_nodes_visible" not in dismiss_fn
             and "func _gui_blocks_map_pick" in ren
+            and "supply_mode" in _slice_func(ren, "_select_province")
+            and "_refresh_supply_highlights" in _slice_func(ren, "_select_province")
+            and "_restore_held_camera" in _slice_func(ren, "_process")
         )
         wiring["search_i_not_stolen"] = (
             "func _gui_text_field_has_focus" in ren
@@ -427,6 +430,7 @@ def build_first_session_hotkeys_product(
             and "_open_fight_from_formation_id" in _slice_func(ren, "_try_execute_province_attack")
             and "start_land_battle" in _slice_func(ren, "_try_execute_province_attack")
             and "Division fold" in (ROOT / "scripts" / "ui" / "ProvinceOOBStrip.gd").read_text(encoding="utf-8")
+            and "BtnOpenFight" in ren
         )
         wiring["wheel_no_full_fill"] = (
             bool(light_fn)

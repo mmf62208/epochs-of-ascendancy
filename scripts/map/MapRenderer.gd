@@ -1628,6 +1628,7 @@ func _process(delta: float) -> void:
 
 	# Camera always — pan/zoom/edge must work while paused (looking at map is the playtest path).
 	_handle_camera_input(delta)
+	_restore_held_camera()
 	# GIS dual-map watchdog: re-lock canvas identity + equirect underlay every ~0.5s while playing.
 	if _is_gis_board_active() and Engine.get_process_frames() % 30 == 0:
 		_reassert_gis_single_canvas()
@@ -12477,6 +12478,12 @@ func _restore_held_camera() -> void:
 		return
 	if _hold_camera_pos == Vector2.ZERO and _hold_camera_zoom == Vector2.ONE:
 		return
+	# User pan/WASD/edge: drop the hold. Only undo teleport-scale jumps (Iberia→Greenland).
+	if _left_pan_active or _is_middle_dragging:
+		_hold_camera_until_msec = 0
+		return
+	if cam.global_position.distance_squared_to(_hold_camera_pos) < 40000.0:
+		return
 	cam.global_position = _hold_camera_pos
 	cam.zoom = _hold_camera_zoom
 
@@ -12490,7 +12497,7 @@ func _dismiss_inspector_and_restore_input() -> void:
 	# ocean-floor, or clamp camera (Play: Close jumped Iberia→Greenland; 282% CPU).
 	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 2500
 	_viewport_cull_hold_after_close = true
-	_map_pick_block_until_msec = Time.get_ticks_msec() + 220
+	_map_pick_block_until_msec = Time.get_ticks_msec() + 500
 	_left_skip_next_pick = true
 	_left_pan_armed = false
 	_left_pan_active = false
@@ -15806,7 +15813,9 @@ func _select_province(province: Province, node: Node2D) -> void:
 		_refresh_hover_tooltip(_hover_province)
 	else:
 		_clear_compare_preview_outline()
-	_refresh_supply_highlights()
+	# Hex inspect must not walk 3520 supply outlines (Play: chip/inspector ~282% CPU).
+	if supply_mode:
+		_refresh_supply_highlights()
 	_refresh_compare_candidate_outlines()
 	_update_supply_legend_text()
 	_update_compare_hint_label()
@@ -15827,6 +15836,8 @@ func _nudge_camera_after_panel(province_id: int, gen: int) -> void:
 ## Pan/zoom so the province sits in the free map area (right of left-docked inspector).
 ## zoom_mode: "soft" (gentle zoom-in) | "keep" (pan only) | "tactical" (closer).
 func _center_camera_on_province(province_id: int, zoom_mode: String = "soft") -> void:
+	if Time.get_ticks_msec() < _hold_camera_until_msec:
+		return
 	if province_id < 0:
 		return
 	# Close/Esc hold: a same-frame hex pick must not teleport (Play: Greenland).
@@ -18172,10 +18183,13 @@ func _ensure_attack_button() -> void:
 			_open_fight_from_formation_id(selected_formation_id)
 		)
 		info_panel.add_child(_btn_open_fight)
+	_btn_open_fight.visible = true
 
 
 func _update_attack_button(province: Province) -> void:
 	_ensure_attack_button()
+	if _btn_open_fight != null and is_instance_valid(_btn_open_fight):
+		_btn_open_fight.visible = true
 	if _btn_attack == null:
 		return
 	if province == null or typeof(BattleManager) == TYPE_NIL:
