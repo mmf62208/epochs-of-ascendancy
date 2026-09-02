@@ -381,6 +381,9 @@ def build_first_session_hotkeys_product(
             and "func _map_click_should_skip_pick" in ren
             and "func _left_gesture_moved_camera" in ren
             and "_left_press_cam_pos" in ren
+            and "func _accumulate_left_drag_slop" in ren
+            and "_left_max_slop_sq" in ren
+            and "_left_block_pick_until_msec" in ren
             and "InputEventMouseMotion" in input_fn
             and "_left_skip_next_pick" in input_fn
         )
