@@ -1049,17 +1049,19 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 		return
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
-	var away_from_release: bool = false
-	if _left_release_screen_valid:
-		away_from_release = mouse.distance_squared_to(_left_release_screen) >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
-	# Genuine later click away from this drag's release (Berlin after Home). Reset slop.
-	# Leftover pressed=true at the release hex is still THIS drag — do not start slop 0
-	# (Play: extra-frame skip-die then gold-star snap opened Paris from Atlantic water).
-	if new_press and away_from_release:
-		pass
-	elif _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick:
+	var physically_down: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	# Leftover pressed=true while the physical button is up is still THIS drag —
+	# even if the cursor moved ≥8px from `_left_release_screen` (689d530
+	# away_from_release reset slop and picked Cornwall / East Asia coarse).
+	if new_press and not physically_down:
 		_left_btn_down = true
 		return
+	if _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick:
+		if new_press and physically_down:
+			pass
+		else:
+			_left_btn_down = true
+			return
 	_left_btn_down = true
 	_left_gesture_dragged = false
 	_left_gesture_origin = mouse
@@ -1100,6 +1102,10 @@ func _note_left_gesture_motion() -> void:
 
 
 func _end_left_button_down() -> void:
+	# Synthetic release while the button is still held must not end THIS drag
+	# (mid-drag `_end` then leftover `_begin(true)` reset slop).
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return
 	_left_btn_down = false
 	_left_pan_armed = false
 	_left_pan_active = false
@@ -1108,15 +1114,14 @@ func _end_left_button_down() -> void:
 	if vp_end != null:
 		_left_release_screen = vp_end.get_mouse_position()
 		_left_release_screen_valid = true
-	# Keep slop/dragged/_left_skip_next_pick. Leftover pressed=true at this screen
-	# pos must not start slop 0. A later click away from here resets in `_begin`.
+	# Keep slop/dragged/_left_skip_next_pick. Leftover pressed=true (physical up)
+	# must not start slop 0. A later real physical press resets in `_begin`.
 
 
 func _allow_left_pan_skip_to_die() -> void:
-	# Do not clear slop/dragged here. Extra-frame clear let leftover `_begin(true)`
-	# start slop 0; zoom-aware gold-star snap then picked a capital (Play: Paris).
-	# `_left_release_frame` still marks the last real button-up. Skip dies only
-	# when `_begin(true)` sees a press away from `_left_release_screen`.
+	# Do not clear slop/dragged (idle-clear / extra-frame / away-from-release
+	# all let leftover `_begin(true)` start slop 0). `_left_release_frame` marks
+	# the last real button-up. Skip dies only on a real physical left-down.
 	if _left_btn_down:
 		return
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):

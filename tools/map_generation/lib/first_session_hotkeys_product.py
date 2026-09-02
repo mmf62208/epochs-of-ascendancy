@@ -395,6 +395,8 @@ def build_first_session_hotkeys_product(
             and "_left_slop_is_drag" in _slice_func(ren, "_left_map_pick_blocked")
             and "func _allow_left_pan_skip_to_die" in ren
             and "_left_release_frame" in _slice_func(ren, "_allow_left_pan_skip_to_die")
+            and "is_mouse_button_pressed" in _slice_func(ren, "_begin_left_map_gesture")
+            and "is_mouse_button_pressed" in _slice_func(ren, "_end_left_button_down")
             and "_left_release_screen" in _slice_func(ren, "_begin_left_map_gesture")
             and "_left_release_screen" in _slice_func(ren, "_end_left_button_down")
             and "_left_map_pick_blocked" in _slice_func(ren, "_unhandled_input")
