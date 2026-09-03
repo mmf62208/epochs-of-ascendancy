@@ -254,9 +254,15 @@ var _left_release_frame: int = -1
 var _left_release_screen: Vector2 = Vector2.ZERO
 var _left_release_screen_valid: bool = false
 ## After a drag, leftover pressed=true looks like a real click (Input is down).
-## Do not reset slop until Home/End/wheel/WASD. Mouse-up motion must not arm
-## (1680687 8px mouse-up armed leftover and picked Ille-et-Vilaine).
+## Sticky origin/slop survive leftover `_begin(true)` (End/wheel arm + reset
+## picked Lisboa / East Asia coarse on 8dcec1f). Home clears sticky.
 var _left_ready_for_still_click: bool = true
+var _left_sticky_origin: Vector2 = Vector2.ZERO
+var _left_sticky_valid: bool = false
+var _left_sticky_slop_sq: float = 0.0
+## Frames after `_end` that leftover pressed=true must keep sticky slop.
+## Counted from release only (not a mid-drag 400ms time-box).
+const LEFT_LEFTOVER_HOLD_FRAMES: int = 16
 var _camera_nudge_gen := 0
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
 var _viewport_cull_suspend_until_msec: int = 0
@@ -1048,14 +1054,46 @@ func _left_slop_is_drag() -> bool:
 
 
 func _arm_still_click_after_pan() -> void:
+	# Home only: Berlin after Home must pick. Do not set `_left_btn_down = false`
+	# (End/wheel/WASD did that mid-drag; leftover `_begin(true)` wiped slop).
 	_left_ready_for_still_click = true
-	_left_btn_down = false
+	_left_sticky_valid = false
+	_left_sticky_slop_sq = 0.0
+	_left_gesture_dragged = false
+	_left_skip_next_pick = false
+	_left_pan_committed = false
+	_left_max_slop_sq = 0.0
+	_left_slop_latched = false
+	_left_gesture_panned = false
 
 
 func _note_mouse_up_arms_still_click() -> void:
 	# 1680687: 8px of mouse-up motion after `_end` armed leftover pressed=true
-	# and picked Ille-et-Vilaine. Do not arm here. Home/End/wheel/WASD only.
+	# and picked Ille-et-Vilaine. Do not arm here.
 	return
+
+
+func _left_sticky_is_drag() -> bool:
+	return _left_sticky_valid and _left_sticky_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
+
+
+func _left_in_leftover_hold() -> bool:
+	if _left_release_frame < 0:
+		return false
+	return Engine.get_process_frames() <= _left_release_frame + LEFT_LEFTOVER_HOLD_FRAMES
+
+
+func _note_sticky_slop() -> void:
+	if not _left_sticky_valid:
+		return
+	var vp_st: Viewport = get_viewport()
+	if vp_st == null:
+		return
+	var slop_st: float = vp_st.get_mouse_position().distance_squared_to(_left_sticky_origin)
+	if slop_st > _left_sticky_slop_sq:
+		_left_sticky_slop_sq = slop_st
+	if _left_sticky_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+		_mark_left_pan_blocked_pick()
 
 
 func _begin_left_map_gesture(new_press: bool = false) -> void:
@@ -1065,9 +1103,12 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
 	var physically_down: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
-	# Leftover pressed=true has Input down. Never reset slop until Home/End/wheel/WASD
-	# (`_left_ready_for_still_click`). Mouse-up 8px / `_left_release_screen` must not arm
-	# (1680687 Ille-et-Vilaine).
+	_note_sticky_slop()
+	# Leftover pressed=true (Input down) after a drag: keep sticky slop.
+	# End/wheel ready-arm + `_begin(true)` reset picked Lisboa / East Asia (8dcec1f).
+	if _left_sticky_is_drag() and (_left_in_leftover_hold() or not _left_ready_for_still_click):
+		_left_btn_down = true
+		return
 	if not _left_ready_for_still_click:
 		_left_btn_down = true
 		return
@@ -1075,7 +1116,7 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 		_left_btn_down = true
 		return
 	if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
-		if not _left_ready_for_still_click:
+		if not _left_ready_for_still_click or _left_in_leftover_hold():
 			_left_btn_down = true
 			return
 	_left_btn_down = true
@@ -1092,6 +1133,9 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	_left_press_cam_valid = false
 	_left_release_frame = -1
 	_left_release_screen_valid = false
+	_left_sticky_origin = mouse
+	_left_sticky_valid = true
+	_left_sticky_slop_sq = 0.0
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
 		_left_press_cam_pos = cam.global_position
@@ -1099,9 +1143,12 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 
 
 func _note_left_gesture_motion() -> void:
+	_note_sticky_slop()
 	if not _left_btn_down:
-		# Never _begin here after a pan — that reset dragged and the release hex picked.
-		if _left_gesture_dragged:
+		# Never `_begin` here after a pan — that reset dragged and the release hex picked.
+		if _left_sticky_is_drag() or _left_gesture_dragged:
+			if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+				_left_btn_down = true
 			return
 		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			_begin_left_map_gesture()
@@ -1126,8 +1173,8 @@ func _end_left_button_down() -> void:
 	if vp_end != null:
 		_left_release_screen = vp_end.get_mouse_position()
 		_left_release_screen_valid = true
-	# Keep slop/dragged/committed. Leftover pressed=true must not reset slop
-	# (`_left_ready_for_still_click` stays false until Home/End/wheel/WASD).
+	# Keep sticky slop. Leftover pressed=true must not reset `_left_release_screen`
+	# origin. Home clears sticky; leftover hold is frames after this `_end`.
 
 
 func _allow_left_pan_skip_to_die() -> void:
@@ -1142,8 +1189,9 @@ func _allow_left_pan_skip_to_die() -> void:
 
 
 func _left_map_pick_blocked() -> bool:
-	# After a drag, block every mouse writer until Home/End/wheel/WASD.
-	# Leftover `_begin(true)` must not be able to clear this (1680687).
+	# Sticky slop survives leftover `_begin(true)` / End-wheel ready-arm.
+	if _left_sticky_is_drag():
+		return true
 	if not _left_ready_for_still_click:
 		return true
 	return _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick
@@ -1273,6 +1321,21 @@ func _mouse_over_close_control() -> bool:
 	return false
 
 
+func _mouse_over_search_control() -> bool:
+	var vp_s: Viewport = get_viewport()
+	if vp_s == null:
+		return false
+	var hov_s: Control = vp_s.gui_get_hovered_control()
+	if hov_s == null:
+		return false
+	var n_s: Node = hov_s
+	while n_s != null:
+		if str(n_s.name) == "MapProvinceSearch":
+			return true
+		n_s = n_s.get_parent()
+	return false
+
+
 func _release_search_focus() -> void:
 	var vp: Viewport = get_viewport()
 	if vp == null:
@@ -1325,7 +1388,7 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_END:
-			_arm_still_click_after_pan()
+			_left_ready_for_still_click = true
 			_unlock_close_camera()
 			_close_click_guard = false
 			_close_release_seen = false
@@ -1409,7 +1472,7 @@ func _input(event: InputEvent) -> void:
 			event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN
 		):
 			if _wheel_should_zoom_map():
-				_arm_still_click_after_pan()
+				_left_ready_for_still_click = true
 				_unlock_close_camera()
 				_close_click_guard = false
 				_close_suppress_edge = false
@@ -1430,6 +1493,8 @@ func _input(event: InputEvent) -> void:
 			else:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed and _mouse_over_search_control():
+				return
 			if event.pressed:
 				# Genuine new button-down (slop 0): only place the pan skip is cleared.
 				# Mid-drag no-ops because _left_btn_down is still true.
@@ -1449,6 +1514,8 @@ func _input(event: InputEvent) -> void:
 				if _mouse_over_close_control() and _inspector_stack_blocking_input():
 					_dismiss_inspector_and_restore_input()
 					get_viewport().set_input_as_handled()
+					return
+				if _mouse_over_search_control():
 					return
 				_finish_close_click_guard_on_new_press()
 				# Arm pan on the map even if a HUD Control is hovered (search/toolbar).
@@ -1755,6 +1822,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _inspector_stack_blocking_input():
 				_dismiss_inspector_and_restore_input()
 			get_viewport().set_input_as_handled()
+			return
+		if _mouse_over_search_control():
 			return
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
@@ -2169,7 +2238,7 @@ func _handle_camera_input(delta: float) -> void:
 
 	if move_dir != Vector2.ZERO:
 		if key_dir != Vector2.ZERO:
-			_arm_still_click_after_pan()
+			_left_ready_for_still_click = true
 			_unlock_close_camera()
 			_close_click_guard = false
 			_close_suppress_edge = false
