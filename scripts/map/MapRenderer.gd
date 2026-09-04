@@ -15361,24 +15361,27 @@ func _asia_sov_hull_hides_fill(pid: int) -> bool:
 			return false
 
 
+func _asia_end_row_is_sov(pid: int) -> bool:
+	var tag: String = _row_owner_tag(pid)
+	if tag == "SOV" or tag == "RUS":
+		return true
+	var p: Province = provinces.get(pid) as Province if provinces.has(pid) else null
+	if p != null:
+		var ot: String = str(p.owner_tag).strip_edges().to_upper()
+		if ot == "SOV" or ot == "RUS":
+			return true
+	return false
+
+
 func _asia_end_is_protected_row(pid: int) -> bool:
+	# Owner tag only. Never protect SOV/RUS (Play ea1271a: name CHN/MONGOL
+	# let a SOV hull be force-painted red while dump skipped it as protected).
+	if _asia_end_row_is_sov(pid):
+		return false
 	if pid == 902487 or pid == 903995:
 		return true
 	var tag: String = _row_owner_tag(pid)
-	if tag == "CHI" or tag == "MON" or tag == "JAP" or tag == "MAN" or tag == "MEN":
-		return true
-	var p: Province = provinces.get(pid) as Province if provinces.has(pid) else null
-	if p == null:
-		return false
-	var n: String = str(p.name).strip_edges().to_upper()
-	return (
-		n.begins_with("CHN")
-		or n.begins_with("MNG")
-		or n.begins_with("JPN")
-		or n == "BEIPING"
-		or n == "TOKYO"
-		or n.begins_with("MONGOL")
-	)
+	return tag == "CHI" or tag == "MON" or tag == "JAP" or tag == "MAN" or tag == "MEN"
 
 
 func _asia_end_color_is_sov_red(c: Color) -> bool:
@@ -15440,13 +15443,19 @@ func _hide_province_fill_polys(pid: int) -> void:
 func _asia_end_force_protected_fill(pid: int, node: Node2D) -> void:
 	if node == null or not is_instance_valid(node):
 		return
+	if _asia_end_row_is_sov(pid):
+		_hide_fill_on_node(node)
+		return
 	node.visible = true
 	node.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	node.z_index = 8
-	var col := Color(0.55, 0.22, 0.18, 0.96)
+	# Never default to SOV maroon — missing CHI/MON country color must not look like a hull.
+	var col := Color(0.62, 0.52, 0.34, 0.96)
 	if provinces.has(pid):
 		col = _get_province_color(provinces[pid] as Province)
 		col.a = 0.96
+	if _asia_end_color_is_sov_red(col):
+		col = Color(0.62, 0.52, 0.34, 0.96)
 	for child in node.get_children():
 		if not (child is Polygon2D):
 			continue
@@ -15464,6 +15473,8 @@ func _asia_end_should_hide_row_fill(pid: int, node: Node2D) -> bool:
 	# Nuclear: ignore AABB. Hide every RoW 900k fill that is not CHI/MON/JAP/MAN/MEN.
 	if pid < 900000 or pid >= 950000:
 		return false
+	if _asia_end_row_is_sov(pid):
+		return true
 	if _asia_end_is_protected_row(pid):
 		return false
 	var tag: String = _row_owner_tag(pid)
@@ -15484,6 +15495,8 @@ func _asia_end_should_keep_fill_hidden(pid: int, poly: Polygon2D) -> bool:
 		return false
 	if pid < 900000 or pid >= 950000:
 		return false
+	if _asia_end_row_is_sov(pid):
+		return true
 	if _asia_end_is_protected_row(pid):
 		return false
 	if poly != null and bool(poly.get_meta("asia_sov_hull_hidden", false)):
@@ -15502,12 +15515,13 @@ func _asia_end_dump_leftover_red() -> void:
 		var pid := int(pid_v)
 		if pid < 900000 or pid >= 950000:
 			continue
-		if _asia_end_is_protected_row(pid):
-			continue
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null or not is_instance_valid(node) or not node.visible:
 			continue
 		var tag: String = _row_owner_tag(pid)
+		if tag == "JAP":
+			continue
+		var prot := _asia_end_is_protected_row(pid)
 		for child in node.get_children():
 			if not (child is Polygon2D):
 				continue
@@ -15516,8 +15530,17 @@ func _asia_end_dump_leftover_red() -> void:
 				continue
 			if not poly.visible:
 				continue
-			if tag == "SOV" or tag == "RUS" or _asia_end_poly_is_sov_red(poly):
-				leftover.append("%d:%s" % [pid, tag])
+			var c: Color = poly.color
+			c.r *= poly.modulate.r
+			c.g *= poly.modulate.g
+			c.b *= poly.modulate.b
+			c.a *= poly.modulate.a
+			var red_dom := _asia_end_color_is_sov_red(c)
+			if tag == "SOV" or tag == "RUS" or _asia_end_row_is_sov(pid) or red_dom:
+				leftover.append(
+					"%d:%s:r=%.2f:g=%.2f:b=%.2f:a=%.2f:prot=%s"
+					% [pid, tag, c.r, c.g, c.b, c.a, "1" if prot else "0"]
+				)
 				break
 	var msg: String = ",".join(leftover) if leftover.size() > 0 else "none"
 	print("MapRenderer: Asia End leftover SOV hulls ", msg)
@@ -15533,6 +15556,9 @@ func _hide_asia_sov_overlap_hulls() -> void:
 			continue
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null or not is_instance_valid(node):
+			continue
+		if _asia_end_row_is_sov(pid):
+			_hide_fill_on_node(node)
 			continue
 		if _asia_end_is_protected_row(pid):
 			_asia_end_force_protected_fill(pid, node)

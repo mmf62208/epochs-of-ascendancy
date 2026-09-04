@@ -486,6 +486,10 @@ def build_first_session_hotkeys_product(
             and "_asia_end_hide_mesh_layer" in _slice_func(ren, "_hide_asia_sov_overlap_hulls")
             and "900000" in _slice_func(ren, "_asia_end_should_hide_row_fill")
             and "leftover SOV hulls" in _slice_func(ren, "_asia_end_dump_leftover_red")
+            and "prot=" in _slice_func(ren, "_asia_end_dump_leftover_red")
+            and "begins_with(\"MONGOL\")" not in _slice_func(ren, "_asia_end_is_protected_row")
+            and "_asia_end_row_is_sov" in _slice_func(ren, "_asia_end_is_protected_row")
+            and "_asia_end_row_is_sov" in _slice_func(ren, "_hide_asia_sov_overlap_hulls")
             and "_restore_asia_end_row_fills" in _slice_func(ren, "_apply_home_key")
             and "var is_water := false" in _slice_func(ren, "_restore_land_poly_visibility")
             and "func _asia_end_star_poly_points" in ren
