@@ -480,7 +480,10 @@ def build_first_session_hotkeys_product(
             and "902487" in _slice_func(ren, "_asia_end_star_extra")
             and "func _asia_sov_hull_hides_fill" in ren
             and "903528" in _slice_func(ren, "_asia_sov_hull_hides_fill")
+            and "903491" in _slice_func(ren, "_asia_sov_hull_hides_fill")
             and "_hide_asia_sov_overlap_hulls" in _slice_func(ren, "_focus_asia_view")
+            and "func _asia_end_star_poly_points" in ren
+            and "903995" in _slice_func(ren, "_asia_end_star_extra")
         )
         open_fn = _slice_func(ren, "_open_fight_from_formation_id")
         wiring["open_fight_sheet"] = (

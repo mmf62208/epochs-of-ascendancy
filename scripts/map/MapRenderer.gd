@@ -14862,7 +14862,7 @@ func _ensure_asia_end_star_overlay() -> Node2D:
 	overlay = Node2D.new()
 	overlay.name = "AsiaEndStarOverlay"
 	overlay.z_as_relative = false
-	overlay.z_index = 90
+	overlay.z_index = 160
 	host.add_child(overlay)
 	return overlay
 
@@ -14886,11 +14886,24 @@ func _asia_end_star_centroid(pid: int) -> Vector2:
 
 
 func _asia_end_star_extra(pid: int) -> Vector2:
-	# Beiping chips sit at (+48, -52). Star must sit opposite that stack
-	# (Play 3f8c614: Tokyo star visible, CHI star buried under Garrison 4 / Division 5).
+	# Chips sit on the centroid. Standalone star must clear the stack
+	# (Play 585d4b2: Tokyo was chip-icon only; Beiping star not observed).
 	if pid == 902487:
-		return Vector2(-56.0, -88.0)
+		return Vector2(-88.0, 110.0)
+	if pid == 903995:
+		return Vector2(-96.0, 72.0)
 	return Vector2.ZERO
+
+
+func _asia_end_star_poly_points(radius: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var i := 0
+	while i < 10:
+		var ang: float = -PI * 0.5 + float(i) * PI / 5.0
+		var r: float = radius if (i % 2 == 0) else radius * 0.42
+		pts.append(Vector2(cos(ang), sin(ang)) * r)
+		i += 1
+	return pts
 
 
 func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
@@ -14901,7 +14914,7 @@ func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
 		child.queue_free()
 	var stamp: Array[int] = []
 	var seen: Dictionary = {}
-	for pid in [902487, tokyo_pid, chi_pid]:
+	for pid in [902487, tokyo_pid, chi_pid, 903995]:
 		if pid > 0 and not seen.has(pid):
 			seen[pid] = true
 			stamp.append(pid)
@@ -14909,38 +14922,26 @@ func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
 		var center: Vector2 = _asia_end_star_centroid(pid)
 		if center == Vector2.ZERO:
 			continue
-		var star: Label = Label.new()
+		var extra: Vector2 = _asia_end_star_extra(pid)
+		var at: Vector2 = center + extra
+		var disc := Polygon2D.new()
+		disc.name = "AsiaEndStarDisc_%d" % pid
+		disc.polygon = _asia_end_star_poly_points(26.0)
+		disc.color = Color(0.04, 0.04, 0.07, 0.92)
+		disc.z_as_relative = false
+		disc.z_index = 158
+		disc.position = at
+		overlay.add_child(disc)
+		var star := Polygon2D.new()
 		star.name = "AsiaEndStar_%d" % pid
-		star.text = "★"
-		star.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		star.polygon = _asia_end_star_poly_points(22.0)
+		star.color = Color(1.0, 0.92, 0.15, 1.0)
 		star.z_as_relative = false
-		star.z_index = 96
-		star.add_theme_font_size_override("font_size", 36)
-		star.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
-		star.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05, 1.0))
-		star.add_theme_constant_override("outline_size", 8)
+		star.z_index = 160
+		star.position = at
 		star.set_meta(META_MAP_GLYPH_CAPITAL, true)
 		star.set_meta(META_MAP_GLYPH_PX, 36)
-		var extra: Vector2 = _asia_end_star_extra(pid)
-		if pid == 902487:
-			var disc := Polygon2D.new()
-			disc.name = "AsiaEndStarDisc_%d" % pid
-			var ring := PackedVector2Array()
-			var i := 0
-			while i < 10:
-				var ang: float = TAU * float(i) / 10.0
-				ring.append(Vector2(cos(ang), sin(ang)) * 18.0)
-				i += 1
-			disc.polygon = ring
-			disc.color = Color(0.05, 0.05, 0.08, 0.9)
-			disc.z_as_relative = false
-			disc.z_index = 95
-			disc.position = center + extra
-			overlay.add_child(disc)
 		overlay.add_child(star)
-		star.reset_size()
-		var sms: Vector2 = star.get_minimum_size()
-		star.position = center - sms * 0.5 + extra
 
 
 func _focus_asia_view() -> void:
@@ -14999,6 +15000,7 @@ func _focus_asia_view() -> void:
 		if z < zmin:
 			cam.zoom = Vector2(zmin, zmin)
 	_last_hover_mouse = Vector2(-99999, -99999)
+	_hide_asia_sov_overlap_hulls()
 	_force_asia_end_capital_stars(903995, chi_pid)
 	var label_at := chi if chi != Vector2.ZERO else _centroid_for_pid(902487)
 	if label_at != Vector2.ZERO:
@@ -15312,40 +15314,106 @@ func _province_draw_z_index(pid: int, is_water: bool) -> int:
 	if pid >= 800000 and pid < 900000:
 		return 3  # US playable
 	if pid >= 900000 and pid < 950000:
-		# CHI/JAP/MON must sit above SOV sparse megablobs (Play 3f8c614: first End
-		# painted blank red triangles over Mongolia / N China).
+		# CHI/JAP/MON must sit above SOV sparse megablobs (Play 585d4b2: same-z
+		# RoW still painted blank red hulls over Mongolia / N China).
 		if _asia_sov_hull_hides_fill(pid):
 			return 0
-		var tag := ""
-		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_owner"):
-			tag = str(MapManager.get_province_owner(pid)).strip_edges().to_upper()
+		var tag: String = _row_owner_tag(pid)
 		if tag == "SOV" or tag == "RUS":
 			return 1
-		return 2
+		return 3
 	return 2
+
+
+func _row_owner_tag(pid: int) -> String:
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_owner"):
+		var mt: String = str(MapManager.get_province_owner(pid)).strip_edges().to_upper()
+		if not mt.is_empty():
+			return mt
+	var p: Province = provinces.get(pid) as Province if provinces.has(pid) else null
+	if p != null:
+		return str(p.owner_tag).strip_edges().to_upper()
+	return ""
 
 
 func _asia_sov_hull_hides_fill(pid: int) -> bool:
 	# Sparse-merge SOV hulls whose convex rings cover Mongolia / N China / Yellow Sea.
-	# Play 3f8c614 first End: these painted as blank red triangles over Asia fills.
-	return pid == 903528 or pid == 903500
+	# Play 585d4b2: 903528/903500 hide left 903491 (CHI+MON overlap) still red.
+	return pid == 903528 or pid == 903500 or pid == 903491
 
 
-func _hide_asia_sov_overlap_hulls() -> void:
-	for pid in [903528, 903500]:
-		if not province_nodes.has(pid):
+func _hide_province_fill_polys(pid: int) -> void:
+	if not province_nodes.has(pid):
+		return
+	var node: Node2D = province_nodes[pid] as Node2D
+	if node == null or not is_instance_valid(node):
+		return
+	for child in node.get_children():
+		if not (child is Polygon2D):
 			continue
-		var node: Node2D = province_nodes[pid] as Node2D
-		if node == null or not is_instance_valid(node):
-			continue
-		var poly: Polygon2D = _get_province_polygon(node)
-		if poly == null:
-			continue
+		var poly := child as Polygon2D
 		poly.visible = false
 		poly.set_meta("asia_sov_hull_hidden", true)
 		var c: Color = poly.color
 		c.a = 0.0
 		poly.color = c
+	node.z_index = 0
+
+
+func _province_poly_aabb(pid: int) -> Rect2:
+	if not province_nodes.has(pid):
+		return Rect2()
+	var node: Node2D = province_nodes[pid] as Node2D
+	if node == null or not is_instance_valid(node):
+		return Rect2()
+	for child in node.get_children():
+		if not (child is Polygon2D):
+			continue
+		var pts: PackedVector2Array = (child as Polygon2D).polygon
+		if pts.size() < 3:
+			continue
+		var min_p: Vector2 = pts[0]
+		var max_p: Vector2 = pts[0]
+		for p in pts:
+			min_p.x = minf(min_p.x, p.x)
+			min_p.y = minf(min_p.y, p.y)
+			max_p.x = maxf(max_p.x, p.x)
+			max_p.y = maxf(max_p.y, p.y)
+		return Rect2(min_p, max_p - min_p)
+	return Rect2()
+
+
+func _hide_asia_sov_overlap_hulls() -> void:
+	var chi_mon: Array[Rect2] = []
+	for pid_v in province_nodes.keys():
+		var pid := int(pid_v)
+		var tag: String = _row_owner_tag(pid)
+		if tag != "CHI" and tag != "MON":
+			continue
+		var bb: Rect2 = _province_poly_aabb(pid)
+		if bb.size.x > 1.0 and bb.size.y > 1.0:
+			chi_mon.append(bb)
+	for pid_v in province_nodes.keys():
+		var pid := int(pid_v)
+		if pid < 900000 or pid >= 950000:
+			continue
+		var node: Node2D = province_nodes[pid] as Node2D
+		if node == null or not is_instance_valid(node):
+			continue
+		var is_water := pid >= 950000
+		var tag: String = _row_owner_tag(pid)
+		var hide := _asia_sov_hull_hides_fill(pid)
+		if not hide and (tag == "SOV" or tag == "RUS") and not chi_mon.is_empty():
+			var sb: Rect2 = _province_poly_aabb(pid)
+			if sb.size.x > 1.0:
+				for cb in chi_mon:
+					if sb.intersects(cb):
+						hide = true
+						break
+		if hide:
+			_hide_province_fill_polys(pid)
+		else:
+			node.z_index = _province_draw_z_index(pid, is_water)
 
 
 func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
