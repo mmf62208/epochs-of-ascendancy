@@ -12792,6 +12792,9 @@ func _restore_land_poly_visibility() -> void:
 		var poly: Polygon2D = _get_province_polygon(node)
 		if poly == null:
 			continue
+		if _asia_sov_hull_hides_fill(int(pid)) or bool(poly.get_meta("asia_sov_hull_hidden", false)):
+			poly.visible = false
+			continue
 		var is_water := false
 		if province != null:
 			is_water = bool(province.is_sea)
@@ -14815,37 +14818,38 @@ func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
 			host.add_child(node)
 			province_nodes[pid] = node
 		node.visible = true
-		var center: Vector2 = _centroid_for_pid(pid)
+		var center: Vector2 = _asia_end_star_centroid(pid)
 		if center != Vector2.ZERO:
 			province_centroids[pid] = center
+		var extra_n: Vector2 = _asia_end_star_extra(pid)
 		var has_star := false
 		for child in node.get_children():
 			if child is Label and (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
 				has_star = true
 				var star := child as Label
 				star.visible = true
-				star.add_theme_font_size_override("font_size", 32)
+				star.add_theme_font_size_override("font_size", 36)
 				star.modulate = Color(1.0, 1.0, 1.0, 1.0)
 				star.z_as_relative = false
 				star.z_index = 80
 				star.reset_size()
 				var sms0 := star.get_minimum_size()
 				if center != Vector2.ZERO:
-					star.position = center - sms0 * 0.5
+					star.position = center - sms0 * 0.5 + extra_n
 				break
 		if not has_star:
-			_add_capital_star_to_node(node, pid, 32)
+			_add_capital_star_to_node(node, pid, 36)
 			for child2 in node.get_children():
 				if child2 is Label and (child2 as Label).has_meta(META_MAP_GLYPH_CAPITAL):
 					var st2 := child2 as Label
 					st2.visible = true
-					st2.add_theme_font_size_override("font_size", 32)
+					st2.add_theme_font_size_override("font_size", 36)
 					st2.z_as_relative = false
 					st2.z_index = 80
 					st2.reset_size()
 					var sms2 := st2.get_minimum_size()
 					if center != Vector2.ZERO:
-						st2.position = center - sms2 * 0.5
+						st2.position = center - sms2 * 0.5 + extra_n
 	_stamp_asia_end_overlay_stars(tokyo_pid, chi_pid)
 	_sync_capital_star_scales()
 
@@ -14863,6 +14867,32 @@ func _ensure_asia_end_star_overlay() -> Node2D:
 	return overlay
 
 
+func _asia_end_star_centroid(pid: int) -> Vector2:
+	var c: Vector2 = _centroid_for_pid(pid)
+	if c != Vector2.ZERO:
+		return c
+	if geometry.has(pid) and geometry[pid] is Dictionary:
+		var raw: Variant = (geometry[pid] as Dictionary).get("points", [])
+		if raw is Array and (raw as Array).size() >= 3:
+			var acc := Vector2.ZERO
+			var n: int = 0
+			for pv in raw as Array:
+				if pv is Array and (pv as Array).size() >= 2:
+					acc += Vector2(float((pv as Array)[0]), float((pv as Array)[1]))
+					n += 1
+			if n > 0:
+				return acc / float(n)
+	return Vector2.ZERO
+
+
+func _asia_end_star_extra(pid: int) -> Vector2:
+	# Beiping chips sit at (+48, -52). Star must sit opposite that stack
+	# (Play 3f8c614: Tokyo star visible, CHI star buried under Garrison 4 / Division 5).
+	if pid == 902487:
+		return Vector2(-56.0, -88.0)
+	return Vector2.ZERO
+
+
 func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
 	var overlay: Node2D = _ensure_asia_end_star_overlay()
 	if overlay == null:
@@ -14876,7 +14906,7 @@ func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
 			seen[pid] = true
 			stamp.append(pid)
 	for pid in stamp:
-		var center: Vector2 = _centroid_for_pid(pid)
+		var center: Vector2 = _asia_end_star_centroid(pid)
 		if center == Vector2.ZERO:
 			continue
 		var star: Label = Label.new()
@@ -14884,63 +14914,74 @@ func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
 		star.text = "★"
 		star.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		star.z_as_relative = false
-		star.z_index = 90
-		star.add_theme_font_size_override("font_size", 32)
+		star.z_index = 96
+		star.add_theme_font_size_override("font_size", 36)
 		star.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
 		star.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05, 1.0))
 		star.add_theme_constant_override("outline_size", 8)
 		star.set_meta(META_MAP_GLYPH_CAPITAL, true)
-		star.set_meta(META_MAP_GLYPH_PX, 32)
-		# Beiping: sit above garrison/division chips (Play: first End hid the CHI star).
-		var extra: Vector2 = Vector2(0.0, -18.0) if pid == 902487 else Vector2.ZERO
-		star.reset_size()
-		var sms: Vector2 = star.get_minimum_size()
-		star.position = center - sms * 0.5 + extra
+		star.set_meta(META_MAP_GLYPH_PX, 36)
+		var extra: Vector2 = _asia_end_star_extra(pid)
+		if pid == 902487:
+			var disc := Polygon2D.new()
+			disc.name = "AsiaEndStarDisc_%d" % pid
+			var ring := PackedVector2Array()
+			var i := 0
+			while i < 10:
+				var ang: float = TAU * float(i) / 10.0
+				ring.append(Vector2(cos(ang), sin(ang)) * 18.0)
+				i += 1
+			disc.polygon = ring
+			disc.color = Color(0.05, 0.05, 0.08, 0.9)
+			disc.z_as_relative = false
+			disc.z_index = 95
+			disc.position = center + extra
+			overlay.add_child(disc)
 		overlay.add_child(star)
 		star.reset_size()
-		sms = star.get_minimum_size()
+		var sms: Vector2 = star.get_minimum_size()
 		star.position = center - sms * 0.5 + extra
 
 
 func _focus_asia_view() -> void:
-	# Leftover click after this camera jump must not pick (Play: first End after G
-	# opened RUS West 903492 and _center_camera_on_province undid Asia). Do not
-	# wipe sticky / cam-moved latch. Do not arm still-click.
 	_left_skip_next_pick = true
 	hide_info_panel()
-	# Tokyo + Beiping/CHI — never first-nonzero that can land on empty USSR (903534).
-	var tokyo := _centroid_for_pid(903995)
+	var tokyo: Vector2 = _asia_end_star_centroid(903995)
+	var chi: Vector2 = _resolve_chi_capital_centroid()
 	var chi_pid := 902487
 	var resolved := _resolve_chi_capital_pid()
 	if resolved > 0:
 		chi_pid = resolved
-	var chi := _centroid_for_pid(chi_pid)
-	if chi == Vector2.ZERO:
-		chi = _resolve_chi_capital_centroid()
-	if chi == Vector2.ZERO:
-		chi = _centroid_for_pid(902487)
+	var bei: Vector2 = _asia_end_star_centroid(902487)
+	if bei != Vector2.ZERO:
+		chi = bei
 		chi_pid = 902487
-	var pts: Array[Vector2] = []
-	if tokyo != Vector2.ZERO:
-		pts.append(tokyo)
-	if chi != Vector2.ZERO:
-		pts.append(chi)
-	# Pad west/south of Beiping so the China nation label + star sit in-frame
-	# (landmass centroid alone sat on the left edge and viewport-cull hid "China").
-	if chi != Vector2.ZERO:
-		pts.append(chi + Vector2(-700.0, 420.0))
-		pts.append(chi + Vector2(-180.0, 220.0))
-		pts.append(chi + Vector2(80.0, -80.0))
-	var frame := _frame_rect_from_points(pts, Vector2(720.0, 520.0))
+	elif chi == Vector2.ZERO:
+		chi = _asia_end_star_centroid(chi_pid)
+	# Tight Tokyo–Beiping box. Do not use _frame_rect_from_points 0.45-span
+	# pad and do not pad −700 west (those opened Mongolia SOV hulls).
+	if tokyo == Vector2.ZERO and chi == Vector2.ZERO:
+		return
+	if tokyo == Vector2.ZERO:
+		tokyo = chi + Vector2(380.0, 450.0)
+	if chi == Vector2.ZERO:
+		chi = tokyo + Vector2(-380.0, -450.0)
+	var p_min: Vector2 = Vector2(minf(tokyo.x, chi.x), minf(tokyo.y, chi.y))
+	var p_max: Vector2 = Vector2(maxf(tokyo.x, chi.x), maxf(tokyo.y, chi.y))
+	p_min = p_min.min(chi + Vector2(-120.0, -80.0))
+	p_max = p_max.max(chi + Vector2(40.0, 180.0))
+	var pad: Vector2 = Vector2(200.0, 160.0)
+	var frame := Rect2(p_min - pad, (p_max + pad) - (p_min - pad))
 	var focus := frame.get_center() if frame.size.x > 80.0 else tokyo
 	if focus == Vector2.ZERO:
 		var b := _current_theater_bounds
 		focus = Vector2(b.position.x + b.size.x * 0.82, b.position.y + b.size.y * 0.38)
-		frame = Rect2(focus - Vector2(720, 520), Vector2(1440, 1040))
+		frame = Rect2(focus - Vector2(420, 320), Vector2(840, 640))
 	if _current_theater_bounds.size.x > 0.0:
 		var hit := frame.intersection(_current_theater_bounds)
 		if hit.size.x >= 80.0 and hit.size.y >= 80.0 and hit.size.x < _current_theater_bounds.size.x * 0.85:
 			frame = hit
+	_hide_asia_sov_overlap_hulls()
 	_unlock_close_camera()
 	_close_click_guard = false
 	_close_release_seen = false
@@ -15271,8 +15312,40 @@ func _province_draw_z_index(pid: int, is_water: bool) -> int:
 	if pid >= 800000 and pid < 900000:
 		return 3  # US playable
 	if pid >= 900000 and pid < 950000:
-		return 1  # RoW sparse (may be oversized)
+		# CHI/JAP/MON must sit above SOV sparse megablobs (Play 3f8c614: first End
+		# painted blank red triangles over Mongolia / N China).
+		if _asia_sov_hull_hides_fill(pid):
+			return 0
+		var tag := ""
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_owner"):
+			tag = str(MapManager.get_province_owner(pid)).strip_edges().to_upper()
+		if tag == "SOV" or tag == "RUS":
+			return 1
+		return 2
 	return 2
+
+
+func _asia_sov_hull_hides_fill(pid: int) -> bool:
+	# Sparse-merge SOV hulls whose convex rings cover Mongolia / N China / Yellow Sea.
+	# Play 3f8c614 first End: these painted as blank red triangles over Asia fills.
+	return pid == 903528 or pid == 903500
+
+
+func _hide_asia_sov_overlap_hulls() -> void:
+	for pid in [903528, 903500]:
+		if not province_nodes.has(pid):
+			continue
+		var node: Node2D = province_nodes[pid] as Node2D
+		if node == null or not is_instance_valid(node):
+			continue
+		var poly: Polygon2D = _get_province_polygon(node)
+		if poly == null:
+			continue
+		poly.visible = false
+		poly.set_meta("asia_sov_hull_hidden", true)
+		var c: Color = poly.color
+		c.a = 0.0
+		poly.color = c
 
 
 func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
@@ -15297,6 +15370,12 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 	points = ProvincePolygonUtil.assign_polygon2d(poly, points)
 	poly.color = _get_province_color(province)
 	poly.antialiased = true
+	if _asia_sov_hull_hides_fill(int(province.id)):
+		poly.visible = false
+		poly.set_meta("asia_sov_hull_hidden", true)
+		var hc: Color = poly.color
+		hc.a = 0.0
+		poly.color = hc
 
 	# Area2D is now completely optional.
 	# In the recommended production pure-spatial configuration (use_spatial_picking=true AND
@@ -20685,6 +20764,10 @@ func _refresh_province_fill_pids(pids: Array) -> void:
 		var poly: Polygon2D = _get_province_polygon(node as Node2D)
 		if poly == null:
 			continue
+		if _asia_sov_hull_hides_fill(pid) or bool(poly.get_meta("asia_sov_hull_hidden", false)):
+			poly.visible = false
+			poly.set_meta("asia_sov_hull_hidden", true)
+			continue
 		var col := _get_province_color(province)
 		if supply_mode:
 			var fill := ProvinceInsight.depot_fill_ratio(pid)
@@ -20720,6 +20803,10 @@ func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
 		var province: Province = provinces[pid] as Province
 		var poly: Polygon2D = _get_province_polygon(node as Node2D)
 		if poly == null:
+			continue
+		if _asia_sov_hull_hides_fill(int(pid)) or bool(poly.get_meta("asia_sov_hull_hidden", false)):
+			poly.visible = false
+			poly.set_meta("asia_sov_hull_hidden", true)
 			continue
 		var col := _get_province_color(province)
 		if supply_mode:
