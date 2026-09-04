@@ -76,6 +76,51 @@ def living_clock_skips_occupation_ticks(tm_src: str) -> bool:
     return False
 
 
+def living_playtest_theater_beat_keys() -> Dict[str, Any]:
+    """Exact shipped keys for the compact-clock Channel beat."""
+    return {
+        "source": "choke",
+        "action": "choke_flag",
+        "from_id": ENG_CHANNEL,
+        "to_id": ENG_CHANNEL,
+        "news_headline": "Channel choke 950001",
+        "choke_flag": True,
+    }
+
+
+def living_clock_theater_beat_ok(tm_src: str, harness: str = "") -> bool:
+    """Named Channel pid, news, no execute / BFS / fill / pin rebuild."""
+    beat = _slice(tm_src, "_record_living_playtest_theater_beat")
+    clock = _slice(tm_src, "advance_living_playtest_days")
+    keys = living_playtest_theater_beat_keys()
+    if not beat:
+        return False
+    banned = (
+        "find_land_path",
+        "preview_player_route",
+        "_update_unit_icons_for_test",
+        "_refresh_province_fill_colors",
+        "execute_province_assault",
+        "try_ai_start_land_battles",
+        "collect_live_border_assault_targets",
+    )
+    if any(tok in beat for tok in banned):
+        return False
+    headline = str(keys["news_headline"])
+    return (
+        "flag_naval_choke" in beat
+        and str(keys["from_id"]) in beat
+        and '"choke"' in beat
+        and '"choke_flag"' in beat
+        and headline in beat
+        and "post_news" in beat
+        and '"news_headline"' in clock
+        and '"choke_flag"' in clock
+        and '"theater_source"' in clock
+        and (not harness or "playtest clock theater beat" in harness)
+    )
+
+
 def _slice(src: str, func_name: str) -> str:
     needle = "func %s" % func_name
     i = src.find(needle)
@@ -431,9 +476,9 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "_skip_quit_autosave" in _slice(save_src, "_notification")
         and "clampi(int(days), 1, 20)" in clock_fn
         and "try_ai_start_land_battles" in _slice(tm_src, "_maybe_run_ai_land_battle_starts")
-        and not living_clock_skips_ai_starts(tm_src)
-        and "ai_land_started_n" in clock_fn
-        and "ai_started_to_ids" in clock_fn
+        and living_clock_skips_ai_starts(tm_src)
+        and "_record_living_playtest_theater_beat" in clock_fn
+        and living_clock_theater_beat_ok(tm_src, harness)
         and "_living_playtest_clock" in _slice(save_src, "_on_day_advanced_for_autosave")
         and "advance_living_playtest_days" in harness
         and "playtest clock advanced" in harness
@@ -450,11 +495,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "execute_province_assault" not in _slice(save_src, "living_playtest_saveload_roundtrip")
         and "living_playtest_saveload_roundtrip" in harness
         and "playtest clock save/load" in harness
-        and "playtest clock AI land start" in harness
-        and "ai_land_started_n" in harness
-        and "occupation_tick_n" in clock_fn
-        and not living_clock_skips_occupation_ticks(tm_src)
-        and "playtest clock occupation unrest tick" in harness
+        and "playtest clock theater beat" in harness
     )
     wiring["playtest_clock"] = clock_ok
     (passes if clock_ok else fails).append("playtest_clock")

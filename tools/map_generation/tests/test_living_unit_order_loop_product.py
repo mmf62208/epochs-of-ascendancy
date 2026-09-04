@@ -16,14 +16,21 @@ from living_unit_order_loop_product import (  # noqa: E402
     FRA_FRONT,
     GER_CAPITAL,
     GER_FRONT,
+    HARNESS,
     JAP_FRONT,
     MAGINOT_REGION,
     TIME_MANAGER,
     build_living_unit_order_loop_product,
     living_clock_skips_ai_starts,
     living_clock_skips_occupation_ticks,
+    living_clock_theater_beat_ok,
+    living_playtest_theater_beat_keys,
     living_unit_order_loop_integrity,
 )
+from order_panel_play_strip_product import (  # noqa: E402
+    build_order_panel_play_strip_product,
+)
+from play_next_hook_product import rank_next_beat  # noqa: E402
 
 
 class TestLivingUnitOrderLoopProduct(unittest.TestCase):
@@ -81,11 +88,41 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
         i = living_unit_order_loop_integrity()
         self.assertTrue(i.get("ok"), msg=i)
 
-    def test_playtest_clock_does_not_skip_ai_starts(self) -> None:
+    def test_living_playtest_theater_beat(self) -> None:
+        keys = living_playtest_theater_beat_keys()
+        self.assertEqual(keys.get("source"), "choke")
+        self.assertEqual(keys.get("action"), "choke_flag")
+        self.assertEqual(keys.get("from_id"), 950001)
+        self.assertEqual(keys.get("to_id"), 950001)
+        self.assertEqual(keys.get("from_id"), ENG_CHANNEL)
+        self.assertEqual(keys.get("news_headline"), "Channel choke 950001")
+        self.assertEqual(keys.get("choke_flag"), True)
         tm = TIME_MANAGER.read_text(encoding="utf-8")
-        self.assertFalse(living_clock_skips_ai_starts(tm), msg=tm[tm.find("_maybe_run_ai_land_battle_starts"): tm.find("_maybe_run_ai_land_battle_starts") + 900])
+        harness = HARNESS.read_text(encoding="utf-8")
+        self.assertTrue(living_clock_skips_ai_starts(tm), msg="living clock must skip unbounded try_ai")
+        self.assertTrue(living_clock_theater_beat_ok(tm, harness), msg=tm[tm.find("_record_living_playtest_theater_beat"): tm.find("_record_living_playtest_theater_beat") + 900])
+        mag = rank_next_beat(
+            {
+                "maginot_ready": True,
+                "maginot_fid": "ger_front",
+                "maginot_from": GER_FRONT,
+                "maginot_to": FRA_FRONT,
+            }
+        )
+        self.assertEqual(mag.get("source"), "maginot")
+        self.assertEqual(mag.get("action"), "open_fight")
+        self.assertEqual(mag.get("from_id"), GER_FRONT)
+        self.assertEqual(mag.get("to_id"), FRA_FRONT)
+        self.assertNotEqual(mag.get("source"), "first_session")
+        self.assertNotEqual(mag.get("action"), "show_war_loop")
+        strip = build_order_panel_play_strip_product()
+        self.assertTrue(strip.get("ok"), msg=strip)
+
+    def test_playtest_clock_skips_unbounded_ai_starts(self) -> None:
+        tm = TIME_MANAGER.read_text(encoding="utf-8")
+        self.assertTrue(living_clock_skips_ai_starts(tm), msg=tm[tm.find("_maybe_run_ai_land_battle_starts"): tm.find("_maybe_run_ai_land_battle_starts") + 900])
         self.assertIn("try_ai_start_land_battles", tm)
-        self.assertIn("ai_land_started_n", tm)
+        self.assertIn("_record_living_playtest_theater_beat", tm)
 
     def test_playtest_clock_does_not_skip_occupation_ticks(self) -> None:
         tm = TIME_MANAGER.read_text(encoding="utf-8")

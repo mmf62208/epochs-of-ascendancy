@@ -1809,6 +1809,54 @@ func _test_playtest_clock() -> void:
 		return
 	if tm.has_method("set_paused"):
 		tm.call("set_paused", false)
+	var five: Dictionary = tm.call("advance_living_playtest_days", 5) as Dictionary
+	print("  [INFO] playtest clock 5d theater %s" % str(five))
+	if str(five.get("theater_source", five.get("source", ""))) != "choke":
+		_fail("playtest clock theater source want choke got %s" % str(five))
+		return
+	if str(five.get("action", "")) != "choke_flag":
+		_fail("playtest clock theater action want choke_flag got %s" % str(five))
+		return
+	if int(five.get("from_id", -1)) != ENG_CHANNEL or int(five.get("to_id", -1)) != ENG_CHANNEL:
+		_fail("playtest clock theater pid want %d got %s" % [ENG_CHANNEL, str(five)])
+		return
+	if str(five.get("news_headline", "")) != "Channel choke 950001":
+		_fail("playtest clock news_headline want Channel choke 950001 got %s" % str(five))
+		return
+	if not bool(five.get("choke_flag", false)):
+		_fail("playtest clock choke_flag false: %s" % str(five))
+		return
+	if not bool(five.get("never_execute", false)):
+		_fail("playtest clock 5d must stay off execute: %s" % str(five))
+		return
+	var news_ok := false
+	var ui: Node = _autoload("LeaderEventUI")
+	if ui != null and "news_history" in ui:
+		for raw_n in ui.news_history:
+			if typeof(raw_n) != TYPE_DICTIONARY:
+				continue
+			if str((raw_n as Dictionary).get("title", "")) == "Channel choke 950001":
+				news_ok = true
+				break
+	if not news_ok:
+		_fail("playtest clock news_history missing Channel choke 950001")
+		return
+	_pass("playtest clock theater beat source=choke pid=%d" % ENG_CHANNEL)
+	var hook_scr: Script = load("res://scripts/ui/PlayNextHook.gd") as Script
+	if hook_scr != null:
+		var mag: Dictionary = hook_scr.call("rank_from_snapshot", {
+			"maginot_ready": true,
+			"maginot_fid": "ger_front",
+			"maginot_from": GER_FRONT,
+			"maginot_to": FRA_FRONT,
+		}) as Dictionary
+		if str(mag.get("source", "")) != "maginot" or str(mag.get("action", "")) != "open_fight":
+			_fail("Maginot idle NEXT want maginot/open_fight got %s" % str(mag))
+			return
+		if int(mag.get("from_id", -1)) != GER_FRONT or int(mag.get("to_id", -1)) != FRA_FRONT:
+			_fail("Maginot idle NEXT pids want %d→%d got %s" % [GER_FRONT, FRA_FRONT, str(mag)])
+			return
+		_pass("Maginot idle NEXT source=maginot %d→%d" % [GER_FRONT, FRA_FRONT])
 	_seed_maginot_clock_battle()
 	if _bm != null and _bm.has_method("clear_last_land_aar"):
 		_bm.call("clear_last_land_aar")

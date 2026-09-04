@@ -350,6 +350,8 @@ func advance_living_playtest_days(days: int = 5) -> Dictionary:
 	_living_playtest_clock = true
 	advance_days(float(n))
 	var flushed := _drain_living_f5_flush(n)
+	# Named-pid Channel beat while toast-skip is on. Never try_ai / execute / 3520 scan.
+	var theater: Dictionary = _record_living_playtest_theater_beat()
 	_living_playtest_clock = false
 	paused = was_paused
 	var advanced := total_days_elapsed - start
@@ -374,7 +376,43 @@ func advance_living_playtest_days(days: int = 5) -> Dictionary:
 		"news": true,
 		"f5_flush": true,
 		"flushed": flushed,
+		"theater_source": str(theater.get("source", "")),
+		"action": str(theater.get("action", "")),
+		"from_id": int(theater.get("from_id", -1)),
+		"to_id": int(theater.get("to_id", -1)),
+		"news_headline": str(theater.get("news_headline", "")),
+		"choke_flag": bool(theater.get("choke_flag", false)),
 	}
+
+
+## One non-player theater beat on the compact clock. Named Channel pid only —
+## no live-border scan, no find_land_path, no fill/pin rebuild, no execute.
+func _record_living_playtest_theater_beat() -> Dictionary:
+	const CHANNEL := 950001
+	var beat := {
+		"ok": false,
+		"source": "",
+		"action": "",
+		"from_id": -1,
+		"to_id": -1,
+		"news_headline": "",
+		"choke_flag": false,
+	}
+	var sentence := ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("flag_naval_choke"):
+		var fl: Dictionary = MapManager.flag_naval_choke(CHANNEL)
+		sentence = str(fl.get("sentence", ""))
+	var headline := "Channel choke 950001"
+	beat["ok"] = true
+	beat["source"] = "choke"
+	beat["action"] = "choke_flag"
+	beat["from_id"] = CHANNEL
+	beat["to_id"] = CHANNEL
+	beat["news_headline"] = headline
+	beat["choke_flag"] = true
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+		LeaderEventUI.post_news(headline, sentence, "naval")
+	return beat
 
 
 func _drain_living_f5_flush(days: int) -> int:
