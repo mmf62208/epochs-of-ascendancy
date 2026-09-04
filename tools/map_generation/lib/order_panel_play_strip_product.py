@@ -204,6 +204,7 @@ def build_order_panel_play_strip_product(
         src = ORDER_PANEL.read_text(encoding="utf-8")
         play_fn = _gd_fn(src, "_rebuild_play_mode_strip")
         open_fn = _gd_fn(src, "_open_play_strip_production")
+        btn_fn = _gd_fn(src, "_add_play_strip_production_button")
         wiring["play_strip_section"] = (
             "EOA_PLAY_STRIP" in src
             or "_rebuild_play_mode_strip" in src
@@ -217,12 +218,14 @@ def build_order_panel_play_strip_product(
         wiring["play_mode_not_apply_production"] = (
             '_add_apply_button("[3] Production", "apply_production"' not in play_fn
             and '"apply_production"' not in play_fn
+            and "apply_production" not in btn_fn
         )
         wiring["play_mode_opens_living_production"] = (
             "open_living_surface" in open_fn
             and '"production"' in open_fn
-            and ("_on_production_pressed" in open_fn or "open_living_surface" in open_fn)
             and "_add_play_strip_production_button" in play_fn
+            and "pressed.connect(_open_play_strip_production)" in btn_fn
+            and "apply_production" not in btn_fn
         )
         for k, v in wiring.items():
             if v:
@@ -236,15 +239,32 @@ def build_order_panel_play_strip_product(
                 passes.append("top_bar_production_live")
             else:
                 fails.append("top_bar_production_live")
+            if (
+                "get_player_country_tag" in bar_open
+                and "player_country_tag = pt" in bar_open
+                and '"GER"' in bar_open
+                and '"USA"' in bar_open
+                and "bar_tag" in bar_open
+            ):
+                passes.append("top_bar_binds_living_tag")
+            else:
+                fails.append("top_bar_binds_living_tag")
         if HOOK_GD.is_file():
             hook = HOOK_GD.read_text(encoding="utf-8")
+            apply_i = hook.find("static func apply")
+            apply_n = hook.find("\nstatic func ", apply_i + 1) if apply_i >= 0 else -1
+            apply_fn = hook[apply_i:apply_n] if apply_i >= 0 and apply_n > apply_i else ""
             if (
                 'func open_living_production' in hook
-                and '_open_living_surface("production"' in hook
+                and '_open_living_surface("production"' in apply_fn
             ):
                 passes.append("hook_open_living_production")
             else:
                 fails.append("hook_open_living_production")
+            if '_open_living_surface("production"' in apply_fn:
+                passes.append("hook_apply_opens_production")
+            else:
+                fails.append("hook_apply_opens_production")
         if UNIT_CARD.is_file():
             card = UNIT_CARD.read_text(encoding="utf-8")
             if "Fill %.0f%%" in card and "stock rifles" in card:
@@ -260,7 +280,9 @@ def build_order_panel_play_strip_product(
         and "wire_play_mode_not_apply_production" not in fails
         and "wire_play_mode_opens_living_production" not in fails
         and "top_bar_production_live" not in fails
+        and "top_bar_binds_living_tag" not in fails
         and "hook_open_living_production" not in fails
+        and "hook_apply_opens_production" not in fails
         and "unit_card_fill_stockpile" not in fails
     )
     return {

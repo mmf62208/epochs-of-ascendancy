@@ -1231,10 +1231,17 @@ func open_living_surface(kind: String) -> Dictionary:
 		k = "research"
 	if k in ["focus_done"]:
 		k = "focus"
+	var pt := ""
 	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
-		var pt := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
-		if not pt.is_empty():
-			player_country_tag = pt
+		pt = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+	if pt.is_empty():
+		pt = "GER"
+	var bar_tag := player_country_tag.strip_edges().to_upper()
+	# Unbooted LM export is USA — do not clobber an already-set living bar.
+	if pt == "USA" and not bar_tag.is_empty() and bar_tag != "USA":
+		pt = bar_tag
+	if not pt.is_empty():
+		player_country_tag = pt
 	_force_open_living = true
 	match k:
 		"production":

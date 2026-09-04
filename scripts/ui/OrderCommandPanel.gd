@@ -1249,7 +1249,7 @@ func _open_play_strip_production() -> void:
 	if bar != null and bar.has_method("open_living_surface"):
 		bar.call("open_living_surface", "production")
 		return
-	if typeof(PlayNextHook) != TYPE_NIL and PlayNextHook.has_method("open_living_production"):
+	if typeof(PlayNextHook) != TYPE_NIL:
 		PlayNextHook.open_living_production()
 
 
