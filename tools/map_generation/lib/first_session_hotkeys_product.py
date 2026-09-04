@@ -489,6 +489,9 @@ def build_first_session_hotkeys_product(
             and "start_land_battle" in _slice_func(ren, "_try_execute_province_attack")
             and "Division fold" in (ROOT / "scripts" / "ui" / "ProvinceOOBStrip.gd").read_text(encoding="utf-8")
             and "BtnOpenFight" in ren
+            and "ACTION_MODE_BUTTON_PRESS" in _slice_func(ren, "_show_unit_detail_popup")
+            and "UnitDetailPopup" in _slice_func(ren, "_show_open_fight_sheet")
+            and "_is_mouse_over_blocking_ui" in input_fn
         )
         wiring["wheel_no_full_fill"] = (
             bool(light_fn)

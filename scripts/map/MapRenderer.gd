@@ -1516,10 +1516,14 @@ func _input(event: InputEvent) -> void:
 				# Mid-drag no-ops because _left_btn_down is still true.
 				_begin_left_map_gesture(true)
 				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
-					_arm_left_map_press()
-					_mark_left_pan_blocked_pick()
-					get_viewport().set_input_as_handled()
-					return
+					# Pan latch stays. Do not swallow Open fight / unit-card buttons
+					# (2d47d06: fold click was tooltip-only no-op after pan PASS).
+					# Search LineEdit/Go already returned above — do not touch that path.
+					if not _is_mouse_over_blocking_ui():
+						_arm_left_map_press()
+						_mark_left_pan_blocked_pick()
+						get_viewport().set_input_as_handled()
+						return
 			if event.ctrl_pressed or event.shift_pressed:
 				pass
 			elif MapViewInput.modal_blocks_map_nav(get_viewport()):
@@ -16536,6 +16540,9 @@ func _is_mouse_over_blocking_ui() -> bool:
 			"ProvinceHoverTooltip",
 			"OpenFightSheet",
 			"UnitDetailPopup",
+			"ProvinceOOBStrip",
+			"BtnOpenFight",
+			"OpenFightFoldBtn",
 			"BtnClose",
 		]:
 			return true
@@ -17487,8 +17494,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		fight_row.add_theme_constant_override("separation", 6)
 		vbox.add_child(fight_row)
 		var fight_btn := Button.new()
+		fight_btn.name = "BtnOpenFight"
 		fight_btn.text = "Open fight"
 		fight_btn.focus_mode = Control.FOCUS_NONE
+		fight_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		fight_btn.tooltip_text = "Start a multi-day land battle from this unit into an adjacent enemy."
 		RetrowaveTheme.style_primary_button(fight_btn)
 		var fight_fid := fid
@@ -18399,12 +18408,13 @@ func _open_fight_from_formation_id(fid: String) -> void:
 			fo = f
 			break
 	if att_fid.is_empty() or fo == null:
-		_show_inspector_toast("Open fight · no GER land division to stage", 3.5, true)
+		# Still open the Maginot sheet — Play: button was tooltip-only / no-op.
+		_show_open_fight_sheet("", null, GER_FRONT, FRA_FRONT, "GER")
 		return
 	selected_formation_id = att_fid
 	attack_staging_province_id = GER_FRONT
 	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("start_land_battle"):
-		_show_inspector_toast("Open fight · battle API missing", 3.0, true)
+		_show_open_fight_sheet(att_fid, fo, GER_FRONT, FRA_FRONT, "GER")
 		return
 	_show_open_fight_sheet(att_fid, fo, GER_FRONT, FRA_FRONT, "GER")
 
@@ -18457,6 +18467,11 @@ func _show_open_fight_sheet(
 	_hold_camera_now()
 	if info_panel != null and info_panel is CanvasItem:
 		(info_panel as CanvasItem).visible = false
+	# Unit card docks the same bottom-left as the Maginot sheet (Play: Open fight
+	# looked like a no-op because Division 0 stayed on top).
+	var unit_pop := ui.get_node_or_null("UnitDetailPopup")
+	if unit_pop != null:
+		unit_pop.queue_free()
 	var old := ui.get_node_or_null("OpenFightSheet")
 	if old != null:
 		old.queue_free()
@@ -18496,7 +18511,8 @@ func _show_open_fight_sheet(
 			can_reason = str(can_pre.get("reason", can_reason))
 	var panel := PanelContainer.new()
 	panel.name = "OpenFightSheet"
-	panel.z_index = 75
+	panel.z_index = 90
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.clip_contents = true
 	panel.custom_minimum_size = Vector2(360, 240)
 	if typeof(RetrowaveTheme) != TYPE_NIL:
@@ -18763,6 +18779,7 @@ func _ensure_attack_button() -> void:
 		_btn_open_fight.offset_right = 440.0
 		_btn_open_fight.offset_bottom = 58.0
 		_btn_open_fight.focus_mode = Control.FOCUS_NONE
+		_btn_open_fight.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		_btn_open_fight.pressed.connect(func() -> void:
 			_open_fight_from_formation_id(selected_formation_id)
 		)

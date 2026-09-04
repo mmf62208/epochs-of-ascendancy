@@ -59,6 +59,7 @@ func _ready() -> void:
 	fight_btn.name = "OpenFightFoldBtn"
 	fight_btn.text = "Open fight"
 	fight_btn.focus_mode = Control.FOCUS_NONE
+	fight_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	fight_btn.custom_minimum_size = Vector2(88, 22)
 	fight_btn.add_theme_font_size_override("font_size", 11)
 	RetrowaveTheme.style_primary_button(fight_btn)
