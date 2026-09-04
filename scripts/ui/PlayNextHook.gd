@@ -1,7 +1,7 @@
 # scripts/ui/PlayNextHook.gd
 ## One recommended next beat for the play-strip / map chip.
 ## War first, then organize-ready, dry fuel, steel shortage, completing
-## research/focus. Empty sit-down shows the first-session WarLoop path.
+## research/focus. Maginot GER chip (710173) outranks idle WarLoop.
 class_name PlayNextHook
 extends RefCounted
 
@@ -205,8 +205,12 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			"to_id": int(occ.get("pid", -1)),
 			"source": "occupation",
 		}
+	var maginot_fid := str(f.get("maginot_fid", "")).strip_edges()
+	var maginot_from := int(f.get("maginot_from", 0))
+	var maginot_to := int(f.get("maginot_to", 0))
+	var maginot_ready := bool(f.get("maginot_ready", false)) or not maginot_fid.is_empty()
 	var wpid := int(f.get("war_goal_pid", -1))
-	if wpid > 0:
+	if wpid > 0 and not maginot_ready:
 		if not bool(f.get("war_justified", false)):
 			return {
 				"ok": true,
@@ -236,6 +240,21 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			"fid": str(f.get("battle_fid", "")),
 			"to_id": int(f.get("battle_to_id", -1)),
 			"source": "land_battle",
+		}
+	if maginot_ready:
+		if maginot_from <= 0:
+			maginot_from = 710173
+		if maginot_to <= 0:
+			maginot_to = 710739
+		return {
+			"ok": true,
+			"action": "open_fight",
+			"label": "Maginot — 1. Infanterie can assault Alsace",
+			"hint": "GER 710173 → FRA 710739 · Open fight / Ctrl+click Alsace",
+			"fid": maginot_fid,
+			"to_id": maginot_to,
+			"from_id": maginot_from,
+			"source": "maginot",
 		}
 	var vacant := str(f.get("vacant_chief", "")).strip_edges()
 	if not vacant.is_empty():
@@ -473,13 +492,18 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 			"region_id": 0,
 			"summary": "CAS unassigned",
 		}
+	if action == "open_fight":
+		var fight_mr: Node = _map_renderer_node()
+		if fight_mr != null and fight_mr.has_method("_open_fight_from_formation_id"):
+			fight_mr.call("_open_fight_from_formation_id", fid)
+			return {
+				"ok": true,
+				"action": "open_fight",
+				"summary": str(r.get("hint", r.get("label", "Maginot"))),
+			}
+		return {"ok": true, "action": "open_fight", "summary": str(r.get("hint", "Maginot"))}
 	if action == "show_war_loop":
-		var tree := Engine.get_main_loop() as SceneTree
-		var mr: Node = null
-		if tree != null:
-			mr = tree.get_first_node_in_group("map_renderer")
-			if mr == null and tree.current_scene != null:
-				mr = tree.current_scene.find_child("MapRenderer", true, false)
+		var mr: Node = _map_renderer_node()
 		if mr != null and mr.has_method("show_first_session_war_path"):
 			var wp: Dictionary = mr.call("show_first_session_war_path")
 			return {
@@ -622,6 +646,8 @@ static func _action_label(action: String) -> String:
 			return "Justify the war goal"
 		"declare":
 			return "Declare war"
+		"open_fight":
+			return "Maginot — 1. Infanterie can assault Alsace"
 		"show_war_loop":
 			return "WarLoop · B Fronts · Ctrl+click"
 		"assign_chief":
@@ -729,6 +755,12 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 	facts["war_goal_pid"] = int(wg.get("pid", -1))
 	facts["war_justified"] = bool(wg.get("justified", false))
 	facts["war_declared"] = bool(wg.get("declared", false))
+	var mag: Dictionary = _maginot_row(tag)
+	if bool(mag.get("ready", false)):
+		facts["maginot_ready"] = true
+		facts["maginot_fid"] = str(mag.get("fid", ""))
+		facts["maginot_from"] = int(mag.get("from", 710173))
+		facts["maginot_to"] = int(mag.get("to", 710739))
 	facts["vacant_chief"] = _vacant_chief(tag)
 	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("completing_snapshot"):
 		var queued := str(facts.get("research_id", "")).strip_edges()
@@ -756,13 +788,54 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 	return facts
 
 
-static func _show_occupation_overlay() -> void:
+static func _map_renderer_node() -> Node:
 	var tree := Engine.get_main_loop() as SceneTree
-	var mr: Node = null
-	if tree != null:
-		mr = tree.get_first_node_in_group("map_renderer")
-		if mr == null and tree.current_scene != null:
-			mr = tree.current_scene.find_child("MapRenderer", true, false)
+	if tree == null:
+		return null
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr == null and tree.current_scene != null:
+		mr = tree.current_scene.find_child("MapRenderer", true, false)
+	return mr
+
+
+## Named Maginot hex only — never walk 3520. GER land at 710173 is the opening chip.
+static func _maginot_row(tag: String) -> Dictionary:
+	var empty := {}
+	if tag.strip_edges().to_upper() != "GER":
+		return empty
+	const FROM := 710173
+	const TO := 710739
+	if typeof(LeaderManager) == TYPE_NIL:
+		return empty
+	var fid := ""
+	if "formations" in LeaderManager:
+		var forms: Variant = LeaderManager.formations
+		if typeof(forms) == TYPE_DICTIONARY:
+			var scanned := 0
+			for key in (forms as Dictionary):
+				if scanned >= 48:
+					break
+				scanned += 1
+				var f: Object = (forms as Dictionary)[key]
+				if f == null:
+					continue
+				if str(f.get("country_tag")).strip_edges().to_upper() != "GER":
+					continue
+				var ft := str(f.formation_type) if "formation_type" in f else ""
+				if ft != "division" and ft != "garrison":
+					continue
+				var pid := int(f.get("stationed_province_id")) if "stationed_province_id" in f else -1
+				if pid != FROM:
+					continue
+				fid = str(f.get("formation_id")) if "formation_id" in f else str(key)
+				break
+	if fid.is_empty():
+		return empty
+	return {"ready": true, "fid": fid, "from": FROM, "to": TO}
+
+
+static func _show_occupation_overlay() -> void:
+	var mr: Node = _map_renderer_node()
 	if mr != null and mr.has_method("set_occupation_overlay_visible"):
 		mr.call("set_occupation_overlay_visible", true)
 		if mr.get("_occupation_layer") != null:

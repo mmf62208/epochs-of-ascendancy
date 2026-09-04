@@ -180,6 +180,57 @@ class TestPlayNextHookProduct(unittest.TestCase):
         self.assertEqual(oil_first.get("source"), "aar")
         self.assertIn("oil", str(oil_first.get("label", "")).lower())
 
+    def test_maginot_chip_is_not_warloop(self) -> None:
+        mag = rank_next_beat(
+            {"maginot_fid": "ger_front", "maginot_from": 710173, "maginot_to": 710739}
+        )
+        self.assertNotEqual(mag.get("source"), "first_session")
+        self.assertNotEqual(mag.get("action"), "show_war_loop")
+        self.assertEqual(mag.get("source"), "maginot")
+        self.assertEqual(mag.get("action"), "open_fight")
+        self.assertIn("maginot", str(mag.get("label", "")).lower())
+        self.assertIn("alsace", str(mag.get("label", "")).lower())
+        ready = rank_next_beat({"maginot_ready": True})
+        self.assertEqual(ready.get("source"), "maginot")
+        idle = rank_next_beat({})
+        self.assertEqual(idle.get("action"), "show_war_loop")
+        self.assertEqual(idle.get("source"), "first_session")
+        fight = rank_next_beat(
+            {"any_open_battle": True, "maginot_fid": "ger_front"}
+        )
+        self.assertEqual(fight.get("source"), "land_battle")
+        train = rank_next_beat(
+            {
+                "training": [{"fid": "u1", "days_left": 1}],
+                "maginot_fid": "ger_front",
+            }
+        )
+        self.assertEqual(train.get("action"), "send_trained")
+        dry = rank_next_beat(
+            {
+                "dry_fuel": [{"fid": "u2"}],
+                "fuel_stock": 0,
+                "oil_stock": 0,
+                "maginot_fid": "ger_front",
+            }
+        )
+        self.assertEqual(dry.get("action"), "refuel")
+        short = rank_next_beat(
+            {"steel_stock": 0.0, "has_vehicle": True, "maginot_fid": "ger_front"}
+        )
+        self.assertEqual(short.get("action"), "shortage")
+        # Living Maginot chip outranks the GER/FRA war-goal so F5 NEXT is Maginot, not Justify.
+        vs_justify = rank_next_beat(
+            {
+                "war_goal_pid": 710739,
+                "war_justified": False,
+                "maginot_fid": "ger_front",
+                "maginot_from": 710173,
+            }
+        )
+        self.assertEqual(vs_justify.get("source"), "maginot")
+        self.assertNotEqual(vs_justify.get("action"), "justify")
+
 
 if __name__ == "__main__":
     unittest.main()

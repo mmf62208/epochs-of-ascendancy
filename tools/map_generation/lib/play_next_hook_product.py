@@ -70,7 +70,8 @@ def _optional_days(f: Mapping[str, Any], key: str) -> float:
 
 
 def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
-    """War first, then organize-ready, dry fuel, shortage, completing bars — idle last."""
+    """War first, then organize-ready, dry fuel, shortage, completing bars.
+    Maginot GER chip (710173) outranks idle WarLoop; empty idle stays WarLoop."""
     f = facts if isinstance(facts, dict) else {}
     aar_pid = int(f.get("aar_next_pid", -1) or -1)
     if aar_pid > 0:
@@ -214,11 +215,21 @@ def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
             "hint": occ_line,
             "to_id": int(occ.get("pid") or 0),
         }
+    maginot_fid = str(f.get("maginot_fid") or "").strip()
+    maginot_ready = bool(f.get("maginot_ready")) or bool(maginot_fid)
+    try:
+        maginot_from = int(f.get("maginot_from") or 0)
+    except (TypeError, ValueError):
+        maginot_from = 0
+    try:
+        maginot_to = int(f.get("maginot_to") or 0)
+    except (TypeError, ValueError):
+        maginot_to = 0
     try:
         wpid = int(f.get("war_goal_pid") or 0)
     except (TypeError, ValueError):
         wpid = 0
-    if wpid > 0:
+    if wpid > 0 and not maginot_ready:
         if not bool(f.get("war_justified")):
             return {
                 "ok": True,
@@ -244,6 +255,21 @@ def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
             "source": "land_battle",
             "label": "Open fight",
             "hint": "A land battle is live — fights outrank WarLoop copy",
+        }
+    if maginot_ready:
+        if maginot_from <= 0:
+            maginot_from = 710173
+        if maginot_to <= 0:
+            maginot_to = 710739
+        return {
+            "ok": True,
+            "action": "open_fight",
+            "source": "maginot",
+            "label": "Maginot — 1. Infanterie can assault Alsace",
+            "fid": maginot_fid,
+            "to_id": maginot_to,
+            "from_id": maginot_from,
+            "hint": "GER 710173 → FRA 710739 · Open fight / Ctrl+click Alsace",
         }
     return {
         "ok": True,
@@ -288,6 +314,14 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("apply_warloop")
     else:
         fails.append("apply_warloop")
+    if 'action == "open_fight"' in hook and "_open_fight_from_formation_id" in hook:
+        passes.append("apply_maginot_open_fight")
+    else:
+        fails.append("apply_maginot_open_fight")
+    if "maginot_fid" in hook and "maginot_ready" in hook and "maginot_from" in hook:
+        passes.append("gd_maginot_facts")
+    else:
+        fails.append("gd_maginot_facts")
     idle = rank_next_beat({})
     if str(idle.get("action")) == "show_war_loop" and str(idle.get("source")) == "first_session":
         passes.append("idle_shows_warloop")
@@ -298,6 +332,68 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("any_fight_beats_warloop")
     else:
         fails.append("any_fight_beats_warloop")
+    mag_idle = rank_next_beat(
+        {"maginot_fid": "ger_front", "maginot_from": 710173, "maginot_to": 710739}
+    )
+    mag_label = str(mag_idle.get("label", "")).lower()
+    if (
+        str(mag_idle.get("source")) == "maginot"
+        and str(mag_idle.get("action")) == "open_fight"
+        and str(mag_idle.get("source")) != "first_session"
+        and ("maginot" in mag_label or "alsace" in mag_label)
+    ):
+        passes.append("maginot_chip_not_warloop")
+    else:
+        fails.append("maginot_chip_not_warloop")
+    mag_fight = rank_next_beat(
+        {"any_open_battle": True, "maginot_fid": "ger_front", "maginot_from": 710173}
+    )
+    if str(mag_fight.get("source")) == "land_battle":
+        passes.append("any_fight_beats_maginot")
+    else:
+        fails.append("any_fight_beats_maginot")
+    mag_train = rank_next_beat(
+        {
+            "training": [{"fid": "u1", "days_left": 1}],
+            "maginot_fid": "ger_front",
+            "maginot_from": 710173,
+        }
+    )
+    if str(mag_train.get("action")) == "send_trained":
+        passes.append("train_beats_maginot")
+    else:
+        fails.append("train_beats_maginot")
+    mag_fuel = rank_next_beat(
+        {
+            "dry_fuel": [{"fid": "u2"}],
+            "fuel_stock": 0,
+            "oil_stock": 0,
+            "maginot_fid": "ger_front",
+        }
+    )
+    if str(mag_fuel.get("action")) == "refuel":
+        passes.append("fuel_beats_maginot")
+    else:
+        fails.append("fuel_beats_maginot")
+    mag_short = rank_next_beat(
+        {"steel_stock": 0.0, "has_vehicle": True, "maginot_fid": "ger_front"}
+    )
+    if str(mag_short.get("action")) == "shortage":
+        passes.append("shortage_beats_maginot")
+    else:
+        fails.append("shortage_beats_maginot")
+    mag_vs_justify = rank_next_beat(
+        {
+            "war_goal_pid": 710739,
+            "war_justified": False,
+            "maginot_fid": "ger_front",
+            "maginot_from": 710173,
+        }
+    )
+    if str(mag_vs_justify.get("source")) == "maginot":
+        passes.append("maginot_beats_justify")
+    else:
+        fails.append("maginot_beats_justify")
     train = rank_next_beat({"training": [{"fid": "u1", "days_left": 1}]})
     if str(train.get("action")) == "send_trained" and str(train.get("source")) == "organize":
         passes.append("train_beats_idle")
@@ -484,6 +580,18 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("gd_choke_before_cas")
     else:
         fails.append("gd_choke_before_cas")
+    fight_src_i = rank_fn.find("any_open_battle")
+    mag_src_i = rank_fn.find('"source": "maginot"')
+    idle_src_i = rank_fn.find('"source": "first_session"')
+    if (
+        fight_src_i >= 0
+        and mag_src_i > fight_src_i
+        and idle_src_i > mag_src_i
+        and '"action": "open_fight"' in rank_fn
+    ):
+        passes.append("gd_maginot_after_fight_before_warloop")
+    else:
+        fails.append("gd_maginot_after_fight_before_warloop")
     row_i = hook.find("func _fleet_choke_row")
     row_n = hook.find("\nfunc ", row_i + 1) if row_i >= 0 else -1
     row_fn = hook[row_i:row_n] if row_i >= 0 else ""

@@ -18,6 +18,7 @@ var _scroll: ScrollContainer
 var _row: HBoxContainer
 var _empty: Label
 var _filter_btn: Button
+var _fight_btn: Button
 var _province_id: int = -1
 ## When true, only show formations matching the player country tag.
 var player_only: bool = true
@@ -55,15 +56,15 @@ func _ready() -> void:
 	_filter_btn.pressed.connect(_on_filter_toggle)
 	title_row.add_child(_filter_btn)
 	_sync_filter_btn()
-	var fight_btn := Button.new()
-	fight_btn.name = "OpenFightFoldBtn"
-	fight_btn.text = "Open fight"
-	fight_btn.focus_mode = Control.FOCUS_NONE
-	fight_btn.custom_minimum_size = Vector2(88, 22)
-	fight_btn.add_theme_font_size_override("font_size", 11)
-	RetrowaveTheme.style_primary_button(fight_btn)
-	fight_btn.pressed.connect(_on_open_fight_pressed)
-	title_row.add_child(fight_btn)
+	_fight_btn = Button.new()
+	_fight_btn.name = "OpenFightFoldBtn"
+	_fight_btn.text = "Open fight"
+	_fight_btn.focus_mode = Control.FOCUS_NONE
+	_fight_btn.custom_minimum_size = Vector2(88, 22)
+	_fight_btn.add_theme_font_size_override("font_size", 11)
+	RetrowaveTheme.style_primary_button(_fight_btn)
+	_fight_btn.pressed.connect(_on_open_fight_pressed)
+	title_row.add_child(_fight_btn)
 	_scroll = ScrollContainer.new()
 	_scroll.custom_minimum_size = Vector2(0, 40)
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -102,14 +103,26 @@ func _sync_filter_btn() -> void:
 		_filter_btn.tooltip_text = "Showing all nations. Click for player-only."
 
 
+func _formation_id_of(item: Variant) -> String:
+	if item is Object and "formation_id" in item:
+		return str(item.formation_id)
+	if item is Dictionary:
+		return str((item as Dictionary).get("formation_id", ""))
+	return ""
+
+
 func _on_open_fight_pressed() -> void:
 	var fid := ""
-	if not _last_formations.is_empty():
-		var item: Variant = _last_formations[0]
-		if item is Object and "formation_id" in item:
-			fid = str(item.formation_id)
-		elif item is Dictionary:
-			fid = str((item as Dictionary).get("formation_id", ""))
+	if _province_id == 710173:
+		for item in _last_formations:
+			var tag := _formation_country_tag(item)
+			if not tag.is_empty() and tag != "GER":
+				continue
+			fid = _formation_id_of(item)
+			if not fid.is_empty():
+				break
+	if fid.is_empty() and not _last_formations.is_empty():
+		fid = _formation_id_of(_last_formations[0])
 	open_fight_requested.emit(fid)
 
 
@@ -132,6 +145,11 @@ func show_for_province(province_id: int, formations: Array, player_tag: String =
 		tag = _resolve_player_tag()
 	_last_player_tag = tag
 	_sync_filter_btn()
+	if _fight_btn != null:
+		if province_id == 710173 and (tag == "GER" or tag.is_empty()):
+			_fight_btn.tooltip_text = "Maginot — 1. Infanterie can assault Alsace"
+		else:
+			_fight_btn.tooltip_text = "Open the Attacker/Defender sheet"
 	var filtered: Array = []
 	if player_only and not tag.is_empty():
 		for item in formations:

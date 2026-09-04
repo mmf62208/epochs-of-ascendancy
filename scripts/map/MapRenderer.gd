@@ -18342,12 +18342,25 @@ var _unit_pick_strategic_hint_shown: bool = false
 
 func _open_fight_from_formation_id(fid: String) -> void:
 	# First-session sheet: stage GER Maginot 710173 → FRA 710739 and open the combat card.
-	# Do not require the clicked unit (DNK etc.) to already sit on a live border.
-	# Cheap Maginot pair only — no world OOB rebuild (that hung input).
+	# Cheap Maginot pair only — no world OOB rebuild / no 3520 BFS on the click.
 	const GER_FRONT := 710173
 	const FRA_FRONT := 710739
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
 		_show_inspector_toast("Open fight · no army list", 3.0, true)
+		return
+	var player := _player_tag()
+	var picked: Object = LeaderManager.get_formation(fid) if not fid.is_empty() else null
+	var picked_tag := ""
+	if picked != null and "country_tag" in picked:
+		picked_tag = str(picked.country_tag).strip_edges().to_upper()
+	# Default GER stays Maginot. Other tags keep their own hex (ITA Milano ≠ Alsace).
+	if player != "GER" and not player.is_empty() and picked_tag != "GER" and picked != null:
+		var from_pid := int(picked.get("stationed_province_id")) if "stationed_province_id" in picked else -1
+		var enemy_pid := _adjacent_enemy_province_id(from_pid, picked_tag if not picked_tag.is_empty() else player)
+		selected_formation_id = fid
+		if from_pid > 0:
+			attack_staging_province_id = from_pid
+		_show_open_fight_sheet(fid, picked, from_pid, enemy_pid, picked_tag if not picked_tag.is_empty() else player)
 		return
 	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
 		if BattleManager.get_divisions_at_province(FRA_FRONT, "FRA").is_empty() \
@@ -18357,7 +18370,7 @@ func _open_fight_from_formation_id(fid: String) -> void:
 				and LeaderManager.has_method("field_designed_unit"):
 			LeaderManager.field_designed_unit("GER", "panzer_iii_j_medium", GER_FRONT, "land")
 	var att_fid := ""
-	var fo: Object = LeaderManager.get_formation(fid) if not fid.is_empty() else null
+	var fo: Object = picked
 	if fo != null and "country_tag" in fo and str(fo.country_tag).strip_edges().to_upper() == "GER":
 		if "stationed_province_id" in fo:
 			fo.stationed_province_id = GER_FRONT
@@ -19683,8 +19696,7 @@ func ensure_equipment_flow_glyphs_on() -> Dictionary:
 ## Cheap G / first-session order toast — never pathfinds.
 func _toast_easy_unit_orders() -> void:
 	var toast := (
-		"Click a GER chip (green org / amber str) · click own land to MARCH · "
-		+ "Ctrl+click France to ASSAULT · Esc clears"
+		"Maginot — 1. Infanterie can assault Alsace · Open fight / Ctrl+click FRA · Start battle"
 	)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug(toast)
@@ -23699,6 +23711,8 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	_sync_unit_counter_visibility()
 	_sync_unit_counter_scales()
 	result["ok"] = int(result["ger"]) > 0
+	if bool(result["ok"]):
+		_refresh_next_hook_chip()
 	var graphical := DisplayServer.get_name() != "headless"
 	if graphical and bool(result["ok"]) and focus_camera:
 		_center_camera_on_province(GER_FRONT, "soft")
