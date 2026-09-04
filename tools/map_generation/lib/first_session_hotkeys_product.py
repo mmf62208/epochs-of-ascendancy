@@ -487,6 +487,7 @@ def build_first_session_hotkeys_product(
             and "900000" in _slice_func(ren, "_asia_end_should_hide_row_fill")
             and "leftover SOV hulls" in _slice_func(ren, "_asia_end_dump_leftover_red")
             and "_restore_asia_end_row_fills" in _slice_func(ren, "_apply_home_key")
+            and "var is_water := false" in _slice_func(ren, "_restore_land_poly_visibility")
             and "func _asia_end_star_poly_points" in ren
             and "903995" in _slice_func(ren, "_asia_end_star_extra")
         )

@@ -12799,9 +12799,7 @@ func _restore_land_poly_visibility() -> void:
 		if _asia_end_should_keep_fill_hidden(int(pid), poly):
 			_hide_fill_on_node(node)
 			continue
-		if _asia_end_hulls_hidden and _asia_end_is_protected_row(int(pid)):
-			node.z_index = 8
-			var is_water := false
+		var is_water := false
 		if province != null:
 			is_water = bool(province.is_sea)
 			var terr := str(province.terrain).to_lower()
