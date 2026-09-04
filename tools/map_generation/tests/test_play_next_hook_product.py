@@ -43,9 +43,16 @@ class TestPlayNextHookProduct(unittest.TestCase):
                 "has_open_battle": True,
                 "battle_hook": "They break tomorrow",
                 "training": [{"fid": "u1", "days_left": 1}],
+                "battle_fid": "ger_front",
+                "battle_to_id": 710739,
+                "battle_from_id": 710173,
             }
         )
         self.assertEqual(war.get("action"), "press")
+        self.assertEqual(war.get("source"), "land_battle")
+        self.assertEqual(war.get("fid"), "ger_front")
+        self.assertEqual(war.get("to_id"), 710739)
+        self.assertEqual(war.get("from_id"), 710173)
 
     def test_capture_economy_sentence(self) -> None:
         occupied = capture_economy_sentence({"oil": 3.0}, 1936, "FRA", "GER")
@@ -69,6 +76,7 @@ class TestPlayNextHookProduct(unittest.TestCase):
         nxt = rank_next_beat(
             {
                 "aar_next_pid": 710000,
+                "aar_fid": "ger_front",
                 "aar_economy": "Now pumping oil (occupied ×0.65).",
                 "aar_line": (
                     "Took Bas-Rhin · 1 day — Press Haguenau next? "
@@ -78,16 +86,32 @@ class TestPlayNextHookProduct(unittest.TestCase):
         )
         self.assertEqual(nxt.get("action"), "next_hex")
         self.assertEqual(nxt.get("source"), "aar")
-        self.assertIn("oil", str(nxt.get("hint", "")).lower())
+        self.assertEqual(nxt.get("to_id"), 710000)
+        self.assertEqual(nxt.get("fid"), "ger_front")
+        self.assertEqual(
+            nxt.get("hint"),
+            "Took Bas-Rhin · 1 day — Press Haguenau next? Now pumping oil (occupied ×0.65).",
+        )
 
     def test_completing_bars_rank(self) -> None:
         tech = rank_next_beat({"research_days_left": 1})
         self.assertEqual(tech.get("action"), "tech_done")
         self.assertEqual(tech.get("source"), "research")
-        self.assertIn("research", str(tech.get("label", "")).lower())
+        self.assertEqual(tech.get("label"), "Research completes tomorrow")
+        named_tech = rank_next_beat(
+            {"research_days_left": 1, "research_name": "Infantry Equipment I"}
+        )
+        self.assertEqual(named_tech.get("action"), "tech_done")
+        self.assertEqual(named_tech.get("label"), "Infantry Equipment I")
+        self.assertEqual(named_tech.get("hint"), "Infantry Equipment I")
         foc = rank_next_beat({"focus_days_left": 1})
         self.assertEqual(foc.get("action"), "focus_done")
         self.assertEqual(foc.get("source"), "focus")
+        self.assertEqual(foc.get("label"), "Focus completes tomorrow")
+        named_foc = rank_next_beat({"focus_days_left": 1, "focus_name": "Rhineland"})
+        self.assertEqual(named_foc.get("action"), "focus_done")
+        self.assertEqual(named_foc.get("label"), "Rhineland")
+        self.assertEqual(named_foc.get("hint"), "Rhineland")
         idle = rank_next_beat({"research_days_left": 5, "focus_days_left": 12})
         self.assertEqual(idle.get("source"), "first_session")
         self.assertEqual(idle.get("action"), "show_war_loop")
@@ -97,9 +121,16 @@ class TestPlayNextHookProduct(unittest.TestCase):
                 "battle_hook": "They break tomorrow — Press",
                 "research_days_left": 1,
                 "focus_days_left": 1,
+                "battle_fid": "ger_front",
+                "battle_to_id": 710739,
+                "battle_from_id": 710173,
             }
         )
         self.assertEqual(war.get("action"), "press")
+        self.assertEqual(war.get("source"), "land_battle")
+        self.assertEqual(war.get("fid"), "ger_front")
+        self.assertEqual(war.get("to_id"), 710739)
+        self.assertEqual(war.get("from_id"), 710173)
         short = rank_next_beat(
             {
                 "steel_stock": 0.0,
@@ -237,6 +268,59 @@ class TestPlayNextHookProduct(unittest.TestCase):
         )
         self.assertEqual(vs_justify.get("source"), "maginot")
         self.assertNotEqual(vs_justify.get("action"), "justify")
+
+    def test_extra_payload_cannot_beat_open_fight(self) -> None:
+        fight = rank_next_beat(
+            {
+                "has_open_battle": True,
+                "research_days_left": 1,
+                "battle_fid": "ger_front",
+                "battle_to_id": 710739,
+                "battle_from_id": 710173,
+            }
+        )
+        self.assertEqual(fight.get("action"), "press")
+        self.assertEqual(fight.get("source"), "land_battle")
+        self.assertEqual(fight.get("fid"), "ger_front")
+        self.assertEqual(fight.get("to_id"), 710739)
+        self.assertEqual(fight.get("from_id"), 710173)
+        stacked = rank_next_beat(
+            {
+                "has_open_battle": True,
+                "battle_hook": "They break tomorrow — Press",
+                "training": [{"fid": "u1", "days_left": 1}],
+                "dry_fuel": [{"fid": "u2"}],
+                "fuel_stock": 0,
+                "oil_stock": 0,
+                "maginot_fid": "ger_front",
+                "maginot_from": 710173,
+                "maginot_to": 710739,
+                "research_days_left": 1,
+                "battle_fid": "ger_front",
+                "battle_to_id": 710739,
+                "battle_from_id": 710173,
+            }
+        )
+        self.assertEqual(stacked.get("action"), "press")
+        self.assertEqual(stacked.get("source"), "land_battle")
+        self.assertEqual(stacked.get("fid"), "ger_front")
+        self.assertEqual(stacked.get("to_id"), 710739)
+        self.assertEqual(stacked.get("from_id"), 710173)
+        nxt = rank_next_beat(
+            {
+                "aar_next_pid": 710000,
+                "aar_fid": "ger_front",
+                "research_days_left": 1,
+                "has_open_battle": True,
+                "training": [{"fid": "u1", "days_left": 1}],
+                "dry_fuel": [{"fid": "u2"}],
+                "maginot_fid": "ger_front",
+            }
+        )
+        self.assertEqual(nxt.get("action"), "next_hex")
+        self.assertEqual(nxt.get("source"), "aar")
+        self.assertEqual(nxt.get("to_id"), 710000)
+        self.assertEqual(nxt.get("fid"), "ger_front")
 
 
 if __name__ == "__main__":

@@ -66,6 +66,7 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			"hint": hook if not hook.is_empty() else "Open fight — Press or Hold",
 			"fid": str(f.get("battle_fid", "")),
 			"to_id": int(f.get("battle_to_id", -1)),
+			"from_id": int(f.get("battle_from_id", -1)),
 			"source": "land_battle",
 		}
 	for row in f.get("training", []):
@@ -111,22 +112,24 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 		}
 	if _days_left(f, "research_days_left") <= 1.001:
 		var rname := str(f.get("research_name", "")).strip_edges()
+		var rlabel := rname if not rname.is_empty() else "Research completes tomorrow"
 		return {
 			"ok": true,
 			"action": "tech_done",
-			"label": "Research completes tomorrow",
-			"hint": rname if not rname.is_empty() else "Research completes tomorrow",
+			"label": rlabel,
+			"hint": rlabel,
 			"fid": str(f.get("research_id", "")),
 			"to_id": -1,
 			"source": "research",
 		}
 	if _days_left(f, "focus_days_left") <= 1.001:
 		var fname := str(f.get("focus_name", "")).strip_edges()
+		var flabel := fname if not fname.is_empty() else "Focus completes tomorrow"
 		return {
 			"ok": true,
 			"action": "focus_done",
-			"label": "Focus completes tomorrow",
-			"hint": fname if not fname.is_empty() else "Focus completes tomorrow",
+			"label": flabel,
+			"hint": flabel,
 			"fid": str(f.get("focus_id", "")),
 			"to_id": -1,
 			"source": "focus",
@@ -364,6 +367,8 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 		return {
 			"ok": bool(nx.get("ok", false)),
 			"action": "next_hex",
+			"to_id": int(nx.get("to_id", r.get("to_id", -1))),
+			"fid": str(nx.get("fid", fid)),
 			"summary": str(nx.get("summary", r.get("hint", "Next hex"))),
 		}
 	if action in ["press", "hold"] and typeof(BattleManager) != TYPE_NIL \
@@ -602,6 +607,8 @@ static func _open_living_surface(kind: String, rec: Dictionary) -> Dictionary:
 	if bar != null and bar.has_method("open_living_surface"):
 		var ui: Dictionary = bar.call("open_living_surface", k)
 		ui_opened = bool(ui.get("ok", false))
+	var named := str(rec.get("hint", rec.get("label", ""))).strip_edges()
+	var summary := named if not named.is_empty() else ("Open %s" % k)
 	return {
 		"ok": true,
 		"action": str(rec.get("action", k)),
@@ -610,7 +617,7 @@ static func _open_living_surface(kind: String, rec: Dictionary) -> Dictionary:
 		"surface": k,
 		"unpause_only": false,
 		"ui_opened": ui_opened,
-		"summary": "Open %s" % k,
+		"summary": summary,
 	}
 
 
@@ -712,6 +719,7 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 			facts["battle_hook"] = hook
 			facts["battle_fid"] = str(b.get("att_fid", ""))
 			facts["battle_to_id"] = int(b.get("to_id", -1))
+			facts["battle_from_id"] = int(b.get("from_id", -1))
 			break
 	facts["training"] = _training_rows(tag)
 	facts["dry_fuel"] = _dry_fuel_rows(tag)

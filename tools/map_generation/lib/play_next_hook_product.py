@@ -17,6 +17,7 @@ RHC_GD = ROOT / "scripts" / "production" / "ResourceHarvestCalculator.gd"
 HARNESS_GD = ROOT / "scripts" / "core" / "HeadlessWorldAccurateUnitOrderLoopTest.gd"
 PEACE_WIN_GD = ROOT / "scripts" / "ui" / "PeaceConferenceWindow.gd"
 GDATA_GD = ROOT / "scripts" / "autoload" / "GameData.gd"
+TOP_BAR_GD = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
 
 AAR_CAPTURE_GOODS = ("oil", "steel", "coal")
 AAR_GOOD_VERBS = {"oil": "pumping", "steel": "mining", "coal": "mining"}
@@ -100,12 +101,22 @@ def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
         if action == "unpause" and bool(f.get("has_open_battle")):
             action = "press"
         if action != "unpause" or bool(f.get("has_open_battle")):
+            try:
+                battle_to = int(f.get("battle_to_id") if f.get("battle_to_id") not in (None, "") else -1)
+            except (TypeError, ValueError):
+                battle_to = -1
+            try:
+                battle_from = int(f.get("battle_from_id") if f.get("battle_from_id") not in (None, "") else -1)
+            except (TypeError, ValueError):
+                battle_from = -1
             return {
                 "ok": True,
                 "action": action,
                 "source": "land_battle",
                 "label": action,
                 "fid": str(f.get("battle_fid") or ""),
+                "to_id": battle_to,
+                "from_id": battle_from,
                 "hint": hook,
             }
     for row in f.get("training") or []:
@@ -153,24 +164,26 @@ def rank_next_beat(facts: Dict[str, Any] | None = None) -> Dict[str, Any]:
     rleft = _optional_days(f, "research_days_left")
     if rleft <= 1.001:
         rname = str(f.get("research_name") or "").strip()
+        rlabel = rname or "Research completes tomorrow"
         return {
             "ok": True,
             "action": "tech_done",
             "source": "research",
-            "label": "Research completes tomorrow",
+            "label": rlabel,
             "fid": str(f.get("research_id") or ""),
-            "hint": rname or "Research completes tomorrow",
+            "hint": rlabel,
         }
     fleft = _optional_days(f, "focus_days_left")
     if fleft <= 1.001:
         fname = str(f.get("focus_name") or f.get("focus_id") or "").strip()
+        flabel = fname or "Focus completes tomorrow"
         return {
             "ok": True,
             "action": "focus_done",
             "source": "focus",
-            "label": "Focus completes tomorrow",
+            "label": flabel,
             "fid": str(f.get("focus_id") or ""),
-            "hint": fname or "Focus completes tomorrow",
+            "hint": flabel,
         }
     choke = f.get("fleet_choke") or {}
     if isinstance(choke, dict) and int(choke.get("pid") or 0) > 0:
@@ -723,6 +736,136 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("map_chip_passes_living_tag")
     else:
         fails.append("map_chip_passes_living_tag")
+    apply_i = hook.find("static func apply")
+    apply_n = hook.find("\nstatic func ", apply_i + 1) if apply_i >= 0 else -1
+    apply_fn = hook[apply_i:apply_n] if apply_i >= 0 and apply_n > apply_i else hook
+    dual_day = (
+        "tech_research_close_day" in apply_fn
+        or "tech_priority_advanced_day" in apply_fn
+        or "focus_war_path_day" in apply_fn
+        or "production_surge_day" in apply_fn
+        or "industry_surge_day" in apply_fn
+        or "tech_catalog_advanced_day" in apply_fn
+    )
+    if (
+        not dual_day
+        and '_open_living_surface("research"' in apply_fn
+        and '_open_living_surface("focus"' in apply_fn
+        and '_open_living_surface("production"' in apply_fn
+    ):
+        passes.append("apply_living_not_dual_day")
+    else:
+        fails.append("apply_living_not_dual_day")
+    if 'action == "next_hex"' in apply_fn and "apply_last_land_aar_next" in apply_fn:
+        passes.append("gd_next_hex_one_click")
+    else:
+        fails.append("gd_next_hex_one_click")
+    top_bar = TOP_BAR_GD.read_text(encoding="utf-8") if TOP_BAR_GD.is_file() else ""
+    open_i = top_bar.find("func open_living_surface")
+    open_n = top_bar.find("\nfunc ", open_i + 1) if open_i >= 0 else -1
+    open_fn = top_bar[open_i:open_n] if open_i >= 0 else ""
+    if (
+        "_on_production_pressed" in open_fn
+        and "_on_technology_pressed" in open_fn
+        and '"unpause_only": false' in open_fn
+        and "set_paused" not in open_fn
+        and "_force_open_living" in open_fn
+    ):
+        passes.append("top_bar_opens_living_panels")
+    else:
+        fails.append("top_bar_opens_living_panels")
+    name_i = top_bar.find("func _living_completing_name")
+    name_n = top_bar.find("\nfunc ", name_i + 1) if name_i >= 0 else -1
+    name_fn = top_bar[name_i:name_n] if name_i >= 0 else ""
+    if "tech_done" in name_fn and "focus_done" in name_fn:
+        passes.append("top_bar_shows_completing_name")
+    else:
+        fails.append("top_bar_shows_completing_name")
+    extra_fight = rank_next_beat(
+        {
+            "has_open_battle": True,
+            "research_days_left": 1,
+            "battle_fid": "ger_front",
+            "battle_to_id": 710739,
+            "battle_from_id": 710173,
+        }
+    )
+    if (
+        str(extra_fight.get("action")) == "press"
+        and str(extra_fight.get("source")) == "land_battle"
+        and str(extra_fight.get("fid")) == "ger_front"
+        and int(extra_fight.get("to_id") or 0) == 710739
+        and int(extra_fight.get("from_id") or 0) == 710173
+    ):
+        passes.append("extra_payload_loses_to_fight")
+    else:
+        fails.append("extra_payload_loses_to_fight")
+    stacked = rank_next_beat(
+        {
+            "has_open_battle": True,
+            "battle_hook": "They break tomorrow — Press",
+            "training": [{"fid": "u1", "days_left": 1}],
+            "dry_fuel": [{"fid": "u2"}],
+            "fuel_stock": 0,
+            "oil_stock": 0,
+            "maginot_fid": "ger_front",
+            "maginot_from": 710173,
+            "maginot_to": 710739,
+            "research_days_left": 1,
+            "battle_fid": "ger_front",
+            "battle_to_id": 710739,
+            "battle_from_id": 710173,
+        }
+    )
+    if (
+        str(stacked.get("action")) == "press"
+        and str(stacked.get("source")) == "land_battle"
+        and str(stacked.get("fid")) == "ger_front"
+        and int(stacked.get("to_id") or 0) == 710739
+        and int(stacked.get("from_id") or 0) == 710173
+    ):
+        passes.append("train_fuel_maginot_lose_to_fight")
+    else:
+        fails.append("train_fuel_maginot_lose_to_fight")
+    named_tech = rank_next_beat(
+        {"research_days_left": 1, "research_name": "Infantry Equipment I"}
+    )
+    if (
+        str(named_tech.get("action")) == "tech_done"
+        and str(named_tech.get("label")) == "Infantry Equipment I"
+        and str(named_tech.get("hint")) == "Infantry Equipment I"
+    ):
+        passes.append("completing_name_on_chip")
+    else:
+        fails.append("completing_name_on_chip")
+    named_focus = rank_next_beat(
+        {"focus_days_left": 1, "focus_name": "Rhineland"}
+    )
+    if (
+        str(named_focus.get("action")) == "focus_done"
+        and str(named_focus.get("label")) == "Rhineland"
+        and str(named_focus.get("hint")) == "Rhineland"
+    ):
+        passes.append("focus_name_on_chip")
+    else:
+        fails.append("focus_name_on_chip")
+    nxt_click = rank_next_beat(
+        {
+            "aar_next_pid": 710000,
+            "aar_fid": "ger_front",
+            "research_days_left": 1,
+            "has_open_battle": True,
+        }
+    )
+    if (
+        str(nxt_click.get("action")) == "next_hex"
+        and str(nxt_click.get("source")) == "aar"
+        and int(nxt_click.get("to_id") or 0) == 710000
+        and str(nxt_click.get("fid")) == "ger_front"
+    ):
+        passes.append("next_hex_one_click_after_aar")
+    else:
+        fails.append("next_hex_one_click_after_aar")
     ok = len(fails) == 0
     return {
         "ok": ok,

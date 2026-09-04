@@ -45,6 +45,8 @@ var debug_button: Button   # Only created in debug builds, added to menu
 
 var current_speed: int = 1
 var is_paused: bool = false
+## NEXT living-surface apply must open, not toggle-close an already-visible panel.
+var _force_open_living: bool = false
 ## Wall-clock last sim tick (msec). Avoids Timer + Engine.time_scale freeze/double-scale.
 var _last_sim_tick_msec: int = 0
 ## True while a day advance is on the main thread (prevents tick-storm: day work >1s → immediate next day).
@@ -992,8 +994,15 @@ func _pause_for_menu(pause: bool) -> void:
 
 
 func _update_date_time() -> void:
-	date_time_label.text = GameDateDisplay.format_top_bar_line(true)
+	var line := GameDateDisplay.format_top_bar_line(true)
+	var completing := _living_completing_name()
+	if completing.is_empty():
+		date_time_label.text = line
+	else:
+		date_time_label.text = "%s · %s" % [line, completing]
 	var tip := GameDateDisplay.format_top_bar_tooltip()
+	if not completing.is_empty():
+		tip = completing if tip.is_empty() else "%s\n%s" % [completing, tip]
 	date_time_label.tooltip_text = tip
 	pause_button.tooltip_text = "Pause / resume simulation\n\n" + tip if not tip.is_empty() else "Pause / resume simulation"
 	if is_paused:
@@ -1001,6 +1010,20 @@ func _update_date_time() -> void:
 		pause_button.tooltip_text = "Resume simulation\n\n" + tip if not tip.is_empty() else "Resume simulation"
 	else:
 		date_time_label.modulate = Color.WHITE
+
+
+## Completing research/focus name on the date/tech area when that NEXT beat wins.
+func _living_completing_name() -> String:
+	if typeof(PlayNextHook) == TYPE_NIL:
+		return ""
+	var rec: Dictionary = PlayNextHook.recommend(player_country_tag)
+	var action := str(rec.get("action", ""))
+	if action != "tech_done" and action != "focus_done":
+		return ""
+	var named := str(rec.get("hint", "")).strip_edges()
+	if named.is_empty():
+		named = str(rec.get("label", "")).strip_edges()
+	return named
 
 
 func _update_resources() -> void:
@@ -1177,27 +1200,35 @@ func _on_hotseat_end_turn() -> void:
 	_refresh_hotseat_banner()
 
 
-## Living NEXT / nation-era boot: open production, research, or focus (TechnologyScreen).
+## NEXT apply: open production / research / focus. Never pause-only.
 func open_living_surface(kind: String) -> Dictionary:
 	var k := kind.strip_edges().to_lower()
 	if k in ["shortage", "industry"]:
 		k = "production"
-	if k in ["tech_done", "technology"]:
+	if k in ["tech_done", "technology", "set_research"]:
 		k = "research"
 	if k in ["focus_done"]:
 		k = "focus"
+	_force_open_living = true
 	match k:
 		"production":
 			_on_production_pressed()
-			return {"ok": true, "panel": "production", "live": true}
+			_force_open_living = false
+			_update_date_time()
+			return {"ok": true, "panel": "production", "live": true, "unpause_only": false}
 		"research":
 			_on_technology_pressed()
-			return {"ok": true, "panel": "research", "live": true}
+			_force_open_living = false
+			_update_date_time()
+			return {"ok": true, "panel": "research", "live": true, "unpause_only": false}
 		"focus":
 			_on_technology_pressed()
-			return {"ok": true, "panel": "focus", "live": true}
+			_force_open_living = false
+			_update_date_time()
+			return {"ok": true, "panel": "focus", "live": true, "unpause_only": false}
 		_:
-			return {"ok": false, "panel": k, "live": true}
+			_force_open_living = false
+			return {"ok": false, "panel": k, "live": true, "unpause_only": false}
 
 
 func set_living_player_nation(tag: String) -> Dictionary:
@@ -1377,7 +1408,22 @@ func _toggle_root_popup(scene_name: String, scene_path: String, configure: Calla
 
 func _toggle_screen(screen_name: String, scene_path: String, configure: Callable) -> void:
 	var existing := get_tree().root.get_node_or_null(screen_name)
+	if existing == null and get_tree().current_scene != null:
+		var ui_layer := get_tree().current_scene.get_node_or_null("UILayer")
+		if ui_layer != null:
+			existing = ui_layer.get_node_or_null(screen_name)
 	if existing != null:
+		if _force_open_living:
+			if existing is Control:
+				var ctl := existing as Control
+				ctl.visible = true
+				if ctl.get_parent() != null:
+					ctl.get_parent().move_child(ctl, ctl.get_parent().get_child_count() - 1)
+				if ctl is DraggablePanel:
+					(ctl as DraggablePanel).bring_to_front()
+			elif existing is Window:
+				(existing as Window).popup()
+			return
 		if existing is Window:
 			existing.hide()
 		existing.call_deferred("queue_free")
