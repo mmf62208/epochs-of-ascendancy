@@ -472,6 +472,9 @@ def build_first_session_hotkeys_product(
             and "AsiaEndStarOverlay" in _slice_func(ren, "_ensure_asia_end_star_overlay")
             and "func _stamp_asia_end_overlay_stars" in ren
             and "China" in _slice_func(ren, "_pin_asia_end_china_label")
+            and "_left_skip_next_pick" in _slice_func(ren, "_focus_asia_view")
+            and "hide_info_panel" in _slice_func(ren, "_focus_asia_view")
+            and "ensure_world_navigation_ready" not in _slice_func(ren, "_focus_asia_view")
         )
         open_fn = _slice_func(ren, "_open_fight_from_formation_id")
         wiring["open_fight_sheet"] = (

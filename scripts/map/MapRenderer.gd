@@ -1404,11 +1404,11 @@ func _input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_END:
-			_left_ready_for_still_click = true
+			# Do not arm still-click / do not clamp-before-fit (Play: first End
+			# after G leftover-picked RUS West and blanked fills).
 			_unlock_close_camera()
 			_close_click_guard = false
 			_close_release_seen = false
-			ensure_world_navigation_ready()
 			_focus_asia_view()
 			get_viewport().set_input_as_handled()
 			return
@@ -1798,7 +1798,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			_unlock_close_camera()
 			_close_click_guard = false
 			_close_release_seen = false
-			ensure_world_navigation_ready()
 			_focus_asia_view()
 			get_viewport().set_input_as_handled()
 			return
@@ -14904,6 +14903,11 @@ func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
 
 
 func _focus_asia_view() -> void:
+	# Leftover click after this camera jump must not pick (Play: first End after G
+	# opened RUS West 903492 and _center_camera_on_province undid Asia). Do not
+	# wipe sticky / cam-moved latch. Do not arm still-click.
+	_left_skip_next_pick = true
+	hide_info_panel()
 	# Tokyo + Beiping/CHI — never first-nonzero that can land on empty USSR (903534).
 	var tokyo := _centroid_for_pid(903995)
 	var chi_pid := 902487
@@ -14942,9 +14946,11 @@ func _focus_asia_view() -> void:
 	_close_release_seen = false
 	_close_suppress_edge = false
 	_hold_camera_until_msec = 0
+	# Keep skip so leftover mouse after the jump cannot open RUS West.
+	# Do not zero _map_pick_block_until_msec (that re-armed the leftover pick).
 	_inspector_held_closed = false
-	_map_pick_block_until_msec = 0
 	fit_camera_to_bounds(frame, frame.get_center(), 0.88)
+	_last_viewport_cull_pos = Vector2(-99999, -99999)
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
 		var z := maxf(cam.zoom.x, cam.zoom.y)
