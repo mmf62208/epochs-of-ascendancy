@@ -1376,6 +1376,7 @@ func _apply_home_key(shift_pressed: bool) -> void:
 	_map_pick_block_until_msec = 0
 	_asia_end_force_star_pids.clear()
 	_asia_end_china_anchor = Vector2.ZERO
+	_restore_asia_end_row_fills()
 	var end_overlay: Node = (container if container != null else self).get_node_or_null("AsiaEndStarOverlay")
 	if end_overlay != null:
 		end_overlay.queue_free()
@@ -12796,9 +12797,11 @@ func _restore_land_poly_visibility() -> void:
 		if poly == null:
 			continue
 		if _asia_end_should_keep_fill_hidden(int(pid), poly):
-			poly.visible = false
+			_hide_fill_on_node(node)
 			continue
-		var is_water := false
+		if _asia_end_hulls_hidden and _asia_end_is_protected_row(int(pid)):
+			node.z_index = 8
+			var is_water := false
 		if province != null:
 			is_water = bool(province.is_sea)
 			var terr := str(province.terrain).to_lower()
@@ -12807,7 +12810,10 @@ func _restore_land_poly_visibility() -> void:
 		# Sea IDs on this board are 950000+
 		if int(pid) >= 950000:
 			is_water = true
-		node.z_index = _province_draw_z_index(int(pid), is_water)
+		if _asia_end_hulls_hidden and _asia_end_is_protected_row(int(pid)):
+			node.z_index = 8
+		else:
+			node.z_index = _province_draw_z_index(int(pid), is_water)
 		if is_water:
 			var sc := poly.color
 			sc.a = 1.0
@@ -13898,6 +13904,9 @@ func _should_use_batched_mesh_fills() -> bool:
 
 
 func _sync_batched_mesh_fills(force: bool = false) -> void:
+	if _asia_end_hulls_hidden:
+		_asia_end_hide_mesh_layer()
+		return
 	var z := _get_camera_zoom()
 	var bucket := int(z * 20.0)
 	if not force and bucket == _last_mesh_zoom_bucket and not _batched_mesh_fills_forced:
@@ -14985,6 +14994,7 @@ func _focus_asia_view() -> void:
 		var hit := frame.intersection(_current_theater_bounds)
 		if hit.size.x >= 80.0 and hit.size.y >= 80.0 and hit.size.x < _current_theater_bounds.size.x * 0.85:
 			frame = hit
+	_asia_end_hulls_hidden = true
 	_hide_asia_sov_overlap_hulls()
 	_unlock_close_camera()
 	_close_click_guard = false
@@ -15012,6 +15022,9 @@ func _focus_asia_view() -> void:
 	else:
 		_asia_end_china_anchor = Vector2.ZERO
 	_pin_asia_end_china_label()
+	# Stars / zoom / fill refresh can restore mesh or RoW fills — hide again, then once more next frame.
+	_hide_asia_sov_overlap_hulls()
+	call_deferred("_hide_asia_sov_overlap_hulls")
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug("Map: Asia · Tokyo + Beiping/CHI · Home=Europe")
 
@@ -15340,8 +15353,7 @@ func _row_owner_tag(pid: int) -> String:
 
 
 func _asia_sov_hull_hides_fill(pid: int) -> bool:
-	# Sparse-merge SOV hulls in the first-End East-Asia frame (Play 96bb484:
-	# AABB∩CHI/MON missed Sakha/RUS North sitting over Mongolia).
+	# Kept for product greps. First End hide is nuclear (all RoW SOV/RUS/sov-red).
 	match pid:
 		903528, 903500, 903491, 903544, 903553, 903494, 903498:
 			return true
@@ -15351,13 +15363,69 @@ func _asia_sov_hull_hides_fill(pid: int) -> bool:
 			return false
 
 
+func _asia_end_is_protected_row(pid: int) -> bool:
+	if pid == 902487 or pid == 903995:
+		return true
+	var tag: String = _row_owner_tag(pid)
+	if tag == "CHI" or tag == "MON" or tag == "JAP" or tag == "MAN" or tag == "MEN":
+		return true
+	var p: Province = provinces.get(pid) as Province if provinces.has(pid) else null
+	if p == null:
+		return false
+	var n: String = str(p.name).strip_edges().to_upper()
+	return (
+		n.begins_with("CHN")
+		or n.begins_with("MNG")
+		or n.begins_with("JPN")
+		or n == "BEIPING"
+		or n == "TOKYO"
+		or n.begins_with("MONGOL")
+	)
+
+
+func _asia_end_color_is_sov_red(c: Color) -> bool:
+	if c.a < 0.06:
+		return false
+	return c.r > 0.35 and c.r > c.g + 0.04 and c.r > c.b + 0.04
+
+
+func _asia_end_poly_is_sov_red(poly: Polygon2D) -> bool:
+	if poly == null:
+		return false
+	var c: Color = poly.color
+	c.r *= poly.modulate.r
+	c.g *= poly.modulate.g
+	c.b *= poly.modulate.b
+	c.a *= poly.modulate.a
+	return _asia_end_color_is_sov_red(c)
+
+
+func _asia_end_is_star_poly(poly: Polygon2D) -> bool:
+	if poly == null:
+		return false
+	var n: String = str(poly.name)
+	return n.begins_with("AsiaEndStar")
+
+
+func _asia_end_hide_mesh_layer() -> void:
+	_batched_mesh_active = false
+	if _province_mesh_layer != null and is_instance_valid(_province_mesh_layer):
+		if _province_mesh_layer.has_method("set_enabled"):
+			_province_mesh_layer.call("set_enabled", false)
+		_province_mesh_layer.visible = false
+
+
 func _hide_fill_on_node(node: Node2D) -> void:
 	if node == null or not is_instance_valid(node):
 		return
 	for child in node.get_children():
+		if str(child.name).begins_with("DemoUnitIcon_"):
+			continue
 		if not (child is Polygon2D):
 			continue
 		var poly := child as Polygon2D
+		if _asia_end_is_star_poly(poly):
+			continue
 		poly.visible = false
 		poly.set_meta("asia_sov_hull_hidden", true)
 		var c: Color = poly.color
@@ -15371,82 +15439,96 @@ func _hide_province_fill_polys(pid: int) -> void:
 		_hide_fill_on_node(province_nodes[pid] as Node2D)
 
 
-func _asia_end_should_keep_fill_hidden(pid: int, poly: Polygon2D) -> bool:
-	if _asia_sov_hull_hides_fill(pid):
-		return true
-	if poly != null and bool(poly.get_meta("asia_sov_hull_hidden", false)):
-		return true
-	if not _asia_end_hulls_hidden:
-		return false
-	var tag: String = _row_owner_tag(pid)
-	if tag == "CHI" or tag == "MON" or tag == "JAP" or tag == "MAN" or tag == "MEN":
-		return false
-	if tag != "SOV" and tag != "RUS":
-		return false
-	if _asia_end_sov_hide_rect.size.x <= 1.0:
-		return false
-	var sb: Rect2 = _province_poly_aabb(pid)
-	return sb.size.x > 1.0 and sb.intersects(_asia_end_sov_hide_rect)
-
-
-func _province_poly_aabb(pid: int) -> Rect2:
-	if not province_nodes.has(pid):
-		return Rect2()
-	var node: Node2D = province_nodes[pid] as Node2D
+func _asia_end_force_protected_fill(pid: int, node: Node2D) -> void:
 	if node == null or not is_instance_valid(node):
-		return Rect2()
-	var acc := Rect2()
-	var any := false
+		return
+	node.visible = true
+	node.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	node.z_index = 8
+	var col := Color(0.55, 0.22, 0.18, 0.96)
+	if provinces.has(pid):
+		col = _get_province_color(provinces[pid] as Province)
+		col.a = 0.96
 	for child in node.get_children():
 		if not (child is Polygon2D):
 			continue
-		var pts: PackedVector2Array = (child as Polygon2D).polygon
-		if pts.size() < 3:
+		var poly := child as Polygon2D
+		if _asia_end_is_star_poly(poly):
 			continue
-		var min_p: Vector2 = pts[0]
-		var max_p: Vector2 = pts[0]
-		for p in pts:
-			min_p.x = minf(min_p.x, p.x)
-			min_p.y = minf(min_p.y, p.y)
-			max_p.x = maxf(max_p.x, p.x)
-			max_p.y = maxf(max_p.y, p.y)
-		var bb := Rect2(min_p, max_p - min_p)
-		if not any:
-			acc = bb
-			any = true
-		else:
-			acc = acc.merge(bb)
-	return acc if any else Rect2()
+		poly.visible = true
+		poly.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		if poly.has_meta("asia_sov_hull_hidden"):
+			poly.remove_meta("asia_sov_hull_hidden")
+		poly.color = col
 
 
-func _asia_end_build_sov_hide_rect() -> Rect2:
-	# Same centroid space as the locked Tokyo/Beiping stars.
-	var bei: Vector2 = _asia_end_star_centroid(902487)
-	var tok: Vector2 = _asia_end_star_centroid(903995)
-	if bei == Vector2.ZERO and tok == Vector2.ZERO:
-		return Rect2()
-	if bei == Vector2.ZERO:
-		bei = tok + Vector2(-380.0, -450.0)
-	if tok == Vector2.ZERO:
-		tok = bei + Vector2(380.0, 450.0)
-	var p_min: Vector2 = Vector2(minf(bei.x, tok.x) - 2400.0, minf(bei.y, tok.y) - 900.0)
-	var p_max: Vector2 = Vector2(maxf(bei.x, tok.x) + 500.0, maxf(bei.y, tok.y) + 800.0)
-	return Rect2(p_min, p_max - p_min)
-
-
-func _asia_end_poly_is_sov_red(poly: Polygon2D) -> bool:
-	if poly == null or not poly.visible:
+func _asia_end_should_hide_row_fill(pid: int, node: Node2D) -> bool:
+	# Nuclear: ignore AABB. Hide every RoW 900k fill that is not CHI/MON/JAP/MAN/MEN.
+	if pid < 900000 or pid >= 950000:
 		return false
-	var c: Color = poly.color
-	if c.a < 0.08:
+	if _asia_end_is_protected_row(pid):
 		return false
-	return c.r > 0.45 and c.r > c.g + 0.08 and c.r > c.b + 0.08
+	var tag: String = _row_owner_tag(pid)
+	if tag == "SOV" or tag == "RUS":
+		return true
+	if _asia_sov_hull_hides_fill(pid):
+		return true
+	if node != null:
+		for child in node.get_children():
+			if child is Polygon2D and not _asia_end_is_star_poly(child as Polygon2D):
+				if _asia_end_poly_is_sov_red(child as Polygon2D):
+					return true
+	return true
+
+
+func _asia_end_should_keep_fill_hidden(pid: int, poly: Polygon2D) -> bool:
+	if not _asia_end_hulls_hidden:
+		return false
+	if pid < 900000 or pid >= 950000:
+		return false
+	if _asia_end_is_protected_row(pid):
+		return false
+	if poly != null and bool(poly.get_meta("asia_sov_hull_hidden", false)):
+		return true
+	var tag: String = _row_owner_tag(pid)
+	if tag == "SOV" or tag == "RUS":
+		return true
+	if _asia_end_poly_is_sov_red(poly):
+		return true
+	return true
+
+
+func _asia_end_dump_leftover_red() -> void:
+	var leftover: PackedStringArray = PackedStringArray()
+	for pid_v in province_nodes.keys():
+		var pid := int(pid_v)
+		if pid < 900000 or pid >= 950000:
+			continue
+		if _asia_end_is_protected_row(pid):
+			continue
+		var node: Node2D = province_nodes[pid] as Node2D
+		if node == null or not is_instance_valid(node) or not node.visible:
+			continue
+		var tag: String = _row_owner_tag(pid)
+		for child in node.get_children():
+			if not (child is Polygon2D):
+				continue
+			var poly := child as Polygon2D
+			if _asia_end_is_star_poly(poly):
+				continue
+			if not poly.visible:
+				continue
+			if tag == "SOV" or tag == "RUS" or _asia_end_poly_is_sov_red(poly):
+				leftover.append("%d:%s" % [pid, tag])
+				break
+	var msg: String = ",".join(leftover) if leftover.size() > 0 else "none"
+	print("MapRenderer: Asia End leftover SOV hulls ", msg)
 
 
 func _hide_asia_sov_overlap_hulls() -> void:
-	_asia_end_hulls_hidden = true
-	_asia_end_sov_hide_rect = _asia_end_build_sov_hide_rect()
-	var leftover: PackedStringArray = PackedStringArray()
+	if not _asia_end_hulls_hidden:
+		return
+	_asia_end_hide_mesh_layer()
 	for pid_v in province_nodes.keys():
 		var pid := int(pid_v)
 		if pid < 900000 or pid >= 950000:
@@ -15454,28 +15536,45 @@ func _hide_asia_sov_overlap_hulls() -> void:
 		var node: Node2D = province_nodes[pid] as Node2D
 		if node == null or not is_instance_valid(node):
 			continue
-		var tag: String = _row_owner_tag(pid)
-		if tag == "CHI" or tag == "MON" or tag == "JAP" or tag == "MAN" or tag == "MEN":
-			node.z_index = _province_draw_z_index(pid, false)
+		if _asia_end_is_protected_row(pid):
+			_asia_end_force_protected_fill(pid, node)
 			continue
-		var hide := _asia_sov_hull_hides_fill(pid)
-		var sb: Rect2 = _province_poly_aabb(pid)
-		var in_asia := _asia_end_sov_hide_rect.size.x > 1.0 and sb.size.x > 1.0 and sb.intersects(_asia_end_sov_hide_rect)
-		if not hide and in_asia and (tag == "SOV" or tag == "RUS"):
-			hide = true
-		if not hide and in_asia:
-			for child in node.get_children():
-				if child is Polygon2D and _asia_end_poly_is_sov_red(child as Polygon2D):
-					hide = true
-					break
-		if hide:
+		if _asia_end_should_hide_row_fill(pid, node):
 			_hide_fill_on_node(node)
-		else:
-			node.z_index = _province_draw_z_index(pid, false)
-			if in_asia and (tag == "SOV" or tag == "RUS"):
-				leftover.append(str(pid))
-	if leftover.size() > 0:
-		print("MapRenderer: Asia End leftover SOV hulls ", ",".join(leftover))
+	_asia_end_dump_leftover_red()
+
+
+func _restore_asia_end_row_fills() -> void:
+	_asia_end_hulls_hidden = false
+	_asia_end_sov_hide_rect = Rect2()
+	for pid_v in province_nodes.keys():
+		var pid := int(pid_v)
+		if pid < 900000 or pid >= 950000:
+			continue
+		var node: Node2D = province_nodes[pid] as Node2D
+		if node == null or not is_instance_valid(node):
+			continue
+		node.visible = true
+		node.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		var is_water := pid >= 950000
+		node.z_index = _province_draw_z_index(pid, is_water)
+		for child in node.get_children():
+			if not (child is Polygon2D):
+				continue
+			var poly := child as Polygon2D
+			if _asia_end_is_star_poly(poly):
+				continue
+			if poly.has_meta("asia_sov_hull_hidden"):
+				poly.remove_meta("asia_sov_hull_hidden")
+			poly.visible = true
+			if provinces.has(pid):
+				poly.color = _get_province_color(provinces[pid] as Province)
+	if _province_mesh_layer != null and is_instance_valid(_province_mesh_layer):
+		var want_mesh := _should_use_batched_mesh_fills()
+		if _province_mesh_layer.has_method("set_enabled"):
+			_province_mesh_layer.call("set_enabled", want_mesh)
+		_province_mesh_layer.visible = want_mesh
+		_batched_mesh_active = want_mesh
 
 
 func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
@@ -15500,7 +15599,7 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 	points = ProvincePolygonUtil.assign_polygon2d(poly, points)
 	poly.color = _get_province_color(province)
 	poly.antialiased = true
-	if _asia_sov_hull_hides_fill(int(province.id)):
+	if _asia_end_hulls_hidden and _asia_end_should_hide_row_fill(int(province.id), node):
 		poly.visible = false
 		poly.set_meta("asia_sov_hull_hidden", true)
 		var hc: Color = poly.color
@@ -20895,8 +20994,7 @@ func _refresh_province_fill_pids(pids: Array) -> void:
 		if poly == null:
 			continue
 		if _asia_end_should_keep_fill_hidden(pid, poly):
-			poly.visible = false
-			poly.set_meta("asia_sov_hull_hidden", true)
+			_hide_fill_on_node(node as Node2D)
 			continue
 		var col := _get_province_color(province)
 		if supply_mode:
@@ -20935,8 +21033,7 @@ func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
 		if poly == null:
 			continue
 		if _asia_end_should_keep_fill_hidden(int(pid), poly):
-			poly.visible = false
-			poly.set_meta("asia_sov_hull_hidden", true)
+			_hide_fill_on_node(node as Node2D)
 			continue
 		var col := _get_province_color(province)
 		if supply_mode:
@@ -21460,8 +21557,12 @@ func _get_province_polygon(node: Node2D) -> Polygon2D:
 	if node == null:
 		return null
 	for child in node.get_children():
-		if child is Polygon2D:
-			return child as Polygon2D
+		if not (child is Polygon2D):
+			continue
+		var poly := child as Polygon2D
+		if _asia_end_is_star_poly(poly):
+			continue
+		return poly
 	return null
 
 
@@ -21775,6 +21876,9 @@ func _refresh_single_province_fill(province_id: int) -> void:
 		return
 	var poly := _get_province_polygon(node)
 	if poly == null:
+		return
+	if _asia_end_should_keep_fill_hidden(province_id, poly):
+		_hide_fill_on_node(node)
 		return
 	var province: Province = provinces[province_id] as Province
 	var col := _get_province_color(province)
@@ -22337,6 +22441,9 @@ func _apply_hover_fill(province_id: int, active: bool) -> void:
 		return
 	var poly := _get_province_polygon(node)
 	if poly == null:
+		return
+	if _asia_end_should_keep_fill_hidden(province_id, poly):
+		_hide_fill_on_node(node)
 		return
 	var province: Province = provinces[province_id] as Province
 	var col := _get_province_color(province)

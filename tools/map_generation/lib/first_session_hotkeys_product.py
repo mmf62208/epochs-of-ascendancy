@@ -483,7 +483,10 @@ def build_first_session_hotkeys_product(
             and "903491" in _slice_func(ren, "_asia_sov_hull_hides_fill")
             and "903544" in _slice_func(ren, "_asia_sov_hull_hides_fill")
             and "_hide_asia_sov_overlap_hulls" in _slice_func(ren, "_focus_asia_view")
-            and "leftover SOV hulls" in _slice_func(ren, "_hide_asia_sov_overlap_hulls")
+            and "_asia_end_hide_mesh_layer" in _slice_func(ren, "_hide_asia_sov_overlap_hulls")
+            and "900000" in _slice_func(ren, "_asia_end_should_hide_row_fill")
+            and "leftover SOV hulls" in _slice_func(ren, "_asia_end_dump_leftover_red")
+            and "_restore_asia_end_row_fills" in _slice_func(ren, "_apply_home_key")
             and "func _asia_end_star_poly_points" in ren
             and "903995" in _slice_func(ren, "_asia_end_star_extra")
         )
