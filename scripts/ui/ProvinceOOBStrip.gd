@@ -10,6 +10,8 @@ const _UnitIcons = preload("res://scripts/ui/UnitIconLibrary.gd")
 signal formation_focused(formation_id: String)
 ## Emitted when player toggles Yours ↔ All (MapRenderer re-filters).
 signal filter_mode_changed(player_only: bool)
+## Division fold → Attacker/Defender sheet (Play: Open fight was missing).
+signal open_fight_requested(formation_id: String)
 
 var _title: Label
 var _scroll: ScrollContainer
@@ -53,6 +55,16 @@ func _ready() -> void:
 	_filter_btn.pressed.connect(_on_filter_toggle)
 	title_row.add_child(_filter_btn)
 	_sync_filter_btn()
+	var fight_btn := Button.new()
+	fight_btn.name = "OpenFightFoldBtn"
+	fight_btn.text = "Open fight"
+	fight_btn.focus_mode = Control.FOCUS_NONE
+	fight_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	fight_btn.custom_minimum_size = Vector2(88, 22)
+	fight_btn.add_theme_font_size_override("font_size", 11)
+	RetrowaveTheme.style_primary_button(fight_btn)
+	fight_btn.pressed.connect(_on_open_fight_pressed)
+	title_row.add_child(fight_btn)
 	_scroll = ScrollContainer.new()
 	_scroll.custom_minimum_size = Vector2(0, 40)
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -89,6 +101,17 @@ func _sync_filter_btn() -> void:
 	else:
 		_filter_btn.text = "All"
 		_filter_btn.tooltip_text = "Showing all nations. Click for player-only."
+
+
+func _on_open_fight_pressed() -> void:
+	var fid := ""
+	if not _last_formations.is_empty():
+		var item: Variant = _last_formations[0]
+		if item is Object and "formation_id" in item:
+			fid = str(item.formation_id)
+		elif item is Dictionary:
+			fid = str((item as Dictionary).get("formation_id", ""))
+	open_fight_requested.emit(fid)
 
 
 func _on_filter_toggle() -> void:
@@ -133,11 +156,11 @@ func show_for_province(province_id: int, formations: Array, player_tag: String =
 		return
 	_empty.visible = false
 	if player_only and not tag.is_empty():
-		_title.text = "OOB · yours (%s) · province %d · %d unit%s" % [
-			tag, province_id, n, "s" if n != 1 else ""
+		_title.text = "Division fold · yours (%s) · %d unit%s" % [
+			tag, n, "s" if n != 1 else ""
 		]
 	else:
-		_title.text = "OOB · all · province %d · %d unit%s" % [province_id, n, "s" if n != 1 else ""]
+		_title.text = "Division fold · all · %d unit%s" % [n, "s" if n != 1 else ""]
 	for item in filtered:
 		_row.add_child(_make_chip(item))
 	visible = true

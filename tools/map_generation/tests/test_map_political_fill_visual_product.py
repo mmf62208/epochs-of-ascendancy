@@ -10,8 +10,11 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from map_political_fill_visual_product import (  # noqa: E402
+    antarctica_fill_class,
     build_map_political_fill_visual_product,
     continuous_sea_fill_rgba,
+    ice_fill_not_eng_red,
+    ice_ocean_fill_rgba,
     land_fill_alpha,
     map_political_fill_visual_integrity,
     political_stack_readable,
@@ -62,6 +65,19 @@ class TestMapPoliticalFillVisual(unittest.TestCase):
         self.assertIn("bg.visible = show_terrain_layer", ren)
         self.assertIn("func _apply_clean_political_clear_color", ren)
         self.assertGreaterEqual(continuous_sea_fill_rgba(clean_political=True)[3], 0.95)
+
+    def test_antarctica_is_ice_ocean_not_eng_red(self) -> None:
+        self.assertEqual(antarctica_fill_class(902133, "ENG"), "ice_ocean")
+        self.assertEqual(antarctica_fill_class(902134, "ENG"), "ice_ocean")
+        ice = ice_ocean_fill_rgba()
+        self.assertTrue(ice_fill_not_eng_red(ice), msg=ice)
+        self.assertGreater(ice[2], ice[0])
+        p = build_map_political_fill_visual_product()
+        self.assertIn("antarctica_ice_ocean_not_eng", p.get("pass") or [])
+        ren = RENDERER.read_text(encoding="utf-8")
+        self.assertIn("func ice_ocean_fill_color", ren)
+        self.assertIn("902133", ren)
+        self.assertIn("902134", ren)
 
     def test_sea_flat_across_bases(self) -> None:
         """Different owner bases must collapse to nearly the same continuous ocean."""

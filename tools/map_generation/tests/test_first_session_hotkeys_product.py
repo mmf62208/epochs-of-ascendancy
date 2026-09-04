@@ -11,12 +11,19 @@ sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from first_session_hotkeys_product import (  # noqa: E402
     DEFAULT_PLAYER_TAG,
+    END_TOKYO_PID,
     FIRST_SESSION_STEPS,
+    HOME_EUROPE_PIDS,
+    SOV_MOSCOW_PID,
+    asia_end_frame,
     build_first_session_hotkeys_product,
     build_hotkey_table,
     first_session_hotkeys_integrity,
     format_help_dialog_text,
     format_onboarding_toast,
+    home_europe_frame,
+    load_board_centroids,
+    rect_contains,
 )
 
 
@@ -82,6 +89,91 @@ class TestFirstSessionHotkeysProduct(unittest.TestCase):
         runner = (ROOT / "scripts" / "core" / "TestRunner.gd").read_text(encoding="utf-8")
         if 'setup_solo_play("GER")' in runner:
             self.assertTrue(p.get("wiring", {}).get("default_ger"), msg=p.get("wiring"))
+        self.assertNotIn("home_frame_berlin_paris_rome", p.get("fail") or [])
+        self.assertNotIn("end_frame_tokyo_chi", p.get("fail") or [])
+        for key in (
+            "home_berlin_paris_rome",
+            "end_tokyo_chi_not_sov",
+            "g_in_input",
+            "end_in_input",
+            "mmb_in_input",
+            "wheel_no_full_fill",
+            "capital_star_disk_wins",
+            "berlin_search_submit",
+            "ice_ocean_ata",
+            "fkeys_in_input",
+            "toolbar_follows_mode",
+            "toolbar_set_mode",
+            "operational_covers_europe_home",
+            "i_glyphs_in_input",
+            "i_glyph_layer_cheap",
+            "i_transport_art_not_blob",
+            "hover_pid_equals_click",
+            "no_strategic_region_placeholder",
+            "insight_strips_placeholder",
+            "no_industry_carpet_at_europe",
+            "capital_star_lod",
+            "boot_recenters_europe",
+            "home_defers_until_capitals",
+            "factory_status_layer_file",
+            "agent_presence_layer_file",
+            "no_const_preload_optional_layers",
+            "living_diplomacy_api",
+            "living_campaign_pick_api",
+            "close_does_not_cull",
+            "search_i_not_stolen",
+            "g_not_self_path",
+            "end_tokyo_chi_pad",
+            "open_fight_sheet",
+            "left_drag_pan",
+        ):
+            self.assertTrue(p.get("wiring", {}).get(key), msg=(key, p.get("wiring"), p.get("fail")))
+
+    def test_home_end_frames_from_live_centroids(self) -> None:
+        cents = load_board_centroids()
+        self.assertTrue(cents, msg="world_accurate geometry centroids")
+        for pid in HOME_EUROPE_PIDS:
+            self.assertIn(pid, cents, msg="missing home capital %s" % pid)
+        self.assertIn(END_TOKYO_PID, cents)
+        home = home_europe_frame(cents)
+        self.assertIsNotNone(home)
+        for pid in HOME_EUROPE_PIDS:
+            self.assertTrue(rect_contains(home, cents[pid]), msg=(pid, home, cents[pid]))
+        # Must be continental, not a postage-stamp zoom that reads as a grey hole.
+        self.assertGreaterEqual(float(home[2]), 1800.0, msg=home)
+        self.assertGreaterEqual(float(home[3]), 1200.0, msg=home)
+        asia = asia_end_frame(cents)
+        self.assertIsNotNone(asia.get("rect"))
+        self.assertIsNotNone(asia.get("tokyo"))
+        self.assertIsNotNone(asia.get("chi"))
+        self.assertTrue(rect_contains(asia["rect"], asia["tokyo"]), msg=asia)
+        self.assertTrue(rect_contains(asia["rect"], asia["chi"]), msg=asia)
+        moscow = cents.get(SOV_MOSCOW_PID)
+        if moscow is not None:
+            self.assertFalse(
+                rect_contains(asia["rect"], moscow),
+                msg="End frame must not be empty USSR / Moscow",
+            )
+
+
+    def test_berlin_search_name_on_board(self) -> None:
+        import json
+        from pathlib import Path
+
+        base = json.loads(
+            (Path(__file__).resolve().parents[3] / "data" / "provinces_world_accurate" / "provinces_base.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        by = {int(p["id"]): p for p in base.get("provinces") or []}
+        self.assertEqual(str(by[710300].get("name") or "").strip().lower(), "berlin")
+        search = (
+            Path(__file__).resolve().parents[3] / "scripts" / "ui" / "map" / "MapProvinceSearch.gd"
+        ).read_text(encoding="utf-8")
+        self.assertIn("func _on_submit", search)
+        self.assertIn("func _resolve_search_pid", search)
+        self.assertIn("focus_province_by_id", search)
+        self.assertIn("rebuild_index", search)
 
 
 if __name__ == "__main__":

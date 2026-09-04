@@ -62,7 +62,12 @@ def lines_for(formation: Any) -> List[str]:
             xp = float(data.get("combat_experience"))
         except (TypeError, ValueError):
             xp = DEFAULT_XP
-    out: List[str] = ["XP %s" % xp_band(xp)]
+    fold_first = fill_toe_fold_line(data)
+    if not fold_first:
+        fold_first = _fill_percent_line(data)
+    if not fold_first:
+        fold_first = "Fill 100% · TOE —"
+    out: List[str] = [fold_first, "XP %s" % xp_band(xp)]
     if "planning" in data:
         out.append("Planning %.0f%%" % _as_percent(data.get("planning")))
     if "entrenchment" in data:
@@ -93,14 +98,10 @@ def lines_for(formation: Any) -> List[str]:
         if fuel_pct <= 1.5:
             fuel_pct *= 100.0
         out.append("%s · region %d · range %s · fuel %.0f%%" % (mission, rid, rng, fuel_pct))
-    if "toe_fill" in data or "stock_rifles" in data:
-        try:
-            fill_pct = float(data.get("toe_fill") or 0.0) * 100.0
-        except (TypeError, ValueError):
-            fill_pct = 0.0
-        rifles = int(data.get("stock_rifles") or 0)
-        trucks = int(data.get("stock_trucks") or 0)
-        out.append("Fill %.0f%% · stock rifles %d · trucks %d" % (fill_pct, rifles, trucks))
+        if rid > 0:
+            out.append("CAS assigned · Unassign")
+        else:
+            out.append("CAS unassigned · Assign")
     if bool(data.get("is_training")):
         try:
             prog = float(data.get("training_progress", 0.0) or 0.0)
@@ -125,6 +126,116 @@ def lines_for(formation: Any) -> List[str]:
             bits = [b for b in (date, outcome) if b]
             if bits:
                 out.append(" ".join(bits))
+    return out
+
+
+def _fill_percent_line(data: Mapping[str, Any]) -> str:
+    if "toe_fill" not in data and data.get("fill_percent") is None:
+        if data.get("strength") is not None:
+            try:
+                st = float(data.get("strength") or 0.0)
+            except (TypeError, ValueError):
+                st = 1.0
+            if st <= 1.5:
+                st *= 100.0
+            return "Fill %.0f%%" % max(0.0, min(150.0, st))
+        return ""
+    try:
+        fill_pct = float(data.get("toe_fill") if data.get("toe_fill") is not None else 0.0) * 100.0
+    except (TypeError, ValueError):
+        fill_pct = 0.0
+    if data.get("fill_percent") is not None and "toe_fill" not in data:
+        try:
+            fill_pct = float(data.get("fill_percent") or 0.0)
+        except (TypeError, ValueError):
+            fill_pct = 0.0
+    return "Fill %.0f%%" % fill_pct
+
+
+def _toe_bits(data: Mapping[str, Any], limit: int = 4) -> List[str]:
+    equip = data.get("equipment")
+    if not isinstance(equip, Mapping):
+        equip = data.get("toe") if isinstance(data.get("toe"), Mapping) else {}
+    if not isinstance(equip, Mapping) or not equip:
+        return []
+    rows: List[tuple] = []
+    for k, raw in equip.items():
+        try:
+            n = int(raw)
+        except (TypeError, ValueError):
+            continue
+        if n <= 0:
+            continue
+        short = str(k).replace("_equipment", "").replace("_", " ").strip() or str(k)
+        rows.append((short, n))
+    rows.sort(key=lambda r: r[0])
+    return ["%s %d" % (name, n) for name, n in rows[: max(1, int(limit))]]
+
+
+def fill_toe_fold_line(formation: Any) -> str:
+    """Card-fold extra: Fill NN% · TOE infantry 80 · tanks 12 (no Speed/Width)."""
+    data = _as_map(formation)
+    if data is None:
+        return ""
+    fill_s = _fill_percent_line(data)
+    bits = _toe_bits(data)
+    if not fill_s and not bits:
+        return ""
+    if not bits:
+        return fill_s
+    toe_s = "TOE " + " · ".join(bits)
+    if not fill_s:
+        return toe_s
+    return "%s · %s" % (fill_s, toe_s)
+
+
+def tooltip_lines_for(formation: Any) -> List[str]:
+    """Speed / Armor / Men and Width / Fuel — parked off the fold."""
+    data = _as_map(formation)
+    if data is None:
+        return []
+    out: List[str] = []
+    has_comp = bool(data.get("has_composition")) or any(
+        k in data for k in ("speed", "armor", "width", "manpower", "fuel_level")
+    )
+    if has_comp and any(k in data for k in ("speed", "armor", "manpower", "width", "fuel_level")):
+        try:
+            str_v = float(data.get("strength") if data.get("strength") is not None else 1.0)
+        except (TypeError, ValueError):
+            str_v = 1.0
+        try:
+            toe = int(data.get("manpower") or 0)
+        except (TypeError, ValueError):
+            toe = 0
+        left = max(0, int(round(float(toe) * str_v)))
+        try:
+            speed = float(data.get("speed") if data.get("speed") is not None else 1.0)
+        except (TypeError, ValueError):
+            speed = 1.0
+        try:
+            armor = float(data.get("armor") or 0.0)
+        except (TypeError, ValueError):
+            armor = 0.0
+        if armor <= 1.5:
+            armor_pct = armor * 100.0
+        else:
+            armor_pct = armor
+        try:
+            width = float(data.get("width") if data.get("width") is not None else 2.0)
+        except (TypeError, ValueError):
+            width = 2.0
+        try:
+            fuel = float(data.get("fuel_level") if data.get("fuel_level") is not None else 1.0)
+        except (TypeError, ValueError):
+            fuel = 1.0
+        if fuel <= 1.5:
+            fuel *= 100.0
+        out.append("Speed %.1f · Armor %.0f%% · Men %d/%d" % (speed, armor_pct, left, toe))
+        out.append("Width %.0f · Fuel %.0f%%" % (width, fuel))
+    rifles = int(data.get("stock_rifles") or 0)
+    trucks = int(data.get("stock_trucks") or 0)
+    if rifles > 0 or trucks > 0:
+        out.append("stock rifles %d · trucks %d" % (rifles, trucks))
     return out
 
 
@@ -183,7 +294,7 @@ def build_unit_card_combat_strip_product(*, check_wiring: bool = True) -> Dict[s
 
     bare = {"strength": 1.0}
     bare_lines = lines_for(bare)
-    bare_ok = bare_lines == ["XP Regular", "Strength 100%"]
+    bare_ok = bare_lines[0].startswith("Fill") and "XP Regular" in bare_lines and "Strength 100%" in bare_lines
     wiring["default_xp_strength"] = bare_ok
     (passes if bare_ok else fails).append("default_xp_strength")
 
@@ -208,6 +319,7 @@ def build_unit_card_combat_strip_product(*, check_wiring: bool = True) -> Dict[s
     }
     full_lines = lines_for(full)
     expected_full = [
+        "Fill 87%",
         "XP Veteran",
         "Planning 45%",
         "Entrenchment 30%",
@@ -231,18 +343,85 @@ def build_unit_card_combat_strip_product(*, check_wiring: bool = True) -> Dict[s
     (passes if extras_ok else fails).append("day_label_extras")
 
     stock = lines_for({"toe_fill": 0.28, "stock_rifles": 12, "stock_trucks": 4})
-    stock_ok = any("Fill" in x and "stock" in x for x in stock)
+    stock_ok = any(x.startswith("Fill") and "28%" in x for x in stock)
     wiring["stockpile_toe_line"] = stock_ok
     (passes if stock_ok else fails).append("stockpile_toe_line")
+
+    land_fold = {
+        "strength": 1.0,
+        "toe_fill": 0.80,
+        "equipment": {"infantry_equipment": 80, "tanks": 12},
+        "speed": 4.0,
+        "armor": 0.12,
+        "manpower": 10000,
+        "width": 9.0,
+        "fuel_level": 0.7,
+        "stock_rifles": 40,
+        "stock_trucks": 6,
+    }
+    fold_lines = lines_for(land_fold)
+    fold_join = "\n".join(fold_lines)
+    fill_idx = next((i for i, ln in enumerate(fold_lines) if "Fill" in ln and "%" in ln), -1)
+    toe_idx = next((i for i, ln in enumerate(fold_lines) if "TOE" in ln), -1)
+    speed_in_fold = any("Speed" in ln for ln in fold_lines)
+    width_in_fold = any(ln.startswith("Width") or "Width " in ln and "Fuel" in ln for ln in fold_lines)
+    fold_ok = (
+        fill_idx == 0
+        and toe_idx >= 0
+        and fill_idx <= toe_idx
+        and "80%" in fold_join
+        and "infantry 80" in fold_join
+        and "tanks 12" in fold_join
+        and not speed_in_fold
+        and not width_in_fold
+    )
+    wiring["fold_fill_toe_before_stats"] = fold_ok
+    (passes if fold_ok else fails).append("fold_fill_toe_before_stats")
+    tips = tooltip_lines_for(land_fold)
+    tip_join = "\n".join(tips)
+    tip_ok = (
+        any("Speed" in ln for ln in tips)
+        and any("Width" in ln and "Fuel" in ln for ln in tips)
+        and "Armor" in tip_join
+        and "stock rifles" in tip_join
+    )
+    wiring["tooltip_speed_width"] = tip_ok
+    (passes if tip_ok else fails).append("tooltip_speed_width")
 
     if check_wiring:
         gd = STRIP_GD.read_text(encoding="utf-8") if STRIP_GD.is_file() else ""
         strip_ok = _gd_has_strip(gd)
         wiring["gd_strip"] = strip_ok
         (passes if strip_ok else fails).append("gd_strip")
-        fill_ok = "_stockpile_toe_line" in gd and "unit_toe_fill_ratio" in gd
+        fill_ok = (
+            "_stockpile_toe_line" in gd
+            and "unit_toe_fill_ratio" in gd
+            and "_fill_toe_fold_line" in gd
+            and "Fill %.0f%%" in gd
+        )
         wiring["gd_stockpile_toe"] = fill_ok
         (passes if fill_ok else fails).append("gd_stockpile_toe")
+        # Fold builder must not emit Speed/Width; those belong on tooltip_lines_for.
+        fn = gd
+        i_lines = fn.find("func lines_for")
+        i_tip = fn.find("func tooltip_lines_for")
+        i_next = fn.find("\nstatic func ", i_lines + 1) if i_lines >= 0 else -1
+        lines_fn = fn[i_lines:i_next] if i_lines >= 0 and i_next > i_lines else ""
+        tip_fn = fn[i_tip : i_tip + 1800] if i_tip >= 0 else ""
+        gd_fold_ok = (
+            "Fill %.0f%%" in gd
+            and "TOE " in gd
+            and "Speed %.1f" not in lines_fn
+            and "Width %.0f" not in lines_fn
+            and "Speed %.1f" in tip_fn
+            and "Width %.0f" in tip_fn
+            and "func tooltip_lines_for" in gd
+        )
+        wiring["gd_fold_fill_toe_tooltip_stats"] = gd_fold_ok
+        (passes if gd_fold_ok else fails).append("gd_fold_fill_toe_tooltip_stats")
+        cas_line_ok = "CAS assigned · Unassign" in gd and "CAS unassigned · Assign" in gd
+        wiring["gd_cas_assign_line"] = cas_line_ok
+        (passes if cas_line_ok else fails).append("gd_cas_assign_line")
 
         bubble = BUBBLE_GD.read_text(encoding="utf-8") if BUBBLE_GD.is_file() else ""
         bubble_ok = _gd_has_bubble_chips(bubble)

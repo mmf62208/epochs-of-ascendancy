@@ -461,6 +461,41 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("justify_beats_idle")
     else:
         fails.append("justify_beats_idle")
+    choke_beats_cas = rank_next_beat(
+        {
+            "fleet_choke": {
+                "fid": "eng_fleet",
+                "pid": 950001,
+                "sentence": "English Channel Zone choke flagged",
+            },
+            "cas_wing": {"fid": "eng_cas", "assigned": False, "region": 0},
+        }
+    )
+    if str(choke_beats_cas.get("source")) == "choke" and str(choke_beats_cas.get("action")) == "choke_flag":
+        passes.append("choke_beats_cas")
+    else:
+        fails.append("choke_beats_cas")
+    rank_i = hook.find("func rank_from_snapshot")
+    rank_n = hook.find("\nfunc ", rank_i + 1) if rank_i >= 0 else -1
+    rank_fn = hook[rank_i:rank_n] if rank_i >= 0 else ""
+    choke_src_i = rank_fn.find('"source": "choke"')
+    cas_src_i = rank_fn.find('"source": "cas"')
+    if choke_src_i >= 0 and cas_src_i > choke_src_i:
+        passes.append("gd_choke_before_cas")
+    else:
+        fails.append("gd_choke_before_cas")
+    row_i = hook.find("func _fleet_choke_row")
+    row_n = hook.find("\nfunc ", row_i + 1) if row_i >= 0 else -1
+    row_fn = hook[row_i:row_n] if row_i >= 0 else ""
+    if (
+        bool(row_fn)
+        and "living_choke_state" in row_fn
+        and 'not bool(st.get("ok"' in row_fn
+        and 'not bool(st.get("bite"' not in row_fn
+    ):
+        passes.append("eng_choke_row_without_bite")
+    else:
+        fails.append("eng_choke_row_without_bite")
     declare = rank_next_beat(
         {"war_goal_pid": 710739, "war_justified": True, "war_declared": False}
     )

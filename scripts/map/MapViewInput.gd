@@ -148,6 +148,9 @@ static func _is_visible_blocking_node(n: Node) -> bool:
 	if not n.visible:
 		return false
 	# Now safe: n is a visible CanvasItem/Window. Check name patterns for popups/panels.
+	# Docked map chrome must NOT freeze left-drag pan (Play: pan dead while inspector/unit card up).
+	if nn in ["InfoPanel", "UnitDetailPopup", "ProvinceHoverTooltip", "MapModeToolbar", "MapProvinceSearch"]:
+		return false
 	if nn in [
 		"LeaderAssignmentScreen", "PolicyLawScreen", "LeaderPickerPopup", "LeaderDetailScreen",
 		"LeaderReplacementPickerPopup", "NationalSpiritsScreen", "ProductionAssignmentScreen", "OrderCommandPanel",
@@ -160,6 +163,6 @@ static func _is_visible_blocking_node(n: Node) -> bool:
 	if n is Window:
 		return true
 	if n is Panel or n is PanelContainer:
-		if nn in ["InfoPanel", "SupplyMenuPanel", "SaveManagerPopup", "MainMenuPopup"]:
+		if nn in ["SupplyMenuPanel", "SaveManagerPopup", "MainMenuPopup"]:
 			return true
 	return false

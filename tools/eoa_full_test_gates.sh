@@ -98,6 +98,8 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_world_accurate_multi_front_and_deploy \
     tools.map_generation.tests.test_ownership_mapmode_readability_product \
     tools.map_generation.tests.test_map_war_path_surface_product \
+    tools.map_generation.tests.test_map_states_mapmode_product \
+    tools.map_generation.tests.test_map_state_labels_surface_product \
     tools.map_generation.tests.test_map_live_border_fronts_surface_product \
     tools.map_generation.tests.test_map_supply_corridor_product \
     tools.map_generation.tests.test_map_supply_hub_brief_product \
@@ -121,6 +123,8 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_land_battle_encircle_product \
     tools.map_generation.tests.test_land_battle_stance_product \
     tools.map_generation.tests.test_play_next_hook_product \
+    tools.map_generation.tests.test_map_factory_shortage_surface_product \
+    tools.map_generation.tests.test_map_agent_presence_product \
     tools.map_generation.tests.test_land_battle_aar_product \
     tools.map_generation.tests.test_land_battle_ai_init_product \
     tools.map_generation.tests.test_land_war_save_product \
