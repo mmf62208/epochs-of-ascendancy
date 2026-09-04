@@ -401,6 +401,11 @@ def build_first_session_hotkeys_product(
             and "_arm_still_click_after_pan" in _slice_func(ren, "_apply_home_key")
             and "_left_sticky_is_drag" in _slice_func(ren, "_begin_left_map_gesture")
             and "_left_sticky_is_drag" in _slice_func(ren, "_left_map_pick_blocked")
+            and "_left_cam_moved_this_down" in _slice_func(ren, "_begin_left_map_gesture")
+            and "_left_cam_moved_this_down" in _slice_func(ren, "_left_map_pick_blocked")
+            and "_left_cam_moved_this_down" in _slice_func(ren, "_handle_camera_input")
+            and "_left_button_was_up" in _slice_func(ren, "_begin_left_map_gesture")
+            and "_left_button_was_up" in _slice_func(ren, "_allow_left_pan_skip_to_die")
             and "LEFT_LEFTOVER_HOLD_FRAMES" in ren
             and "_left_release_screen" in _slice_func(ren, "_begin_left_map_gesture")
             and "_left_release_screen" in _slice_func(ren, "_end_left_button_down")

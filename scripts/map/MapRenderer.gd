@@ -263,6 +263,12 @@ var _left_sticky_slop_sq: float = 0.0
 ## Frames after `_end` that leftover pressed=true must keep sticky slop.
 ## Counted from release only (not a mid-drag 400ms time-box).
 const LEFT_LEFTOVER_HOLD_FRAMES: int = 16
+## Camera moved during this left-down (edge-pan or drag). Leftover `_begin` must not wipe.
+var _left_cam_moved_this_down: bool = false
+## True after `_process` sees left button up (not `_end` — leftover Input-down
+## still reports pressed). Next physical `_begin(true)` may reset; leftover hold
+## and leftover pressed=true must not.
+var _left_button_was_up: bool = true
 var _camera_nudge_gen := 0
 ## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
 var _viewport_cull_suspend_until_msec: int = 0
@@ -1065,6 +1071,8 @@ func _arm_still_click_after_pan() -> void:
 	_left_max_slop_sq = 0.0
 	_left_slop_latched = false
 	_left_gesture_panned = false
+	_left_cam_moved_this_down = false
+	_left_button_was_up = true
 
 
 func _note_mouse_up_arms_still_click() -> void:
@@ -1104,19 +1112,22 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
 	var physically_down: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 	_note_sticky_slop()
-	# Leftover pressed=true (Input down) after a drag: keep sticky slop.
-	# End/wheel ready-arm + `_begin(true)` reset picked Lisboa / East Asia (8dcec1f).
-	if _left_sticky_is_drag() and (_left_in_leftover_hold() or not _left_ready_for_still_click):
-		_left_btn_down = true
-		return
-	if not _left_ready_for_still_click:
+	# Leftover pressed=true / leftover hold / leftover Input-down: keep THIS drag.
+	# c4c44b8: Atlantic water in the left edge strip slid the camera onto Iberia
+	# with slop <8px; leftover `_begin(true)` wiped sticky and picked Lisboa.
+	# Genuine new click after button-up (Alicante) may reset — not idle-clear.
+	var leftover: bool = (not physically_down) or _left_in_leftover_hold() or not _left_button_was_up
+	var keep_this_drag: bool = (
+		_left_cam_moved_this_down or _left_sticky_is_drag() or (not _left_ready_for_still_click)
+	)
+	if keep_this_drag and (leftover or not new_press):
 		_left_btn_down = true
 		return
 	if new_press and not physically_down:
 		_left_btn_down = true
 		return
 	if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
-		if not _left_ready_for_still_click or _left_in_leftover_hold():
+		if leftover or not _left_ready_for_still_click:
 			_left_btn_down = true
 			return
 	_left_btn_down = true
@@ -1136,6 +1147,8 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	_left_sticky_origin = mouse
 	_left_sticky_valid = true
 	_left_sticky_slop_sq = 0.0
+	_left_cam_moved_this_down = false
+	_left_button_was_up = false
 	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
 		_left_press_cam_pos = cam.global_position
@@ -1178,19 +1191,21 @@ func _end_left_button_down() -> void:
 
 
 func _allow_left_pan_skip_to_die() -> void:
-	# Do not clear slop/dragged. Do not arm on mouse-up motion (1680687).
-	# Home/End/wheel/WASD arm a later still-click (Berlin after Home).
+	# Observe idle button-up so the next physical click is Alicante-class.
+	# Do not clear slop/skip/cam latch here (idle-clear let THIS release pick).
+	# Do not arm on mouse-up motion (1680687 Ille-et-Vilaine).
 	if _left_btn_down:
 		return
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		return
+	_left_button_was_up = true
 	if _left_release_frame < 0:
 		return
 
 
 func _left_map_pick_blocked() -> bool:
-	# Sticky slop survives leftover `_begin(true)` / End-wheel ready-arm.
-	if _left_sticky_is_drag():
+	# Sticky slop / camera-move latch survive leftover `_begin(true)`.
+	if _left_cam_moved_this_down or _left_sticky_is_drag():
 		return true
 	if not _left_ready_for_still_click:
 		return true
@@ -1208,6 +1223,7 @@ func _mark_left_pan_blocked_pick() -> void:
 	_left_gesture_panned = true
 	_left_slop_latched = true
 	_left_ready_for_still_click = false
+	_left_cam_moved_this_down = true
 
 
 func _map_click_should_skip_pick() -> bool:
@@ -1225,7 +1241,7 @@ func _map_click_should_skip_pick() -> bool:
 
 
 func _left_gesture_moved_camera() -> bool:
-	if _left_pan_committed:
+	if _left_cam_moved_this_down or _left_pan_committed:
 		return true
 	if not _left_press_cam_valid:
 		return false
@@ -2264,6 +2280,14 @@ func _handle_camera_input(delta: float) -> void:
 	# Only clamp when camera moved — wrapping/clamp every idle frame was thrashing redraws.
 	if moved:
 		_clamp_camera_to_theater()
+		# c4c44b8 Lisboa: Atlantic water sits in the left edge-pan strip on
+		# Home Europe. Camera slides onto Iberia while mouse slop stays <8px;
+		# leftover `_begin` then wiped sticky slop. Latch the camera move as
+		# THIS drag — leftover `_begin` must not reset it (see KEEP above).
+		# WASD with button up must not mark (Alicante after key-pan).
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down or _left_pan_armed:
+			_left_cam_moved_this_down = true
+			_mark_left_pan_blocked_pick()
 
 
 func _zoom_toward_mouse(zoom_change: float) -> void:
