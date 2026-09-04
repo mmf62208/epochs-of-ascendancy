@@ -593,6 +593,14 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("gd_choke_before_cas")
     else:
         fails.append("gd_choke_before_cas")
+    if (
+        "battle_from_id" in rank_fn
+        and '"from_id": int(f.get("battle_from_id"' in rank_fn
+        and '"to_id": int(f.get("battle_to_id"' in rank_fn
+    ):
+        passes.append("gd_land_battle_from_id")
+    else:
+        fails.append("gd_land_battle_from_id")
     fight_src_i = rank_fn.find("any_open_battle")
     mag_src_i = rank_fn.find('"source": "maginot"')
     idle_src_i = rank_fn.find('"source": "first_session"')
@@ -781,6 +789,25 @@ def build_play_next_hook_product() -> Dict[str, Any]:
         passes.append("top_bar_shows_completing_name")
     else:
         fails.append("top_bar_shows_completing_name")
+    layout_i = top_bar.find("func _apply_responsive_layout")
+    layout_n = top_bar.find("\nfunc ", layout_i + 1) if layout_i >= 0 else -1
+    layout_fn = top_bar[layout_i:layout_n] if layout_i >= 0 else ""
+    date_i = top_bar.find("func _update_date_time")
+    date_n = top_bar.find("\nfunc ", date_i + 1) if date_i >= 0 else -1
+    date_fn = top_bar[date_i:date_n] if date_i >= 0 else ""
+    size_i = top_bar.find("func _apply_date_label_size")
+    size_n = top_bar.find("\nfunc ", size_i + 1) if size_i >= 0 else -1
+    size_fn = top_bar[size_i:size_n] if size_i >= 0 else ""
+    if (
+        "_update_date_time()" in layout_fn
+        and "format_top_bar_tooltip" not in layout_fn
+        and "_apply_date_label_size" in date_fn
+        and "SIZE_EXPAND_FILL" in size_fn
+        and "360" in size_fn
+    ):
+        passes.append("top_bar_completing_name_visible")
+    else:
+        fails.append("top_bar_completing_name_visible")
     extra_fight = rank_next_beat(
         {
             "has_open_battle": True,

@@ -212,12 +212,10 @@ func _apply_responsive_layout() -> void:
 
 	if date_time_label:
 		date_time_label.visible = true
-		date_time_label.custom_minimum_size = Vector2(120 if narrow else (136 if compact else 148), 26)
-		date_time_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 		date_time_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 		date_time_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		date_time_label.add_theme_font_size_override("font_size", 12 if compact else 13)
-		date_time_label.tooltip_text = GameDateDisplay.format_top_bar_tooltip()
+	_update_date_time()
 
 	if menu_button and is_instance_valid(menu_button):
 		menu_button.text = "Menu" if not narrow else "M"
@@ -994,22 +992,46 @@ func _pause_for_menu(pause: bool) -> void:
 
 
 func _update_date_time() -> void:
+	if date_time_label == null:
+		return
 	var line := GameDateDisplay.format_top_bar_line(true)
 	var completing := _living_completing_name()
 	if completing.is_empty():
 		date_time_label.text = line
 	else:
 		date_time_label.text = "%s · %s" % [line, completing]
+	_apply_date_label_size(not completing.is_empty())
 	var tip := GameDateDisplay.format_top_bar_tooltip()
 	if not completing.is_empty():
 		tip = completing if tip.is_empty() else "%s\n%s" % [completing, tip]
 	date_time_label.tooltip_text = tip
-	pause_button.tooltip_text = "Pause / resume simulation\n\n" + tip if not tip.is_empty() else "Pause / resume simulation"
+	if pause_button:
+		pause_button.tooltip_text = "Pause / resume simulation\n\n" + tip if not tip.is_empty() else "Pause / resume simulation"
 	if is_paused:
 		date_time_label.modulate = RetrowaveTheme.MAGENTA
-		pause_button.tooltip_text = "Resume simulation\n\n" + tip if not tip.is_empty() else "Resume simulation"
+		if pause_button:
+			pause_button.tooltip_text = "Resume simulation\n\n" + tip if not tip.is_empty() else "Resume simulation"
 	else:
 		date_time_label.modulate = Color.WHITE
+
+
+## Date-only stays compact; completing research/focus name must fit on the bar.
+func _apply_date_label_size(show_completing: bool) -> void:
+	if date_time_label == null:
+		return
+	if show_completing:
+		date_time_label.custom_minimum_size = Vector2(360, 26)
+		date_time_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		date_time_label.clip_text = false
+		return
+	var vp_w := 1600.0
+	if is_inside_tree() and get_viewport():
+		vp_w = get_viewport().get_visible_rect().size.x
+	var compact := vp_w < WIDTH_COMPACT
+	var narrow := vp_w < WIDTH_NARROW
+	date_time_label.custom_minimum_size = Vector2(120 if narrow else (136 if compact else 148), 26)
+	date_time_label.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	date_time_label.clip_text = true
 
 
 ## Completing research/focus name on the date/tech area when that NEXT beat wins.
