@@ -1,6 +1,6 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-22 (L1 land loop + living units + organize + composition + industry TOE + era resources + occupier harvest + **NEXT daily command beat** + **capture AAR economy** + completing bars · `--quick` green · board ~3520 · M6 human-only open)  
+**Date:** 2026-08-22 (L1 land loop + living units + organize + composition + industry TOE + era resources + occupier harvest + **NEXT daily command beat** + **play-strip factory board** + **capture AAR economy** + completing bars · `--quick` green · board ~3520 · M6 human-only open)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
 **How to keep going:** 5-step protocol in §0. Next human: F5 §0b 3–15 + a 20d unpause (M6 notes). Next machine: only playtest-driven shipped-path fixes. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
@@ -26,7 +26,7 @@ Every Cursor / Grok / human session on this tree:
 
 | Next | Action |
 |------|--------|
-| **Human** | Not required for units. F5 GER 1936: NEXT names Maginot when the 710173 chip is ready. M6 20d/60d still open. |
+| **Human** | Not required for units. F5 GER 1936: play-strip **Production** opens the factory board; NEXT names Maginot when the 710173 chip is ready. M6 20d/60d still open. |
 | **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS** (organize/train/priority included). Soft 30fps still FAIL honest. |
 | **GitHub** | `origin/main` @ `9d24efe` (no retrowave fort dummy units; chip text not Control). Play branch `eoa/l1-war-loop-slice` matches. Do not force-push over June Cursor history. |
 
@@ -48,7 +48,7 @@ Every Cursor / Grok / human session on this tree:
 - **L1 designer → map unit (machine):** Finalize in DomainDesignPopup / Field seed calls `LeaderManager.field_designed_unit` (via `DesignManager.field_design_on_map`). Custom template becomes a division on Maginot, chip rebuilds, pick/march/assault still **RESULT=PASS**. Product `designer_field_map_unit_product` on `--quick`.
 - **L1 unit creator + loop SFX (machine):** Unit Designer picks NATO **symbol** + **strength/org** sliders, fields that chip. Combat bubble pulses; `LandBattleSfx.key_for_unit` maps armor/infantry **move** and **clash** to existing pack keys (no new wavs). Product `unit_design_creator_loop_product` on `--quick`.
 - **L1 organize / recruit queue (machine):** Designer **existing vs new** template · multi-recruit (1–8) · core-province deploy · field-vs-new equipment priority. New units train 14d (existing template 10d) at reduced org/rdy/str; refit of fielded units 7d with org/rdy/str dip until ready. Daily chip refresh (amber **TrainPulse**) · unit-card **Training N/Dd** · save round-trips `organize_priority` + days/mode. Equip share 1.0 vs 0.35 into `daily_reinforcement_tick`. `LeaderManager.enqueue_organize` + `tick_organize_day`. Product `unit_organize_queue_product` on `--quick`. Headless `_test_organize`. Not commercial HOI designer.
-- **Stockpile → TOE (playtest):** unit card shows Fill% + stock rifles/trucks; daily reinforce toasts `Stockpile → TOE · N units · N eq`.
+- **Stockpile → TOE (playtest):** unit card shows Fill% + stock rifles/trucks; daily reinforce toasts `Stockpile → TOE · N units · N eq`. Play-strip **Production** opens the living factory board (`TopInfoBar.open_living_surface("production")`) for the player tag — not `apply_production` dual. Shortage NEXT (steel / fuel) is the same click-to-open production path. Fill% / stockpile line stays on the unit card. Maginot idle still Maginot, not WarLoop. Not HOI efficiency tables.
 - **NEXT live fight (playtest):** any open land battle outranks first-session WarLoop copy (`Open fight`). Completing bars / player fights / train / fuel still outrank that.
 - **First-session NEXT (playtest):** Maginot GER chip at `710173` (FRA `710739`) with no fight/AAR/train/fuel/shortage → NEXT `Maginot — 1. Infanterie can assault Alsace` (`open_fight` / source `maginot`). Apply opens the Attacker/Defender sheet (`start_land_battle` on Start battle, never `execute_province_assault` on the click). Idle without that chip stays `WarLoop · B Fronts · Ctrl+click`. Completing bars and live fights still outrank it.
 - **Panel close (playtest):** Close / Esc locks the **live GIS camera**. The actual Close→Greenland writer was leftover cursor in the north **edge-pan strip** (Close sits under the HUD): `_handle_camera_input` treated it as edge-north, called `_unlock_close_camera()`, then flew at `pan_speed` ~2600. Edge-pan is now off while Close-held (`_close_suppress_edge` until the mouse leaves that band). Only WASD / Home / End / wheel / a new map press unlock. Fills stay painted. Fight-sheet / unit-card Close use the same dismiss. A new hex pick reopens the inspector. No Home required.
@@ -101,8 +101,8 @@ Every Cursor / Grok / human session on this tree:
 |------|-------|
 | **Engine** | Godot **4.7.1** (`tools/run_godot.sh`) |
 | **Command Center** | **CanvasLayer overlay** · wordmark + menu chrome · **✕ / ESC / click dimmer** · **Ctrl+S / Ctrl+L** save/load (no F5/F9 collision) · Help lists WarLoop path · `first_session_hotkeys_product` |
-| **First-session play** | Default **GER** Maginot theater · onboarding toast · **B / Shift+I / G / ?** · mapmode icons for states/terrain/resources/fronts/war_loop · supply **fuel** brief on G · **play-strip** Assault/Production (harness debug-only) · assault toast after Fronts |
-| **Order strip** | **EOA_PLAY_STRIP** player mode · pure `order_panel_play_strip_product` · dual/harness under `is_debug_build` only |
+| **First-session play** | Default **GER** Maginot theater · onboarding toast · **B / Shift+I / G / ?** · mapmode icons for states/terrain/resources/fronts/war_loop · supply **fuel** brief on G · **play-strip** Assault + Production (living factory board, not `apply_production`) · harness debug-only · assault toast after Fronts |
+| **Order strip** | **EOA_PLAY_STRIP** player mode · Production → `open_living_surface("production")` · pure `order_panel_play_strip_product` · dual/harness under `is_debug_build` only |
 | **Interactive multi-AI** | Personality-weighted major order (aggression) + budget 3 prod + 1 soft · pure `interactive_multi_ai_day_product` |
 | **Nation labels** | Capital **contiguous landmass** centroid (BFS) · scale by province n + pop · pure `map_nation_label_landmass_product` |
 | **Unit counters (pins)** | OOB/NATO map chips · **culled at strategic** (ocean/terrain/capitals beat chips) · operational+ full chips · **Shift+U** master toggle · nation plate + org/str bars · docked unit card · **pin-first pick when visible** (48px disk / floor 20 · gold chip · no inspector · `[` `]` stack) · inspector **Close restores input** · `map_unit_counter_lod_product` + `unit_centric_pick_product` + `unit_counter_chrome_product` |

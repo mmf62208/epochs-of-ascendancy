@@ -13,6 +13,9 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence
 
 ROOT = Path(__file__).resolve().parents[3]
 ORDER_PANEL = ROOT / "scripts" / "ui" / "OrderCommandPanel.gd"
+TOP_BAR = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
+HOOK_GD = ROOT / "scripts" / "ui" / "PlayNextHook.gd"
+UNIT_CARD = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
 
 # Always-visible first-session play actions (player mode).
 PLAY_ACTIONS: List[Dict[str, Any]] = [
@@ -24,11 +27,12 @@ PLAY_ACTIONS: List[Dict[str, Any]] = [
         "hint": "Attack adjacent enemy (or Ctrl+click on map)",
     },
     {
-        "action_id": "apply_production",
+        "action_id": "open_living_production",
         "label": "Production",
         "key": "3",
         "domain": "industry",
-        "hint": "Advance production at capital/hub",
+        "hint": "Open living factory board for the player tag",
+        "living_surface": "production",
     },
     {
         "action_id": "apply_station",
@@ -105,6 +109,15 @@ LIVE_PLAY_ACTION_IDS = frozenset(
 )
 
 
+def _gd_fn(src: str, name: str) -> str:
+    needle = "func %s" % name
+    i = src.find(needle)
+    if i < 0:
+        return ""
+    n = src.find("\nfunc ", i + 1)
+    return src[i:n] if n > i else src[i:]
+
+
 def play_strip_actions(*, max_actions: int = 8) -> List[Dict[str, Any]]:
     limit = max(4, min(8, int(max_actions)))
     out: List[Dict[str, Any]] = []
@@ -177,14 +190,20 @@ def build_order_panel_play_strip_product(
         passes.append("has_assault")
     else:
         fails.append("missing_assault")
-    if "apply_production" in aids:
+    if "open_living_production" in aids:
         passes.append("has_production")
     else:
         fails.append("missing_production")
+    if "apply_production" in aids:
+        fails.append("play_mode_apply_production")
+    else:
+        passes.append("play_mode_not_apply_production")
 
     wiring: Dict[str, bool] = {}
     if check_wiring and ORDER_PANEL.is_file():
         src = ORDER_PANEL.read_text(encoding="utf-8")
+        play_fn = _gd_fn(src, "_rebuild_play_mode_strip")
+        open_fn = _gd_fn(src, "_open_play_strip_production")
         wiring["play_strip_section"] = (
             "EOA_PLAY_STRIP" in src
             or "_rebuild_play_mode_strip" in src
@@ -195,13 +214,55 @@ def build_order_panel_play_strip_product(
             "is_debug_build" in src
             and ("HARNESS" in src or "harness" in src or "stream_alpha_primary_packs" in src)
         ) or ("EOA_PLAY_STRIP" in src)
+        wiring["play_mode_not_apply_production"] = (
+            '_add_apply_button("[3] Production", "apply_production"' not in play_fn
+            and '"apply_production"' not in play_fn
+        )
+        wiring["play_mode_opens_living_production"] = (
+            "open_living_surface" in open_fn
+            and '"production"' in open_fn
+            and ("_on_production_pressed" in open_fn or "open_living_surface" in open_fn)
+            and "_add_play_strip_production_button" in play_fn
+        )
         for k, v in wiring.items():
             if v:
                 passes.append("wire_%s" % k)
             else:
                 fails.append("wire_%s" % k)
+        if TOP_BAR.is_file():
+            bar = TOP_BAR.read_text(encoding="utf-8")
+            bar_open = _gd_fn(bar, "open_living_surface")
+            if "_on_production_pressed" in bar_open and '"unpause_only": false' in bar_open:
+                passes.append("top_bar_production_live")
+            else:
+                fails.append("top_bar_production_live")
+        if HOOK_GD.is_file():
+            hook = HOOK_GD.read_text(encoding="utf-8")
+            if (
+                'func open_living_production' in hook
+                and '_open_living_surface("production"' in hook
+            ):
+                passes.append("hook_open_living_production")
+            else:
+                fails.append("hook_open_living_production")
+        if UNIT_CARD.is_file():
+            card = UNIT_CARD.read_text(encoding="utf-8")
+            if "Fill %.0f%%" in card and "stock rifles" in card:
+                passes.append("unit_card_fill_stockpile")
+            else:
+                fails.append("unit_card_fill_stockpile")
 
-    ok = "membership_leak" not in fails and "missing_assault" not in fails and "too_few_actions" not in fails
+    ok = (
+        "membership_leak" not in fails
+        and "missing_assault" not in fails
+        and "too_few_actions" not in fails
+        and "play_mode_apply_production" not in fails
+        and "wire_play_mode_not_apply_production" not in fails
+        and "wire_play_mode_opens_living_production" not in fails
+        and "top_bar_production_live" not in fails
+        and "hook_open_living_production" not in fails
+        and "unit_card_fill_stockpile" not in fails
+    )
     return {
         "ok": ok,
         "empty": False,
@@ -218,6 +279,8 @@ def build_order_panel_play_strip_product(
         "integration": [
             "order_panel_play_strip_product",
             "OrderCommandPanel._rebuild_campaign_alpha_primary_strip",
+            "OrderCommandPanel._open_play_strip_production",
+            "TopInfoBar.open_living_surface",
             "first_session_assault_surface_product",
         ],
     }

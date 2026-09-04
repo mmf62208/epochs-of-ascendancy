@@ -1192,7 +1192,7 @@ func _rebuild_play_mode_strip() -> void:
 		280
 	)
 	_add_apply_button("[2] Assault", "apply_assault", true)
-	_add_apply_button("[3] Production", "apply_production", true)
+	_add_play_strip_production_button()
 	_add_apply_button("[1] Station forces", "apply_station", true)
 	_add_apply_button("[8] Checkpoint save", "save_resume_checkpoint", true)
 	var rec: Dictionary = {}
@@ -1223,6 +1223,34 @@ func _rebuild_play_mode_strip() -> void:
 	_add_map_surface_button(map_row, "WarLoop (Shift+I)", "show_first_session_war_path")
 	_add_map_surface_button(map_row, "Fronts (B)", "show_live_border_fronts")
 	_add_map_surface_button(map_row, "Corridor (G)", "highlight_corridor_capital_to_selected")
+
+
+## Player-mode Production — living factory board, not apply_production dual.
+func _add_play_strip_production_button() -> void:
+	var row := HBoxContainer.new()
+	var lbl := Label.new()
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.text = "[3] Production"
+	row.add_child(lbl)
+	var btn := Button.new()
+	btn.text = "Open"
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.tooltip_text = "Living factory board for the player tag"
+	btn.pressed.connect(_open_play_strip_production)
+	row.add_child(btn)
+	_target_body().add_child(row)
+
+
+func _open_play_strip_production() -> void:
+	var tree := get_tree()
+	var bar: Node = null
+	if tree != null:
+		bar = tree.get_first_node_in_group("top_info_bar")
+	if bar != null and bar.has_method("open_living_surface"):
+		bar.call("open_living_surface", "production")
+		return
+	if typeof(PlayNextHook) != TYPE_NIL and PlayNextHook.has_method("open_living_production"):
+		PlayNextHook.open_living_production()
 
 
 func _add_map_surface_button(parent: Control, label: String, method_name: String) -> void:

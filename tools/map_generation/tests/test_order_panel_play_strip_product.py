@@ -18,8 +18,11 @@ from order_panel_play_strip_product import (  # noqa: E402
     play_strip_actions,
     play_strip_membership_audit,
 )
+from play_next_hook_product import rank_next_beat  # noqa: E402
 
 PANEL = ROOT / "scripts" / "ui" / "OrderCommandPanel.gd"
+TOP_BAR = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
+HOOK_GD = ROOT / "scripts" / "ui" / "PlayNextHook.gd"
 
 
 class TestOrderPanelPlayStripProduct(unittest.TestCase):
@@ -27,7 +30,10 @@ class TestOrderPanelPlayStripProduct(unittest.TestCase):
         acts = play_strip_actions()
         ids = {a["action_id"] for a in acts}
         self.assertIn("apply_assault", ids)
-        self.assertIn("apply_production", ids)
+        self.assertIn("open_living_production", ids)
+        self.assertNotIn("apply_production", ids)
+        prod = next(a for a in acts if a["action_id"] == "open_living_production")
+        self.assertEqual(prod.get("living_surface"), "production")
         self.assertGreaterEqual(len(acts), 4)
         self.assertLessEqual(len(acts), 8)
 
@@ -60,6 +66,47 @@ class TestOrderPanelPlayStripProduct(unittest.TestCase):
         self.assertIn("is_debug_build", src)
         p = build_order_panel_play_strip_product(check_wiring=True)
         self.assertTrue(p.get("wiring", {}).get("play_strip_section"), msg=p)
+        self.assertTrue(p.get("ok"), msg=p)
+
+    def test_play_mode_production_opens_living_surface(self) -> None:
+        src = PANEL.read_text(encoding="utf-8")
+        play_i = src.find("func _rebuild_play_mode_strip")
+        play_n = src.find("\nfunc ", play_i + 1) if play_i >= 0 else -1
+        play_fn = src[play_i:play_n] if play_i >= 0 else ""
+        open_i = src.find("func _open_play_strip_production")
+        open_n = src.find("\nfunc ", open_i + 1) if open_i >= 0 else -1
+        open_fn = src[open_i:open_n] if open_i >= 0 else ""
+        self.assertTrue(play_fn, msg="missing _rebuild_play_mode_strip")
+        self.assertTrue(open_fn, msg="missing _open_play_strip_production")
+        self.assertNotIn('_add_apply_button("[3] Production", "apply_production"', play_fn)
+        self.assertNotIn('"apply_production"', play_fn)
+        self.assertIn("_add_play_strip_production_button", play_fn)
+        self.assertIn("open_living_surface", open_fn)
+        self.assertIn('"production"', open_fn)
+        bar = TOP_BAR.read_text(encoding="utf-8")
+        bar_i = bar.find("func open_living_surface")
+        bar_n = bar.find("\nfunc ", bar_i + 1) if bar_i >= 0 else -1
+        bar_fn = bar[bar_i:bar_n] if bar_i >= 0 else ""
+        self.assertIn("_on_production_pressed", bar_fn)
+        hook = HOOK_GD.read_text(encoding="utf-8")
+        self.assertIn("func open_living_production", hook)
+        self.assertIn('_open_living_surface("production"', hook)
+        p = build_order_panel_play_strip_product(check_wiring=True)
+        self.assertTrue(p.get("wiring", {}).get("play_mode_opens_living_production"), msg=p)
+        self.assertTrue(p.get("wiring", {}).get("play_mode_not_apply_production"), msg=p)
+        self.assertIn("unit_card_fill_stockpile", p.get("pass") or [])
+
+    def test_maginot_idle_still_maginot_not_warloop(self) -> None:
+        mag = rank_next_beat(
+            {"maginot_fid": "ger_front", "maginot_from": 710173, "maginot_to": 710739}
+        )
+        self.assertEqual(mag.get("source"), "maginot")
+        self.assertEqual(mag.get("action"), "open_fight")
+        self.assertNotEqual(mag.get("action"), "show_war_loop")
+        self.assertNotEqual(mag.get("source"), "first_session")
+        idle = rank_next_beat({})
+        self.assertEqual(idle.get("action"), "show_war_loop")
+        self.assertEqual(idle.get("source"), "first_session")
 
 
 if __name__ == "__main__":

@@ -1222,7 +1222,7 @@ func _on_hotseat_end_turn() -> void:
 	_refresh_hotseat_banner()
 
 
-## NEXT apply: open production / research / focus. Never pause-only.
+## NEXT apply / play-strip Production: open production / research / focus. Never pause-only.
 func open_living_surface(kind: String) -> Dictionary:
 	var k := kind.strip_edges().to_lower()
 	if k in ["shortage", "industry"]:
@@ -1231,6 +1231,10 @@ func open_living_surface(kind: String) -> Dictionary:
 		k = "research"
 	if k in ["focus_done"]:
 		k = "focus"
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		var pt := str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		if not pt.is_empty():
+			player_country_tag = pt
 	_force_open_living = true
 	match k:
 		"production":

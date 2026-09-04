@@ -581,6 +581,11 @@ static func _living_player_tag(player_tag: String = "") -> String:
 	return "GER"
 
 
+## Play-strip Production: same living factory board as shortage NEXT.
+static func open_living_production() -> Dictionary:
+	return _open_living_surface("production", {"action": "production", "hint": "Factory board"})
+
+
 ## NEXT chip: open the living research / focus / production surface (not unpause-only).
 ## Headless has no TopInfoBar — still reports the same panel the F5 chip would open.
 static func _open_living_surface(kind: String, rec: Dictionary) -> Dictionary:
