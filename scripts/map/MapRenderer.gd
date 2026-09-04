@@ -18354,14 +18354,19 @@ func _open_fight_from_formation_id(fid: String) -> void:
 	if picked != null and "country_tag" in picked:
 		picked_tag = str(picked.country_tag).strip_edges().to_upper()
 	# Default GER stays Maginot. Other tags keep their own hex (ITA Milano ≠ Alsace).
-	if player != "GER" and not player.is_empty() and picked_tag != "GER" and picked != null:
-		var from_pid := int(picked.get("stationed_province_id")) if "stationed_province_id" in picked else -1
-		var enemy_pid := _adjacent_enemy_province_id(from_pid, picked_tag if not picked_tag.is_empty() else player)
-		selected_formation_id = fid
-		if from_pid > 0:
-			attack_staging_province_id = from_pid
-		_show_open_fight_sheet(fid, picked, from_pid, enemy_pid, picked_tag if not picked_tag.is_empty() else player)
-		return
+	# Empty fid Maginot is GER-only — ITA/ENG with no pick must not stage Alsace.
+	if player != "GER":
+		if picked == null:
+			_show_inspector_toast("Open fight · pick a unit chip first", 3.0, true)
+			return
+		if picked_tag != "GER":
+			var from_pid := int(picked.get("stationed_province_id")) if "stationed_province_id" in picked else -1
+			var enemy_pid := _adjacent_enemy_province_id(from_pid, picked_tag if not picked_tag.is_empty() else player)
+			selected_formation_id = fid
+			if from_pid > 0:
+				attack_staging_province_id = from_pid
+			_show_open_fight_sheet(fid, picked, from_pid, enemy_pid, picked_tag if not picked_tag.is_empty() else player)
+			return
 	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
 		if BattleManager.get_divisions_at_province(FRA_FRONT, "FRA").is_empty() \
 				and LeaderManager.has_method("field_designed_unit"):
