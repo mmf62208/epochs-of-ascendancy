@@ -100,7 +100,8 @@ Every Cursor / Grok / human session on this tree:
 | Item | Truth |
 |------|-------|
 | **Engine** | Godot **4.7.1** (`tools/run_godot.sh`) |
-| **Command Center** | **CanvasLayer overlay** · wordmark + menu chrome · **✕ / ESC / click dimmer** · **Ctrl+S / Ctrl+L** save/load (no F5/F9 collision) · Help lists WarLoop path · `first_session_hotkeys_product` |
+| **Command Center** | **CanvasLayer overlay** · wordmark + menu chrome · **✕ / ESC / click dimmer** · idle map **Esc → Command Center** (`MapRenderer` after overlay dismiss; LineEdit/search not stolen) · **Ctrl+S / Ctrl+L** save/load (no F5/F9 collision) · Help lists WarLoop path · `first_session_hotkeys_product` |
+| **Agent portraits** | Agnt roster **36px FileDialog slot** · 6 stock faces + Import/Reset in-card · PNG bytes only to `user://agent_portraits/{id}.png` (never `res://`) · `.stock` sidecar · `agent_portrait_filedialog_product` |
 | **First-session play** | Default **GER** Maginot theater · onboarding toast · **B / Shift+I / G / ?** · mapmode icons for states/terrain/resources/fronts/war_loop · supply **fuel** brief on G · **play-strip** Assault/Production (harness debug-only) · assault toast after Fronts |
 | **Order strip** | **EOA_PLAY_STRIP** player mode · pure `order_panel_play_strip_product` · dual/harness under `is_debug_build` only |
 | **Interactive multi-AI** | Personality-weighted major order (aggression) + budget 3 prod + 1 soft · pure `interactive_multi_ai_day_product` |
