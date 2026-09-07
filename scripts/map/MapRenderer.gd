@@ -13,6 +13,9 @@ const _DomainOpsOverlayLayerScr = preload("res://scripts/map/DomainOpsOverlayLay
 const _LeaderStationOverlayLayerScr = preload("res://scripts/map/LeaderStationOverlayLayer.gd")
 const _UnitChipTextScr = preload("res://scripts/map/UnitChipText.gd")
 const _ConstructionProgressOverlayLayerScr = preload("res://scripts/map/ConstructionProgressOverlayLayer.gd")
+## Loaded in _ready — missing scripts must not fail MapRenderer parse (grey TestScenario).
+var _FactoryStatusLayerScr: Script = null
+var _AgentPresenceLayerScr: Script = null
 const RoutePackQRScr = preload("res://scripts/ui/RoutePackQR.gd")
 const _SFX_PATHS := {
 	"select": "res://Sound FX Starter Pack Vol. 1/UI & Menus/Select.wav",
@@ -210,10 +213,73 @@ var _left_pan_armed := false
 var _left_pan_active := false
 var _left_press_screen := Vector2.ZERO
 const LEFT_PAN_SLOP_PX := 8.0
+## Sticky slop so release still pans if _input cleared armed before _unhandled_input.
+var _left_slop_latched := false
+## Skip the hex pick on the release that ends a left-drag pan (Play: drag also picked).
+var _left_skip_next_pick := false
+## True once this left-drag actually moved the camera (release must not pick).
+var _left_gesture_panned := false
+## Survives flag resets: set when left-drag actually pans; cleared only on the next press.
+var _left_pan_committed := false
+## Close click-through: ignore map picks until this msec (Play: Iberia→Greenland).
+var _map_pick_block_until_msec: int = 0
+## Close/Esc: do not move the camera (no snapshot restore — that still teleported).
+var _hold_camera_until_msec: int = 0
 var _last_mouse_pos := Vector2.ZERO
 ## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
 var _inspector_held_closed := false
+## Live GIS camera at Close press — reassert every frame so europe_center / pick-center cannot teleport.
+var _close_camera_locked := false
+var _close_camera_lock_pos := Vector2.ZERO
+var _close_camera_lock_zoom := Vector2.ONE
+var _close_click_guard := false
+var _close_release_seen := false
+## Close button sits in the north edge-pan strip — suppress edge until the mouse leaves that click.
+var _close_suppress_edge := false
+var _close_click_screen := Vector2.ZERO
+## Camera at left-press; pick is skipped if this gesture moved the camera (flags can be reset).
+var _left_press_cam_pos := Vector2.ZERO
+var _left_press_cam_valid := false
+## Sticky origin + peak slop for this button-down (survives re-arm at release pos).
+var _left_origin_screen: Vector2 = Vector2.ZERO
+var _left_origin_valid: bool = false
+var _left_max_slop_sq: float = 0.0
+## This left-button-down: once slop exceeds 8px, THIS release cannot pick (no time-box).
+var _left_btn_down: bool = false
+var _left_gesture_dragged: bool = false
+var _left_gesture_origin: Vector2 = Vector2.ZERO
+## Process frame of last `_end_left_button_down`.
+var _left_release_frame: int = -1
+## Screen pos of last left release — leftover pressed=true at this hex is still THIS drag.
+var _left_release_screen: Vector2 = Vector2.ZERO
+var _left_release_screen_valid: bool = false
+## After a drag, leftover pressed=true looks like a real click (Input is down).
+## Sticky origin/slop survive leftover `_begin(true)` (End/wheel arm + reset
+## picked Lisboa / East Asia coarse on 8dcec1f). Home clears sticky.
+var _left_ready_for_still_click: bool = true
+var _left_sticky_origin: Vector2 = Vector2.ZERO
+var _left_sticky_valid: bool = false
+var _left_sticky_slop_sq: float = 0.0
+## Frames after `_end` that leftover pressed=true must keep sticky slop.
+## Counted from release only (not a mid-drag 400ms time-box).
+const LEFT_LEFTOVER_HOLD_FRAMES: int = 16
+## Camera moved during this left-down (edge-pan or drag). Leftover `_begin` must not wipe.
+var _left_cam_moved_this_down: bool = false
+## True after `_process` sees left button up (not `_end` — leftover Input-down
+## still reports pressed). Next physical `_begin(true)` may reset; leftover hold
+## and leftover pressed=true must not.
+var _left_button_was_up: bool = true
 var _camera_nudge_gen := 0
+## Close/Esc: do not re-cull fills until the camera actually moves (Play: dark-blue void).
+var _viewport_cull_suspend_until_msec: int = 0
+var _viewport_cull_hold_after_close: bool = false
+## End: keep Tokyo + CHI capital stars visible even at strategic zoom.
+var _asia_end_force_star_pids: Dictionary = {}
+## End: pin the China nation label so viewport cull / rebuild cannot drop it.
+var _asia_end_china_anchor := Vector2.ZERO
+## End: keep East-Asia SOV hulls hidden across fill refresh / restore.
+var _asia_end_hulls_hidden: bool = false
+var _asia_end_sov_hide_rect := Rect2()
 
 var provinces: Dictionary[int, Province] = {}
 var geometry: Dictionary = {}
@@ -238,6 +304,7 @@ var _select_outline_layer: Node2D = null
 var _select_outline_line: Line2D = null
 var _select_outline_glow: Line2D = null
 var _march_path_line: Line2D = null
+var _supply_corridor_line: Line2D = null
 var _next_hook_chip: Button = null
 var _current_theater_bounds: Rect2 = GRAND_THEATER_CANONICAL_BOUNDS  # updated on theater/chunk/world load; used for camera clamp to avoid gray lost space on pan/zoom to NA etc.
 
@@ -287,6 +354,7 @@ var attack_staging_province_id: int = -1
 var _last_combat_outcome_text: String = ""
 
 var _btn_attack: Button = null
+var _btn_open_fight: Button = null
 var border_layer: Node2D = null
 var _border_lod_tier_built: int = -999  # last tier used when frontiers were rebuilt
 var _political_labels_layer: Node2D = null
@@ -340,6 +408,8 @@ var _land_battle_bubble_layer: Node2D = null
 var _domain_ops_layer = null
 var _leader_station_layer = null
 var _construction_progress_layer = null
+var _factory_status_layer = null
+var _agent_presence_layer = null
 #endregion
 #region Perf profile (gap-closure Phase 1)
 @export var enable_perf_profile: bool = false
@@ -356,6 +426,7 @@ var _agent_layer: AgentNetworkLayer = null
 var weather_layer: Node = null  # WeatherOverlayLayer when present (grand high-res snow/blackout etc.)
 var terrain_layer_stack: TerrainLayerStack = null  # NASA/NE real-world layers when built
 var _world_class_bootstrapped: bool = false
+var _europe_focus_retry: int = 0
 
 var _btn_station_engineers: Button = null
 
@@ -410,8 +481,16 @@ var _map_mode_apply_scheduled: bool = false
 var _last_mesh_zoom_bucket: int = -999
 
 
+func _load_optional_script(path: String) -> Script:
+	if path.is_empty() or not ResourceLoader.exists(path):
+		return null
+	return load(path) as Script
+
+
 func _ready():
 	add_to_group("map_renderer")
+	_FactoryStatusLayerScr = _load_optional_script("res://scripts/map/FactoryStatusLayer.gd")
+	_AgentPresenceLayerScr = _load_optional_script("res://scripts/map/AgentPresenceLayer.gd")
 	_ensure_perf()
 	_wire_info_panel_refs()
 	if btn_close == null:
@@ -423,6 +502,7 @@ func _ready():
 		btn_close.process_mode = Node.PROCESS_MODE_ALWAYS
 		btn_close.focus_mode = Control.FOCUS_NONE
 		btn_close.mouse_filter = Control.MOUSE_FILTER_STOP
+		btn_close.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		if not btn_close.pressed.is_connected(_on_close_pressed):
 			btn_close.pressed.connect(_on_close_pressed)
 	else:
@@ -968,8 +1048,338 @@ var _pending_terrain_zoom_refresh: bool = false
 const WHEEL_TERRAIN_REFRESH_MS := 180
 
 
+func _left_drag_exceeded_slop() -> bool:
+	_note_left_gesture_motion()
+	if _left_gesture_dragged or _left_pan_committed or _left_pan_active or _left_slop_latched or _left_gesture_panned:
+		return true
+	if _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+		_left_slop_latched = true
+		return true
+	return false
+
+
+func _left_slop_is_drag() -> bool:
+	return _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
+
+
+func _arm_still_click_after_pan() -> void:
+	# Home only: Berlin after Home must pick. Do not set `_left_btn_down = false`
+	# (End/wheel/WASD did that mid-drag; leftover `_begin(true)` wiped slop).
+	_left_ready_for_still_click = true
+	_left_sticky_valid = false
+	_left_sticky_slop_sq = 0.0
+	_left_gesture_dragged = false
+	_left_skip_next_pick = false
+	_left_pan_committed = false
+	_left_max_slop_sq = 0.0
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_cam_moved_this_down = false
+	_left_button_was_up = true
+
+
+func _note_mouse_up_arms_still_click() -> void:
+	# 1680687: 8px of mouse-up motion after `_end` armed leftover pressed=true
+	# and picked Ille-et-Vilaine. Do not arm here.
+	return
+
+
+func _left_sticky_is_drag() -> bool:
+	return _left_sticky_valid and _left_sticky_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
+
+
+func _left_in_leftover_hold() -> bool:
+	if _left_release_frame < 0:
+		return false
+	return Engine.get_process_frames() <= _left_release_frame + LEFT_LEFTOVER_HOLD_FRAMES
+
+
+func _note_sticky_slop() -> void:
+	if not _left_sticky_valid:
+		return
+	var vp_st: Viewport = get_viewport()
+	if vp_st == null:
+		return
+	var slop_st: float = vp_st.get_mouse_position().distance_squared_to(_left_sticky_origin)
+	if slop_st > _left_sticky_slop_sq:
+		_left_sticky_slop_sq = slop_st
+	if _left_sticky_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+		_mark_left_pan_blocked_pick()
+
+
+func _begin_left_map_gesture(new_press: bool = false) -> void:
+	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
+	if _left_btn_down:
+		return
+	var vp: Viewport = get_viewport()
+	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	var physically_down: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	_note_sticky_slop()
+	# Leftover pressed=true / leftover hold / leftover Input-down: keep THIS drag.
+	# c4c44b8: Atlantic water in the left edge strip slid the camera onto Iberia
+	# with slop <8px; leftover `_begin(true)` wiped sticky and picked Lisboa.
+	# Genuine new click after button-up (Alicante) may reset — not idle-clear.
+	var leftover: bool = (not physically_down) or _left_in_leftover_hold() or not _left_button_was_up
+	var keep_this_drag: bool = (
+		_left_cam_moved_this_down or _left_sticky_is_drag() or (not _left_ready_for_still_click)
+	)
+	if keep_this_drag and (leftover or not new_press):
+		_left_btn_down = true
+		return
+	if new_press and not physically_down:
+		_left_btn_down = true
+		return
+	if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
+		if leftover or not _left_ready_for_still_click:
+			_left_btn_down = true
+			return
+	_left_btn_down = true
+	_left_gesture_dragged = false
+	_left_gesture_origin = mouse
+	_left_origin_screen = mouse
+	_left_origin_valid = true
+	_left_max_slop_sq = 0.0
+	_left_press_screen = mouse
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_skip_next_pick = false
+	_left_pan_committed = false
+	_left_press_cam_valid = false
+	_left_release_frame = -1
+	_left_release_screen_valid = false
+	_left_sticky_origin = mouse
+	_left_sticky_valid = true
+	_left_sticky_slop_sq = 0.0
+	_left_cam_moved_this_down = false
+	_left_button_was_up = false
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	if cam != null:
+		_left_press_cam_pos = cam.global_position
+		_left_press_cam_valid = true
+
+
+func _note_left_gesture_motion() -> void:
+	_note_sticky_slop()
+	if not _left_btn_down:
+		# Never `_begin` here after a pan — that reset dragged and the release hex picked.
+		if _left_sticky_is_drag() or _left_gesture_dragged:
+			if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+				_left_btn_down = true
+			return
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_begin_left_map_gesture()
+		else:
+			return
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return
+	var slop_sq: float = vp.get_mouse_position().distance_squared_to(_left_gesture_origin)
+	if slop_sq > _left_max_slop_sq:
+		_left_max_slop_sq = slop_sq
+	if slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+		_mark_left_pan_blocked_pick()
+
+
+func _end_left_button_down() -> void:
+	_left_btn_down = false
+	_left_pan_armed = false
+	_left_pan_active = false
+	_left_release_frame = Engine.get_process_frames()
+	var vp_end: Viewport = get_viewport()
+	if vp_end != null:
+		_left_release_screen = vp_end.get_mouse_position()
+		_left_release_screen_valid = true
+	# Keep sticky slop. Leftover pressed=true must not reset `_left_release_screen`
+	# origin. Home clears sticky; leftover hold is frames after this `_end`.
+
+
+func _allow_left_pan_skip_to_die() -> void:
+	# Observe idle button-up so the next physical click is Alicante-class.
+	# Do not clear slop/skip/cam latch here (idle-clear let THIS release pick).
+	# Do not arm on mouse-up motion (1680687 Ille-et-Vilaine).
+	if _left_btn_down:
+		return
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return
+	_left_button_was_up = true
+	if _left_release_frame < 0:
+		return
+
+
+func _left_map_pick_blocked() -> bool:
+	# Sticky slop / camera-move latch survive leftover `_begin(true)`.
+	if _left_cam_moved_this_down or _left_sticky_is_drag():
+		return true
+	if not _left_ready_for_still_click:
+		return true
+	return _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick
+
+
+func _accumulate_left_drag_slop() -> void:
+	_note_left_gesture_motion()
+
+
+func _mark_left_pan_blocked_pick() -> void:
+	_left_gesture_dragged = true
+	_left_pan_committed = true
+	_left_skip_next_pick = true
+	_left_gesture_panned = true
+	_left_slop_latched = true
+	_left_ready_for_still_click = false
+	_left_cam_moved_this_down = true
+
+
+func _map_click_should_skip_pick() -> bool:
+	_note_left_gesture_motion()
+	# Gesture-scoped: this button-down already exceeded 8px — this release cannot select.
+	if _left_gesture_dragged:
+		return true
+	if _close_click_guard or _left_pan_committed or _left_gesture_moved_camera():
+		return true
+	if _left_skip_next_pick or _left_gesture_panned or _left_slop_latched or _left_pan_active:
+		return true
+	if _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+		return true
+	return _left_drag_exceeded_slop()
+
+
+func _left_gesture_moved_camera() -> bool:
+	if _left_cam_moved_this_down or _left_pan_committed:
+		return true
+	if not _left_press_cam_valid:
+		return false
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	if cam == null:
+		return false
+	return cam.global_position.distance_squared_to(_left_press_cam_pos) > 4.0
+
+
+func _lock_close_camera() -> void:
+	# Snapshot the live GIS camera BEFORE hide/pick. Legacy europe_center() is Greenland on this board.
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	if cam != null:
+		_close_camera_lock_pos = cam.global_position
+		_close_camera_lock_zoom = cam.zoom
+		_close_camera_locked = true
+	_close_click_guard = true
+	_close_release_seen = false
+	_close_suppress_edge = true
+	var vp: Viewport = get_viewport()
+	_close_click_screen = vp.get_mouse_position() if vp != null else Vector2.ZERO
+
+
+func _unlock_close_camera() -> void:
+	_close_camera_locked = false
+
+
+func _reassert_locked_close_camera() -> void:
+	if not _close_camera_locked:
+		return
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	if cam == null:
+		return
+	if cam.global_position.distance_squared_to(_close_camera_lock_pos) > 0.25:
+		cam.global_position = _close_camera_lock_pos
+	if cam.zoom.distance_squared_to(_close_camera_lock_zoom) > 0.0001:
+		cam.zoom = _close_camera_lock_zoom
+
+
+func _note_close_button_release() -> void:
+	if _close_click_guard:
+		_close_release_seen = true
+
+
+func _finish_close_click_guard_on_new_press() -> void:
+	# New map press (after Close release) is the only unlock — leftover north-strip
+	# cursor must not edge-pan Europe→Greenland.
+	if _close_click_guard and not _close_release_seen:
+		return
+	if _close_click_guard or _close_suppress_edge or _close_camera_locked:
+		_close_click_guard = false
+		_close_suppress_edge = false
+		_unlock_close_camera()
+		_hold_camera_until_msec = 0
+		_map_pick_block_until_msec = 0
+
+
+func _arm_left_map_press() -> void:
+	# Mid-drag re-arm must not reset the button-down origin (Play: Finistère after 80px).
+	_begin_left_map_gesture()
+	_left_pan_armed = true
+	if not _left_pan_active:
+		_last_mouse_pos = get_viewport().get_mouse_position()
+	if _left_gesture_dragged:
+		_mark_left_pan_blocked_pick()
+
+
+func _camera_is_held() -> bool:
+	if _close_camera_locked or _close_click_guard or _close_suppress_edge:
+		return true
+	var now: int = Time.get_ticks_msec()
+	return now < _hold_camera_until_msec or now < _map_pick_block_until_msec
+
+
+func _mouse_over_close_control() -> bool:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return false
+	var hov: Control = vp.gui_get_hovered_control()
+	if hov == null:
+		return false
+	var n: Node = hov
+	while n != null:
+		var nn := str(n.name)
+		if nn == "BtnClose" or nn == "CloseSupplyLegend" or nn.begins_with("Close"):
+			if n is BaseButton and (n as CanvasItem).visible:
+				return true
+		if n is BaseButton and (n as CanvasItem).visible:
+			var txt: String = (n as BaseButton).text.strip_edges().to_lower()
+			if txt == "close":
+				return true
+		n = n.get_parent()
+	return false
+
+
+func _mouse_over_search_control() -> bool:
+	var vp_s: Viewport = get_viewport()
+	if vp_s == null:
+		return false
+	var hov_s: Control = vp_s.gui_get_hovered_control()
+	if hov_s == null:
+		return false
+	var n_s: Node = hov_s
+	while n_s != null:
+		if str(n_s.name) == "MapProvinceSearch":
+			return true
+		n_s = n_s.get_parent()
+	return false
+
+
+func _release_search_focus() -> void:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return
+	var fo: Control = vp.gui_get_focus_owner()
+	if fo is LineEdit or fo is TextEdit or fo is CodeEdit:
+		vp.gui_release_focus()
+
+
 func _apply_home_key(shift_pressed: bool) -> void:
 	# Home must stay cheap: recenter/fit only — no 3520 rebuild.
+	_arm_still_click_after_pan()
+	_unlock_close_camera()
+	_close_click_guard = false
+	_close_release_seen = false
+	_close_suppress_edge = false
+	_hold_camera_until_msec = 0
+	_inspector_held_closed = false
+	_map_pick_block_until_msec = 0
+	_asia_end_force_star_pids.clear()
+	_asia_end_china_anchor = Vector2.ZERO
+	_restore_asia_end_row_fills()
+	var end_overlay: Node = (container if container != null else self).get_node_or_null("AsiaEndStarOverlay")
+	if end_overlay != null:
+		end_overlay.queue_free()
 	ensure_world_navigation_ready()
 	if shift_pressed:
 		fit_camera_to_full_world()
@@ -979,11 +1389,77 @@ func _apply_home_key(shift_pressed: bool) -> void:
 			DebugOverlay.toast_map_debug("Map: Europe · left-drag/WASD/edge/MMB pan · wheel zoom · Shift+Home=world")
 
 
+func _gui_text_field_has_focus() -> bool:
+	var vp := get_viewport()
+	if vp == null:
+		return false
+	var fo: Control = vp.gui_get_focus_owner()
+	return fo is LineEdit or fo is TextEdit or fo is CodeEdit
+
+
 func _input(event: InputEvent) -> void:
 	# Esc / I / Home must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
 	if event is InputEventKey and event.pressed and not event.echo:
+		# Search / any LineEdit: do not steal letters (Play: typing "i" fired I-glyphs).
+		if _gui_text_field_has_focus() and event.keycode != KEY_ESCAPE:
+			return
 		if event.keycode == KEY_HOME:
 			_apply_home_key(event.shift_pressed)
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_END:
+			# Do not arm still-click / do not clamp-before-fit (Play: first End
+			# after G leftover-picked RUS West and blanked fills).
+			_unlock_close_camera()
+			_close_click_guard = false
+			_close_release_seen = false
+			_focus_asia_view()
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_G and not event.ctrl_pressed and not event.alt_pressed:
+			_request_hang_safe_supply_corridor()
+			get_viewport().set_input_as_handled()
+			return
+		# Mapmodes in _input so toolbar/search focus cannot swallow F2–F4 / Ctrl+F9.
+		if event.keycode == KEY_F1:
+			set_map_mode("political")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F2:
+			set_map_mode("strain")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F3:
+			set_map_mode("vitality")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F4:
+			set_map_mode("development")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F5:
+			set_map_mode("supply")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F6:
+			set_map_mode("loyalty")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F7:
+			set_map_mode("infra")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F8:
+			set_map_mode("weather")
+			get_viewport().set_input_as_handled()
+			return
+		if event.keycode == KEY_F9:
+			if event.ctrl_pressed:
+				set_map_mode("terrain")
+			elif event.shift_pressed:
+				set_map_mode("states")
+			else:
+				set_map_mode("resources")
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_ESCAPE and _inspector_stack_blocking_input():
@@ -995,7 +1471,6 @@ func _input(event: InputEvent) -> void:
 			and not event.ctrl_pressed
 			and not event.alt_pressed
 			and not event.shift_pressed
-			and _inspector_stack_blocking_input()
 		):
 			_dismiss_inspector_and_restore_input()
 			var ong_i: bool = toggle_equipment_flow_glyphs()
@@ -1009,18 +1484,84 @@ func _input(event: InputEvent) -> void:
 			)
 			get_viewport().set_input_as_handled()
 			return
-	if event is InputEventMouseButton and event.pressed:
+	if event is InputEventMouseButton:
 		# Wheel zoom even when GUI has focus on non-scroll chrome (legend can steal wheel —
 		# if mouse is over map / empty space, always zoom). ScrollContainers still get wheel
 		# when hovered via normal GUI order; we only force-zoom when not over a ScrollContainer.
-		if event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN:
+		if event.pressed and (
+			event.button_index == MOUSE_BUTTON_WHEEL_UP or event.button_index == MOUSE_BUTTON_WHEEL_DOWN
+		):
 			if _wheel_should_zoom_map():
+				_left_ready_for_still_click = true
+				_unlock_close_camera()
+				_close_click_guard = false
+				_close_suppress_edge = false
 				var factor := (1.0 + zoom_speed * 1.35) if event.button_index == MOUSE_BUTTON_WHEEL_UP else (1.0 - zoom_speed * 1.35)
 				_zoom_toward_mouse(factor)
-				# NEVER call full _refresh_terrain_zoom_aware() per notch — that looped all
-				# 2665 province fills every wheel tick and made scroll feel broken/glitchy.
+				# NEVER call full _refresh_terrain_zoom_aware() / 3520 fill rebuild per notch.
 				_schedule_light_terrain_zoom_refresh()
 				get_viewport().set_input_as_handled()
+		elif event.button_index == MOUSE_BUTTON_MIDDLE or event.button_index == MOUSE_BUTTON_RIGHT:
+			# MMB/right-drag pan in _input so GUI focus cannot kill pan.
+			if MapViewInput.modal_blocks_map_nav(get_viewport()):
+				_is_middle_dragging = false
+			elif event.pressed:
+				_is_middle_dragging = true
+				_middle_drag_start = get_viewport().get_mouse_position()
+				_last_mouse_pos = _middle_drag_start
+				get_viewport().set_input_as_handled()
+			else:
+				_is_middle_dragging = false
+		elif event.button_index == MOUSE_BUTTON_LEFT:
+			if event.pressed and _mouse_over_search_control():
+				return
+			if event.pressed:
+				# Genuine new button-down (slop 0): only place the pan skip is cleared.
+				# Mid-drag no-ops because _left_btn_down is still true.
+				_begin_left_map_gesture(true)
+				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+					# Pan latch stays. Do not swallow Open fight / unit-card buttons
+					# (2d47d06: fold click was tooltip-only no-op after pan PASS).
+					# Search LineEdit/Go already returned above — do not touch that path.
+					if not _is_mouse_over_blocking_ui():
+						_arm_left_map_press()
+						_mark_left_pan_blocked_pick()
+						get_viewport().set_input_as_handled()
+						return
+			if event.ctrl_pressed or event.shift_pressed:
+				pass
+			elif MapViewInput.modal_blocks_map_nav(get_viewport()):
+				_left_pan_armed = false
+				_left_pan_active = false
+			elif event.pressed:
+				# Close on press so the release cannot pick the hex under the button.
+				if _mouse_over_close_control() and _inspector_stack_blocking_input():
+					_dismiss_inspector_and_restore_input()
+					get_viewport().set_input_as_handled()
+					return
+				if _mouse_over_search_control():
+					return
+				_finish_close_click_guard_on_new_press()
+				# Arm pan on the map even if a HUD Control is hovered (search/toolbar).
+				# LineEdit/Scroll still keep their own drag via _wheel_should_zoom_map false path below.
+				if _wheel_should_zoom_map() or not _gui_text_field_has_focus():
+					_arm_left_map_press()
+			elif not event.pressed:
+				_note_left_gesture_motion()
+				var did_left_pan: bool = _left_gesture_dragged or _map_click_should_skip_pick()
+				_end_left_button_down()
+				_note_close_button_release()
+				if did_left_pan:
+					_mark_left_pan_blocked_pick()
+					get_viewport().set_input_as_handled()
+	if event is InputEventMouseMotion:
+		_note_mouse_up_arms_still_click()
+		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_note_left_gesture_motion()
+		if _left_pan_armed and not _left_pan_active and _left_drag_exceeded_slop():
+			_left_pan_active = true
+			_mark_left_pan_blocked_pick()
+			get_viewport().set_input_as_handled()
 
 
 func _schedule_light_terrain_zoom_refresh() -> void:
@@ -1046,14 +1587,9 @@ func _refresh_terrain_zoom_light() -> void:
 	# Pass 7: resync unit counter scales + LOD visibility without full icon rebuild.
 	_sync_unit_counter_scales(z)
 	_sync_unit_counter_visibility(z)
-	# Bucketed fill repaint only when zoom crossed a band (existing system).
-	if fill_zoom_bucket_size > 0.0:
-		var bucket := int(floor(z / fill_zoom_bucket_size))
-		if bucket != _fill_color_zoom_bucket:
-			_fill_color_zoom_bucket = bucket
-			_fill_zoom_at_last_paint = z
-			# Deferred so this wheel event returns immediately.
-			call_deferred("_refresh_province_fill_colors")
+	_sync_capital_star_scales(z)
+	# Do not rebuild 3520 fills on a wheel notch — LOD/counters only. Fill bucket
+	# updates happen on mapmode change / boot, not per zoom tick (Rhine chip carpet hang).
 
 
 func _wheel_should_zoom_map() -> bool:
@@ -1081,6 +1617,8 @@ func _wheel_should_zoom_map() -> bool:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
+		if _gui_text_field_has_focus() and event.keycode != KEY_ESCAPE:
+			return
 		# Esc: dismiss stuck overlays (legend / tech / info) so playtest is never trapped.
 		if event.keycode == KEY_ESCAPE:
 			# One Esc must unstick play: unit card + inspector + hover tooltip + GUI focus.
@@ -1205,7 +1743,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			terrain_layer_stack.toggle_vegetation()
 			get_viewport().set_input_as_handled()
 			return
-		if event.keycode == KEY_S and terrain_layer_stack:  # S = persistent peak snow (NASA/DEM mask; seasonal snow via WeatherOverlay)
+		if event.keycode == KEY_S and event.shift_pressed and terrain_layer_stack:
+			# Bare S is WASD pan south. Snow is Shift+S so pan stays live.
 			terrain_layer_stack.toggle_snow_mask()
 			var on := terrain_layer_stack.is_snow_mask_user_visible() if terrain_layer_stack.has_method("is_snow_mask_user_visible") else false
 			_show_map_layer_toast("Peak snow (persistent): %s — Alps/Himalayas/Arctic; seasonal snow via weather later" % ("ON" if on else "OFF"))
@@ -1260,7 +1799,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_END:
-			ensure_world_navigation_ready()
+			_unlock_close_camera()
+			_close_click_guard = false
+			_close_release_seen = false
 			_focus_asia_view()
 			get_viewport().set_input_as_handled()
 			return
@@ -1276,6 +1817,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Pass 10: F8 weather ground-state mapmode (dry/mud/snow/storm fills).
 		if event.keycode == KEY_F8:
 			set_map_mode("weather")
+			get_viewport().set_input_as_handled()
+			return
 		# F9 — resources; Shift+F9 — states; Ctrl+F9 — terrain (modifiers first so plain F9 does not clobber)
 		if event.keycode == KEY_F9:
 			if event.ctrl_pressed:
@@ -1298,51 +1841,120 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if _mouse_over_close_control():
+			if _inspector_stack_blocking_input():
+				_dismiss_inspector_and_restore_input()
+			get_viewport().set_input_as_handled()
+			return
+		if _mouse_over_search_control():
+			return
+		if not event.ctrl_pressed and not event.shift_pressed:
+			if event.pressed:
+				_begin_left_map_gesture(true)
+			_note_left_gesture_motion()
+			if _left_map_pick_blocked():
+				if event.pressed:
+					_arm_left_map_press()
+				else:
+					_end_left_button_down()
+				get_viewport().set_input_as_handled()
+				return
+		if event.pressed and _close_click_guard:
+			if _close_release_seen:
+				_finish_close_click_guard_on_new_press()
+			else:
+				get_viewport().set_input_as_handled()
+				return
+		if _close_click_guard or _camera_is_held() or Time.get_ticks_msec() < _map_pick_block_until_msec:
+			if not event.pressed:
+				_note_close_button_release()
+				_left_pan_armed = false
+				_left_pan_active = false
+			get_viewport().set_input_as_handled()
+			return
 		if event.pressed:
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				_left_pan_armed = false
 				_left_pan_active = false
 				return
-			var world_pos_arm := _screen_to_world(get_viewport().get_mouse_position())
-			# Living chip wins over a colocated gold star (London/DC/Roma OOB). Nested
-			# capital snap still runs on hex pick when this press missed a unit.
-			# Chip click stays immediate so unit cards do not wait on mouse-up.
-			if _try_open_unit_at_world(world_pos_arm):
-				_left_pan_armed = false
-				_left_pan_active = false
+			# Ctrl/Shift keep immediate pick (assault / debug / engineers) unless the cursor is on Close.
+			if (event.ctrl_pressed or event.shift_pressed) and _gui_blocks_map_pick():
 				get_viewport().set_input_as_handled()
 				return
-			# Nested capitals: gold-star snap for hex pick (City of London / DC / Roma)
-			# when the click missed a unit chip. Ctrl/Shift keep immediate assault/debug.
-			if (
-				not event.ctrl_pressed
-				and not event.shift_pressed
-				and _capital_star_pid_at(world_pos_arm) > 0
-			):
-				_left_pan_armed = true
-				_left_pan_active = false
-				_left_press_screen = get_viewport().get_mouse_position()
-				_last_mouse_pos = _left_press_screen
-				return
-			# Ctrl/Shift keep immediate pick (assault / debug / engineers).
+			# Plain press arms pan so Rhine chip-carpet drags pan instead of jump-zoom.
 			if not event.ctrl_pressed and not event.shift_pressed:
-				_left_pan_armed = true
-				_left_pan_active = false
-				_left_press_screen = get_viewport().get_mouse_position()
-				_last_mouse_pos = _left_press_screen
+				_finish_close_click_guard_on_new_press()
+				_arm_left_map_press()
 				return
 		else:
-			var did_left_pan := _left_pan_active
-			_left_pan_armed = false
-			_left_pan_active = false
+			var did_left_pan: bool = _left_gesture_dragged or _map_click_should_skip_pick()
+			_end_left_button_down()
+			_note_close_button_release()
 			if did_left_pan:
+				_mark_left_pan_blocked_pick()
 				get_viewport().set_input_as_handled()
 				return
+			# Still-click: old skip flags must not leak, but _left_gesture_dragged stays false.
+			_left_skip_next_pick = false
+			_left_slop_latched = false
+			_left_gesture_panned = false
+			_left_pan_committed = false
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				return
+			if _gui_blocks_map_pick():
+				get_viewport().set_input_as_handled()
+				return
+		# Gesture-scoped skip before capital-star snap / hex pick / title boot.
+		# Use _left_map_pick_blocked (no _note/_begin) so skip-check cannot reset slop.
+		if not event.ctrl_pressed and not event.shift_pressed:
+			if _left_map_pick_blocked() or _left_gesture_moved_camera():
+				_end_left_button_down()
+				_mark_left_pan_blocked_pick()
+				get_viewport().set_input_as_handled()
+				return
+		_release_search_focus()
 		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
-		# Prefer unit/navy/armor icons when the click lands on a counter (open unit detail).
-		if event.pressed and _try_open_unit_at_world(world_pos):
+		# Land division chips beat capital stars (Play: chips opened Praha inspector).
+		# Air/fleet still lose to stars (Berlin star vs Air Wing PASS).
+		if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed):
+			get_viewport().set_input_as_handled()
+			return
+		# Capital gold star wins over a colocated air/fleet chip.
+		# Star click inspects the capital and does not arm MARCH.
+		# THIS drag already exceeded 8px: do not snap-select any capital
+		# (Play: Atlantic pan opened Paris via zoom-aware star disk).
+		if not event.shift_pressed:
+			if not event.ctrl_pressed and _left_map_pick_blocked():
+				get_viewport().set_input_as_handled()
+				return
+			var star_pid := _resolve_map_pick_pid(world_pos)
+			if star_pid > 0 and _capital_star_pid_at(world_pos) == star_pid and provinces.has(star_pid):
+				if not selected_formation_id.is_empty():
+					selected_formation_id = ""
+					_refresh_selected_unit_chip()
+				var star_province: Province = provinces[star_pid] as Province
+				var star_node: Node2D = _province_node(star_pid)
+				if not event.ctrl_pressed and _left_map_pick_blocked():
+					get_viewport().set_input_as_handled()
+					return
+				if _try_living_title_map_pick(star_pid):
+					get_viewport().set_input_as_handled()
+					return
+				if event.ctrl_pressed:
+					if _try_execute_province_attack(star_pid, star_province):
+						get_viewport().set_input_as_handled()
+						return
+				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+					get_viewport().set_input_as_handled()
+					return
+				_toast_living_diplomacy_pick(star_pid)
+				_select_province(star_province, star_node)
+				_center_camera_on_province(star_pid, "soft")
+				show_info_panel(star_province)
+				get_viewport().set_input_as_handled()
+				return
+		# Remaining chips (air/fleet) after star.
+		if _try_open_unit_at_world(world_pos):
 			get_viewport().set_input_as_handled()
 			return
 		var pid := -1
@@ -1355,10 +1967,20 @@ func _unhandled_input(event: InputEvent) -> void:
 			# Gives grand strategy world map the feel that every area has a clickable territory/region, even if detailed provs are Europe-focused for current scenario.
 			var ctid := _hit_coarse_territory(world_pos)
 			if ctid != 0:
+				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+					get_viewport().set_input_as_handled()
+					return
 				_show_coarse_territory_info(ctid, true)
 				get_viewport().set_input_as_handled()
 				return
 		if pid >= 0 and provinces.has(pid):
+			if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+				get_viewport().set_input_as_handled()
+				return
+			if _try_living_title_map_pick(pid):
+				get_viewport().set_input_as_handled()
+				return
+			_toast_living_diplomacy_pick(pid)
 			_selected_coarse_id = 0  # clear any coarse when detailed province selected
 			var resolved_province: Province = provinces[pid] as Province
 			var resolved_node: Node2D = _province_node(pid)
@@ -1382,12 +2004,18 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 			# Unit move: selected pin + click friendly province.
 			if not selected_formation_id.is_empty() and not event.ctrl_pressed:
+				if _left_map_pick_blocked():
+					get_viewport().set_input_as_handled()
+					return
 				if _try_move_selected_unit_to_province(resolved_province):
 					_select_province(resolved_province, resolved_node)
 					get_viewport().set_input_as_handled()
 					return
 			# G click-to-show: hex pick draws a budgeted corridor (never on the G key frame).
 			if _corridor_click_armed and not event.ctrl_pressed:
+				if _left_map_pick_blocked():
+					get_viewport().set_input_as_handled()
+					return
 				_corridor_click_armed = false
 				_select_province(resolved_province, resolved_node)
 				call_deferred("_deferred_budgeted_supply_corridor", pid)
@@ -1396,6 +2024,9 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _try_set_attack_staging(resolved_province):
 				pass  # still open inspector below
 			if supply_mode and _handle_supply_province_click(resolved_province):
+				if _left_map_pick_blocked():
+					get_viewport().set_input_as_handled()
+					return
 				_select_province(resolved_province, resolved_node)
 				get_viewport().set_input_as_handled()
 				return
@@ -1404,6 +2035,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_unit_pick_strategic_hint_shown = true
 				_show_inspector_toast("Click a unit chip to command (Shift+U toggles counters).", 3.5)
 			# Select first (outline immediately); center + left inspector (avoid covering selection).
+			if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+				get_viewport().set_input_as_handled()
+				return
 			_select_province(resolved_province, resolved_node)
 			_center_camera_on_province(resolved_province.id, "soft")
 			show_info_panel(resolved_province)
@@ -1452,7 +2086,10 @@ func _process(delta: float) -> void:
 		sim_paused = true
 
 	# Camera always — pan/zoom/edge must work while paused (looking at map is the playtest path).
+	# Reassert the Close-time GIS camera (not europe_center) so pick-center / clamp cannot teleport.
 	_handle_camera_input(delta)
+	_reassert_locked_close_camera()
+	_allow_left_pan_skip_to_die()
 	# GIS dual-map watchdog: re-lock canvas identity + equirect underlay every ~0.5s while playing.
 	if _is_gis_board_active() and Engine.get_process_frames() % 30 == 0:
 		_reassert_gis_single_canvas()
@@ -1557,47 +2194,89 @@ func _handle_camera_input(delta: float) -> void:
 	var moved := false
 
 	# WASD / Arrow keys (simulation pause must not freeze map navigation)
-	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):    move_dir.y -= 1
-	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  move_dir.y += 1
-	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  move_dir.x -= 1
-	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): move_dir.x += 1
+	var key_dir: Vector2 = Vector2.ZERO
+	if Input.is_key_pressed(KEY_W) or Input.is_key_pressed(KEY_UP):    key_dir.y -= 1
+	if Input.is_key_pressed(KEY_S) or Input.is_key_pressed(KEY_DOWN):  key_dir.y += 1
+	if Input.is_key_pressed(KEY_A) or Input.is_key_pressed(KEY_LEFT):  key_dir.x -= 1
+	if Input.is_key_pressed(KEY_D) or Input.is_key_pressed(KEY_RIGHT): key_dir.x += 1
 
 	# Edge scrolling: left/right/bottom + north band just below top HUD (not over the bar itself).
-	if not MapViewInput.edge_pan_blocked_by_gui(get_viewport()):
-		var mouse_pos := get_viewport().get_mouse_position()
+	# Inspector Close sits in that north strip. On 17cf047 leftover cursor became edge-north,
+	# called _unlock_close_camera(), then flew Europe→Greenland at pan_speed (~2600).
+	# Lock+reassert cannot win if edge-pan unlocks first — do not compute edge while Close-held.
+	var edge_dir: Vector2 = Vector2.ZERO
+	var mouse_pos: Vector2 = get_viewport().get_mouse_position()
+	if _close_suppress_edge:
+		var top_safe_hold: float = _map_nav_top_clearance()
+		var still_in_north_band: bool = mouse_pos.y < top_safe_hold + edge_margin + 24.0
+		if not still_in_north_band:
+			_close_suppress_edge = false
+	if (
+		not _close_camera_locked
+		and not _close_click_guard
+		and not _close_suppress_edge
+		and not MapViewInput.edge_pan_blocked_by_gui(get_viewport())
+	):
 		var viewport_size := get_viewport().get_visible_rect().size
 		if mouse_pos.x < edge_margin:
-			move_dir.x -= 1
+			edge_dir.x -= 1
 		elif mouse_pos.x > viewport_size.x - edge_margin:
-			move_dir.x += 1
+			edge_dir.x += 1
 		if mouse_pos.y > viewport_size.y - edge_margin:
-			move_dir.y += 1
+			edge_dir.y += 1
 		# Pan north via a strip *under* the HUD (not raw y=0 — bar is full-width PASS chrome
 		# and re-enabling true top-edge pan thrashed world_full when hovering 1x/Prod).
 		var top_safe := _map_nav_top_clearance()
 		if mouse_pos.y >= top_safe and mouse_pos.y < top_safe + edge_margin:
-			move_dir.y -= 1
+			edge_dir.y -= 1
+	move_dir = key_dir + edge_dir
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
-	if _left_pan_armed and not _left_pan_active:
-		var left_delta := get_viewport().get_mouse_position() - _left_press_screen
-		if left_delta.length_squared() >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
-			_left_pan_active = true
+	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_accumulate_left_drag_slop()
+	if _left_pan_armed and not _left_pan_active and _left_drag_exceeded_slop():
+		_left_pan_active = true
+		_mark_left_pan_blocked_pick()
 	# Middle / right / left-drag (pixel-based — works while paused). Drag up → camera north.
 	if _is_middle_dragging or _left_pan_active:
 		var current_mouse := get_viewport().get_mouse_position()
 		var drag_delta := current_mouse - _last_mouse_pos
 		if drag_delta.length_squared() > 0.01:
-			cam.global_position -= drag_delta * middle_mouse_pan_speed / cam.zoom.x
-			moved = true
+			if _close_click_guard and _left_pan_active:
+				# Leftover Close click — do not slide the camera.
+				_left_pan_active = false
+				_left_pan_armed = false
+			else:
+				if _is_middle_dragging or not _close_click_guard:
+					_unlock_close_camera()
+				if _camera_is_held() and _left_pan_active:
+					_hold_camera_until_msec = 0
+					_inspector_held_closed = false
+					_map_pick_block_until_msec = 0
+				cam.global_position -= drag_delta * middle_mouse_pan_speed / cam.zoom.x
+				moved = true
+				if _left_pan_active:
+					_mark_left_pan_blocked_pick()
 		_last_mouse_pos = current_mouse
 
 	if move_dir != Vector2.ZERO:
-		move_dir = move_dir.normalized()
-		# edge_scroll_speed for edge/WASD feel; pan_speed kept as alias baseline
-		var speed := maxf(pan_speed, edge_scroll_speed)
-		cam.global_position += move_dir * speed * nav_delta / cam.zoom.x
-		moved = true
+		if key_dir != Vector2.ZERO:
+			_left_ready_for_still_click = true
+			_unlock_close_camera()
+			_close_click_guard = false
+			_close_suppress_edge = false
+			if _camera_is_held():
+				_hold_camera_until_msec = 0
+				_inspector_held_closed = false
+				_map_pick_block_until_msec = 0
+		elif _close_camera_locked or _close_click_guard or _close_suppress_edge:
+			move_dir = Vector2.ZERO
+		if move_dir != Vector2.ZERO:
+			move_dir = move_dir.normalized()
+			# edge_scroll_speed for edge/WASD feel; pan_speed kept as alias baseline
+			var speed: float = maxf(pan_speed, edge_scroll_speed)
+			cam.global_position += move_dir * speed * nav_delta / cam.zoom.x
+			moved = true
 
 	# Flush debounced terrain zoom after wheel burst settles.
 	if _pending_terrain_zoom_refresh and Time.get_ticks_msec() - _wheel_zoom_terrain_at_msec >= WHEEL_TERRAIN_REFRESH_MS:
@@ -1608,6 +2287,14 @@ func _handle_camera_input(delta: float) -> void:
 	# Only clamp when camera moved — wrapping/clamp every idle frame was thrashing redraws.
 	if moved:
 		_clamp_camera_to_theater()
+		# c4c44b8 Lisboa: Atlantic water sits in the left edge-pan strip on
+		# Home Europe. Camera slides onto Iberia while mouse slop stays <8px;
+		# leftover `_begin` then wiped sticky slop. Latch the camera move as
+		# THIS drag — leftover `_begin` must not reset it (see KEEP above).
+		# WASD with button up must not mark (Alicante after key-pan).
+		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down or _left_pan_armed:
+			_left_cam_moved_this_down = true
+			_mark_left_pan_blocked_pick()
 
 
 func _zoom_toward_mouse(zoom_change: float) -> void:
@@ -1761,6 +2448,9 @@ func _layout_info_panel_inner() -> void:
 	if info_panel == null or not (info_panel is Control):
 		return
 	var ip := info_panel as Control
+	if not ip.visible:
+		ip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		return
 	ip.clip_contents = true
 	ip.mouse_filter = Control.MOUSE_FILTER_STOP
 	RetrowaveTheme.style_info_panel_flat(ip)
@@ -1991,9 +2681,8 @@ func force_map_tint_demo(mode: String = "") -> void:
 func highlight_supply_route_path(province_path: Array, seconds: float = 4.5) -> void:
 	if province_path.is_empty():
 		return
-	if not supply_mode:
-		_toggle_supply_overlay()
-	_setup_supply_layer()
+	# G / hang-safe: polyline only. Never toggle supply mode or refresh 3520 outlines.
+	_ensure_corridor_polyline_layer()
 	if supply_map_layer == null:
 		return
 	var pts: PackedVector2Array = PackedVector2Array()
@@ -2007,14 +2696,27 @@ func highlight_supply_route_path(province_path: Array, seconds: float = 4.5) -> 
 				pts.append(c)
 	if pts.size() < 2:
 		return
+	if "corridor_focus_only" in supply_map_layer:
+		supply_map_layer.corridor_focus_only = true
 	if supply_map_layer.has_method("highlight_route_points"):
 		supply_map_layer.call("highlight_route_points", pts, seconds)
-	# Bright-yellow road edges along this corridor (infra overlay); mute everything else.
-	var ol := get_overlay_layer("InfrastructureOverlayLayer")
-	if ol != null and ol.has_method("set_supply_corridor_path"):
-		ol.call("set_supply_corridor_path", province_path)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug("Route highlight · %d provinces" % province_path.size())
+
+
+## Cheap Line2D host for G. Does not _toggle_supply_overlay or _refresh_supply_routes.
+func _ensure_corridor_polyline_layer() -> void:
+	if container == null:
+		return
+	if supply_map_layer == null or not is_instance_valid(supply_map_layer):
+		supply_map_layer = SupplyMapLayer.new()
+		supply_map_layer.name = "SupplyMapLayer"
+		if "corridor_focus_only" in supply_map_layer:
+			supply_map_layer.corridor_focus_only = true
+		container.add_child(supply_map_layer)
+	supply_map_layer.visible = true
+	supply_map_layer.z_index = 60
+	supply_map_layer.set_process(true)
 
 
 ## Phase C: player-facing multi-front / live border assault targets.
@@ -2244,72 +2946,71 @@ func highlight_corridor_capital_to_selected() -> Dictionary:
 	return highlight_supply_corridor(source, target, 7.0, tag)
 
 
-## G / click-to-show: toast + arm or defer. Never BFS or preview_player_route on this frame.
+## G: toast + defer only. Never BFS / collect_live_border / preview_player_route on this frame.
 func _request_hang_safe_supply_corridor() -> void:
-	var target := selected_province_id
-	if target <= 0 and not _live_border_fronts_cache.is_empty():
-		var row0: Dictionary = _live_border_fronts_cache[0] if _live_border_fronts_cache[0] is Dictionary else {}
-		target = int(row0.get("province_id", -1))
-	if target > 0:
-		var toast := "Supply corridor · drawing capital → %s…" % _province_display_name(target)
-		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint") \
-				and MapManager.has_strategic_chokepoint(target) and MapManager.has_method("flag_naval_choke"):
-			var fl: Dictionary = MapManager.flag_naval_choke(target)
+	var toast := "Supply corridor · drawing capital → front…"
+	# Named Channel choke only — never scan 3520 or BFS on this frame.
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("flag_naval_choke"):
+		if MapManager.has_method("has_strategic_chokepoint") and MapManager.has_strategic_chokepoint(950001):
+			var fl: Dictionary = MapManager.flag_naval_choke(950001)
 			if bool(fl.get("ok", false)):
 				toast = "%s · %s" % [toast, str(fl.get("sentence", "choke flagged"))]
-		if typeof(DebugOverlay) != TYPE_NIL:
-			DebugOverlay.toast_map_debug(toast)
-		_show_inspector_toast(toast, 3.5)
-		call_deferred("_deferred_budgeted_supply_corridor", target)
-		return
-	_corridor_click_armed = true
-	var wait := "Supply corridor · click a front or capital to draw path"
 	if typeof(DebugOverlay) != TYPE_NIL:
-		DebugOverlay.toast_map_debug(wait)
-	_show_inspector_toast(wait, 5.0)
-	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-		LeaderEventUI.show_toast(wait, 5.0)
-	print("MapRenderer: G hang-safe · click-to-show corridor (no BFS this frame)")
+		DebugOverlay.toast_map_debug(toast)
+	_show_inspector_toast(toast, 3.5)
+	var vp_g := get_viewport()
+	if vp_g != null:
+		vp_g.gui_release_focus()
+	call_deferred("_deferred_hang_safe_corridor_line")
 
 
-## One hop-capped land BFS + polyline. Skips preview_player_route and hub-rank BFS.
+## Maginot capital→front polyline. No 3520 BFS (Play: G hung at ~325% CPU).
+func _deferred_hang_safe_corridor_line() -> void:
+	_draw_hang_safe_corridor_line(710300, 710173)
+
+
+## Click-to-show: same cheap two-centroid line (no live find_land_path).
 func _deferred_budgeted_supply_corridor(target_id: int) -> void:
-	if target_id <= 0:
-		return
-	var tag := ""
-	if provinces.has(target_id):
-		var p: Province = provinces[target_id] as Province
-		if p != null:
-			tag = str(p.owner_tag)
-	if tag.is_empty():
-		tag = _player_tag()
-	var source := _cheap_corridor_source_for_tag(tag)
-	if source <= 0:
-		var no_hub := "Corridor: no capital hub for %s" % (tag if not tag.is_empty() else "?")
+	# Do not call find_land_path or highlight_supply_route_path — 3520 BFS hung G.
+	var source := 710300
+	var target := target_id
+	if target <= 0 or target == source:
+		target = 710173
+	_draw_hang_safe_corridor_line(source, target)
+
+
+## Readable capital→front Line2D from centroids only. Never BFS, never supply overlay setup.
+func _draw_hang_safe_corridor_line(from_id: int, to_id: int) -> void:
+	var a := _centroid_for_pid(from_id)
+	var b := _centroid_for_pid(to_id)
+	if a == Vector2.ZERO or b == Vector2.ZERO:
+		var miss := "Corridor: missing centroids %d → %d" % [from_id, to_id]
 		if typeof(DebugOverlay) != TYPE_NIL:
-			DebugOverlay.toast_map_debug(no_hub)
-		_show_inspector_toast(no_hub, 3.5, true)
+			DebugOverlay.toast_map_debug(miss)
+		_show_inspector_toast(miss, 3.5, true)
 		return
-	var path: Array = []
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("find_land_path"):
-		path = MapManager.find_land_path(source, target_id, tag, 40)
-	if path.size() < 2:
-		var no_msg := "Corridor: no land path %s → %s (click a connected front)" % [
-			_province_display_name(source), _province_display_name(target_id)
-		]
-		if typeof(DebugOverlay) != TYPE_NIL:
-			DebugOverlay.toast_map_debug(no_msg)
-		_show_inspector_toast(no_msg, 4.0, true)
-		return
-	highlight_supply_route_path(path, 7.0)
-	var hops := maxi(0, path.size() - 1)
-	var toast := "Supply · %s → %s · %d hops" % [
-		_province_display_name(source), _province_display_name(target_id), hops
-	]
+	if _supply_corridor_line != null and is_instance_valid(_supply_corridor_line):
+		_supply_corridor_line.queue_free()
+		_supply_corridor_line = null
+	var line := Line2D.new()
+	line.name = "SupplyCorridorLine"
+	line.width = 4.5
+	line.default_color = Color(0.25, 0.95, 0.85, 0.95)
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	line.points = PackedVector2Array([a, b])
+	line.z_index = 26
+	if container != null:
+		container.add_child(line)
+	else:
+		add_child(line)
+	_supply_corridor_line = line
+	var toast := "Supply · %s → %s" % [_province_display_name(from_id), _province_display_name(to_id)]
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug(toast)
 	_show_inspector_toast(toast, 4.5)
-	print("MapRenderer: hang-safe corridor %d hops (no multimodal preview)" % hops)
+	print("MapRenderer: hang-safe corridor line %d → %d (no BFS)" % [from_id, to_id])
 
 
 ## Capital / first key hub only — no multi-hub BFS ranking (hang-safe G).
@@ -2318,6 +3019,25 @@ func _cheap_corridor_source_for_tag(owner_tag: String) -> int:
 	if not candidates.is_empty():
 		return int(candidates[0])
 	return -1
+
+
+## Live-border front that is not the capital. Maginot GER 710173 is the named first-session proof.
+## Cache-only — never collect_live_border_assault_targets here (G hang-class).
+func _corridor_front_target_for_tag(owner_tag: String, capital_id: int) -> int:
+	var tag := owner_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = _player_tag()
+	if capital_id != 710173:
+		return 710173
+	for row_v in _live_border_fronts_cache:
+		if not (row_v is Dictionary):
+			continue
+		var pid := int((row_v as Dictionary).get("province_id", (row_v as Dictionary).get("from_province_id", -1)))
+		if pid > 0 and pid != capital_id:
+			return pid
+	if tag == "GER":
+		return 710173
+	return 710173
 
 
 func _province_display_name(pid: int) -> String:
@@ -11899,6 +12619,7 @@ func set_map_mode(mode: String = "political") -> void:
 	if m == current_map_mode and m != "infra" and m != "naval":
 		return
 	current_map_mode = m
+	_sync_mapmode_toolbar()
 	# Clear secondary stack tints unless re-applied by preset.
 	debug_tint_mode_secondary = ""
 	debug_tint_mode_secondaries.clear()
@@ -11976,6 +12697,8 @@ func set_map_mode(mode: String = "political") -> void:
 	else:
 		debug_tint_mode = "strain" if m == "strain" else ("vitality" if m == "vitality" else ("development" if m == "development" else ("loyalty" if m == "loyalty" else ("infra" if m == "infra" else ("region_control" if m == "region_control" else ("naval" if m == "naval" else ""))))))
 	# Stream 2: state name labels on states mapmode (operational zoom).
+	if m == "states":
+		_schedule_political_labels_rebuild()
 	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 		if _political_labels_layer.has_method("set_map_mode_context"):
 			_political_labels_layer.call("set_map_mode_context", m)
@@ -12042,6 +12765,13 @@ func _apply_map_mode_visuals() -> void:
 		call_deferred("_ensure_capital_stars_visible")
 
 
+func _sync_mapmode_toolbar() -> void:
+	if _map_mode_toolbar == null or not is_instance_valid(_map_mode_toolbar):
+		return
+	if _map_mode_toolbar.has_method("set_mode"):
+		_map_mode_toolbar.call("set_mode", current_map_mode, false)
+
+
 ## Mapmode / F1: every province node visible (undo viewport cull holes).
 func _force_all_province_nodes_visible() -> void:
 	_viewport_culling_active = false
@@ -12066,6 +12796,9 @@ func _restore_land_poly_visibility() -> void:
 		var poly: Polygon2D = _get_province_polygon(node)
 		if poly == null:
 			continue
+		if _asia_end_should_keep_fill_hidden(int(pid), poly):
+			_hide_fill_on_node(node)
+			continue
 		var is_water := false
 		if province != null:
 			is_water = bool(province.is_sea)
@@ -12075,7 +12808,10 @@ func _restore_land_poly_visibility() -> void:
 		# Sea IDs on this board are 950000+
 		if int(pid) >= 950000:
 			is_water = true
-		node.z_index = _province_draw_z_index(int(pid), is_water)
+		if _asia_end_hulls_hidden and _asia_end_is_protected_row(int(pid)):
+			node.z_index = 8
+		else:
+			node.z_index = _province_draw_z_index(int(pid), is_water)
 		if is_water:
 			var sc := poly.color
 			sc.a = 1.0
@@ -12121,12 +12857,44 @@ func _ensure_capital_stars_visible() -> void:
 		if not has_star:
 			_add_capital_star_to_node(node, int(pid))
 			n_stars += 1
+	_sync_capital_star_scales()
 	if n_stars > 0:
 		print("MapRenderer: capital stars visible n=%d" % n_stars)
 
 
-func _add_capital_star_to_node(node: Node2D, pid: int) -> void:
-	var center: Vector2 = province_centroids.get(pid, Vector2.ZERO) as Vector2
+func _capital_star_font_px() -> int:
+	var z := _get_camera_zoom()
+	if z <= MapZoomLODScript.STRATEGIC_MAX_ZOOM:
+		return 0  # hide at world/strategic — nation labels own that band
+	# ~16 screen px at operational Europe zoom; clamp so Maginot does not grow a carpet.
+	return int(clampf(16.0 / maxf(z, 0.35), 11.0, 20.0))
+
+
+func _sync_capital_star_scales(_z: float = -1.0) -> void:
+	var px := _capital_star_font_px()
+	for pid in province_nodes.keys():
+		var node: Node2D = province_nodes[pid] as Node2D
+		if node == null:
+			continue
+		var force := _asia_end_force_star_pids.has(int(pid))
+		var use_px := 32 if force else px
+		for child in node.get_children():
+			if not (child is Label) or not (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
+				continue
+			var star := child as Label
+			star.visible = use_px > 0
+			if use_px > 0:
+				star.add_theme_font_size_override("font_size", use_px)
+				star.set_meta(META_MAP_GLYPH_PX, use_px)
+				if force:
+					star.z_as_relative = false
+					star.z_index = 80
+
+
+func _add_capital_star_to_node(node: Node2D, pid: int, force_px: int = 0) -> void:
+	var center: Vector2 = _centroid_for_pid(pid)
+	if center == Vector2.ZERO:
+		center = province_centroids.get(pid, Vector2.ZERO) as Vector2
 	if center == Vector2.ZERO:
 		return
 	var star := Label.new()
@@ -12134,14 +12902,18 @@ func _add_capital_star_to_node(node: Node2D, pid: int) -> void:
 	star.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	star.z_as_relative = false
 	star.z_index = 40
-	star.add_theme_font_size_override("font_size", 30)
+	var px := force_px if force_px > 0 else _capital_star_font_px()
+	if px <= 0 and force_px > 0:
+		px = force_px
+	star.add_theme_font_size_override("font_size", px)
 	# Bright gold fill + thick dark+white outline so stars read on yellow (BEL) and light paints.
 	star.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
 	star.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05, 1.0))
-	star.add_theme_constant_override("outline_size", 8)
+	star.add_theme_constant_override("outline_size", 6)
 	star.modulate = Color(1.0, 1.0, 1.0, 1.0)
-	star.set_meta(META_MAP_GLYPH_PX, 30)
+	star.set_meta(META_MAP_GLYPH_PX, px)
 	star.set_meta(META_MAP_GLYPH_CAPITAL, true)
+	star.visible = px > 0
 	star.reset_size()
 	var sms := star.get_minimum_size()
 	star.position = center - sms * 0.5
@@ -12177,6 +12949,9 @@ func hide_info_panel() -> void:
 	_camera_nudge_gen += 1
 	if info_panel and info_panel is CanvasItem:
 		info_panel.visible = false
+		if info_panel is Control:
+			(info_panel as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+			(info_panel as Control).release_focus()
 	elif info_panel != null:
 		push_warning("MapRenderer: hide_info_panel called on non-CanvasItem (got " + str(info_panel.get_script() if info_panel.get_script() else info_panel.get_class()) + ")")
 	if _province_id_badge != null:
@@ -12189,16 +12964,53 @@ func _inspector_stack_blocking_input() -> bool:
 	if info_panel != null and info_panel is CanvasItem and (info_panel as CanvasItem).visible:
 		return true
 	var ui := get_node_or_null("UI") as CanvasLayer
-	if ui != null and ui.get_node_or_null("UnitDetailPopup") != null:
+	if ui != null:
+		if ui.get_node_or_null("UnitDetailPopup") != null:
+			return true
+		if ui.get_node_or_null("OpenFightSheet") != null:
+			return true
+	return false
+
+
+func _gui_blocks_map_pick() -> bool:
+	# Close/Esc click-through must not hex-pick (Play: Iberia→Greenland + Mid Pacific tooltip).
+	if Time.get_ticks_msec() < _map_pick_block_until_msec:
+		return true
+	if _is_mouse_over_blocking_ui():
 		return true
 	return false
 
 
+func _hold_camera_now() -> void:
+	# Hold only — never snapshot-write europe_center. Lock the live GIS camera instead.
+	_hold_camera_until_msec = Time.get_ticks_msec() + 900
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	if cam != null:
+		_last_viewport_cull_pos = cam.global_position
+		_last_viewport_cull_zoom = _get_camera_zoom()
+
+
 ## Inspector Close / Esc / unit-card Close: hide stack and restore map keys/clicks.
 func _dismiss_inspector_and_restore_input() -> void:
+	_lock_close_camera()
+	_hold_camera_now()
 	hide_info_panel()
+	_camera_nudge_gen += 1
+	# Accurate fills already stay painted (never_cull_fills). Do not 3520-restore,
+	# ocean-floor, clamp, or write the camera (Play: snapshot restore jumped to Greenland).
+	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 2500
+	_viewport_cull_hold_after_close = true
+	_map_pick_block_until_msec = Time.get_ticks_msec() + 800
+	_left_skip_next_pick = true
+	_left_gesture_panned = true
+	_left_pan_armed = false
+	_left_pan_active = false
+	_left_slop_latched = true
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui != null:
+		var fight_sheet := ui.get_node_or_null("OpenFightSheet")
+		if fight_sheet != null:
+			fight_sheet.queue_free()
 		var unit_pop := ui.get_node_or_null("UnitDetailPopup")
 		if unit_pop != null:
 			if unit_pop is CanvasItem:
@@ -12216,13 +13028,14 @@ func _dismiss_inspector_and_restore_input() -> void:
 		_refresh_selected_unit_chip()
 	_corridor_click_armed = false
 	_is_middle_dragging = false
-	_left_pan_armed = false
-	_left_pan_active = false
 	if has_method("_hide_oob_strip"):
 		_hide_oob_strip()
 	var vp := get_viewport()
 	if vp != null:
 		vp.gui_release_focus()
+		# Re-enable map input in case a leftover Control ate unhandled events.
+		set_process_input(true)
+		set_process_unhandled_input(true)
 	print("MapRenderer: inspector Close restored input")
 
 
@@ -12283,7 +13096,7 @@ func _refresh_province_detail_visibility() -> void:
 		_fill_zoom_at_last_paint >= 0.0
 		and absf(current_zoom - _fill_zoom_at_last_paint) >= q * drift_frac
 	)
-	if bucket_changed or drift:
+	if (bucket_changed or drift) and not _viewport_cull_hold_after_close:
 		if bucket_changed:
 			_fill_color_zoom_bucket = b
 		_refresh_province_fill_colors()
@@ -12524,6 +13337,14 @@ func _boot_political_map_complete() -> void:
 	_refresh_province_fill_colors(true)
 	_restore_land_poly_visibility()
 	_ensure_capital_stars_visible()
+	# Centroids exist now — frame Europe. An earlier deferred center (empty centroids)
+	# used europe_world_center and left the camera on grey clear (underlay is hidden).
+	_ensure_ocean_floor()
+	_apply_clean_political_clear_color()
+	center_europe_in_world_view()
+	_force_all_province_nodes_visible()
+	if _map_search != null and _map_search.has_method("rebuild_index"):
+		_map_search.call("rebuild_index")
 	var ol := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol != null and ol.has_method("queue_redraw"):
 		ol.queue_redraw()
@@ -12678,6 +13499,8 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 	_setup_domain_ops_layer()
 	_setup_leader_station_layer()
 	_setup_construction_progress_layer()
+	_setup_factory_status_layer()
+	_setup_agent_presence_layer()
 	_setup_agent_layer()
 	_setup_infrastructure_overlay_layer()
 	call_deferred("_setup_terrain_layer_stack")
@@ -12856,6 +13679,15 @@ func _rebuild_political_labels() -> void:
 		layer.call("set_map_mode_context", current_map_mode)
 	if layer.has_method("sync_tier"):
 		layer.call("sync_tier", _map_lod_tier)
+	_pin_asia_end_china_label()
+
+
+func _pin_asia_end_china_label() -> void:
+	if _asia_end_china_anchor == Vector2.ZERO:
+		return
+	var layer := _ensure_political_labels_layer()
+	if layer != null and layer.has_method("force_nation_label_at"):
+		layer.call("force_nation_label_at", "CHI", _asia_end_china_anchor, "China")
 
 
 func _sync_political_labels_tier(tier: int) -> void:
@@ -12864,6 +13696,7 @@ func _sync_political_labels_tier(tier: int) -> void:
 			_political_labels_layer.call("set_map_mode_context", current_map_mode)
 		if _political_labels_layer.has_method("sync_tier"):
 			_political_labels_layer.call("sync_tier", tier)
+	_pin_asia_end_china_label()
 
 
 func _ensure_region_highlight_layer() -> Node2D:
@@ -12949,9 +13782,33 @@ func _get_camera_world_rect(margin_ratio: float = 0.10) -> Rect2:
 
 
 func _sync_viewport_culling(force: bool = false) -> void:
+	if Time.get_ticks_msec() < _viewport_cull_suspend_until_msec:
+		return
+	if _viewport_cull_hold_after_close:
+		# Stay painted after Close. Only recull after a real user pan, not zoom jitter.
+		var hold_cam := get_viewport().get_camera_2d() if get_viewport() else null
+		if hold_cam != null:
+			var hold_moved := hold_cam.global_position.distance_squared_to(_last_viewport_cull_pos) > 250000.0
+			if not hold_moved or _last_viewport_cull_pos.x < -90000.0:
+				return
+		_viewport_cull_hold_after_close = false
 	var prov_count := province_nodes.size()
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_count"):
 		prov_count = maxi(prov_count, int(MapManager.get_province_count()))
+	# Accurate GIS board: never hide province fill nodes (Play: Close/cull blanked Europe).
+	var never_cull_fills := (
+		prov_count >= MapZoomLODScript.ACCURATE_BOARD_CULL_THRESHOLD
+		or _is_gis_board_active()
+	)
+	if never_cull_fills:
+		if _viewport_culling_active:
+			_clear_viewport_culling()
+		var labels_rect := _get_camera_world_rect(0.14)
+		if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
+			if _political_labels_layer.has_method("sync_viewport"):
+				_political_labels_layer.call("sync_viewport", labels_rect, true)
+		_pin_asia_end_china_label()
+		return
 	var use_cull := MapZoomLODScript.use_viewport_culling_for_board(_map_lod_tier, prov_count)
 	if not use_cull:
 		if _viewport_culling_active:
@@ -12984,8 +13841,15 @@ func _sync_viewport_culling(force: bool = false) -> void:
 		visible_pids[selected_province_id] = true
 	if _hover_province != null:
 		visible_pids[_hover_province.id] = true
+	for pid in _asia_end_force_star_pids.keys():
+		visible_pids[int(pid)] = true
 	for pid in _get_interesting_province_ids().keys():
 		visible_pids[int(pid)] = true
+
+	# Empty in-rect query (camera not framed yet) must not hide the whole board —
+	# that is the grey-screen boot: underlay off + default clear + all polys culled.
+	if visible_pids.is_empty():
+		return
 
 	for pid_var in province_nodes.keys():
 		var pid := int(pid_var)
@@ -12997,6 +13861,7 @@ func _sync_viewport_culling(force: bool = false) -> void:
 	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
 		if _political_labels_layer.has_method("sync_viewport"):
 			_political_labels_layer.call("sync_viewport", world_rect, true)
+	_pin_asia_end_china_label()
 
 
 func _clear_viewport_culling() -> void:
@@ -13037,6 +13902,9 @@ func _should_use_batched_mesh_fills() -> bool:
 
 
 func _sync_batched_mesh_fills(force: bool = false) -> void:
+	if _asia_end_hulls_hidden:
+		_asia_end_hide_mesh_layer()
+		return
 	var z := _get_camera_zoom()
 	var bucket := int(z * 20.0)
 	if not force and bucket == _last_mesh_zoom_bucket and not _batched_mesh_fills_forced:
@@ -13285,6 +14153,8 @@ func auto_update_theater_from_camera() -> void:
 
 ## Clamp or wrap camera within current theater bounds (wrap enables seamless toroidal pan for tactical refinement).
 func _clamp_camera_to_theater() -> void:
+	if _camera_is_held():
+		return
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam == null:
 		return
@@ -13464,6 +14334,8 @@ func _sync_camera_controller_wrap() -> void:
 
 ## Fit the active camera zoom so map bounds fill the viewport (reduces gray margins).
 func fit_camera_to_bounds(bounds: Rect2, center: Vector2, fill_ratio: float = -1.0) -> void:
+	if _close_camera_locked:
+		return
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam == null or bounds.size.x <= 0.0:
 		return
@@ -13743,6 +14615,10 @@ func _hit_coarse_territory(world_pos: Vector2) -> int:
 ## [param focus_camera]: only true on explicit user click / F10 focus — never on panel refresh.
 ## Auto-teleport on every refresh was thrashing the camera (Africa re-select on each data_changed) and hard-crashing while panning.
 func _show_coarse_territory_info(terr_id: int, focus_camera: bool = false) -> void:
+	# Mouse click only: a left-drag that already exceeded 8px must not open coarse inspector.
+	# focus_camera=false refreshes (data_changed) stay live.
+	if focus_camera and _left_map_pick_blocked():
+		return
 	if not _coarse_territories.has(terr_id) or info_panel == null:
 		return
 	var info: Dictionary = _coarse_territories[terr_id]
@@ -13785,7 +14661,8 @@ func _show_coarse_territory_info(terr_id: int, focus_camera: bool = false) -> vo
 	if info_national:
 		info_national.text = "Inspector: Coarse World Territory. F10 can focus the camera on this region."
 	# Camera only on explicit focus (user click once). Re-shows must not re-teleport.
-	if focus_camera and first_select:
+	# Close hold: never recenter a coarse rect (NA/Atlantic center looks like Greenland).
+	if focus_camera and first_select and not _camera_is_held():
 		var cam := get_viewport().get_camera_2d() if get_viewport() else null
 		if cam:
 			var r: Rect2 = info.rect
@@ -13809,17 +14686,21 @@ func debug_focus_coarse_territory(terr_name: String = "Africa") -> void:
 func center_europe_in_world_view() -> void:
 	_sync_theater_bounds_to_map_data()
 	set_meta("full_world_underlay_active", true)
+	var frame := _resolve_europe_focus_rect(Vector2.ZERO)
+	if frame.size.x < 80.0 or frame.size.y < 80.0:
+		# Capitals not in memory yet — do not aim at europe_world_center (grey void).
+		if _europe_focus_retry < 12:
+			_europe_focus_retry += 1
+			call_deferred("center_europe_in_world_view")
+		return
+	_europe_focus_retry = 0
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam:
-		var focus := _resolve_europe_focus_center()
-		var frame := _resolve_europe_focus_rect(focus)
-		if fill_viewport_on_load:
-			fit_camera_to_bounds(frame, focus, MapCanvasConfig.EUROPE_VIEW_FILL_RATIO)
-		else:
-			cam.global_position = _apply_camera_bounds(focus)
-			cam.zoom = Vector2.ONE * (0.35 * MapCanvasConfig.THEATER_SCALE)
+		var focus := frame.get_center()
+		# Always re-fit (not pan-only) so a zoom-out red void recovers on first Home.
+		fit_camera_to_bounds(frame, focus, MapCanvasConfig.EUROPE_VIEW_FILL_RATIO)
 	_clamp_camera_to_theater()
-	print("MapRenderer: centered on Europe (GIS-aware focus) inside world view")
+	print("MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view")
 
 
 ## Sync pan theater + underlay for GIS boards (equirect underlay, full Asia pan).
@@ -13831,56 +14712,319 @@ func _sync_theater_bounds_to_map_data() -> void:
 	_fit_background_to_bounds()
 
 
-func _resolve_europe_focus_center() -> Vector2:
-	# Capitals known on world_accurate (scaled by MapManager centroids if available).
-	var candidates: Array[int] = [710300, 710707, 711414, 710963]  # GER FRA ENG ITA
+func _centroid_for_pid(pid: int) -> Vector2:
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
-		for pid in candidates:
-			var c: Vector2 = MapManager.get_province_centroid(pid)
-			if c != Vector2.ZERO and c.length_squared() > 1.0:
-				return c
-	if province_centroids.has(710300):
-		return province_centroids[710300] as Vector2
-	# Fallback legacy Europe theater center (pre-GIS boards).
-	return MapCanvasConfig.europe_world_center()
+		var c: Vector2 = MapManager.get_province_centroid(pid)
+		if c != Vector2.ZERO and c.length_squared() > 1.0:
+			return c
+	if province_centroids.has(pid):
+		var pc: Vector2 = province_centroids[pid] as Vector2
+		if pc != Vector2.ZERO:
+			return pc
+	return Vector2.ZERO
 
 
-func _resolve_europe_focus_rect(center: Vector2) -> Rect2:
-	# ~continental Europe framing around focus (GIS world canvas units, post-scale).
-	var half := Vector2(2200.0, 1600.0) * 0.5
-	var r := Rect2(center - half, half * 2.0)
-	# Clamp into theater so fit_camera never frames outside the map.
+func _frame_rect_from_points(pts: Array[Vector2], min_pad: Vector2 = Vector2(280.0, 200.0)) -> Rect2:
+	if pts.is_empty():
+		return Rect2()
+	var min_p := pts[0]
+	var max_p := pts[0]
+	for p in pts:
+		min_p.x = minf(min_p.x, p.x)
+		min_p.y = minf(min_p.y, p.y)
+		max_p.x = maxf(max_p.x, p.x)
+		max_p.y = maxf(max_p.y, p.y)
+	var span := max_p - min_p
+	var pad := Vector2(
+		maxf(min_pad.x, span.x * 0.45),
+		maxf(min_pad.y, span.y * 0.45)
+	)
+	return Rect2(min_p - pad, (max_p + pad) - (min_p - pad))
+
+
+func _resolve_europe_focus_center() -> Vector2:
+	return _resolve_europe_focus_rect(Vector2.ZERO).get_center()
+
+
+func _resolve_europe_focus_rect(_center: Vector2) -> Rect2:
+	# Berlin + Paris + Rome — not first-nonzero (that can land on Scandinavia fallback).
+	var pids: Array[int] = [710300, 710707, 710963]
+	var pts: Array[Vector2] = []
+	for pid in pids:
+		var c := _centroid_for_pid(pid)
+		if c != Vector2.ZERO:
+			pts.append(c)
+	if pts.size() < 2:
+		return Rect2()
+	# Continental pad (old Home was 2200×1600 around one capital). A 0.45 bbox
+	# around the three cities is a postage stamp and looks like a grey hole.
+	var r := _frame_rect_from_points(pts, Vector2(1100.0, 800.0))
 	var b := _current_theater_bounds
 	if b.size.x > 0.0:
-		r = r.intersection(b)
-		if r.size.x < 100.0 or r.size.y < 100.0:
-			r = b
+		var hit := r.intersection(b)
+		# Never replace a valid Europe frame with the full-world theater (void Home).
+		if hit.size.x >= 80.0 and hit.size.y >= 80.0 and hit.size.x < b.size.x * 0.85:
+			r = hit
 	return r
 
 
-func _focus_asia_view() -> void:
-	# JAP capital / East Asia sample on world_accurate
-	var focus := Vector2.ZERO
-	var candidates: Array[int] = [903995, 903986, 904007, 903534]  # JAP hubs + SOV sample
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
-		for pid in candidates:
-			var c: Vector2 = MapManager.get_province_centroid(pid)
-			if c != Vector2.ZERO and c.length_squared() > 1.0:
-				focus = c
+func _resolve_chi_capital_pid() -> int:
+	# First End must prefer Beiping (902487) even when the renderer centroid dict is stale.
+	if provinces.has(902487) or _centroid_for_pid(902487) != Vector2.ZERO:
+		return 902487
+	# Named CHI capital cells first (Beiping-class CHN North) — not closest-to-Tokyo CHN West.
+	for pid in [902487, 902496, 902505]:
+		if _centroid_for_pid(pid) != Vector2.ZERO:
+			return pid
+	var tokyo := _centroid_for_pid(903995)
+	var best_pid := 0
+	var best_d := INF
+	var owned: Array = []
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):
+		owned = MapManager.get_provinces_by_owner("CHI")
+	for pid_v in owned:
+		var pid := int(pid_v)
+		var c := _centroid_for_pid(pid)
+		if c == Vector2.ZERO:
+			continue
+		if tokyo != Vector2.ZERO and c.x >= tokyo.x:
+			continue
+		var d := c.distance_squared_to(tokyo) if tokyo != Vector2.ZERO else c.x
+		if d < best_d:
+			best_d = d
+			best_pid = pid
+	return best_pid
+
+
+func _resolve_chi_capital_centroid() -> Vector2:
+	return _centroid_for_pid(_resolve_chi_capital_pid())
+
+
+func _force_asia_end_capital_stars(tokyo_pid: int, chi_pid: int) -> void:
+	_asia_end_force_star_pids.clear()
+	var chi_names := {902487: "Beiping", 902496: "Nanjing", 902505: "Chongqing"}
+	# Always stamp Tokyo + Beiping (Play: CHI star missing when only the resolved pid was used).
+	var stamp: Array[int] = []
+	var seen_stamp: Dictionary = {}
+	# 902487 first so Beiping is never dropped when chi_pid aliases another cell.
+	for pid in [902487, tokyo_pid, chi_pid]:
+		if pid > 0 and not seen_stamp.has(pid):
+			seen_stamp[pid] = true
+			stamp.append(pid)
+	for pid in stamp:
+		_asia_end_force_star_pids[pid] = true
+		if provinces.has(pid):
+			var p: Province = provinces[pid] as Province
+			if p != null:
+				if chi_names.has(pid) and (str(p.name).begins_with("CHN") or str(p.name).strip_edges().is_empty()):
+					p.name = str(chi_names[pid])
+				if p.has_method("has_feature") and not p.has_feature("capital"):
+					p.special_features["capital"] = 1
+		var node: Node2D = _province_node(pid)
+		if node == null:
+			var host := container if container != null else self
+			node = Node2D.new()
+			node.name = "AsiaEndStarHost_%d" % pid
+			host.add_child(node)
+			province_nodes[pid] = node
+		node.visible = true
+		var center: Vector2 = _asia_end_star_centroid(pid)
+		if center != Vector2.ZERO:
+			province_centroids[pid] = center
+		var extra_n: Vector2 = _asia_end_star_extra(pid)
+		var has_star := false
+		for child in node.get_children():
+			if child is Label and (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
+				has_star = true
+				var star := child as Label
+				star.visible = true
+				star.add_theme_font_size_override("font_size", 36)
+				star.modulate = Color(1.0, 1.0, 1.0, 1.0)
+				star.z_as_relative = false
+				star.z_index = 80
+				star.reset_size()
+				var sms0 := star.get_minimum_size()
+				if center != Vector2.ZERO:
+					star.position = center - sms0 * 0.5 + extra_n
 				break
+		if not has_star:
+			_add_capital_star_to_node(node, pid, 36)
+			for child2 in node.get_children():
+				if child2 is Label and (child2 as Label).has_meta(META_MAP_GLYPH_CAPITAL):
+					var st2 := child2 as Label
+					st2.visible = true
+					st2.add_theme_font_size_override("font_size", 36)
+					st2.z_as_relative = false
+					st2.z_index = 80
+					st2.reset_size()
+					var sms2 := st2.get_minimum_size()
+					if center != Vector2.ZERO:
+						st2.position = center - sms2 * 0.5 + extra_n
+	_stamp_asia_end_overlay_stars(tokyo_pid, chi_pid)
+	_sync_capital_star_scales()
+
+
+func _ensure_asia_end_star_overlay() -> Node2D:
+	var host: Node2D = container if container != null else self
+	var overlay: Node2D = host.get_node_or_null("AsiaEndStarOverlay") as Node2D
+	if overlay != null and is_instance_valid(overlay):
+		return overlay
+	overlay = Node2D.new()
+	overlay.name = "AsiaEndStarOverlay"
+	overlay.z_as_relative = false
+	overlay.z_index = 160
+	host.add_child(overlay)
+	return overlay
+
+
+func _asia_end_star_centroid(pid: int) -> Vector2:
+	var c: Vector2 = _centroid_for_pid(pid)
+	if c != Vector2.ZERO:
+		return c
+	if geometry.has(pid) and geometry[pid] is Dictionary:
+		var raw: Variant = (geometry[pid] as Dictionary).get("points", [])
+		if raw is Array and (raw as Array).size() >= 3:
+			var acc := Vector2.ZERO
+			var n: int = 0
+			for pv in raw as Array:
+				if pv is Array and (pv as Array).size() >= 2:
+					acc += Vector2(float((pv as Array)[0]), float((pv as Array)[1]))
+					n += 1
+			if n > 0:
+				return acc / float(n)
+	return Vector2.ZERO
+
+
+func _asia_end_star_extra(pid: int) -> Vector2:
+	# Chips sit on the centroid. Standalone star must clear the stack
+	# (Play 585d4b2: Tokyo was chip-icon only; Beiping star not observed).
+	if pid == 902487:
+		return Vector2(-88.0, 110.0)
+	if pid == 903995:
+		return Vector2(-96.0, 72.0)
+	return Vector2.ZERO
+
+
+func _asia_end_star_poly_points(radius: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var i := 0
+	while i < 10:
+		var ang: float = -PI * 0.5 + float(i) * PI / 5.0
+		var r: float = radius if (i % 2 == 0) else radius * 0.42
+		pts.append(Vector2(cos(ang), sin(ang)) * r)
+		i += 1
+	return pts
+
+
+func _stamp_asia_end_overlay_stars(tokyo_pid: int, chi_pid: int) -> void:
+	var overlay: Node2D = _ensure_asia_end_star_overlay()
+	if overlay == null:
+		return
+	for child in overlay.get_children():
+		child.queue_free()
+	var stamp: Array[int] = []
+	var seen: Dictionary = {}
+	for pid in [902487, tokyo_pid, chi_pid, 903995]:
+		if pid > 0 and not seen.has(pid):
+			seen[pid] = true
+			stamp.append(pid)
+	for pid in stamp:
+		var center: Vector2 = _asia_end_star_centroid(pid)
+		if center == Vector2.ZERO:
+			continue
+		var extra: Vector2 = _asia_end_star_extra(pid)
+		var at: Vector2 = center + extra
+		var disc := Polygon2D.new()
+		disc.name = "AsiaEndStarDisc_%d" % pid
+		disc.polygon = _asia_end_star_poly_points(26.0)
+		disc.color = Color(0.04, 0.04, 0.07, 0.92)
+		disc.z_as_relative = false
+		disc.z_index = 158
+		disc.position = at
+		overlay.add_child(disc)
+		var star := Polygon2D.new()
+		star.name = "AsiaEndStar_%d" % pid
+		star.polygon = _asia_end_star_poly_points(22.0)
+		star.color = Color(1.0, 0.92, 0.15, 1.0)
+		star.z_as_relative = false
+		star.z_index = 160
+		star.position = at
+		star.set_meta(META_MAP_GLYPH_CAPITAL, true)
+		star.set_meta(META_MAP_GLYPH_PX, 36)
+		overlay.add_child(star)
+
+
+func _focus_asia_view() -> void:
+	_left_skip_next_pick = true
+	hide_info_panel()
+	var tokyo: Vector2 = _asia_end_star_centroid(903995)
+	var chi: Vector2 = _resolve_chi_capital_centroid()
+	var chi_pid := 902487
+	var resolved := _resolve_chi_capital_pid()
+	if resolved > 0:
+		chi_pid = resolved
+	var bei: Vector2 = _asia_end_star_centroid(902487)
+	if bei != Vector2.ZERO:
+		chi = bei
+		chi_pid = 902487
+	elif chi == Vector2.ZERO:
+		chi = _asia_end_star_centroid(chi_pid)
+	# Tight Tokyo–Beiping box. Do not use _frame_rect_from_points 0.45-span
+	# pad and do not pad −700 west (those opened Mongolia SOV hulls).
+	if tokyo == Vector2.ZERO and chi == Vector2.ZERO:
+		return
+	if tokyo == Vector2.ZERO:
+		tokyo = chi + Vector2(380.0, 450.0)
+	if chi == Vector2.ZERO:
+		chi = tokyo + Vector2(-380.0, -450.0)
+	var p_min: Vector2 = Vector2(minf(tokyo.x, chi.x), minf(tokyo.y, chi.y))
+	var p_max: Vector2 = Vector2(maxf(tokyo.x, chi.x), maxf(tokyo.y, chi.y))
+	p_min = p_min.min(chi + Vector2(-120.0, -80.0))
+	p_max = p_max.max(chi + Vector2(40.0, 180.0))
+	var pad: Vector2 = Vector2(200.0, 160.0)
+	var frame := Rect2(p_min - pad, (p_max + pad) - (p_min - pad))
+	var focus := frame.get_center() if frame.size.x > 80.0 else tokyo
 	if focus == Vector2.ZERO:
-		# East side of content bounds
 		var b := _current_theater_bounds
-		focus = Vector2(b.position.x + b.size.x * 0.78, b.position.y + b.size.y * 0.42)
-	var half := Vector2(2800.0, 2000.0) * 0.5
-	var frame := Rect2(focus - half, half * 2.0)
+		focus = Vector2(b.position.x + b.size.x * 0.82, b.position.y + b.size.y * 0.38)
+		frame = Rect2(focus - Vector2(420, 320), Vector2(840, 640))
 	if _current_theater_bounds.size.x > 0.0:
-		frame = frame.intersection(_current_theater_bounds)
-		if frame.size.x < 100.0:
-			frame = _current_theater_bounds
-	fit_camera_to_bounds(frame, focus, 0.9)
+		var hit := frame.intersection(_current_theater_bounds)
+		if hit.size.x >= 80.0 and hit.size.y >= 80.0 and hit.size.x < _current_theater_bounds.size.x * 0.85:
+			frame = hit
+	_asia_end_hulls_hidden = true
+	_hide_asia_sov_overlap_hulls()
+	_unlock_close_camera()
+	_close_click_guard = false
+	_close_release_seen = false
+	_close_suppress_edge = false
+	_hold_camera_until_msec = 0
+	# Keep skip so leftover mouse after the jump cannot open RUS West.
+	# Do not zero _map_pick_block_until_msec (that re-armed the leftover pick).
+	_inspector_held_closed = false
+	fit_camera_to_bounds(frame, frame.get_center(), 0.88)
+	_last_viewport_cull_pos = Vector2(-99999, -99999)
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	if cam != null:
+		var z := maxf(cam.zoom.x, cam.zoom.y)
+		var zmin := MapZoomLODScript.STRATEGIC_MAX_ZOOM + 0.08
+		if z < zmin:
+			cam.zoom = Vector2(zmin, zmin)
+	_last_hover_mouse = Vector2(-99999, -99999)
+	_hide_asia_sov_overlap_hulls()
+	_force_asia_end_capital_stars(903995, chi_pid)
+	var label_at := chi if chi != Vector2.ZERO else _centroid_for_pid(902487)
+	if label_at != Vector2.ZERO:
+		# South-west of Beiping onto the North China Plain — not under Tokyo/Beiping chips.
+		_asia_end_china_anchor = label_at + Vector2(-90.0, 160.0)
+	else:
+		_asia_end_china_anchor = Vector2.ZERO
+	_pin_asia_end_china_label()
+	# Stars / zoom / fill refresh can restore mesh or RoW fills — hide again, then once more next frame.
+	_hide_asia_sov_overlap_hulls()
+	call_deferred("_hide_asia_sov_overlap_hulls")
 	if typeof(DebugOverlay) != TYPE_NIL:
-		DebugOverlay.toast_map_debug("Map: Asia focus · Home=Europe · Shift+Home=full world")
+		DebugOverlay.toast_map_debug("Map: Asia · Tokyo + Beiping/CHI · Home=Europe")
 
 ## Alias per spec for center_europe_inside_world (ensures grand underlay base, Europe 471 polys + river children NW aligned, coarse rects always).
 func center_europe_inside_world() -> void:
@@ -14184,8 +15328,277 @@ func _province_draw_z_index(pid: int, is_water: bool) -> int:
 	if pid >= 800000 and pid < 900000:
 		return 3  # US playable
 	if pid >= 900000 and pid < 950000:
-		return 1  # RoW sparse (may be oversized)
+		# CHI/JAP/MON must sit above SOV sparse megablobs (Play 585d4b2: same-z
+		# RoW still painted blank red hulls over Mongolia / N China).
+		if _asia_sov_hull_hides_fill(pid):
+			return 0
+		var tag: String = _row_owner_tag(pid)
+		if tag == "SOV" or tag == "RUS":
+			return 1
+		return 3
 	return 2
+
+
+func _row_owner_tag(pid: int) -> String:
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_owner"):
+		var mt: String = str(MapManager.get_province_owner(pid)).strip_edges().to_upper()
+		if not mt.is_empty():
+			return mt
+	var p: Province = provinces.get(pid) as Province if provinces.has(pid) else null
+	if p != null:
+		return str(p.owner_tag).strip_edges().to_upper()
+	return ""
+
+
+func _asia_sov_hull_hides_fill(pid: int) -> bool:
+	# Kept for product greps. First End hide is nuclear (all RoW SOV/RUS/sov-red).
+	match pid:
+		903528, 903500, 903491, 903544, 903553, 903494, 903498:
+			return true
+		904078, 904070, 904073, 904075, 904069:
+			return true
+		_:
+			return false
+
+
+func _asia_end_row_is_sov(pid: int) -> bool:
+	var tag: String = _row_owner_tag(pid)
+	if tag == "SOV" or tag == "RUS":
+		return true
+	var p: Province = provinces.get(pid) as Province if provinces.has(pid) else null
+	if p != null:
+		var ot: String = str(p.owner_tag).strip_edges().to_upper()
+		if ot == "SOV" or ot == "RUS":
+			return true
+	return false
+
+
+func _asia_end_is_protected_row(pid: int) -> bool:
+	# Owner tag only. Never protect SOV/RUS (Play ea1271a: name CHN/MONGOL
+	# let a SOV hull be force-painted red while dump skipped it as protected).
+	if _asia_end_row_is_sov(pid):
+		return false
+	if pid == 902487 or pid == 903995:
+		return true
+	var tag: String = _row_owner_tag(pid)
+	return tag == "CHI" or tag == "MON" or tag == "JAP" or tag == "MAN" or tag == "MEN"
+
+
+func _asia_end_color_is_sov_red(c: Color) -> bool:
+	if c.a < 0.06:
+		return false
+	return c.r > 0.35 and c.r > c.g + 0.04 and c.r > c.b + 0.04
+
+
+func _asia_end_poly_is_sov_red(poly: Polygon2D) -> bool:
+	if poly == null:
+		return false
+	var c: Color = poly.color
+	c.r *= poly.modulate.r
+	c.g *= poly.modulate.g
+	c.b *= poly.modulate.b
+	c.a *= poly.modulate.a
+	return _asia_end_color_is_sov_red(c)
+
+
+func _asia_end_is_star_poly(poly: Polygon2D) -> bool:
+	if poly == null:
+		return false
+	var n: String = str(poly.name)
+	return n.begins_with("AsiaEndStar")
+
+
+func _asia_end_hide_mesh_layer() -> void:
+	_batched_mesh_active = false
+	if _province_mesh_layer != null and is_instance_valid(_province_mesh_layer):
+		if _province_mesh_layer.has_method("set_enabled"):
+			_province_mesh_layer.call("set_enabled", false)
+		_province_mesh_layer.visible = false
+
+
+func _hide_fill_on_node(node: Node2D) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	for child in node.get_children():
+		if str(child.name).begins_with("DemoUnitIcon_"):
+			continue
+		if not (child is Polygon2D):
+			continue
+		var poly := child as Polygon2D
+		if _asia_end_is_star_poly(poly):
+			continue
+		poly.visible = false
+		poly.set_meta("asia_sov_hull_hidden", true)
+		var c: Color = poly.color
+		c.a = 0.0
+		poly.color = c
+	node.z_index = 0
+
+
+func _hide_province_fill_polys(pid: int) -> void:
+	if province_nodes.has(pid):
+		_hide_fill_on_node(province_nodes[pid] as Node2D)
+
+
+func _asia_end_force_protected_fill(pid: int, node: Node2D) -> void:
+	if node == null or not is_instance_valid(node):
+		return
+	if _asia_end_row_is_sov(pid):
+		_hide_fill_on_node(node)
+		return
+	node.visible = true
+	node.modulate = Color(1.0, 1.0, 1.0, 1.0)
+	node.z_index = 8
+	# Never default to SOV maroon — missing CHI/MON country color must not look like a hull.
+	var col := Color(0.62, 0.52, 0.34, 0.96)
+	if provinces.has(pid):
+		col = _get_province_color(provinces[pid] as Province)
+		col.a = 0.96
+	if _asia_end_color_is_sov_red(col):
+		col = Color(0.62, 0.52, 0.34, 0.96)
+	for child in node.get_children():
+		if not (child is Polygon2D):
+			continue
+		var poly := child as Polygon2D
+		if _asia_end_is_star_poly(poly):
+			continue
+		poly.visible = true
+		poly.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		if poly.has_meta("asia_sov_hull_hidden"):
+			poly.remove_meta("asia_sov_hull_hidden")
+		poly.color = col
+
+
+func _asia_end_should_hide_row_fill(pid: int, node: Node2D) -> bool:
+	# Nuclear: ignore AABB. Hide every RoW 900k fill that is not CHI/MON/JAP/MAN/MEN.
+	if pid < 900000 or pid >= 950000:
+		return false
+	if _asia_end_row_is_sov(pid):
+		return true
+	if _asia_end_is_protected_row(pid):
+		return false
+	var tag: String = _row_owner_tag(pid)
+	if tag == "SOV" or tag == "RUS":
+		return true
+	if _asia_sov_hull_hides_fill(pid):
+		return true
+	if node != null:
+		for child in node.get_children():
+			if child is Polygon2D and not _asia_end_is_star_poly(child as Polygon2D):
+				if _asia_end_poly_is_sov_red(child as Polygon2D):
+					return true
+	return true
+
+
+func _asia_end_should_keep_fill_hidden(pid: int, poly: Polygon2D) -> bool:
+	if not _asia_end_hulls_hidden:
+		return false
+	if pid < 900000 or pid >= 950000:
+		return false
+	if _asia_end_row_is_sov(pid):
+		return true
+	if _asia_end_is_protected_row(pid):
+		return false
+	if poly != null and bool(poly.get_meta("asia_sov_hull_hidden", false)):
+		return true
+	var tag: String = _row_owner_tag(pid)
+	if tag == "SOV" or tag == "RUS":
+		return true
+	if _asia_end_poly_is_sov_red(poly):
+		return true
+	return true
+
+
+func _asia_end_dump_leftover_red() -> void:
+	var leftover: PackedStringArray = PackedStringArray()
+	for pid_v in province_nodes.keys():
+		var pid := int(pid_v)
+		if pid < 900000 or pid >= 950000:
+			continue
+		var node: Node2D = province_nodes[pid] as Node2D
+		if node == null or not is_instance_valid(node) or not node.visible:
+			continue
+		var tag: String = _row_owner_tag(pid)
+		if tag == "JAP":
+			continue
+		var prot := _asia_end_is_protected_row(pid)
+		for child in node.get_children():
+			if not (child is Polygon2D):
+				continue
+			var poly := child as Polygon2D
+			if _asia_end_is_star_poly(poly):
+				continue
+			if not poly.visible:
+				continue
+			var c: Color = poly.color
+			c.r *= poly.modulate.r
+			c.g *= poly.modulate.g
+			c.b *= poly.modulate.b
+			c.a *= poly.modulate.a
+			var red_dom := _asia_end_color_is_sov_red(c)
+			if tag == "SOV" or tag == "RUS" or _asia_end_row_is_sov(pid) or red_dom:
+				leftover.append(
+					"%d:%s:r=%.2f:g=%.2f:b=%.2f:a=%.2f:prot=%s"
+					% [pid, tag, c.r, c.g, c.b, c.a, "1" if prot else "0"]
+				)
+				break
+	var msg: String = ",".join(leftover) if leftover.size() > 0 else "none"
+	print("MapRenderer: Asia End leftover SOV hulls ", msg)
+
+
+func _hide_asia_sov_overlap_hulls() -> void:
+	if not _asia_end_hulls_hidden:
+		return
+	_asia_end_hide_mesh_layer()
+	for pid_v in province_nodes.keys():
+		var pid := int(pid_v)
+		if pid < 900000 or pid >= 950000:
+			continue
+		var node: Node2D = province_nodes[pid] as Node2D
+		if node == null or not is_instance_valid(node):
+			continue
+		if _asia_end_row_is_sov(pid):
+			_hide_fill_on_node(node)
+			continue
+		if _asia_end_is_protected_row(pid):
+			_asia_end_force_protected_fill(pid, node)
+			continue
+		if _asia_end_should_hide_row_fill(pid, node):
+			_hide_fill_on_node(node)
+	_asia_end_dump_leftover_red()
+
+
+func _restore_asia_end_row_fills() -> void:
+	_asia_end_hulls_hidden = false
+	_asia_end_sov_hide_rect = Rect2()
+	for pid_v in province_nodes.keys():
+		var pid := int(pid_v)
+		if pid < 900000 or pid >= 950000:
+			continue
+		var node: Node2D = province_nodes[pid] as Node2D
+		if node == null or not is_instance_valid(node):
+			continue
+		node.visible = true
+		node.modulate = Color(1.0, 1.0, 1.0, 1.0)
+		var is_water := pid >= 950000
+		node.z_index = _province_draw_z_index(pid, is_water)
+		for child in node.get_children():
+			if not (child is Polygon2D):
+				continue
+			var poly := child as Polygon2D
+			if _asia_end_is_star_poly(poly):
+				continue
+			if poly.has_meta("asia_sov_hull_hidden"):
+				poly.remove_meta("asia_sov_hull_hidden")
+			poly.visible = true
+			if provinces.has(pid):
+				poly.color = _get_province_color(provinces[pid] as Province)
+	if _province_mesh_layer != null and is_instance_valid(_province_mesh_layer):
+		var want_mesh := _should_use_batched_mesh_fills()
+		if _province_mesh_layer.has_method("set_enabled"):
+			_province_mesh_layer.call("set_enabled", want_mesh)
+		_province_mesh_layer.visible = want_mesh
+		_batched_mesh_active = want_mesh
 
 
 func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
@@ -14210,6 +15623,12 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 	points = ProvincePolygonUtil.assign_polygon2d(poly, points)
 	poly.color = _get_province_color(province)
 	poly.antialiased = true
+	if _asia_end_hulls_hidden and _asia_end_should_hide_row_fill(int(province.id), node):
+		poly.visible = false
+		poly.set_meta("asia_sov_hull_hidden", true)
+		var hc: Color = poly.color
+		hc.a = 0.0
+		poly.color = hc
 
 	# Area2D is now completely optional.
 	# In the recommended production pure-spatial configuration (use_spatial_picking=true AND
@@ -14373,6 +15792,8 @@ func _calculate_centroid(points: PackedVector2Array) -> Vector2:
 
 
 func _get_province_color(province: Province) -> Color:
+	if _is_ice_ocean_visual(province) and _wants_clean_political_fills():
+		return ice_ocean_fill_color()
 	var base := _political_province_base_color(province)
 	var clean := _wants_clean_political_fills()
 	var c := _characterize_province_fill(base, province, _overlay_base_character_blend())
@@ -14502,7 +15923,26 @@ func _supply_depot_mix_amount() -> float:
 	return clampf(supply_depot_fill_blend, 0.12, 0.55)
 
 
+func _is_ice_ocean_visual(province: Province) -> bool:
+	if province == null:
+		return false
+	var pid := int(province.id)
+	if pid == 902133 or pid == 902134:
+		return true
+	var nm := str(province.name).strip_edges().to_lower()
+	if "antarctica" in nm or nm.begins_with("ata ") or nm == "ata region":
+		return true
+	return false
+
+
+static func ice_ocean_fill_color() -> Color:
+	# Pale ice / ocean — not ENG political red.
+	return Color(0.70, 0.82, 0.90, 1.0)
+
+
 func _political_province_base_color(province: Province) -> Color:
+	if _is_ice_ocean_visual(province):
+		return ice_ocean_fill_color()
 	var land_fallback := Color(0.34, 0.34, 0.41, 0.86)
 	var sea_fallback := Color(0.16, 0.33, 0.47, 0.88)
 	if province.owner_tag.is_empty() or not countries.has(province.owner_tag):
@@ -15214,12 +16654,18 @@ func _terrain_palette_multipliers(terrain_key: String) -> Vector3:
 # ====================== INTERACTION ======================
 
 func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, province: Province, node: Node2D):
+	# Area2D / sea-hex writer: this button-down already exceeded 8px — do not select.
+	# Check before use_spatial_picking so a leftover Area2D cannot open the inspector.
+	if _left_map_pick_blocked():
+		return
 	# When pure spatial picking is active (no Area2D or ignoring it), this handler should not fire for hover/selection.
 	# The unhandled_input path above handles clicks.
 	if use_spatial_picking:
 		return
 
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		if _left_map_pick_blocked() or _map_click_should_skip_pick():
+			return
 		var resolved_province := province
 		var resolved_node := node
 
@@ -15262,7 +16708,7 @@ func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> b
 	var cam := get_node_or_null("MapCamera") as Camera2D
 	if cam == null:
 		cam = get_viewport().get_camera_2d() if get_viewport() else null
-	if cam != null and pos != Vector2.ZERO:
+	if cam != null and pos != Vector2.ZERO and not _camera_is_held():
 		var tactical_z := clampf(2.4 * MapCanvasConfig.THEATER_SCALE, min_zoom, max_zoom)
 		cam.global_position = _apply_camera_bounds(pos)
 		var zm := zoom_mode.strip_edges().to_lower()
@@ -15280,7 +16726,8 @@ func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> b
 
 
 func _select_province(province: Province, node: Node2D) -> void:
-	_inspector_held_closed = false
+	if not _camera_is_held():
+		_inspector_held_closed = false
 	if selected_province_id >= 0 and selected_province_id != province.id:
 		_set_selection_outline(selected_province_id, false)
 
@@ -15296,17 +16743,20 @@ func _select_province(province: Province, node: Node2D) -> void:
 		_refresh_hover_tooltip(_hover_province)
 	else:
 		_clear_compare_preview_outline()
-	_refresh_supply_highlights()
+	# Hex inspect must not walk 3520 supply outlines (Play: chip/inspector ~282% CPU).
+	if supply_mode:
+		_refresh_supply_highlights()
 	_refresh_compare_candidate_outlines()
 	_update_supply_legend_text()
 	_update_compare_hint_label()
 	_play_map_action_flair_select(province)
+	_toast_factory_shortage_if_starved(province.id)
 
 
 func _nudge_camera_after_panel(province_id: int, gen: int) -> void:
 	if gen != _camera_nudge_gen:
 		return
-	if _inspector_held_closed:
+	if _camera_is_held() or _inspector_held_closed:
 		return
 	if info_panel == null or not (info_panel is CanvasItem) or not (info_panel as CanvasItem).visible:
 		return
@@ -15316,6 +16766,8 @@ func _nudge_camera_after_panel(province_id: int, gen: int) -> void:
 ## Pan/zoom so the province sits in the free map area (right of left-docked inspector).
 ## zoom_mode: "soft" (gentle zoom-in) | "keep" (pan only) | "tactical" (closer).
 func _center_camera_on_province(province_id: int, zoom_mode: String = "soft") -> void:
+	if _camera_is_held():
+		return
 	if province_id < 0:
 		return
 	var pos: Vector2 = province_centroids.get(province_id, Vector2.ZERO) as Vector2
@@ -15424,6 +16876,12 @@ func _is_mouse_over_blocking_ui() -> bool:
 			"AgentAssignmentScreen",
 			"NationalSpiritsScreen",
 			"ProvinceHoverTooltip",
+			"OpenFightSheet",
+			"UnitDetailPopup",
+			"ProvinceOOBStrip",
+			"BtnOpenFight",
+			"OpenFightFoldBtn",
+			"BtnClose",
 		]:
 			return true
 		if nn.ends_with("Screen") or nn.ends_with("Popup") or nn.ends_with("View"):
@@ -15596,11 +17054,7 @@ func _update_spatial_hover() -> void:
 
 	var world_pos := _screen_to_world(mouse_screen)
 
-	var pid := -1
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
-		pid = MapManager.get_province_at_world_pos(world_pos, true)
-		if MapManager.has_method("resolve_pick_province_id"):
-			pid = MapManager.resolve_pick_province_id(pid)
+	var pid := _resolve_map_pick_pid(world_pos)
 	var new_hover_province: Province = null
 	if pid >= 0 and provinces.has(pid):
 		new_hover_province = provinces[pid]
@@ -15634,10 +17088,13 @@ func show_info_panel(province: Province) -> void:
 		push_warning("MapRenderer: info_panel is not a CanvasItem (type=" + str(info_panel.get_class()) + ", script=" + str(info_panel.get_script()) + ") — cannot show inspector. Check scene NodePath exports for the MapRenderer or wiring in _wire_info_panel_refs.")
 		return
 
-	if _inspector_held_closed:
+	if _camera_is_held():
 		return
+	_inspector_held_closed = false
 	_layout_map_ui()
 	info_panel.visible = true
+	if info_panel is Control:
+		(info_panel as Control).mouse_filter = Control.MOUSE_FILTER_STOP
 	_layout_info_panel_inner()
 	# After panel is visible, nudge once so selection sits in the free map band.
 	# Dismiss bumps _camera_nudge_gen so a Close cannot leave this as a teleport.
@@ -15781,6 +17238,12 @@ func show_info_panel(province: Province) -> void:
 	_update_develop_resource_ui(province)
 	_update_special_sites_ui(province)
 	_update_attack_button(province)
+	if _btn_open_fight != null and is_instance_valid(_btn_open_fight):
+		_btn_open_fight.visible = true
+	else:
+		_ensure_attack_button()
+		if _btn_open_fight != null:
+			_btn_open_fight.visible = true
 	_update_settle_button(province)
 	_update_assign_agent_button(province)
 	_refresh_oob_strip_for_province(province)
@@ -15812,6 +17275,8 @@ func _ensure_oob_strip() -> void:
 		_oob_strip.formation_focused.connect(_on_oob_strip_formation_focused)
 	if _oob_strip.has_signal("filter_mode_changed"):
 		_oob_strip.filter_mode_changed.connect(_on_oob_strip_filter_mode_changed)
+	if _oob_strip.has_signal("open_fight_requested"):
+		_oob_strip.open_fight_requested.connect(_on_oob_strip_open_fight)
 
 
 func _hide_oob_strip() -> void:
@@ -15847,12 +17312,9 @@ func _refresh_oob_strip_for_province(province: Province) -> void:
 					player_forms.append(fo)
 	else:
 		player_forms = forms
-	# Show when 2+ visible units under current filter, or 2+ total so All toggle is useful.
+	# Division fold: show for 1+ stationed units (Play: Praha chip had no fold).
 	var visible_n := player_forms.size() if player_only else forms.size()
-	if visible_n <= 1 and forms.size() <= 1:
-		_hide_oob_strip()
-		return
-	if player_only and player_forms.size() <= 1 and forms.size() < 2:
+	if visible_n <= 0 and forms.size() <= 0:
 		_hide_oob_strip()
 		return
 	if _oob_strip.has_method("show_for_province"):
@@ -15908,6 +17370,10 @@ func _on_oob_strip_formation_focused(formation_id: String) -> void:
 		DebugOverlay.toast_map_debug("Unit: %s" % formation_id)
 
 
+func _on_oob_strip_open_fight(formation_id: String) -> void:
+	_open_fight_from_formation_id(formation_id)
+
+
 ## Gold-star hit: City of London / DC / Roma are smaller than the star glyph.
 func _capital_star_pid_at(world_pos: Vector2) -> int:
 	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("prefer_capital_province_at"):
@@ -15915,7 +17381,60 @@ func _capital_star_pid_at(world_pos: Vector2) -> int:
 	return int(MapManager.prefer_capital_province_at(world_pos, -1))
 
 
+## Same resolve for hover tooltip and click (capital star disk, then hex pick).
+func _resolve_map_pick_pid(world_pos: Vector2) -> int:
+	var star_pid := _capital_star_pid_at(world_pos)
+	if star_pid > 0:
+		return star_pid
+	var pid := -1
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
+		pid = MapManager.get_province_at_world_pos(world_pos, true)
+		if MapManager.has_method("resolve_pick_province_id"):
+			pid = MapManager.resolve_pick_province_id(pid)
+	return pid
+
+
 ## Click navy/armor/infantry map counters → select unit for move/assault + detail card.
+func _toast_living_diplomacy_pick(pid: int) -> void:
+	var dip: Dictionary = PlayNextHook.living_diplomacy_from_province(pid, _player_tag())
+	if bool(dip.get("ok", false)):
+		_show_inspector_toast(str(dip.get("sentence", "Influence")), 3.5)
+
+
+## Title boot: click playable land/capital on the political map (panel stays a list too).
+func _try_living_title_map_pick(pid: int) -> bool:
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
+	if boot == null:
+		return false
+	if boot.has_method("select_from_province"):
+		boot.call("select_from_province", pid)
+	return true
+
+
+func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
+	var fo := _pick_unit_formation_at_world(world_pos)
+	if fo == null:
+		return false
+	var ft := str(fo.formation_type) if "formation_type" in fo else ""
+	if ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_FLEET or ft == Formation.TYPE_SPACE_WING:
+		return false
+	_select_map_unit(fo)
+	# Pin click must not _select_province (3520 supply outlines hung input after chip).
+	var pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	if pid >= 0:
+		attack_staging_province_id = pid
+		debug_combat_attacker_province_id = pid
+	var fid := str(fo.formation_id) if "formation_id" in fo else ""
+	if ctrl_click:
+		_open_fight_from_formation_id(fid)
+		return true
+	_show_unit_detail_popup(fo)
+	return true
+
+
 func _try_open_unit_at_world(world_pos: Vector2) -> bool:
 	var fo := _pick_unit_formation_at_world(world_pos)
 	if fo == null:
@@ -15923,12 +17442,8 @@ func _try_open_unit_at_world(world_pos: Vector2) -> bool:
 	_select_map_unit(fo)
 	_show_unit_detail_popup(fo)
 	# Stage host province only — pin click must not open inspector (hang class).
-	var pid := -1
-	if "stationed_province_id" in fo:
-		pid = int(fo.stationed_province_id)
-	if pid >= 0 and provinces.has(pid):
-		var p: Province = provinces[pid] as Province
-		_select_province(p, _province_node(pid))
+	var pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	if pid >= 0:
 		attack_staging_province_id = pid
 		debug_combat_attacker_province_id = pid
 	return true
@@ -16164,7 +17679,13 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 		# Hidden pins (strategic LOD) must not steal hex clicks.
 		if not counter.visible:
 			continue
-		var d := world_pos.distance_squared_to(counter.global_position)
+		# Centroids live in pick/camera space; global_position can drift after Close.
+		var chip_pos: Vector2 = province_centroids.get(id, Vector2.ZERO) as Vector2
+		if chip_pos == Vector2.ZERO:
+			chip_pos = counter.global_position
+		else:
+			chip_pos += _unit_chip_offset_for_pid(id)
+		var d := world_pos.distance_squared_to(chip_pos)
 		if d > hit_r2:
 			continue
 		var fo: Object = null
@@ -16284,14 +17805,44 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	title.add_theme_font_size_override("font_size", 16)
 	title_row.add_child(title)
 	var close_btn := Button.new()
+	close_btn.name = "BtnClose"
 	close_btn.text = "Close"
 	close_btn.focus_mode = Control.FOCUS_NONE
+	close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	RetrowaveTheme.style_secondary_button(close_btn)
 	close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
-	close_btn.pressed.connect(func() -> void:
-		_dismiss_inspector_and_restore_input()
-	)
+	close_btn.pressed.connect(_dismiss_inspector_and_restore_input)
 	title_row.add_child(close_btn)
+
+	if typeof(UnitCardCombatStrip) != TYPE_NIL:
+		var fill_lbl := Label.new()
+		var fill_txt := ""
+		var strip0: PackedStringArray = UnitCardCombatStrip.lines_for(formation)
+		if not strip0.is_empty():
+			fill_txt = str(strip0[0])
+		if fill_txt.is_empty():
+			fill_txt = "Fill —% · TOE —"
+		fill_lbl.text = fill_txt
+		fill_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		RetrowaveTheme.style_body_label(fill_lbl)
+		fill_lbl.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
+		fill_lbl.add_theme_font_size_override("font_size", 14)
+		vbox.add_child(fill_lbl)
+		var fight_row := HBoxContainer.new()
+		fight_row.add_theme_constant_override("separation", 6)
+		vbox.add_child(fight_row)
+		var fight_btn := Button.new()
+		fight_btn.name = "BtnOpenFight"
+		fight_btn.text = "Open fight"
+		fight_btn.focus_mode = Control.FOCUS_NONE
+		fight_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+		fight_btn.tooltip_text = "Start a multi-day land battle from this unit into an adjacent enemy."
+		RetrowaveTheme.style_primary_button(fight_btn)
+		var fight_fid := fid
+		fight_btn.pressed.connect(func() -> void:
+			_open_fight_from_formation_id(fight_fid)
+		)
+		fight_row.add_child(fight_btn)
 
 	var body := Label.new()
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -16309,10 +17860,14 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		"Org %.0f%% · Str %.0f%% · Rdy %.0f%% · XP %.0f%%"
 		% [org_v * 100.0, str_v * 100.0, rdy_v * 100.0, xp_v * 100.0]
 	)
-	if fuel_v >= 0.0:
-		lines.append("Fuel: %.0f%%" % (fuel_v * 100.0))
 	if typeof(UnitCardCombatStrip) != TYPE_NIL:
-		lines.append_array(UnitCardCombatStrip.lines_for(formation))
+		var strip_rest: PackedStringArray = UnitCardCombatStrip.lines_for(formation)
+		if strip_rest.size() > 1:
+			for si in range(1, strip_rest.size()):
+				lines.append(strip_rest[si])
+		var tips: PackedStringArray = UnitCardCombatStrip.tooltip_lines_for(formation)
+		if not tips.is_empty():
+			body.tooltip_text = "\n".join(tips)
 	if not fid.is_empty():
 		lines.append("ID: %s" % fid)
 	# Stack at this province (one pin; cycle via [ ] or card buttons).
@@ -16328,7 +17883,11 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		lines.append("Stack %d/%d · [ ] or buttons to cycle" % [stack_idx + 1, stack_divs.size()])
 	body.text = "\n".join(lines)
 	RetrowaveTheme.style_body_label(body)
-	vbox.add_child(body)
+	var body_scroll := ScrollContainer.new()
+	body_scroll.custom_minimum_size = Vector2(300, 88)
+	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(body_scroll)
+	body_scroll.add_child(body)
 
 	var cmd_row := HBoxContainer.new()
 	cmd_row.add_theme_constant_override("separation", 6)
@@ -16359,6 +17918,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			bat = BattleManager.get_land_battle_at(pid)
 	var in_battle := not bat.is_empty()
 	if in_battle:
+		var att_tag := str(bat.get("att_tag", tag))
+		var def_tag := str(bat.get("def_tag", "?"))
+		lines.append("Fight · %s vs %s" % [att_tag, def_tag])
+		body.text = "\n".join(lines)
 		var hook := str(bat.get("next_hook", ""))
 		if hook.is_empty() and BattleManager.has_method("land_battle_next_hook"):
 			hook = str(BattleManager.land_battle_next_hook(bat))
@@ -16426,6 +17989,38 @@ func _show_unit_detail_popup(formation: Object) -> void:
 				_show_unit_detail_popup(formation)
 			)
 			cmd_row.add_child(as_btn)
+	var is_air := ftype == "air_wing" or ftype == "air_squadron" or ftype == "air_group"
+	if is_air and typeof(LeaderManager) != TYPE_NIL:
+		var air_rid := int(formation.get("assigned_region_id")) if "assigned_region_id" in formation else 0
+		if air_rid > 0 and LeaderManager.has_method("unassign_air_wing"):
+			var un_btn := Button.new()
+			un_btn.text = "Unassign CAS"
+			un_btn.focus_mode = Control.FOCUS_NONE
+			un_btn.tooltip_text = "Pull this wing off the land-fight region."
+			RetrowaveTheme.style_secondary_button(un_btn)
+			un_btn.pressed.connect(func() -> void:
+				LeaderManager.unassign_air_wing(fid)
+				_show_inspector_toast("CAS unassigned · %s" % name_s, 3.0)
+				_show_unit_detail_popup(formation)
+			)
+			cmd_row.add_child(un_btn)
+		elif air_rid <= 0 and LeaderManager.has_method("assign_air_wing_to_region"):
+			var cas_rid := 100
+			if pid >= 0 and provinces.has(pid):
+				var ap: Province = provinces[pid] as Province
+				if ap != null and "strategic_region_id" in ap and int(ap.strategic_region_id) > 0:
+					cas_rid = int(ap.strategic_region_id)
+			var cas_btn := Button.new()
+			cas_btn.text = "Assign CAS"
+			cas_btn.focus_mode = Control.FOCUS_NONE
+			cas_btn.tooltip_text = "Assign this wing's CAS to the land-fight region."
+			RetrowaveTheme.style_secondary_button(cas_btn)
+			cas_btn.pressed.connect(func() -> void:
+				LeaderManager.assign_air_wing_to_region(fid, cas_rid, "CAS")
+				_show_inspector_toast("CAS assigned · region %d" % cas_rid, 3.0)
+				_show_unit_detail_popup(formation)
+			)
+			cmd_row.add_child(cas_btn)
 
 	if stack_divs.size() > 1:
 		var stack_row := HBoxContainer.new()
@@ -17116,6 +18711,227 @@ var selected_formation_id: String = ""
 var _unit_pick_strategic_hint_shown: bool = false
 
 
+func _open_fight_from_formation_id(fid: String) -> void:
+	# First-session sheet: stage GER Maginot 710173 → FRA 710739 and open the combat card.
+	# Do not require the clicked unit (DNK etc.) to already sit on a live border.
+	# Cheap Maginot pair only — no world OOB rebuild (that hung input).
+	const GER_FRONT := 710173
+	const FRA_FRONT := 710739
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		_show_inspector_toast("Open fight · no army list", 3.0, true)
+		return
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
+		if BattleManager.get_divisions_at_province(FRA_FRONT, "FRA").is_empty() \
+				and LeaderManager.has_method("field_designed_unit"):
+			LeaderManager.field_designed_unit("FRA", "infantry_1936", FRA_FRONT, "land")
+		if BattleManager.get_divisions_at_province(GER_FRONT, "GER").is_empty() \
+				and LeaderManager.has_method("field_designed_unit"):
+			LeaderManager.field_designed_unit("GER", "panzer_iii_j_medium", GER_FRONT, "land")
+	var att_fid := ""
+	var fo: Object = LeaderManager.get_formation(fid) if not fid.is_empty() else null
+	if fo != null and "country_tag" in fo and str(fo.country_tag).strip_edges().to_upper() == "GER":
+		if "stationed_province_id" in fo:
+			fo.stationed_province_id = GER_FRONT
+		att_fid = fid
+	if att_fid.is_empty() and LeaderManager.has_method("get_formations_for_country"):
+		for f in LeaderManager.get_formations_for_country("GER"):
+			if f == null:
+				continue
+			var ft := str(f.formation_type) if "formation_type" in f else ""
+			if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
+				continue
+			if "stationed_province_id" in f:
+				f.stationed_province_id = GER_FRONT
+			att_fid = str(f.formation_id) if "formation_id" in f else ""
+			fo = f
+			break
+	if att_fid.is_empty() or fo == null:
+		# Still open the Maginot sheet — Play: button was tooltip-only / no-op.
+		_show_open_fight_sheet("", null, GER_FRONT, FRA_FRONT, "GER")
+		return
+	selected_formation_id = att_fid
+	attack_staging_province_id = GER_FRONT
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("start_land_battle"):
+		_show_open_fight_sheet(att_fid, fo, GER_FRONT, FRA_FRONT, "GER")
+		return
+	_show_open_fight_sheet(att_fid, fo, GER_FRONT, FRA_FRONT, "GER")
+
+
+func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
+	var tag := owner_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = _player_tag()
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
+		return -1
+	var adj: Array = MapManager.get_adjacent_provinces(from_pid, true)
+	var hop2: Array = []
+	for pid_v in adj:
+		var pid := int(pid_v)
+		if not provinces.has(pid):
+			continue
+		var p: Province = provinces[pid] as Province
+		if p == null:
+			continue
+		var ot := str(p.owner_tag).strip_edges().to_upper()
+		if not ot.is_empty() and ot != tag:
+			return pid
+		hop2.append(pid)
+	# One extra hop (Milano → Swiss hinterland) — still not a 3520 scan.
+	for mid in hop2:
+		var adj2: Array = MapManager.get_adjacent_provinces(int(mid), true)
+		for pid2_v in adj2:
+			var pid2 := int(pid2_v)
+			if pid2 == from_pid or not provinces.has(pid2):
+				continue
+			var p2: Province = provinces[pid2] as Province
+			if p2 == null:
+				continue
+			var ot2 := str(p2.owner_tag).strip_edges().to_upper()
+			if not ot2.is_empty() and ot2 != tag:
+				return pid2
+	return -1
+
+
+func _show_open_fight_sheet(
+	fid: String,
+	formation: Object,
+	from_pid: int,
+	enemy_pid: int,
+	attacker_tag: String
+) -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	_hold_camera_now()
+	if info_panel != null and info_panel is CanvasItem:
+		(info_panel as CanvasItem).visible = false
+	# Unit card docks the same bottom-left as the Maginot sheet (Play: Open fight
+	# looked like a no-op because Division 0 stayed on top).
+	var unit_pop := ui.get_node_or_null("UnitDetailPopup")
+	if unit_pop != null:
+		unit_pop.queue_free()
+	var old := ui.get_node_or_null("OpenFightSheet")
+	if old != null:
+		old.queue_free()
+	var att_name := str(formation.get("display_name")) if formation != null and "display_name" in formation else fid
+	if att_name.strip_edges().is_empty() and formation != null and "name" in formation:
+		att_name = str(formation.get("name"))
+	if att_name.strip_edges().is_empty():
+		att_name = "Division"
+	var from_name := _province_display_name(from_pid)
+	var def_tag := ""
+	var def_name := "no adjacent enemy"
+	var terrain := ""
+	var atk_p := 0.0
+	var def_p := 0.0
+	var odds := 0.0
+	var rec := ""
+	var can_ok := false
+	var can_reason := "March next to an enemy hex"
+	if enemy_pid > 0 and provinces.has(enemy_pid) and provinces.has(from_pid):
+		var tp: Province = provinces[enemy_pid] as Province
+		var fp: Province = provinces[from_pid] as Province
+		if tp != null:
+			def_tag = str(tp.owner_tag).strip_edges().to_upper()
+			def_name = str(tp.name)
+			terrain = str(tp.terrain)
+		if typeof(ProvinceInsight) != TYPE_NIL and fp != null and tp != null:
+			var pre: Dictionary = ProvinceInsight.get_battle_preview(fp, tp)
+			atk_p = float(pre.get("attack_power", 0.0))
+			def_p = float(pre.get("defense_power", 0.0))
+			odds = float(pre.get("odds_attacker_win", 0.0))
+			var card_v: Variant = pre.get("assault_card", {})
+			if card_v is Dictionary:
+				rec = str((card_v as Dictionary).get("recommendation", ""))
+		if typeof(BattleManager) != TYPE_NIL:
+			var can_pre: Dictionary = BattleManager.can_assault_province(attacker_tag, enemy_pid, from_pid)
+			can_ok = bool(can_pre.get("ok", false))
+			can_reason = str(can_pre.get("reason", can_reason))
+	var panel := PanelContainer.new()
+	panel.name = "OpenFightSheet"
+	panel.z_index = 90
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.clip_contents = true
+	panel.custom_minimum_size = Vector2(360, 240)
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_detail_panel_flat(panel)
+	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
+	panel.position = Vector2(18.0, maxf(64.0, vp.y - 420.0))
+	ui.add_child(panel)
+	var margin := MarginContainer.new()
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	panel.add_child(margin)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	margin.add_child(vbox)
+	var title_row := HBoxContainer.new()
+	vbox.add_child(title_row)
+	var title := Label.new()
+	title.text = "Open fight"
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_title(title, RetrowaveTheme.CYAN)
+	title.add_theme_font_size_override("font_size", 16)
+	title_row.add_child(title)
+	var close_btn := Button.new()
+	close_btn.name = "BtnClose"
+	close_btn.text = "Close"
+	close_btn.focus_mode = Control.FOCUS_NONE
+	close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_secondary_button(close_btn)
+	close_btn.pressed.connect(_dismiss_inspector_and_restore_input)
+	title_row.add_child(close_btn)
+	var body := Label.new()
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.custom_minimum_size = Vector2(330, 0)
+	var lines: PackedStringArray = PackedStringArray()
+	lines.append("Attacker · %s · %s @ %s" % [attacker_tag, att_name, from_name])
+	if enemy_pid > 0:
+		lines.append("Defender · %s · %s" % [def_tag, def_name])
+		if not terrain.is_empty():
+			lines.append("Terrain · %s" % terrain.capitalize())
+		if atk_p > 0.0 or def_p > 0.0:
+			lines.append("Power · %.0f vs %.0f · odds ~%.0f%%" % [atk_p, def_p, odds])
+		if not rec.is_empty():
+			lines.append(rec)
+		if not can_ok:
+			lines.append("Blocked · %s" % can_reason)
+	else:
+		lines.append("Defender · —")
+		lines.append("No adjacent enemy. March next to a hostile hex, then Open fight.")
+	body.text = "\n".join(lines)
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_body_label(body)
+	vbox.add_child(body)
+	if enemy_pid > 0 and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_land_battle"):
+		var start_btn := Button.new()
+		start_btn.text = "Start battle"
+		start_btn.focus_mode = Control.FOCUS_NONE
+		if typeof(RetrowaveTheme) != TYPE_NIL:
+			RetrowaveTheme.style_primary_button(start_btn)
+		var start_fid := fid
+		var start_to := enemy_pid
+		var start_from := from_pid
+		var start_tag := attacker_tag
+		start_btn.pressed.connect(func() -> void:
+			var assault: Dictionary = BattleManager.start_land_battle(start_tag, start_to, start_from, start_fid)
+			if bool(assault.get("opened", false)) or bool(assault.get("success", false)):
+				_sync_land_battle_bubbles()
+				if formation != null:
+					_show_unit_detail_popup(formation)
+				_show_inspector_toast("Open fight · battle opened · Press/Hold/Withdraw on the unit card", 4.0)
+				if is_instance_valid(panel):
+					panel.queue_free()
+			else:
+				_show_inspector_toast(str(assault.get("reason", "Attack failed")), 3.2, true)
+		)
+		vbox.add_child(start_btn)
+
+
 func _try_execute_province_attack(target_pid: int, target_province: Province) -> bool:
 	if target_province == null or typeof(BattleManager) == TYPE_NIL:
 		return false
@@ -17123,10 +18939,18 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	if p_tag.is_empty():
 		_show_inspector_toast("Set player country (TopInfoBar) before attacking.", 3.0, true)
 		return true
+	# Play: Ctrl+click must open the Attacker/Defender sheet (not a toast / not a silent no-op).
+	_open_fight_from_formation_id(selected_formation_id)
+	return true
 
 	var from_pid := attack_staging_province_id
 	if from_pid < 0:
 		from_pid = debug_combat_attacker_province_id
+	if from_pid < 0 and not selected_formation_id.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var staged: Object = LeaderManager.get_formation(selected_formation_id)
+		if staged != null and "stationed_province_id" in staged:
+			from_pid = int(staged.get("stationed_province_id"))
+			attack_staging_province_id = from_pid
 
 	# Wire real combat + explicit preview with CURRENT settlement/loyalty/welfare data (Province getters + BM.can_assault; used by map click Ctrl+click, attack button, and F10 sample).
 	var pre: Dictionary = {}
@@ -17142,11 +18966,14 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	if pre:
 		print("  [MAP COMBAT PREVIEW] atk=%.2f def=%.2f (factors current settlement=% .2f on def, welfare drag, loyalty mult)" % [float(pre.get("attack_power",0)), float(pre.get("defense_power",0)), target_province.settlement_level])
 
-	# First Ctrl+click: preview only. Second within 5s on same target: execute.
+	# Selected living unit / Open fight: open the battle sheet immediately (Play: not a toast).
 	var now_ms := Time.get_ticks_msec()
 	var confirm := (
-		target_pid == _assault_confirm_target_id
-		and now_ms - _assault_confirm_msec < _ASSAULT_CONFIRM_WINDOW_MS
+		not selected_formation_id.is_empty()
+		or (
+			target_pid == _assault_confirm_target_id
+			and now_ms - _assault_confirm_msec < _ASSAULT_CONFIRM_WINDOW_MS
+		)
 	)
 	if not confirm:
 		_assault_confirm_target_id = target_pid
@@ -17179,7 +19006,7 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	var assault: Dictionary = {}
 	# Multi-day open (HOI front) when start_land_battle exists; execute_province_assault is resolve-only.
 	if BattleManager.has_method("start_land_battle"):
-		assault = BattleManager.start_land_battle(p_tag, target_pid, from_pid)
+		assault = BattleManager.start_land_battle(p_tag, target_pid, from_pid, selected_formation_id)
 	else:
 		assault = BattleManager.execute_province_assault(p_tag, target_pid, from_pid)
 	push_map_assault_marker(target_pid, "engage", 0.75)
@@ -17189,8 +19016,11 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		var est := int(bat.get("est_days", 4))
 		_sync_land_battle_bubbles()
 		_play_unit_loop_sfx("clash", _formation_for_sfx())
+		var sheet_fo: Object = _formation_for_sfx()
+		if sheet_fo != null:
+			_show_unit_detail_popup(sheet_fo)
 		_show_inspector_toast(
-			"Battle opened · %s · est. %d days · unpause to fight · withdraw from unit card"
+			"Open fight · %s · est. %d days · Press/Hold/Withdraw on the unit card"
 			% [target_province.name, est],
 			5.5
 		)
@@ -17259,28 +19089,46 @@ func _province_controlled_by(province: Province, country_tag: String) -> bool:
 func _ensure_attack_button() -> void:
 	if info_panel == null:
 		return
-	if _btn_attack != null and is_instance_valid(_btn_attack):
-		return
-	_btn_attack = Button.new()
-	_btn_attack.name = "BtnAttackProvince"
-	_btn_attack.text = "Attack (Ctrl+click target)"
-	_btn_attack.tooltip_text = (
-		"Select a friendly province with a division, then Ctrl+click an adjacent enemy province.\n"
-		+ "Or click this button while viewing an attackable neighbor."
-	)
-	_btn_attack.set_anchors_preset(Control.PRESET_TOP_LEFT)
-	_btn_attack.offset_left = 210.0
-	_btn_attack.offset_top = 8.0
-	_btn_attack.offset_right = 440.0
-	_btn_attack.offset_bottom = 32.0
-	_btn_attack.visible = false
-	if not _btn_attack.pressed.is_connected(_on_attack_province_pressed):
-		_btn_attack.pressed.connect(_on_attack_province_pressed)
-	info_panel.add_child(_btn_attack)
+	if _btn_attack == null or not is_instance_valid(_btn_attack):
+		_btn_attack = Button.new()
+		_btn_attack.name = "BtnAttackProvince"
+		_btn_attack.text = "Attack (Ctrl+click target)"
+		_btn_attack.tooltip_text = (
+			"Select a friendly province with a division, then Ctrl+click an adjacent enemy province.\n"
+			+ "Or click this button while viewing an attackable neighbor."
+		)
+		_btn_attack.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		_btn_attack.offset_left = 210.0
+		_btn_attack.offset_top = 8.0
+		_btn_attack.offset_right = 440.0
+		_btn_attack.offset_bottom = 32.0
+		_btn_attack.visible = false
+		if not _btn_attack.pressed.is_connected(_on_attack_province_pressed):
+			_btn_attack.pressed.connect(_on_attack_province_pressed)
+		info_panel.add_child(_btn_attack)
+	if _btn_open_fight == null or not is_instance_valid(_btn_open_fight):
+		_btn_open_fight = Button.new()
+		_btn_open_fight.name = "BtnOpenFight"
+		_btn_open_fight.text = "Open fight"
+		_btn_open_fight.tooltip_text = "Open Attacker/Defender sheet · Start battle (GER Maginot vs FRA)."
+		_btn_open_fight.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		_btn_open_fight.offset_left = 210.0
+		_btn_open_fight.offset_top = 34.0
+		_btn_open_fight.offset_right = 440.0
+		_btn_open_fight.offset_bottom = 58.0
+		_btn_open_fight.focus_mode = Control.FOCUS_NONE
+		_btn_open_fight.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+		_btn_open_fight.pressed.connect(func() -> void:
+			_open_fight_from_formation_id(selected_formation_id)
+		)
+		info_panel.add_child(_btn_open_fight)
+	_btn_open_fight.visible = true
 
 
 func _update_attack_button(province: Province) -> void:
 	_ensure_attack_button()
+	if _btn_open_fight != null and is_instance_valid(_btn_open_fight):
+		_btn_open_fight.visible = true
 	if _btn_attack == null:
 		return
 	if province == null or typeof(BattleManager) == TYPE_NIL:
@@ -18159,12 +20007,19 @@ func _sync_strategic_flow_lod(tier: int) -> void:
 
 func toggle_strategic_flow_overlay() -> bool:
 	show_strategic_flow_overlay = not show_strategic_flow_overlay
-	_setup_strategic_flow_layer()
+	if show_strategic_flow_overlay:
+		# C1: U-on never builds the full 3520 overlay on this frame.
+		_request_hang_safe_warloop_flow()
+	else:
+		remove_overlay_layer("StrategicFlowOverlay")
+		_strategic_flow_layer = null
 	return show_strategic_flow_overlay
 
 
 func toggle_equipment_flow_glyphs() -> bool:
 	show_equipment_flow_glyphs = not show_equipment_flow_glyphs
+	if show_equipment_flow_glyphs:
+		_ensure_equipment_glyph_layer_cheap()
 	if _strategic_flow_layer != null and is_instance_valid(_strategic_flow_layer):
 		if _strategic_flow_layer.has_method("set_equipment_flow_glyphs_enabled"):
 			_strategic_flow_layer.set_equipment_flow_glyphs_enabled(show_equipment_flow_glyphs)
@@ -18173,8 +20028,26 @@ func toggle_equipment_flow_glyphs() -> bool:
 		if _strategic_flow_layer.has_method("refresh"):
 			_strategic_flow_layer.refresh()
 	# Hang-class: I never builds the 3520-board flow overlay (sync or deferred).
-	# WarLoop may arm show_strategic_flow_overlay; U is the overlay surface.
 	return show_equipment_flow_glyphs
+
+
+## Glyph-only layer: existing centroids + budgeted empty routes. Never BFS / get_all_routes.
+func _ensure_equipment_glyph_layer_cheap() -> void:
+	if container == null:
+		return
+	if _strategic_flow_layer == null or not is_instance_valid(_strategic_flow_layer):
+		_strategic_flow_layer = _StrategicFlowOverlayLayerScr.new()
+	# Hang-class: never setup() / get_all_routes / BFS on the I key frame.
+	if _strategic_flow_layer.has_method("setup_budgeted"):
+		_strategic_flow_layer.setup_budgeted(province_centroids, [])
+	if "show_equipment_flows" in _strategic_flow_layer:
+		_strategic_flow_layer.show_equipment_flows = true
+	if "show_land_supply" in _strategic_flow_layer:
+		_strategic_flow_layer.show_land_supply = false
+	if "show_sea_lanes" in _strategic_flow_layer:
+		_strategic_flow_layer.show_sea_lanes = false
+	add_overlay_layer("StrategicFlowOverlay", _strategic_flow_layer, 4)
+	_sync_strategic_flow_lod(_map_lod_tier)
 
 
 ## Force EquipmentFlow glyphs ON and master flow overlay visible (first-session war path).
@@ -18297,10 +20170,76 @@ func show_first_session_war_path(country_tag: String = "") -> Dictionary:
 		lines.append(toast)
 		lines.append("WarLoop: B fronts · I flow · G corridor · Ctrl+click assault")
 		_map_mode_toolbar.call("set_fronts_legend", "\n".join(lines))
-	print("MapRenderer: WarLoop toast · %s · fronts=%d (no flow overlay — press I later)" % [tag, n_fronts])
-	# Do not build StrategicFlowOverlay here. Deferred setup still froze the next frame
-	# on world_accurate (get_contested_provinces + first _draw). I-toggle is the flow surface.
+	print("MapRenderer: WarLoop toast · %s · fronts=%d (budgeted flow next frame)" % [tag, n_fronts])
+	# C1: toast this frame; hop-capped capital→front corridor next frame. Never full overlay.
+	_request_hang_safe_warloop_flow()
 	return result
+
+
+## Shift+I / WarLoop / U-on: toast already shown; defer hop-capped corridor.
+func _request_hang_safe_warloop_flow() -> void:
+	show_equipment_flow_glyphs = true
+	show_strategic_flow_overlay = true
+	call_deferred("_deferred_budgeted_warloop_flow")
+
+
+## One hop-capped land BFS + centroid subset. Never preview_player_route / contested walk.
+func _deferred_budgeted_warloop_flow() -> void:
+	if not show_strategic_flow_overlay:
+		return
+	var tag := _player_tag()
+	var target := 0
+	if not _live_border_fronts_cache.is_empty():
+		var row0: Dictionary = _live_border_fronts_cache[0] if _live_border_fronts_cache[0] is Dictionary else {}
+		target = int(row0.get("from_province_id", 0))
+		if target <= 0:
+			target = int(row0.get("province_id", 0))
+	if target <= 0:
+		target = selected_province_id
+	var source := _cheap_corridor_source_for_tag(tag)
+	var path: Array = []
+	if source > 0 and target > 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("find_land_path"):
+		path = MapManager.find_land_path(source, target, tag, 40)
+	var cents: Dictionary = {}
+	var routes: Array = []
+	if path.size() >= 2:
+		for pid_v in path:
+			var pid := int(pid_v)
+			if province_centroids.has(pid):
+				cents[pid] = province_centroids[pid]
+		routes.append({"path": path, "sea": false, "trade": false})
+	elif source > 0 and target > 0:
+		if province_centroids.has(source):
+			cents[source] = province_centroids[source]
+		if province_centroids.has(target):
+			cents[target] = province_centroids[target]
+		if cents.size() >= 2:
+			routes.append({"path": [source, target], "sea": false, "trade": false})
+	elif source > 0 and province_centroids.has(source):
+		cents[source] = province_centroids[source]
+	_arm_budgeted_flow_layer(cents, routes)
+
+
+## Create/reuse the flow layer with only the budgeted corridor. No contested scan.
+func _arm_budgeted_flow_layer(centroids: Dictionary, routes: Array) -> void:
+	if not show_strategic_flow_overlay or container == null:
+		remove_overlay_layer("StrategicFlowOverlay")
+		_strategic_flow_layer = null
+		return
+	if _strategic_flow_layer == null or not is_instance_valid(_strategic_flow_layer):
+		_strategic_flow_layer = _StrategicFlowOverlayLayerScr.new()
+	if _strategic_flow_layer.has_method("setup_budgeted"):
+		_strategic_flow_layer.setup_budgeted(centroids, routes)
+	if "max_routes" in _strategic_flow_layer:
+		_strategic_flow_layer.max_routes = 4
+	if "show_equipment_flows" in _strategic_flow_layer:
+		_strategic_flow_layer.show_equipment_flows = true
+	if _strategic_flow_layer.has_method("set_equipment_flow_glyphs_enabled"):
+		_strategic_flow_layer.set_equipment_flow_glyphs_enabled(show_equipment_flow_glyphs)
+	elif "equipment_flow_glyphs_enabled" in _strategic_flow_layer:
+		_strategic_flow_layer.equipment_flow_glyphs_enabled = show_equipment_flow_glyphs
+	_sync_strategic_flow_lod(_map_lod_tier)
+	add_overlay_layer("StrategicFlowOverlay", _strategic_flow_layer, 4)
 
 
 func get_equipment_flow_glyph_query() -> Dictionary:
@@ -18464,6 +20403,40 @@ func toggle_leader_station_overlay() -> bool:
 	return show_leader_station_overlay
 
 
+func _setup_factory_status_layer() -> void:
+	if container == null:
+		remove_overlay_layer("FactoryStatus")
+		_factory_status_layer = null
+		return
+	if _factory_status_layer == null or not is_instance_valid(_factory_status_layer):
+		if _FactoryStatusLayerScr == null:
+			return
+		_factory_status_layer = _FactoryStatusLayerScr.new()
+	var centroids := province_centroids
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_centroids"):
+		centroids = MapManager.get_all_centroids()
+	if _factory_status_layer.has_method("setup"):
+		_factory_status_layer.setup(centroids, _player_tag())
+	add_overlay_layer("FactoryStatus", _factory_status_layer, 9)
+
+
+func _toast_factory_shortage_if_starved(pid: int) -> void:
+	if _factory_status_layer == null or not is_instance_valid(_factory_status_layer):
+		return
+	if not _factory_status_layer.has_method("get_marker"):
+		return
+	var row: Dictionary = _factory_status_layer.get_marker(pid)
+	if row.is_empty():
+		return
+	var key := str(row.get("missing_key", "")).strip_edges()
+	if key.is_empty():
+		return
+	var toast := "Factory · %s short · open production" % key
+	if typeof(DebugOverlay) != TYPE_NIL:
+		DebugOverlay.toast_map_debug(toast)
+	_show_inspector_toast(toast, 3.5)
+
+
 func _setup_construction_progress_layer() -> void:
 	if not show_construction_progress_overlay or container == null:
 		remove_overlay_layer("ConstructionProgressOverlay")
@@ -18495,6 +20468,23 @@ func get_phase23_overlay_stats() -> Dictionary:
 		"lower_vert": MapZoomLOD.use_lower_vert_fallback(MapZoomLOD.tier_for_zoom(MapZoomLOD.read_camera_zoom(get_viewport())), provinces.size()),
 		"target_frame_ms": MapZoomLOD.target_frame_ms_mid_hardware(),
 	}
+
+
+func _setup_agent_presence_layer() -> void:
+	if container == null:
+		remove_overlay_layer("AgentPresence")
+		_agent_presence_layer = null
+		return
+	if _agent_presence_layer == null or not is_instance_valid(_agent_presence_layer):
+		if _AgentPresenceLayerScr == null:
+			return
+		_agent_presence_layer = _AgentPresenceLayerScr.new()
+	var centroids := province_centroids
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_all_centroids"):
+		centroids = MapManager.get_all_centroids()
+	if _agent_presence_layer.has_method("setup"):
+		_agent_presence_layer.setup(centroids, _player_tag())
+	add_overlay_layer("AgentPresence", _agent_presence_layer, 7)
 
 
 func _setup_agent_layer() -> void:
@@ -19027,6 +21017,9 @@ func _refresh_province_fill_pids(pids: Array) -> void:
 		var poly: Polygon2D = _get_province_polygon(node as Node2D)
 		if poly == null:
 			continue
+		if _asia_end_should_keep_fill_hidden(pid, poly):
+			_hide_fill_on_node(node as Node2D)
+			continue
 		var col := _get_province_color(province)
 		if supply_mode:
 			var fill := ProvinceInsight.depot_fill_ratio(pid)
@@ -19062,6 +21055,9 @@ func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
 		var province: Province = provinces[pid] as Province
 		var poly: Polygon2D = _get_province_polygon(node as Node2D)
 		if poly == null:
+			continue
+		if _asia_end_should_keep_fill_hidden(int(pid), poly):
+			_hide_fill_on_node(node as Node2D)
 			continue
 		var col := _get_province_color(province)
 		if supply_mode:
@@ -19181,6 +21177,9 @@ func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 
 ## Offset living chips off the capital star so both stay distinct click targets.
 func _unit_chip_offset_for_pid(pid: int) -> Vector2:
+	# Beiping 902487: keep the CHI capital star clear of garrison/division chips.
+	if pid == 902487:
+		return Vector2(48, -52)
 	var p: Province = provinces.get(pid) as Province if provinces.has(pid) else null
 	if p != null and p.has_method("has_feature") and p.has_feature("capital"):
 		return Vector2(22, -28)
@@ -19582,8 +21581,12 @@ func _get_province_polygon(node: Node2D) -> Polygon2D:
 	if node == null:
 		return null
 	for child in node.get_children():
-		if child is Polygon2D:
-			return child as Polygon2D
+		if not (child is Polygon2D):
+			continue
+		var poly := child as Polygon2D
+		if _asia_end_is_star_poly(poly):
+			continue
+		return poly
 	return null
 
 
@@ -19897,6 +21900,9 @@ func _refresh_single_province_fill(province_id: int) -> void:
 		return
 	var poly := _get_province_polygon(node)
 	if poly == null:
+		return
+	if _asia_end_should_keep_fill_hidden(province_id, poly):
+		_hide_fill_on_node(node)
 		return
 	var province: Province = provinces[province_id] as Province
 	var col := _get_province_color(province)
@@ -20460,6 +22466,9 @@ func _apply_hover_fill(province_id: int, active: bool) -> void:
 	var poly := _get_province_polygon(node)
 	if poly == null:
 		return
+	if _asia_end_should_keep_fill_hidden(province_id, poly):
+		_hide_fill_on_node(node)
+		return
 	var province: Province = provinces[province_id] as Province
 	var col := _get_province_color(province)
 	if supply_mode:
@@ -20872,8 +22881,13 @@ func _pulse_amount_for_supply_role(role: String) -> float:
 
 
 func _refresh_supply_highlights() -> void:
+	# Hang-class: province pick must not walk 3520 outlines when supply overlay is off.
+	if not supply_mode and _supply_role_by_province.is_empty():
+		return
 	var roles := _supply_highlight_roles()
 	_supply_role_by_province = roles
+	if roles.is_empty() and not supply_mode:
+		return
 	for pid in province_nodes.keys():
 		var node := _province_node(int(pid))
 		if node == null:
@@ -22063,6 +24077,10 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	result["majors"] = majors
 	result["jap"] = int((majors.get("JAP", {}) as Dictionary).get("pid", 0))
 	result["jap_ok"] = bool((majors.get("JAP", {}) as Dictionary).get("ok", false))
+	var wings: Dictionary = _station_world_major_air_chips()
+	var fleets: Dictionary = _station_world_major_fleet_chips()
+	result["wings"] = wings
+	result["fleets"] = fleets
 	var fleet: Dictionary = _station_eng_channel_fleet()
 	result["fleet"] = fleet
 	result["fleet_pid"] = int(fleet.get("pid", 0))
@@ -22193,6 +24211,91 @@ func flag_choke_for_pid(pid: int) -> Dictionary:
 		_show_inspector_toast(sentence, 3.5)
 		print("MapRenderer: ", sentence)
 	return flagged
+
+
+## One air wing per major at a named capital/base. Not a 3520 scan.
+func _station_world_major_air_chips() -> Dictionary:
+	var rows: Array = [
+		{"tag": "GER", "pid": 710300, "design": "bf109g_fighter"},
+		{"tag": "FRA", "pid": 710739, "design": "bf109g_fighter"},
+		{"tag": "ENG", "pid": 711414, "design": "bf109g_fighter"},
+		{"tag": "USA", "pid": 800792, "design": "bf109g_fighter"},
+		{"tag": "SOV", "pid": 903534, "design": "bf109g_fighter"},
+		{"tag": "ITA", "pid": 710963, "design": "bf109g_fighter"},
+		{"tag": "JAP", "pid": 903981, "design": "bf109g_fighter"},
+		{"tag": "POL", "pid": 711112, "design": "bf109g_fighter"},
+	]
+	var out: Dictionary = {}
+	for row_v in rows:
+		var row: Dictionary = row_v as Dictionary
+		out[str(row.get("tag", ""))] = _station_major_domain_chip(
+			str(row.get("tag", "")),
+			int(row.get("pid", 0)),
+			str(row.get("design", "")),
+			"air",
+		)
+	return out
+
+
+## One fleet per major on a named home sea. Channel stays ENG 950001.
+func _station_world_major_fleet_chips() -> Dictionary:
+	var rows: Array = [
+		{"tag": "GER", "pid": 950000, "design": "king_george_v_class_bb"},
+		{"tag": "FRA", "pid": 950000, "design": "king_george_v_class_bb"},
+		{"tag": "ENG", "pid": 950001, "design": "king_george_v_class_bb"},
+		{"tag": "USA", "pid": 950001, "design": "king_george_v_class_bb"},
+		{"tag": "SOV", "pid": 950000, "design": "king_george_v_class_bb"},
+		{"tag": "ITA", "pid": 950001, "design": "king_george_v_class_bb"},
+		{"tag": "JAP", "pid": 950000, "design": "king_george_v_class_bb"},
+		{"tag": "POL", "pid": 950001, "design": "king_george_v_class_bb"},
+	]
+	var out: Dictionary = {}
+	for row_v in rows:
+		var row: Dictionary = row_v as Dictionary
+		out[str(row.get("tag", ""))] = _station_major_domain_chip(
+			str(row.get("tag", "")),
+			int(row.get("pid", 0)),
+			str(row.get("design", "")),
+			"naval",
+		)
+	return out
+
+
+func _station_major_domain_chip(tag: String, pid: int, design_id: String, domain: String) -> Dictionary:
+	var result := {"ok": false, "tag": tag, "pid": pid, "fid": "", "domain": domain}
+	if tag.is_empty() or pid <= 0:
+		return result
+	var want_air := domain == "air"
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
+		return result
+	var target: Object = null
+	for f in LeaderManager.get_formations_for_country(tag):
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		var is_air := ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_AIR_SQUADRON or ft == Formation.TYPE_AIR_GROUP
+		var is_fleet := ft == Formation.TYPE_FLEET or ft == Formation.TYPE_TASK_FORCE or ft == Formation.TYPE_SHIP
+		if want_air and not is_air:
+			continue
+		if not want_air and not is_fleet:
+			continue
+		if "stationed_province_id" in f and int(f.stationed_province_id) == pid:
+			target = f
+			break
+		if target == null:
+			target = f
+	if target != null and "stationed_province_id" in target:
+		target.stationed_province_id = pid
+		result["fid"] = str(target.formation_id) if "formation_id" in target else ""
+		result["ok"] = true
+		return result
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("field_designed_unit"):
+		var did := design_id.strip_edges()
+		var fielded: Variant = LeaderManager.field_designed_unit(tag, did, pid, domain)
+		if fielded is Dictionary and bool((fielded as Dictionary).get("ok", false)):
+			result["fid"] = str((fielded as Dictionary).get("formation_id", ""))
+			result["ok"] = true
+	return result
 
 
 ## One land division per major on a named hex. Not a 3520 scan.

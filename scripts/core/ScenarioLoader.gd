@@ -1982,7 +1982,10 @@ const _CAPITAL_CITY_NAMES: Dictionary = {
 	"buenos aires": "ARG",
 	"santiago": "CHL",
 	"beijing": "CHI",
+	"beiping": "CHI",
 	"nanjing": "CHI",
+	"nanking": "CHI",
+	"chongqing": "CHI",
 	"seoul": "KOR",
 	"cairo": "EGY",
 	"tehran": "PER",
@@ -2079,6 +2082,7 @@ const _1936_CURATED_CAPITALS: Dictionary = {
 	"NLD": 711019, "BEL": 710047, "LUX": 710977, "SWI": 710122, "AUS": 710020,
 	"CZE": 710146, "HUN": 710829, "ROM": 711177, "YUG": 711188, "TUR": 711276,
 	"DNK": 710561, "SWE": 711213, "NOR": 711039, "FIN": 710693, "IRE": 710854,
+	"CHI": 902487,
 }
 
 

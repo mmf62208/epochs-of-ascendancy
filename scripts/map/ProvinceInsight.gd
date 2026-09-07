@@ -72,6 +72,8 @@ static func build_inspector_topline(province: Province) -> Dictionary:
 		var rid: int = province.strategic_region_id if province.strategic_region_id > 0 else MapManager.get_province_region_id(province.id)
 		if rid > 0 and MapManager.has_method("get_strategic_region_name"):
 			region = str(MapManager.get_strategic_region_name(rid)).strip_edges()
+			if region.begins_with("Strategic Region "):
+				region = ""
 	var sea_zone := ""
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_sea_zone_name"):
 		sea_zone = str(MapManager.get_sea_zone_name(province.id)).strip_edges()
@@ -99,7 +101,9 @@ static func build_strategic_hover_tooltip(province: Province) -> String:
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
 		var rid: int = province.strategic_region_id if province.strategic_region_id > 0 else MapManager.get_province_region_id(province.id)
 		if rid > 0:
-			region = MapManager.get_strategic_region_name(rid)
+			region = str(MapManager.get_strategic_region_name(rid)).strip_edges()
+			if region.begins_with("Strategic Region "):
+				region = ""
 	var choke := ""
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_strategic_chokepoint"):
 		if MapManager.has_strategic_chokepoint(province.id):

@@ -81,24 +81,25 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     spatial = _spatial_left_click_slice(ren)
 
     # 1) Pin branch first: _try_open_unit_at_world before hex resolve.
+    # Capital gold star wins over a colocated chip (Berlin Air Wing / London star).
     pin_first = False
-    chip_before_star = False
+    star_before_chip = False
     if spatial:
         i_pin = spatial.find("_try_open_unit_at_world")
         i_hex = spatial.find("get_province_at_world_pos")
         i_star = spatial.find("_capital_star_pid_at")
         pin_first = i_pin >= 0 and i_hex >= 0 and i_pin < i_hex
-        chip_before_star = i_pin >= 0 and i_star >= 0 and i_pin < i_star
+        star_before_chip = i_star >= 0 and i_pin >= 0 and i_star < i_pin
     wiring["pin_before_hex"] = pin_first
     if pin_first:
         passes.append("pin_before_hex")
     else:
         fails.append("pin_before_hex")
-    wiring["chip_before_capital_star"] = chip_before_star
-    if chip_before_star:
-        passes.append("chip_before_capital_star")
+    wiring["capital_star_before_chip"] = star_before_chip
+    if star_before_chip:
+        passes.append("capital_star_before_chip")
     else:
-        fails.append("chip_before_capital_star")
+        fails.append("capital_star_before_chip")
 
     # 2) Hit disk ≥48 px / zoom with floor ≥20 world units.
     hit_ok = _hit_radius_ok(pick_fn)
@@ -218,7 +219,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
             "MapRenderer _pick_unit_formation_at_world",
         ],
         "policy": "pin_first_hit_disk_48_floor_20_selected_chip_no_inspector"
-        "; chip_match_station_province_one_pin_per_hex",
+        "; capital_star_before_chip; chip_match_station_province_one_pin_per_hex",
     }
 
 

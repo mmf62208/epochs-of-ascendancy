@@ -5,9 +5,57 @@ class_name MainMenu
 extends CanvasLayer
 
 const MENU_WIDTH := 960.0
-const MENU_HEIGHT := 620.0
+const MENU_HEIGHT := 680.0
+const LIVING_CC_NATIONS := ["GER", "ENG", "FRA", "JAP", "USA", "SOV", "ITA", "POL"]
+const LIVING_CC_ERAS := [1918, 1936, 2026]
 
 signal menu_closed
+
+
+## Facts for the Command Center living campaign pick. Unknown tag/year → GER 1936.
+static func living_campaign_pick_facts(tag: String = "GER", year: int = 1936) -> Dictionary:
+	var t := tag.strip_edges().to_upper()
+	var defaulted := false
+	if t.is_empty() or not LIVING_CC_NATIONS.has(t):
+		t = "GER"
+		defaulted = true
+	var y := int(year)
+	if y != 1918 and y != 1936 and y != 2026:
+		y = 1936
+		defaulted = true
+	return {
+		"ok": true,
+		"player_tag": t,
+		"year": y,
+		"era": y,
+		"nations": LIVING_CC_NATIONS.duplicate(),
+		"eras": LIVING_CC_ERAS.duplicate(),
+		"default_ger": t == "GER",
+		"default_1936": y == 1936,
+		"defaulted": defaulted,
+		"live": true,
+	}
+
+
+## Apply a Command Center nation/era pick. Headless-safe (no Window). Env boot in TestRunner stays.
+static func apply_living_campaign_pick(tag: String = "GER", year: int = 1936) -> Dictionary:
+	var facts: Dictionary = living_campaign_pick_facts(tag, year)
+	var t := str(facts.get("player_tag", "GER"))
+	var y := int(facts.get("year", 1936))
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("boot_living_player"):
+		var nation: Dictionary = LeaderManager.boot_living_player(t)
+		facts["nation"] = nation
+		facts["player_tag"] = str(nation.get("player_tag", t))
+	elif typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("set_player_country_tag"):
+		LeaderManager.set_player_country_tag(t)
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("boot_living_era"):
+		var era: Dictionary = TimeManager.boot_living_era(y)
+		facts["era_boot"] = era
+		facts["year"] = int(era.get("year", y))
+		facts["era"] = int(era.get("era", y))
+	facts["ok"] = true
+	facts["applied"] = true
+	return facts
 
 var _closing := false
 var _root: Control
@@ -24,6 +72,8 @@ var _rename_field: LineEdit
 var _pending_rename_slot := ""
 var _save_as_dialog: AcceptDialog
 var _save_as_field: LineEdit
+var _nation_btns: Dictionary = {}
+var _era_btns: Dictionary = {}
 
 
 func _ready() -> void:
@@ -173,6 +223,49 @@ func _build_ui() -> void:
 	_add_action_button(left, "Return to Title", "return_to_main", false)
 	_add_action_button(left, "Exit to Desktop", "exit", false, true)
 
+	var camp_hdr := Label.new()
+	camp_hdr.text = "CAMPAIGN"
+	RetrowaveTheme.style_column_header(camp_hdr)
+	left.add_child(camp_hdr)
+	var camp_hint := Label.new()
+	camp_hint.text = "GER Maginot is the F5 default. Pick a nation and era."
+	camp_hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	RetrowaveTheme.style_body_label(camp_hint)
+	left.add_child(camp_hint)
+	var nation_row_a := HBoxContainer.new()
+	nation_row_a.add_theme_constant_override("separation", 4)
+	left.add_child(nation_row_a)
+	var nation_row_b := HBoxContainer.new()
+	nation_row_b.add_theme_constant_override("separation", 4)
+	left.add_child(nation_row_b)
+	var ni := 0
+	for tag in LIVING_CC_NATIONS:
+		var nbtn := Button.new()
+		nbtn.text = str(tag)
+		nbtn.custom_minimum_size = Vector2(52, 32)
+		nbtn.focus_mode = Control.FOCUS_ALL
+		nbtn.process_mode = Node.PROCESS_MODE_ALWAYS
+		nbtn.pressed.connect(_on_living_nation_pressed.bind(str(tag)))
+		if ni < 4:
+			nation_row_a.add_child(nbtn)
+		else:
+			nation_row_b.add_child(nbtn)
+		_nation_btns[str(tag)] = nbtn
+		ni += 1
+	var era_row := HBoxContainer.new()
+	era_row.add_theme_constant_override("separation", 4)
+	left.add_child(era_row)
+	for yr in LIVING_CC_ERAS:
+		var ebtn := Button.new()
+		ebtn.text = str(int(yr))
+		ebtn.custom_minimum_size = Vector2(68, 32)
+		ebtn.focus_mode = Control.FOCUS_ALL
+		ebtn.process_mode = Node.PROCESS_MODE_ALWAYS
+		ebtn.pressed.connect(_on_living_era_pressed.bind(int(yr)))
+		era_row.add_child(ebtn)
+		_era_btns[int(yr)] = ebtn
+	_refresh_living_campaign_buttons()
+
 	if OS.is_debug_build():
 		var dbg_hdr := Label.new()
 		dbg_hdr.text = "DEBUG"
@@ -287,6 +380,51 @@ func _add_action_button(parent: VBoxContainer, text: String, id: String, primary
 	else:
 		RetrowaveTheme.style_secondary_button(btn)
 	parent.add_child(btn)
+
+
+func _on_living_nation_pressed(tag: String) -> void:
+	var year := 1936
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year"):
+		year = int(TimeManager.get_current_year())
+	var out: Dictionary = apply_living_campaign_pick(tag, year)
+	_refresh_living_campaign_buttons()
+	_set_status("Playing %s · %d" % [str(out.get("player_tag", tag)), int(out.get("year", year))])
+	_toast("Campaign · %s %d" % [str(out.get("player_tag", tag)), int(out.get("year", year))], 2.5)
+
+
+func _on_living_era_pressed(year: int) -> void:
+	var tag := "GER"
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		tag = str(LeaderManager.get_player_country_tag())
+	var out: Dictionary = apply_living_campaign_pick(tag, year)
+	_refresh_living_campaign_buttons()
+	_set_status("Playing %s · %d" % [str(out.get("player_tag", tag)), int(out.get("year", year))])
+	_toast("Era · %d" % int(out.get("year", year)), 2.5)
+
+
+func _refresh_living_campaign_buttons() -> void:
+	var tag := "GER"
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		tag = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+	var year := 1936
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year"):
+		year = int(TimeManager.get_current_year())
+	for k in _nation_btns.keys():
+		var btn: Button = _nation_btns[k]
+		if btn == null or not is_instance_valid(btn):
+			continue
+		if str(k) == tag:
+			RetrowaveTheme.style_primary_button(btn)
+		else:
+			RetrowaveTheme.style_secondary_button(btn)
+	for yk in _era_btns.keys():
+		var ebtn: Button = _era_btns[yk]
+		if ebtn == null or not is_instance_valid(ebtn):
+			continue
+		if int(yk) == year:
+			RetrowaveTheme.style_primary_button(ebtn)
+		else:
+			RetrowaveTheme.style_secondary_button(ebtn)
 
 
 func _on_action(id: String) -> void:
@@ -657,7 +795,8 @@ func _show_help() -> void:
 	dlg.title = "Epochs of Ascendancy — First Session"
 	dlg.dialog_text = (
 		"Epochs of Ascendancy — First Session\n\n"
-		+ "Command Center: Save / Load slots · ESC resumes map\n\n"
+		+ "Command Center: Save / Load slots · pick GER/ENG/FRA/JAP · 1918/1936/2026 · ESC resumes map\n"
+		+ "Title: pick scenario date, country, or load a save (map stays live underneath)\n\n"
 		+ "— Session —\n"
 		+ "Ctrl+S — Quicksave\n"
 		+ "Ctrl+L — Quickload\n"
@@ -675,7 +814,7 @@ func _show_help() -> void:
 		+ "F9 resources · Shift+F9 states · Ctrl+F9 terrain\n\n"
 		+ "— Navigation —\n"
 		+ "Home Europe · Shift+Home world · End Asia · Shift+U unit counters\n\n"
-		+ "Default play as GER (Europe Maginot theater)."
+		+ "Default F5 play as GER 1936 (Europe Maginot theater). Env EOA_PLAYER_TAG / EOA_START_YEAR still override boot."
 	)
 	dlg.confirmed.connect(dlg.queue_free)
 	add_child(dlg)

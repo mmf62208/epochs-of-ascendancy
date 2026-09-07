@@ -89,6 +89,10 @@ class TestMapStateLabelsSurface(unittest.TestCase):
         self.assertIn("_select_state_labels_for_budget", gd)
         self.assertIn("europe_nuts", gd)
         self.assertIn("_geo_grid_pick_state_rows", gd)
+        lod = (ROOT / "scripts" / "map" / "MapZoomLOD.gd").read_text(encoding="utf-8")
+        self.assertIn("OPERATIONAL_MAX_ZOOM: float = 1.55", lod)
+        ren = (ROOT / "scripts" / "map" / "MapRenderer.gd").read_text(encoding="utf-8")
+        self.assertIn("_schedule_political_labels_rebuild", ren)
 
 
 if __name__ == "__main__":

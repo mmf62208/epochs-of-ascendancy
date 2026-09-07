@@ -331,11 +331,18 @@ def map_state_labels_surface_integrity() -> Dict[str, Any]:
         ("europe_nuts", lab, "layer_europe_flag"),
         ("set_map_mode_context", lab, "layer_mode_ctx"),
         ("set_map_mode_context", ren, "renderer_mode_ctx"),
+        ("OPERATIONAL_MAX_ZOOM", lod, "lod_operational_band"),
+        ("_schedule_political_labels_rebuild", ren, "renderer_states_rebuild"),
     ):
         if needle in blob:
             passes.append(key)
         else:
             fails.append("missing_%s" % key)
+    # Europe Home (~1.3) must stay operational so Alsace/Baden/Rhineland names show.
+    if "OPERATIONAL_MAX_ZOOM: float = 1.55" in lod or "OPERATIONAL_MAX_ZOOM: float = 1.55" in lod.replace("\t", " "):
+        passes.append("operational_max_covers_europe_home")
+    else:
+        fails.append("operational_max_too_low")
 
     ok = len(fails) == 0
     return {

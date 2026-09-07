@@ -41,9 +41,65 @@ static func apply_living_transfer(
 	return GameData.apply_peace_conference_settlement_live(w, l, pid, true, false, 0.0, true)
 
 
+## NEXT chip / harness: open the living peace sheet. Headless never pops a Window.
+static func open_living_sheet(
+	winner_tag: String = "GER",
+	loser_tag: String = "FRA",
+	province_id: int = 710739
+) -> Dictionary:
+	var w := winner_tag.strip_edges().to_upper()
+	var l := loser_tag.strip_edges().to_upper()
+	if w.is_empty():
+		w = "GER"
+	if l.is_empty():
+		l = "FRA"
+	var pid := province_id if province_id > 0 else 710739
+	var place := ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var prov: Province = MapManager.get_province(pid)
+		if prov != null:
+			place = str(prov.name).strip_edges()
+	var sheet := {
+		"ok": true,
+		"title": "Peace conference opened",
+		"winner": w,
+		"loser": l,
+		"winner_tag": w,
+		"loser_tag": l,
+		"province_id": pid,
+		"to_id": pid,
+		"place": place,
+		"opened": true,
+		"sheet": true,
+		"headless": DisplayServer.get_name() == "headless",
+	}
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return sheet
+	var tree := Engine.get_main_loop() as SceneTree
+	if tree == null or tree.root == null:
+		return sheet
+	var win := PeaceConferenceWindow.new()
+	win._living_winner = w
+	win._living_loser = l
+	win._living_pid = pid
+	tree.root.add_child(win)
+	return sheet
+
+
+## Apply annex from an open_living_sheet dict (NEXT apply never calls settlement itself).
+static func apply_from_sheet(sheet: Dictionary = {}) -> Dictionary:
+	var w := str(sheet.get("winner", sheet.get("winner_tag", "GER"))).strip_edges().to_upper()
+	var l := str(sheet.get("loser", sheet.get("loser_tag", "FRA"))).strip_edges().to_upper()
+	var pid := int(sheet.get("province_id", sheet.get("to_id", -1)))
+	return apply_living_transfer(w, l, pid)
+
+
 var _player_tag: String = PLAYER_FALLBACK
 var _current_leverage: int = 0
 var _selected_terms: Dictionary = {}
+var _living_winner: String = ""
+var _living_loser: String = ""
+var _living_pid: int = -1
 
 @onready var main_vbox: VBoxContainer = $Margin/MainVBox   # Will be created in code if needed
 
@@ -344,18 +400,23 @@ func _on_living_annex_pressed() -> void:
 
 
 func _apply_captured_living_transfer() -> Dictionary:
-	var pid := -1
-	var winner := _player_tag.strip_edges().to_upper()
-	var loser := ""
+	var pid := _living_pid
+	var winner := _living_winner.strip_edges().to_upper()
+	var loser := _living_loser.strip_edges().to_upper()
+	if winner.is_empty():
+		winner = _player_tag.strip_edges().to_upper()
 	if winner.is_empty():
 		winner = "GER"
-	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("peek_last_land_aar"):
-		var aar: Dictionary = BattleManager.peek_last_land_aar()
-		pid = int(aar.get("peace_pid", aar.get("from_id", -1)))
-		var w := str(aar.get("peace_winner", aar.get("tag", ""))).strip_edges().to_upper()
-		if not w.is_empty():
-			winner = w
-		loser = str(aar.get("peace_loser", aar.get("defender_tag", ""))).strip_edges().to_upper()
+	if pid <= 0 or loser.is_empty():
+		if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("peek_last_land_aar"):
+			var aar: Dictionary = BattleManager.peek_last_land_aar()
+			if pid <= 0:
+				pid = int(aar.get("peace_pid", aar.get("from_id", -1)))
+			var w := str(aar.get("peace_winner", aar.get("tag", ""))).strip_edges().to_upper()
+			if not w.is_empty() and _living_winner.strip_edges().is_empty():
+				winner = w
+			if loser.is_empty():
+				loser = str(aar.get("peace_loser", aar.get("defender_tag", ""))).strip_edges().to_upper()
 	if pid <= 0:
 		pid = 710739 if winner == "GER" else (902598 if winner == "JAP" else -1)
 	if pid <= 0:

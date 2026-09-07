@@ -17,6 +17,9 @@ SEA_ALPHA_CLEAN = 1.0
 LAND_ALPHA_CLEAN = 0.96
 LAND_ALPHA_TERRAIN = 0.72  # when terrain underlay ON
 SEA_POLITICAL_TRACE_MAX = 0.12  # keep seas flat (no loud per-cell tiles)
+ATA_ICE_PIDS = (902133, 902134)
+ICE_OCEAN_RGBA = (0.70, 0.82, 0.90, 1.0)
+ENG_RED_RGB = (0.72, 0.22, 0.22)
 
 
 def continuous_sea_fill_rgba(
@@ -62,6 +65,24 @@ def world_board_fill_alpha(*, terrain_layer_on: bool = False, clean_political: b
     if clean_political and not terrain_layer_on:
         return LAND_ALPHA_CLEAN
     return LAND_ALPHA_TERRAIN if terrain_layer_on else LAND_ALPHA_CLEAN
+
+
+def ice_ocean_fill_rgba() -> Tuple[float, float, float, float]:
+    return ICE_OCEAN_RGBA
+
+
+def antarctica_fill_class(pid: int, owner: str = "") -> str:
+    """902133 / 902134 must paint ice/ocean, not ENG political red."""
+    if int(pid) in ATA_ICE_PIDS:
+        return "ice_ocean"
+    if str(owner).strip().upper() == "ENG":
+        return "eng_red"
+    return "other"
+
+
+def ice_fill_not_eng_red(rgba: Tuple[float, float, float, float] = ICE_OCEAN_RGBA) -> bool:
+    r, g, b, a = rgba
+    return b > r and g > r and a >= 0.9 and abs(r - ENG_RED_RGB[0]) + abs(g - ENG_RED_RGB[1]) > 0.5
 
 
 def political_stack_readable(
@@ -147,6 +168,22 @@ def build_map_political_fill_visual_product() -> Dict[str, Any]:
         passes.append("terrain_default_off")
     else:
         fails.append("terrain_default_still_on")
+
+    ice = ice_ocean_fill_rgba()
+    ata_ok = (
+        antarctica_fill_class(902133, "ENG") == "ice_ocean"
+        and antarctica_fill_class(902134, "ENG") == "ice_ocean"
+        and ice_fill_not_eng_red(ice)
+        and "902133" in ren
+        and "902134" in ren
+        and "func ice_ocean_fill_color" in ren
+        and "func _is_ice_ocean_visual" in ren
+        and "_is_ice_ocean_visual" in ren
+    )
+    if ata_ok:
+        passes.append("antarctica_ice_ocean_not_eng")
+    else:
+        fails.append("antarctica_ice_ocean_not_eng")
 
     # Ocean floor + apply visibility after underlay load (void-hex alignment fix)
     if "func _ensure_ocean_floor" in ren or "OceanFloorContinuous" in ren:

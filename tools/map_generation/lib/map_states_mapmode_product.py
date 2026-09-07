@@ -182,3 +182,55 @@ def states_mapmode_integrity_from_board(board_dir: str = "") -> Dict[str, Any]:
     prod["board"] = str(d)
     prod["sample_state_ids"] = sids
     return prod
+
+
+def states_terrain_hotkey_integrity() -> Dict[str, Any]:
+    """F1–F4 / F9 / Shift+F9 / Ctrl+F9 must call live set_map_mode from _input; toolbar follows."""
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[3]
+    ren_path = root / "scripts" / "map" / "MapRenderer.gd"
+    tb_path = root / "scripts" / "ui" / "map" / "MapModeToolbar.gd"
+    ren = ren_path.read_text(encoding="utf-8") if ren_path.is_file() else ""
+    tb = tb_path.read_text(encoding="utf-8") if tb_path.is_file() else ""
+    input_i = ren.find("func _input")
+    unh_i = ren.find("func _unhandled_input")
+    input_fn = ren[input_i:unh_i] if input_i >= 0 and unh_i > input_i else ""
+    fails: list = []
+    passes: list = []
+    for mode, needle in (
+        ("political", 'set_map_mode("political")'),
+        ("strain", 'set_map_mode("strain")'),
+        ("vitality", 'set_map_mode("vitality")'),
+        ("development", 'set_map_mode("development")'),
+        ("resources", 'set_map_mode("resources")'),
+        ("states", 'set_map_mode("states")'),
+        ("terrain", 'set_map_mode("terrain")'),
+    ):
+        if needle in input_fn:
+            passes.append("input_%s" % mode)
+        else:
+            fails.append("missing_input_%s" % mode)
+    if "KEY_F9" in input_fn and "event.ctrl_pressed" in input_fn and 'set_map_mode("terrain")' in input_fn:
+        passes.append("ctrl_f9_terrain_in_input")
+    else:
+        fails.append("ctrl_f9_terrain_not_in_input")
+    set_fn_i = ren.find("func set_map_mode")
+    set_fn = ren[set_fn_i : set_fn_i + 2500] if set_fn_i >= 0 else ""
+    if "_sync_mapmode_toolbar" in set_fn:
+        passes.append("set_map_mode_syncs_toolbar")
+    else:
+        fails.append("set_map_mode_no_toolbar_sync")
+    if "func set_mode" in tb and "notify_renderer" in tb and "false" in tb:
+        passes.append("toolbar_set_mode_notify_false")
+    else:
+        fails.append("toolbar_set_mode_missing")
+    ok = len(fails) == 0
+    return {
+        "ok": ok,
+        "empty": False,
+        "status": "PASS" if ok else "FAIL",
+        "pass": passes,
+        "fail": fails,
+        "summary": "states/terrain F-key path %s" % ("PASS" if ok else "FAIL"),
+    }

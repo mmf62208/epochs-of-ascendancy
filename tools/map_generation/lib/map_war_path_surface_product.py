@@ -146,6 +146,88 @@ def map_war_path_surface_integrity() -> Dict[str, Any]:
     # Shift+I specifically for war loop
     if "KEY_SHIFT" in ren and "show_first_session_war_path" in ren:
         passes.append("shift_i_or_war_hotkey")
+    layer = ROOT / "scripts" / "map" / "StrategicFlowOverlayLayer.gd"
+    lyr = layer.read_text(encoding="utf-8") if layer.is_file() else ""
+    war_i = ren.find("func show_first_session_war_path")
+    war_slice = ""
+    if war_i >= 0:
+        nxt = ren.find("\nfunc ", war_i + 1)
+        war_slice = ren[war_i : nxt if nxt > 0 else war_i + 4000]
+    flow_i = ren.find("func _deferred_budgeted_warloop_flow")
+    flow_slice = ""
+    if flow_i >= 0:
+        nxt = ren.find("\nfunc ", flow_i + 1)
+        flow_slice = ren[flow_i : nxt if nxt > 0 else flow_i + 4000]
+    if "_request_hang_safe_warloop_flow" in war_slice and "call_deferred" in ren:
+        passes.append("warloop_deferred_request")
+    else:
+        fails.append("missing_warloop_deferred_request")
+    if "_setup_strategic_flow_layer(" in war_slice or "preview_player_route()" in war_slice:
+        fails.append("warloop_keyframe_full_setup")
+    else:
+        passes.append("warloop_keyframe_cheap")
+    if (
+        "find_land_path" in flow_slice
+        and "get_contested_provinces" not in flow_slice
+        and "preview_player_route()" not in flow_slice
+        and "_setup_strategic_flow_layer(" not in flow_slice
+    ):
+        passes.append("warloop_deferred_budgeted")
+    else:
+        fails.append("warloop_deferred_not_budgeted")
+    if "func setup_budgeted" in lyr and "_budgeted_only" in lyr:
+        passes.append("flow_layer_budgeted")
+    else:
+        fails.append("missing_flow_layer_budgeted")
+    toggle_i = ren.find("func toggle_equipment_flow_glyphs")
+    toggle_fn = ""
+    if toggle_i >= 0:
+        nxt = ren.find("\nfunc ", toggle_i + 1)
+        toggle_fn = ren[toggle_i : nxt if nxt > 0 else toggle_i + 2500]
+    cheap_i = ren.find("func _ensure_equipment_glyph_layer_cheap")
+    cheap_fn = ""
+    if cheap_i >= 0:
+        nxt = ren.find("\nfunc ", cheap_i + 1)
+        cheap_fn = ren[cheap_i : nxt if nxt > 0 else cheap_i + 2500]
+    input_i = ren.find("func _input")
+    unh_i = ren.find("func _unhandled_input")
+    input_fn = ren[input_i:unh_i] if input_i >= 0 and unh_i > input_i else ""
+    if "KEY_I" in input_fn and "toggle_equipment_flow_glyphs" in input_fn:
+        passes.append("i_in_input")
+    else:
+        fails.append("missing_i_in_input")
+    if (
+        bool(toggle_fn)
+        and "_ensure_equipment_glyph_layer_cheap" in toggle_fn
+        and "_setup_strategic_flow_layer" not in toggle_fn
+        and "preview_player_route()" not in toggle_fn
+    ):
+        passes.append("i_toggle_cheap")
+    else:
+        fails.append("i_toggle_not_cheap")
+    if (
+        bool(cheap_fn)
+        and "setup_budgeted" in cheap_fn
+        and "_setup_strategic_flow_layer" not in cheap_fn
+        and "preview_player_route()" not in cheap_fn
+    ):
+        passes.append("i_glyph_layer_budgeted")
+    else:
+        fails.append("i_glyph_layer_not_budgeted")
+    if "func _transport_glyph_tex" in lyr and "logistics_32.png" in lyr and "never a blob" in lyr:
+        passes.append("i_transport_art")
+    else:
+        fails.append("missing_i_transport_art")
+    if "draw_circle(pos, 4.0 * s, col)" in lyr:
+        fails.append("i_glyph_default_blob")
+    else:
+        passes.append("i_glyph_default_not_blob")
+    g_i = input_fn.find("KEY_G")
+    g_slice = input_fn[g_i : g_i + 400] if g_i >= 0 else ""
+    if "_request_hang_safe_supply_corridor" in g_slice and "preview_player_route()" not in g_slice:
+        passes.append("g_hang_safe_in_input")
+    else:
+        fails.append("g_not_hang_safe_in_input")
     ok = len(fails) == 0
     return {
         "ok": ok,

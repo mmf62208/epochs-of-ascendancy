@@ -18,7 +18,10 @@ from living_unit_order_loop_product import (  # noqa: E402
     GER_FRONT,
     JAP_FRONT,
     MAGINOT_REGION,
+    TIME_MANAGER,
     build_living_unit_order_loop_product,
+    living_clock_skips_ai_starts,
+    living_clock_skips_occupation_ticks,
     living_unit_order_loop_integrity,
 )
 
@@ -46,20 +49,24 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
             "sea_hop_api",
             "choke_flag",
             "air_region_cas",
+            "world_oob_air_naval",
             "peace_occupation",
             "ai_take_land",
             "nation_era_next",
+            "map_country_select",
             "playtest_clock",
             "f5_boot_unlocks",
             "chip_str_num",
             "inverse_zoom_scale",
             "chip_on_centroid",
             "pin_before_hex",
+            "capital_star_before_chip",
             "click_own_land_marches",
             "ctrl_click_starts_battle",
             "g_hang_safe",
             "inspector_close_restores",
             "i_hang_safe",
+            "warloop_hang_safe",
             "resolve_hang_safe",
             "strategic_pick_skip",
             "march_api",
@@ -73,6 +80,21 @@ class TestLivingUnitOrderLoopProduct(unittest.TestCase):
     def test_integrity(self) -> None:
         i = living_unit_order_loop_integrity()
         self.assertTrue(i.get("ok"), msg=i)
+
+    def test_playtest_clock_does_not_skip_ai_starts(self) -> None:
+        tm = TIME_MANAGER.read_text(encoding="utf-8")
+        self.assertFalse(living_clock_skips_ai_starts(tm), msg=tm[tm.find("_maybe_run_ai_land_battle_starts"): tm.find("_maybe_run_ai_land_battle_starts") + 900])
+        self.assertIn("try_ai_start_land_battles", tm)
+        self.assertIn("ai_land_started_n", tm)
+
+    def test_playtest_clock_does_not_skip_occupation_ticks(self) -> None:
+        tm = TIME_MANAGER.read_text(encoding="utf-8")
+        self.assertFalse(
+            living_clock_skips_occupation_ticks(tm),
+            msg=tm[tm.find("_maybe_tick_occupation_unrest") : tm.find("_maybe_tick_occupation_unrest") + 900],
+        )
+        self.assertIn("apply_occupation_daily_tick_live", tm)
+        self.assertIn("occupation_tick_n", tm)
 
 
 if __name__ == "__main__":

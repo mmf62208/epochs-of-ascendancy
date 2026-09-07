@@ -29,9 +29,26 @@ var _last_equipment_glyph_n: int = 0
 var _last_equipment_symbols: Dictionary = {}
 var _last_lod_policy: Dictionary = {}
 var _province_count: int = 0
+## C1: WarLoop / U-on paints only the caller-supplied corridor. Never get_all_routes
+## or get_contested_provinces (those froze the next frame on world_accurate).
+var _budgeted_only: bool = false
+var _budgeted_routes: Array = []
+var _transport_tex: Texture2D = null
+var _transport_tex_tried: bool = false
 
 
 func setup(centroids: Dictionary) -> void:
+	_budgeted_only = false
+	_budgeted_routes = []
+	_centroids = centroids
+	_province_count = centroids.size()
+	queue_redraw()
+
+
+## Hop-capped capital→front corridor. Centroids must already be a subset.
+func setup_budgeted(centroids: Dictionary, routes: Array = []) -> void:
+	_budgeted_only = true
+	_budgeted_routes = routes.duplicate(true) if routes else []
 	_centroids = centroids
 	_province_count = centroids.size()
 	queue_redraw()
@@ -196,6 +213,13 @@ func _draw() -> void:
 
 
 func _collect_routes() -> Array:
+	if _budgeted_only:
+		var budgeted: Array = []
+		for plan in _budgeted_routes:
+			budgeted.append(plan)
+			if budgeted.size() >= max_routes:
+				break
+		return budgeted
 	var out: Array = []
 	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("get_all_routes"):
 		for plan in SupplyManager.get_all_routes():
@@ -378,9 +402,31 @@ func _equipment_glyph_color(mode: String) -> Color:
 			return Color(0.8, 0.8, 0.55, 0.85)
 
 
+func _transport_glyph_tex() -> Texture2D:
+	if _transport_tex_tried:
+		return _transport_tex
+	_transport_tex_tried = true
+	var p := "res://assets/graphics/units/nato/ww2/logistics_32.png"
+	if ResourceLoader.exists(p):
+		_transport_tex = load(p) as Texture2D
+		return _transport_tex
+	p = "res://assets/graphics/units/nato/modern/logistics_32.png"
+	if ResourceLoader.exists(p):
+		_transport_tex = load(p) as Texture2D
+	return _transport_tex
+
+
 func _draw_equipment_symbol(pos: Vector2, symbol: String, col: Color, scale_mult: float = 1.0) -> void:
 	var s := clampf(scale_mult, 0.5, 1.6)
 	var sym := symbol.strip_edges().to_lower()
+	# Prefer shipped logistics plate over a pink/yellow blob for land/sea cargo.
+	# Air/orbital keep vector glyphs; everything else (including unknown) is transport art.
+	if sym not in ["transport_plane", "helicopter", "drone_convoy", "orbital_loft"]:
+		var tex := _transport_glyph_tex()
+		if tex != null:
+			var sz := Vector2(18, 18) * s
+			draw_texture_rect(tex, Rect2(pos - sz * 0.5, sz), false, col)
+			return
 	match sym:
 		"train":
 			draw_rect(Rect2(pos + Vector2(-8, -4) * s, Vector2(16, 8) * s), col)
@@ -411,7 +457,10 @@ func _draw_equipment_symbol(pos: Vector2, symbol: String, col: Color, scale_mult
 			draw_circle(pos, 2.2 * s, col)
 			draw_line(pos + Vector2(0, -10) * s, pos + Vector2(0, -4) * s, col, 1.5 * s, true)
 		_:
-			draw_circle(pos, 4.0 * s, col)
+			# Unknown symbol: still a train, never a blob.
+			draw_rect(Rect2(pos + Vector2(-8, -4) * s, Vector2(16, 8) * s), col)
+			draw_circle(pos + Vector2(-5, 5) * s, 2.0 * s, col)
+			draw_circle(pos + Vector2(5, 5) * s, 2.0 * s, col)
 
 
 ## Pure/live dual helper: describe what the paint layer would show without requiring a scene.

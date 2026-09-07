@@ -9,6 +9,14 @@ static func lines_for(formation: Object) -> PackedStringArray:
 	var lines: PackedStringArray = PackedStringArray()
 	if formation == null:
 		return lines
+	# Promote Fill · TOE above XP/plan so the fold clip still shows equipment (Play P0).
+	var comp_early: Dictionary = LandCombatPower.composition_from_formation(formation)
+	var fold := _fill_toe_fold_line(formation, comp_early)
+	if fold.is_empty():
+		fold = _fill_percent_line(formation)
+	if fold.is_empty():
+		fold = "Fill 100% · TOE —"
+	lines.append(fold)
 	var xp := 48.0
 	if "combat_experience" in formation:
 		xp = float(formation.get("combat_experience"))
@@ -42,41 +50,10 @@ static func lines_for(formation: Object) -> PackedStringArray:
 		lines.append(
 			"%s · region %d · range %s · fuel %.0f%%" % [mission, rid, rng, fuel_pct]
 		)
-	var comp: Dictionary = LandCombatPower.composition_from_formation(formation)
-	if bool(comp.get("has_composition", false)) or float(comp.get("armor", 0.0)) > 0.001:
-		var toe := int(comp.get("manpower", 0))
-		var left := maxi(0, int(round(float(toe) * str_v)))
-		var fuel_pct := 100.0
-		if "fuel_level" in formation:
-			fuel_pct = clampf(float(formation.get("fuel_level")), 0.0, 1.0) * 100.0
-		lines.append(
-			"Speed %.1f · Armor %.0f%% · Men %d/%d"
-			% [
-				float(comp.get("speed", 1.0)),
-				float(comp.get("armor", 0.0)) * 100.0,
-				left,
-				toe,
-			]
-		)
-		lines.append(
-			"Width %.0f · Fuel %.0f%%"
-			% [float(comp.get("width", 2.0)), fuel_pct]
-		)
-		var toe_eq: Dictionary = LandCombatPower.equipment_toe(comp)
-		if not toe_eq.is_empty():
-			var bits: PackedStringArray = PackedStringArray()
-			var keys: Array = toe_eq.keys()
-			keys.sort()
-			for k in keys:
-				if bits.size() >= 4:
-					break
-				var short := str(k).replace("_equipment", "").replace("_", " ")
-				bits.append("%s %d" % [short, int(toe_eq[k])])
-			if not bits.is_empty():
-				lines.append("TOE " + " · ".join(bits))
-		var stock_line := _stockpile_toe_line(formation)
-		if not stock_line.is_empty():
-			lines.append(stock_line)
+		if rid > 0:
+			lines.append("CAS assigned · Unassign")
+		else:
+			lines.append("CAS unassigned · Assign")
 	if "last_manpower_loss" in formation:
 		var men_l := int(formation.get("last_manpower_loss"))
 		if men_l > 0 and "last_equip_loss_plain" not in formation:
@@ -120,35 +97,107 @@ static func bbcode_for(formation: Object) -> String:
 	return "\n".join(lines_for(formation))
 
 
+static func tooltip_lines_for(formation: Object) -> PackedStringArray:
+	var tips: PackedStringArray = PackedStringArray()
+	if formation == null:
+		return tips
+	var str_v := 1.0
+	if "strength" in formation:
+		str_v = float(formation.get("strength"))
+	var comp: Dictionary = LandCombatPower.composition_from_formation(formation)
+	if bool(comp.get("has_composition", false)) or float(comp.get("armor", 0.0)) > 0.001:
+		var toe := int(comp.get("manpower", 0))
+		var left := maxi(0, int(round(float(toe) * str_v)))
+		var fuel_pct := 100.0
+		if "fuel_level" in formation:
+			fuel_pct = clampf(float(formation.get("fuel_level")), 0.0, 1.0) * 100.0
+		tips.append(
+			"Speed %.1f · Armor %.0f%% · Men %d/%d"
+			% [
+				float(comp.get("speed", 1.0)),
+				float(comp.get("armor", 0.0)) * 100.0,
+				left,
+				toe,
+			]
+		)
+		tips.append("Width %.0f · Fuel %.0f%%" % [float(comp.get("width", 2.0)), fuel_pct])
+	var stock := _stockpile_stock_line(formation)
+	if not stock.is_empty():
+		tips.append(stock)
+	return tips
 
-static func _stockpile_toe_line(formation: Object) -> String:
+
+static func _toe_bits_from_comp(comp: Dictionary) -> PackedStringArray:
+	var bits: PackedStringArray = PackedStringArray()
+	var toe_eq: Dictionary = LandCombatPower.equipment_toe(comp)
+	if toe_eq.is_empty():
+		return bits
+	var keys: Array = toe_eq.keys()
+	keys.sort()
+	for k in keys:
+		if bits.size() >= 4:
+			break
+		var short := str(k).replace("_equipment", "").replace("_", " ").strip_edges()
+		bits.append("%s %d" % [short, int(toe_eq[k])])
+	return bits
+
+
+static func _fill_ratio_for(formation: Object) -> float:
+	if formation == null:
+		return -1.0
+	if ProductionManager != null and ProductionManager.has_method("unit_toe_fill_ratio"):
+		var fid := ""
+		if "formation_id" in formation:
+			fid = str(formation.get("formation_id")).strip_edges()
+		if not fid.is_empty():
+			return clampf(float(ProductionManager.unit_toe_fill_ratio(fid)), 0.0, 2.0)
+	if "toe_fill" in formation:
+		return clampf(float(formation.get("toe_fill")), 0.0, 2.0)
+	return -1.0
+
+
+static func _fill_percent_line(formation: Object) -> String:
+	var fill := _fill_ratio_for(formation)
+	if fill < 0.0:
+		if formation != null and "strength" in formation:
+			fill = clampf(float(formation.get("strength")), 0.0, 2.0)
+		else:
+			fill = 1.0
+	return "Fill %.0f%%" % (fill * 100.0)
+
+
+static func _fill_toe_fold_line(formation: Object, comp: Dictionary) -> String:
+	var fill_s := _fill_percent_line(formation)
+	var bits := _toe_bits_from_comp(comp)
+	if fill_s.is_empty() and bits.is_empty():
+		return ""
+	if bits.is_empty():
+		return fill_s
+	var toe_s := "TOE " + " · ".join(bits)
+	if fill_s.is_empty():
+		return toe_s
+	return "%s · %s" % [fill_s, toe_s]
+
+
+static func _stockpile_stock_line(formation: Object) -> String:
 	if ProductionManager == null:
 		return ""
-	var fid := ""
-	if "formation_id" in formation:
-		fid = str(formation.get("formation_id")).strip_edges()
-	if fid.is_empty():
-		return ""
-	var fill := 0.0
-	if ProductionManager.has_method("unit_toe_fill_ratio"):
-		fill = float(ProductionManager.unit_toe_fill_ratio(fid))
 	var tag := ""
 	if "country_tag" in formation:
 		tag = str(formation.get("country_tag")).strip_edges().to_upper()
-	var rifles := 0
-	var trucks := 0
-	if not tag.is_empty() and ProductionManager.has_method("get_country_equipment_stockpile"):
-		var st: Dictionary = ProductionManager.get_country_equipment_stockpile(tag)
-		rifles = int(st.get("rifles", st.get("infantry_equipment", 0)))
-		trucks = int(st.get("trucks", st.get("truck", 0)))
-	var last := ""
-	if "last_stockpile_toe_plain" in ProductionManager:
-		last = str(ProductionManager.last_stockpile_toe_plain).strip_edges()
-	if fill <= 0.0 and rifles <= 0 and trucks <= 0 and last.is_empty():
+	if tag.is_empty() or not ProductionManager.has_method("get_country_equipment_stockpile"):
 		return ""
-	if last.is_empty():
-		return "Fill %.0f%% · stock rifles %d · trucks %d" % [fill * 100.0, rifles, trucks]
-	return last
+	var st: Dictionary = ProductionManager.get_country_equipment_stockpile(tag)
+	var rifles := int(st.get("rifles", st.get("infantry_equipment", 0)))
+	var trucks := int(st.get("trucks", st.get("truck", 0)))
+	if rifles <= 0 and trucks <= 0:
+		return ""
+	return "stock rifles %d · trucks %d" % [rifles, trucks]
+
+
+static func _stockpile_toe_line(formation: Object) -> String:
+	# Fold helper kept for greps / older callers. Prefer Fill · TOE on the card.
+	return _fill_percent_line(formation)
 
 
 static func xp_band(xp: float) -> String:

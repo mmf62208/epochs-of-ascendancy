@@ -5,6 +5,12 @@
 class_name PlayNextHook
 extends RefCounted
 
+## settle_peace opens PeaceConferenceWindow.open_living_sheet.
+## Annex is apply_from_sheet → apply_peace_conference_settlement_live (not in apply()).
+
+## Last foreign named hex the player clicked (toast / map pick). Never a 3520 scan.
+static var last_diplomacy_pid: int = -1
+
 
 static func recommend(player_tag: String = "") -> Dictionary:
 	var tag := _living_player_tag(player_tag)
@@ -130,7 +136,7 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 		var ch: Dictionary = choke_v as Dictionary
 		var sentence := str(ch.get("sentence", "")).strip_edges()
 		if sentence.is_empty():
-			sentence = "Channel choke flagged"
+			sentence = "Channel off-station · supply bite"
 		return {
 			"ok": true,
 			"action": "choke_flag",
@@ -139,14 +145,43 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			"fid": str(ch.get("fid", "")),
 			"to_id": int(ch.get("pid", -1)),
 			"source": "choke",
+			"bite": true,
 		}
+	var cas_v: Variant = f.get("cas_wing", {})
+	if cas_v is Dictionary:
+		var cas: Dictionary = cas_v as Dictionary
+		var cas_fid := str(cas.get("fid", "")).strip_edges()
+		if not cas_fid.is_empty():
+			var cas_rid := int(cas.get("region", cas.get("region_id", 100)))
+			if cas_rid <= 0:
+				cas_rid = 100
+			if bool(cas.get("unassign", false)) and bool(cas.get("assigned", false)):
+				return {
+					"ok": true,
+					"action": "unassign_cas",
+					"label": "Unassign CAS",
+					"hint": "Pull the wing off the land fight",
+					"fid": cas_fid,
+					"to_id": int(cas.get("region", 0)),
+					"source": "cas",
+				}
+			if not bool(cas.get("assigned", true)) or int(cas.get("region", cas.get("assigned_region_id", 0))) <= 0:
+				return {
+					"ok": true,
+					"action": "assign_cas",
+					"label": "Assign CAS to the front",
+					"hint": "Assign the wing to the land fight region",
+					"fid": cas_fid,
+					"to_id": cas_rid,
+					"source": "cas",
+				}
 	var peace_pid := int(f.get("peace_pid", -1))
 	if peace_pid > 0:
 		return {
 			"ok": true,
 			"action": "settle_peace",
 			"label": "Settle the peace",
-			"hint": "Annex the captured province at the conference",
+			"hint": "Open the peace conference to annex",
 			"fid": str(f.get("aar_fid", "")),
 			"to_id": peace_pid,
 			"source": "peace",
@@ -202,6 +237,91 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			"to_id": int(f.get("battle_to_id", -1)),
 			"source": "land_battle",
 		}
+	var vacant := str(f.get("vacant_chief", "")).strip_edges()
+	if not vacant.is_empty():
+		return {
+			"ok": true,
+			"action": "assign_chief",
+			"label": "Assign %s" % vacant.replace("_", " "),
+			"hint": "Vacant national chief — pick a leader",
+			"fid": vacant,
+			"to_id": -1,
+			"source": "cabinet",
+		}
+	if f.has("research_queued") and not bool(f.get("research_queued", true)):
+		return {
+			"ok": true,
+			"action": "set_research",
+			"label": "Set research",
+			"hint": "No tech queued — choose a path",
+			"fid": "",
+			"to_id": -1,
+			"source": "cabinet",
+		}
+	if f.has("agent_roster_n") and int(f.get("agent_roster_n", 0)) <= 0:
+		return {
+			"ok": true,
+			"action": "recruit_agent",
+			"label": "Recruit an agent",
+			"hint": "Build the team — research / intel / war",
+			"fid": "",
+			"to_id": -1,
+			"source": "cabinet",
+		}
+	if f.has("agent_on_mission_n") and int(f.get("agent_on_mission_n", 0)) <= 0:
+		var send_dip: Dictionary = {}
+		var send_dip_v: Variant = f.get("diplomacy", {})
+		if send_dip_v is Dictionary:
+			send_dip = send_dip_v as Dictionary
+		var send_other := str(send_dip.get("other_tag", "")).strip_edges().to_upper()
+		var send_pid := int(send_dip.get("pid", -1))
+		var send_label := "Send an agent"
+		if not send_other.is_empty() and send_pid > 0:
+			send_label = "Send an agent to %s" % send_other
+		return {
+			"ok": true,
+			"action": "send_agent",
+			"label": send_label,
+			"hint": (send_label if send_pid > 0 else "Choose a specialist and a mission"),
+			"fid": send_other,
+			"to_id": send_pid if send_pid > 0 else -1,
+			"source": "cabinet",
+			"other_tag": send_other,
+		}
+	var dip_v: Variant = f.get("diplomacy", {})
+	if dip_v is Dictionary and int((dip_v as Dictionary).get("pid", 0)) > 0:
+		var dip: Dictionary = dip_v as Dictionary
+		var other := str(dip.get("other_tag", "")).strip_edges().to_upper()
+		var dpid := int(dip.get("pid", -1))
+		var offers := int(dip.get("trade_offers", 0))
+		var crs := float(dip.get("crs", 0.0))
+		if crs > 0.001 and offers <= 0:
+			var trade_line := str(dip.get("sentence", "")).strip_edges()
+			if trade_line.is_empty() or trade_line.to_lower().begins_with("influence"):
+				trade_line = "Trade with %s" % other
+			return {
+				"ok": true,
+				"action": "trade",
+				"label": trade_line,
+				"hint": trade_line,
+				"fid": other,
+				"to_id": dpid,
+				"source": "trade",
+				"other_tag": other,
+			}
+		var sentence := str(dip.get("sentence", "")).strip_edges()
+		if sentence.is_empty():
+			sentence = "Influence %s" % other
+		return {
+			"ok": true,
+			"action": "influence",
+			"label": sentence,
+			"hint": sentence,
+			"fid": other,
+			"to_id": dpid,
+			"source": "diplomacy",
+			"other_tag": other,
+		}
 	return {
 		"ok": true,
 		"action": "show_war_loop",
@@ -248,10 +368,111 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 		return {"ok": true, "action": "send_trained", "summary": str(r.get("hint", "Training ready"))}
 	if action == "shortage":
 		return _open_living_surface("production", r)
-	if action == "tech_done":
+	if action == "tech_done" or action == "set_research":
 		return _open_living_surface("research", r)
 	if action == "focus_done":
 		return _open_living_surface("focus", r)
+	if action == "assign_chief":
+		return _open_living_surface("leaders", r)
+	if action == "recruit_agent":
+		var tag := _living_player_tag(str(r.get("player_tag", "")))
+		if typeof(AgentManager) != TYPE_NIL and AgentManager.has_method("recruit_agent"):
+			AgentManager.recruit_agent(tag)
+		return _open_living_surface("agents", r)
+	if action == "send_agent":
+		var spid := int(r.get("to_id", -1))
+		var stag := _living_player_tag(str(r.get("player_tag", "")))
+		var planted: Dictionary = send_agent_to_province(spid, stag)
+		var ui: Dictionary = _open_living_surface("agents", r)
+		ui["ok"] = bool(planted.get("ok", false))
+		ui["action"] = "send_agent"
+		ui["summary"] = str(planted.get("sentence", r.get("hint", "Send an agent")))
+		ui["agent_id"] = str(planted.get("agent_id", ""))
+		ui["to_id"] = int(planted.get("pid", spid))
+		ui["other_tag"] = str(planted.get("other_tag", ""))
+		ui["on_mission"] = bool(planted.get("on_mission", false))
+		return ui
+	if action == "trade":
+		var tpid := int(r.get("to_id", -1))
+		var ttag := _living_player_tag(str(r.get("player_tag", "")))
+		var traded: Dictionary = apply_living_trade(tpid, ttag)
+		var tui: Dictionary = _open_living_surface("trade", r)
+		tui["ok"] = bool(traded.get("ok", false))
+		tui["action"] = "trade"
+		tui["summary"] = str(traded.get("sentence", r.get("hint", "Trade")))
+		tui["offer_id"] = str(traded.get("offer_id", ""))
+		tui["to_id"] = int(traded.get("pid", tpid))
+		tui["other_tag"] = str(traded.get("other_tag", ""))
+		return tui
+	if action == "influence":
+		var ipid := int(r.get("to_id", -1))
+		var itag := _living_player_tag(str(r.get("player_tag", "")))
+		var influenced: Dictionary = apply_living_diplomacy(ipid, itag)
+		var ui: Dictionary = _open_living_surface("diplomacy", r)
+		ui["ok"] = bool(influenced.get("ok", false))
+		ui["action"] = "influence"
+		ui["summary"] = str(influenced.get("sentence", r.get("hint", "Influence")))
+		ui["crs"] = float(influenced.get("crs_after", influenced.get("crs", 0.0)))
+		ui["other_tag"] = str(influenced.get("other_tag", ""))
+		ui["to_id"] = ipid
+		return ui
+	if action == "choke_flag":
+		var cpid := int(r.get("to_id", 950001))
+		var cfid := str(r.get("fid", "")).strip_edges()
+		var ctag := _living_player_tag(str(r.get("player_tag", "")))
+		if ctag.is_empty():
+			ctag = "ENG"
+		if cfid.is_empty() and typeof(MapManager) != TYPE_NIL and MapManager.has_method("living_choke_state"):
+			var st0: Dictionary = MapManager.living_choke_state(cpid, ctag)
+			cfid = str(st0.get("fid", ""))
+		if cfid.is_empty() or cpid <= 0 or typeof(LeaderManager) == TYPE_NIL:
+			return {"ok": false, "action": "choke_flag", "summary": "No fleet to station"}
+		var fleet: Object = LeaderManager.get_formation(cfid) if LeaderManager.has_method("get_formation") else null
+		if fleet == null:
+			return {"ok": false, "action": "choke_flag", "summary": "Unknown fleet"}
+		var hop: Dictionary = {}
+		if typeof(FormationMovement) != TYPE_NIL:
+			hop = FormationMovement.enqueue_own_sea_hop(cfid, cpid, ctag)
+		if "stationed_province_id" in fleet:
+			fleet.stationed_province_id = cpid
+		return {
+			"ok": true,
+			"action": "choke_flag",
+			"stationed": true,
+			"to_id": cpid,
+			"fid": cfid,
+			"summary": "Fleet stationed on the choke",
+			"hop": hop,
+		}
+	if action == "assign_cas":
+		var afid := str(r.get("fid", "")).strip_edges()
+		var arid := int(r.get("to_id", 100))
+		if arid <= 0:
+			arid = 100
+		if afid.is_empty() or typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("assign_air_wing_to_region"):
+			return {"ok": false, "action": "assign_cas", "summary": "No wing to assign"}
+		var assigned: Dictionary = LeaderManager.assign_air_wing_to_region(afid, arid, "CAS")
+		return {
+			"ok": bool(assigned.get("ok", false)),
+			"action": "assign_cas",
+			"fid": afid,
+			"to_id": arid,
+			"region_id": arid,
+			"summary": "CAS assigned to region %d" % arid,
+		}
+	if action == "unassign_cas":
+		var ufid := str(r.get("fid", "")).strip_edges()
+		if ufid.is_empty() or typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("unassign_air_wing"):
+			return {"ok": false, "action": "unassign_cas", "summary": "No wing to unassign"}
+		var cleared: Dictionary = LeaderManager.unassign_air_wing(ufid)
+		return {
+			"ok": bool(cleared.get("ok", false)),
+			"action": "unassign_cas",
+			"fid": ufid,
+			"to_id": 0,
+			"region_id": 0,
+			"summary": "CAS unassigned",
+		}
 	if action == "show_war_loop":
 		var tree := Engine.get_main_loop() as SceneTree
 		var mr: Node = null
@@ -283,9 +504,8 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 			"action": "declare",
 			"summary": str(declared.get("summary", r.get("hint", "Declare war"))),
 		}
-	if action == "settle_peace" and typeof(GameData) != TYPE_NIL \
-			and GameData.has_method("apply_peace_conference_settlement_live"):
-		var pid := int(r.get("to_id", -1))
+	if action == "settle_peace":
+		var pid := int(r.get("to_id", r.get("province_id", -1)))
 		var winner := str(r.get("winner", "")).strip_edges().to_upper()
 		var loser := str(r.get("loser", "")).strip_edges().to_upper()
 		if winner.is_empty():
@@ -293,14 +513,20 @@ static func apply(rec: Dictionary = {}) -> Dictionary:
 		if loser.is_empty():
 			loser = "FRA"
 		if pid > 0:
-			var settled: Dictionary = GameData.apply_peace_conference_settlement_live(
-				winner, loser, pid, true, false, 0.0, true
-			)
-			_show_occupation_overlay()
+			var sheet: Dictionary = PeaceConferenceWindow.open_living_sheet(winner, loser, pid)
 			return {
-				"ok": bool(settled.get("ok", false)),
+				"ok": bool(sheet.get("ok", false)),
 				"action": "settle_peace",
-				"summary": str(settled.get("summary", "Peace annex applied")),
+				"sheet": true,
+				"opened": true,
+				"panel": "peace",
+				"unpause_only": false,
+				"summary": str(sheet.get("title", "Peace conference opened")),
+				"winner": str(sheet.get("winner", winner)),
+				"loser": str(sheet.get("loser", loser)),
+				"to_id": int(sheet.get("province_id", pid)),
+				"province_id": int(sheet.get("province_id", pid)),
+				"place": str(sheet.get("place", "")),
 			}
 	if action == "occupation_unrest":
 		_show_occupation_overlay()
@@ -332,10 +558,18 @@ static func _open_living_surface(kind: String, rec: Dictionary) -> Dictionary:
 	var k := kind.strip_edges().to_lower()
 	if k == "shortage":
 		k = "production"
-	if k == "tech_done" or k == "technology":
+	if k == "tech_done" or k == "technology" or k == "set_research":
 		k = "research"
 	if k == "focus_done":
 		k = "focus"
+	if k == "assign_chief":
+		k = "leaders"
+	if k == "recruit_agent" or k == "send_agent":
+		k = "agents"
+	if k == "influence" or k == "diplomacy":
+		k = "diplomacy"
+	if k == "trade":
+		k = "trade"
 	var ui_opened := false
 	var tree := Engine.get_main_loop() as SceneTree
 	var bar: Node = null
@@ -375,7 +609,11 @@ static func _action_label(action: String) -> String:
 		"focus_done":
 			return "Focus completes tomorrow"
 		"choke_flag":
-			return "Channel choke flagged"
+			return "Channel off-station · supply bite"
+		"assign_cas":
+			return "Assign CAS to the front"
+		"unassign_cas":
+			return "Unassign CAS"
 		"settle_peace":
 			return "Settle the peace"
 		"occupation_unrest":
@@ -386,8 +624,30 @@ static func _action_label(action: String) -> String:
 			return "Declare war"
 		"show_war_loop":
 			return "WarLoop · B Fronts · Ctrl+click"
+		"assign_chief":
+			return "Assign a chief"
+		"set_research":
+			return "Set research"
+		"recruit_agent":
+			return "Recruit an agent"
+		"send_agent":
+			return "Send an agent"
+		"influence":
+			return "Influence a neighbor"
+		"trade":
+			return "Trade with a neighbor"
 		_:
 			return "Unpause a day"
+
+
+static func _vacant_chief(tag: String) -> String:
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_country_position_leader"):
+		return ""
+	for pos in ["chief_of_army", "chief_of_navy", "chief_of_air_force"]:
+		var leader = LeaderManager.get_country_position_leader(tag, pos)
+		if leader == null:
+			return pos
+	return ""
 
 
 static func _days_left(facts: Dictionary, key: String) -> float:
@@ -456,6 +716,7 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 		if dleft >= 0.0:
 			facts["develop_days_left"] = dleft
 	facts["fleet_choke"] = _fleet_choke_row(tag)
+	facts["cas_wing"] = _cas_row(tag)
 	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("peek_last_land_aar"):
 		var peace_aar: Dictionary = BattleManager.peek_last_land_aar()
 		if not peace_aar.is_empty():
@@ -463,10 +724,35 @@ static func _gather_facts(player_tag: String) -> Dictionary:
 			facts["peace_winner"] = str(peace_aar.get("peace_winner", tag))
 			facts["peace_loser"] = str(peace_aar.get("peace_loser", ""))
 	facts["occupation"] = _occupation_row(tag)
+	facts["diplomacy"] = _diplomacy_row(tag)
 	var wg: Dictionary = _war_goal_row(tag)
 	facts["war_goal_pid"] = int(wg.get("pid", -1))
 	facts["war_justified"] = bool(wg.get("justified", false))
 	facts["war_declared"] = bool(wg.get("declared", false))
+	facts["vacant_chief"] = _vacant_chief(tag)
+	if typeof(TechnologyManager) != TYPE_NIL and TechnologyManager.has_method("completing_snapshot"):
+		var queued := str(facts.get("research_id", "")).strip_edges()
+		facts["research_queued"] = not queued.is_empty()
+	facts["agent_roster_n"] = 0
+	facts["agent_on_mission_n"] = 0
+	if typeof(AgentManager) != TYPE_NIL and AgentManager.has_method("get_agents_for_country"):
+		var roster: Array = AgentManager.get_agents_for_country(tag)
+		facts["agent_roster_n"] = roster.size()
+		var on_mission := 0
+		for ag in roster:
+			if ag == null:
+				continue
+			var st := ""
+			var mid := ""
+			if ag is Dictionary:
+				st = str(ag.get("status", ""))
+				mid = str(ag.get("current_mission_id", ""))
+			else:
+				st = str(ag.status)
+				mid = str(ag.current_mission_id)
+			if st.strip_edges().to_lower() == "on_mission" or not mid.strip_edges().is_empty():
+				on_mission += 1
+		facts["agent_on_mission_n"] = on_mission
 	return facts
 
 
@@ -524,6 +810,181 @@ static func _occupation_row(tag: String) -> Dictionary:
 	return empty
 
 
+## Named living theaters only — never walk 3520. GER sees FRA Maginot; JAP sees CHI–JAP.
+static func living_diplomacy_from_province(province_id: int, player_tag: String = "", remember: bool = true) -> Dictionary:
+	var pid := int(province_id)
+	var player := _living_player_tag(player_tag)
+	var empty := {"ok": false, "pid": pid, "player_tag": player}
+	if pid <= 0 or typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province"):
+		return empty
+	var p: Object = MapManager.get_province(pid)
+	if p == null:
+		return empty
+	var other := str(p.get("owner_tag")).strip_edges().to_upper()
+	if other.is_empty():
+		other = str(p.get("controller_tag")).strip_edges().to_upper()
+	if other.is_empty() or other == player:
+		return empty
+	var crs := 0.0
+	var band_id := "neutral"
+	var band_label := "Neutral"
+	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("get_snapshot"):
+		var snap: Dictionary = RelationsManager.get_snapshot(player, other)
+		crs = float(snap.get("crs", 0.0))
+		var band_v: Variant = snap.get("band", {})
+		if band_v is Dictionary:
+			band_id = str((band_v as Dictionary).get("id", band_id))
+			band_label = str((band_v as Dictionary).get("label", band_label))
+			crs = float((band_v as Dictionary).get("crs", crs))
+	var offers := 0
+	if typeof(TradeManager) != TYPE_NIL and TradeManager.has_method("get_diplomatic_summary_with"):
+		var trade: Dictionary = TradeManager.get_diplomatic_summary_with(player, other)
+		offers = int(trade.get("active_offers", 0))
+	var place := str(p.get("name")).strip_edges()
+	if place.is_empty():
+		place = other
+	var sentence := "Influence %s · %s · CRS %.0f · trade %d" % [other, band_label, crs, offers]
+	if remember:
+		last_diplomacy_pid = pid
+	return {
+		"ok": true,
+		"pid": pid,
+		"player_tag": player,
+		"other_tag": other,
+		"crs": crs,
+		"band": band_id,
+		"band_label": band_label,
+		"trade_offers": offers,
+		"place": place,
+		"sentence": sentence,
+	}
+
+
+static func apply_living_diplomacy(province_id: int, player_tag: String = "") -> Dictionary:
+	var facts: Dictionary = living_diplomacy_from_province(province_id, player_tag)
+	if not bool(facts.get("ok", false)):
+		return facts
+	var player := str(facts.get("player_tag", "GER"))
+	var other := str(facts.get("other_tag", ""))
+	var crs_after := float(facts.get("crs", 0.0))
+	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("apply_vector_delta"):
+		var snap: Dictionary = RelationsManager.apply_vector_delta(
+			player, other, {"public": 5.0, "trust": 3.0, "alignment": 2.0}, "map_influence"
+		)
+		if not snap.is_empty():
+			crs_after = float(snap.get("crs", crs_after))
+			var band_v: Variant = snap.get("band", {})
+			if band_v is Dictionary:
+				crs_after = float((band_v as Dictionary).get("crs", crs_after))
+				facts["band"] = str((band_v as Dictionary).get("id", facts.get("band", "")))
+				facts["band_label"] = str((band_v as Dictionary).get("label", facts.get("band_label", "")))
+	facts["crs_after"] = crs_after
+	facts["applied"] = true
+	facts["sentence"] = "Influence %s · %s · CRS %.0f" % [
+		other, str(facts.get("band_label", "Neutral")), crs_after
+	]
+	return facts
+
+
+## Plant a player agent on the clicked/named foreign hex so AgentPresenceLayer can draw them.
+static func send_agent_to_province(province_id: int, player_tag: String = "") -> Dictionary:
+	var pid := int(province_id)
+	var player := _living_player_tag(player_tag)
+	var facts: Dictionary = living_diplomacy_from_province(pid, player, pid > 0)
+	if not bool(facts.get("ok", false)):
+		facts = _diplomacy_row(player)
+	if not bool(facts.get("ok", false)):
+		return {"ok": false, "pid": pid, "player_tag": player, "sentence": "No foreign hex"}
+	pid = int(facts.get("pid", pid))
+	player = str(facts.get("player_tag", player))
+	var other := str(facts.get("other_tag", ""))
+	if typeof(AgentManager) == TYPE_NIL or not AgentManager.has_method("establish_network"):
+		facts["ok"] = false
+		facts["sentence"] = "No AgentManager"
+		return facts
+	var agent_id := ""
+	if AgentManager.has_method("get_available_agents"):
+		var idle: Array = AgentManager.get_available_agents(player)
+		if not idle.is_empty() and idle[0] != null:
+			agent_id = str(idle[0].agent_id)
+	if agent_id.is_empty() and AgentManager.has_method("recruit_agent"):
+		var recruited: Object = AgentManager.recruit_agent(player)
+		if recruited != null:
+			agent_id = str(recruited.get("agent_id"))
+	if agent_id.is_empty():
+		facts["ok"] = false
+		facts["sentence"] = "No agent to send"
+		return facts
+	var planted := false
+	var net_ok := false
+	if AgentManager.has_method("get_network") and AgentManager.get_network(pid) != null:
+		net_ok = true
+	else:
+		net_ok = bool(AgentManager.establish_network(agent_id, pid, "intelligence"))
+	var agent: Object = AgentManager.get_agent(agent_id) if AgentManager.has_method("get_agent") else null
+	if agent != null:
+		if str(agent.get("status")).strip_edges().to_lower() != "on_mission" \
+				or int(agent.get("assigned_province_id")) != pid:
+			agent.set("status", "on_mission")
+			agent.set("current_mission_id", "network_lead")
+			agent.set("assigned_province_id", pid)
+			if not other.is_empty():
+				agent.set("assigned_target_tag", other)
+		planted = str(agent.get("status")).strip_edges().to_lower() == "on_mission" \
+			and int(agent.get("assigned_province_id")) == pid
+	if (not net_ok or planted) and AgentManager.has_signal("agent_assigned_to_mission"):
+		AgentManager.agent_assigned_to_mission.emit(agent_id, "network_lead")
+	facts["ok"] = planted
+	facts["agent_id"] = agent_id
+	facts["on_mission"] = planted
+	facts["network"] = net_ok
+	facts["applied"] = planted
+	if planted:
+		facts["sentence"] = "Agent in %s · #%d" % [other, pid]
+	else:
+		facts["sentence"] = "Send agent failed"
+	return facts
+
+
+## Open a living proposed offer with the neighbor on the clicked/named hex.
+static func apply_living_trade(province_id: int, player_tag: String = "") -> Dictionary:
+	var facts: Dictionary = living_diplomacy_from_province(province_id, player_tag, province_id > 0)
+	if not bool(facts.get("ok", false)):
+		facts = _diplomacy_row(_living_player_tag(player_tag))
+	if not bool(facts.get("ok", false)):
+		return facts
+	var player := str(facts.get("player_tag", "GER"))
+	var other := str(facts.get("other_tag", ""))
+	var offer_id := ""
+	if typeof(TradeManager) != TYPE_NIL and TradeManager.has_method("create_offer"):
+		offer_id = str(TradeManager.create_offer(
+			player, other, [], [], TradeManager.TradeVisibility.PUBLIC, 2
+		))
+	facts["offer_id"] = offer_id
+	facts["applied"] = not offer_id.is_empty()
+	facts["ok"] = not offer_id.is_empty()
+	if offer_id.is_empty():
+		facts["sentence"] = "Trade offer failed"
+	else:
+		facts["sentence"] = "Trade with %s · offer %s" % [other, offer_id]
+	return facts
+
+
+static func _diplomacy_row(tag: String) -> Dictionary:
+	var empty := {}
+	# Maginot FRA front + CHI–JAP edge — never 3520.
+	var named: Array = [710739, 903981, 902598]
+	if named.has(last_diplomacy_pid):
+		var remembered: Dictionary = living_diplomacy_from_province(last_diplomacy_pid, tag, false)
+		if bool(remembered.get("ok", false)):
+			return remembered
+	for raw in named:
+		var row: Dictionary = living_diplomacy_from_province(int(raw), tag, false)
+		if bool(row.get("ok", false)):
+			return row
+	return empty
+
+
 static func _war_goal_row(tag: String) -> Dictionary:
 	var out := {"pid": -1, "justified": false, "declared": false}
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_war_goal_state"):
@@ -547,38 +1008,59 @@ static func _war_goal_row(tag: String) -> Dictionary:
 
 static func _fleet_choke_row(tag: String) -> Dictionary:
 	var empty := {}
-	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("living_choke_state"):
 		return empty
-	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("has_strategic_chokepoint"):
+	# Known Channel theater only — never walk 3520 seas.
+	var pid := 950001
+	if tag != "ENG" and tag != "GBR":
+		return empty
+	var st: Dictionary = MapManager.living_choke_state(pid, tag)
+	if not bool(st.get("ok", false)):
+		return empty
+	# ENG Channel NEXT whenever the strait is a living choke. Off-station bites;
+	# on-station still names the choke so Maginot recommend("ENG") is not CAS leak
+	# after the fleet is parked back on 950001.
+	return {
+		"fid": str(st.get("fid", "")),
+		"pid": pid,
+		"sentence": str(st.get("sentence", "Channel choke flagged")),
+		"bonus": float(st.get("bonus", 0.85)),
+		"bite": bool(st.get("bite", false)),
+		"on_station": bool(st.get("on_station", false)),
+	}
+
+
+static func _cas_row(tag: String) -> Dictionary:
+	var empty := {}
+	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
 		return empty
 	var forms: Variant = LeaderManager.formations
 	if typeof(forms) != TYPE_DICTIONARY:
 		return empty
 	var scanned := 0
-	for fid in forms:
+	for key in (forms as Dictionary):
 		if scanned >= 48:
 			break
 		scanned += 1
-		var f: Object = (forms as Dictionary)[fid]
+		var f: Object = (forms as Dictionary)[key]
 		if f == null:
 			continue
 		if str(f.get("country_tag")).strip_edges().to_upper() != tag:
 			continue
 		var ft := str(f.formation_type) if "formation_type" in f else ""
-		if ft != "fleet" and ft != "task_force" and ft != "ship":
+		if ft != "air_wing" and ft != "air_squadron" and ft != "air_group":
 			continue
-		var pid := int(f.get("stationed_province_id")) if "stationed_province_id" in f else -1
-		if pid <= 0 or not MapManager.has_strategic_chokepoint(pid):
-			continue
-		var sentence := "Channel choke flagged"
-		if MapManager.has_method("flag_naval_choke"):
-			var fl: Dictionary = MapManager.flag_naval_choke(pid)
-			if bool(fl.get("ok", false)):
-				sentence = str(fl.get("sentence", sentence))
+		var rid := int(f.get("assigned_region_id")) if "assigned_region_id" in f else 0
+		var fid := str(f.get("formation_id")) if "formation_id" in f else str(key)
+		var want := 100 if tag == "GER" else rid
+		if want <= 0:
+			want = 100
 		return {
-			"fid": str(f.get("formation_id")) if "formation_id" in f else str(fid),
-			"pid": pid,
-			"sentence": sentence,
+			"fid": fid,
+			"region": want if rid <= 0 else rid,
+			"assigned_region_id": rid,
+			"assigned": rid > 0,
+			"unassign": false,
 		}
 	return empty
 

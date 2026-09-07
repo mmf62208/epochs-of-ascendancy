@@ -15,6 +15,7 @@ from map_states_mapmode_product import (  # noqa: E402
     build_states_mapmode_product,
     states_mapmode_integrity_from_board,
     states_mapmode_rgb,
+    states_terrain_hotkey_integrity,
     terrain_mapmode_rgb,
 )
 
@@ -75,6 +76,15 @@ class TestMapStatesMapmodeProduct(unittest.TestCase):
         self.assertIn('"terrain"', tb)
         self.assertIn("States", tb)
         self.assertIn("Terrain", tb)
+        # F-keys must live in _input (GUI/search cannot swallow Ctrl+F9) and toolbar follows.
+        g = states_terrain_hotkey_integrity()
+        self.assertTrue(g.get("ok"), msg=g)
+        input_i = ren.find("func _input")
+        unh_i = ren.find("func _unhandled_input")
+        input_fn = ren[input_i:unh_i]
+        self.assertIn('set_map_mode("terrain")', input_fn)
+        self.assertIn('set_map_mode("states")', input_fn)
+        self.assertIn("func _sync_mapmode_toolbar", ren)
 
 
 if __name__ == "__main__":

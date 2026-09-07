@@ -564,6 +564,8 @@ func _ensure_game_interactive() -> void:
 	if _is_graphical_launch():
 		# Solo session so hotseat banner / End Turn stay hidden for normal F5.
 		# Default human tag GER (Europe Maginot theater) — first-session play path.
+		# Command Center can pick GER/ENG/FRA/JAP · 1918/1936/2026 after boot.
+		# Env EOA_PLAYER_TAG / EOA_START_YEAR still override this default.
 		player_tag = "GER"
 		if typeof(SessionPlayers) != TYPE_NIL:
 			if SessionPlayers.has_method("setup_solo_play"):
@@ -593,8 +595,17 @@ func _ensure_game_interactive() -> void:
 				top_bar_hs.player_country_tag = player_tag
 			if top_bar_hs.has_method("_refresh_hotseat_visibility"):
 				top_bar_hs.call("_refresh_hotseat_visibility")
-		# One-shot first-session onboarding toast (after load paints).
-		if not has_meta("eoa_first_session_toast"):
+		# Title overlay on the live map (pick date / country / load). Skip if env already chose.
+		var title_scr := _living_title_boot_script()
+		if (
+			title_scr != null
+			and title_scr.has_method("should_show_living_title")
+			and bool(title_scr.call("should_show_living_title"))
+			and not has_meta("eoa_title_boot")
+		):
+			set_meta("eoa_title_boot", true)
+			call_deferred("_show_living_title_boot")
+		elif not has_meta("eoa_first_session_toast"):
 			set_meta("eoa_first_session_toast", true)
 			call_deferred("_toast_first_session_onboarding")
 		var tm := get_node_or_null("/root/TimeManager")
@@ -640,6 +651,39 @@ func _ensure_game_interactive() -> void:
 	if OS.get_environment("EOA_FEB_CLOCK").strip_edges() == "1" and not has_meta("eoa_feb_clock_ran"):
 		set_meta("eoa_feb_clock_ran", true)
 		call_deferred("_run_feb_clock_advance_test")
+
+
+func _living_title_boot_script() -> GDScript:
+	return load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
+
+
+func _show_living_title_boot() -> void:
+	var script := _living_title_boot_script()
+	if script == null:
+		return
+	if script.has_method("should_show_living_title") and not bool(script.call("should_show_living_title")):
+		return
+	if get_node_or_null("LivingTitleBoot") != null:
+		return
+	var boot: Node = script.new() as Node
+	if boot == null:
+		return
+	boot.name = "LivingTitleBoot"
+	add_child(boot)
+	if boot.has_signal("boot_closed"):
+		boot.connect("boot_closed", _on_living_title_boot_closed)
+	print("TestRunner: living title boot — pick scenario date, country, or load")
+
+
+func _on_living_title_boot_closed(result: Dictionary) -> void:
+	print("TestRunner: living title closed %s" % str(result))
+	var tag := str(result.get("player_tag", player_tag)).strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "GER"
+	player_tag = tag
+	if not has_meta("eoa_first_session_toast"):
+		set_meta("eoa_first_session_toast", true)
+		_toast_first_session_onboarding()
 
 
 ## One-shot first-session onboarding for graphical F5 (meta-guarded at call site).
