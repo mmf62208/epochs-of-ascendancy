@@ -652,6 +652,13 @@ def build_first_session_hotkeys_product(
             and "func _sync_capital_star_scales" in ren
             and "STRATEGIC_MAX_ZOOM" in _slice_func(ren, "_capital_star_font_px")
         )
+        unh_fn = _slice_func(ren, "_unhandled_input")
+        wiring["esc_idle_opens_command_center"] = (
+            "KEY_ESCAPE" in unh_fn
+            and "_dismiss_map_overlays_esc" in unh_fn
+            and "TopInfoBar.find_in_tree" in unh_fn
+            and "_on_menu_pressed" in unh_fn
+        )
 
         for k, v in wiring.items():
             if v:

@@ -1636,6 +1636,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _dismiss_map_overlays_esc():
 				get_viewport().set_input_as_handled()
 				return
+			# Idle Esc → Command Center. Do not steal Esc from search / LineEdit.
+			# TopInfoBar already has a fallback; MapRenderer was eating Esc first.
+			if _gui_text_field_has_focus():
+				get_viewport().set_input_as_handled()
+				return
+			var tib := TopInfoBar.find_in_tree(get_tree())
+			if tib != null and tib.has_method("_on_menu_pressed"):
+				tib.call("_on_menu_pressed")
+			get_viewport().set_input_as_handled()
+			return
 		# Stack cycle on selected pin province: [ previous · ] next (unit card also has buttons).
 		if (
 			(event.keycode == KEY_BRACKETLEFT or event.keycode == KEY_BRACKETRIGHT)
@@ -20850,8 +20860,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			(info_panel as CanvasItem).visible = false
 		dismissed = true
 		_show_map_layer_toast("Inspector closed (Esc)")
-	if not dismissed:
-		_show_map_layer_toast("Nothing to close — L toggles supply legend; Tech toggles tech panel")
+	# Idle Esc opens Command Center in _unhandled_input — no "nothing to close" toast.
 	return dismissed
 
 
