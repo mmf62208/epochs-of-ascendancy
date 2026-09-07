@@ -20306,7 +20306,9 @@ func _refresh_next_hook_chip() -> void:
 		_next_hook_chip.position = Vector2(18, 52)
 		_next_hook_chip.custom_minimum_size = Vector2(420, 28)
 		if typeof(RetrowaveTheme) != TYPE_NIL:
-			RetrowaveTheme.style_secondary_button(_next_hook_chip)
+			RetrowaveTheme.style_primary_button(_next_hook_chip)
+			_next_hook_chip.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 1.0))
+			_next_hook_chip.add_theme_constant_override("outline_size", 3)
 		ui.add_child(_next_hook_chip)
 		_next_hook_chip.pressed.connect(func() -> void:
 			if typeof(PlayNextHook) != TYPE_NIL:
