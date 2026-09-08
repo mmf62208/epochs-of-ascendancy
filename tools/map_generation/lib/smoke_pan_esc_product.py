@@ -1,7 +1,8 @@
 """Smoke walls: left-drag pans (release skip-pick) + idle Esc → Command Center.
 
-Play short-smoke MIXED (5c8e0f2 / b11cb4e): sea left-drag picked
-“Rio Grande Rise – Sea” and jump-zoomed; Esc closed inspector only.
+Play short-smoke MIXED (5c8e0f2 / b11cb4e / cf95762): sea left-drag picked
+“Rio Grande Rise – Sea” and jump-zoomed; 2nd/3rd empty-area drags did not
+pan; Esc closed inspector only.
 Pure wiring product — no dual packages.
 """
 from __future__ import annotations
@@ -51,6 +52,12 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
     pan_fn = _gd_func_slice(ren, "_left_drag_should_pan")
     activate_fn = _gd_func_slice(ren, "_activate_left_drag_pan_from_slop")
     unlock_drag_fn = _gd_func_slice(ren, "_unlock_close_camera_for_left_drag_pan")
+    begin_fn = _gd_func_slice(ren, "_begin_left_map_gesture")
+    allow_fn = _gd_func_slice(ren, "_allow_left_pan_skip_to_die")
+    rearm_fn = _gd_func_slice(ren, "_rearm_left_drag_for_next_press")
+    live_fn = _gd_func_slice(ren, "_left_live_slop_is_drag")
+    exceeded_fn = _gd_func_slice(ren, "_left_drag_exceeded_slop")
+    blocked_fn = _gd_func_slice(ren, "_left_map_pick_blocked")
     esc_fn = _gd_func_slice(ren, "_handle_escape_key")
     open_fn = _gd_func_slice(ren, "_esc_open_command_center")
     dismiss_fn = _gd_func_slice(ren, "_dismiss_map_overlays_esc")
@@ -77,6 +84,7 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             bool(prov_fn)
             and "_left_release_must_skip_pick" in prov_fn
             and "if event.pressed:" in prov_fn
+            and prov_fn.find("if event.pressed:") < prov_fn.find("_left_release_must_skip_pick")
             and prov_fn.find("if event.pressed:") < prov_fn.find("_select_province")
         )
         wiring["unhandled_release_skip_and_block"] = (
@@ -153,6 +161,42 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
         )
         wiring["topbar_uses_esc_chain"] = (
             "_handle_escape_key" in top and "_on_menu_pressed" in top
+        )
+        # cf95762 residual: skip-pick on committed slop/pan (no sea pick path)
+        # and re-arm so 2nd/3rd empty-area drags pan after release.
+        wiring["drag_skip_pick_live_slop"] = (
+            bool(live_fn)
+            and "_note_left_gesture_motion" not in live_fn
+            and "_begin_left_map_gesture" not in live_fn
+            and "_left_live_slop_is_drag" in skip_fn
+            and "_left_live_slop_is_drag" in blocked_fn
+            and "_left_live_slop_is_drag" in exceeded_fn
+            and exceeded_fn.find("_left_live_slop_is_drag")
+            < exceeded_fn.find("_note_left_gesture_motion")
+            and "_mark_left_pan_blocked_pick" in activate_fn
+            and "_left_release_must_skip_pick" in unh_fn
+            and unh_fn.rfind("_left_release_must_skip_pick")
+            < unh_fn.rfind("_select_province")
+            and unh_fn.rfind("_left_release_must_skip_pick")
+            < unh_fn.rfind("_center_camera_on_province")
+            and "_note_left_gesture_motion" not in skip_fn
+        )
+        wiring["repeat_empty_drag_rearm"] = (
+            bool(begin_fn)
+            and "genuine_new_press" in begin_fn
+            and "_left_button_was_up" in begin_fn
+            and "physically_down" in begin_fn
+            and bool(rearm_fn)
+            and "_left_pan_armed" in rearm_fn
+            and "_left_ready_for_still_click" in rearm_fn
+            and "_left_skip_next_pick" in rearm_fn
+            and bool(allow_fn)
+            and "_rearm_left_drag_for_next_press" in allow_fn
+            and "_left_in_leftover_hold" in allow_fn
+            and allow_fn.find("_left_in_leftover_hold")
+            < allow_fn.find("_rearm_left_drag_for_next_press")
+            and "_left_drag_should_pan" in process_fn
+            and "_activate_left_drag_pan_from_slop" in process_fn
         )
 
         for k, v in wiring.items():

@@ -33,6 +33,8 @@ class TestSmokePanEscProduct(unittest.TestCase):
             "esc_idle_calls_menu",
             "dismiss_no_mainmenu_leftover",
             "topbar_uses_esc_chain",
+            "drag_skip_pick_live_slop",
+            "repeat_empty_drag_rearm",
         ):
             self.assertTrue(w.get(key), msg=(key, w, p.get("fail")))
 
