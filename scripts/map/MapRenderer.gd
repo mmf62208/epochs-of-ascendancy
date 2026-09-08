@@ -1229,16 +1229,24 @@ func _end_left_button_down() -> void:
 
 
 func _rearm_left_drag_for_next_press() -> void:
-	# After leftover hold: drop pan-active so the next empty-area press can
-	# slop-pan. Do NOT clear skip/slop/cam latch here — leftover Area2D /
-	# unhandled after a drag still picks Mid Pacific Waters if skip dies
-	# before a genuine new press. `_begin(true)` genuine_new_press resets.
+	# After leftover hold: next empty-area press may slop-pan without a pick first.
 	# Do not call during leftover hold (idle-clear let THIS release pick).
 	_left_pan_armed = false
 	_left_pan_active = false
 	_left_ready_for_still_click = true
+	_left_cam_moved_this_down = false
+	_left_gesture_dragged = false
+	_left_skip_next_pick = false
+	_left_pan_committed = false
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_max_slop_sq = 0.0
+	_left_sticky_valid = false
+	_left_sticky_slop_sq = 0.0
+	_left_origin_valid = false
 	_left_release_frame = -1
 	_left_release_screen_valid = false
+	_left_press_cam_valid = false
 
 
 func _allow_left_pan_skip_to_die() -> void:
@@ -1405,39 +1413,6 @@ func _unlock_close_camera_for_left_drag_pan() -> void:
 	_map_pick_block_until_msec = 0
 
 
-func _ensure_left_drag_armed_from_physical() -> void:
-	# First empty-area drag: `_input` may miss the press (focus click /
-	# Area2D swallow). Arm from physical left-down so `_process` can pan.
-	if _left_pan_armed and _left_btn_down:
-		return
-	if not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-		return
-	if _mouse_over_search_control():
-		return
-	if MapViewInput.modal_blocks_map_nav(get_viewport()):
-		return
-	if not _left_btn_down:
-		_arm_left_map_press()
-		return
-	_left_pan_armed = true
-	if not _left_pan_active and _left_origin_valid:
-		_last_mouse_pos = _left_origin_screen
-
-
-func _left_pick_allowed_on_release() -> bool:
-	# Suppress pick until button-up confirms click-without-slop.
-	# Never pick while this left-down was/is a drag (sea Mid Pacific).
-	if _left_release_must_skip_pick() or _left_map_pick_blocked():
-		return false
-	if _left_pan_active or _left_gesture_dragged or _left_pan_committed:
-		return false
-	if _left_live_slop_is_drag() or _left_slop_is_drag() or _left_sticky_is_drag():
-		return false
-	if _left_cam_moved_this_down or _left_gesture_moved_camera():
-		return false
-	return _left_ready_for_still_click
-
-
 func _activate_left_drag_pan_from_slop() -> bool:
 	# Empty-area path: physical left-down + 8px slop, even if `_left_pan_armed`
 	# was never set (no Area2D / leftover Close swallow / paused).
@@ -1445,17 +1420,9 @@ func _activate_left_drag_pan_from_slop() -> bool:
 		return true
 	if not _left_drag_should_pan():
 		return false
-	# Drag1 (c8ee174): never seed `_last_mouse_pos` at current mouse — that
-	# zeroes the first camera apply. Keep press/origin so handle pans the
-	# accumulated slop (drag up = camera north).
-	if _left_origin_valid:
-		_last_mouse_pos = _left_origin_screen
-	elif _left_sticky_valid:
-		_last_mouse_pos = _left_sticky_origin
-	elif not _left_pan_armed:
+	if not _left_pan_armed:
 		_last_mouse_pos = get_viewport().get_mouse_position()
 	_left_pan_active = true
-	_left_pan_armed = true
 	_mark_left_pan_blocked_pick()
 	return true
 
@@ -2089,15 +2056,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 		# Gesture-scoped skip before capital-star snap / hex pick / title boot.
 		# `_left_release_must_skip_pick` does not `_note`/`_begin` (cannot reset slop).
-		# Pick only when button-up confirms click-without-slop (repeated empty
-		# drags must not select sea after leftover re-arm).
 		if not event.ctrl_pressed and not event.shift_pressed:
-			if (
-				_left_release_must_skip_pick()
-				or _left_map_pick_blocked()
-				or _left_gesture_moved_camera()
-				or not _left_pick_allowed_on_release()
-			):
+			if _left_release_must_skip_pick() or _left_map_pick_blocked() or _left_gesture_moved_camera():
 				_end_left_button_down()
 				_mark_left_pan_blocked_pick()
 				get_viewport().set_input_as_handled()
@@ -2232,9 +2192,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_show_inspector_toast("Click a unit chip to command (Shift+U toggles counters).", 3.5)
 			# Select first (outline immediately); center + left inspector (avoid covering selection).
 			if not event.ctrl_pressed and not event.shift_pressed and (
-				_left_release_must_skip_pick()
-				or _left_map_pick_blocked()
-				or not _left_pick_allowed_on_release()
+				_left_release_must_skip_pick() or _left_map_pick_blocked()
 			):
 				get_viewport().set_input_as_handled()
 				return
@@ -2289,10 +2247,6 @@ func _process(delta: float) -> void:
 	# Empty-area left-drag: physical left-down + slop → `_left_pan_active` even with
 	# no Area2D / leftover Close swallow. `_left_drag_should_pan` lives here so a
 	# missed `_input` arm still moves the camera after 8px.
-	# Drag1: arm from physical left-down *before* slop/activate so last_mouse
-	# stays at press origin (c8ee174 first empty drag never clearly panned).
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down:
-		_ensure_left_drag_armed_from_physical()
 	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down:
 		_accumulate_left_drag_slop()
 	if not _left_pan_active and _left_drag_should_pan():
@@ -16895,15 +16849,11 @@ func _terrain_palette_multipliers(terrain_key: String) -> Vector3:
 func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, province: Province, node: Node2D):
 	# Area2D / sea-hex writer: never pick on press (Rio Grande Rise jump-zoom).
 	# Press return is first so skip-pick does not have to latch before this fires.
-	# Never pick while left is/was a drag — leftover release after re-arm
-	# selected Mid Pacific Waters on c8ee174.
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			return
-		if not _left_pick_allowed_on_release():
-			return
 	# Check before use_spatial_picking so a leftover Area2D cannot open the inspector.
-	if _left_release_must_skip_pick() or _left_map_pick_blocked() or not _left_pick_allowed_on_release():
+	if _left_release_must_skip_pick() or _left_map_pick_blocked():
 		return
 	# When pure spatial picking is active (no Area2D or ignoring it), this handler should not fire for hover/selection.
 	# The unhandled_input path above handles clicks.
@@ -16913,12 +16863,7 @@ func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, pro
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			return
-		if (
-			_left_release_must_skip_pick()
-			or _left_map_pick_blocked()
-			or _map_click_should_skip_pick()
-			or not _left_pick_allowed_on_release()
-		):
+		if _left_release_must_skip_pick() or _left_map_pick_blocked() or _map_click_should_skip_pick():
 			return
 		var resolved_province := province
 		var resolved_node := node
