@@ -438,6 +438,19 @@ def build_first_session_hotkeys_product(
             )
             and input_fn.find("_finish_close_click_guard_on_new_press")
             < input_fn.find("_left_map_pick_blocked")
+            and "func _left_live_slop_is_drag" in ren
+            and "_left_live_slop_is_drag" in _slice_func(ren, "_left_release_must_skip_pick")
+            and "_left_live_slop_is_drag" in _slice_func(ren, "_left_map_pick_blocked")
+            and "_left_live_slop_is_drag" in _slice_func(ren, "_left_drag_exceeded_slop")
+            and "genuine_new_press" in _slice_func(ren, "_begin_left_map_gesture")
+            and "func _rearm_left_drag_for_next_press" in ren
+            and "_rearm_left_drag_for_next_press" in _slice_func(
+                ren, "_allow_left_pan_skip_to_die"
+            )
+            and _slice_func(ren, "_on_province_input").find("if event.pressed:")
+            < _slice_func(ren, "_on_province_input").find("_select_province")
+            and _slice_func(ren, "_unhandled_input").rfind("_left_release_must_skip_pick")
+            < _slice_func(ren, "_unhandled_input").rfind("_select_province")
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")

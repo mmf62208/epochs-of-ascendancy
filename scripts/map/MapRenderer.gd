@@ -1048,8 +1048,32 @@ var _pending_terrain_zoom_refresh: bool = false
 const WHEEL_TERRAIN_REFRESH_MS := 180
 
 
+func _left_live_slop_is_drag() -> bool:
+	# Read-only screen slop. Release/pick sites must not `_note`/`_begin`
+	# (that can reset origin before skip-pick latches — Rio Grande Rise).
+	var slop_lim: float = LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX
+	if _left_max_slop_sq >= slop_lim:
+		return true
+	var vp_live: Viewport = get_viewport()
+	if vp_live == null:
+		return false
+	var mouse_live: Vector2 = vp_live.get_mouse_position()
+	if _left_origin_valid and mouse_live.distance_squared_to(_left_origin_screen) >= slop_lim:
+		return true
+	if _left_origin_valid and mouse_live.distance_squared_to(_left_gesture_origin) >= slop_lim:
+		return true
+	if _left_sticky_valid and mouse_live.distance_squared_to(_left_sticky_origin) >= slop_lim:
+		return true
+	return false
+
+
 func _left_drag_exceeded_slop() -> bool:
+	# Live slop first: `_note` must not `_begin`-reset origin before we latch.
+	var live_drag: bool = _left_live_slop_is_drag()
 	_note_left_gesture_motion()
+	if live_drag:
+		_mark_left_pan_blocked_pick()
+		return true
 	if _left_gesture_dragged or _left_pan_committed or _left_pan_active or _left_slop_latched or _left_gesture_panned:
 		return true
 	if _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
@@ -1123,16 +1147,21 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	var keep_this_drag: bool = (
 		_left_cam_moved_this_down or _left_sticky_is_drag() or (not _left_ready_for_still_click)
 	)
-	if keep_this_drag and (leftover or not new_press):
-		_left_btn_down = true
-		return
-	if new_press and not physically_down:
-		_left_btn_down = true
-		return
-	if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
-		if leftover or not _left_ready_for_still_click:
+	# cf95762: leftover skip/cam flags blocked `_begin(true)` reset, so 2nd/3rd
+	# empty-area presses never re-armed `_process` pan. A physical new press
+	# after idle button-up always starts a fresh origin.
+	var genuine_new_press: bool = new_press and physically_down and _left_button_was_up
+	if not genuine_new_press:
+		if keep_this_drag and (leftover or not new_press):
 			_left_btn_down = true
 			return
+		if new_press and not physically_down:
+			_left_btn_down = true
+			return
+		if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
+			if leftover or not _left_ready_for_still_click:
+				_left_btn_down = true
+				return
 	_left_btn_down = true
 	_left_gesture_dragged = false
 	_left_gesture_origin = mouse
@@ -1162,12 +1191,18 @@ func _note_left_gesture_motion() -> void:
 	_note_sticky_slop()
 	if not _left_btn_down:
 		# Never `_begin` here after a pan — that reset dragged and the release hex picked.
+		# Physical hold: restore `_left_btn_down` without `_begin()`-resetting origin
+		# (cf95762: mid-drag reset zeroed slop; Area2D/unhandled release picked sea).
 		if _left_sticky_is_drag() or _left_gesture_dragged:
 			if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 				_left_btn_down = true
-			return
-		if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
-			_begin_left_map_gesture()
+			else:
+				return
+		elif Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			if _left_origin_valid or _left_skip_next_pick:
+				_left_btn_down = true
+			else:
+				_begin_left_map_gesture()
 		else:
 			return
 	var vp: Viewport = get_viewport()
@@ -1193,6 +1228,27 @@ func _end_left_button_down() -> void:
 	# origin. Home clears sticky; leftover hold is frames after this `_end`.
 
 
+func _rearm_left_drag_for_next_press() -> void:
+	# After leftover hold: next empty-area press may slop-pan without a pick first.
+	# Do not call during leftover hold (idle-clear let THIS release pick).
+	_left_pan_armed = false
+	_left_pan_active = false
+	_left_ready_for_still_click = true
+	_left_cam_moved_this_down = false
+	_left_gesture_dragged = false
+	_left_skip_next_pick = false
+	_left_pan_committed = false
+	_left_slop_latched = false
+	_left_gesture_panned = false
+	_left_max_slop_sq = 0.0
+	_left_sticky_valid = false
+	_left_sticky_slop_sq = 0.0
+	_left_origin_valid = false
+	_left_release_frame = -1
+	_left_release_screen_valid = false
+	_left_press_cam_valid = false
+
+
 func _allow_left_pan_skip_to_die() -> void:
 	# Observe idle button-up so the next physical click is Alicante-class.
 	# Do not clear slop/skip/cam latch here (idle-clear let THIS release pick).
@@ -1204,6 +1260,9 @@ func _allow_left_pan_skip_to_die() -> void:
 	_left_button_was_up = true
 	if _left_release_frame < 0:
 		return
+	if _left_in_leftover_hold():
+		return
+	_rearm_left_drag_for_next_press()
 
 
 func _left_map_pick_blocked() -> bool:
@@ -1211,6 +1270,8 @@ func _left_map_pick_blocked() -> bool:
 	if _left_cam_moved_this_down or _left_sticky_is_drag():
 		return true
 	if not _left_ready_for_still_click:
+		return true
+	if _left_live_slop_is_drag():
 		return true
 	return _left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick
 
@@ -1257,6 +1318,8 @@ func _left_release_must_skip_pick() -> bool:
 	if _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
 		return true
 	if _left_sticky_is_drag():
+		return true
+	if _left_live_slop_is_drag():
 		return true
 	return false
 
@@ -16785,6 +16848,10 @@ func _terrain_palette_multipliers(terrain_key: String) -> Vector3:
 
 func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, province: Province, node: Node2D):
 	# Area2D / sea-hex writer: never pick on press (Rio Grande Rise jump-zoom).
+	# Press return is first so skip-pick does not have to latch before this fires.
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			return
 	# Check before use_spatial_picking so a leftover Area2D cannot open the inspector.
 	if _left_release_must_skip_pick() or _left_map_pick_blocked():
 		return
