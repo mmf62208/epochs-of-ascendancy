@@ -1,0 +1,154 @@
+"""Smoke walls: left-drag pans (release skip-pick) + idle Esc → Command Center.
+
+Play short-smoke MIXED (5c8e0f2 / b11cb4e): sea left-drag picked
+“Rio Grande Rise – Sea” and jump-zoomed; Esc closed inspector only.
+Pure wiring product — no dual packages.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Dict, List
+
+ROOT = Path(__file__).resolve().parents[3]
+MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
+TOP_INFO = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
+
+
+def _gd_func_slice(src: str, func_name: str) -> str:
+    needle = "func %s" % func_name
+    i = src.find(needle)
+    if i < 0:
+        return ""
+    lines = src[i:].splitlines()
+    out = [lines[0]]
+    for line in lines[1:]:
+        if line.startswith("func ") or line.startswith("static func "):
+            break
+        out.append(line)
+    return "\n".join(out)
+
+
+def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
+    passes: List[str] = []
+    fails: List[str] = []
+    wiring: Dict[str, bool] = {}
+
+    ren = MAP_RENDERER.read_text(encoding="utf-8") if MAP_RENDERER.is_file() else ""
+    top = TOP_INFO.read_text(encoding="utf-8") if TOP_INFO.is_file() else ""
+    if not ren:
+        fails.append("missing_map_renderer")
+    if not top:
+        fails.append("missing_top_info_bar")
+
+    input_i = ren.find("func _input")
+    unh_i = ren.find("func _unhandled_input")
+    input_fn = ren[input_i:unh_i] if input_i >= 0 and unh_i > input_i else ""
+    unh_fn = _gd_func_slice(ren, "_unhandled_input")
+    prov_fn = _gd_func_slice(ren, "_on_province_input")
+    cam_fn = _gd_func_slice(ren, "_handle_camera_input")
+    skip_fn = _gd_func_slice(ren, "_left_release_must_skip_pick")
+    pan_fn = _gd_func_slice(ren, "_left_drag_should_pan")
+    esc_fn = _gd_func_slice(ren, "_handle_escape_key")
+    open_fn = _gd_func_slice(ren, "_esc_open_command_center")
+    dismiss_fn = _gd_func_slice(ren, "_dismiss_map_overlays_esc")
+    stack_fn = _gd_func_slice(ren, "_inspector_stack_blocking_input")
+    coarse_fn = _gd_func_slice(ren, "_show_coarse_territory_info")
+    title_fn = _gd_func_slice(ren, "_try_living_title_map_pick")
+
+    if check_wiring:
+        wiring["release_skip_pick_helper"] = (
+            bool(skip_fn)
+            and "_left_map_pick_blocked" in skip_fn
+            and "_left_gesture_dragged" in skip_fn
+            and "_left_max_slop_sq" in skip_fn
+            and "_note_left_gesture_motion" not in skip_fn
+        )
+        wiring["pan_from_slop_helper"] = (
+            bool(pan_fn)
+            and "_left_pan_armed" in pan_fn
+            and "_left_btn_down" in pan_fn
+            and "is_mouse_button_pressed" in pan_fn
+            and "_left_drag_exceeded_slop" in pan_fn
+        )
+        wiring["area2d_never_pick_on_press"] = (
+            bool(prov_fn)
+            and "_left_release_must_skip_pick" in prov_fn
+            and "if event.pressed:" in prov_fn
+            and prov_fn.find("if event.pressed:") < prov_fn.find("_select_province")
+        )
+        wiring["unhandled_release_skip_and_block"] = (
+            "_left_release_must_skip_pick" in unh_fn
+            and "did_left_pan" in unh_fn
+            and "_mark_left_pan_blocked_pick" in unh_fn
+            and "_center_camera_on_province" in unh_fn
+            and unh_fn.rfind("_left_release_must_skip_pick")
+            < unh_fn.rfind("_center_camera_on_province")
+        )
+        wiring["coarse_and_title_honor_skip"] = (
+            "_left_release_must_skip_pick" in coarse_fn
+            and "_left_release_must_skip_pick" in title_fn
+        )
+        wiring["camera_slop_before_modal"] = (
+            bool(cam_fn)
+            and "_accumulate_left_drag_slop" in cam_fn
+            and "_left_drag_should_pan" in cam_fn
+            and cam_fn.find("_accumulate_left_drag_slop")
+            < cam_fn.find("modal_blocks_map_nav")
+        )
+        wiring["input_motion_pans_from_slop"] = (
+            "_left_drag_should_pan" in input_fn and "_left_pan_active" in input_fn
+        )
+        wiring["esc_chain_in_input"] = (
+            "KEY_ESCAPE" in input_fn
+            and "_handle_escape_key" in input_fn
+            and input_fn.find("KEY_ESCAPE") < input_fn.find("MOUSE_BUTTON_LEFT")
+        )
+        wiring["esc_idle_calls_menu"] = (
+            bool(esc_fn)
+            and "_dismiss_map_overlays_esc" in esc_fn
+            and "_esc_open_command_center" in esc_fn
+            and "_on_menu_pressed" in open_fn
+            and "TopInfoBar.find_in_tree" in open_fn
+        )
+        wiring["dismiss_no_mainmenu_leftover"] = (
+            bool(dismiss_fn)
+            and '"MainMenu"' not in dismiss_fn
+            and "_overlay_node_is_up" in dismiss_fn
+            and "_overlay_node_is_up" in stack_fn
+        )
+        wiring["topbar_uses_esc_chain"] = (
+            "_handle_escape_key" in top and "_on_menu_pressed" in top
+        )
+
+        for k, v in wiring.items():
+            if v:
+                passes.append("wire_%s" % k)
+            else:
+                fails.append("wire_%s" % k)
+
+    ok = len(fails) == 0
+    return {
+        "ok": ok,
+        "empty": False,
+        "status": "PASS" if ok else "FAIL",
+        "wiring": wiring,
+        "pass": passes,
+        "fail": fails,
+        "summary": "Smoke pan+Esc walls · %s" % ("PASS" if ok else "FAIL"),
+        "integration": [
+            "smoke_pan_esc_product",
+            "MapRenderer._left_release_must_skip_pick",
+            "MapRenderer._handle_escape_key",
+            "TopInfoBar._on_menu_pressed",
+        ],
+    }
+
+
+def smoke_pan_esc_integrity(**kwargs: Any) -> Dict[str, Any]:
+    p = build_smoke_pan_esc_product(**kwargs)
+    return {
+        "ok": bool(p.get("ok")),
+        "status": p.get("status"),
+        "fail": list(p.get("fail") or []),
+        "summary": p.get("summary"),
+    }
