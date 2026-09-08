@@ -1150,7 +1150,11 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	# cf95762: leftover skip/cam flags blocked `_begin(true)` reset, so 2nd/3rd
 	# empty-area presses never re-armed `_process` pan. A physical new press
 	# after idle button-up always starts a fresh origin.
-	var genuine_new_press: bool = new_press and physically_down and _left_button_was_up
+	# `_allow` sets `_left_button_was_up` during leftover hold — do not treat
+	# leftover pressed=true as genuine (51dc2a4 / cf95762 Rio Grande Rise pick).
+	var genuine_new_press: bool = (
+		new_press and physically_down and _left_button_was_up and not _left_in_leftover_hold()
+	)
 	if not genuine_new_press:
 		if keep_this_drag and (leftover or not new_press):
 			_left_btn_down = true
@@ -1229,24 +1233,16 @@ func _end_left_button_down() -> void:
 
 
 func _rearm_left_drag_for_next_press() -> void:
-	# After leftover hold: next empty-area press may slop-pan without a pick first.
+	# After leftover hold: drop pan-active so the next empty-area press can
+	# slop-pan. Do NOT clear skip/slop/cam latch here — leftover Area2D /
+	# unhandled after a drag still picks Rio Grande Rise / Mid Pacific if skip
+	# dies before a genuine new press. `_begin(true)` genuine_new_press resets.
 	# Do not call during leftover hold (idle-clear let THIS release pick).
 	_left_pan_armed = false
 	_left_pan_active = false
 	_left_ready_for_still_click = true
-	_left_cam_moved_this_down = false
-	_left_gesture_dragged = false
-	_left_skip_next_pick = false
-	_left_pan_committed = false
-	_left_slop_latched = false
-	_left_gesture_panned = false
-	_left_max_slop_sq = 0.0
-	_left_sticky_valid = false
-	_left_sticky_slop_sq = 0.0
-	_left_origin_valid = false
 	_left_release_frame = -1
 	_left_release_screen_valid = false
-	_left_press_cam_valid = false
 
 
 func _allow_left_pan_skip_to_die() -> void:
@@ -1420,7 +1416,14 @@ func _activate_left_drag_pan_from_slop() -> bool:
 		return true
 	if not _left_drag_should_pan():
 		return false
-	if not _left_pan_armed:
+	# Keep press/origin so the first camera apply pans the accumulated slop
+	# (drag up = camera north). Seeding `_last_mouse_pos` at current mouse
+	# zeroes that delta. No `_process` physical-arm helper (PR 16 Esc/chip).
+	if _left_origin_valid:
+		_last_mouse_pos = _left_origin_screen
+	elif _left_sticky_valid:
+		_last_mouse_pos = _left_sticky_origin
+	elif not _left_pan_armed:
 		_last_mouse_pos = get_viewport().get_mouse_position()
 	_left_pan_active = true
 	_mark_left_pan_blocked_pick()

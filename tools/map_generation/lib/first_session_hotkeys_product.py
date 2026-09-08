@@ -452,6 +452,30 @@ def build_first_session_hotkeys_product(
             and _slice_func(ren, "_unhandled_input").rfind("_left_release_must_skip_pick")
             < _slice_func(ren, "_unhandled_input").rfind("_select_province")
         )
+        begin_fn = _slice_func(ren, "_begin_left_map_gesture")
+        rearm_fn = _slice_func(ren, "_rearm_left_drag_for_next_press")
+        process_fn_hot = _slice_func(ren, "_process")
+        prov_fn_hot = _slice_func(ren, "_on_province_input")
+        unh_fn_hot = _slice_func(ren, "_unhandled_input")
+        activate_fn_hot = _slice_func(ren, "_activate_left_drag_pan_from_slop")
+        # Empty-area drag skip-pick only (51dc2a4 Rio Grande Rise). Esc + chip
+        # wires stay in their own keys — do not require PR 16 helpers.
+        wiring["empty_drag_skip_pick"] = (
+            bool(rearm_fn)
+            and "_left_skip_next_pick = false" not in rearm_fn
+            and "_left_cam_moved_this_down = false" not in rearm_fn
+            and "_left_gesture_dragged = false" not in rearm_fn
+            and "not _left_in_leftover_hold()" in begin_fn
+            and begin_fn.find("genuine_new_press")
+            < begin_fn.find("not _left_in_leftover_hold()")
+            and "_left_skip_next_pick = false" in begin_fn
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+            and "_ensure_left_drag_armed_from_physical" not in process_fn_hot
+            and "_left_pick_allowed_on_release" not in prov_fn_hot
+            and "_left_pick_allowed_on_release" not in unh_fn_hot
+            and "_left_origin_screen" in activate_fn_hot
+        )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")
         process_fn = _slice_func(ren, "_process")
