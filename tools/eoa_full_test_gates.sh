@@ -106,6 +106,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_hoi_full_test_gap_matrix_product \
     tools.map_generation.tests.test_first_session_play_surface_product \
     tools.map_generation.tests.test_first_session_hotkeys_product \
+    tools.map_generation.tests.test_settle_title_product \
     tools.map_generation.tests.test_agent_portrait_filedialog_product \
     tools.map_generation.tests.test_first_session_assault_surface_product \
     tools.map_generation.tests.test_order_panel_play_strip_product \

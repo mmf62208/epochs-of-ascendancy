@@ -19201,7 +19201,8 @@ func _ensure_settle_button() -> void:
 		return
 	_btn_settle = Button.new()
 	_btn_settle.name = "BtnSettleProvince"
-	_btn_settle.text = "🏠 Settle This Province Now (+0.35)"
+	_btn_settle.text = ""
+	_btn_settle.visible = false
 	_btn_settle.tooltip_text = (
 		"Direct action on selected/inspected province: bumps settlement_level.\n"
 		+ "Real Province data + MapManager emit → map vitality tint update + inspector refresh + combat/supply bonuses live.\n"
@@ -19212,7 +19213,6 @@ func _ensure_settle_button() -> void:
 	_btn_settle.offset_top = 38.0   # below close/spirits row
 	_btn_settle.offset_right = 225.0
 	_btn_settle.offset_bottom = 62.0
-	_btn_settle.visible = false
 	if not _btn_settle.pressed.is_connected(_on_settle_province_pressed):
 		_btn_settle.pressed.connect(_on_settle_province_pressed)
 	info_panel.add_child(_btn_settle)
