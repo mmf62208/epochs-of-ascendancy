@@ -46,8 +46,11 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
     unh_fn = _gd_func_slice(ren, "_unhandled_input")
     prov_fn = _gd_func_slice(ren, "_on_province_input")
     cam_fn = _gd_func_slice(ren, "_handle_camera_input")
+    process_fn = _gd_func_slice(ren, "_process")
     skip_fn = _gd_func_slice(ren, "_left_release_must_skip_pick")
     pan_fn = _gd_func_slice(ren, "_left_drag_should_pan")
+    activate_fn = _gd_func_slice(ren, "_activate_left_drag_pan_from_slop")
+    unlock_drag_fn = _gd_func_slice(ren, "_unlock_close_camera_for_left_drag_pan")
     esc_fn = _gd_func_slice(ren, "_handle_escape_key")
     open_fn = _gd_func_slice(ren, "_esc_open_command_center")
     dismiss_fn = _gd_func_slice(ren, "_dismiss_map_overlays_esc")
@@ -97,6 +100,38 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
         )
         wiring["input_motion_pans_from_slop"] = (
             "_left_drag_should_pan" in input_fn and "_left_pan_active" in input_fn
+        )
+        wiring["empty_area_process_armed_to_camera"] = (
+            bool(process_fn)
+            and "_accumulate_left_drag_slop" in process_fn
+            and "_left_drag_should_pan" in activate_fn
+            and "_left_drag_should_pan" in process_fn
+            and "_activate_left_drag_pan_from_slop" in process_fn
+            and "_left_pan_active" in process_fn
+            and process_fn.find("_left_drag_should_pan")
+            < process_fn.find("_handle_camera_input")
+            and process_fn.find("_activate_left_drag_pan_from_slop")
+            < process_fn.find("_handle_camera_input")
+            and process_fn.find("_handle_camera_input")
+            < process_fn.find("_reassert_locked_close_camera")
+            and "if not _left_pan_active" in process_fn
+            and bool(cam_fn)
+            and "cam.global_position" in cam_fn
+            and "_left_pan_active" in cam_fn
+            and "_unlock_close_camera_for_left_drag_pan" in cam_fn
+            and "_close_release_seen" in cam_fn
+            and bool(unlock_drag_fn)
+            and "_unlock_close_camera" in unlock_drag_fn
+            and "_close_suppress_edge" not in unlock_drag_fn
+            and input_fn.find("_finish_close_click_guard_on_new_press")
+            < input_fn.find("_left_map_pick_blocked")
+            and "_arm_left_map_press" in unh_fn
+            and unh_fn.find("if event.pressed and _close_click_guard")
+            < unh_fn.find(
+                "_arm_left_map_press",
+                max(0, unh_fn.find("if event.pressed and _close_click_guard")),
+            )
+            and "_close_release_seen" in esc_fn
         )
         wiring["esc_chain_in_input"] = (
             "KEY_ESCAPE" in input_fn
