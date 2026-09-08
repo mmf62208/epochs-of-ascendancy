@@ -476,6 +476,20 @@ def build_first_session_hotkeys_product(
             and "_left_pick_allowed_on_release" not in unh_fn_hot
             and "_left_origin_screen" in activate_fn_hot
         )
+        # Safer pan: Area2D hold + release sites skip on live slop (Tropical Atlantic).
+        wiring["area2d_hold_release_live_slop"] = (
+            "is_mouse_button_pressed" in prov_fn_hot
+            and "_left_live_slop_is_drag" in prov_fn_hot
+            and "_left_release_must_skip_pick" in prov_fn_hot
+            and prov_fn_hot.find("if event.pressed:") < prov_fn_hot.find("_select_province")
+            and prov_fn_hot.find("_left_live_slop_is_drag") < prov_fn_hot.find("_select_province")
+            and "_left_live_slop_is_drag" in unh_fn_hot
+            and unh_fn_hot.rfind("_left_live_slop_is_drag") < unh_fn_hot.rfind("_select_province")
+            and "_left_live_slop_is_drag" in _slice_func(ren, "_show_coarse_territory_info")
+            and "_left_live_slop_is_drag" in _slice_func(ren, "_try_living_title_map_pick")
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+        )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")
         process_fn = _slice_func(ren, "_process")

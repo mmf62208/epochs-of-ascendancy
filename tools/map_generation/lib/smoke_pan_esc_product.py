@@ -235,6 +235,31 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and activate_fn.find("_left_origin_screen")
             < activate_fn.find("get_mouse_position")
         )
+        # f942ac3 Play: camera moved then sea-picked Tropical Atlantic Waters.
+        # Area2D hold + all release pick sites gate skip + live slop only.
+        wiring["area2d_hold_release_live_slop"] = (
+            bool(prov_fn)
+            and "is_mouse_button_pressed" in prov_fn
+            and "_left_live_slop_is_drag" in prov_fn
+            and "_left_release_must_skip_pick" in prov_fn
+            and "if event.pressed:" in prov_fn
+            and prov_fn.find("if event.pressed:") < prov_fn.find("_select_province")
+            and prov_fn.find("is_mouse_button_pressed") < prov_fn.find("_select_province")
+            and prov_fn.find("_left_live_slop_is_drag") < prov_fn.find("_select_province")
+            and prov_fn.find("_left_release_must_skip_pick") < prov_fn.find("_select_province")
+            and "_left_live_slop_is_drag" in unh_fn
+            and unh_fn.rfind("_left_live_slop_is_drag") < unh_fn.rfind("_select_province")
+            and unh_fn.rfind("_left_release_must_skip_pick") < unh_fn.rfind("_select_province")
+            and "_left_live_slop_is_drag" in coarse_fn
+            and "_left_release_must_skip_pick" in coarse_fn
+            and "_left_live_slop_is_drag" in title_fn
+            and "_left_release_must_skip_pick" in title_fn
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+            and "_ensure_left_drag_armed_from_physical" not in process_fn
+            and "_left_pick_allowed_on_release" not in prov_fn
+            and "_left_pick_allowed_on_release" not in unh_fn
+        )
 
         for k, v in wiring.items():
             if v:

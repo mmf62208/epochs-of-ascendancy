@@ -2040,6 +2040,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_left_gesture_dragged
 				or _map_click_should_skip_pick()
 				or _left_release_must_skip_pick()
+				or _left_live_slop_is_drag()
 			)
 			_end_left_button_down()
 			_note_close_button_release()
@@ -2058,9 +2059,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 		# Gesture-scoped skip before capital-star snap / hex pick / title boot.
-		# `_left_release_must_skip_pick` does not `_note`/`_begin` (cannot reset slop).
+		# `_left_release_must_skip_pick` + live slop only (no `_note`/`_begin`).
 		if not event.ctrl_pressed and not event.shift_pressed:
-			if _left_release_must_skip_pick() or _left_map_pick_blocked() or _left_gesture_moved_camera():
+			if (
+				_left_release_must_skip_pick()
+				or _left_live_slop_is_drag()
+				or _left_map_pick_blocked()
+				or _left_gesture_moved_camera()
+			):
 				_end_left_button_down()
 				_mark_left_pan_blocked_pick()
 				get_viewport().set_input_as_handled()
@@ -2077,7 +2083,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		# THIS drag already exceeded 8px: do not snap-select any capital
 		# (Play: Atlantic pan opened Paris via zoom-aware star disk).
 		if not event.shift_pressed:
-			if not event.ctrl_pressed and (_left_release_must_skip_pick() or _left_map_pick_blocked()):
+			if not event.ctrl_pressed and (
+				_left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked()
+			):
 				get_viewport().set_input_as_handled()
 				return
 			var star_pid := _resolve_map_pick_pid(world_pos)
@@ -2087,7 +2095,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					_refresh_selected_unit_chip()
 				var star_province: Province = provinces[star_pid] as Province
 				var star_node: Node2D = _province_node(star_pid)
-				if not event.ctrl_pressed and (_left_release_must_skip_pick() or _left_map_pick_blocked()):
+				if not event.ctrl_pressed and (
+					_left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked()
+				):
 					get_viewport().set_input_as_handled()
 					return
 				if _try_living_title_map_pick(star_pid):
@@ -2098,7 +2108,7 @@ func _unhandled_input(event: InputEvent) -> void:
 						get_viewport().set_input_as_handled()
 						return
 				if not event.ctrl_pressed and not event.shift_pressed and (
-					_left_release_must_skip_pick() or _left_map_pick_blocked()
+					_left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked()
 				):
 					get_viewport().set_input_as_handled()
 					return
@@ -2123,7 +2133,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			var ctid := _hit_coarse_territory(world_pos)
 			if ctid != 0:
 				if not event.ctrl_pressed and not event.shift_pressed and (
-					_left_release_must_skip_pick() or _left_map_pick_blocked()
+					_left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked()
 				):
 					get_viewport().set_input_as_handled()
 					return
@@ -2132,7 +2142,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 		if pid >= 0 and provinces.has(pid):
 			if not event.ctrl_pressed and not event.shift_pressed and (
-				_left_release_must_skip_pick() or _left_map_pick_blocked()
+				_left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked()
 			):
 				get_viewport().set_input_as_handled()
 				return
@@ -2163,7 +2173,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 			# Unit move: selected pin + click friendly province.
 			if not selected_formation_id.is_empty() and not event.ctrl_pressed:
-				if _left_release_must_skip_pick() or _left_map_pick_blocked():
+				if _left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked():
 					get_viewport().set_input_as_handled()
 					return
 				if _try_move_selected_unit_to_province(resolved_province):
@@ -2172,7 +2182,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 			# G click-to-show: hex pick draws a budgeted corridor (never on the G key frame).
 			if _corridor_click_armed and not event.ctrl_pressed:
-				if _left_release_must_skip_pick() or _left_map_pick_blocked():
+				if _left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked():
 					get_viewport().set_input_as_handled()
 					return
 				_corridor_click_armed = false
@@ -2183,7 +2193,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _try_set_attack_staging(resolved_province):
 				pass  # still open inspector below
 			if supply_mode and _handle_supply_province_click(resolved_province):
-				if _left_release_must_skip_pick() or _left_map_pick_blocked():
+				if _left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked():
 					get_viewport().set_input_as_handled()
 					return
 				_select_province(resolved_province, resolved_node)
@@ -2195,7 +2205,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_show_inspector_toast("Click a unit chip to command (Shift+U toggles counters).", 3.5)
 			# Select first (outline immediately); center + left inspector (avoid covering selection).
 			if not event.ctrl_pressed and not event.shift_pressed and (
-				_left_release_must_skip_pick() or _left_map_pick_blocked()
+				_left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked()
 			):
 				get_viewport().set_input_as_handled()
 				return
@@ -14813,7 +14823,9 @@ func _hit_coarse_territory(world_pos: Vector2) -> int:
 func _show_coarse_territory_info(terr_id: int, focus_camera: bool = false) -> void:
 	# Mouse click only: a left-drag that already exceeded 8px must not open coarse inspector.
 	# focus_camera=false refreshes (data_changed) stay live.
-	if focus_camera and (_left_release_must_skip_pick() or _left_map_pick_blocked()):
+	if focus_camera and (
+		_left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked()
+	):
 		return
 	if not _coarse_territories.has(terr_id) or info_panel == null:
 		return
@@ -16855,8 +16867,15 @@ func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, pro
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			return
-	# Check before use_spatial_picking so a leftover Area2D cannot open the inspector.
-	if _left_release_must_skip_pick() or _left_map_pick_blocked():
+	# Hold + committed slop/skip: abort before inspector (Tropical Atlantic Waters).
+	# Read-only live slop — do not `_note`/`_begin` here. Click-without-slop still picks.
+	var left_still_down: bool = (
+		_left_btn_down or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	)
+	if left_still_down and (_left_live_slop_is_drag() or _left_release_must_skip_pick()):
+		return
+	# Release/leftover Area2D: skip + live slop (no new arm / `_note`).
+	if _left_release_must_skip_pick() or _left_live_slop_is_drag() or _left_map_pick_blocked():
 		return
 	# When pure spatial picking is active (no Area2D or ignoring it), this handler should not fire for hover/selection.
 	# The unhandled_input path above handles clicks.
@@ -16866,7 +16885,7 @@ func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, pro
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			return
-		if _left_release_must_skip_pick() or _left_map_pick_blocked() or _map_click_should_skip_pick():
+		if _left_release_must_skip_pick() or _left_live_slop_is_drag():
 			return
 		var resolved_province := province
 		var resolved_node := node
@@ -17605,7 +17624,7 @@ func _toast_living_diplomacy_pick(pid: int) -> void:
 
 ## Title boot: click playable land/capital on the political map (panel stays a list too).
 func _try_living_title_map_pick(pid: int) -> bool:
-	if _left_release_must_skip_pick():
+	if _left_release_must_skip_pick() or _left_live_slop_is_drag():
 		return false
 	var tree := get_tree()
 	if tree == null or tree.root == null:
