@@ -1067,6 +1067,23 @@ func _left_live_slop_is_drag() -> bool:
 	return false
 
 
+func _latch_left_skip_pick_from_live_slop() -> void:
+	# eed9b5f Drag2 Labrador Approaches West: `_unhandled_input` spatial
+	# `_select_province` (named sea — not Area2D / coarse / title). Mid-gesture
+	# left-down + live slop ≥8px sets skip once. Keep until genuine `_begin(true)`.
+	# Do not mark/activate/rearm (Drag1 camera stays deferred). Default board
+	# has no Area2D (`use_spatial_picking` + `create_area_nodes_for_fallback=false`).
+	if _left_skip_next_pick:
+		return
+	var left_down: bool = (
+		_left_btn_down or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	)
+	if not left_down:
+		return
+	if _left_live_slop_is_drag():
+		_left_skip_next_pick = true
+
+
 func _left_drag_exceeded_slop() -> bool:
 	# Live slop first: `_note` must not `_begin`-reset origin before we latch.
 	var live_drag: bool = _left_live_slop_is_drag()
@@ -1701,6 +1718,7 @@ func _input(event: InputEvent) -> void:
 				if _wheel_should_zoom_map() or not _gui_text_field_has_focus():
 					_arm_left_map_press()
 			elif not event.pressed:
+				_latch_left_skip_pick_from_live_slop()
 				_note_left_gesture_motion()
 				var did_left_pan: bool = (
 					_left_gesture_dragged
@@ -1715,6 +1733,7 @@ func _input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
 		_note_mouse_up_arms_still_click()
 		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+			_latch_left_skip_pick_from_live_slop()
 			_note_left_gesture_motion()
 		if not _left_pan_active and _left_drag_should_pan():
 			_activate_left_drag_pan_from_slop()
@@ -1997,6 +2016,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
 				_begin_left_map_gesture(true)
+			# Latch skip from live slop before `_note` can `_begin`-reset origin
+			# (eed9b5f Drag2 Labrador sea pick on the spatial release path).
+			_latch_left_skip_pick_from_live_slop()
 			_note_left_gesture_motion()
 			if _left_map_pick_blocked():
 				if event.pressed:
@@ -2261,6 +2283,7 @@ func _process(delta: float) -> void:
 	# no Area2D / leftover Close swallow. `_left_drag_should_pan` lives here so a
 	# missed `_input` arm still moves the camera after 8px.
 	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down:
+		_latch_left_skip_pick_from_live_slop()
 		_accumulate_left_drag_slop()
 	if not _left_pan_active and _left_drag_should_pan():
 		_activate_left_drag_pan_from_slop()

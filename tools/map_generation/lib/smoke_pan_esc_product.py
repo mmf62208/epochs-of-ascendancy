@@ -1,10 +1,12 @@
 """Smoke walls: left-drag pans (release skip-pick) + idle Esc → Command Center.
 
-Play short-smoke MIXED (5c8e0f2 / b11cb4e / cf95762 / 51dc2a4): sea left-drag
-picked “Rio Grande Rise” (camera moved, then leftover/release selected sea).
-Esc dismiss-then-CC and unit-chip Fill%/TOE stay PASS — do not reintroduce
-the PR 16 `_ensure_left_drag_armed_from_physical` / `_left_pick_allowed_on_release`
-stack.
+Play short-smoke MIXED (5c8e0f2 / b11cb4e / cf95762 / 51dc2a4 / eed9b5f): sea
+left-drag picked “Rio Grande Rise” / Drag2 “Labrador Approaches West”
+(`_unhandled_input` spatial `_select_province`, not Area2D / coarse / title).
+Mid-gesture left-down + live slop ≥8px latches `_left_skip_next_pick` before
+`_note`. Esc dismiss-then-CC and unit-chip Fill%/TOE stay PASS — do not
+reintroduce the PR 16 `_ensure_left_drag_armed_from_physical` /
+`_left_pick_allowed_on_release` stack.
 Pure wiring product — no dual packages.
 """
 from __future__ import annotations
@@ -58,6 +60,7 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
     allow_fn = _gd_func_slice(ren, "_allow_left_pan_skip_to_die")
     rearm_fn = _gd_func_slice(ren, "_rearm_left_drag_for_next_press")
     live_fn = _gd_func_slice(ren, "_left_live_slop_is_drag")
+    latch_fn = _gd_func_slice(ren, "_latch_left_skip_pick_from_live_slop")
     exceeded_fn = _gd_func_slice(ren, "_left_drag_exceeded_slop")
     blocked_fn = _gd_func_slice(ren, "_left_map_pick_blocked")
     esc_fn = _gd_func_slice(ren, "_handle_escape_key")
@@ -259,6 +262,59 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "_ensure_left_drag_armed_from_physical" not in process_fn
             and "_left_pick_allowed_on_release" not in prov_fn
             and "_left_pick_allowed_on_release" not in unh_fn
+        )
+        # eed9b5f Drag2 Labrador Approaches West: `_unhandled_input` spatial
+        # `_select_province` (named sea — not Area2D / coarse / title). Latch
+        # skip from live slop mid-gesture before `_note` can reset origin.
+        # Do not change rearm/activate/Esc/chip helpers.
+        motion_i = input_fn.find("InputEventMouseMotion")
+        motion_latch_i = (
+            input_fn.find("_latch_left_skip_pick_from_live_slop", motion_i)
+            if motion_i >= 0
+            else -1
+        )
+        motion_note_i = (
+            input_fn.find("_note_left_gesture_motion", motion_i)
+            if motion_i >= 0
+            else -1
+        )
+        wiring["early_live_slop_skip_latch"] = (
+            bool(latch_fn)
+            and "_left_live_slop_is_drag" in latch_fn
+            and "_left_skip_next_pick = true" in latch_fn
+            and "_left_skip_next_pick = false" not in latch_fn
+            and "_note_left_gesture_motion" not in latch_fn
+            and "_begin_left_map_gesture" not in latch_fn
+            and "_activate_left_drag_pan_from_slop" not in latch_fn
+            and "_rearm_left_drag_for_next_press" not in latch_fn
+            and "_mark_left_pan_blocked_pick" not in latch_fn
+            and "_allow_left_pan_skip_to_die" not in latch_fn
+            and "is_mouse_button_pressed" in latch_fn
+            and "_left_btn_down" in latch_fn
+            and latch_fn.find("_left_live_slop_is_drag")
+            < latch_fn.find("_left_skip_next_pick = true")
+            and "_latch_left_skip_pick_from_live_slop" in process_fn
+            and process_fn.find("_latch_left_skip_pick_from_live_slop")
+            < process_fn.find("_accumulate_left_drag_slop")
+            and motion_i >= 0
+            and 0 <= motion_latch_i < motion_note_i
+            and "_latch_left_skip_pick_from_live_slop" in input_fn
+            and input_fn.find("_latch_left_skip_pick_from_live_slop")
+            < input_fn.find("_note_left_gesture_motion")
+            and "_latch_left_skip_pick_from_live_slop" in unh_fn
+            and unh_fn.find("_latch_left_skip_pick_from_live_slop")
+            < unh_fn.find("_note_left_gesture_motion")
+            and unh_fn.find("_latch_left_skip_pick_from_live_slop")
+            < unh_fn.rfind("_select_province")
+            and unh_fn.find("_latch_left_skip_pick_from_live_slop")
+            < unh_fn.find("_map_click_should_skip_pick")
+            and "_left_skip_next_pick = false" not in rearm_fn
+            and "_left_origin_screen" in activate_fn
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+            and "func _handle_escape_key" in ren
+            and "func _try_open_land_unit_at_world" in ren
+            and "func _try_open_unit_at_world" in ren
         )
 
         for k, v in wiring.items():

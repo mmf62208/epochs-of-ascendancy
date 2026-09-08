@@ -9,6 +9,8 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
+> **2026-09-08 smoke pan early skip latch:** Play eed9b5f Drag2 sea-picked Labrador Approaches West via `_unhandled_input` spatial `_select_province` (not Area2D / coarse / title). Mid-gesture left-down + live slop ≥8px now latches `_left_skip_next_pick` once before `_note`/`_begin` can reset origin. Rearm/activate/Esc/chip untouched. Drag1 camera deferred. HOLD merge.
+>
 > **2026-08-17 formation combat save:** LeaderManager now persists combat_experience / planning / entrenchment / land mission. Calendar autosave toasts day N. Next: human M6 notes.
 >
 > **2026-08-17 7-day autosave + strength trickle + type letter:** Calendar autosave every 7 days (1936 20–60d never hits year tick). Out-of-combat strength +0.03/day. Chip I/A/M from template. Next: human M6 notes.

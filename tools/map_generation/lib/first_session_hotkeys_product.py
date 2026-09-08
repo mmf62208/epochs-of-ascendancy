@@ -490,6 +490,44 @@ def build_first_session_hotkeys_product(
             and "func _ensure_left_drag_armed_from_physical" not in ren
             and "func _left_pick_allowed_on_release" not in ren
         )
+        # eed9b5f Drag2 Labrador: mid-gesture live-slop skip latch before `_note`.
+        latch_fn_hot = _slice_func(ren, "_latch_left_skip_pick_from_live_slop")
+        motion_i_hot = input_fn.find("InputEventMouseMotion")
+        motion_latch_i_hot = (
+            input_fn.find("_latch_left_skip_pick_from_live_slop", motion_i_hot)
+            if motion_i_hot >= 0
+            else -1
+        )
+        motion_note_i_hot = (
+            input_fn.find("_note_left_gesture_motion", motion_i_hot)
+            if motion_i_hot >= 0
+            else -1
+        )
+        wiring["early_live_slop_skip_latch"] = (
+            bool(latch_fn_hot)
+            and "_left_live_slop_is_drag" in latch_fn_hot
+            and "_left_skip_next_pick = true" in latch_fn_hot
+            and "_left_skip_next_pick = false" not in latch_fn_hot
+            and "_note_left_gesture_motion" not in latch_fn_hot
+            and "_begin_left_map_gesture" not in latch_fn_hot
+            and "_activate_left_drag_pan_from_slop" not in latch_fn_hot
+            and "_rearm_left_drag_for_next_press" not in latch_fn_hot
+            and "_mark_left_pan_blocked_pick" not in latch_fn_hot
+            and "is_mouse_button_pressed" in latch_fn_hot
+            and "_latch_left_skip_pick_from_live_slop" in process_fn_hot
+            and process_fn_hot.find("_latch_left_skip_pick_from_live_slop")
+            < process_fn_hot.find("_accumulate_left_drag_slop")
+            and motion_i_hot >= 0
+            and 0 <= motion_latch_i_hot < motion_note_i_hot
+            and "_latch_left_skip_pick_from_live_slop" in unh_fn_hot
+            and unh_fn_hot.find("_latch_left_skip_pick_from_live_slop")
+            < unh_fn_hot.find("_note_left_gesture_motion")
+            and unh_fn_hot.find("_latch_left_skip_pick_from_live_slop")
+            < unh_fn_hot.rfind("_select_province")
+            and "_left_skip_next_pick = false" not in rearm_fn
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+        )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")
         process_fn = _slice_func(ren, "_process")
