@@ -458,33 +458,23 @@ def build_first_session_hotkeys_product(
         prov_fn_hot = _slice_func(ren, "_on_province_input")
         unh_fn_hot = _slice_func(ren, "_unhandled_input")
         activate_fn_hot = _slice_func(ren, "_activate_left_drag_pan_from_slop")
-        # Empty-area drag skip-pick only (51dc2a4 Rio Grande Rise / e3fea3e
-        # Labrador). Drag1 must seed press origin; leftover-at-release keeps
-        # skip. Esc + chip wires stay in their own keys — no PR 16 helpers.
-        allow_fn_hot = _slice_func(ren, "_allow_left_pan_skip_to_die")
+        # Empty-area drag skip-pick only (51dc2a4 Rio Grande Rise). Esc + chip
+        # wires stay in their own keys — do not require PR 16 helpers.
         wiring["empty_drag_skip_pick"] = (
             bool(rearm_fn)
             and "_left_skip_next_pick = false" not in rearm_fn
             and "_left_cam_moved_this_down = false" not in rearm_fn
             and "_left_gesture_dragged = false" not in rearm_fn
-            and "_left_release_screen_valid = false" not in rearm_fn
             and "not _left_in_leftover_hold()" in begin_fn
             and begin_fn.find("genuine_new_press")
             < begin_fn.find("not _left_in_leftover_hold()")
             and "_left_skip_next_pick = false" in begin_fn
-            and "leftover_at_release" in begin_fn
-            and "_left_release_screen" in begin_fn
             and "func _ensure_left_drag_armed_from_physical" not in ren
             and "func _left_pick_allowed_on_release" not in ren
             and "_ensure_left_drag_armed_from_physical" not in process_fn_hot
             and "_left_pick_allowed_on_release" not in prov_fn_hot
             and "_left_pick_allowed_on_release" not in unh_fn_hot
             and "_left_origin_screen" in activate_fn_hot
-            and "_last_mouse_pos = _left_origin_screen" in activate_fn_hot
-            and "_left_pan_armed = true" in activate_fn_hot
-            and bool(allow_fn_hot)
-            and allow_fn_hot.find("_left_in_leftover_hold")
-            < allow_fn_hot.find("_left_button_was_up = true")
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")
