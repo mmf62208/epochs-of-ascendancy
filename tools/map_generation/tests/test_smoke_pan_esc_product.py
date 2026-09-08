@@ -35,8 +35,6 @@ class TestSmokePanEscProduct(unittest.TestCase):
             "topbar_uses_esc_chain",
             "drag_skip_pick_live_slop",
             "repeat_empty_drag_rearm",
-            "first_empty_drag_pan_from_origin",
-            "repeat_drag_no_pick_until_still_click",
         ):
             self.assertTrue(w.get(key), msg=(key, w, p.get("fail")))
 

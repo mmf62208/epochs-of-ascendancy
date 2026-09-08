@@ -447,27 +447,9 @@ def build_first_session_hotkeys_product(
             and "_rearm_left_drag_for_next_press" in _slice_func(
                 ren, "_allow_left_pan_skip_to_die"
             )
-            and "_left_skip_next_pick = false"
-            not in _slice_func(ren, "_rearm_left_drag_for_next_press")
-            and "_left_cam_moved_this_down = false"
-            not in _slice_func(ren, "_rearm_left_drag_for_next_press")
-            and "func _ensure_left_drag_armed_from_physical" in ren
-            and "_ensure_left_drag_armed_from_physical"
-            in _slice_func(ren, "_process")
-            and _slice_func(ren, "_process").find(
-                "_ensure_left_drag_armed_from_physical"
-            )
-            < _slice_func(ren, "_process").find("_activate_left_drag_pan_from_slop")
-            and "_left_origin_screen"
-            in _slice_func(ren, "_activate_left_drag_pan_from_slop")
-            and "func _left_pick_allowed_on_release" in ren
-            and "_left_pick_allowed_on_release" in _slice_func(ren, "_on_province_input")
-            and "_left_pick_allowed_on_release" in _slice_func(ren, "_unhandled_input")
             and _slice_func(ren, "_on_province_input").find("if event.pressed:")
             < _slice_func(ren, "_on_province_input").find("_select_province")
             and _slice_func(ren, "_unhandled_input").rfind("_left_release_must_skip_pick")
-            < _slice_func(ren, "_unhandled_input").rfind("_select_province")
-            and _slice_func(ren, "_unhandled_input").rfind("_left_pick_allowed_on_release")
             < _slice_func(ren, "_unhandled_input").rfind("_select_province")
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")

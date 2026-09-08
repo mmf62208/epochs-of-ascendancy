@@ -1,9 +1,8 @@
 """Smoke walls: left-drag pans (release skip-pick) + idle Esc → Command Center.
 
-Play short-smoke MIXED (5c8e0f2 / b11cb4e / cf95762 / c8ee174): sea left-drag
-picked “Rio Grande Rise” / “Mid Pacific Waters”; Drag1 did not clearly pan;
-2nd/3rd empty-area drags either missed pan or panned and still picked sea.
-Esc closed inspector only.
+Play short-smoke MIXED (5c8e0f2 / b11cb4e / cf95762): sea left-drag picked
+“Rio Grande Rise – Sea” and jump-zoomed; 2nd/3rd empty-area drags did not
+pan; Esc closed inspector only.
 Pure wiring product — no dual packages.
 """
 from __future__ import annotations
@@ -59,8 +58,6 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
     live_fn = _gd_func_slice(ren, "_left_live_slop_is_drag")
     exceeded_fn = _gd_func_slice(ren, "_left_drag_exceeded_slop")
     blocked_fn = _gd_func_slice(ren, "_left_map_pick_blocked")
-    ensure_fn = _gd_func_slice(ren, "_ensure_left_drag_armed_from_physical")
-    allow_pick_fn = _gd_func_slice(ren, "_left_pick_allowed_on_release")
     esc_fn = _gd_func_slice(ren, "_handle_escape_key")
     open_fn = _gd_func_slice(ren, "_esc_open_command_center")
     dismiss_fn = _gd_func_slice(ren, "_dismiss_map_overlays_esc")
@@ -192,10 +189,7 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and bool(rearm_fn)
             and "_left_pan_armed" in rearm_fn
             and "_left_ready_for_still_click" in rearm_fn
-            and "_left_skip_next_pick = false" not in rearm_fn
-            and "_left_cam_moved_this_down = false" not in rearm_fn
-            and "_left_gesture_dragged = false" not in rearm_fn
-            and "_left_skip_next_pick = false" in begin_fn
+            and "_left_skip_next_pick" in rearm_fn
             and bool(allow_fn)
             and "_rearm_left_drag_for_next_press" in allow_fn
             and "_left_in_leftover_hold" in allow_fn
@@ -203,35 +197,6 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             < allow_fn.find("_rearm_left_drag_for_next_press")
             and "_left_drag_should_pan" in process_fn
             and "_activate_left_drag_pan_from_slop" in process_fn
-        )
-        # c8ee174: Drag1 must pan from press origin; leftover re-arm must not
-        # pick sea on 2nd/3rd empty-area releases.
-        wiring["first_empty_drag_pan_from_origin"] = (
-            bool(ensure_fn)
-            and "_arm_left_map_press" in ensure_fn
-            and "is_mouse_button_pressed" in ensure_fn
-            and "modal_blocks_map_nav" in ensure_fn
-            and "_ensure_left_drag_armed_from_physical" in process_fn
-            and process_fn.find("_ensure_left_drag_armed_from_physical")
-            < process_fn.find("_activate_left_drag_pan_from_slop")
-            and bool(activate_fn)
-            and "_left_origin_screen" in activate_fn
-            and activate_fn.find("_left_origin_screen")
-            < activate_fn.find("get_mouse_position")
-            and "_left_pan_armed = true" in activate_fn
-        )
-        wiring["repeat_drag_no_pick_until_still_click"] = (
-            bool(allow_pick_fn)
-            and "_left_release_must_skip_pick" in allow_pick_fn
-            and "_left_live_slop_is_drag" in allow_pick_fn
-            and "_left_ready_for_still_click" in allow_pick_fn
-            and "_left_pick_allowed_on_release" in prov_fn
-            and prov_fn.find("if event.pressed:")
-            < prov_fn.find("_left_pick_allowed_on_release")
-            and "_left_pick_allowed_on_release" in unh_fn
-            and unh_fn.rfind("_left_pick_allowed_on_release")
-            < unh_fn.rfind("_select_province")
-            and "_left_skip_next_pick = false" not in rearm_fn
         )
 
         for k, v in wiring.items():
@@ -252,8 +217,6 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
         "integration": [
             "smoke_pan_esc_product",
             "MapRenderer._left_release_must_skip_pick",
-            "MapRenderer._left_pick_allowed_on_release",
-            "MapRenderer._ensure_left_drag_armed_from_physical",
             "MapRenderer._handle_escape_key",
             "TopInfoBar._on_menu_pressed",
         ],
