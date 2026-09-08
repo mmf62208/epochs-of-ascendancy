@@ -379,6 +379,8 @@ def build_first_session_hotkeys_product(
             and "_left_pan_committed" in ren
             and "func _arm_left_map_press" in ren
             and "func _map_click_should_skip_pick" in ren
+            and "func _left_release_must_skip_pick" in ren
+            and "func _left_drag_should_pan" in ren
             and "func _left_gesture_moved_camera" in ren
             and "_left_press_cam_pos" in ren
             and "func _accumulate_left_drag_slop" in ren
@@ -388,7 +390,11 @@ def build_first_session_hotkeys_product(
             and "_left_btn_down" in ren
             and "func _left_map_pick_blocked" in ren
             and "_left_map_pick_blocked" in _slice_func(ren, "_on_province_input")
+            and "_left_release_must_skip_pick" in _slice_func(ren, "_on_province_input")
+            and "if event.pressed:" in _slice_func(ren, "_on_province_input")
+            and "return" in _slice_func(ren, "_on_province_input")
             and "_left_map_pick_blocked" in _slice_func(ren, "_show_coarse_territory_info")
+            and "_left_release_must_skip_pick" in _slice_func(ren, "_show_coarse_territory_info")
             and "new_press" in _slice_func(ren, "_begin_left_map_gesture")
             and "_left_skip_next_pick" in _slice_func(ren, "_begin_left_map_gesture")
             and "_left_slop_is_drag" in _slice_func(ren, "_begin_left_map_gesture")
@@ -410,7 +416,14 @@ def build_first_session_hotkeys_product(
             and "_left_release_screen" in _slice_func(ren, "_begin_left_map_gesture")
             and "_left_release_screen" in _slice_func(ren, "_end_left_button_down")
             and "_left_map_pick_blocked" in _slice_func(ren, "_unhandled_input")
+            and "_left_release_must_skip_pick" in _slice_func(ren, "_unhandled_input")
+            and "_mark_left_pan_blocked_pick" in _slice_func(ren, "_unhandled_input")
             and "_capital_star_pid_at" in _slice_func(ren, "_unhandled_input")
+            and "_left_drag_should_pan" in _slice_func(ren, "_handle_camera_input")
+            and "_left_drag_should_pan" in input_fn
+            and "_accumulate_left_drag_slop" in _slice_func(ren, "_handle_camera_input")
+            and _slice_func(ren, "_handle_camera_input").find("_accumulate_left_drag_slop")
+            < _slice_func(ren, "_handle_camera_input").find("modal_blocks_map_nav")
             and "_clear_left_gesture_dragged_if_idle" not in ren
             and "LEFT_PAN_PICK_BLOCK_MS" not in ren
             and "_left_block_pick_until_msec" not in ren
@@ -653,11 +666,23 @@ def build_first_session_hotkeys_product(
             and "STRATEGIC_MAX_ZOOM" in _slice_func(ren, "_capital_star_font_px")
         )
         unh_fn = _slice_func(ren, "_unhandled_input")
+        esc_fn = _slice_func(ren, "_handle_escape_key")
+        open_cc_fn = _slice_func(ren, "_esc_open_command_center")
+        dismiss_esc_fn = _slice_func(ren, "_dismiss_map_overlays_esc")
+        stack_fn = _slice_func(ren, "_inspector_stack_blocking_input")
         wiring["esc_idle_opens_command_center"] = (
-            "KEY_ESCAPE" in unh_fn
-            and "_dismiss_map_overlays_esc" in unh_fn
-            and "TopInfoBar.find_in_tree" in unh_fn
-            and "_on_menu_pressed" in unh_fn
+            "KEY_ESCAPE" in input_fn
+            and "_handle_escape_key" in input_fn
+            and "func _handle_escape_key" in ren
+            and "func _esc_open_command_center" in ren
+            and "_dismiss_map_overlays_esc" in esc_fn
+            and "_esc_open_command_center" in esc_fn
+            and "TopInfoBar.find_in_tree" in open_cc_fn
+            and "_on_menu_pressed" in open_cc_fn
+            and "_handle_escape_key" in unh_fn
+            and '"MainMenu"' not in dismiss_esc_fn
+            and "_overlay_node_is_up" in dismiss_esc_fn
+            and "_overlay_node_is_up" in stack_fn
         )
 
         for k, v in wiring.items():

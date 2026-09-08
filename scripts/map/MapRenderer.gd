@@ -1243,6 +1243,32 @@ func _map_click_should_skip_pick() -> bool:
 	return _left_drag_exceeded_slop()
 
 
+## Release/pick sites must not call `_note` (that can re-arm mid-release).
+## Sea hex + jump-zoom play: slop/pan flags were set, then release still picked.
+func _left_release_must_skip_pick() -> bool:
+	if _left_map_pick_blocked():
+		return true
+	if _left_gesture_dragged or _left_pan_committed or _left_skip_next_pick:
+		return true
+	if _left_slop_latched or _left_gesture_panned or _left_pan_active:
+		return true
+	if _left_cam_moved_this_down or _left_gesture_moved_camera():
+		return true
+	if _left_max_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+		return true
+	if _left_sticky_is_drag():
+		return true
+	return false
+
+
+func _left_drag_should_pan() -> bool:
+	if _left_pan_active:
+		return true
+	if not (_left_pan_armed or _left_btn_down or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)):
+		return false
+	return _left_drag_exceeded_slop()
+
+
 func _left_gesture_moved_camera() -> bool:
 	if _left_cam_moved_this_down or _left_pan_committed:
 		return true
@@ -1397,6 +1423,32 @@ func _gui_text_field_has_focus() -> bool:
 	return fo is LineEdit or fo is TextEdit or fo is CodeEdit
 
 
+## Esc stack: inspector / unit card / selection / visible overlays first.
+## Idle / clean map → TopInfoBar._on_menu_pressed (Command Center toggle).
+func _handle_escape_key() -> void:
+	if _inspector_stack_blocking_input():
+		_dismiss_inspector_and_restore_input()
+		return
+	if not selected_formation_id.is_empty():
+		selected_formation_id = ""
+		_refresh_selected_unit_chip()
+		_show_inspector_toast("Unit selection cleared", 2.0)
+		return
+	if _dismiss_map_overlays_esc():
+		return
+	_esc_open_command_center()
+
+
+func _esc_open_command_center() -> void:
+	_release_search_focus()
+	var vp_esc: Viewport = get_viewport()
+	if vp_esc != null:
+		vp_esc.gui_release_focus()
+	var tib := TopInfoBar.find_in_tree(get_tree())
+	if tib != null and tib.has_method("_on_menu_pressed"):
+		tib.call("_on_menu_pressed")
+
+
 func _input(event: InputEvent) -> void:
 	# Esc / I / Home must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -1462,8 +1514,11 @@ func _input(event: InputEvent) -> void:
 				set_map_mode("resources")
 			get_viewport().set_input_as_handled()
 			return
-		if event.keycode == KEY_ESCAPE and _inspector_stack_blocking_input():
-			_dismiss_inspector_and_restore_input()
+		if event.keycode == KEY_ESCAPE:
+			# Full Esc chain in `_input` (Home-key pattern) so search/GUI cannot
+			# swallow idle Esc after inspector close (play: Esc closed inspector,
+			# next idle Esc never opened Command Center).
+			_handle_escape_key()
 			get_viewport().set_input_as_handled()
 			return
 		if (
@@ -1548,7 +1603,11 @@ func _input(event: InputEvent) -> void:
 					_arm_left_map_press()
 			elif not event.pressed:
 				_note_left_gesture_motion()
-				var did_left_pan: bool = _left_gesture_dragged or _map_click_should_skip_pick()
+				var did_left_pan: bool = (
+					_left_gesture_dragged
+					or _map_click_should_skip_pick()
+					or _left_release_must_skip_pick()
+				)
 				_end_left_button_down()
 				_note_close_button_release()
 				if did_left_pan:
@@ -1558,7 +1617,7 @@ func _input(event: InputEvent) -> void:
 		_note_mouse_up_arms_still_click()
 		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			_note_left_gesture_motion()
-		if _left_pan_armed and not _left_pan_active and _left_drag_exceeded_slop():
+		if not _left_pan_active and _left_drag_should_pan():
 			_left_pan_active = true
 			_mark_left_pan_blocked_pick()
 			get_viewport().set_input_as_handled()
@@ -1621,29 +1680,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		# Esc: dismiss stuck overlays (legend / tech / info) so playtest is never trapped.
 		if event.keycode == KEY_ESCAPE:
-			# One Esc must unstick play: unit card + inspector + hover tooltip + GUI focus.
-			if _inspector_stack_blocking_input():
-				_dismiss_inspector_and_restore_input()
-				get_viewport().set_input_as_handled()
-				return
-			# Clear selected map unit before other dismissals.
-			if not selected_formation_id.is_empty():
-				selected_formation_id = ""
-				_refresh_selected_unit_chip()
-				_show_inspector_toast("Unit selection cleared", 2.0)
-				get_viewport().set_input_as_handled()
-				return
-			if _dismiss_map_overlays_esc():
-				get_viewport().set_input_as_handled()
-				return
-			# Idle Esc → Command Center. Do not steal Esc from search / LineEdit.
-			# TopInfoBar already has a fallback; MapRenderer was eating Esc first.
-			if _gui_text_field_has_focus():
-				get_viewport().set_input_as_handled()
-				return
-			var tib := TopInfoBar.find_in_tree(get_tree())
-			if tib != null and tib.has_method("_on_menu_pressed"):
-				tib.call("_on_menu_pressed")
+			# Backup if `_input` did not run. Same chain: dismiss then idle `_on_menu_pressed`.
+			_handle_escape_key()
 			get_viewport().set_input_as_handled()
 			return
 		# Stack cycle on selected pin province: [ previous · ] next (unit card also has buttons).
@@ -1897,7 +1935,11 @@ func _unhandled_input(event: InputEvent) -> void:
 				_arm_left_map_press()
 				return
 		else:
-			var did_left_pan: bool = _left_gesture_dragged or _map_click_should_skip_pick()
+			var did_left_pan: bool = (
+				_left_gesture_dragged
+				or _map_click_should_skip_pick()
+				or _left_release_must_skip_pick()
+			)
 			_end_left_button_down()
 			_note_close_button_release()
 			if did_left_pan:
@@ -1915,9 +1957,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 		# Gesture-scoped skip before capital-star snap / hex pick / title boot.
-		# Use _left_map_pick_blocked (no _note/_begin) so skip-check cannot reset slop.
+		# `_left_release_must_skip_pick` does not `_note`/`_begin` (cannot reset slop).
 		if not event.ctrl_pressed and not event.shift_pressed:
-			if _left_map_pick_blocked() or _left_gesture_moved_camera():
+			if _left_release_must_skip_pick() or _left_map_pick_blocked() or _left_gesture_moved_camera():
 				_end_left_button_down()
 				_mark_left_pan_blocked_pick()
 				get_viewport().set_input_as_handled()
@@ -1934,7 +1976,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		# THIS drag already exceeded 8px: do not snap-select any capital
 		# (Play: Atlantic pan opened Paris via zoom-aware star disk).
 		if not event.shift_pressed:
-			if not event.ctrl_pressed and _left_map_pick_blocked():
+			if not event.ctrl_pressed and (_left_release_must_skip_pick() or _left_map_pick_blocked()):
 				get_viewport().set_input_as_handled()
 				return
 			var star_pid := _resolve_map_pick_pid(world_pos)
@@ -1944,7 +1986,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					_refresh_selected_unit_chip()
 				var star_province: Province = provinces[star_pid] as Province
 				var star_node: Node2D = _province_node(star_pid)
-				if not event.ctrl_pressed and _left_map_pick_blocked():
+				if not event.ctrl_pressed and (_left_release_must_skip_pick() or _left_map_pick_blocked()):
 					get_viewport().set_input_as_handled()
 					return
 				if _try_living_title_map_pick(star_pid):
@@ -1954,7 +1996,9 @@ func _unhandled_input(event: InputEvent) -> void:
 					if _try_execute_province_attack(star_pid, star_province):
 						get_viewport().set_input_as_handled()
 						return
-				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+				if not event.ctrl_pressed and not event.shift_pressed and (
+					_left_release_must_skip_pick() or _left_map_pick_blocked()
+				):
 					get_viewport().set_input_as_handled()
 					return
 				_toast_living_diplomacy_pick(star_pid)
@@ -1977,14 +2021,18 @@ func _unhandled_input(event: InputEvent) -> void:
 			# Gives grand strategy world map the feel that every area has a clickable territory/region, even if detailed provs are Europe-focused for current scenario.
 			var ctid := _hit_coarse_territory(world_pos)
 			if ctid != 0:
-				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+				if not event.ctrl_pressed and not event.shift_pressed and (
+					_left_release_must_skip_pick() or _left_map_pick_blocked()
+				):
 					get_viewport().set_input_as_handled()
 					return
 				_show_coarse_territory_info(ctid, true)
 				get_viewport().set_input_as_handled()
 				return
 		if pid >= 0 and provinces.has(pid):
-			if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+			if not event.ctrl_pressed and not event.shift_pressed and (
+				_left_release_must_skip_pick() or _left_map_pick_blocked()
+			):
 				get_viewport().set_input_as_handled()
 				return
 			if _try_living_title_map_pick(pid):
@@ -2014,7 +2062,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 			# Unit move: selected pin + click friendly province.
 			if not selected_formation_id.is_empty() and not event.ctrl_pressed:
-				if _left_map_pick_blocked():
+				if _left_release_must_skip_pick() or _left_map_pick_blocked():
 					get_viewport().set_input_as_handled()
 					return
 				if _try_move_selected_unit_to_province(resolved_province):
@@ -2023,7 +2071,7 @@ func _unhandled_input(event: InputEvent) -> void:
 					return
 			# G click-to-show: hex pick draws a budgeted corridor (never on the G key frame).
 			if _corridor_click_armed and not event.ctrl_pressed:
-				if _left_map_pick_blocked():
+				if _left_release_must_skip_pick() or _left_map_pick_blocked():
 					get_viewport().set_input_as_handled()
 					return
 				_corridor_click_armed = false
@@ -2034,7 +2082,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			if _try_set_attack_staging(resolved_province):
 				pass  # still open inspector below
 			if supply_mode and _handle_supply_province_click(resolved_province):
-				if _left_map_pick_blocked():
+				if _left_release_must_skip_pick() or _left_map_pick_blocked():
 					get_viewport().set_input_as_handled()
 					return
 				_select_province(resolved_province, resolved_node)
@@ -2045,7 +2093,9 @@ func _unhandled_input(event: InputEvent) -> void:
 				_unit_pick_strategic_hint_shown = true
 				_show_inspector_toast("Click a unit chip to command (Shift+U toggles counters).", 3.5)
 			# Select first (outline immediately); center + left inspector (avoid covering selection).
-			if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
+			if not event.ctrl_pressed and not event.shift_pressed and (
+				_left_release_must_skip_pick() or _left_map_pick_blocked()
+			):
 				get_viewport().set_input_as_handled()
 				return
 			_select_province(resolved_province, resolved_node)
@@ -2191,6 +2241,14 @@ func _handle_camera_input(delta: float) -> void:
 	if not cam:
 		return
 
+	# Accumulate slop before the modal early-return so a leftover false-positive
+	# popup cannot wipe skip-pick; sea release then jump-zoomed Rio Grande Rise.
+	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down:
+		_accumulate_left_drag_slop()
+	if not _left_pan_active and _left_drag_should_pan():
+		_left_pan_active = true
+		_mark_left_pan_blocked_pick()
+
 	# Command Center / modal screens: freeze all map pan (WASD, edge, drag).
 	# Edge-only block was insufficient — WASD still moved the map under MainMenu.
 	if MapViewInput.modal_blocks_map_nav(get_viewport()):
@@ -2242,9 +2300,10 @@ func _handle_camera_input(delta: float) -> void:
 	move_dir = key_dir + edge_dir
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
-	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+	# Slop + physical left-down starts pan even if `_left_pan_armed` was cleared.
+	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down:
 		_accumulate_left_drag_slop()
-	if _left_pan_armed and not _left_pan_active and _left_drag_exceeded_slop():
+	if not _left_pan_active and _left_drag_should_pan():
 		_left_pan_active = true
 		_mark_left_pan_blocked_pick()
 	# Middle / right / left-drag (pixel-based — works while paused). Drag up → camera north.
@@ -12971,14 +13030,30 @@ func hide_info_panel() -> void:
 
 func _inspector_stack_blocking_input() -> bool:
 	# Hover tooltip alone is normal map chrome — do not treat it as a trap.
+	# Hidden / queued leftover cards must not sticky-block idle Esc → Command Center.
 	if info_panel != null and info_panel is CanvasItem and (info_panel as CanvasItem).visible:
 		return true
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui != null:
-		if ui.get_node_or_null("UnitDetailPopup") != null:
+		if _overlay_node_is_up(ui.get_node_or_null("UnitDetailPopup")):
 			return true
-		if ui.get_node_or_null("OpenFightSheet") != null:
+		if _overlay_node_is_up(ui.get_node_or_null("OpenFightSheet")):
 			return true
+	return false
+
+
+func _overlay_node_is_up(n: Node) -> bool:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+		return false
+	if n is Window:
+		return (n as Window).visible
+	if n is CanvasItem:
+		return (n as CanvasItem).visible
+	if n is CanvasLayer:
+		for ch in n.get_children():
+			if ch is CanvasItem and (ch as CanvasItem).visible:
+				return true
+		return false
 	return false
 
 
@@ -14627,7 +14702,7 @@ func _hit_coarse_territory(world_pos: Vector2) -> int:
 func _show_coarse_territory_info(terr_id: int, focus_camera: bool = false) -> void:
 	# Mouse click only: a left-drag that already exceeded 8px must not open coarse inspector.
 	# focus_camera=false refreshes (data_changed) stay live.
-	if focus_camera and _left_map_pick_blocked():
+	if focus_camera and (_left_release_must_skip_pick() or _left_map_pick_blocked()):
 		return
 	if not _coarse_territories.has(terr_id) or info_panel == null:
 		return
@@ -16664,17 +16739,19 @@ func _terrain_palette_multipliers(terrain_key: String) -> Vector3:
 # ====================== INTERACTION ======================
 
 func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, province: Province, node: Node2D):
-	# Area2D / sea-hex writer: this button-down already exceeded 8px — do not select.
+	# Area2D / sea-hex writer: never pick on press (Rio Grande Rise jump-zoom).
 	# Check before use_spatial_picking so a leftover Area2D cannot open the inspector.
-	if _left_map_pick_blocked():
+	if _left_release_must_skip_pick() or _left_map_pick_blocked():
 		return
 	# When pure spatial picking is active (no Area2D or ignoring it), this handler should not fire for hover/selection.
 	# The unhandled_input path above handles clicks.
 	if use_spatial_picking:
 		return
 
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		if _left_map_pick_blocked() or _map_click_should_skip_pick():
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed:
+			return
+		if _left_release_must_skip_pick() or _left_map_pick_blocked() or _map_click_should_skip_pick():
 			return
 		var resolved_province := province
 		var resolved_node := node
@@ -17413,15 +17490,21 @@ func _toast_living_diplomacy_pick(pid: int) -> void:
 
 ## Title boot: click playable land/capital on the political map (panel stays a list too).
 func _try_living_title_map_pick(pid: int) -> bool:
+	if _left_release_must_skip_pick():
+		return false
 	var tree := get_tree()
 	if tree == null or tree.root == null:
 		return false
 	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
-	if boot == null:
+	if boot == null or not is_instance_valid(boot) or boot.is_queued_for_deletion():
+		return false
+	if not _overlay_node_is_up(boot):
 		return false
 	if boot.has_method("select_from_province"):
-		boot.call("select_from_province", pid)
-	return true
+		var picked: Variant = boot.call("select_from_province", pid)
+		if picked is Dictionary and bool((picked as Dictionary).get("ok", false)):
+			return true
+	return false
 
 
 func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
@@ -20839,6 +20922,8 @@ func build_supply_network(city_layer: Dictionary, player_tag: String = "USA") ->
 
 
 ## Esc / Close affordance: dismiss overlays that trap playtest (supply legend, tech, inspector).
+## Never queue_free MainMenu here — idle Esc opens Command Center via `_on_menu_pressed`.
+## Hidden leftovers must not return true (play: inspector gone, Esc still did nothing).
 func _dismiss_map_overlays_esc() -> bool:
 	var dismissed := false
 	if supply_mode:
@@ -20849,18 +20934,19 @@ func _dismiss_map_overlays_esc() -> bool:
 	var ui_layer := get_node_or_null("UI") as CanvasLayer
 	if ui_layer != null:
 		var unit_pop := ui_layer.get_node_or_null("UnitDetailPopup")
-		if unit_pop != null:
+		if _overlay_node_is_up(unit_pop):
 			unit_pop.queue_free()
 			_show_map_layer_toast("Unit detail closed (Esc)")
+			_release_search_focus()
 			return true
 	var tree := get_tree()
 	if tree:
-		for screen_name in ["TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen", "MainMenu"]:
+		for screen_name in ["TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
 			var n := tree.root.get_node_or_null(screen_name)
 			if n == null and tree.current_scene:
 				var ui := tree.current_scene.get_node_or_null("UILayer/%s" % screen_name)
 				n = ui
-			if n != null:
+			if _overlay_node_is_up(n):
 				if n is Window:
 					(n as Window).hide()
 				n.queue_free()
@@ -20873,8 +20959,9 @@ func _dismiss_map_overlays_esc() -> bool:
 				for child in layer.get_children():
 					var cn := str(child.name)
 					if cn in ["TechnologyScreen", "AgentAssignmentScreen", "NationalSpiritsScreen"]:
-						child.queue_free()
-						dismissed = true
+						if _overlay_node_is_up(child):
+							child.queue_free()
+							dismissed = true
 	if info_panel != null and info_panel is CanvasItem and (info_panel as CanvasItem).visible:
 		if info_panel.has_method("hide"):
 			info_panel.hide()
@@ -20882,7 +20969,12 @@ func _dismiss_map_overlays_esc() -> bool:
 			(info_panel as CanvasItem).visible = false
 		dismissed = true
 		_show_map_layer_toast("Inspector closed (Esc)")
-	# Idle Esc opens Command Center in _unhandled_input — no "nothing to close" toast.
+	if dismissed:
+		_release_search_focus()
+		var vp_d: Viewport = get_viewport()
+		if vp_d != null:
+			vp_d.gui_release_focus()
+	# Idle Esc opens Command Center via `_handle_escape_key` → `_on_menu_pressed`.
 	return dismissed
 
 

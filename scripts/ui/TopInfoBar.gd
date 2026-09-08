@@ -859,10 +859,15 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 	if event.keycode == KEY_ESCAPE:
-		# Prefer closing map overlays (supply legend / tech) over opening Main Menu.
+		# Backup: MapRenderer `_input` owns the Esc stack (dismiss then idle CC).
+		# Do not queue_free MainMenu here — `_on_menu_pressed` toggles Command Center.
 		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
 		if mr == null and get_tree() and get_tree().current_scene:
 			mr = get_tree().current_scene.find_child("MapRenderer", true, false)
+		if mr != null and mr.has_method("_handle_escape_key"):
+			mr.call("_handle_escape_key")
+			get_viewport().set_input_as_handled()
+			return
 		if mr != null and mr.has_method("_dismiss_map_overlays_esc") and bool(mr.call("_dismiss_map_overlays_esc")):
 			get_viewport().set_input_as_handled()
 			return
