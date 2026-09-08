@@ -17784,12 +17784,13 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var panel := PanelContainer.new()
 	panel.name = "UnitDetailPopup"
 	panel.z_index = 70
-	panel.clip_contents = true
-	panel.custom_minimum_size = Vector2(320, 220)
+	# First-session Fill%/TOE must stay above the clip fold — do not clip the promoted line.
+	panel.clip_contents = false
+	panel.custom_minimum_size = Vector2(320, 360)
 	RetrowaveTheme.style_detail_panel_flat(panel)
 	# Docked HOI-style unit card (bottom-left). UNIT_CARD_DOCK / unit_card_dock — not a mouse popup.
 	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
-	var dock := Vector2(18.0, maxf(64.0, vp.y - 276.0))
+	var dock := Vector2(18.0, maxf(64.0, vp.y - 416.0))
 	panel.position = dock
 	panel.set_meta("unit_card_dock", true)
 	ui.add_child(panel)
@@ -17835,9 +17836,24 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		fill_lbl.text = fill_txt
 		fill_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
 		RetrowaveTheme.style_body_label(fill_lbl)
-		fill_lbl.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
-		fill_lbl.add_theme_font_size_override("font_size", 14)
+		var fill_ratio := UnitCardCombatStrip._fill_ratio_for(formation)
+		if fill_ratio < 0.0:
+			fill_ratio = str_v
+		var fill_col: Color = RetrowaveTheme.SUCCESS
+		if fill_ratio < 0.5:
+			fill_col = RetrowaveTheme.WARNING
+		fill_lbl.add_theme_color_override("font_color", fill_col)
+		fill_lbl.add_theme_font_size_override("font_size", 16)
 		vbox.add_child(fill_lbl)
+		var fill_bar := ProgressBar.new()
+		fill_bar.name = "FillToeBar"
+		fill_bar.custom_minimum_size = Vector2(0, 4)
+		fill_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		fill_bar.max_value = 100.0
+		fill_bar.value = clampf(fill_ratio, 0.0, 1.0) * 100.0
+		fill_bar.show_percentage = false
+		RetrowaveTheme.style_progress_bar(fill_bar)
+		vbox.add_child(fill_bar)
 		var fight_row := HBoxContainer.new()
 		fight_row.add_theme_constant_override("separation", 6)
 		vbox.add_child(fight_row)
@@ -17874,7 +17890,11 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		var strip_rest: PackedStringArray = UnitCardCombatStrip.lines_for(formation)
 		if strip_rest.size() > 1:
 			for si in range(1, strip_rest.size()):
-				lines.append(strip_rest[si])
+				var rest_ln := str(strip_rest[si]).strip_edges()
+				# Last-3 combat_log dates stay on tooltip so Fill/TOE stay above the fold.
+				if rest_ln.length() >= 7 and rest_ln.substr(0, 4).is_valid_int() and rest_ln[4] == "-":
+					continue
+				lines.append(rest_ln)
 		var tips: PackedStringArray = UnitCardCombatStrip.tooltip_lines_for(formation)
 		if not tips.is_empty():
 			body.tooltip_text = "\n".join(tips)
