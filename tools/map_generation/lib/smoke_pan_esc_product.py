@@ -1,8 +1,7 @@
 """Smoke walls: left-drag pans (release skip-pick) + idle Esc → Command Center.
 
-Play short-smoke MIXED (5c8e0f2 / b11cb4e / cf95762 / 51dc2a4 / e3fea3e):
-sea left-drag picked “Rio Grande Rise” / “Labrador Approaches East – Sea”
-(e3fea3e also: Drag1–3 empty-area left-drags never moved the camera).
+Play short-smoke MIXED (5c8e0f2 / b11cb4e / cf95762 / 51dc2a4): sea left-drag
+picked “Rio Grande Rise” (camera moved, then leftover/release selected sea).
 Esc dismiss-then-CC and unit-chip Fill%/TOE stay PASS — do not reintroduce
 the PR 16 `_ensure_left_drag_armed_from_physical` / `_left_pick_allowed_on_release`
 stack.
@@ -204,37 +203,9 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "_left_drag_should_pan" in process_fn
             and "_activate_left_drag_pan_from_slop" in process_fn
         )
-        # e3fea3e Drag1: leftover pressed=true must not stick `_left_btn_down`
-        # (that blocked `_begin(true)` origin seed). `_allow` must not set
-        # `_left_button_was_up` during leftover hold. leftover-at-release
-        # reseeds origin but keeps skip (Labrador).
-        wiring["drag1_press_origin_seed"] = (
-            bool(activate_fn)
-            and "_left_origin_valid" in activate_fn
-            and "_left_origin_screen" in activate_fn
-            and "_last_mouse_pos = _left_origin_screen" in activate_fn
-            and "_left_pan_armed = true" in activate_fn
-            and activate_fn.find("if not _left_origin_valid:")
-            < activate_fn.find("_last_mouse_pos = _left_origin_screen")
-            and activate_fn.find("_left_origin_screen")
-            < activate_fn.find("get_mouse_position")
-            and bool(begin_fn)
-            and "leftover_at_release" in begin_fn
-            and "_left_release_screen" in begin_fn
-            and "if keep_this_drag:" in begin_fn
-            and begin_fn.find("new_press and not physically_down")
-            < begin_fn.find("if keep_this_drag:")
-            and bool(allow_fn)
-            and allow_fn.find("_left_in_leftover_hold")
-            < allow_fn.find("_left_button_was_up = true")
-            and "_left_btn_down = false" in allow_fn
-            and bool(rearm_fn)
-            and "_left_release_screen_valid = false" not in rearm_fn
-        )
-        # 51dc2a4 / cf95762 / e3fea3e: empty-area drag must skip sea pick on
-        # press+release (1st–3rd). Latch skip across leftover re-arm; leftover
-        # hold / leftover-at-release is not a genuine new press. Do not
-        # reintroduce the PR 16 process/pick helpers.
+        # 51dc2a4 / cf95762: empty-area drag must skip sea pick on press+release
+        # (1st–3rd). Latch skip across leftover re-arm; leftover hold is not a
+        # genuine new press. Do not reintroduce the PR 16 process/pick helpers.
         wiring["empty_drag_skip_pick_latch"] = (
             bool(rearm_fn)
             and "_left_skip_next_pick = false" not in rearm_fn
@@ -263,8 +234,6 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "_left_origin_screen" in activate_fn
             and activate_fn.find("_left_origin_screen")
             < activate_fn.find("get_mouse_position")
-            and "leftover_at_release" in begin_fn
-            and "_left_release_screen_valid = false" not in rearm_fn
         )
 
         for k, v in wiring.items():
