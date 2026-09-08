@@ -429,6 +429,15 @@ def build_first_session_hotkeys_product(
             and "_left_block_pick_until_msec" not in ren
             and "InputEventMouseMotion" in input_fn
             and "_left_gesture_dragged" in input_fn
+            and "func _activate_left_drag_pan_from_slop" in ren
+            and "_left_drag_should_pan" in _slice_func(ren, "_activate_left_drag_pan_from_slop")
+            and "_activate_left_drag_pan_from_slop" in _slice_func(ren, "_process")
+            and "_left_drag_should_pan" in _slice_func(ren, "_process")
+            and "_unlock_close_camera_for_left_drag_pan" in _slice_func(
+                ren, "_handle_camera_input"
+            )
+            and input_fn.find("_finish_close_click_guard_on_new_press")
+            < input_fn.find("_left_map_pick_blocked")
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")

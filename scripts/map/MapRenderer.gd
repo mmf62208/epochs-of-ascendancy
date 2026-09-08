@@ -1330,12 +1330,38 @@ func _finish_close_click_guard_on_new_press() -> void:
 
 func _arm_left_map_press() -> void:
 	# Mid-drag re-arm must not reset the button-down origin (Play: Finistère after 80px).
+	# Empty-area / sea / paused: same arm — Area2D is not required.
 	_begin_left_map_gesture()
 	_left_pan_armed = true
 	if not _left_pan_active:
 		_last_mouse_pos = get_viewport().get_mouse_position()
 	if _left_gesture_dragged:
 		_mark_left_pan_blocked_pick()
+
+
+func _unlock_close_camera_for_left_drag_pan() -> void:
+	# Slop-exceeded empty-area drag after Close/Esc is a new map press.
+	# Unlock the GIS lock so _process can apply the delta. Keep north-strip
+	# edge suppress until the cursor leaves that band (Greenland leftover).
+	_close_click_guard = false
+	_unlock_close_camera()
+	_hold_camera_until_msec = 0
+	_inspector_held_closed = false
+	_map_pick_block_until_msec = 0
+
+
+func _activate_left_drag_pan_from_slop() -> bool:
+	# Empty-area path: physical left-down + 8px slop, even if `_left_pan_armed`
+	# was never set (no Area2D / leftover Close swallow / paused).
+	if _left_pan_active:
+		return true
+	if not _left_drag_should_pan():
+		return false
+	if not _left_pan_armed:
+		_last_mouse_pos = get_viewport().get_mouse_position()
+	_left_pan_active = true
+	_mark_left_pan_blocked_pick()
+	return true
 
 
 func _camera_is_held() -> bool:
@@ -1428,6 +1454,8 @@ func _gui_text_field_has_focus() -> bool:
 func _handle_escape_key() -> void:
 	if _inspector_stack_blocking_input():
 		_dismiss_inspector_and_restore_input()
+		# Esc is not a held Close button — next empty-area left-drag may unlock.
+		_close_release_seen = true
 		return
 	if not selected_formation_id.is_empty():
 		selected_formation_id = ""
@@ -1571,6 +1599,11 @@ func _input(event: InputEvent) -> void:
 			if event.pressed and _mouse_over_search_control():
 				return
 			if event.pressed:
+				# New map press unlocks Close/Esc camera lock *before* leftover
+				# skip-pick flags early-return (340d9d8: three empty-area drags
+				# never reached `_finish` so `_close_click_guard` ate the pan).
+				if not event.ctrl_pressed and not event.shift_pressed:
+					_finish_close_click_guard_on_new_press()
 				# Genuine new button-down (slop 0): only place the pan skip is cleared.
 				# Mid-drag no-ops because _left_btn_down is still true.
 				_begin_left_map_gesture(true)
@@ -1618,8 +1651,7 @@ func _input(event: InputEvent) -> void:
 		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 			_note_left_gesture_motion()
 		if not _left_pan_active and _left_drag_should_pan():
-			_left_pan_active = true
-			_mark_left_pan_blocked_pick()
+			_activate_left_drag_pan_from_slop()
 			get_viewport().set_input_as_handled()
 
 
@@ -1910,14 +1942,17 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.pressed and _close_click_guard:
 			if _close_release_seen:
 				_finish_close_click_guard_on_new_press()
-			else:
-				get_viewport().set_input_as_handled()
-				return
+			# Empty-area / sea still arm so slop can start pan after Close/Esc.
+			if not event.ctrl_pressed and not event.shift_pressed:
+				_arm_left_map_press()
+			get_viewport().set_input_as_handled()
+			return
 		if _close_click_guard or _camera_is_held() or Time.get_ticks_msec() < _map_pick_block_until_msec:
-			if not event.pressed:
+			if event.pressed and not event.ctrl_pressed and not event.shift_pressed:
+				_arm_left_map_press()
+			elif not event.pressed:
 				_note_close_button_release()
-				_left_pan_armed = false
-				_left_pan_active = false
+				_end_left_button_down()
 			get_viewport().set_input_as_handled()
 			return
 		if event.pressed:
@@ -2146,9 +2181,17 @@ func _process(delta: float) -> void:
 		sim_paused = true
 
 	# Camera always — pan/zoom/edge must work while paused (looking at map is the playtest path).
-	# Reassert the Close-time GIS camera (not europe_center) so pick-center / clamp cannot teleport.
+	# Empty-area left-drag: physical left-down + slop → `_left_pan_active` even with
+	# no Area2D / leftover Close swallow. `_left_drag_should_pan` lives here so a
+	# missed `_input` arm still moves the camera after 8px.
+	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down:
+		_accumulate_left_drag_slop()
+	if not _left_pan_active and _left_drag_should_pan():
+		_activate_left_drag_pan_from_slop()
 	_handle_camera_input(delta)
-	_reassert_locked_close_camera()
+	# Active empty-area drag must apply; Close lock cannot snap the camera back.
+	if not _left_pan_active:
+		_reassert_locked_close_camera()
 	_allow_left_pan_skip_to_die()
 	# GIS dual-map watchdog: re-lock canvas identity + equirect underlay every ~0.5s while playing.
 	if _is_gis_board_active() and Engine.get_process_frames() % 30 == 0:
@@ -2246,8 +2289,7 @@ func _handle_camera_input(delta: float) -> void:
 	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down:
 		_accumulate_left_drag_slop()
 	if not _left_pan_active and _left_drag_should_pan():
-		_left_pan_active = true
-		_mark_left_pan_blocked_pick()
+		_activate_left_drag_pan_from_slop()
 
 	# Command Center / modal screens: freeze all map pan (WASD, edge, drag).
 	# Edge-only block was insufficient — WASD still moved the map under MainMenu.
@@ -2304,18 +2346,21 @@ func _handle_camera_input(delta: float) -> void:
 	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) or _left_btn_down:
 		_accumulate_left_drag_slop()
 	if not _left_pan_active and _left_drag_should_pan():
-		_left_pan_active = true
-		_mark_left_pan_blocked_pick()
+		_activate_left_drag_pan_from_slop()
 	# Middle / right / left-drag (pixel-based — works while paused). Drag up → camera north.
 	if _is_middle_dragging or _left_pan_active:
 		var current_mouse := get_viewport().get_mouse_position()
 		var drag_delta := current_mouse - _last_mouse_pos
 		if drag_delta.length_squared() > 0.01:
 			if _close_click_guard and _left_pan_active:
-				# Leftover Close click — do not slide the camera.
-				_left_pan_active = false
-				_left_pan_armed = false
-			else:
+				if _close_release_seen:
+					# New empty-area drag after Close/Esc release — unlock and pan.
+					_unlock_close_camera_for_left_drag_pan()
+				else:
+					# Same button-down as Close — do not slide the camera.
+					_left_pan_active = false
+					_left_pan_armed = false
+			if _is_middle_dragging or _left_pan_active:
 				if _is_middle_dragging or not _close_click_guard:
 					_unlock_close_camera()
 				if _camera_is_held() and _left_pan_active:

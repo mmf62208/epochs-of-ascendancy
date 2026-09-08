@@ -28,6 +28,7 @@ class TestSmokePanEscProduct(unittest.TestCase):
             "coarse_and_title_honor_skip",
             "camera_slop_before_modal",
             "input_motion_pans_from_slop",
+            "empty_area_process_armed_to_camera",
             "esc_chain_in_input",
             "esc_idle_calls_menu",
             "dismiss_no_mainmenu_leftover",
