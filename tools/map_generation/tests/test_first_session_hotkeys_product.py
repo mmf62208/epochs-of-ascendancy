@@ -127,6 +127,7 @@ class TestFirstSessionHotkeysProduct(unittest.TestCase):
             "open_fight_sheet",
             "left_drag_pan",
             "empty_drag_skip_pick",
+            "area2d_hold_release_live_slop",
             "esc_idle_opens_command_center",
         ):
             self.assertTrue(p.get("wiring", {}).get(key), msg=(key, p.get("wiring"), p.get("fail")))

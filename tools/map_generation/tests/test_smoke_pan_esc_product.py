@@ -36,6 +36,7 @@ class TestSmokePanEscProduct(unittest.TestCase):
             "drag_skip_pick_live_slop",
             "repeat_empty_drag_rearm",
             "empty_drag_skip_pick_latch",
+            "area2d_hold_release_live_slop",
         ):
             self.assertTrue(w.get(key), msg=(key, w, p.get("fail")))
 
