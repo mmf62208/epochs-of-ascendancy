@@ -71,25 +71,7 @@ static func lines_for(formation: Object) -> PackedStringArray:
 			lines.append("Refit %d/%dd · org/str recovering" % [int(prog), int(need)])
 		else:
 			lines.append("Training %d/%dd · not combat-ready" % [int(prog), int(need)])
-	if "combat_log" in formation:
-		var raw: Variant = formation.get("combat_log")
-		if raw is Array:
-			var log: Array = raw as Array
-			var start := maxi(0, log.size() - 3)
-			for i in range(start, log.size()):
-				var row: Variant = log[i]
-				if not (row is Dictionary):
-					continue
-				var d: Dictionary = row as Dictionary
-				var date := str(d.get("date", "")).strip_edges()
-				var outcome := str(d.get("outcome", d.get("result", ""))).strip_edges()
-				var bits := PackedStringArray()
-				if not date.is_empty():
-					bits.append(date)
-				if not outcome.is_empty():
-					bits.append(outcome)
-				if not bits.is_empty():
-					lines.append(" ".join(bits))
+	# Last-3 combat_log stays on tooltip — first-session card body keeps Fill/TOE above the fold.
 	return lines
 
 
@@ -124,7 +106,36 @@ static func tooltip_lines_for(formation: Object) -> PackedStringArray:
 	var stock := _stockpile_stock_line(formation)
 	if not stock.is_empty():
 		tips.append(stock)
+	var clog := _combat_log_tip_lines(formation)
+	for ln in clog:
+		tips.append(ln)
 	return tips
+
+
+static func _combat_log_tip_lines(formation: Object) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	if formation == null or not ("combat_log" in formation):
+		return out
+	var raw: Variant = formation.get("combat_log")
+	if not (raw is Array):
+		return out
+	var log: Array = raw as Array
+	var start := maxi(0, log.size() - 3)
+	for i in range(start, log.size()):
+		var row: Variant = log[i]
+		if not (row is Dictionary):
+			continue
+		var d: Dictionary = row as Dictionary
+		var date := str(d.get("date", "")).strip_edges()
+		var outcome := str(d.get("outcome", d.get("result", ""))).strip_edges()
+		var bits := PackedStringArray()
+		if not date.is_empty():
+			bits.append(date)
+		if not outcome.is_empty():
+			bits.append(outcome)
+		if not bits.is_empty():
+			out.append(" ".join(bits))
+	return out
 
 
 static func _toe_bits_from_comp(comp: Dictionary) -> PackedStringArray:

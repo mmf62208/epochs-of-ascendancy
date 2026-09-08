@@ -116,16 +116,7 @@ def lines_for(formation: Any) -> List[str]:
             out.append("Refit %d/%dd · org/str recovering" % (int(prog), int(need)))
         else:
             out.append("Training %d/%dd · not combat-ready" % (int(prog), int(need)))
-    clog = data.get("combat_log")
-    if isinstance(clog, (list, tuple)):
-        for raw in list(clog)[-3:]:
-            if not isinstance(raw, Mapping):
-                continue
-            date = str(raw.get("date") or "").strip()
-            outcome = str(raw.get("outcome") or raw.get("result") or "").strip()
-            bits = [b for b in (date, outcome) if b]
-            if bits:
-                out.append(" ".join(bits))
+    # Last-3 combat_log stays on tooltip — first-session card body keeps Fill/TOE above the fold.
     return out
 
 
@@ -236,6 +227,16 @@ def tooltip_lines_for(formation: Any) -> List[str]:
     trucks = int(data.get("stock_trucks") or 0)
     if rifles > 0 or trucks > 0:
         out.append("stock rifles %d · trucks %d" % (rifles, trucks))
+    clog = data.get("combat_log")
+    if isinstance(clog, (list, tuple)):
+        for raw in list(clog)[-3:]:
+            if not isinstance(raw, Mapping):
+                continue
+            date = str(raw.get("date") or "").strip()
+            outcome = str(raw.get("outcome") or raw.get("result") or "").strip()
+            bits = [b for b in (date, outcome) if b]
+            if bits:
+                out.append(" ".join(bits))
     return out
 
 

@@ -121,6 +121,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_land_battle_reinforce_product \
     tools.map_generation.tests.test_land_battle_attrition_product \
     tools.map_generation.tests.test_unit_card_combat_strip_product \
+    tools.map_generation.tests.test_unit_card_fill_toe_visibility_product \
     tools.map_generation.tests.test_land_battle_depth_product \
     tools.map_generation.tests.test_land_battle_encircle_product \
     tools.map_generation.tests.test_land_battle_stance_product \
