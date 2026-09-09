@@ -1431,17 +1431,43 @@ func _activate_left_drag_pan_from_slop() -> bool:
 	# was never set (no Area2D / leftover Close swallow / paused).
 	if _left_pan_active:
 		return true
+	# Drag1 origin-seed only: capture press origin *before* `_left_drag_should_pan`
+	# / `_note` can `_begin`-reset it to the current mouse (that zeroes the first
+	# camera apply). Keep PR 22 skip latch; no PR 16 arm helper; do not rearm.
+	var seed_origin: Vector2 = Vector2.ZERO
+	var have_seed_origin: bool = false
+	if _left_origin_valid:
+		seed_origin = _left_origin_screen
+		have_seed_origin = true
+	elif _left_sticky_valid:
+		seed_origin = _left_sticky_origin
+		have_seed_origin = true
+	elif _left_press_screen != Vector2.ZERO:
+		seed_origin = _left_press_screen
+		have_seed_origin = true
+	elif _last_mouse_pos != Vector2.ZERO:
+		seed_origin = _last_mouse_pos
+		have_seed_origin = true
 	if not _left_drag_should_pan():
 		return false
-	# Keep press/origin so the first camera apply pans the accumulated slop
-	# (drag up = camera north). Seeding `_last_mouse_pos` at current mouse
-	# zeroes that delta. No `_process` physical-arm helper (PR 16 Esc/chip).
-	if _left_origin_valid:
+	if not _left_origin_valid:
+		if have_seed_origin:
+			_left_origin_screen = seed_origin
+			_left_origin_valid = true
+		elif _left_sticky_valid:
+			_left_origin_screen = _left_sticky_origin
+			_left_origin_valid = true
+		else:
+			var vp_seed: Viewport = get_viewport()
+			if vp_seed != null:
+				_left_origin_screen = vp_seed.get_mouse_position()
+				_left_origin_valid = true
+	if have_seed_origin:
+		_last_mouse_pos = seed_origin
+	elif _left_origin_valid:
 		_last_mouse_pos = _left_origin_screen
 	elif _left_sticky_valid:
 		_last_mouse_pos = _left_sticky_origin
-	elif not _left_pan_armed:
-		_last_mouse_pos = get_viewport().get_mouse_position()
 	_left_pan_active = true
 	_mark_left_pan_blocked_pick()
 	return true
