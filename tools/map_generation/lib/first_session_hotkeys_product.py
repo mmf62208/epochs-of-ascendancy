@@ -453,7 +453,6 @@ def build_first_session_hotkeys_product(
             < _slice_func(ren, "_unhandled_input").rfind("_select_province")
         )
         begin_fn = _slice_func(ren, "_begin_left_map_gesture")
-        repeat_seed_fn_hot = _slice_func(ren, "_seed_left_origin_for_repeat_press")
         rearm_fn = _slice_func(ren, "_rearm_left_drag_for_next_press")
         process_fn_hot = _slice_func(ren, "_process")
         prov_fn_hot = _slice_func(ren, "_on_province_input")
@@ -545,25 +544,6 @@ def build_first_session_hotkeys_product(
             and "_left_pick_allowed_on_release" not in activate_fn_hot
             and "_rearm_left_drag_for_next_press" not in activate_fn_hot
             and "_latch_left_skip_pick_from_live_slop" not in activate_fn_hot
-        )
-        # de178e7 Drag2+3: leftover physical new press seeds a fresh origin
-        # without clearing skip/cam (North Atlantic Deep). Keep rearm/allow.
-        wiring["drag2_3_repeat_origin_seed"] = (
-            bool(repeat_seed_fn_hot)
-            and "_left_origin_screen = mouse" in repeat_seed_fn_hot
-            and "_last_mouse_pos = mouse" in repeat_seed_fn_hot
-            and "_left_skip_next_pick = false" not in repeat_seed_fn_hot
-            and "_left_cam_moved_this_down = false" not in repeat_seed_fn_hot
-            and "_left_gesture_dragged = false" not in repeat_seed_fn_hot
-            and "_seed_left_origin_for_repeat_press" in begin_fn
-            and begin_fn.find("keep_this_drag")
-            < begin_fn.rfind("_seed_left_origin_for_repeat_press")
-            and begin_fn.rfind("_seed_left_origin_for_repeat_press")
-            < begin_fn.find("_left_skip_next_pick = false")
-            and "_left_skip_next_pick = false" not in rearm_fn
-            and "seed_origin" in activate_fn_hot
-            and "func _ensure_left_drag_armed_from_physical" not in ren
-            and "func _left_pick_allowed_on_release" not in ren
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")
