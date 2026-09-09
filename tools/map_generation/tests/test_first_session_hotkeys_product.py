@@ -131,6 +131,7 @@ class TestFirstSessionHotkeysProduct(unittest.TestCase):
             "early_live_slop_skip_latch",
             "drag1_activate_origin_seed",
             "empty_drag_unstick_idle_btn_down",
+            "drag2_idle_up_origin_reseed",
             "esc_idle_opens_command_center",
             "esc_dismiss_then_idle_cc",
         ):
