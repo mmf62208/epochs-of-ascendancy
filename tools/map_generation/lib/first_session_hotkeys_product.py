@@ -550,6 +550,7 @@ def build_first_session_hotkeys_product(
         # after physical up (CC dimmer never `_end`). Not PR 24/26/16.
         allow_fn_hot = _slice_func(ren, "_allow_left_pan_skip_to_die")
         hover_fn_hot = _slice_func(ren, "_update_spatial_hover")
+        reseed_fn_hot = _slice_func(ren, "_reseed_left_origin_from_idle_up")
         wiring["empty_drag_unstick_idle_btn_down"] = (
             bool(allow_fn_hot)
             and "stuck_btn_down" in allow_fn_hot
@@ -566,6 +567,34 @@ def build_first_session_hotkeys_product(
             and bool(hover_fn_hot)
             and "_left_live_slop_is_drag" in hover_fn_hot
             and "is_mouse_button_pressed" in hover_fn_hot
+        )
+        # 1f48f56 Drag2+3: leftover hold blocked origin reset. `_input`
+        # reseeds after idle-up only — not `_begin` (PR 24 mid-drag).
+        input_hot_left = input_fn.find("MOUSE_BUTTON_LEFT")
+        idle_hot_i = (
+            input_fn.find("idle_up_for_repeat", input_hot_left)
+            if input_hot_left >= 0
+            else -1
+        )
+        begin_hot_i = (
+            input_fn.find("_begin_left_map_gesture(true)", input_hot_left)
+            if input_hot_left >= 0
+            else -1
+        )
+        reseed_hot_i = (
+            input_fn.find("_reseed_left_origin_from_idle_up", input_hot_left)
+            if input_hot_left >= 0
+            else -1
+        )
+        wiring["drag2_idle_up_origin_reseed"] = (
+            bool(reseed_fn_hot)
+            and "_last_mouse_pos = mouse" in reseed_fn_hot
+            and "_left_skip_next_pick = false" not in reseed_fn_hot
+            and "_reseed_left_origin_from_idle_up" not in begin_fn
+            and "idle_up_for_repeat" in input_fn
+            and 0 <= idle_hot_i < begin_hot_i < reseed_hot_i
+            and "func _seed_left_origin_for_repeat_press" not in ren
+            and "func _ensure_left_drag_armed_from_physical" not in ren
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")

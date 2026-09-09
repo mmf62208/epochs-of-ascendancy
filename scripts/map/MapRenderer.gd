@@ -1150,6 +1150,25 @@ func _note_sticky_slop() -> void:
 		_mark_left_pan_blocked_pick()
 
 
+func _reseed_left_origin_from_idle_up(mouse: Vector2) -> void:
+	# 1f48f56 Drag2+3: leftover hold / leftover skip keep Drag1 origin so
+	# `_begin(true)` never slop-pans the 2nd/3rd empty-area press. Seed THIS
+	# press for `_activate` origin-seed. Call only from `_input` when
+	# `_left_button_was_up` was true (idle up — not mid-Drag1). Do not clear
+	# skip/cam/dragged. Not PR 24 `_seed_left_origin_for_repeat_press`
+	# (ungated `_begin` mid-drag). Not PR 26 idle-stuck `_begin` seed.
+	_left_gesture_origin = mouse
+	_left_origin_screen = mouse
+	_left_origin_valid = true
+	_left_press_screen = mouse
+	_left_max_slop_sq = 0.0
+	_left_sticky_origin = mouse
+	_left_sticky_valid = true
+	_left_sticky_slop_sq = 0.0
+	_last_mouse_pos = mouse
+	_left_button_was_up = false
+
+
 func _begin_left_map_gesture(new_press: bool = false) -> void:
 	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
 	if _left_btn_down:
@@ -1752,7 +1771,19 @@ func _input(event: InputEvent) -> void:
 					_finish_close_click_guard_on_new_press()
 				# Genuine new button-down (slop 0): only place the pan skip is cleared.
 				# Mid-drag no-ops because _left_btn_down is still true.
+				var idle_up_for_repeat: bool = _left_button_was_up
 				_begin_left_map_gesture(true)
+				# Drag2+3 leftover hold: `_begin(true)` keeps Drag1 origin.
+				# Reseed THIS press only after idle button-up (not mid-Drag1).
+				if (
+					idle_up_for_repeat
+					and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+					and not event.ctrl_pressed
+					and not event.shift_pressed
+				):
+					var vp_rep: Viewport = get_viewport()
+					var mouse_rep: Vector2 = vp_rep.get_mouse_position() if vp_rep != null else Vector2.ZERO
+					_reseed_left_origin_from_idle_up(mouse_rep)
 				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
 					# Pan latch stays. Do not swallow Open fight / unit-card buttons
 					# (2d47d06: fold click was tooltip-only no-op after pan PASS).

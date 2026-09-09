@@ -11,10 +11,13 @@ left-down + live slop ≥8px latches `_left_skip_next_pick` before `_note`
 47af97a Drag1–3 still never moved after Esc-then-CC: idle `_allow` must
 unstick leftover `_left_btn_down` on physical button-up so the next
 `_begin(true)` can genuine-reset origin (CC dimmer / swallowed release never
-`_end`). Not PR 24 leftover-hold origin seed; not PR 26 chip / idle-stuck
-`_begin` seed. Esc dismiss-then-CC and unit-chip Fill%/TOE stay PASS — do
-not reintroduce the PR 16 `_ensure_left_drag_armed_from_physical` /
-`_left_pick_allowed_on_release` stack.
+`_end`). 1f48f56 Drag1 move OK / Drag2+3 no camera move: leftover hold
+blocks `genuine_new_press`, so `_input` reseeds origin after idle button-up
+without clearing skip/cam (not PR 24 ungated `_begin` seed; not PR 26
+chip / idle-stuck `_begin` seed). Esc dismiss-then-CC and unit-chip
+Fill%/TOE stay PASS — do not reintroduce the PR 16
+`_ensure_left_drag_armed_from_physical` / `_left_pick_allowed_on_release`
+stack.
 Pure wiring product — no dual packages.
 """
 from __future__ import annotations
@@ -70,6 +73,7 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
     rearm_fn = _gd_func_slice(ren, "_rearm_left_drag_for_next_press")
     live_fn = _gd_func_slice(ren, "_left_live_slop_is_drag")
     latch_fn = _gd_func_slice(ren, "_latch_left_skip_pick_from_live_slop")
+    reseed_fn = _gd_func_slice(ren, "_reseed_left_origin_from_idle_up")
     exceeded_fn = _gd_func_slice(ren, "_left_drag_exceeded_slop")
     blocked_fn = _gd_func_slice(ren, "_left_map_pick_blocked")
     esc_fn = _gd_func_slice(ren, "_handle_escape_key")
@@ -413,6 +417,52 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             < hover_fn.find("is_mouse_button_pressed")
             and "_try_open_land_unit_at_world" not in hover_fn
             and "_handle_escape_key" not in hover_fn
+            and "func _handle_escape_key" in ren
+            and "func _try_open_land_unit_at_world" in ren
+        )
+        # 1f48f56 Drag2+3: leftover hold blocked `_begin(true)` origin reset.
+        # `_input` only — capture idle-up *before* `_begin`, then reseed
+        # origin/last_mouse/slop. Keep skip/cam. Not PR 24 `_begin` seed.
+        left_i = input_fn.find("MOUSE_BUTTON_LEFT")
+        idle_up_i = (
+            input_fn.find("idle_up_for_repeat", left_i) if left_i >= 0 else -1
+        )
+        begin_press_i = (
+            input_fn.find("_begin_left_map_gesture(true)", left_i)
+            if left_i >= 0
+            else -1
+        )
+        reseed_call_i = (
+            input_fn.find("_reseed_left_origin_from_idle_up", left_i)
+            if left_i >= 0
+            else -1
+        )
+        wiring["drag2_idle_up_origin_reseed"] = (
+            bool(reseed_fn)
+            and "_left_origin_screen = mouse" in reseed_fn
+            and "_last_mouse_pos = mouse" in reseed_fn
+            and "_left_max_slop_sq = 0.0" in reseed_fn
+            and "_left_button_was_up = false" in reseed_fn
+            and "_left_skip_next_pick = false" not in reseed_fn
+            and "_left_cam_moved_this_down = false" not in reseed_fn
+            and "_left_gesture_dragged = false" not in reseed_fn
+            and "_left_pan_committed = false" not in reseed_fn
+            and "_handle_escape_key" not in reseed_fn
+            and "_try_open_land_unit_at_world" not in reseed_fn
+            and "_try_open_unit_at_world" not in reseed_fn
+            and "_reseed_left_origin_from_idle_up" not in begin_fn
+            and "_reseed_left_origin_from_idle_up" not in activate_fn
+            and "_reseed_left_origin_from_idle_up" not in allow_fn
+            and "_reseed_left_origin_from_idle_up" not in latch_fn
+            and "_reseed_left_origin_from_idle_up" not in process_fn
+            and "idle_up_for_repeat" in input_fn
+            and left_i >= 0
+            and 0 <= idle_up_i < begin_press_i < reseed_call_i
+            and input_fn.find("_left_button_was_up") < begin_press_i
+            and "func _seed_left_origin_for_repeat_press" not in ren
+            and "func _seed_left_origin_for_idle_stuck_press" not in ren
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
             and "func _handle_escape_key" in ren
             and "func _try_open_land_unit_at_world" in ren
         )
