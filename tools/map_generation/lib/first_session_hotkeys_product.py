@@ -596,21 +596,6 @@ def build_first_session_hotkeys_product(
             and "func _seed_left_origin_for_repeat_press" not in ren
             and "func _ensure_left_drag_armed_from_physical" not in ren
         )
-        # 75dffb3 Drag2 Mid Pacific Waters: release latch without left-down.
-        end_fn_hot = _slice_func(ren, "_end_left_button_down")
-        wiring["drag2_sea_release_skip_pick"] = (
-            bool(latch_fn_hot)
-            and "not left_down and not _left_live_slop_is_drag()" in latch_fn_hot
-            and bool(end_fn_hot)
-            and end_fn_hot.find("_left_skip_next_pick = true")
-            < end_fn_hot.find("_left_pan_active = false")
-            and "if stuck_btn_down:" in allow_fn_hot
-            and "_latch_left_skip_pick_from_live_slop" in prov_fn_hot
-            and "func _ensure_left_drag_armed_from_physical" not in ren
-            and "func _left_pick_allowed_on_release" not in ren
-            and "func _reseed_left_origin_from_idle_up" in ren
-            and "func _handle_escape_key" in ren
-        )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")
         process_fn = _slice_func(ren, "_process")

@@ -14,14 +14,8 @@ unstick leftover `_left_btn_down` on physical button-up so the next
 `_end`). 1f48f56 Drag1 move OK / Drag2+3 no camera move: leftover hold
 blocks `genuine_new_press`, so `_input` reseeds origin after idle button-up
 without clearing skip/cam (not PR 24 ungated `_begin` seed; not PR 26
-chip / idle-stuck `_begin` seed). 75dffb3 Drag2 move OK / sea-pick Mid
-Pacific Waters: skip-pick latch missed Area2D / `_unhandled_input`
-spatial release after `_end` / `_allow` unstick dropped left-down and
-`_rearm` cleared `_left_pan_active` on the same release frame. Latch
-from live slop without left-down; `_end` persists skip if this gesture
-panned; `_allow` does not `_rearm` on the first physical-up frame
-before `_end`. Esc dismiss-then-CC and unit-chip Fill%/TOE stay PASS —
-do not reintroduce the PR 16
+chip / idle-stuck `_begin` seed). Esc dismiss-then-CC and unit-chip
+Fill%/TOE stay PASS — do not reintroduce the PR 16
 `_ensure_left_drag_armed_from_physical` / `_left_pick_allowed_on_release`
 stack.
 Pure wiring product — no dual packages.
@@ -470,71 +464,6 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "func _ensure_left_drag_armed_from_physical" not in ren
             and "func _left_pick_allowed_on_release" not in ren
             and "func _handle_escape_key" in ren
-            and "func _try_open_land_unit_at_world" in ren
-        )
-        # 75dffb3 Drag2 Mid Pacific Waters: finished empty-area pan must not
-        # spatial-pick sea. Same skip-pick surface only — no reseed/Esc/chip.
-        end_fn = _gd_func_slice(ren, "_end_left_button_down")
-        input_rel_i = input_fn.find("elif not event.pressed:")
-        input_rel_skip_i = (
-            input_fn.find("_left_release_must_skip_pick", input_rel_i)
-            if input_rel_i >= 0
-            else -1
-        )
-        input_rel_map_i = (
-            input_fn.find("_map_click_should_skip_pick", input_rel_i)
-            if input_rel_i >= 0
-            else -1
-        )
-        unh_else_i = unh_fn.find("var did_left_pan")
-        unh_else_skip_i = (
-            unh_fn.find("_left_release_must_skip_pick", unh_else_i)
-            if unh_else_i >= 0
-            else -1
-        )
-        unh_else_map_i = (
-            unh_fn.find("_map_click_should_skip_pick", unh_else_i)
-            if unh_else_i >= 0
-            else -1
-        )
-        wiring["drag2_sea_release_skip_pick"] = (
-            bool(latch_fn)
-            and "not left_down and not _left_live_slop_is_drag()" in latch_fn
-            and "_left_skip_next_pick = true" in latch_fn
-            and bool(end_fn)
-            and "_left_pan_active" in end_fn
-            and "_left_live_slop_is_drag" in end_fn
-            and end_fn.find("_left_skip_next_pick = true")
-            < end_fn.find("_left_pan_active = false")
-            and "_left_skip_next_pick = false" not in end_fn
-            and bool(allow_fn)
-            and "if stuck_btn_down:" in allow_fn
-            and allow_fn.find("_left_release_frame < 0")
-            < allow_fn.find("if stuck_btn_down:")
-            and allow_fn.find("if stuck_btn_down:")
-            < allow_fn.rfind("_rearm_left_drag_for_next_press")
-            and "_left_skip_next_pick = false" not in allow_fn
-            and "_reseed_left_origin_from_idle_up" not in allow_fn
-            and "_reseed_left_origin_from_idle_up" not in latch_fn
-            and "_reseed_left_origin_from_idle_up" not in end_fn
-            and "_handle_escape_key" not in latch_fn
-            and "_handle_escape_key" not in end_fn
-            and "_try_open_land_unit_at_world" not in latch_fn
-            and "_try_open_land_unit_at_world" not in end_fn
-            and "_latch_left_skip_pick_from_live_slop" in prov_fn
-            and prov_fn.find("if event.pressed:")
-            < prov_fn.find("_latch_left_skip_pick_from_live_slop")
-            and prov_fn.find("_latch_left_skip_pick_from_live_slop")
-            < prov_fn.find("_select_province")
-            and input_rel_i >= 0
-            and 0 <= input_rel_skip_i < input_rel_map_i
-            and unh_else_i >= 0
-            and 0 <= unh_else_skip_i < unh_else_map_i
-            and "func _ensure_left_drag_armed_from_physical" not in ren
-            and "func _left_pick_allowed_on_release" not in ren
-            and "func _seed_left_origin_for_repeat_press" not in ren
-            and "func _handle_escape_key" in ren
-            and "func _reseed_left_origin_from_idle_up" in ren
             and "func _try_open_land_unit_at_world" in ren
         )
 
