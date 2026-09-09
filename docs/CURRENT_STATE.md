@@ -9,6 +9,8 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
+> **2026-09-09 smoke Esc dismiss-then-CC restore:** Play ff63a46 Esc HARD FAIL — settle/inspector dismissed, Command Center did not open. Esc helpers only: same-press `_esc_stack_frame` (no one-key dismiss+open), idle `_esc_open_command_center` `call_deferred("_on_menu_pressed")`, leftover FileDialog exclusive + hidden MainMenu rename (never `queue_free` MainMenu). Pan/chip/PR26 untouched. HOLD merge.
+>
 > **2026-09-09 smoke careful activate origin-seed:** Play a16ee8e Drag1–3 empty-area left-drags never moved the camera (PR 22 skip-pick latch held — no sea pick). Narrow `_activate_left_drag_pan_from_slop` only: capture press origin *before* `_left_drag_should_pan` / `_note` can `_begin`-reset it, then seed `_last_mouse_pos` so the first camera apply has a non-zero delta. PR 22 latch / rearm / allow / Esc / chip / PR 16 untouched. HOLD merge.
 >
 > **2026-09-08 smoke pan early skip latch:** Play eed9b5f Drag2 sea-picked Labrador Approaches West via `_unhandled_input` spatial `_select_province` (not Area2D / coarse / title). Mid-gesture left-down + live slop ≥8px now latches `_left_skip_next_pick` once before `_note`/`_begin` can reset origin. Rearm/activate/Esc/chip untouched. Drag1 camera deferred. HOLD merge.

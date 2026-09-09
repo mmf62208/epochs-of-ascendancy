@@ -161,6 +161,29 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "_on_menu_pressed" in open_fn
             and "TopInfoBar.find_in_tree" in open_fn
         )
+        settle_btn_fn = _gd_func_slice(ren, "_ensure_settle_button")
+        agent_path = ROOT / "scripts" / "ui" / "AgentAssignmentScreen.gd"
+        agent_src = agent_path.read_text(encoding="utf-8") if agent_path.is_file() else ""
+        agent_rel_fn = _gd_func_slice(agent_src, "_on_portrait_file_dialog_released")
+        # Play ff63a46 HARD FAIL: settle dismissed, Command Center did not open.
+        # 1st Esc closes settle/inspector; idle Esc opens CC via deferred _on_menu_pressed.
+        wiring["esc_dismiss_then_idle_cc"] = (
+            bool(esc_fn)
+            and "_esc_stack_frame" in esc_fn
+            and "get_process_frames" in esc_fn
+            and esc_fn.find("_esc_stack_frame") < esc_fn.find("_inspector_stack_blocking_input")
+            and esc_fn.find("if _dismiss_map_overlays_esc()")
+            < esc_fn.find("_esc_open_command_center")
+            and "return" in esc_fn[esc_fn.find("if _dismiss_map_overlays_esc()") : esc_fn.find("_esc_open_command_center")]
+            and 'call_deferred("_on_menu_pressed")' in open_fn
+            and "MainMenuLeftover" in open_fn
+            and "queue_free(" not in open_fn
+            and "FileDialog" in dismiss_fn
+            and "exclusive = false" in dismiss_fn
+            and '"MainMenu"' not in dismiss_fn
+            and "FOCUS_NONE" in settle_btn_fn
+            and "exclusive = false" in agent_rel_fn
+        )
         wiring["dismiss_no_mainmenu_leftover"] = (
             bool(dismiss_fn)
             and '"MainMenu"' not in dismiss_fn
