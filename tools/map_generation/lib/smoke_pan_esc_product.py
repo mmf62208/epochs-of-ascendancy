@@ -1,11 +1,14 @@
 """Smoke walls: left-drag pans (release skip-pick) + idle Esc → Command Center.
 
-Play short-smoke MIXED (5c8e0f2 / b11cb4e / cf95762 / 51dc2a4 / eed9b5f): sea
-left-drag picked “Rio Grande Rise” / Drag2 “Labrador Approaches West”
-(`_unhandled_input` spatial `_select_province`, not Area2D / coarse / title).
-Mid-gesture left-down + live slop ≥8px latches `_left_skip_next_pick` before
-`_note`. Esc dismiss-then-CC and unit-chip Fill%/TOE stay PASS — do not
-reintroduce the PR 16 `_ensure_left_drag_armed_from_physical` /
+Play short-smoke MIXED (5c8e0f2 / b11cb4e / cf95762 / 51dc2a4 / eed9b5f /
+a16ee8e): sea left-drag picked “Rio Grande Rise” / Drag2 “Labrador Approaches
+West” (`_unhandled_input` spatial `_select_province`, not Area2D / coarse /
+title). Mid-gesture left-down + live slop ≥8px latches `_left_skip_next_pick`
+before `_note` (PR 22 — keep). a16ee8e Drag1–3 empty-area left-drags never
+moved the camera: `_activate` must origin-seed `_last_mouse_pos` from the
+press origin captured *before* `_left_drag_should_pan` / `_note` can reset it.
+Esc dismiss-then-CC and unit-chip Fill%/TOE stay PASS — do not reintroduce
+the PR 16 `_ensure_left_drag_armed_from_physical` /
 `_left_pick_allowed_on_release` stack.
 Pure wiring product — no dual packages.
 """
@@ -315,6 +318,35 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "func _handle_escape_key" in ren
             and "func _try_open_land_unit_at_world" in ren
             and "func _try_open_unit_at_world" in ren
+        )
+        # a16ee8e Drag1–3: camera never moved. Origin-seed `_last_mouse_pos`
+        # from press origin captured before `_left_drag_should_pan` / `_note`
+        # can `_begin`-reset it (current-mouse seed zeroes first delta).
+        # Activate only — do not rewrite latch / rearm / Esc / chip / PR 16.
+        wiring["drag1_activate_origin_seed"] = (
+            bool(activate_fn)
+            and "seed_origin" in activate_fn
+            and "have_seed_origin" in activate_fn
+            and "if not _left_origin_valid:" in activate_fn
+            and "_last_mouse_pos = seed_origin" in activate_fn
+            and "_last_mouse_pos = _left_origin_screen" in activate_fn
+            and activate_fn.find("seed_origin")
+            < activate_fn.find("if not _left_drag_should_pan()")
+            and activate_fn.find("if not _left_origin_valid:")
+            < activate_fn.find("_last_mouse_pos = _left_origin_screen")
+            and activate_fn.find("_left_origin_screen")
+            < activate_fn.find("get_mouse_position")
+            and "_left_press_screen" in activate_fn
+            and "_left_sticky_origin" in activate_fn
+            and "_left_pan_armed = true" not in activate_fn
+            and "_ensure_left_drag_armed_from_physical" not in activate_fn
+            and "_left_pick_allowed_on_release" not in activate_fn
+            and "_rearm_left_drag_for_next_press" not in activate_fn
+            and "_allow_left_pan_skip_to_die" not in activate_fn
+            and "_latch_left_skip_pick_from_live_slop" not in activate_fn
+            and "_handle_escape_key" not in activate_fn
+            and "_try_open_land_unit_at_world" not in activate_fn
+            and "_try_open_unit_at_world" not in activate_fn
         )
 
         for k, v in wiring.items():

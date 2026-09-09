@@ -528,6 +528,23 @@ def build_first_session_hotkeys_product(
             and "func _ensure_left_drag_armed_from_physical" not in ren
             and "func _left_pick_allowed_on_release" not in ren
         )
+        # a16ee8e Drag1: `_activate` origin-seed before should_pan/_note reset.
+        wiring["drag1_activate_origin_seed"] = (
+            bool(activate_fn_hot)
+            and "seed_origin" in activate_fn_hot
+            and "have_seed_origin" in activate_fn_hot
+            and "if not _left_origin_valid:" in activate_fn_hot
+            and "_last_mouse_pos = seed_origin" in activate_fn_hot
+            and activate_fn_hot.find("seed_origin")
+            < activate_fn_hot.find("if not _left_drag_should_pan()")
+            and activate_fn_hot.find("_left_origin_screen")
+            < activate_fn_hot.find("get_mouse_position")
+            and "_left_pan_armed = true" not in activate_fn_hot
+            and "_ensure_left_drag_armed_from_physical" not in activate_fn_hot
+            and "_left_pick_allowed_on_release" not in activate_fn_hot
+            and "_rearm_left_drag_for_next_press" not in activate_fn_hot
+            and "_latch_left_skip_pick_from_live_slop" not in activate_fn_hot
+        )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")
         process_fn = _slice_func(ren, "_process")
