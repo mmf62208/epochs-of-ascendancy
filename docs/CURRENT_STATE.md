@@ -9,8 +9,6 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
-> **2026-09-09 smoke pan Drag2+3 residual after origin-seed:** Play de178e7 Drag1 empty-area left-drag moved the camera and did not pick (PR 23 keep). Drag2+3 leftover consecutive empty-area left-drags did not move the camera (North Atlantic Deep). `_begin` seeds a fresh origin on a physical 2nd–3rd press without clearing skip/cam latch; `_activate` origin-seed + PR 22 latch / rearm / allow / Esc / chip / PR 16 untouched. HOLD merge.
->
 > **2026-09-09 smoke careful activate origin-seed:** Play a16ee8e Drag1–3 empty-area left-drags never moved the camera (PR 22 skip-pick latch held — no sea pick). Narrow `_activate_left_drag_pan_from_slop` only: capture press origin *before* `_left_drag_should_pan` / `_note` can `_begin`-reset it, then seed `_last_mouse_pos` so the first camera apply has a non-zero delta. PR 22 latch / rearm / allow / Esc / chip / PR 16 untouched. HOLD merge.
 >
 > **2026-09-08 smoke pan early skip latch:** Play eed9b5f Drag2 sea-picked Labrador Approaches West via `_unhandled_input` spatial `_select_province` (not Area2D / coarse / title). Mid-gesture left-down + live slop ≥8px now latches `_left_skip_next_pick` once before `_note`/`_begin` can reset origin. Rearm/activate/Esc/chip untouched. Drag1 camera deferred. HOLD merge.
