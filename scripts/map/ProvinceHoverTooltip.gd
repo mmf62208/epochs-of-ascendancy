@@ -29,6 +29,9 @@ func _ready() -> void:
 	visible = false
 	z_index = 200
 	var margin := MarginContainer.new()
+	# Default STOP on MarginContainer stole GER Division chip clicks
+	# (Play c6a06cc Fill%/TOE HARD FAIL). Whole tree must IGNORE.
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_theme_constant_override("margin_left", 6)
 	margin.add_theme_constant_override("margin_right", 6)
 	margin.add_theme_constant_override("margin_top", 5)
@@ -46,6 +49,14 @@ func _ready() -> void:
 	# IGNORE: a stuck tooltip must not bury inspector Close or map clicks.
 	_rich.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_child(_rich)
+	_ignore_mouse_tree(self)
+
+
+func _ignore_mouse_tree(n: Node) -> void:
+	if n is Control:
+		(n as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for c in n.get_children():
+		_ignore_mouse_tree(c)
 
 	_panel_style = StyleBoxFlat.new()
 	_apply_panel_style()

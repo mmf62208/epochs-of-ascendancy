@@ -1148,9 +1148,36 @@ func _note_sticky_slop() -> void:
 		_mark_left_pan_blocked_pick()
 
 
+func _seed_left_origin_for_idle_stuck_press(mouse: Vector2) -> void:
+	# Drag2+3 only: leftover `_left_btn_down` stuck after idle button-up.
+	# Fresh origin for `_activate` seed; do not clear skip/cam (PR 22 latch).
+	# Do not call during leftover-hold (PR 24 leftover-seed broke Drag1).
+	_left_gesture_origin = mouse
+	_left_origin_screen = mouse
+	_left_origin_valid = true
+	_left_press_screen = mouse
+	_left_max_slop_sq = 0.0
+	_left_sticky_origin = mouse
+	_left_sticky_valid = true
+	_left_sticky_slop_sq = 0.0
+	_last_mouse_pos = mouse
+	_left_button_was_up = false
+
+
 func _begin_left_map_gesture(new_press: bool = false) -> void:
 	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
 	if _left_btn_down:
+		# Leftover pressed=true can leave `_left_btn_down` stuck while
+		# `_left_button_was_up` is still true. After leftover-hold expires,
+		# seed a fresh origin so Drag2+3 slop-pans. Skip leftover-hold
+		# (PR 24 leftover-seed zeroed Drag1). Do not seed keep_this_drag.
+		if _left_in_leftover_hold():
+			return
+		var vp_stuck: Viewport = get_viewport()
+		var mouse_stuck: Vector2 = vp_stuck.get_mouse_position() if vp_stuck != null else Vector2.ZERO
+		var physically_stuck: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+		if new_press and physically_stuck and _left_button_was_up:
+			_seed_left_origin_for_idle_stuck_press(mouse_stuck)
 		return
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
@@ -1756,6 +1783,10 @@ func _input(event: InputEvent) -> void:
 				if did_left_pan:
 					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
+				elif not event.shift_pressed and _try_open_land_chip_from_input(event.ctrl_pressed):
+					# Still-click land chip in `_input` so ProvinceHoverTooltip
+					# cannot steal GER Division Fill%/TOE (Play c6a06cc).
+					return
 	if event is InputEventMouseMotion:
 		_note_mouse_up_arms_still_click()
 		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
@@ -17145,7 +17176,6 @@ func _is_mouse_over_blocking_ui() -> bool:
 			"LeaderAssignmentScreen",
 			"AgentAssignmentScreen",
 			"NationalSpiritsScreen",
-			"ProvinceHoverTooltip",
 			"OpenFightSheet",
 			"UnitDetailPopup",
 			"ProvinceOOBStrip",
@@ -17687,6 +17717,23 @@ func _try_living_title_map_pick(pid: int) -> bool:
 		var picked: Variant = boot.call("select_from_province", pid)
 		if picked is Dictionary and bool((picked as Dictionary).get("ok", false)):
 			return true
+	return false
+
+
+func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
+	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
+	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
+	# Esc helpers untouched.
+	if _mouse_over_search_control() or _mouse_over_close_control():
+		return false
+	if _is_mouse_over_blocking_ui():
+		return false
+	if MapViewInput.modal_blocks_map_nav(get_viewport()):
+		return false
+	var world_pos: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+	if _try_open_land_unit_at_world(world_pos, ctrl_click):
+		get_viewport().set_input_as_handled()
+		return true
 	return false
 
 
