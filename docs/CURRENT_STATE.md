@@ -9,8 +9,6 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
-> **2026-09-09 smoke chip open + Drag2+3 residual:** Play c6a06cc GER Division Fill%/TOE HARD FAIL (province glance tooltip stole chip hits) + Drag2+3 empty-area no camera move. Land-chip still-click now runs in `_input` (`_try_open_land_chip_from_input`); tooltip MarginContainer + tree IGNORE; `ProvinceHoverTooltip` is not a map-pick blocker. Drag2+3: idle-stuck `_left_btn_down` seeds a fresh origin after leftover-hold expires — not PR 24 leftover-hold/keep_this_drag seed (broke Drag1), not PR 16. Esc / Drag1 activate origin-seed / PR 22 latch kept. HOLD merge.
->
 > **2026-09-09 smoke careful activate origin-seed:** Play a16ee8e Drag1–3 empty-area left-drags never moved the camera (PR 22 skip-pick latch held — no sea pick). Narrow `_activate_left_drag_pan_from_slop` only: capture press origin *before* `_left_drag_should_pan` / `_note` can `_begin`-reset it, then seed `_last_mouse_pos` so the first camera apply has a non-zero delta. PR 22 latch / rearm / allow / Esc / chip / PR 16 untouched. HOLD merge.
 >
 > **2026-09-08 smoke pan early skip latch:** Play eed9b5f Drag2 sea-picked Labrador Approaches West via `_unhandled_input` spatial `_select_province` (not Area2D / coarse / title). Mid-gesture left-down + live slop ≥8px now latches `_left_skip_next_pick` once before `_note`/`_begin` can reset origin. Rearm/activate/Esc/chip untouched. Drag1 camera deferred. HOLD merge.

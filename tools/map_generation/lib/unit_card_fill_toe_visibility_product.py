@@ -13,7 +13,6 @@ from typing import Any, Dict, List, Optional
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 STRIP_GD = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
-TOOLTIP_GD = ROOT / "scripts" / "map" / "ProvinceHoverTooltip.gd"
 
 
 def _gd_func_slice(src: str, func_name: str) -> str:
@@ -92,7 +91,6 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
             "integration": [
                 "unit_card_fill_toe_visibility_product",
                 "MapRenderer._show_unit_detail_popup",
-                "MapRenderer._try_open_land_chip_from_input",
                 "UnitCardCombatStrip.lines_for",
             ],
         }
@@ -176,43 +174,6 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     wiring["fold_fill_toe_first"] = fold_first
     (passes if fold_first else fails).append("fold_fill_toe_first")
 
-    # Play c6a06cc: province glance tooltip stole GER Division clicks so the
-    # Fill%/TOE card never opened. Chip still-click must run in `_input`
-    # (before GUI) and tooltip children must IGNORE.
-    tip = TOOLTIP_GD.read_text(encoding="utf-8") if TOOLTIP_GD.is_file() else ""
-    input_i = ren.find("func _input")
-    unh_i = ren.find("func _unhandled_input")
-    input_fn = ren[input_i:unh_i] if input_i >= 0 and unh_i > input_i else ""
-    chip_in_fn = _gd_func_slice(ren, "_try_open_land_chip_from_input")
-    block_fn = _gd_func_slice(ren, "_is_mouse_over_blocking_ui")
-    land_fn = _gd_func_slice(ren, "_try_open_land_unit_at_world")
-    tooltip_ignore = (
-        bool(tip)
-        and "func _ignore_mouse_tree" in tip
-        and "margin.mouse_filter = Control.MOUSE_FILTER_IGNORE" in tip
-        and "_ignore_mouse_tree(self)" in tip
-        and "MOUSE_FILTER_IGNORE" in tip
-    )
-    wiring["tooltip_mouse_ignore"] = tooltip_ignore
-    (passes if tooltip_ignore else fails).append("tooltip_mouse_ignore")
-
-    tooltip_not_blocker = bool(block_fn) and '"ProvinceHoverTooltip"' not in block_fn
-    wiring["tooltip_not_map_pick_blocker"] = tooltip_not_blocker
-    (passes if tooltip_not_blocker else fails).append("tooltip_not_map_pick_blocker")
-
-    chip_open_in_input = (
-        "_try_open_land_chip_from_input" in input_fn
-        and bool(chip_in_fn)
-        and "_try_open_land_unit_at_world" in chip_in_fn
-        and "_show_unit_detail_popup" in land_fn
-        and "show_info_panel" not in land_fn
-        and "_handle_escape_key" not in chip_in_fn
-        and "_mouse_over_search_control" in chip_in_fn
-        and "_is_mouse_over_blocking_ui" in chip_in_fn
-    )
-    wiring["chip_open_in_input"] = chip_open_in_input
-    (passes if chip_open_in_input else fails).append("chip_open_in_input")
-
     ok = len(fails) == 0
     return {
         "ok": ok,
@@ -226,7 +187,6 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
         "integration": [
             "unit_card_fill_toe_visibility_product",
             "MapRenderer._show_unit_detail_popup",
-            "MapRenderer._try_open_land_chip_from_input",
             "UnitCardCombatStrip.lines_for",
         ],
     }

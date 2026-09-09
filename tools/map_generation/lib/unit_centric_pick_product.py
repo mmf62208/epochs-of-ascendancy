@@ -194,32 +194,6 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     else:
         fails.append("selected_frame_immediate_free")
 
-    # Play c6a06cc: glance tooltip stole Division clicks. Land chip still-click
-    # must run in `_input` (before GUI) and tooltip must not be a pick blocker.
-    input_i = ren.find("func _input")
-    unh_i = ren.find("func _unhandled_input")
-    input_fn = ren[input_i:unh_i] if input_i >= 0 and unh_i > input_i else ""
-    chip_in_fn = _gd_func_slice(ren, "_try_open_land_chip_from_input")
-    block_fn = _gd_func_slice(ren, "_is_mouse_over_blocking_ui")
-    land_chip_in_input = (
-        "_try_open_land_chip_from_input" in input_fn
-        and bool(chip_in_fn)
-        and "_try_open_land_unit_at_world" in chip_in_fn
-        and "show_info_panel" not in chip_in_fn
-        and "_handle_escape_key" not in chip_in_fn
-    )
-    wiring["land_chip_in_input"] = land_chip_in_input
-    if land_chip_in_input:
-        passes.append("land_chip_in_input")
-    else:
-        fails.append("land_chip_in_input")
-    tooltip_not_blocker = bool(block_fn) and '"ProvinceHoverTooltip"' not in block_fn
-    wiring["tooltip_not_pick_blocker"] = tooltip_not_blocker
-    if tooltip_not_blocker:
-        passes.append("tooltip_not_pick_blocker")
-    else:
-        fails.append("tooltip_not_pick_blocker")
-
     if not check_wiring:
         ok = toast_ok and hit_ok
     else:

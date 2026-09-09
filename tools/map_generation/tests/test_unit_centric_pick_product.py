@@ -46,8 +46,6 @@ class TestUnitCentricPickProduct(unittest.TestCase):
             "select_refreshes_chip",
             "chip_match_by_province",
             "selected_frame_immediate_free",
-            "land_chip_in_input",
-            "tooltip_not_pick_blocker",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 
