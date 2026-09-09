@@ -1075,12 +1075,14 @@ func _latch_left_skip_pick_from_live_slop() -> void:
 	# left-down + live slop ≥8px sets skip once. Keep until genuine `_begin(true)`.
 	# Do not mark/activate/rearm (Drag1 camera stays deferred). Default board
 	# has no Area2D (`use_spatial_picking` + `create_area_nodes_for_fallback=false`).
+	# 75dffb3 Drag2 Mid Pacific Waters: `_input` `_end` / `_allow` unstick can
+	# drop left-down before Area2D / spatial release. Live slop still latches.
 	if _left_skip_next_pick:
 		return
 	var left_down: bool = (
 		_left_btn_down or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 	)
-	if not left_down:
+	if not left_down and not _left_live_slop_is_drag():
 		return
 	if _left_live_slop_is_drag():
 		_left_skip_next_pick = true
@@ -1258,6 +1260,17 @@ func _note_left_gesture_motion() -> void:
 
 
 func _end_left_button_down() -> void:
+	# Persist skip before dropping `_left_pan_active` so leftover Area2D /
+	# `_unhandled_input` spatial release (Mid Pacific Waters) still skip-picks
+	# after `_allow` unstick. Do not clear skip/cam/slop here.
+	if (
+		_left_pan_active
+		or _left_gesture_dragged
+		or _left_cam_moved_this_down
+		or _left_live_slop_is_drag()
+		or _left_skip_next_pick
+	):
+		_left_skip_next_pick = true
 	_left_btn_down = false
 	_left_pan_armed = false
 	_left_pan_active = false
@@ -1298,7 +1311,15 @@ func _allow_left_pan_skip_to_die() -> void:
 	if _left_in_leftover_hold():
 		return
 	_left_btn_down = false
-	if _left_release_frame < 0 and not stuck_btn_down:
+	if _left_release_frame < 0:
+		# Release frame before `_input` `_end`: do not `_rearm` (that drops
+		# `_left_pan_active` so Drag2 spatial release picks Mid Pacific Waters).
+		# Unstick still runs so the next `_begin(true)` can genuine-reset
+		# (47af97a CC dimmer / swallowed `_end`). Later idle frames with no
+		# `_end` (`stuck_btn_down` already false) drop pan-active.
+		if stuck_btn_down:
+			return
+		_rearm_left_drag_for_next_press()
 		return
 	_rearm_left_drag_for_next_press()
 
@@ -1813,11 +1834,11 @@ func _input(event: InputEvent) -> void:
 					_arm_left_map_press()
 			elif not event.pressed:
 				_latch_left_skip_pick_from_live_slop()
-				_note_left_gesture_motion()
 				var did_left_pan: bool = (
-					_left_gesture_dragged
+					_left_release_must_skip_pick()
+					or _left_live_slop_is_drag()
+					or _left_gesture_dragged
 					or _map_click_should_skip_pick()
-					or _left_release_must_skip_pick()
 				)
 				_end_left_button_down()
 				_note_close_button_release()
@@ -2153,10 +2174,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 		else:
 			var did_left_pan: bool = (
-				_left_gesture_dragged
-				or _map_click_should_skip_pick()
-				or _left_release_must_skip_pick()
+				_left_release_must_skip_pick()
 				or _left_live_slop_is_drag()
+				or _left_gesture_dragged
+				or _map_click_should_skip_pick()
 			)
 			_end_left_button_down()
 			_note_close_button_release()
@@ -16984,6 +17005,9 @@ func _on_province_input(_viewport: Node, event: InputEvent, _shape_idx: int, pro
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			return
+		# Release-time latch: `_end` / `_allow` may have dropped left-down
+		# (75dffb3 Drag2 Mid Pacific Waters). No `_note`/`_begin`.
+		_latch_left_skip_pick_from_live_slop()
 	# Hold + committed slop/skip: abort before inspector (Tropical Atlantic Waters).
 	# Read-only live slop — do not `_note`/`_begin` here. Click-without-slop still picks.
 	var left_still_down: bool = (
