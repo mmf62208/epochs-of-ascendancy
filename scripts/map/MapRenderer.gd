@@ -1268,14 +1268,18 @@ func _allow_left_pan_skip_to_die() -> void:
 	# Observe idle button-up so the next physical click is Alicante-class.
 	# Do not clear slop/skip/cam latch here (idle-clear let THIS release pick).
 	# Do not arm on mouse-up motion (1680687 Ille-et-Vilaine).
-	if _left_btn_down:
-		return
+	# Physical up must unstick leftover `_left_btn_down` even when `_end` never
+	# ran (CC dimmer / swallowed release). Otherwise `_begin(true)` early-returns
+	# and Drag1–3 never re-origin (Play 47af97a empty-area no camera move).
+	# Not PR 24 leftover-hold origin seed; not PR 26 idle-stuck `_begin` seed.
 	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		return
+	var stuck_btn_down: bool = _left_btn_down
 	_left_button_was_up = true
-	if _left_release_frame < 0:
-		return
 	if _left_in_leftover_hold():
+		return
+	_left_btn_down = false
+	if _left_release_frame < 0 and not stuck_btn_down:
 		return
 	_rearm_left_drag_for_next_press()
 
@@ -17347,6 +17351,14 @@ func _update_spatial_hover() -> void:
 
 	# Don't show map province tooltips while the cursor is over a UI window/popup.
 	if _is_mouse_over_blocking_ui():
+		if _hover_province != null or (hover_tooltip != null and hover_tooltip.visible):
+			_clear_hover_state()
+		return
+	# Empty-area left-drag: no sea/province glance (Play 47af97a Drag2 MAR North).
+	# Physical hold + committed slop/pan only — idle hover after Esc stays.
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and (
+		_left_live_slop_is_drag() or _left_pan_active or _left_skip_next_pick
+	):
 		if _hover_province != null or (hover_tooltip != null and hover_tooltip.visible):
 			_clear_hover_state()
 		return

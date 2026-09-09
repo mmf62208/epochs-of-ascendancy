@@ -1,14 +1,19 @@
 """Smoke walls: left-drag pans (release skip-pick) + idle Esc → Command Center.
 
 Play short-smoke MIXED (5c8e0f2 / b11cb4e / cf95762 / 51dc2a4 / eed9b5f /
-a16ee8e): sea left-drag picked “Rio Grande Rise” / Drag2 “Labrador Approaches
-West” (`_unhandled_input` spatial `_select_province`, not Area2D / coarse /
-title). Mid-gesture left-down + live slop ≥8px latches `_left_skip_next_pick`
-before `_note` (PR 22 — keep). a16ee8e Drag1–3 empty-area left-drags never
-moved the camera: `_activate` must origin-seed `_last_mouse_pos` from the
-press origin captured *before* `_left_drag_should_pan` / `_note` can reset it.
-Esc dismiss-then-CC and unit-chip Fill%/TOE stay PASS — do not reintroduce
-the PR 16 `_ensure_left_drag_armed_from_physical` /
+a16ee8e / 47af97a): sea left-drag picked “Rio Grande Rise” / Drag2 “Labrador
+Approaches West” / Drag2 “MAR North” (`_unhandled_input` spatial
+`_select_province` or hover glance — not Area2D / coarse / title). Mid-gesture
+left-down + live slop ≥8px latches `_left_skip_next_pick` before `_note`
+(PR 22 — keep). a16ee8e Drag1–3 empty-area left-drags never moved the camera:
+`_activate` must origin-seed `_last_mouse_pos` from the press origin captured
+*before* `_left_drag_should_pan` / `_note` can reset it (PR 23 — keep).
+47af97a Drag1–3 still never moved after Esc-then-CC: idle `_allow` must
+unstick leftover `_left_btn_down` on physical button-up so the next
+`_begin(true)` can genuine-reset origin (CC dimmer / swallowed release never
+`_end`). Not PR 24 leftover-hold origin seed; not PR 26 chip / idle-stuck
+`_begin` seed. Esc dismiss-then-CC and unit-chip Fill%/TOE stay PASS — do
+not reintroduce the PR 16 `_ensure_left_drag_armed_from_physical` /
 `_left_pick_allowed_on_release` stack.
 Pure wiring product — no dual packages.
 """
@@ -55,6 +60,7 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
     prov_fn = _gd_func_slice(ren, "_on_province_input")
     cam_fn = _gd_func_slice(ren, "_handle_camera_input")
     process_fn = _gd_func_slice(ren, "_process")
+    hover_fn = _gd_func_slice(ren, "_update_spatial_hover")
     skip_fn = _gd_func_slice(ren, "_left_release_must_skip_pick")
     pan_fn = _gd_func_slice(ren, "_left_drag_should_pan")
     activate_fn = _gd_func_slice(ren, "_activate_left_drag_pan_from_slop")
@@ -370,6 +376,45 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "_handle_escape_key" not in activate_fn
             and "_try_open_land_unit_at_world" not in activate_fn
             and "_try_open_unit_at_world" not in activate_fn
+        )
+        # 47af97a Drag1–3: leftover `_left_btn_down` blocked `_begin(true)`
+        # origin reset after Esc/CC dimmer (swallowed `_end`). Idle `_allow`
+        # unsticks on physical up after leftover-hold; skip/cam stay.
+        # Hover glance hidden while left is down + slop/pan/skip (MAR North).
+        wiring["empty_drag_unstick_idle_btn_down"] = (
+            bool(allow_fn)
+            and "stuck_btn_down" in allow_fn
+            and "_left_btn_down = false" in allow_fn
+            and "_left_button_was_up = true" in allow_fn
+            and allow_fn.find("is_mouse_button_pressed")
+            < allow_fn.find("stuck_btn_down")
+            and allow_fn.find("_left_in_leftover_hold")
+            < allow_fn.find("_left_btn_down = false")
+            and allow_fn.find("_left_btn_down = false")
+            < allow_fn.find("_rearm_left_drag_for_next_press")
+            and "_left_skip_next_pick = false" not in allow_fn
+            and "_left_cam_moved_this_down = false" not in allow_fn
+            and "_left_gesture_dragged = false" not in allow_fn
+            and "func _seed_left_origin_for_repeat_press" not in ren
+            and "func _seed_left_origin_for_idle_stuck_press" not in ren
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+            and "_try_open_land_chip_from_input" not in allow_fn
+            and "_handle_escape_key" not in allow_fn
+            and "_try_open_land_unit_at_world" not in allow_fn
+            and bool(hover_fn)
+            and "_left_live_slop_is_drag" in hover_fn
+            and "_left_pan_active" in hover_fn
+            and "_left_skip_next_pick" in hover_fn
+            and "is_mouse_button_pressed" in hover_fn
+            and hover_fn.find("is_mouse_button_pressed")
+            < hover_fn.rfind("_clear_hover_state")
+            and hover_fn.find("_is_mouse_over_blocking_ui")
+            < hover_fn.find("is_mouse_button_pressed")
+            and "_try_open_land_unit_at_world" not in hover_fn
+            and "_handle_escape_key" not in hover_fn
+            and "func _handle_escape_key" in ren
+            and "func _try_open_land_unit_at_world" in ren
         )
 
         for k, v in wiring.items():
