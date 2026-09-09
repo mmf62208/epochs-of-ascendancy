@@ -234,6 +234,8 @@ var _close_camera_lock_pos := Vector2.ZERO
 var _close_camera_lock_zoom := Vector2.ONE
 var _close_click_guard := false
 var _close_release_seen := false
+## One Esc press = one stack step (TopInfoBar + MapRenderer `_input` / `_unhandled_input`).
+var _esc_stack_frame: int = -1
 ## Close button sits in the north edge-pan strip — suppress edge until the mouse leaves that click.
 var _close_suppress_edge := false
 var _close_click_screen := Vector2.ZERO
@@ -1560,7 +1562,15 @@ func _gui_text_field_has_focus() -> bool:
 
 ## Esc stack: inspector / unit card / selection / visible overlays first.
 ## Idle / clean map → TopInfoBar._on_menu_pressed (Command Center toggle).
+## One key = one step: do not dismiss settle/inspector and open CC on the same press.
 func _handle_escape_key() -> void:
+	# Re-entrant `_input` (TopInfoBar + MapRenderer + `_unhandled_input`) must not
+	# dismiss-then-open or open-then-toggle-close on the same Esc (Play ff63a46:
+	# settle dismissed, Command Center did not stay open).
+	var frame_now: int = Engine.get_process_frames()
+	if _esc_stack_frame == frame_now:
+		return
+	_esc_stack_frame = frame_now
 	if _inspector_stack_blocking_input():
 		_dismiss_inspector_and_restore_input()
 		# Esc is not a held Close button — next empty-area left-drag may unlock.
@@ -1581,9 +1591,32 @@ func _esc_open_command_center() -> void:
 	var vp_esc: Viewport = get_viewport()
 	if vp_esc != null:
 		vp_esc.gui_release_focus()
+	# Hidden exclusive FileDialog leftover must not eat this idle Esc.
+	var tree_esc: SceneTree = get_tree()
+	if tree_esc != null and tree_esc.root != null:
+		var fds_esc: Array = tree_esc.root.find_children("*", "FileDialog", true, false)
+		for fd_any_esc in fds_esc:
+			if fd_any_esc is FileDialog and is_instance_valid(fd_any_esc):
+				var fd_esc: FileDialog = fd_any_esc
+				fd_esc.exclusive = false
+				if _overlay_node_is_up(fd_esc):
+					fd_esc.hide()
+		# Leftover closing/hidden MainMenu must not toggle-close instead of open.
+		# Do not queue_free MainMenu — rename so `_on_menu_pressed` can instance.
+		var leftover_mm: Node = tree_esc.root.get_node_or_null("MainMenu")
+		if leftover_mm != null:
+			var leftover_closing: bool = bool(leftover_mm.get("_closing"))
+			var leftover_up: bool = (
+				_overlay_node_is_up(leftover_mm)
+				and not leftover_mm.is_queued_for_deletion()
+				and not leftover_closing
+			)
+			if not leftover_up:
+				leftover_mm.name = "MainMenuLeftover"
 	var tib := TopInfoBar.find_in_tree(get_tree())
 	if tib != null and tib.has_method("_on_menu_pressed"):
-		tib.call("_on_menu_pressed")
+		# Deferred so the opening Esc cannot `_force_close` the new overlay.
+		tib.call_deferred("_on_menu_pressed")
 
 
 func _input(event: InputEvent) -> void:
@@ -19487,6 +19520,7 @@ func _ensure_settle_button() -> void:
 		return
 	_btn_settle = Button.new()
 	_btn_settle.name = "BtnSettleProvince"
+	_btn_settle.focus_mode = Control.FOCUS_NONE
 	_btn_settle.text = ""
 	_btn_settle.visible = false
 	_btn_settle.tooltip_text = (
@@ -21152,12 +21186,25 @@ func _dismiss_map_overlays_esc() -> bool:
 			(info_panel as CanvasItem).visible = false
 		dismissed = true
 		_show_map_layer_toast("Inspector closed (Esc)")
+	# FileDialog / exclusive leftover: hide + drop exclusive so the next idle Esc
+	# reaches MapRenderer `_input` (Play: settle dismissed, next Esc never opened CC).
+	if tree:
+		var fds: Array = tree.root.find_children("*", "FileDialog", true, false)
+		for fd_any in fds:
+			if not (fd_any is FileDialog) or not is_instance_valid(fd_any):
+				continue
+			var fd: FileDialog = fd_any
+			if _overlay_node_is_up(fd):
+				fd.hide()
+				dismissed = true
+			fd.exclusive = false
 	if dismissed:
 		_release_search_focus()
 		var vp_d: Viewport = get_viewport()
 		if vp_d != null:
 			vp_d.gui_release_focus()
 	# Idle Esc opens Command Center via `_handle_escape_key` → `_on_menu_pressed`.
+	# Never queue_free MainMenu here — leftover must not sticky-block the open path.
 	return dismissed
 
 

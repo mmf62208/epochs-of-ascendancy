@@ -131,6 +131,7 @@ class TestFirstSessionHotkeysProduct(unittest.TestCase):
             "early_live_slop_skip_latch",
             "drag1_activate_origin_seed",
             "esc_idle_opens_command_center",
+            "esc_dismiss_then_idle_cc",
         ):
             self.assertTrue(p.get("wiring", {}).get(key), msg=(key, p.get("wiring"), p.get("fail")))
 

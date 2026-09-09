@@ -31,6 +31,7 @@ class TestSmokePanEscProduct(unittest.TestCase):
             "empty_area_process_armed_to_camera",
             "esc_chain_in_input",
             "esc_idle_calls_menu",
+            "esc_dismiss_then_idle_cc",
             "dismiss_no_mainmenu_leftover",
             "topbar_uses_esc_chain",
             "drag_skip_pick_live_slop",

@@ -1591,7 +1591,24 @@ func _on_import_portrait_pressed(agent_id: String) -> void:
 		_portrait_file_dialog.exclusive = true
 		add_child(_portrait_file_dialog)
 		_portrait_file_dialog.file_selected.connect(_on_portrait_file_selected)
+		_portrait_file_dialog.canceled.connect(_on_portrait_file_dialog_released)
+		_portrait_file_dialog.visibility_changed.connect(_on_portrait_file_dialog_visibility)
 	_portrait_file_dialog.popup_centered_ratio(0.55)
+
+
+func _on_portrait_file_dialog_visibility() -> void:
+	if _portrait_file_dialog != null and is_instance_valid(_portrait_file_dialog) and not _portrait_file_dialog.visible:
+		_on_portrait_file_dialog_released()
+
+
+func _on_portrait_file_dialog_released() -> void:
+	# Esc / cancel must drop exclusive grab so the next idle Esc can open CC.
+	if _portrait_file_dialog != null and is_instance_valid(_portrait_file_dialog):
+		_portrait_file_dialog.exclusive = false
+		_portrait_file_dialog.visible = false
+	var vp_fd: Viewport = get_viewport()
+	if vp_fd != null:
+		vp_fd.gui_release_focus()
 
 
 func _on_portrait_file_selected(src_path: String) -> void:

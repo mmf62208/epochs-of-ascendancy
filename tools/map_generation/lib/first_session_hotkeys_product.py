@@ -18,6 +18,7 @@ MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 MAP_MANAGER = ROOT / "scripts" / "map" / "MapManager.gd"
 TOP_INFO = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
 MAIN_MENU = ROOT / "scripts" / "ui" / "MainMenu.gd"
+AGENT_SCREEN = ROOT / "scripts" / "ui" / "AgentAssignmentScreen.gd"
 TEST_RUNNER = ROOT / "scripts" / "core" / "TestRunner.gd"
 SEARCH_GD = ROOT / "scripts" / "ui" / "map" / "MapProvinceSearch.gd"
 TOOLBAR_GD = ROOT / "scripts" / "ui" / "map" / "MapModeToolbar.gd"
@@ -798,6 +799,37 @@ def build_first_session_hotkeys_product(
             and '"MainMenu"' not in dismiss_esc_fn
             and "_overlay_node_is_up" in dismiss_esc_fn
             and "_overlay_node_is_up" in stack_fn
+        )
+        settle_btn_fn = _slice_func(ren, "_ensure_settle_button")
+        agent_src = AGENT_SCREEN.read_text(encoding="utf-8") if AGENT_SCREEN.is_file() else ""
+        agent_import_fn = _slice_func(agent_src, "_on_import_portrait_pressed")
+        agent_rel_fn = _slice_func(agent_src, "_on_portrait_file_dialog_released")
+        # Play ff63a46: 1st Esc closes settle/inspector; idle Esc opens CC.
+        # Same-press re-entry must not open CC while settle is still being dismissed,
+        # and leftover FileDialog exclusive / hidden MainMenu must not eat the next Esc.
+        wiring["esc_dismiss_then_idle_cc"] = (
+            bool(esc_fn)
+            and "_esc_stack_frame" in esc_fn
+            and "get_process_frames" in esc_fn
+            and esc_fn.find("_esc_stack_frame") < esc_fn.find("_inspector_stack_blocking_input")
+            and esc_fn.find("_inspector_stack_blocking_input")
+            < esc_fn.find("_dismiss_map_overlays_esc")
+            and esc_fn.find("if _dismiss_map_overlays_esc()")
+            < esc_fn.find("_esc_open_command_center")
+            and "return" in esc_fn[esc_fn.find("_dismiss_inspector_and_restore_input") : esc_fn.find("_esc_open_command_center")]
+            and "return" in esc_fn[esc_fn.find("if _dismiss_map_overlays_esc()") : esc_fn.find("_esc_open_command_center")]
+            and 'call_deferred("_on_menu_pressed")' in open_cc_fn
+            and "MainMenuLeftover" in open_cc_fn
+            and "not leftover_up" in open_cc_fn
+            and "queue_free(" not in open_cc_fn
+            and "FileDialog" in dismiss_esc_fn
+            and "exclusive = false" in dismiss_esc_fn
+            and '"MainMenu"' not in dismiss_esc_fn
+            and "queue_free(" not in dismiss_esc_fn.split("FileDialog")[-1]
+            and "FOCUS_NONE" in settle_btn_fn
+            and "canceled.connect" in agent_import_fn
+            and "func _on_portrait_file_dialog_released" in agent_src
+            and "exclusive = false" in agent_rel_fn
         )
 
         for k, v in wiring.items():
