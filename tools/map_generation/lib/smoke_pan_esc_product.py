@@ -1,15 +1,18 @@
 """Smoke walls: left-drag pans (release skip-pick) + idle Esc → Command Center.
 
 Play short-smoke MIXED (5c8e0f2 / b11cb4e / cf95762 / 51dc2a4 / eed9b5f /
-a16ee8e): sea left-drag picked “Rio Grande Rise” / Drag2 “Labrador Approaches
-West” (`_unhandled_input` spatial `_select_province`, not Area2D / coarse /
-title). Mid-gesture left-down + live slop ≥8px latches `_left_skip_next_pick`
-before `_note` (PR 22 — keep). a16ee8e Drag1–3 empty-area left-drags never
-moved the camera: `_activate` must origin-seed `_last_mouse_pos` from the
-press origin captured *before* `_left_drag_should_pan` / `_note` can reset it.
-Esc dismiss-then-CC and unit-chip Fill%/TOE stay PASS — do not reintroduce
-the PR 16 `_ensure_left_drag_armed_from_physical` /
-`_left_pick_allowed_on_release` stack.
+a16ee8e / de178e7): sea left-drag picked “Rio Grande Rise” / Drag2 “Labrador
+Approaches West” (`_unhandled_input` spatial `_select_province`, not Area2D /
+coarse / title). Mid-gesture left-down + live slop ≥8px latches
+`_left_skip_next_pick` before `_note` (PR 22 — keep). a16ee8e Drag1–3 never
+moved the camera: `_activate` origin-seeds `_last_mouse_pos` from the press
+origin captured *before* `_left_drag_should_pan` / `_note` can reset it
+(PR 23 Drag1 — keep). de178e7 Drag2+3 leftover empty-area left-drags did not
+move the camera (North Atlantic Deep): `_begin` must seed a fresh origin on a
+physical 2nd–3rd press without clearing skip/cam latch. Esc dismiss-then-CC
+and unit-chip Fill%/TOE stay PASS — do not reintroduce the PR 16
+`_ensure_left_drag_armed_from_physical` / `_left_pick_allowed_on_release`
+stack.
 Pure wiring product — no dual packages.
 """
 from __future__ import annotations
@@ -60,6 +63,7 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
     activate_fn = _gd_func_slice(ren, "_activate_left_drag_pan_from_slop")
     unlock_drag_fn = _gd_func_slice(ren, "_unlock_close_camera_for_left_drag_pan")
     begin_fn = _gd_func_slice(ren, "_begin_left_map_gesture")
+    repeat_seed_fn = _gd_func_slice(ren, "_seed_left_origin_for_repeat_press")
     allow_fn = _gd_func_slice(ren, "_allow_left_pan_skip_to_die")
     rearm_fn = _gd_func_slice(ren, "_rearm_left_drag_for_next_press")
     live_fn = _gd_func_slice(ren, "_left_live_slop_is_drag")
@@ -347,6 +351,51 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "_handle_escape_key" not in activate_fn
             and "_try_open_land_unit_at_world" not in activate_fn
             and "_try_open_unit_at_world" not in activate_fn
+        )
+        # de178e7 Drag2+3: leftover skip/cam blocked fresh origin so 2nd/3rd
+        # empty-area presses never slop-pan (North Atlantic Deep). Seed origin
+        # on a physical new press; keep skip latch. Do not rewrite rearm/allow
+        # / Esc / chip / PR 16.
+        wiring["drag2_3_repeat_origin_seed"] = (
+            bool(repeat_seed_fn)
+            and "_left_origin_screen = mouse" in repeat_seed_fn
+            and "_left_press_screen = mouse" in repeat_seed_fn
+            and "_last_mouse_pos = mouse" in repeat_seed_fn
+            and "_left_max_slop_sq = 0.0" in repeat_seed_fn
+            and "_left_button_was_up = false" in repeat_seed_fn
+            and "_left_skip_next_pick = false" not in repeat_seed_fn
+            and "_left_cam_moved_this_down = false" not in repeat_seed_fn
+            and "_left_gesture_dragged = false" not in repeat_seed_fn
+            and "_left_pan_committed = false" not in repeat_seed_fn
+            and "_rearm_left_drag_for_next_press" not in repeat_seed_fn
+            and "_allow_left_pan_skip_to_die" not in repeat_seed_fn
+            and "_handle_escape_key" not in repeat_seed_fn
+            and "_try_open_land_unit_at_world" not in repeat_seed_fn
+            and "_try_open_unit_at_world" not in repeat_seed_fn
+            and "_ensure_left_drag_armed_from_physical" not in repeat_seed_fn
+            and "_left_pick_allowed_on_release" not in repeat_seed_fn
+            and "_seed_left_origin_for_repeat_press" in begin_fn
+            and begin_fn.find("if _left_btn_down:")
+            < begin_fn.find("_seed_left_origin_for_repeat_press")
+            and begin_fn.find("keep_this_drag")
+            < begin_fn.rfind("_seed_left_origin_for_repeat_press")
+            and begin_fn.find("genuine_new_press")
+            < begin_fn.find("not _left_in_leftover_hold()")
+            and "_left_skip_next_pick = false" in begin_fn
+            and begin_fn.rfind("_seed_left_origin_for_repeat_press")
+            < begin_fn.find("_left_skip_next_pick = false")
+            and bool(rearm_fn)
+            and "_left_skip_next_pick = false" not in rearm_fn
+            and "_left_cam_moved_this_down = false" not in rearm_fn
+            and "seed_origin" in activate_fn
+            and activate_fn.find("seed_origin")
+            < activate_fn.find("if not _left_drag_should_pan()")
+            and "_rearm_left_drag_for_next_press" not in activate_fn
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+            and "func _handle_escape_key" in ren
+            and "func _try_open_land_unit_at_world" in ren
+            and "func _try_open_unit_at_world" in ren
         )
 
         for k, v in wiring.items():
