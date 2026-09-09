@@ -132,6 +132,7 @@ class TestFirstSessionHotkeysProduct(unittest.TestCase):
             "drag1_activate_origin_seed",
             "empty_drag_unstick_idle_btn_down",
             "drag2_idle_up_origin_reseed",
+            "drag2_sea_release_skip_pick",
             "esc_idle_opens_command_center",
             "esc_dismiss_then_idle_cc",
         ):
