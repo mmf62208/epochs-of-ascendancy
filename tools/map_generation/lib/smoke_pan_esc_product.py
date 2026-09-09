@@ -348,6 +348,35 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "_try_open_land_unit_at_world" not in activate_fn
             and "_try_open_unit_at_world" not in activate_fn
         )
+        # Drag2+3: idle-stuck `_left_btn_down` seeds a fresh origin after
+        # leftover-hold expires. Not PR 24 leftover-hold / keep_this_drag seed
+        # (that broke Drag1). Activate origin-seed + PR 22 latch kept.
+        seed_fn = _gd_func_slice(ren, "_seed_left_origin_for_idle_stuck_press")
+        wiring["drag23_idle_stuck_origin_seed"] = (
+            bool(seed_fn)
+            and "_left_origin_screen = mouse" in seed_fn
+            and "_last_mouse_pos = mouse" in seed_fn
+            and "_left_skip_next_pick = false" not in seed_fn
+            and "_left_cam_moved_this_down = false" not in seed_fn
+            and "_left_gesture_dragged = false" not in seed_fn
+            and "func _seed_left_origin_for_repeat_press" not in ren
+            and "_seed_left_origin_for_repeat_press" not in begin_fn
+            and "_seed_left_origin_for_idle_stuck_press" in begin_fn
+            and begin_fn.find("if _left_btn_down")
+            < begin_fn.find("_seed_left_origin_for_idle_stuck_press")
+            and begin_fn.find("if _left_in_leftover_hold()")
+            < begin_fn.find("_seed_left_origin_for_idle_stuck_press")
+            and begin_fn.find("_left_button_was_up")
+            < begin_fn.find("_seed_left_origin_for_idle_stuck_press")
+            and begin_fn.count("_seed_left_origin_for_idle_stuck_press") == 1
+            and "_seed_left_origin_for_idle_stuck_press" not in activate_fn
+            and "_left_pan_armed = true" not in seed_fn
+            and "_ensure_left_drag_armed_from_physical" not in seed_fn
+            and "_left_pick_allowed_on_release" not in seed_fn
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+            and "func _handle_escape_key" in ren
+        )
 
         for k, v in wiring.items():
             if v:

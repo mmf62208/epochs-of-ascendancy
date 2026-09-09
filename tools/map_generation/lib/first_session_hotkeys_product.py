@@ -545,6 +545,21 @@ def build_first_session_hotkeys_product(
             and "_rearm_left_drag_for_next_press" not in activate_fn_hot
             and "_latch_left_skip_pick_from_live_slop" not in activate_fn_hot
         )
+        # Drag2+3 idle-stuck origin seed — not PR 24 leftover-hold seed.
+        seed_fn_hot = _slice_func(ren, "_seed_left_origin_for_idle_stuck_press")
+        wiring["drag23_idle_stuck_origin_seed"] = (
+            bool(seed_fn_hot)
+            and "_last_mouse_pos = mouse" in seed_fn_hot
+            and "_left_skip_next_pick = false" not in seed_fn_hot
+            and "func _seed_left_origin_for_repeat_press" not in ren
+            and "_seed_left_origin_for_idle_stuck_press" in begin_fn
+            and begin_fn.find("if _left_in_leftover_hold()")
+            < begin_fn.find("_seed_left_origin_for_idle_stuck_press")
+            and begin_fn.count("_seed_left_origin_for_idle_stuck_press") == 1
+            and "_seed_left_origin_for_idle_stuck_press" not in activate_fn_hot
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+        )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")
         process_fn = _slice_func(ren, "_process")
