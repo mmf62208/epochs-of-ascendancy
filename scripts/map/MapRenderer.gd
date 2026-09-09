@@ -1148,13 +1148,34 @@ func _note_sticky_slop() -> void:
 		_mark_left_pan_blocked_pick()
 
 
+func _seed_left_origin_for_repeat_press(mouse: Vector2) -> void:
+	# de178e7 Drag2+3: leftover skip/cam blocked a fresh origin so 2nd/3rd
+	# empty-area presses never slop-pan (North Atlantic Deep). Seed THIS press
+	# for `_activate` origin-seed; do not clear skip/cam/dragged latch.
+	_left_gesture_origin = mouse
+	_left_origin_screen = mouse
+	_left_origin_valid = true
+	_left_press_screen = mouse
+	_left_max_slop_sq = 0.0
+	_left_sticky_origin = mouse
+	_left_sticky_valid = true
+	_left_sticky_slop_sq = 0.0
+	_last_mouse_pos = mouse
+	_left_button_was_up = false
+
+
 func _begin_left_map_gesture(new_press: bool = false) -> void:
 	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
-	if _left_btn_down:
-		return
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
 	var physically_down: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	if _left_btn_down:
+		# Leftover pressed=true can leave `_left_btn_down` stuck while
+		# `_left_button_was_up` is still true. A physical new press must take
+		# a fresh origin so Drag2+3 pan; keep skip latch.
+		if new_press and physically_down and _left_button_was_up:
+			_seed_left_origin_for_repeat_press(mouse)
+		return
 	_note_sticky_slop()
 	# Leftover pressed=true / leftover hold / leftover Input-down: keep THIS drag.
 	# c4c44b8: Atlantic water in the left edge strip slid the camera onto Iberia
@@ -1175,6 +1196,8 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 	if not genuine_new_press:
 		if keep_this_drag and (leftover or not new_press):
 			_left_btn_down = true
+			if new_press and physically_down:
+				_seed_left_origin_for_repeat_press(mouse)
 			return
 		if new_press and not physically_down:
 			_left_btn_down = true
@@ -1182,6 +1205,8 @@ func _begin_left_map_gesture(new_press: bool = false) -> void:
 		if new_press and (_left_gesture_dragged or _left_slop_is_drag() or _left_skip_next_pick):
 			if leftover or not _left_ready_for_still_click:
 				_left_btn_down = true
+				if physically_down:
+					_seed_left_origin_for_repeat_press(mouse)
 				return
 	_left_btn_down = true
 	_left_gesture_dragged = false
@@ -1433,7 +1458,8 @@ func _activate_left_drag_pan_from_slop() -> bool:
 		return true
 	# Drag1 origin-seed only: capture press origin *before* `_left_drag_should_pan`
 	# / `_note` can `_begin`-reset it to the current mouse (that zeroes the first
-	# camera apply). Keep PR 22 skip latch; no PR 16 arm helper; do not rearm.
+	# camera apply). Drag2+3 leftover presses seed origin in `_begin` without
+	# clearing skip. Keep PR 22 latch; no PR 16 arm helper; do not rearm.
 	var seed_origin: Vector2 = Vector2.ZERO
 	var have_seed_origin: bool = false
 	if _left_origin_valid:
