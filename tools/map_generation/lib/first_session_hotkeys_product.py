@@ -546,6 +546,27 @@ def build_first_session_hotkeys_product(
             and "_rearm_left_drag_for_next_press" not in activate_fn_hot
             and "_latch_left_skip_pick_from_live_slop" not in activate_fn_hot
         )
+        # 47af97a Drag1–3: idle `_allow` unsticks leftover `_left_btn_down`
+        # after physical up (CC dimmer never `_end`). Not PR 24/26/16.
+        allow_fn_hot = _slice_func(ren, "_allow_left_pan_skip_to_die")
+        hover_fn_hot = _slice_func(ren, "_update_spatial_hover")
+        wiring["empty_drag_unstick_idle_btn_down"] = (
+            bool(allow_fn_hot)
+            and "stuck_btn_down" in allow_fn_hot
+            and "_left_btn_down = false" in allow_fn_hot
+            and allow_fn_hot.find("_left_in_leftover_hold")
+            < allow_fn_hot.find("_left_btn_down = false")
+            and allow_fn_hot.find("_left_btn_down = false")
+            < allow_fn_hot.find("_rearm_left_drag_for_next_press")
+            and "_left_skip_next_pick = false" not in allow_fn_hot
+            and "func _seed_left_origin_for_repeat_press" not in ren
+            and "func _seed_left_origin_for_idle_stuck_press" not in ren
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+            and bool(hover_fn_hot)
+            and "_left_live_slop_is_drag" in hover_fn_hot
+            and "is_mouse_button_pressed" in hover_fn_hot
+        )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")
         process_fn = _slice_func(ren, "_process")

@@ -9,6 +9,8 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
+> **2026-09-09 smoke empty-area pan residual (Drag1–3):** Play 47af97a MIXED — Esc dismiss-then-idle CC HARD PASS (untouched). Empty-area left-drag Drag1–3 never moved the camera; Drag2 opened MAR North sea glance. Idle `_allow_left_pan_skip_to_die` now unsticks leftover `_left_btn_down` on physical button-up after leftover-hold (CC dimmer / swallowed `_end`) so the next `_begin(true)` can genuine-reset origin. Hover glance hidden while left is down + slop/pan/skip. Not PR 24 leftover-hold seed, not PR 26 chip/`_begin` seed, not PR 16. Esc helpers + chip openers byte-untouched. HOLD merge.
+>
 > **2026-09-09 smoke Esc dismiss-then-CC restore:** Play ff63a46 Esc HARD FAIL — settle/inspector dismissed, Command Center did not open. Esc helpers only: same-press `_esc_stack_frame` (no one-key dismiss+open), idle `_esc_open_command_center` `call_deferred("_on_menu_pressed")`, leftover FileDialog exclusive + hidden MainMenu rename (never `queue_free` MainMenu). Pan/chip/PR26 untouched. HOLD merge.
 >
 > **2026-09-09 smoke careful activate origin-seed:** Play a16ee8e Drag1–3 empty-area left-drags never moved the camera (PR 22 skip-pick latch held — no sea pick). Narrow `_activate_left_drag_pan_from_slop` only: capture press origin *before* `_left_drag_should_pan` / `_note` can `_begin`-reset it, then seed `_last_mouse_pos` so the first camera apply has a non-zero delta. PR 22 latch / rearm / allow / Esc / chip / PR 16 untouched. HOLD merge.
