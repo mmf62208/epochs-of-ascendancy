@@ -127,9 +127,20 @@ static func _is_visible_blocking_node(n: Node) -> bool:
 		return false
 	# Command Center is a CanvasLayer (NOT CanvasItem) — must treat by name before the CanvasItem guard.
 	# Without this, WASD/edge/drag still pan under MainMenu (user playtest 2026-08-07).
+	# Closing / queued leftover must not freeze empty-area left-drag (Fri CC smoke
+	# Drag1–3 no camera move after Esc→CC dismiss). Open CC still blocks.
 	if nn == "MainMenu" or nn == "MainMenuPopup":
+		if n.is_queued_for_deletion():
+			return false
+		if bool(n.get("_closing")):
+			return false
 		if n is CanvasLayer:
-			return true
+			for ch_layer in n.get_children():
+				if ch_layer is CanvasItem and (ch_layer as CanvasItem).visible:
+					return true
+				if ch_layer is CanvasLayer:
+					return true
+			return false
 		if n is CanvasItem and (n as CanvasItem).visible:
 			return true
 		# Visible if any CanvasItem child is up (Root panel under layer).
@@ -138,7 +149,7 @@ static func _is_visible_blocking_node(n: Node) -> bool:
 				return true
 			if ch is CanvasLayer:
 				return true
-		return true  # named MainMenu on root = open command center
+		return false
 	# Only CanvasItem / Window nodes have .visible. Guard explicitly with separate statements so no expression can ever read .visible on a plain Node.
 	if not (n is CanvasItem or n is Window):
 		# CanvasLayer screens (other than MainMenu handled above)

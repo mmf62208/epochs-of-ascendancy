@@ -42,6 +42,7 @@ class TestSmokePanEscProduct(unittest.TestCase):
             "drag1_activate_origin_seed",
             "empty_drag_unstick_idle_btn_down",
             "drag2_idle_up_origin_reseed",
+            "empty_drag_idle_up_begin_unstick",
         ):
             self.assertTrue(w.get(key), msg=(key, w, p.get("fail")))
 

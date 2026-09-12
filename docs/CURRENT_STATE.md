@@ -9,6 +9,8 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
+> **2026-09-12 smoke empty-area Drag1–3 pan residual (idle-up unstick):** Play 650c85c-cc MIXED — Esc dismiss-then-Command Center HARD PASS (untouched). Chip Fill%/TOE soft visual out of scope. Drag1–3 empty-area left-drags no camera move after Esc→CC: leftover stuck `_left_btn_down` first-line-blocked `_begin(true)`; leftover hold now unsticks btn-down without `_rearm`; `_input` reseeds on idle-up `event.pressed` (Input singleton can stay stale after CC dimmer). Closing/queued MainMenu no longer `modal_blocks_map_nav`. Not PR 16/19/24/26/31. Esc helpers byte-untouched. HOLD merge.
+>
 > **2026-09-09 smoke Drag2+3 pan residual (idle-up origin reseed):** Play 1f48f56 MIXED — Esc dismiss-then-idle CC HARD PASS (untouched). Drag1 empty-area pan move OK (no sea/MAR; land Cantabria). Drag2+3 no camera move: leftover hold blocks `genuine_new_press` so `_begin(true)` keeps Drag1 origin. `_input` now reseeds origin/`_last_mouse_pos` after idle button-up only (not mid-Drag1, not `_begin` ungated PR 24 seed, not PR 26 chip). Skip/cam/dragged stay. Chip Fill%/TOE out of scope. HOLD merge.
 >
 > **2026-09-09 smoke empty-area pan residual (Drag1–3):** Play 47af97a MIXED — Esc dismiss-then-idle CC HARD PASS (untouched). Empty-area left-drag Drag1–3 never moved the camera; Drag2 opened MAR North sea glance. Idle `_allow_left_pan_skip_to_die` now unsticks leftover `_left_btn_down` on physical button-up after leftover-hold (CC dimmer / swallowed `_end`) so the next `_begin(true)` can genuine-reset origin. Hover glance hidden while left is down + slop/pan/skip. Not PR 24 leftover-hold seed, not PR 26 chip/`_begin` seed, not PR 16. Esc helpers + chip openers byte-untouched. HOLD merge.

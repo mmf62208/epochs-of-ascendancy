@@ -14,7 +14,12 @@ unstick leftover `_left_btn_down` on physical button-up so the next
 `_end`). 1f48f56 Drag1 move OK / Drag2+3 no camera move: leftover hold
 blocks `genuine_new_press`, so `_input` reseeds origin after idle button-up
 without clearing skip/cam (not PR 24 ungated `_begin` seed; not PR 26
-chip / idle-stuck `_begin` seed). Esc dismiss-then-CC and unit-chip
+chip / idle-stuck `_begin` seed). 650c85c-cc MIXED: Drag1–3 no camera
+move after Esc→CC — leftover stuck `_left_btn_down` first-line-blocked
+`_begin(true)`; idle `_allow` now unsticks btn-down during leftover hold
+(no `_rearm`); `_input` reseeds on idle-up `event.pressed` (Input
+singleton can stay stale after CC dimmer). Closing MainMenu must not
+`modal_blocks_map_nav`. Esc dismiss-then-CC and unit-chip
 Fill%/TOE stay PASS — do not reintroduce the PR 16
 `_ensure_left_drag_armed_from_physical` / `_left_pick_allowed_on_release`
 stack.
@@ -27,6 +32,7 @@ from typing import Any, Dict, List
 
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
+MAP_VIEW = ROOT / "scripts" / "map" / "MapViewInput.gd"
 TOP_INFO = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
 
 
@@ -50,9 +56,12 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
     wiring: Dict[str, bool] = {}
 
     ren = MAP_RENDERER.read_text(encoding="utf-8") if MAP_RENDERER.is_file() else ""
+    view = MAP_VIEW.read_text(encoding="utf-8") if MAP_VIEW.is_file() else ""
     top = TOP_INFO.read_text(encoding="utf-8") if TOP_INFO.is_file() else ""
     if not ren:
         fails.append("missing_map_renderer")
+    if not view:
+        fails.append("missing_map_view_input")
     if not top:
         fails.append("missing_top_info_bar")
 
@@ -465,6 +474,53 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "func _left_pick_allowed_on_release" not in ren
             and "func _handle_escape_key" in ren
             and "func _try_open_land_unit_at_world" in ren
+        )
+        # 650c85c-cc: leftover stuck `_left_btn_down` first-line-blocked
+        # `_begin(true)` after Esc→CC / swallowed `_end`. Idle-up new press
+        # must fall through; leftover hold unsticks btn-down without `_rearm`;
+        # `_input` reseeds on idle-up without Input-singleton gate.
+        # Closing MainMenu must not freeze camera apply.
+        view_block_fn = _gd_func_slice(view, "_is_visible_blocking_node")
+        begin_stuck_i = begin_fn.find("if _left_btn_down")
+        begin_idle_i = begin_fn.find("new_press and _left_button_was_up")
+        leftover_hold_i = allow_fn.find("if _left_in_leftover_hold()")
+        leftover_unstick_i = (
+            allow_fn.find("_left_btn_down = false", leftover_hold_i)
+            if leftover_hold_i >= 0
+            else -1
+        )
+        leftover_rearm_i = allow_fn.find("_rearm_left_drag_for_next_press")
+        reseed_block = ""
+        if reseed_call_i >= 0:
+            reseed_block = input_fn[max(0, idle_up_i) : reseed_call_i + 80]
+        wiring["empty_drag_idle_up_begin_unstick"] = (
+            bool(begin_fn)
+            and 0 <= begin_stuck_i < begin_idle_i
+            and "new_press and _left_button_was_up" in begin_fn
+            and leftover_hold_i >= 0
+            and leftover_hold_i < leftover_unstick_i < leftover_rearm_i
+            and "_left_btn_down = false" in allow_fn[leftover_hold_i:leftover_rearm_i]
+            and allow_fn.find("_rearm_left_drag_for_next_press", leftover_hold_i)
+            > leftover_unstick_i
+            and "idle_up_for_repeat" in input_fn
+            and "_reseed_left_origin_from_idle_up" in input_fn
+            and "is_mouse_button_pressed" not in reseed_block
+            and "_reseed_left_origin_from_idle_up" not in begin_fn
+            and "_reseed_left_origin_from_idle_up" not in activate_fn
+            and "func _seed_left_origin_for_repeat_press" not in ren
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+            and bool(view_block_fn)
+            and '"MainMenu"' in view_block_fn
+            and "_closing" in view_block_fn
+            and "is_queued_for_deletion" in view_block_fn
+            and view_block_fn.find("is_queued_for_deletion")
+            < view_block_fn.find("return true")
+            and view_block_fn.find("_closing")
+            < view_block_fn.find("return true")
+            and "_handle_escape_key" not in begin_fn
+            and "_try_open_land_unit_at_world" not in begin_fn
+            and "func _handle_escape_key" in ren
         )
 
         for k, v in wiring.items():
