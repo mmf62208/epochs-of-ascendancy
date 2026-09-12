@@ -1494,26 +1494,8 @@ func _activate_left_drag_pan_from_slop() -> bool:
 			if vp_seed != null:
 				_left_origin_screen = vp_seed.get_mouse_position()
 				_left_origin_valid = true
-	# e611e7a first Drag2 clamp: leftover `_left_gesture_dragged` makes
-	# `_left_drag_exceeded_slop` true immediately. If idle-up reseed was
-	# consumed by leftover pressed=true, seed_origin is still Drag1 and
-	# the first apply jumps then `_apply_camera_bounds` clamps (no move).
-	# Keep PR 23 near-origin seed (THIS slop ~8px). Far leftover origin
-	# uses current mouse so the camera follows THIS drag. Not PR 24.
-	var vp_act: Viewport = get_viewport()
-	var mouse_act: Vector2 = vp_act.get_mouse_position() if vp_act != null else seed_origin
-	var stale_seed_lim: float = (LEFT_PAN_SLOP_PX * 8.0) * (LEFT_PAN_SLOP_PX * 8.0)
-	var leftover_committed: bool = (
-		_left_gesture_dragged or _left_pan_committed or _left_cam_moved_this_down
-	)
-	var seed_far: bool = (
-		have_seed_origin and mouse_act.distance_squared_to(seed_origin) > stale_seed_lim
-	)
 	if have_seed_origin:
-		if seed_far and leftover_committed:
-			_last_mouse_pos = mouse_act
-		else:
-			_last_mouse_pos = seed_origin
+		_last_mouse_pos = seed_origin
 	elif _left_origin_valid:
 		_last_mouse_pos = _left_origin_screen
 	elif _left_sticky_valid:
@@ -1799,15 +1781,12 @@ func _input(event: InputEvent) -> void:
 				var idle_up_for_repeat: bool = _left_button_was_up
 				_begin_left_map_gesture(true)
 				# Drag2+3 leftover hold: `_begin(true)` keeps Drag1 origin.
-				# Reseed THIS press after idle button-up (not mid-Drag1).
-				# Leftover pressed=true after Drag1 can consume `_left_button_was_up`
-				# (Play e611e7a first Drag2 clamp): still reseed while leftover
-				# hold is active so the 2nd empty-area press is THIS origin.
+				# Reseed THIS press only after idle button-up (not mid-Drag1).
 				# `event.pressed` is THIS new left-down. Do not also require the
 				# Input singleton — a swallowed `_end` / CC dimmer can leave
 				# the singleton stale so Drag1–3 never reseed.
 				if (
-					(idle_up_for_repeat or _left_in_leftover_hold())
+					idle_up_for_repeat
 					and not event.ctrl_pressed
 					and not event.shift_pressed
 				):
