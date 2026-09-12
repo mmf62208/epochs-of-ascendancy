@@ -629,6 +629,29 @@ def build_first_session_hotkeys_product(
             and "is_queued_for_deletion" in view_block_hot
             and view_block_hot.find("_closing") < view_block_hot.find("return true")
         )
+        # e611e7a first Drag2 clamp: leftover-hold reseed + activate far
+        # leftover origin uses current mouse (not Drag1 jump-clamp).
+        leftover_reseed_hot = (
+            input_fn.find("_left_in_leftover_hold()", input_hot_left)
+            if input_hot_left >= 0
+            else -1
+        )
+        wiring["drag2_stale_origin_no_clamp"] = (
+            bool(activate_fn_hot)
+            and "leftover_committed" in activate_fn_hot
+            and "seed_far" in activate_fn_hot
+            and "_last_mouse_pos = mouse_act" in activate_fn_hot
+            and "_last_mouse_pos = seed_origin" in activate_fn_hot
+            and activate_fn_hot.find("seed_far and leftover_committed")
+            < activate_fn_hot.find("_last_mouse_pos = mouse_act")
+            and leftover_reseed_hot >= 0
+            and leftover_reseed_hot < reseed_hot_i
+            and "idle_up_for_repeat or _left_in_leftover_hold()" in input_fn
+            and "_reseed_left_origin_from_idle_up" not in begin_fn
+            and "func _seed_left_origin_for_repeat_press" not in ren
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+        )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")
         process_fn = _slice_func(ren, "_process")

@@ -19,7 +19,12 @@ move after Esc→CC — leftover stuck `_left_btn_down` first-line-blocked
 `_begin(true)`; idle `_allow` now unsticks btn-down during leftover hold
 (no `_rearm`); `_input` reseeds on idle-up `event.pressed` (Input
 singleton can stay stale after CC dimmer). Closing MainMenu must not
-`modal_blocks_map_nav`. Esc dismiss-then-CC and unit-chip
+`modal_blocks_map_nav`. e611e7a MIXED: Drag1+3 move / first Drag2
+clamp no move — leftover pressed=true can consume idle-up reseed so
+`_activate` origin-seeds Drag1 and the first apply jump-clamps.
+`_input` reseeds while leftover hold even if was_up was consumed;
+`_activate` uses current mouse when leftover origin is far (keep PR 23
+near-origin seed). Esc dismiss-then-CC and unit-chip
 Fill%/TOE stay PASS — do not reintroduce the PR 16
 `_ensure_left_drag_armed_from_physical` / `_left_pick_allowed_on_release`
 stack.
@@ -521,6 +526,47 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "_handle_escape_key" not in begin_fn
             and "_try_open_land_unit_at_world" not in begin_fn
             and "func _handle_escape_key" in ren
+        )
+        # e611e7a first Drag2 clamp: leftover pressed=true consumes idle-up
+        # reseed; leftover dragged flags activate immediately with Drag1
+        # origin → huge first delta → theater clamp. Reseed on leftover
+        # hold too; activate far leftover origin uses current mouse.
+        leftover_reseed_i = (
+            input_fn.find("_left_in_leftover_hold()", left_i) if left_i >= 0 else -1
+        )
+        wiring["drag2_stale_origin_no_clamp"] = (
+            bool(activate_fn)
+            and "leftover_committed" in activate_fn
+            and "seed_far" in activate_fn
+            and "stale_seed_lim" in activate_fn
+            and "mouse_act" in activate_fn
+            and "_last_mouse_pos = mouse_act" in activate_fn
+            and "_last_mouse_pos = seed_origin" in activate_fn
+            and activate_fn.find("leftover_committed")
+            < activate_fn.find("_last_mouse_pos = mouse_act")
+            < activate_fn.find("_last_mouse_pos = seed_origin")
+            and activate_fn.find("seed_far and leftover_committed")
+            < activate_fn.find("_last_mouse_pos = mouse_act")
+            and "_left_pan_armed = true" not in activate_fn
+            and "_ensure_left_drag_armed_from_physical" not in activate_fn
+            and "_left_pick_allowed_on_release" not in activate_fn
+            and "_rearm_left_drag_for_next_press" not in activate_fn
+            and "_allow_left_pan_skip_to_die" not in activate_fn
+            and "_reseed_left_origin_from_idle_up" not in activate_fn
+            and "_handle_escape_key" not in activate_fn
+            and "_try_open_land_unit_at_world" not in activate_fn
+            and "_try_open_unit_at_world" not in activate_fn
+            and "func _seed_left_origin_for_repeat_press" not in ren
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+            and leftover_reseed_i >= 0
+            and idle_up_i >= 0
+            and leftover_reseed_i < reseed_call_i
+            and "idle_up_for_repeat or _left_in_leftover_hold()" in input_fn
+            and "_reseed_left_origin_from_idle_up" not in begin_fn
+            and "_reseed_left_origin_from_idle_up" not in process_fn
+            and "func _handle_escape_key" in ren
+            and "func _try_open_land_unit_at_world" in ren
         )
 
         for k, v in wiring.items():

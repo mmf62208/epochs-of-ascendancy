@@ -133,6 +133,7 @@ class TestFirstSessionHotkeysProduct(unittest.TestCase):
             "empty_drag_unstick_idle_btn_down",
             "drag2_idle_up_origin_reseed",
             "empty_drag_idle_up_begin_unstick",
+            "drag2_stale_origin_no_clamp",
             "esc_idle_opens_command_center",
             "esc_dismiss_then_idle_cc",
         ):
