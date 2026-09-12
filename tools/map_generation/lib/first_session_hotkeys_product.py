@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
+MAP_VIEW = ROOT / "scripts" / "map" / "MapViewInput.gd"
 MAP_MANAGER = ROOT / "scripts" / "map" / "MapManager.gd"
 TOP_INFO = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
 MAIN_MENU = ROOT / "scripts" / "ui" / "MainMenu.gd"
@@ -333,6 +334,7 @@ def build_first_session_hotkeys_product(
     wiring: Dict[str, bool] = {}
     if check_wiring:
         ren = MAP_RENDERER.read_text(encoding="utf-8") if MAP_RENDERER.is_file() else ""
+        view = MAP_VIEW.read_text(encoding="utf-8") if MAP_VIEW.is_file() else ""
         top = TOP_INFO.read_text(encoding="utf-8") if TOP_INFO.is_file() else ""
         menu = MAIN_MENU.read_text(encoding="utf-8") if MAIN_MENU.is_file() else ""
         runner = TEST_RUNNER.read_text(encoding="utf-8") if TEST_RUNNER.is_file() else ""
@@ -595,6 +597,37 @@ def build_first_session_hotkeys_product(
             and 0 <= idle_hot_i < begin_hot_i < reseed_hot_i
             and "func _seed_left_origin_for_repeat_press" not in ren
             and "func _ensure_left_drag_armed_from_physical" not in ren
+        )
+        # 650c85c-cc: leftover stuck `_left_btn_down` after Esc→CC. Idle-up
+        # `_begin(true)` must not first-line return; leftover hold unsticks
+        # btn-down without `_rearm`; closing MainMenu must not block pan.
+        begin_fn_hot = _slice_func(ren, "_begin_left_map_gesture")
+        view_block_hot = _slice_func(view, "_is_visible_blocking_node")
+        begin_stuck_hot = begin_fn_hot.find("if _left_btn_down")
+        begin_idle_hot = begin_fn_hot.find("new_press and _left_button_was_up")
+        leftover_hold_hot = allow_fn_hot.find("if _left_in_leftover_hold()")
+        leftover_unstick_hot = (
+            allow_fn_hot.find("_left_btn_down = false", leftover_hold_hot)
+            if leftover_hold_hot >= 0
+            else -1
+        )
+        leftover_rearm_hot = allow_fn_hot.find("_rearm_left_drag_for_next_press")
+        reseed_block_hot = ""
+        if reseed_hot_i >= 0:
+            reseed_block_hot = input_fn[max(0, idle_hot_i) : reseed_hot_i + 80]
+        wiring["empty_drag_idle_up_begin_unstick"] = (
+            bool(begin_fn_hot)
+            and 0 <= begin_stuck_hot < begin_idle_hot
+            and leftover_hold_hot >= 0
+            and leftover_hold_hot < leftover_unstick_hot < leftover_rearm_hot
+            and "is_mouse_button_pressed" not in reseed_block_hot
+            and "_reseed_left_origin_from_idle_up" not in begin_fn_hot
+            and "func _ensure_left_drag_armed_from_physical" not in ren
+            and "func _left_pick_allowed_on_release" not in ren
+            and bool(view_block_hot)
+            and "_closing" in view_block_hot
+            and "is_queued_for_deletion" in view_block_hot
+            and view_block_hot.find("_closing") < view_block_hot.find("return true")
         )
         dismiss_fn = _slice_func(ren, "_dismiss_inspector_and_restore_input")
         cull_fn = _slice_func(ren, "_sync_viewport_culling")

@@ -1171,7 +1171,10 @@ func _reseed_left_origin_from_idle_up(mouse: Vector2) -> void:
 
 func _begin_left_map_gesture(new_press: bool = false) -> void:
 	# Already in THIS button-down — never reset origin/dragged (Play: 400ms re-arm opened Finistère).
-	if _left_btn_down:
+	# Idle-up new press: leftover swallowed `_end` can leave `_left_btn_down` stuck
+	# (CC dimmer). Fall through so leftover/genuine logic can start THIS origin.
+	# Mid-drag `_left_button_was_up` is false — keep origin (not PR 24 mid-drag seed).
+	if _left_btn_down and not (new_press and _left_button_was_up):
 		return
 	var vp: Viewport = get_viewport()
 	var mouse: Vector2 = vp.get_mouse_position() if vp != null else Vector2.ZERO
@@ -1296,6 +1299,10 @@ func _allow_left_pan_skip_to_die() -> void:
 	var stuck_btn_down: bool = _left_btn_down
 	_left_button_was_up = true
 	if _left_in_leftover_hold():
+		# Unstick leftover `_left_btn_down` so the next idle-up `_begin(true)`
+		# is not first-line blocked. Do NOT `_rearm` here — skip/cam stay until
+		# leftover hold expires (idle-clear let THIS release pick).
+		_left_btn_down = false
 		return
 	_left_btn_down = false
 	if _left_release_frame < 0 and not stuck_btn_down:
@@ -1775,9 +1782,11 @@ func _input(event: InputEvent) -> void:
 				_begin_left_map_gesture(true)
 				# Drag2+3 leftover hold: `_begin(true)` keeps Drag1 origin.
 				# Reseed THIS press only after idle button-up (not mid-Drag1).
+				# `event.pressed` is THIS new left-down. Do not also require the
+				# Input singleton — a swallowed `_end` / CC dimmer can leave
+				# the singleton stale so Drag1–3 never reseed.
 				if (
 					idle_up_for_repeat
-					and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 					and not event.ctrl_pressed
 					and not event.shift_pressed
 				):
