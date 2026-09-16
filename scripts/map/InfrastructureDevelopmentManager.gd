@@ -340,9 +340,13 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 	for item in to_complete:
 		_complete_project(int(item.pid), item.proj)
 
-	# Auto AI investment consideration (low rate for natural 50+ turn playtest evolution; non-player countries develop cores).
-	# Uses same validation/Mandate path. Throttled to prevent spam.
-	if randi() % 5 == 0:  # roughly every 5 days across sim
+	# Auto AI investment: never walk 3520×tags on graphical F5 (hangs 1x/3x at 23:00).
+	var light := (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_interactive_light_sim")
+		and bool(TimeManager.is_interactive_light_sim())
+	)
+	if not light and randi() % 5 == 0:
 		ai_consider_daily_invests([], 0.08)
 
 
@@ -1103,6 +1107,12 @@ func _capital_pid_for_tag(tag: String) -> int:
 
 
 func _pick_ai_infra_province(tag: String) -> int:
+	# F5: capital only. collect_live_border + owned-hex scan hung 3x at 23:00 (~18GB).
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+		var cap_only := _capital_pid_for_tag(tag)
+		if cap_only > 0 and not has_active_project(cap_only):
+			return cap_only
+		return 0
 	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
 		return 0
 	var t := tag.strip_edges().to_upper()

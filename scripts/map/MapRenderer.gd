@@ -194,8 +194,9 @@ const PROVINCE_INTERNAL_BORDER_COLOR := Color(0.08, 0.09, 0.12, 0.22)
 const COUNTRY_FRONTIER_PREFIX := "CountryFrontier_"
 const COAST_FRONTIER_PREFIX := "CoastEdge_"
 const PROVINCE_EDGE_PREFIX := "ProvEdge_"
-## GIS NUTS verts rarely share exact coords; 2.5px bin still matches most shared edges.
-const _EDGE_KEY_PRECISION := 2.5
+## GIS NUTS verts rarely share exact coords. 2.5 was too coarse: Benelux edges
+## hashed together and painted black dashes inside NLD/LUX (play 2026-09-11).
+const _EDGE_KEY_PRECISION := 1.0
 
 ## Toggle for separate terrain layer (the high-res detailed raster bg image). When OFF: clean political view (solid ownership fills, no terrain texture underneath) — highly valued in grand strat (HOI4/EU4 players often prefer political/clean for readability of borders/infra/ownership; use terrain mode for combat planning/immersion). Perfect for map editing at close zoom too.
 ## Default OFF: world underlay hex/void ocean + muddy double-stack made political unreadable (2026-07 playtest).
@@ -228,6 +229,7 @@ var _hold_camera_until_msec: int = 0
 var _last_mouse_pos := Vector2.ZERO
 ## Close must not leave a deferred camera nudge (play extra: panel-close teleport).
 var _inspector_held_closed := false
+var _unit_card_geom: Rect2 = Rect2()
 ## Live GIS camera at Close press — reassert every frame so europe_center / pick-center cannot teleport.
 var _close_camera_locked := false
 var _close_camera_lock_pos := Vector2.ZERO
@@ -269,6 +271,10 @@ var _viewport_cull_suspend_until_msec: int = 0
 var _viewport_cull_hold_after_close: bool = false
 ## End: keep Tokyo + CHI capital stars visible even at strategic zoom.
 var _asia_end_force_star_pids: Dictionary = {}
+## Capital pids with a ★ glyph — pick/zoom must not walk 3520 province_nodes.
+var _capital_star_pids: Array = []
+## Last selected chip pid for gold ring (refresh only this + new, not every icon).
+var _selected_chip_pid: int = -1
 ## End: pin the China nation label so viewport cull / rebuild cannot drop it.
 var _asia_end_china_anchor := Vector2.ZERO
 
@@ -283,6 +289,11 @@ var _province_name_labels: Dictionary[int, Label] = {}
 var current_hover: Node2D = null
 var _hover_province: Province = null
 var hover_tooltip: ProvinceHoverTooltip = null
+## Dwell before the cursor card appears (350ms feels snappy without flicker).
+const HOVER_TOOLTIP_DWELL_MS := 350
+var _hover_dwell_msec: int = 0
+var _hover_dwell_pid: int = -1
+var _hover_tooltip_built_pid: int = -1
 
 var selected_province_id: int = -1
 var _hover_outline_province_id: int = -1
@@ -295,6 +306,11 @@ var _select_outline_layer: Node2D = null
 var _select_outline_line: Line2D = null
 var _select_outline_glow: Line2D = null
 var _march_path_line: Line2D = null
+var _order_intent: Node2D = null
+var _open_fight_battle_id: String = ""
+var _order_busy_until_msec: int = 0
+## 0 = player nation only (default), 1 = player + allies, 2 = all nations.
+var capture_notify_scope: int = 0
 var _supply_corridor_line: Line2D = null
 var _next_hook_chip: Button = null
 var _current_theater_bounds: Rect2 = GRAND_THEATER_CANONICAL_BOUNDS  # updated on theater/chunk/world load; used for camera clamp to avoid gray lost space on pan/zoom to NA etc.
@@ -826,6 +842,11 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 	if not light:
 		_refresh_province_fill_colors()
 	_refresh_map_time_ui()
+	if light:
+		_refresh_order_intent_arrows()
+		_refresh_fight_card_if_open()
+		_sync_land_battle_bubbles()
+		return
 	var open_n := _sync_land_battle_bubbles()
 	if open_n > 0:
 		_play_unit_loop_sfx("clash", _formation_for_sfx())
@@ -1207,7 +1228,8 @@ func _mark_left_pan_blocked_pick() -> void:
 	_left_skip_next_pick = true
 	_left_gesture_panned = true
 	_left_slop_latched = true
-	_left_ready_for_still_click = false
+	# Keep still-click armed. Clearing this after pan made Maginot chips unclickable
+	# until Home/wheel (play 2026-09-11).
 
 
 func _map_click_should_skip_pick() -> bool:
@@ -1481,8 +1503,8 @@ func _input(event: InputEvent) -> void:
 				# NEVER call full _refresh_terrain_zoom_aware() / 3520 fill rebuild per notch.
 				_schedule_light_terrain_zoom_refresh()
 				get_viewport().set_input_as_handled()
-		elif event.button_index == MOUSE_BUTTON_MIDDLE or event.button_index == MOUSE_BUTTON_RIGHT:
-			# MMB/right-drag pan in _input so GUI focus cannot kill pan.
+		elif event.button_index == MOUSE_BUTTON_MIDDLE:
+			# MMB pan in _input so GUI focus cannot kill pan.
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				_is_middle_dragging = false
 			elif event.pressed:
@@ -1492,18 +1514,28 @@ func _input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 			else:
 				_is_middle_dragging = false
+		elif event.button_index == MOUSE_BUTTON_RIGHT:
+			# Selected unit: still-click orders (march / fight). Drag ≥8px still pans.
+			if MapViewInput.modal_blocks_map_nav(get_viewport()):
+				_is_middle_dragging = false
+				_right_order_armed = false
+			elif event.pressed:
+				if _arm_right_unit_order():
+					get_viewport().set_input_as_handled()
+				else:
+					_is_middle_dragging = true
+					_middle_drag_start = get_viewport().get_mouse_position()
+					_last_mouse_pos = _middle_drag_start
+					get_viewport().set_input_as_handled()
+			else:
+				if _release_right_unit_order():
+					get_viewport().set_input_as_handled()
+				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if event.pressed and _mouse_over_search_control():
 				return
-			if event.pressed:
-				# Genuine new button-down (slop 0): only place the pan skip is cleared.
-				# Mid-drag no-ops because _left_btn_down is still true.
-				_begin_left_map_gesture(true)
-				if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
-					_arm_left_map_press()
-					_mark_left_pan_blocked_pick()
-					get_viewport().set_input_as_handled()
-					return
+			# Do not handle left-click here — _unhandled_input still-click picks chips/hexes.
+			# Eating the event when leftover pan-block was set made Maginot unclickable.
 			if event.ctrl_pressed or event.shift_pressed:
 				pass
 			elif MapViewInput.modal_blocks_map_nav(get_viewport()):
@@ -1538,6 +1570,8 @@ func _input(event: InputEvent) -> void:
 			_left_pan_active = true
 			_mark_left_pan_blocked_pick()
 			get_viewport().set_input_as_handled()
+		if _right_order_armed and Input.is_mouse_button_pressed(MOUSE_BUTTON_RIGHT):
+			_note_right_order_slop()
 
 
 func _schedule_light_terrain_zoom_refresh() -> void:
@@ -1818,6 +1852,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if event.pressed and _close_click_guard and _close_release_seen:
+			_finish_close_click_guard_on_new_press()
 		if _mouse_over_close_control():
 			if _inspector_stack_blocking_input():
 				_dismiss_inspector_and_restore_input()
@@ -1827,13 +1863,17 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
+				if _mouse_over_inspector_chrome():
+					_left_pan_armed = false
+					_left_pan_active = false
+					_left_btn_down = false
+					return
 				_begin_left_map_gesture(true)
 			_note_left_gesture_motion()
-			if _left_map_pick_blocked():
-				if event.pressed:
-					_arm_left_map_press()
-				else:
-					_end_left_button_down()
+			# Only the press of a leftover pan-block arms pan. Release of a still-click
+			# must reach unit/hex pick (play: Maginot chips dead after zoom/pan).
+			if event.pressed and _left_map_pick_blocked():
+				_arm_left_map_press()
 				get_viewport().set_input_as_handled()
 				return
 		if event.pressed and _close_click_guard:
@@ -1842,17 +1882,16 @@ func _unhandled_input(event: InputEvent) -> void:
 			else:
 				get_viewport().set_input_as_handled()
 				return
-		if _close_click_guard or _camera_is_held() or Time.get_ticks_msec() < _map_pick_block_until_msec:
-			if not event.pressed:
-				_note_close_button_release()
-				_left_pan_armed = false
-				_left_pan_active = false
-			get_viewport().set_input_as_handled()
-			return
 		if event.pressed:
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				_left_pan_armed = false
 				_left_pan_active = false
+				return
+			# Unit card / inspector / scrollbar: GUI owns the drag. Do not pan the map.
+			if _mouse_over_inspector_chrome() or _gui_blocks_map_pick() or _is_mouse_over_blocking_ui():
+				_left_pan_armed = false
+				_left_pan_active = false
+				_left_btn_down = false
 				return
 			# Ctrl/Shift keep immediate pick (assault / debug / engineers) unless the cursor is on Close.
 			if (event.ctrl_pressed or event.shift_pressed) and _gui_blocks_map_pick():
@@ -1869,6 +1908,8 @@ func _unhandled_input(event: InputEvent) -> void:
 			_note_close_button_release()
 			if did_left_pan:
 				_mark_left_pan_blocked_pick()
+				_left_ready_for_still_click = true
+				_left_skip_next_pick = false
 				get_viewport().set_input_as_handled()
 				return
 			# Still-click: old skip flags must not leak, but _left_gesture_dragged stays false.
@@ -1879,23 +1920,66 @@ func _unhandled_input(event: InputEvent) -> void:
 			if MapViewInput.modal_blocks_map_nav(get_viewport()):
 				return
 			if _gui_blocks_map_pick():
+				print("[pick] skip gui_block hovered=", get_viewport().gui_get_hovered_control())
 				get_viewport().set_input_as_handled()
 				return
-		# Gesture-scoped skip before capital-star snap / hex pick / title boot.
-		# Use _left_map_pick_blocked (no _note/_begin) so skip-check cannot reset slop.
-		if not event.ctrl_pressed and not event.shift_pressed:
-			if _left_map_pick_blocked() or _left_gesture_moved_camera():
-				_end_left_button_down()
-				_mark_left_pan_blocked_pick()
-				get_viewport().set_input_as_handled()
-				return
+		# Still-click: do not re-apply pan leftover / camera-moved skip.
 		_release_search_focus()
 		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
-		# Land division chips beat capital stars (Play: chips opened Praha inspector).
-		# Air/fleet still lose to stars (Berlin star vs Air Wing PASS).
-		if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed):
+		print(
+			"[pick] still-click world=",
+			world_pos,
+			" gui_block=",
+			_gui_blocks_map_pick(),
+			" modal=",
+			MapViewInput.modal_blocks_map_nav(get_viewport())
+		)
+		# Red attack arrow: click for battle info (before issuing a new order).
+		if not event.ctrl_pressed and not event.shift_pressed:
+			if _try_pick_order_intent(world_pos):
+				print("[pick] attack arrow")
+				get_viewport().set_input_as_handled()
+				return
+		# Commanding a chip: this click is an ORDER. Never capital-inspector (hang class).
+		if not selected_formation_id.is_empty() and not event.ctrl_pressed and not event.shift_pressed:
+			if _try_open_land_unit_at_world(world_pos, false):
+				print("[pick] land unit at ", world_pos)
+				get_viewport().set_input_as_handled()
+				return
+			var order_pid := _resolve_map_pick_pid(world_pos)
+			if order_pid >= 0 and provinces.has(order_pid):
+				print("[pick] order pid=", order_pid)
+				order_selected_unit_at_province(provinces[order_pid] as Province)
+				get_viewport().set_input_as_handled()
+				return
+			print("[pick] no land unit at ", world_pos)
 			get_viewport().set_input_as_handled()
 			return
+		# Gold star: screen-rect of the drawn ★ always opens that capital (not neighbor NUTS, not chip).
+		if not event.shift_pressed and not event.ctrl_pressed:
+			var early_star := _capital_star_pid_at_screen(get_viewport().get_mouse_position())
+			if early_star <= 0:
+				early_star = _capital_star_pid_at(world_pos)
+			if early_star > 0 and provinces.has(early_star):
+				if not selected_formation_id.is_empty():
+					selected_formation_id = ""
+					_refresh_selected_unit_chip()
+				var cap_p: Province = provinces[early_star] as Province
+				var cap_n: Node2D = _province_node(early_star)
+				if _try_living_title_map_pick(early_star):
+					get_viewport().set_input_as_handled()
+					return
+				print("[pick] capital star pid=", early_star)
+				_toast_living_diplomacy_pick(early_star)
+				_select_province(cap_p, cap_n)
+				show_info_panel(cap_p)
+				get_viewport().set_input_as_handled()
+				return
+		if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed):
+			print("[pick] land unit at ", world_pos)
+			get_viewport().set_input_as_handled()
+			return
+		print("[pick] no land unit at ", world_pos)
 		# Capital gold star wins over a colocated air/fleet chip.
 		# Star click inspects the capital and does not arm MARCH.
 		# THIS drag already exceeded 8px: do not snap-select any capital
@@ -1951,6 +2035,15 @@ func _unhandled_input(event: InputEvent) -> void:
 				get_viewport().set_input_as_handled()
 				return
 		if pid >= 0 and provinces.has(pid):
+			# Nested capital: star over Hertfordshire fill still means London (711414).
+			var near_star := _capital_star_pid_at(world_pos)
+			if near_star > 0 and provinces.has(near_star) and near_star != pid:
+				var hex_p: Province = provinces[pid] as Province
+				var cap_p2: Province = provinces[near_star] as Province
+				var ho := str(hex_p.owner_tag).strip_edges().to_upper() if hex_p else ""
+				var so := str(cap_p2.owner_tag).strip_edges().to_upper() if cap_p2 else ""
+				if not so.is_empty() and so == ho:
+					pid = near_star
 			if not event.ctrl_pressed and not event.shift_pressed and _left_map_pick_blocked():
 				get_viewport().set_input_as_handled()
 				return
@@ -1979,15 +2072,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				if _try_station_engineers_at_province(resolved_province):
 					get_viewport().set_input_as_handled()
 					return
-			# Unit move: selected pin + click friendly province.
+			# Selected chip: click is an ORDER (march own / attack enemy). Never inspector.
 			if not selected_formation_id.is_empty() and not event.ctrl_pressed:
 				if _left_map_pick_blocked():
 					get_viewport().set_input_as_handled()
 					return
-				if _try_move_selected_unit_to_province(resolved_province):
-					_select_province(resolved_province, resolved_node)
-					get_viewport().set_input_as_handled()
-					return
+				var ordered: Dictionary = order_selected_unit_at_province(resolved_province)
+				get_viewport().set_input_as_handled()
+				return
 			# G click-to-show: hex pick draws a budgeted corridor (never on the G key frame).
 			if _corridor_click_armed and not event.ctrl_pressed:
 				if _left_map_pick_blocked():
@@ -2041,6 +2133,8 @@ func _unhandled_input(event: InputEvent) -> void:
 				# Do not start map pan under Command Center / modal overlays.
 				if MapViewInput.modal_blocks_map_nav(get_viewport()):
 					_is_middle_dragging = false
+				elif event.button_index == MOUSE_BUTTON_RIGHT and _right_order_armed:
+					pass
 				else:
 					_is_middle_dragging = true
 					_middle_drag_start = get_viewport().get_mouse_position()
@@ -2080,13 +2174,12 @@ func _process(delta: float) -> void:
 	_update_outline_pulse()
 	if use_spatial_picking:
 		_update_spatial_hover()
+	_tick_hover_tooltip_dwell()
 	if not sim_paused:
 		# Throttle fill/LOD — world_full (2k+ polys) needs coarse cadence.
 		var detail_every := 6 if province_nodes.size() >= 800 else 2
 		if Engine.get_process_frames() % detail_every == 0:
 			_refresh_province_detail_visibility()
-		if hover_tooltip and hover_tooltip.visible and _hover_province != null and hover_name_follow_mouse:
-			_refresh_hover_tooltip(_hover_province)
 		var cam := get_viewport().get_camera_2d()
 		if cam:
 			var z := cam.zoom.x if cam.zoom else 1.0
@@ -2209,6 +2302,10 @@ func _handle_camera_input(delta: float) -> void:
 	move_dir = key_dir + edge_dir
 
 	# Left-drag pan after slop (click still picks). Middle / right drag too.
+	# Scrollbar / unit card / province inspector drag must not pan (play 2026-09-11).
+	if _mouse_over_inspector_chrome() or _gui_blocks_map_pick() or _is_mouse_over_blocking_ui():
+		_left_pan_armed = false
+		_left_pan_active = false
 	if _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
 		_accumulate_left_drag_slop()
 	if _left_pan_armed and not _left_pan_active and _left_drag_exceeded_slop():
@@ -2327,24 +2424,10 @@ func _setup_player_map_ux() -> void:
 		if _map_search.has_method("bind"):
 			_map_search.call("bind", self, cam)
 
-	if _map_minimap == null:
-		var MinimapScript := preload("res://scripts/ui/map/MapMinimap.gd")
-		_map_minimap = PanelContainer.new()
-		_map_minimap.set_script(MinimapScript)
-		_map_minimap.name = "MapMinimap"
-		_map_minimap.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
-		_map_minimap.offset_left = 12.0
-		_map_minimap.offset_top = -120.0
-		_map_minimap.offset_right = 200.0
-		_map_minimap.offset_bottom = -12.0
-		ui.add_child(_map_minimap)
-		var cam2 := get_node_or_null("MapCamera") as Camera2D
-		if _map_minimap.has_method("bind"):
-			_map_minimap.call("bind", self, cam2)
-		if _map_minimap.has_method("set_lod_tier"):
-			_map_minimap.call("set_lod_tier", _map_lod_tier)
-		# Pass 46: restore persisted heat prefs after minimap exists.
-		call_deferred("apply_stored_pack_risk_heat_prefs")
+	# Play: no corner minimap. Unit card owns bottom-left. Pack-heat helpers already null-check.
+	if _map_minimap != null and is_instance_valid(_map_minimap):
+		_map_minimap.visible = false
+		_map_minimap.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 	if _adjacency_preview == null and container != null:
 		var AdjScript := preload("res://scripts/map/AdjacencyPreviewLayer.gd")
@@ -12653,6 +12736,14 @@ func set_map_mode(mode: String = "political") -> void:
 		var ol_n := get_overlay_layer("InfrastructureOverlayLayer")
 		if ol_n and ol_n.has_method("queue_redraw"):
 			ol_n.queue_redraw()
+	var ol_res := get_overlay_layer("InfrastructureOverlayLayer")
+	if ol_res:
+		if ol_res.has_method("set_map_mode_for_glyphs"):
+			ol_res.call("set_map_mode_for_glyphs", m)
+		else:
+			ol_res.set("show_resource_icons", m == "resources")
+			if ol_res.has_method("queue_redraw"):
+				ol_res.queue_redraw()
 	if m == "weather":
 		debug_tint_mode = "weather"
 	elif m == "munitions":
@@ -12803,6 +12894,7 @@ func _restore_land_poly_visibility() -> void:
 func _ensure_capital_stars_visible() -> void:
 	_restore_land_poly_visibility()
 	# Re-stamp stars if missing (mapmode / mesh paths must never drop capitals).
+	_capital_star_pids.clear()
 	var n_stars := 0
 	for pid in province_nodes.keys():
 		var node: Node2D = province_nodes[pid] as Node2D
@@ -12811,6 +12903,7 @@ func _ensure_capital_stars_visible() -> void:
 		var province: Province = provinces.get(pid) as Province if provinces.has(pid) else null
 		if province == null or not province.has_feature("capital"):
 			continue
+		_capital_star_pids.append(int(pid))
 		var has_star := false
 		for child in node.get_children():
 			if child is Label and (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
@@ -12835,11 +12928,13 @@ func _capital_star_font_px() -> int:
 
 func _sync_capital_star_scales(_z: float = -1.0) -> void:
 	var px := _capital_star_font_px()
-	for pid in province_nodes.keys():
-		var node: Node2D = province_nodes[pid] as Node2D
+	var pids: Array = _capital_star_pids if not _capital_star_pids.is_empty() else []
+	for pid_v in pids:
+		var pid := int(pid_v)
+		var node: Node2D = province_nodes.get(pid) as Node2D if province_nodes.has(pid) else null
 		if node == null:
 			continue
-		var force := _asia_end_force_star_pids.has(int(pid))
+		var force := _asia_end_force_star_pids.has(pid)
 		var use_px := 32 if force else px
 		for child in node.get_children():
 			if not (child is Label) or not (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
@@ -12849,19 +12944,28 @@ func _sync_capital_star_scales(_z: float = -1.0) -> void:
 			if use_px > 0:
 				star.add_theme_font_size_override("font_size", use_px)
 				star.set_meta(META_MAP_GLYPH_PX, use_px)
+				star.custom_minimum_size = Vector2(float(use_px) * 1.35, float(use_px) * 1.35)
+				star.reset_size()
+				var c: Vector2 = star.get_meta("capital_center", Vector2.ZERO)
+				if c != Vector2.ZERO:
+					star.position = c - star.size * 0.5
 				if force:
 					star.z_as_relative = false
 					star.z_index = 80
 
 
 func _add_capital_star_to_node(node: Node2D, pid: int, force_px: int = 0) -> void:
-	var center: Vector2 = _centroid_for_pid(pid)
+	var center: Vector2 = _bbox_center_for_pid(pid)
+	if center == Vector2.ZERO:
+		center = _centroid_for_pid(pid)
 	if center == Vector2.ZERO:
 		center = province_centroids.get(pid, Vector2.ZERO) as Vector2
 	if center == Vector2.ZERO:
 		return
 	var star := Label.new()
 	star.text = "★"
+	star.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	star.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	star.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	star.z_as_relative = false
 	star.z_index = 40
@@ -12872,15 +12976,31 @@ func _add_capital_star_to_node(node: Node2D, pid: int, force_px: int = 0) -> voi
 	# Bright gold fill + thick dark+white outline so stars read on yellow (BEL) and light paints.
 	star.add_theme_color_override("font_color", Color(1.0, 0.92, 0.15, 1.0))
 	star.add_theme_color_override("font_outline_color", Color(0.02, 0.02, 0.05, 1.0))
-	star.add_theme_constant_override("outline_size", 6)
+	star.add_theme_constant_override("outline_size", 4)
 	star.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	star.set_meta(META_MAP_GLYPH_PX, px)
 	star.set_meta(META_MAP_GLYPH_CAPITAL, true)
+	star.set_meta("capital_center", center)
 	star.visible = px > 0
+	star.custom_minimum_size = Vector2(float(maxi(px, 1)) * 1.35, float(maxi(px, 1)) * 1.35)
 	star.reset_size()
-	var sms := star.get_minimum_size()
-	star.position = center - sms * 0.5
+	# Center the glyph on the capital hex. Top-left Label origin put London/Paris up-left.
+	star.position = center - star.size * 0.5
 	node.add_child(star)
+
+
+func _bbox_center_for_pid(pid: int) -> Vector2:
+	var pts: PackedVector2Array = _province_polygon_points(pid)
+	if pts.size() < 1:
+		return Vector2.ZERO
+	var mn := pts[0]
+	var mx := pts[0]
+	for p in pts:
+		mn.x = minf(mn.x, p.x)
+		mn.y = minf(mn.y, p.y)
+		mx.x = maxf(mx.x, p.x)
+		mx.y = maxf(mx.y, p.y)
+	return (mn + mx) * 0.5
 
 
 func _sync_weather_mapmode_particles(enable: bool) -> void:
@@ -12939,8 +13059,36 @@ func _gui_blocks_map_pick() -> bool:
 	# Close/Esc click-through must not hex-pick (Play: Iberia→Greenland + Mid Pacific tooltip).
 	if Time.get_ticks_msec() < _map_pick_block_until_msec:
 		return true
+	if _mouse_over_inspector_chrome():
+		return true
 	if _is_mouse_over_blocking_ui():
 		return true
+	return false
+
+
+## Province inspector + unit card (scrollbars included). Rect check, not only hovered name.
+func _mouse_over_inspector_chrome() -> bool:
+	var vp := get_viewport()
+	if vp == null:
+		return false
+	var mp := vp.get_mouse_position()
+	if info_panel != null and info_panel is Control and (info_panel as CanvasItem).visible:
+		if (info_panel as Control).get_global_rect().has_point(mp):
+			return true
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui != null:
+		var unit_pop := ui.get_node_or_null("UnitDetailPopup")
+		if unit_pop is Control and (unit_pop as CanvasItem).visible:
+			if (unit_pop as Control).get_global_rect().has_point(mp):
+				return true
+		var fight := ui.get_node_or_null("OpenFightSheet")
+		if fight is Control and (fight as CanvasItem).visible:
+			if (fight as Control).get_global_rect().has_point(mp):
+				return true
+		var gate := ui.get_node_or_null("WillGateSheet")
+		if gate is Control and (gate as CanvasItem).visible:
+			if (gate as Control).get_global_rect().has_point(mp):
+				return true
 	return false
 
 
@@ -12963,12 +13111,15 @@ func _dismiss_inspector_and_restore_input() -> void:
 	# ocean-floor, clamp, or write the camera (Play: snapshot restore jumped to Greenland).
 	_viewport_cull_suspend_until_msec = Time.get_ticks_msec() + 2500
 	_viewport_cull_hold_after_close = true
-	_map_pick_block_until_msec = Time.get_ticks_msec() + 800
-	_left_skip_next_pick = true
-	_left_gesture_panned = true
+	# Do not arm pan-skip / pick-block — that deadlocked the next Maginot click
+	# after unit-card Close (play 2026-09-11). Close-guard covers this release only.
+	_map_pick_block_until_msec = 0
+	_left_skip_next_pick = false
+	_left_gesture_panned = false
+	_left_ready_for_still_click = true
 	_left_pan_armed = false
 	_left_pan_active = false
-	_left_slop_latched = true
+	_left_slop_latched = false
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui != null:
 		var fight_sheet := ui.get_node_or_null("OpenFightSheet")
@@ -13048,7 +13199,12 @@ func _refresh_province_detail_visibility() -> void:
 
 	_sync_viewport_culling()
 	var show_details: bool = MapZoomLODScript.show_province_glyphs(tier) or current_zoom > province_detail_min_zoom
-	var show_prov_names: bool = show_province_names and MapZoomLODScript.show_province_labels(tier)
+	# Tiny NUTS names + heavy outline looked like sharpie ticks on LUX/NLD/SWI at Maginot zoom.
+	var show_prov_names: bool = (
+		show_province_names
+		and MapZoomLODScript.show_province_labels(tier)
+		and current_zoom >= 2.05
+	)
 	_zoom_fill_characterization_scale = current_zoom
 	# Bucket boundaries + drift are in the same space as `container.scale` length.
 	var q := clampf(fill_zoom_bucket_size, 0.028, 0.14)
@@ -15307,22 +15463,10 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 		var feat_damaged := _province_feature_is_damaged(province, fk)
 		# Clean political: never stamp retrowave fort/port/airfield chips — they read as
 		# unclickable dummy units (GER bunker hex spam) and freeze pan on ~3520.
+		# Also skip emoji ◆ / 🛡️ pins (same dummy look). Living DemoUnitIcon is the unit.
 		if not _special_feature_sprite_path(fk, feat_lv, feat_damaged).is_empty():
 			continue
-		else:
-			var icon := Label.new()
-			icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-			icon.text = _get_feature_icon(fk)
-			icon.z_index = ProvinceMapVisuals.Z_MAP_GLYPH
-			icon.add_theme_font_size_override("font_size", 15)
-			icon.set_meta(META_MAP_GLYPH_PX, 15)
-			icon.set_meta(META_MAP_GLYPH_OFFS, offs)
-			_apply_static_map_glyph_outline(icon)
-			icon.reset_size()
-			var ims := icon.get_minimum_size()
-			icon.position = center + offs - ims * 0.5
-			node.add_child(icon)
-		icon_i += 1
+		continue
 
 	_create_or_update_province_name_label(province, center)
 
@@ -16457,6 +16601,34 @@ func _clear_hover_state() -> void:
 	_set_agent_highlight(-1)
 	_sync_hovered_strategic_region(null)
 	_hide_hover_tooltip()
+	_hover_dwell_pid = -1
+	_hover_dwell_msec = 0
+	_hover_tooltip_built_pid = -1
+
+
+func _tick_hover_tooltip_dwell() -> void:
+	if not show_hover_province_name or _hover_province == null:
+		return
+	if _is_mouse_over_blocking_ui():
+		_hide_hover_tooltip()
+		return
+	var now := Time.get_ticks_msec()
+	if now - _hover_dwell_msec < HOVER_TOOLTIP_DWELL_MS:
+		return
+	if hover_tooltip != null and hover_tooltip.visible:
+		if hover_name_follow_mouse and hover_tooltip.has_method("reposition_to_mouse"):
+			hover_tooltip.call(
+				"reposition_to_mouse",
+				get_viewport().get_mouse_position(),
+				get_viewport().get_visible_rect().size
+			)
+		return
+	# Build once per hex. Rebuilding ProvinceInsight every frame leaked ~20GB while paused.
+	var pid := int(_hover_province.id)
+	if pid == _hover_tooltip_built_pid:
+		return
+	_hover_tooltip_built_pid = pid
+	_refresh_hover_tooltip(_hover_province)
 
 
 func _on_mouse_entered(node: Node2D, province: Province):
@@ -16470,8 +16642,9 @@ func _on_mouse_entered(node: Node2D, province: Province):
 	_hover_province = province
 	_apply_hover_visuals(province.id, true)
 	_sync_hovered_strategic_region(province)
-	if show_hover_province_name:
-		_refresh_hover_tooltip(province)
+	_hover_dwell_pid = int(province.id) if province != null else -1
+	_hover_dwell_msec = Time.get_ticks_msec()
+	_hide_hover_tooltip()
 
 
 func _on_mouse_exited(node: Node2D) -> void:
@@ -16509,7 +16682,6 @@ func _is_mouse_over_blocking_ui() -> bool:
 			"LeaderAssignmentScreen",
 			"AgentAssignmentScreen",
 			"NationalSpiritsScreen",
-			"ProvinceHoverTooltip",
 			"OpenFightSheet",
 			"UnitDetailPopup",
 			"BtnClose",
@@ -16568,6 +16740,7 @@ func _refresh_hover_tooltip(province: Province) -> void:
 			province, selected_province_id, counterpart, supply_mode, hover_role,
 			is_candidate, contested, has_agent,
 		)
+	text = _hover_text_name_first(province, text)
 	var mouse := get_viewport().get_mouse_position()
 	var compare_active := counterpart != null
 	var selected_accent := selected_province_id == province.id
@@ -16656,6 +16829,51 @@ func _battle_counterpart_for_hover(province: Province) -> Province:
 	return provinces[selected_province_id] as Province
 
 
+func _hover_text_name_first(province: Province, raw: String) -> String:
+	if province == null:
+		return raw
+	var pname := str(province.name).strip_edges()
+	if pname.is_empty():
+		pname = "Province %d" % int(province.id)
+	var owner := str(province.owner_tag).strip_edges().to_upper()
+	var header := "[font_size=14][b][color=#f4f7fb]%s[/color][/b][/font_size]" % pname
+	if not owner.is_empty():
+		header += "\n[color=#a8b4c8]%s[/color]" % owner
+	var seen_recovering := false
+	var out_lines: PackedStringArray = PackedStringArray()
+	for line in raw.split("\n"):
+		var plain := _hover_plain_line(line)
+		if plain.is_empty():
+			continue
+		if plain.begins_with(pname) or ("(#%d)" % int(province.id)) in plain:
+			continue
+		var is_rec := "recovering" in plain.to_lower()
+		if is_rec:
+			if seen_recovering:
+				continue
+			seen_recovering = true
+		out_lines.append(line)
+	if out_lines.is_empty():
+		return header
+	return header + "\n" + "\n".join(out_lines)
+
+
+func _hover_plain_line(line: String) -> String:
+	var s := line
+	var out := ""
+	var i := 0
+	while i < s.length():
+		if s[i] == "[":
+			var close := s.find("]", i)
+			if close < 0:
+				break
+			i = close + 1
+			continue
+		out += s[i]
+		i += 1
+	return out.strip_edges()
+
+
 func _hide_hover_tooltip() -> void:
 	_clear_compare_preview_outline()
 	if hover_tooltip:
@@ -16699,13 +16917,31 @@ func _update_spatial_hover() -> void:
 			current_hover = province_nodes.get(pid) as Node2D
 			_apply_hover_visuals(pid, true)
 			_sync_hovered_strategic_region(new_hover_province)
-			if show_hover_province_name:
-				_refresh_hover_tooltip(new_hover_province)
+			_hover_dwell_pid = pid
+			_hover_dwell_msec = Time.get_ticks_msec()
+			_hide_hover_tooltip()
 
 
 # ====================== INFO PANEL ======================
 
 func show_info_panel(province: Province) -> void:
+	# Commanding a chip: inspector is hang-class (3520 supply). Toast only.
+	if not selected_formation_id.is_empty():
+		if province != null:
+			_show_inspector_toast(str(province.name), 2.0)
+		return
+	var light := (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_interactive_light_sim")
+		and bool(TimeManager.is_interactive_light_sim())
+	)
+	if light and province != null:
+		_selected_coarse_id = 0
+		_show_inspector_toast(
+			"%s · %s" % [province.name, str(province.owner_tag).to_upper()],
+			2.5
+		)
+		return
 	# Real province always wins — never redirect back to coarse (that re-teleported camera every
 	# data_changed/air tick after clicking Africa and hard-crashed while panning).
 	if province != null:
@@ -16719,8 +16955,7 @@ func show_info_panel(province: Province) -> void:
 		push_warning("MapRenderer: info_panel is not a CanvasItem (type=" + str(info_panel.get_class()) + ", script=" + str(info_panel.get_script()) + ") — cannot show inspector. Check scene NodePath exports for the MapRenderer or wiring in _wire_info_panel_refs.")
 		return
 
-	if _camera_is_held():
-		return
+	# Camera-hold after zoom/pan must not swallow the inspector (Play: Maginot click no-op).
 	_inspector_held_closed = false
 	_layout_map_ui()
 	info_panel.visible = true
@@ -17005,18 +17240,69 @@ func _on_oob_strip_open_fight(formation_id: String) -> void:
 	_open_fight_from_formation_id(formation_id)
 
 
-## Gold-star hit: City of London / DC / Roma are smaller than the star glyph.
+## Click on the visible ★ glyph (viewport rect). Always the capital pid that owns that star.
+func _capital_star_pid_at_screen(screen_pos: Vector2) -> int:
+	var best_pid := -1
+	var best_d := 1.0e12
+	# Hang-class: only the ~37 capital stars, never 3520 province_nodes + get_children.
+	for pid_v in _capital_star_pids:
+		var pid := int(pid_v)
+		var node: Node2D = province_nodes.get(pid) as Node2D if province_nodes.has(pid) else null
+		if node == null:
+			continue
+		for child in node.get_children():
+			if not (child is Label) or not (child as Label).has_meta(META_MAP_GLYPH_CAPITAL):
+				continue
+			var star := child as Label
+			if not star.visible:
+				continue
+			var r: Rect2 = star.get_global_rect().grow(6.0)
+			if not r.has_point(screen_pos):
+				continue
+			var c: Vector2 = r.get_center()
+			var d := screen_pos.distance_squared_to(c)
+			if d < best_d:
+				best_d = d
+				best_pid = pid
+	return best_pid
+
+
+## Gold-star hit: transform capital center into the same space as `_screen_to_world`.
+func _capital_star_world_center(pid: int) -> Vector2:
+	var c: Vector2 = _bbox_center_for_pid(pid)
+	if c == Vector2.ZERO:
+		c = _centroid_for_pid(pid)
+	if c == Vector2.ZERO:
+		c = province_centroids.get(pid, Vector2.ZERO) as Vector2
+	var node: Node2D = province_nodes.get(pid) as Node2D if province_nodes.has(pid) else null
+	if node != null and c != Vector2.ZERO:
+		return node.to_global(c)
+	return c
+
+
+## Tiny capitals (London 711414, LIE) are smaller than the glyph — disk is screen-constant.
 func _capital_star_pid_at(world_pos: Vector2) -> int:
-	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("prefer_capital_province_at"):
-		return -1
-	return int(MapManager.prefer_capital_province_at(world_pos, -1))
+	var z := _get_camera_zoom()
+	var hit_r := maxf(28.0 / maxf(z, 0.25), 16.0)
+	var best_pid := -1
+	var best_d := 1.0e12
+	# Hang-class: cached capitals only. No 3520 walk, no polygon bbox on the click.
+	for pid_v in _capital_star_pids:
+		var pid := int(pid_v)
+		var sc: Vector2 = _capital_star_world_center(pid)
+		if sc == Vector2.ZERO:
+			continue
+		var d := world_pos.distance_squared_to(sc)
+		if d <= hit_r * hit_r and d <= best_d:
+			best_d = d
+			best_pid = pid
+	return best_pid
 
 
-## Same resolve for hover tooltip and click (capital star disk, then hex pick).
+## Hex first, then same-owner capital snap (inside MapManager.get_province_at_world_pos).
+## Do not pre-empt with prefer_capital(..., -1): that disk is bigger than LUX and
+## paints FRA fill as Luxembourg on hover.
 func _resolve_map_pick_pid(world_pos: Vector2) -> int:
-	var star_pid := _capital_star_pid_at(world_pos)
-	if star_pid > 0:
-		return star_pid
 	var pid := -1
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
 		pid = MapManager.get_province_at_world_pos(world_pos, true)
@@ -17040,9 +17326,13 @@ func _try_living_title_map_pick(pid: int) -> bool:
 	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
 	if boot == null:
 		return false
+	if boot is CanvasItem and not (boot as CanvasItem).visible:
+		return false
 	if boot.has_method("select_from_province"):
 		boot.call("select_from_province", pid)
-	return true
+	_show_inspector_toast("Click Begin on the left to start the campaign.", 3.5)
+	# Do not steal hex/inspector — overlay is only the left card.
+	return false
 
 
 func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
@@ -17060,9 +17350,10 @@ func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) 
 		debug_combat_attacker_province_id = pid
 	var fid := str(fo.formation_id) if "formation_id" in fo else ""
 	if ctrl_click:
-		_open_fight_from_formation_id(fid)
+		call_deferred("_open_fight_from_formation_id", fid)
 		return true
-	_show_unit_detail_popup(fo)
+	# Defer the card so this click returns immediately (22GB RSS made sync popup hang).
+	call_deferred("_show_unit_detail_popup_for_selected")
 	return true
 
 
@@ -17094,10 +17385,8 @@ func _select_map_unit(formation: Object) -> void:
 	if pid >= 0:
 		attack_staging_province_id = pid
 		debug_combat_attacker_province_id = pid
-	var toast := "Unit selected · %s · click friendly province to MARCH (days) · Ctrl+click enemy to ASSAULT · Esc clears" % name_s
-	_show_inspector_toast(toast, 5.5)
-	if typeof(DebugOverlay) != TYPE_NIL:
-		DebugOverlay.toast_map_debug(toast)
+	var toast := "Unit selected · %s · click / right-click own land to MARCH · right-click or Ctrl+click enemy to FIGHT · Esc clears" % name_s
+	_show_inspector_toast(toast, 3.0)
 
 
 ## Selected-chip ring via nation-frame helper. One pin per province — match by station pid
@@ -17112,7 +17401,14 @@ func _refresh_selected_unit_chip() -> void:
 		var sel_f: Formation = LeaderManager.get_formation(selected_formation_id)
 		if sel_f != null and "stationed_province_id" in sel_f:
 			sel_pid = int(sel_f.stationed_province_id)
-	for id_v in _demo_unit_icon_pids:
+	# Hang-class: only the previous ring + the new pin. Never walk every DemoUnitIcon.
+	var touch: Array = []
+	if _selected_chip_pid >= 0:
+		touch.append(_selected_chip_pid)
+	if sel_pid >= 0 and sel_pid != _selected_chip_pid:
+		touch.append(sel_pid)
+	_selected_chip_pid = sel_pid
+	for id_v in touch:
 		var id := int(id_v)
 		if not province_nodes.has(id):
 			continue
@@ -17127,13 +17423,9 @@ func _refresh_selected_unit_chip() -> void:
 		if old_sel != null:
 			counter.remove_child(old_sel)
 			old_sel.free()
-		if selected_formation_id.is_empty() or sel_pid < 0:
-			continue
-		# Province pin match (one DemoUnitIcon per pid); formation_id equality is optional fast path.
+		# Province pin match (one DemoUnitIcon per pid).
 		var pin_pid := int(counter.get_meta("province_id", id))
-		var cfid := str(counter.get_meta("formation_id", ""))
-		var match_pin := pin_pid == sel_pid or (not cfid.is_empty() and cfid == selected_formation_id)
-		if not match_pin:
+		if selected_formation_id.is_empty() or sel_pid < 0 or pin_pid != sel_pid:
 			continue
 		var frame := _make_unit_nation_frame(gold)
 		frame.name = "SelectedFrame"
@@ -17209,6 +17501,8 @@ func _try_move_selected_unit_to_province(province: Province) -> bool:
 	var path: Array = res.get("path", []) as Array
 	_highlight_march_path(path)
 	_play_unit_loop_sfx("move", _formation_for_sfx())
+	_refresh_fight_card_if_open()
+	_refresh_order_intent_arrows()
 	_show_inspector_toast(
 		"March · %d hop%s · arrives in %d day%s · unpause to walk · %s"
 		% [hops_n, "s" if hops_n != 1 else "", cal, "s" if cal != 1 else "", province.name],
@@ -17245,17 +17539,407 @@ func _highlight_march_path(province_path: Array) -> void:
 	line.z_index = 24
 	add_child(line)
 	_march_path_line = line
+	_ensure_order_intent_layer()
+	if _order_intent != null and _order_intent.has_method("set_march_points"):
+		_order_intent.call("set_march_points", pts)
+
+
+func _ensure_order_intent_layer() -> void:
+	if _order_intent != null and is_instance_valid(_order_intent):
+		return
+	var scr: Script = load("res://scripts/map/OrderIntentLayer.gd") as Script
+	if scr == null:
+		return
+	_order_intent = scr.new() as Node2D
+	if _order_intent == null:
+		return
+	_order_intent.name = "OrderIntentLayer"
+	add_child(_order_intent)
+
+
+func _centroid_for_intent(pid: int) -> Vector2:
+	if pid <= 0:
+		return Vector2.ZERO
+	if province_centroids.has(pid):
+		return province_centroids[pid] as Vector2
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
+		return MapManager.get_province_centroid(pid)
+	return Vector2.ZERO
+
+
+func _refresh_order_intent_arrows() -> void:
+	_ensure_order_intent_layer()
+	if _order_intent == null or not _order_intent.has_method("set_attacks"):
+		return
+	var rows: Array = []
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_open_land_battles"):
+		for raw in BattleManager.get_open_land_battles():
+			if not (raw is Dictionary):
+				continue
+			var from_id := int(raw.get("from_id", -1))
+			var to_id := int(raw.get("to_id", -1))
+			var a := _centroid_for_intent(from_id)
+			var b := _centroid_for_intent(to_id)
+			if a == Vector2.ZERO or b == Vector2.ZERO:
+				continue
+			rows.append({
+				"from": a,
+				"to": b,
+				"from_id": from_id,
+				"to_id": to_id,
+				"id": str(raw.get("id", "")),
+				"att_tag": str(raw.get("att_tag", "")),
+				"def_tag": str(raw.get("def_tag", "")),
+				"att_org": float(raw.get("att_org", 0.0)),
+				"def_org": float(raw.get("def_org", 0.0)),
+				"days_elapsed": int(raw.get("days_elapsed", 0)),
+				"est_days": int(raw.get("est_days", 0)),
+				"att_stance": str(raw.get("att_stance", "press")),
+				"lean": str(raw.get("lean", "")),
+			})
+	if typeof(FormationMovement) != TYPE_NIL:
+		for occ in FormationMovement.list_occupy_orders():
+			if not (occ is Dictionary):
+				continue
+			var ofrom := int((occ as Dictionary).get("from_id", -1))
+			var oto := int((occ as Dictionary).get("to_id", -1))
+			var a2 := _centroid_for_intent(ofrom)
+			var b2 := _centroid_for_intent(oto)
+			if a2 == Vector2.ZERO or b2 == Vector2.ZERO:
+				continue
+			rows.append({
+				"from": a2,
+				"to": b2,
+				"from_id": ofrom,
+				"to_id": oto,
+				"occupy": true,
+			})
+	_order_intent.call("set_attacks", rows)
+
+
+func _highlight_occupy_arrow(from_id: int, to_id: int) -> void:
+	_ensure_order_intent_layer()
+	_refresh_order_intent_arrows()
+
+
+func _try_pick_order_intent(world_pos: Vector2) -> bool:
+	# Don't spawn the layer on every map click — only pick if an attack arrow already exists.
+	if _order_intent == null or not is_instance_valid(_order_intent):
+		return false
+	if not _order_intent.has_method("pick_attack_at"):
+		return false
+	var hit: Dictionary = _order_intent.call("pick_attack_at", world_pos)
+	if hit.is_empty():
+		return false
+	var to_id := int(hit.get("to_id", -1))
+	var from_id := int(hit.get("from_id", -1))
+	var att := str(hit.get("att_tag", "?"))
+	print("[pick] fight arrow %s #%d → #%d" % [att, from_id, to_id])
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_land_battle_at"):
+		var bat2: Dictionary = BattleManager.get_land_battle_at(to_id)
+		call_deferred("_open_fight_card_for_battle_id", str(bat2.get("id", "")))
+	return true
+
+
+func _open_fight_card_for_formation(fid: String) -> void:
+	if fid.is_empty() or typeof(BattleManager) == TYPE_NIL:
+		return
+	if not BattleManager.has_method("get_land_battle_for_formation"):
+		return
+	var bat: Dictionary = BattleManager.get_land_battle_for_formation(fid)
+	_open_fight_card_for_battle_id(str(bat.get("id", "")))
+
+
+func _open_fight_card_for_battle_id(battle_id: String) -> void:
+	var bid := battle_id.strip_edges()
+	if bid.is_empty() or typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("get_open_land_battles"):
+		return
+	var found: Dictionary = {}
+	for raw in BattleManager.get_open_land_battles():
+		if raw is Dictionary and str((raw as Dictionary).get("id", "")) == bid:
+			found = raw as Dictionary
+			break
+	if found.is_empty():
+		_close_fight_card_taken(-1, "They broke.")
+		return
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui != null:
+		var existing: Node = ui.get_node_or_null("FightCard")
+		if existing != null and is_instance_valid(existing) and _open_fight_battle_id == bid:
+			return
+	_open_fight_battle_id = bid
+	_show_fight_card(found)
+
+
+func _refresh_fight_card_if_open() -> void:
+	if _open_fight_battle_id.is_empty():
+		return
+	var bid := _open_fight_battle_id
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("get_open_land_battles"):
+		return
+	var found: Dictionary = {}
+	for raw in BattleManager.get_open_land_battles():
+		if raw is Dictionary and str((raw as Dictionary).get("id", "")) == bid:
+			found = raw as Dictionary
+			break
+	if found.is_empty():
+		_close_fight_card_taken(-1, "They broke.")
+		return
+	_show_fight_card(found)
+
+
+func _on_land_battles_resolved(resolved: Array) -> void:
+	_refresh_order_intent_arrows()
+	_sync_land_battle_bubbles()
+	var player := _player_tag()
+	if player == "USA":
+		player = "GER"
+	var to_id := -1
+	var winner := ""
+	var occupy_pending := false
+	var player_fight := false
+	for raw in resolved:
+		if not (raw is Dictionary):
+			continue
+		var ev: Dictionary = raw
+		if not bool(ev.get("resolved", false)):
+			continue
+		var att := str(ev.get("att_tag", "")).to_upper()
+		if att != player:
+			continue
+		player_fight = true
+		to_id = int(ev.get("to_id", -1))
+		winner = str(ev.get("winner", ""))
+		occupy_pending = bool(ev.get("occupy_pending", false))
+	if not player_fight:
+		_refresh_order_intent_arrows()
+		return
+	if occupy_pending:
+		var place := _province_display_name(to_id) if to_id > 0 else "the hex"
+		_show_inspector_toast("They broke · occupying %s · walk in to take it" % place, 4.5)
+		var ui := get_node_or_null("UI") as CanvasLayer
+		if ui != null:
+			var card: Node = ui.get_node_or_null("FightCard")
+			if card != null:
+				card.queue_free()
+		_open_fight_battle_id = ""
+		_refresh_order_intent_arrows()
+		_sync_land_battle_bubbles()
+	elif winner == "attacker":
+		_close_fight_card_taken(to_id, "They broke.")
+	elif not _open_fight_battle_id.is_empty():
+		_refresh_fight_card_if_open()
+
+
+func _close_fight_card_taken(to_id: int, line: String) -> void:
+	var place := _province_display_name(to_id) if to_id > 0 else "the hex"
+	_show_inspector_toast("Taken · %s · %s" % [place, line], 4.5)
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui != null:
+		var card: Node = ui.get_node_or_null("FightCard")
+		if card != null:
+			card.queue_free()
+	_open_fight_battle_id = ""
+	_refresh_order_intent_arrows()
+	_sync_land_battle_bubbles()
+
+
+func _show_fight_card(battle: Dictionary) -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	if DisplayServer.get_name() == "headless":
+		return
+	var old := ui.get_node_or_null("FightCard")
+	if old != null:
+		old.queue_free()
+	var brief: Dictionary = {}
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("build_fight_briefing"):
+		brief = BattleManager.build_fight_briefing(battle, _player_tag())
+	if brief.is_empty():
+		return
+	var outlook: Dictionary = brief.get("outlook", {}) as Dictionary
+	var band := str(outlook.get("band", "tight"))
+	var word := str(outlook.get("word", "Tight"))
+	var progress := clampf(float(outlook.get("progress", 0.5)), 0.0, 1.0)
+	var panel := DraggablePanel.new()
+	panel.name = "FightCard"
+	panel.z_index = 96
+	panel.clip_contents = true
+	panel.custom_minimum_size = Vector2(300, 220)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var unit_pop: Control = ui.get_node_or_null("UnitDetailPopup") as Control
+	if unit_pop != null and unit_pop.visible:
+		panel.position = Vector2(unit_pop.position.x + unit_pop.size.x + 12.0, unit_pop.position.y)
+	else:
+		var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
+		panel.position = Vector2(380.0, maxf(64.0, vp.y - 340.0))
+	panel.size = Vector2(340, 320)
+	ui.add_child(panel)
+	if panel.has_method("bring_to_front"):
+		panel.bring_to_front()
+	var chrome := PanelContainer.new()
+	chrome.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	chrome.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chrome.clip_contents = true
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_detail_panel_flat(chrome)
+	panel.add_child(chrome)
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(margin)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 6)
+	margin.add_child(vbox)
+	var title_row := HBoxContainer.new()
+	vbox.add_child(title_row)
+	var title := Label.new()
+	title.text = "Fight · %s" % str(brief.get("place", ""))
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_title(title, RetrowaveTheme.CYAN)
+	title.add_theme_font_size_override("font_size", 15)
+	title_row.add_child(title)
+	var close_btn := Button.new()
+	close_btn.text = "Close"
+	close_btn.focus_mode = Control.FOCUS_NONE
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_secondary_button(close_btn)
+	close_btn.pressed.connect(func() -> void:
+		_open_fight_battle_id = ""
+		if is_instance_valid(panel):
+			panel.queue_free()
+	)
+	title_row.add_child(close_btn)
+	var vs := Label.new()
+	vs.text = "%s → %s · %s" % [
+		str(brief.get("att_tag", "?")),
+		str(brief.get("def_tag", "?")),
+		word.to_upper(),
+	]
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_body_label(vs)
+	vbox.add_child(vs)
+	var bar_bg := ColorRect.new()
+	bar_bg.custom_minimum_size = Vector2(0, 10)
+	bar_bg.color = Color(0.12, 0.13, 0.16, 0.95)
+	bar_bg.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var bar_fill := ColorRect.new()
+	bar_fill.color = Color(0.95, 0.78, 0.22, 0.95)
+	if band == "likely":
+		bar_fill.color = Color(0.32, 0.84, 0.46, 0.95)
+	elif band == "bad":
+		bar_fill.color = Color(0.90, 0.32, 0.22, 0.95)
+	bar_fill.set_anchors_preset(Control.PRESET_LEFT_WIDE)
+	bar_fill.anchor_right = clampf(progress, 0.08, 1.0)
+	bar_bg.add_child(bar_fill)
+	vbox.add_child(bar_bg)
+	var staff := Label.new()
+	staff.text = "“%s”" % str(brief.get("staff_line", ""))
+	staff.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	staff.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_body_label(staff)
+	vbox.add_child(staff)
+	var ours_hdr := Label.new()
+	ours_hdr.text = "Our side"
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_title(ours_hdr, RetrowaveTheme.CYAN)
+	ours_hdr.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(ours_hdr)
+	var ours: Array = brief.get("ours", []) as Array
+	if ours.is_empty():
+		var empty_o := Label.new()
+		empty_o.text = "—"
+		vbox.add_child(empty_o)
+	for row in ours:
+		if not (row is Dictionary):
+			continue
+		var rl := Label.new()
+		var st := str((row as Dictionary).get("status", "engaged"))
+		rl.text = "%s  ·  %s" % [str((row as Dictionary).get("name", "?")), st.to_upper()]
+		if typeof(RetrowaveTheme) != TYPE_NIL:
+			RetrowaveTheme.style_body_label(rl)
+		vbox.add_child(rl)
+	var them := Label.new()
+	them.text = "Them (intel)"
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_title(them, RetrowaveTheme.CYAN)
+	them.add_theme_font_size_override("font_size", 12)
+	vbox.add_child(them)
+	var fog := Label.new()
+	var tn := int(brief.get("theirs_n", 1))
+	var fog_bits: PackedStringArray = PackedStringArray()
+	fog_bits.append("~%d formation%s engaged" % [tn, "s" if tn != 1 else ""])
+	if int(brief.get("theirs_joining", 0)) > 0:
+		fog_bits.append("possible reserve")
+	if bool(brief.get("fortified", false)):
+		fog_bits.append("Fortified (Maginot)")
+	if bool(brief.get("armor_present", false)):
+		fog_bits.append("armor present")
+	else:
+		fog_bits.append("composition unclear")
+	fog.text = " · ".join(fog_bits)
+	fog.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	fog.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_body_label(fog)
+	vbox.add_child(fog)
+	var cmd := HBoxContainer.new()
+	cmd.add_theme_constant_override("separation", 8)
+	vbox.add_child(cmd)
+	for pair in [["Press", "press"], ["Hold", "hold"], ["Withdraw", "withdraw"]]:
+		var b := Button.new()
+		b.text = str(pair[0])
+		b.focus_mode = Control.FOCUS_NONE
+		if typeof(RetrowaveTheme) != TYPE_NIL:
+			if str(pair[1]) == "press":
+				RetrowaveTheme.style_primary_button(b)
+			else:
+				RetrowaveTheme.style_secondary_button(b)
+		var stn := str(pair[1])
+		b.pressed.connect(func() -> void:
+			if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("set_land_battle_stance"):
+				BattleManager.set_land_battle_stance(selected_formation_id, stn)
+			_refresh_fight_card_if_open()
+		)
+		cmd.add_child(b)
 
 
 func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictionary = {}) -> void:
+	if to_pid > 0 and to_pid not in _living_land_chip_pids:
+		_living_land_chip_pids.append(to_pid)
+	if dest_id > 0 and dest_id not in _living_land_chip_pids:
+		_living_land_chip_pids.append(dest_id)
 	var pname := "province %d" % to_pid
 	if provinces.has(to_pid):
 		var p: Province = provinces[to_pid] as Province
 		if p != null:
 			pname = p.name
+	var occ: Dictionary = hop.get("occupy", {}) as Dictionary if hop is Dictionary else {}
+	if bool(occ.get("captured", false)):
+		_refresh_order_intent_arrows()
+		refresh_after_capture_light(to_pid, int(hop.get("from_id", -1)), -1)
+		var occ_tag := ""
+		if hop is Dictionary:
+			occ_tag = str(hop.get("country_tag", "")).to_upper()
+		if occ_tag.is_empty() or occ_tag == _player_tag():
+			_show_inspector_toast("Took %s · no opposition" % pname, 4.0)
+		return
+	if bool(occ.get("fought", false)):
+		_refresh_order_intent_arrows()
+		_show_inspector_toast("They walked in · fight at %s" % pname, 4.5)
+		return
 	var rf: Dictionary = hop.get("reinforce", {}) as Dictionary if hop is Dictionary else {}
 	if bool(rf.get("joined", false)):
 		_sync_land_battle_bubbles()
+		_refresh_fight_card_if_open()
+		_refresh_order_intent_arrows()
 		_play_map_sfx("confirm")
 		_show_inspector_toast(
 			"Reinforced front · %dv%d · lean %s · est. %d days"
@@ -17270,8 +17954,10 @@ func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictio
 		if _march_path_line != null and is_instance_valid(_march_path_line):
 			_march_path_line.queue_free()
 			_march_path_line = null
+		if _order_intent != null and _order_intent.has_method("clear_march"):
+			_order_intent.call("clear_march")
 		_play_unit_loop_sfx("arrive", _formation_for_sfx())
-		_show_inspector_toast("Arrived · %s · Ctrl+click enemy to assault" % pname, 4.0)
+		_show_inspector_toast("Arrived · %s · right-click / Ctrl+click enemy to fight" % pname, 4.0)
 		attack_staging_province_id = to_pid
 		debug_combat_attacker_province_id = to_pid
 	else:
@@ -17289,8 +17975,8 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 	var z := 1.0
 	if cam:
 		z = maxf(cam.zoom.x, cam.zoom.y)
-	# ~48px screen radius in world units; floor so tactical zoom stays finger-sized.
-	var hit_r := maxf(48.0 / maxf(z, 0.05), 20.0)
+	# Chip + bars are ~44×60 local; keep the disk at least plate-sized at tactical zoom.
+	var hit_r := maxf(80.0 / maxf(z, 0.05), 40.0)
 	var hit_r2 := hit_r * hit_r
 	var best_player: Object = null
 	var best_player_d := INF
@@ -17310,15 +17996,20 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 		# Hidden pins (strategic LOD) must not steal hex clicks.
 		if not counter.visible:
 			continue
-		# Centroids live in pick/camera space; global_position can drift after Close.
-		var chip_pos: Vector2 = province_centroids.get(id, Vector2.ZERO) as Vector2
+		# Prefer the drawn chip (global) so offset/chrome still hit.
+		var chip_pos: Vector2 = counter.global_position
 		if chip_pos == Vector2.ZERO:
-			chip_pos = counter.global_position
-		else:
+			chip_pos = province_centroids.get(id, Vector2.ZERO) as Vector2
 			chip_pos += _unit_chip_offset_for_pid(id)
 		var d := world_pos.distance_squared_to(chip_pos)
 		if d > hit_r2:
 			continue
+		# Capital hex: if the click is nearer the star than this chip, leave it for the star.
+		var pcap: Province = provinces.get(id) as Province if provinces.has(id) else null
+		if pcap != null and pcap.has_method("has_feature") and pcap.has_feature("capital"):
+			var star_c: Vector2 = _capital_star_world_center(id)
+			if star_c != Vector2.ZERO and world_pos.distance_squared_to(star_c) <= d:
+				continue
 		var fo: Object = null
 		if counter.has_meta("formation"):
 			var fmeta: Variant = counter.get_meta("formation")
@@ -17346,16 +18037,39 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 	return best_any
 
 
+func _clear_unit_detail_popup() -> void:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	var doomed: Array = []
+	for c in ui.get_children():
+		if str(c.name).begins_with("UnitDetailPopup"):
+			doomed.append(c)
+	for c in doomed:
+		if c is Control:
+			_unit_card_geom = Rect2((c as Control).position, (c as Control).size)
+		ui.remove_child(c)
+		c.free()
+
+
+func _show_unit_detail_popup_for_selected() -> void:
+	if selected_formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return
+	if not LeaderManager.has_method("get_formation"):
+		return
+	var fo: Object = LeaderManager.get_formation(selected_formation_id)
+	if fo != null:
+		_show_unit_detail_popup(fo)
+
+
 func _show_unit_detail_popup(formation: Object) -> void:
 	if formation == null:
 		return
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return
-	# Replace previous card.
-	var old := ui.get_node_or_null("UnitDetailPopup")
-	if old != null:
-		old.queue_free()
+	# One card only — queue_free left the old panel for a frame so a second stacked on top.
+	_clear_unit_detail_popup()
 
 	var name_s := "Unit"
 	if "name" in formation:
@@ -17402,27 +18116,43 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		if p != null:
 			prov_name = p.name
 
-	var panel := PanelContainer.new()
+	var panel := DraggablePanel.new()
 	panel.name = "UnitDetailPopup"
-	panel.z_index = 70
+	panel.z_index = 90
 	panel.clip_contents = true
-	panel.custom_minimum_size = Vector2(320, 220)
-	RetrowaveTheme.style_detail_panel_flat(panel)
+	panel.custom_minimum_size = Vector2(320, 240)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	# Docked HOI-style unit card (bottom-left). UNIT_CARD_DOCK / unit_card_dock — not a mouse popup.
 	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
-	var dock := Vector2(18.0, maxf(64.0, vp.y - 276.0))
-	panel.position = dock
+	var dock := Vector2(18.0, maxf(64.0, vp.y - 360.0))
+	if _unit_card_geom.size.x >= 320.0:
+		panel.position = _unit_card_geom.position
+		panel.size = _unit_card_geom.size
+	else:
+		panel.position = dock
+		panel.size = Vector2(360, 340)
 	panel.set_meta("unit_card_dock", true)
-	ui.add_child(panel)
+	var chrome := PanelContainer.new()
+	chrome.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	chrome.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	chrome.clip_contents = true
+	RetrowaveTheme.style_detail_panel_flat(chrome)
+	panel.add_child(chrome)
 
 	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 12)
 	margin.add_theme_constant_override("margin_right", 12)
 	margin.add_theme_constant_override("margin_top", 10)
-	margin.add_theme_constant_override("margin_bottom", 10)
+	margin.add_theme_constant_override("margin_bottom", 22)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	margin.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	margin.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	panel.add_child(margin)
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 6)
+	vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	vbox.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	margin.add_child(vbox)
 
 	var title_row := HBoxContainer.new()
@@ -17438,12 +18168,24 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	var close_btn := Button.new()
 	close_btn.name = "BtnClose"
 	close_btn.text = "Close"
+	close_btn.custom_minimum_size = Vector2(76, 28)
 	close_btn.focus_mode = Control.FOCUS_NONE
+	close_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	RetrowaveTheme.style_secondary_button(close_btn)
 	close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	close_btn.pressed.connect(_dismiss_inspector_and_restore_input)
+	close_btn.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton:
+			var mb := ev as InputEventMouseButton
+			if mb.button_index == MOUSE_BUTTON_LEFT and mb.pressed:
+				_dismiss_inspector_and_restore_input()
+				close_btn.accept_event()
+	)
 	title_row.add_child(close_btn)
+	title_row.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.drag_handle = title_row
+	ui.add_child(panel)
 
 	if typeof(UnitCardCombatStrip) != TYPE_NIL:
 		var fill_lbl := Label.new()
@@ -17454,7 +18196,8 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		if fill_txt.is_empty():
 			fill_txt = "Fill —% · TOE —"
 		fill_lbl.text = fill_txt
-		fill_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		fill_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		fill_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		RetrowaveTheme.style_body_label(fill_lbl)
 		fill_lbl.add_theme_color_override("font_color", RetrowaveTheme.CYAN)
 		fill_lbl.add_theme_font_size_override("font_size", 14)
@@ -17463,19 +18206,20 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		fight_row.add_theme_constant_override("separation", 6)
 		vbox.add_child(fight_row)
 		var fight_btn := Button.new()
-		fight_btn.text = "Open fight"
+		fight_btn.name = "BtnAttack"
+		fight_btn.text = "Attack"
 		fight_btn.focus_mode = Control.FOCUS_NONE
-		fight_btn.tooltip_text = "Start a multi-day land battle from this unit into an adjacent enemy."
+		fight_btn.tooltip_text = "Attack the adjacent enemy hex. Right-click that hex does the same."
 		RetrowaveTheme.style_primary_button(fight_btn)
-		var fight_fid := fid
 		fight_btn.pressed.connect(func() -> void:
-			_open_fight_from_formation_id(fight_fid)
+			open_living_assault()
 		)
 		fight_row.add_child(fight_btn)
 
 	var body := Label.new()
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body.custom_minimum_size = Vector2(290, 0)
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.custom_minimum_size = Vector2(0, 0)
 	var lines: PackedStringArray = []
 	if not tag.is_empty():
 		lines.append("Nation: %s" % tag)
@@ -17500,10 +18244,11 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	if not fid.is_empty():
 		lines.append("ID: %s" % fid)
 	# Stack at this province (one pin; cycle via [ ] or card buttons).
+	# Hang-class: do not call get_divisions_at_province (SupplyManager scans all deployments).
 	var stack_divs: Array = []
 	var stack_idx := 0
-	if pid >= 0 and not tag.is_empty() and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
-		stack_divs = BattleManager.get_divisions_at_province(pid, tag)
+	if pid >= 0 and not tag.is_empty() and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("_land_formations_stationed_at"):
+		stack_divs = BattleManager.call("_land_formations_stationed_at", pid, tag)
 		for si in stack_divs.size():
 			if str(stack_divs[si].get("formation_id", "")) == fid:
 				stack_idx = si
@@ -17513,7 +18258,9 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	body.text = "\n".join(lines)
 	RetrowaveTheme.style_body_label(body)
 	var body_scroll := ScrollContainer.new()
-	body_scroll.custom_minimum_size = Vector2(300, 88)
+	body_scroll.custom_minimum_size = Vector2(0, 72)
+	body_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	vbox.add_child(body_scroll)
 	body_scroll.add_child(body)
@@ -17547,6 +18294,12 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			bat = BattleManager.get_land_battle_at(pid)
 	var in_battle := not bat.is_empty()
 	if in_battle:
+		for ch in vbox.get_children():
+			if ch is HBoxContainer:
+				var b: Node = (ch as HBoxContainer).get_node_or_null("BtnAttack")
+				if b != null:
+					(ch as CanvasItem).visible = false
+					break
 		var att_tag := str(bat.get("att_tag", tag))
 		var def_tag := str(bat.get("def_tag", "?"))
 		lines.append("Fight · %s vs %s" % [att_tag, def_tag])
@@ -17601,23 +18354,6 @@ func _show_unit_detail_popup(formation: Object) -> void:
 			_show_unit_detail_popup(formation)
 		)
 		cmd_row.add_child(wd_btn)
-	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_available_leaders"):
-		var avail: Array = LeaderManager.get_available_leaders(tag)
-		if avail.size() > 0:
-			var L: Variant = avail[0]
-			var lname := str(L.name) if L is Object and "name" in L else "leader"
-			var as_btn := Button.new()
-			as_btn.text = "Assign %s" % lname
-			as_btn.focus_mode = Control.FOCUS_NONE
-			as_btn.tooltip_text = "Assign an unused leader of this tag."
-			RetrowaveTheme.style_secondary_button(as_btn)
-			as_btn.pressed.connect(func() -> void:
-				if formation != null and formation.has_method("assign_leader") and L is Object:
-					formation.assign_leader(L as Object)
-				_show_inspector_toast("Leader assigned · %s" % lname, 3.0)
-				_show_unit_detail_popup(formation)
-			)
-			cmd_row.add_child(as_btn)
 	var is_air := ftype == "air_wing" or ftype == "air_squadron" or ftype == "air_group"
 	if is_air and typeof(LeaderManager) != TYPE_NIL:
 		var air_rid := int(formation.get("assigned_region_id")) if "assigned_region_id" in formation else 0
@@ -17675,13 +18411,48 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		stack_row.add_child(next_btn)
 
 	var hint := Label.new()
-	hint.text = "SELECTED · click friendly land to MARCH (arrives in N days) · Ctrl+click enemy to ASSAULT · Esc clears"
+	hint.text = "SELECTED · click own land to MARCH · right-click / Ctrl+click enemy to FIGHT · Esc clears"
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	hint.custom_minimum_size = Vector2(290, 0)
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	hint.custom_minimum_size = Vector2(0, 0)
 	RetrowaveTheme.style_body_label(hint)
 	hint.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
 	hint.add_theme_font_size_override("font_size", 11)
 	vbox.add_child(hint)
+
+	var grip := ColorRect.new()
+	grip.name = "ResizeGrip"
+	grip.color = Color(0.35, 0.85, 0.95, 0.55)
+	grip.custom_minimum_size = Vector2(16, 16)
+	grip.size = Vector2(16, 16)
+	grip.mouse_filter = Control.MOUSE_FILTER_STOP
+	grip.mouse_default_cursor_shape = Control.CURSOR_FDIAGSIZE
+	grip.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+	grip.offset_left = -18.0
+	grip.offset_top = -18.0
+	grip.offset_right = -2.0
+	grip.offset_bottom = -2.0
+	panel.add_child(grip)
+	var resizing := {"on": false}
+	grip.gui_input.connect(func(ev: InputEvent) -> void:
+		if ev is InputEventMouseButton:
+			var mb2 := ev as InputEventMouseButton
+			if mb2.button_index == MOUSE_BUTTON_LEFT:
+				resizing["on"] = mb2.pressed
+				grip.accept_event()
+		elif ev is InputEventMouseMotion and bool(resizing["on"]):
+			var gmp := panel.get_global_mouse_position()
+			var ns := gmp - panel.global_position
+			ns.x = maxf(ns.x, panel.custom_minimum_size.x)
+			ns.y = maxf(ns.y, panel.custom_minimum_size.y)
+			panel.size = ns
+			_unit_card_geom = Rect2(panel.position, panel.size)
+			grip.accept_event()
+	)
+	panel.tree_exiting.connect(func() -> void:
+		if is_instance_valid(panel):
+			_unit_card_geom = Rect2(panel.position, panel.size)
+	)
 
 	panel.gui_input.connect(func(ev: InputEvent) -> void:
 		if ev is InputEventMouseButton and ev.pressed:
@@ -18336,8 +19107,367 @@ const _ASSAULT_CONFIRM_WINDOW_MS: int = 5000
 var _assault_execute_busy: bool = false
 ## Player-selected map unit (grey pin click) for move / assault staging.
 var selected_formation_id: String = ""
+## Right still-click orders the selected unit (march / open fight). Right-drag still pans.
+var _right_order_armed: bool = false
+var _right_order_origin: Vector2 = Vector2.ZERO
+var _right_order_slop_sq: float = 0.0
 ## One-shot toast when hex-click happens while pins are hidden (strategic / master-off).
 var _unit_pick_strategic_hint_shown: bool = false
+
+
+func _arm_right_unit_order() -> bool:
+	if selected_formation_id.is_empty():
+		_right_order_armed = false
+		return false
+	if typeof(DebugOverlay) != TYPE_NIL and DebugOverlay.is_map_debug_tools_active():
+		_right_order_armed = false
+		return false
+	var vp: Viewport = get_viewport()
+	_right_order_armed = true
+	_right_order_origin = vp.get_mouse_position() if vp != null else Vector2.ZERO
+	_right_order_slop_sq = 0.0
+	return true
+
+
+func _note_right_order_slop() -> void:
+	if not _right_order_armed:
+		return
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return
+	var slop_sq: float = vp.get_mouse_position().distance_squared_to(_right_order_origin)
+	if slop_sq > _right_order_slop_sq:
+		_right_order_slop_sq = slop_sq
+	if _right_order_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+		_right_order_armed = false
+		_is_middle_dragging = true
+		_middle_drag_start = _right_order_origin
+		_last_mouse_pos = vp.get_mouse_position()
+
+
+func _release_right_unit_order() -> bool:
+	if not _right_order_armed:
+		return false
+	_right_order_armed = false
+	if _right_order_slop_sq >= LEFT_PAN_SLOP_PX * LEFT_PAN_SLOP_PX:
+		return false
+	return _try_right_order_at_mouse()
+
+
+func _try_right_order_at_mouse() -> bool:
+	if selected_formation_id.is_empty():
+		return false
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return false
+	var world_pos := _screen_to_world(vp.get_mouse_position())
+	print("[pick] right-order world=", world_pos)
+	if _try_pick_order_intent(world_pos):
+		return true
+	var pid := -1
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
+		pid = MapManager.get_province_at_world_pos(world_pos, true)
+		if MapManager.has_method("resolve_pick_province_id"):
+			pid = MapManager.resolve_pick_province_id(pid)
+	if pid < 0 or not provinces.has(pid):
+		_show_inspector_toast("Right-click a hex · own land MARCH · enemy ATTACK", 3.0)
+		return true
+	var province: Province = provinces[pid] as Province
+	var res: Dictionary = order_selected_unit_at_province(province)
+	return bool(res.get("handled", false))
+
+
+## Living click-order: selected chip → own land marches, adjacent enemy ATTACKS.
+## Extra box only when not at war / no access. Never execute_province_assault on the click.
+func order_selected_unit_at_province(province: Province) -> Dictionary:
+	var out := {
+		"handled": false,
+		"ok": false,
+		"kind": "",
+		"fid": selected_formation_id,
+		"from_id": -1,
+		"to_id": -1,
+	}
+	if province == null or selected_formation_id.is_empty():
+		return out
+	var now_ms := Time.get_ticks_msec()
+	if DisplayServer.get_name() != "headless" and now_ms < _order_busy_until_msec:
+		out["handled"] = true
+		out["kind"] = "busy"
+		return out
+	var p_tag := _player_tag()
+	if p_tag.is_empty():
+		out["handled"] = true
+		out["kind"] = "no_player"
+		_show_inspector_toast("Set player country before ordering.", 3.0, true)
+		return out
+	out["to_id"] = int(province.id)
+	if _province_controlled_by(province, p_tag):
+		var marched := _try_move_selected_unit_to_province(province)
+		out["handled"] = marched
+		out["ok"] = marched
+		out["kind"] = "march"
+		return out
+	var fo: Object = null
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		fo = LeaderManager.get_formation(selected_formation_id)
+	if fo == null:
+		out["kind"] = "no_unit"
+		return out
+	var from_pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	var tag := str(fo.country_tag).strip_edges().to_upper() if "country_tag" in fo else p_tag
+	out["from_id"] = from_pid
+	var ot := str(province.owner_tag).strip_edges().to_upper()
+	if ot.is_empty() or ot == tag:
+		out["handled"] = true
+		out["kind"] = "blocked"
+		_show_inspector_toast("Order · pick own land to march or an enemy hex to fight", 3.0)
+		return out
+	var adjacent := false
+	if from_pid >= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_adjacent_provinces"):
+		for nv in MapManager.get_adjacent_provinces(from_pid, true):
+			if int(nv) == int(province.id):
+				adjacent = true
+				break
+	if not adjacent:
+		out["handled"] = true
+		out["kind"] = "not_adjacent"
+		_show_inspector_toast(
+			"March next to %s, then right-click to attack" % province.name,
+			4.0
+		)
+		return out
+	attack_staging_province_id = from_pid
+	debug_combat_attacker_province_id = from_pid
+	if not _is_at_war_with(tag, ot):
+		out["handled"] = true
+		out["kind"] = "will_gate"
+		out["reason"] = "not at war"
+		_order_busy_until_msec = now_ms + 600
+		_show_will_gate_sheet(tag, ot, from_pid, int(province.id), "not at war")
+		return out
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_land_battle_at"):
+		var existing: Dictionary = BattleManager.get_land_battle_at(int(province.id))
+		if not existing.is_empty() and str(existing.get("att_tag", "")).to_upper() == tag:
+			out["handled"] = true
+			out["ok"] = true
+			out["kind"] = "already_fighting"
+			_show_unit_detail_popup_for_selected()
+			_show_inspector_toast("Already fighting in %s · Press / Hold / Withdraw" % province.name, 3.5)
+			return out
+	var can: Dictionary = {}
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("can_assault_province"):
+		can = BattleManager.can_assault_province(tag, int(province.id), from_pid)
+	if not bool(can.get("ok", false)):
+		out["handled"] = true
+		out["kind"] = "blocked"
+		out["reason"] = str(can.get("reason", "Cannot assault"))
+		_show_inspector_toast(str(can.get("reason", "Cannot assault")), 3.5, true)
+		return out
+	print(
+		"MapRenderer: order attack %s %d → %d"
+		% [tag, from_pid, int(province.id)]
+	)
+	_order_busy_until_msec = now_ms + 800
+	call_deferred(
+		"_deferred_commit_attack",
+		tag,
+		from_pid,
+		int(province.id),
+		selected_formation_id
+	)
+	out["handled"] = true
+	out["ok"] = true
+	out["kind"] = "start_battle"
+	return out
+
+
+func _deferred_commit_attack(tag: String, from_pid: int, to_pid: int, fid: String) -> void:
+	var fo: Object = null
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		fo = LeaderManager.get_formation(fid)
+	_commit_selected_attack(tag, from_pid, to_pid, fid, fo)
+
+
+func _commit_selected_attack(
+	tag: String,
+	from_pid: int,
+	to_pid: int,
+	fid: String,
+	formation: Object
+) -> Dictionary:
+	var out := {"ok": false, "kind": "start_battle"}
+	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("start_land_battle"):
+		_show_inspector_toast("Battle API missing", 3.0, true)
+		return out
+	print("MapRenderer: start_land_battle begin %s %d→%d" % [tag, from_pid, to_pid])
+	var assault: Dictionary = BattleManager.start_land_battle(tag, to_pid, from_pid, fid)
+	print("MapRenderer: start_land_battle done opened=%s instant=%s" % [
+		str(assault.get("opened", false)), str(assault.get("instant", false))
+	])
+	var pname := _province_display_name(to_pid)
+	if bool(assault.get("opened", false)):
+		out["ok"] = true
+		_show_inspector_toast("Attacking %s · unpause · Press / Hold" % pname, 4.5)
+		call_deferred("_refresh_order_intent_arrows")
+		return out
+	if bool(assault.get("occupy_move", false)):
+		out["ok"] = true
+		out["kind"] = "occupy_move"
+		if typeof(FormationMovement) != TYPE_NIL:
+			var occ: Dictionary = FormationMovement.enqueue_occupy_adjacent(fid, to_pid, tag)
+			if bool(occ.get("ok", false)):
+				_highlight_occupy_arrow(from_pid, to_pid)
+				_show_inspector_toast("Occupying %s · no opposition · unpause to walk in" % pname, 4.5)
+			else:
+				_show_inspector_toast(str(occ.get("reason", "Can't occupy")), 3.2, true)
+		return out
+	if bool(assault.get("instant", false)):
+		out["ok"] = true
+		out["kind"] = "instant_capture"
+		_show_inspector_toast("Took %s" % pname, 4.0)
+		refresh_after_capture_light(to_pid, from_pid, -1)
+		return out
+	_show_inspector_toast(str(assault.get("reason", "Attack failed")), 3.2, true)
+	return out
+
+
+func _show_will_gate_sheet(
+	attacker_tag: String,
+	defender_tag: String,
+	from_pid: int,
+	to_pid: int,
+	reason: String
+) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return
+	var old := ui.get_node_or_null("WillGateSheet")
+	if old != null and is_instance_valid(old):
+		return
+	var place := _province_display_name(to_pid)
+	var panel := DraggablePanel.new()
+	panel.name = "WillGateSheet"
+	panel.z_index = 125
+	panel.clip_contents = true
+	panel.custom_minimum_size = Vector2(360, 240)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
+	var unit_pop: Control = ui.get_node_or_null("UnitDetailPopup") as Control
+	if unit_pop != null and unit_pop.visible:
+		panel.position = Vector2(unit_pop.position.x + unit_pop.size.x + 16.0, unit_pop.position.y)
+	else:
+		panel.position = Vector2(370.0, maxf(64.0, vp.y - 340.0))
+	panel.size = Vector2(380, 280)
+	ui.add_child(panel)
+	if panel.has_method("bring_to_front"):
+		panel.bring_to_front()
+	var chrome := PanelContainer.new()
+	chrome.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	chrome.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_detail_panel_flat(chrome)
+	panel.add_child(chrome)
+	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	margin.add_theme_constant_override("margin_left", 12)
+	margin.add_theme_constant_override("margin_right", 12)
+	margin.add_theme_constant_override("margin_top", 10)
+	margin.add_theme_constant_override("margin_bottom", 10)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_child(margin)
+	var vbox := VBoxContainer.new()
+	vbox.add_theme_constant_override("separation", 8)
+	margin.add_child(vbox)
+	var title := Label.new()
+	title.text = "Not at war with %s" % defender_tag
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_title(title, RetrowaveTheme.CYAN)
+	title.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(title)
+	var body := Label.new()
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var why := reason.strip_edges()
+	if why.is_empty():
+		why = "no access"
+	body.text = "You do not have access to %s. Declare war, or try to negotiate access." % place
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_body_label(body)
+	vbox.add_child(body)
+	var start_tag := attacker_tag
+	var start_from := from_pid
+	var start_to := to_pid
+	var start_fid := selected_formation_id
+	var war_btn := Button.new()
+	war_btn.text = "Declare war"
+	war_btn.focus_mode = Control.FOCUS_NONE
+	war_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_primary_button(war_btn)
+	war_btn.pressed.connect(func() -> void:
+		if typeof(GameData) != TYPE_NIL and GameData.has_method("apply_war_goal_execute"):
+			GameData.apply_war_goal_execute(start_to)
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("declare_war"):
+			LeaderManager.declare_war(start_tag, defender_tag)
+		elif typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("set_country_at_war"):
+			LeaderManager.set_country_at_war(start_tag, true)
+		var fo: Object = null
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+			fo = LeaderManager.get_formation(start_fid)
+		_commit_selected_attack(start_tag, start_from, start_to, start_fid, fo)
+		if is_instance_valid(panel):
+			panel.queue_free()
+	)
+	vbox.add_child(war_btn)
+	var talk_btn := Button.new()
+	talk_btn.text = "Negotiate access"
+	talk_btn.focus_mode = Control.FOCUS_NONE
+	talk_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_secondary_button(talk_btn)
+	talk_btn.pressed.connect(func() -> void:
+		_show_inspector_toast("Access talks with %s — not landed yet" % defender_tag, 4.0)
+		if is_instance_valid(panel):
+			panel.queue_free()
+	)
+	vbox.add_child(talk_btn)
+	var cancel_btn := Button.new()
+	cancel_btn.text = "Cancel"
+	cancel_btn.focus_mode = Control.FOCUS_NONE
+	cancel_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_secondary_button(cancel_btn)
+	cancel_btn.pressed.connect(func() -> void:
+		if is_instance_valid(panel):
+			panel.queue_free()
+	)
+	vbox.add_child(cancel_btn)
+
+
+## Play-strip / NEXT Assault: selected unit attacks adjacent enemy (sheet only if gated).
+func open_living_assault() -> Dictionary:
+	var out := {"ok": false, "kind": "", "fid": selected_formation_id, "from_id": -1, "to_id": -1}
+	if not selected_formation_id.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var fo: Object = LeaderManager.get_formation(selected_formation_id)
+		if fo != null:
+			var from_pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+			var tag := str(fo.country_tag).strip_edges().to_upper() if "country_tag" in fo else _player_tag()
+			var enemy_pid := _adjacent_enemy_province_id(from_pid, tag)
+			out["from_id"] = from_pid
+			out["to_id"] = enemy_pid
+			out["fid"] = selected_formation_id
+			if enemy_pid > 0 and provinces.has(enemy_pid):
+				var ordered: Dictionary = order_selected_unit_at_province(provinces[enemy_pid] as Province)
+				out["ok"] = bool(ordered.get("ok", ordered.get("handled", false)))
+				out["kind"] = str(ordered.get("kind", "start_battle"))
+				return out
+	_open_fight_from_formation_id(selected_formation_id)
+	out["ok"] = true
+	out["kind"] = "maginot_or_selected"
+	return out
 
 
 func _open_fight_from_formation_id(fid: String) -> void:
@@ -18377,8 +19507,6 @@ func _open_fight_from_formation_id(fid: String) -> void:
 	var att_fid := ""
 	var fo: Object = picked
 	if fo != null and "country_tag" in fo and str(fo.country_tag).strip_edges().to_upper() == "GER":
-		if "stationed_province_id" in fo:
-			fo.stationed_province_id = GER_FRONT
 		att_fid = fid
 	if att_fid.is_empty() and LeaderManager.has_method("get_formations_for_country"):
 		for f in LeaderManager.get_formations_for_country("GER"):
@@ -18387,20 +19515,25 @@ func _open_fight_from_formation_id(fid: String) -> void:
 			var ft := str(f.formation_type) if "formation_type" in f else ""
 			if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
 				continue
-			if "stationed_province_id" in f:
-				f.stationed_province_id = GER_FRONT
 			att_fid = str(f.formation_id) if "formation_id" in f else ""
 			fo = f
-			break
+			if "stationed_province_id" in f and int(f.stationed_province_id) == GER_FRONT:
+				break
 	if att_fid.is_empty() or fo == null:
 		_show_inspector_toast("Open fight · no GER land division to stage", 3.5, true)
 		return
+	var from_pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else GER_FRONT
+	if from_pid <= 0:
+		from_pid = GER_FRONT
+	var enemy_pid := _adjacent_enemy_province_id(from_pid, "GER")
+	if enemy_pid <= 0:
+		enemy_pid = FRA_FRONT
 	selected_formation_id = att_fid
-	attack_staging_province_id = GER_FRONT
+	attack_staging_province_id = from_pid
 	if typeof(BattleManager) == TYPE_NIL or not BattleManager.has_method("start_land_battle"):
 		_show_inspector_toast("Open fight · battle API missing", 3.0, true)
 		return
-	_show_open_fight_sheet(att_fid, fo, GER_FRONT, FRA_FRONT, "GER")
+	_show_open_fight_sheet(att_fid, fo, from_pid, enemy_pid, "GER")
 
 
 func _adjacent_enemy_province_id(from_pid: int, owner_tag: String = "") -> int:
@@ -18445,6 +19578,8 @@ func _show_open_fight_sheet(
 	enemy_pid: int,
 	attacker_tag: String
 ) -> void:
+	if DisplayServer.get_name() == "headless":
+		return
 	var ui := get_node_or_null("UI") as CanvasLayer
 	if ui == null:
 		return
@@ -18488,21 +19623,36 @@ func _show_open_fight_sheet(
 			var can_pre: Dictionary = BattleManager.can_assault_province(attacker_tag, enemy_pid, from_pid)
 			can_ok = bool(can_pre.get("ok", false))
 			can_reason = str(can_pre.get("reason", can_reason))
-	var panel := PanelContainer.new()
+	var panel := DraggablePanel.new()
 	panel.name = "OpenFightSheet"
-	panel.z_index = 75
-	panel.clip_contents = true
+	panel.z_index = 120
+	panel.clip_contents = false
 	panel.custom_minimum_size = Vector2(360, 240)
-	if typeof(RetrowaveTheme) != TYPE_NIL:
-		RetrowaveTheme.style_detail_panel_flat(panel)
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
-	panel.position = Vector2(18.0, maxf(64.0, vp.y - 420.0))
+	# Sit to the right of the unit card so Start battle is not buried under Division 1.
+	var unit_pop: Control = ui.get_node_or_null("UnitDetailPopup") as Control
+	if unit_pop != null and unit_pop.visible:
+		panel.position = Vector2(unit_pop.position.x + unit_pop.size.x + 16.0, unit_pop.position.y)
+	else:
+		panel.position = Vector2(370.0, maxf(64.0, vp.y - 320.0))
+	panel.size = Vector2(380, 280)
 	ui.add_child(panel)
+	if panel.has_method("bring_to_front"):
+		panel.bring_to_front()
+	var chrome := PanelContainer.new()
+	chrome.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	chrome.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_detail_panel_flat(chrome)
+	panel.add_child(chrome)
 	var margin := MarginContainer.new()
+	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 12)
 	margin.add_theme_constant_override("margin_right", 12)
 	margin.add_theme_constant_override("margin_top", 10)
 	margin.add_theme_constant_override("margin_bottom", 10)
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_child(margin)
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 6)
@@ -18523,7 +19673,10 @@ func _show_open_fight_sheet(
 	close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	if typeof(RetrowaveTheme) != TYPE_NIL:
 		RetrowaveTheme.style_secondary_button(close_btn)
-	close_btn.pressed.connect(_dismiss_inspector_and_restore_input)
+	close_btn.pressed.connect(func() -> void:
+		if is_instance_valid(panel):
+			panel.queue_free()
+	)
 	title_row.add_child(close_btn)
 	var body := Label.new()
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -18579,7 +19732,12 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 	if p_tag.is_empty():
 		_show_inspector_toast("Set player country (TopInfoBar) before attacking.", 3.0, true)
 		return true
-	# Play: Ctrl+click must open the Attacker/Defender sheet (not a toast / not a silent no-op).
+	# Play: selected unit orders into the CLICKED hex (sheet → Start battle).
+	# BattleManager.start_land_battle is the confirm on that sheet — never execute on this click.
+	if not selected_formation_id.is_empty():
+		var ordered: Dictionary = order_selected_unit_at_province(target_province)
+		if bool(ordered.get("handled", false)):
+			return true
 	_open_fight_from_formation_id(selected_formation_id)
 	return true
 
@@ -19701,7 +20859,7 @@ func ensure_equipment_flow_glyphs_on() -> Dictionary:
 ## Cheap G / first-session order toast — never pathfinds.
 func _toast_easy_unit_orders() -> void:
 	var toast := (
-		"Maginot — 1. Infanterie can assault Alsace · Open fight / Ctrl+click FRA · Start battle"
+		"Maginot — click the GER chip · right-click Alsace or Ctrl+click · Start battle"
 	)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug(toast)
@@ -19714,8 +20872,8 @@ func _toast_easy_unit_orders() -> void:
 ## First-session help toast (? / Shift+/) — mirrors first_session_hotkeys_product.
 func _toast_first_session_help() -> void:
 	var toast := (
-		"Help · click a GER chip (str %) · click own land to MARCH · Ctrl+click enemy to ASSAULT · "
-		+ "B Fronts · F1–F9 mapmodes · Ctrl+S save · Home Europe"
+		"Help · click a GER chip (str %) · click / right-click own land to MARCH · "
+		+ "right-click or Ctrl+click enemy to FIGHT · B Fronts · F1–F9 · Ctrl+S save · Home Europe"
 	)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug(toast)
@@ -20412,6 +21570,12 @@ func _ensure_supply_overlay_panel() -> void:
 	supply_overlay_panel.set_mode_callback(_on_supply_mode_changed)
 
 
+func _is_at_war_with(a: String, b: String) -> bool:
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("is_at_war_with"):
+		return bool(LeaderManager.is_at_war_with(a, b))
+	return false
+
+
 func _player_tag() -> String:
 	# Prefer the explicit LeaderManager player (F5 sets GER). Unset falls through
 	# to SupplyManager, then Maginot default — never treat empty as USA.
@@ -20747,48 +21911,40 @@ func _get_interesting_province_ids() -> Dictionary:
 	return ints
 
 
-## Prefer world-class retrowave unit chips when available; fall back to nato/ww2|modern paths.
-## Land NATO glyphs stay NATO — retrowave 32s are opaque dark plates that hide org/str chrome.
+## Map counters use NATO glyphs on living plates. Retrowave 32s are opaque dark
+## plates (cyan outline, pink glyph) that hide org/str chrome — play: GER hex spam.
 func _prefer_retrowave_unit_icon(tex_path: String) -> String:
+	# Land NATO stays NATO: retrowave 32s are opaque dark plates that hide org/str chrome.
 	var p := tex_path.strip_edges()
 	if p.is_empty():
 		return p
-	var file := p.get_file()  # e.g. infantry_32.png
+	var file := p.get_file()
 	var stem := file.get_basename().replace("_32", "").replace("_64", "")
-	# Land NATO stays NATO: retrowave 32s are opaque dark plates that hide org/str chrome.
+	# Furniture is not a unit. Living DemoUnitIcon only.
 	if stem in [
-		"infantry", "artillery", "rocket", "logistics",
-		"light_tank", "medium_tank", "heavy_tank",
+		"fort", "fort_bunker", "fort_heavy", "fort_damaged",
+		"port", "port_jetty", "port_major", "port_damaged",
+		"airfield", "airfield_strip", "airfield_hangar", "airfield_damaged",
 	]:
+		return ""
+	if not p.begins_with("res://assets/graphics/units/retrowave/"):
 		return p
-	# Already a retrowave path (e.g. frigate).
-	if p.begins_with("res://assets/graphics/units/retrowave/") and ResourceLoader.exists(p):
-		return p
-	# Map cruiser nato path → retrowave cruiser (file may not exist under nato/cruiser).
-	if "battleship" in file:
-		var bb := "res://assets/graphics/units/retrowave/battleship_32.png"
-		if ResourceLoader.exists(bb):
-			return bb
-	if "cruiser" in file:
-		var cru := "res://assets/graphics/units/retrowave/cruiser_32.png"
-		if ResourceLoader.exists(cru):
-			return cru
-	if "frigate" in file:
-		var fri := "res://assets/graphics/units/retrowave/frigate_32.png"
-		if ResourceLoader.exists(fri):
-			return fri
-	var rw := "res://assets/graphics/units/retrowave/" + file
-	if ResourceLoader.exists(rw):
-		return rw
-	# Try 32 if path was 64 and vice versa
-	if file.ends_with("_64.png"):
-		var rw32 := "res://assets/graphics/units/retrowave/" + file.replace("_64.png", "_32.png")
-		if ResourceLoader.exists(rw32):
-			return rw32
-	elif file.ends_with("_32.png"):
-		var rw64 := "res://assets/graphics/units/retrowave/" + file.replace("_32.png", "_64.png")
-		if ResourceLoader.exists(rw64):
-			return rw64
+	# Remap leftover retrowave unit plates (fighter/infantry/…) to NATO.
+	for folder in ["ww2", "modern"]:
+		var nato := "res://assets/graphics/units/nato/%s/%s" % [folder, file]
+		if ResourceLoader.exists(nato):
+			return nato
+	if stem in ["fighter", "bomber", "helicopter"]:
+		var air := "res://assets/graphics/units/nato/ww2/fighter_32.png"
+		if ResourceLoader.exists(air):
+			return air
+	if stem in ["destroyer", "cruiser", "frigate", "battleship", "convoy", "submarine"]:
+		var sea := "res://assets/graphics/units/nato/ww2/destroyer_32.png"
+		if ResourceLoader.exists(sea):
+			return sea
+	var inf := "res://assets/graphics/units/nato/ww2/infantry_32.png"
+	if ResourceLoader.exists(inf):
+		return inf
 	return p
 
 
@@ -20847,6 +22003,7 @@ func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 	if _demo_unit_icon_pids.is_empty():
 		return
 	var vis := _unit_counters_want_visible(z)
+	var zz := z if z >= 0.0 else (_get_camera_zoom() if has_method("_get_camera_zoom") else 1.0)
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
 		if not province_nodes.has(id):
@@ -20854,9 +22011,87 @@ func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 		var node: Node2D = province_nodes[id] as Node2D
 		if node == null:
 			continue
+		var p: Province = provinces.get(id) as Province if provinces.has(id) else null
 		for c in node.get_children():
 			if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
-				(c as Node2D).visible = vis
+				var ff: Object = null
+				if (c as Node2D).has_meta("formation"):
+					ff = (c as Node2D).get_meta("formation") as Object
+				(c as Node2D).visible = vis and _chip_should_show_at_zoom(id, ff, p, zz)
+
+
+## Living plates: any Formation object. Maginot always. No tag-only pins.
+func _chip_should_show_at_zoom(pid: int, ff: Object, p: Province, z: float) -> bool:
+	if pid == 710173 or pid == 710739:
+		return true
+	if pid in _living_land_chip_pids:
+		return true
+	return ff != null
+
+
+func _debug_log_map_sprite_inventory() -> void:
+	var counts: Dictionary = {}
+	var root: Node = container if container != null else self
+	_tally_sprites_under(root, counts)
+	var keys: Array = counts.keys()
+	keys.sort()
+	print("MapRenderer: sprite inventory n=", counts.size())
+	for k in keys:
+		print("  sprite x", counts[k], " ", k)
+
+
+func _tally_sprites_under(n: Node, counts: Dictionary) -> void:
+	if n == null:
+		return
+	if n is Sprite2D:
+		var spr := n as Sprite2D
+		var rp := "(no tex)"
+		if spr.texture != null:
+			rp = spr.texture.resource_path
+			if rp.is_empty():
+				rp = "(embedded tex)"
+		var vis := " vis" if spr.visible else " hide"
+		var key := rp + vis
+		counts[key] = int(counts.get(key, 0)) + 1
+	if n is Label:
+		var lb := n as Label
+		var t := lb.text.strip_edges()
+		if t in ["◆", "🛡️", "🏰", "✈", "⚓"] or t.length() <= 2:
+			var key := "label:" + t + (" vis" if lb.visible else " hide")
+			counts[key] = int(counts.get(key, 0)) + 1
+	if n is TextureRect:
+		var tr := n as TextureRect
+		var rp2 := "(texrect)"
+		if tr.texture != null:
+			rp2 = tr.texture.resource_path
+		counts["texrect:" + rp2] = int(counts.get("texrect:" + rp2, 0)) + 1
+	for c in n.get_children():
+		_tally_sprites_under(c, counts)
+
+
+func _strip_retrowave_sprites_from_map() -> void:
+	for id_v in province_nodes.keys():
+		var n: Node2D = province_nodes[id_v] as Node2D
+		if n == null:
+			continue
+		_strip_retrowave_sprites_under(n)
+
+
+func _strip_retrowave_sprites_under(n: Node) -> void:
+	if n == null:
+		return
+	var kids: Array = n.get_children()
+	for c in kids:
+		if c is Sprite2D:
+			var spr := c as Sprite2D
+			var rp := ""
+			if spr.texture != null:
+				rp = spr.texture.resource_path
+			if rp.contains("retrowave") or str(spr.name).begins_with("DemoNATO_"):
+				n.remove_child(spr)
+				spr.free()
+				continue
+		_strip_retrowave_sprites_under(c)
 
 
 func toggle_unit_counters() -> bool:
@@ -23600,6 +24835,8 @@ func _suppress_old_background_maps() -> void:
 
 ## Province ids that currently have a DemoUnitIcon_* child (avoids full-board clear).
 var _demo_unit_icon_pids: Array = []
+## Living land chips: Maginot pair + Maginot GER neighbor + 8-major capitals.
+var _living_land_chip_pids: Array = [710173, 710739, 711414, 800792, 903534, 710963, 903981, 711112]
 var _oob_strip: PanelContainer = null
 ## Pass 19: munitions production/logistics desk chip.
 var _munitions_desk: PanelContainer = null
@@ -23637,6 +24874,8 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	const GER_FRONT := 710173
 	const FRA_FRONT := 710739
 	var result := {"ok": false, "ger": 0, "fra": 0, "ger_pid": GER_FRONT, "fra_pid": FRA_FRONT}
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("boot_living_player"):
+		LeaderManager.boot_living_player("GER")
 	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formations_for_country"):
 		return result
 	var ger_land: Array = []
@@ -23674,15 +24913,29 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 			if str(np.owner_tag).strip_edges().to_upper() == "GER":
 				ger_nbr = nid
 				break
+	if ger_land.size() < 2 and ger_nbr > 0 and LeaderManager.has_method("field_designed_unit"):
+		LeaderManager.field_designed_unit("GER", "infantry_1936", ger_nbr, "land")
+		ger_land.clear()
+		for f4 in LeaderManager.get_formations_for_country("GER"):
+			if f4 == null:
+				continue
+			var ft4 := str(f4.formation_type) if "formation_type" in f4 else ""
+			if ft4 == Formation.TYPE_DIVISION or ft4 == Formation.TYPE_GARRISON:
+				ger_land.append(f4)
 	if ger_land.size() >= 1 and "stationed_province_id" in ger_land[0]:
 		ger_land[0].stationed_province_id = GER_FRONT
 		if "design_id" in ger_land[0] and str(ger_land[0].design_id).is_empty():
 			ger_land[0].design_id = "panzer_iii_j_medium"
 		result["design_id"] = str(ger_land[0].design_id) if "design_id" in ger_land[0] else ""
 		result["ger"] = int(result["ger"]) + 1
+	# Second chip on the GER neighbor so the playtest can march it onto Maginot / reinforce.
 	if ger_land.size() >= 2 and "stationed_province_id" in ger_land[1]:
-		ger_land[1].stationed_province_id = GER_FRONT
+		var rear_pid := ger_nbr if ger_nbr > 0 else GER_FRONT
+		ger_land[1].stationed_province_id = rear_pid
 		result["ger"] = int(result["ger"]) + 1
+		result["ger_rear"] = rear_pid
+		if rear_pid > 0 and rear_pid not in _living_land_chip_pids:
+			_living_land_chip_pids.append(rear_pid)
 	if ger_land.size() >= 3 and ger_nbr > 0 and "stationed_province_id" in ger_land[2]:
 		ger_land[2].stationed_province_id = ger_nbr
 		result["ger"] = int(result["ger"]) + 1
@@ -24056,10 +25309,20 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 		var p: Province = provinces.get(id) as Province
 		var entry: Variant = by_pid[pid_v]
 		var ff: Object = entry as Object if entry is Object else null
+		# Tag-only deployments (no Formation) became unclickable cyan/pink pins.
+		if ff == null:
+			continue
+		# Interior garrisons were the GER/AUS cyan-pink pin carpet. Living map shows
+		# divisions / air / fleet / Maginot — not a hex of unnamed garrisons.
+		if "formation_type" in ff:
+			var gft := str(ff.formation_type)
+			if gft == Formation.TYPE_GARRISON and id not in _living_land_chip_pids:
+				continue
+			if gft in [Formation.TYPE_DIVISION, Formation.TYPE_BRIGADE, Formation.TYPE_ARMY, Formation.TYPE_ARMY_GROUP]:
+				if id not in _living_land_chip_pids:
+					continue
 		var force_tag := ""
-		if entry is String:
-			force_tag = str(entry)
-		elif ff != null and "country_tag" in ff:
+		if ff != null and "country_tag" in ff:
 			force_tag = str(ff.country_tag)
 		var stack_n := int(stack_counts.get(id, 1))
 		var samples: Array = stack_samples.get(id, []) as Array
@@ -24243,40 +25506,41 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 			elif "b17" in dsn or "bomber" in dsn:
 				tex_path = "res://assets/graphics/units/nato/" + era_folder + "/bomber_32.png"
 
-		# Prefer retrowave unit chips when present (world-class map counters).
+		# NATO glyph on the living plate — never retrowave dummy pins.
 		tex_path = _prefer_retrowave_unit_icon(tex_path)
+		if tex_path.begins_with("res://assets/graphics/units/retrowave/"):
+			tex_path = "res://assets/graphics/units/nato/ww2/infantry_32.png"
 		var tex: Texture2D = null
 		if tex_cache.has(tex_path):
 			tex = tex_cache[tex_path] as Texture2D
 		else:
-			if ResourceLoader.exists(tex_path):
+			if not tex_path.is_empty() and ResourceLoader.exists(tex_path):
 				tex = load(tex_path) as Texture2D
 			tex_cache[tex_path] = tex
 		# Do not atlas-crop nato_counters_sheet onto map chips (64px cells hide chrome).
-		var using_retrowave := tex_path.begins_with("res://assets/graphics/units/retrowave/")
+		# Hard no: retrowave 32s (cyan outline / pink glyph) are not map units.
+		if tex != null and tex.resource_path.contains("retrowave"):
+			tex = null
+		if tex_path.begins_with("res://assets/graphics/units/retrowave/"):
+			tex = null
+		var using_retrowave := false
 		var nation_tag := force_tag
 		if nation_tag.is_empty() and p != null:
 			nation_tag = p.owner_tag
 		var nation_col := Color(0.85, 0.88, 0.95, 1.0)
 		if not nation_tag.is_empty() and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_country_color"):
 			nation_col = MapManager.get_country_color(nation_tag)
-		if tex:
+		if tex and tex_path.contains("/nato/"):
 			var spr := Sprite2D.new()
 			spr.texture = tex
 			spr.centered = true
 			spr.position = Vector2(0, -2)
 			spr.scale = Vector2(0.82, 0.82)
 			spr.z_index = 1
-			# NATO glyph keeps its own colors; nation identity is the plate, not a modulate wash.
 			spr.modulate = Color.WHITE
-			# One living plate per hex; stack count is the badge (fan-out looked like dummy units).
-			var fan := 1
-			if fan <= 1:
-				counter.add_child(spr)
-				if not nation_tag.is_empty():
-					counter.add_child(_make_unit_nation_frame(nation_col))
-			else:
-				_add_unit_stack_fanout(counter, spr, tex, tex_cache, samples, fan, nation_tag, nation_col, using_retrowave, era_folder)
+			counter.add_child(spr)
+			if not nation_tag.is_empty():
+				counter.add_child(_make_unit_nation_frame(nation_col))
 			_attach_unit_counter_chrome(counter, ff, nation_col)
 			if stack_n > 1:
 				counter.add_child(_make_formation_stack_badge(stack_n))
@@ -24286,13 +25550,20 @@ func _rebuild_demo_unit_icons(only_pids: Dictionary) -> void:
 				counter.add_child(_make_unit_nation_frame(nation_col))
 			if stack_n > 1:
 				counter.add_child(_make_formation_stack_badge(stack_n))
+		for leftover in counter.get_children():
+			if leftover is Sprite2D and leftover.texture != null and leftover.texture.resource_path.contains("retrowave"):
+				counter.remove_child(leftover)
+				leftover.free()
 		_demo_unit_icon_pids.append(id)
 		icons_placed += 1
 
 	if not scoped and icons_placed > 0:
 		print("[MapRenderer] Unit icons placed=%d (indexed formations, no per-province template reload)" % icons_placed)
+		_debug_log_map_sprite_inventory()
 	if not scoped:
 		_update_riot_markers()
+	_strip_retrowave_sprites_from_map()
+	_sync_unit_counter_visibility()
 	# Re-apply selected-chip chrome after pin rebuild (do not rebuild all pins for selection).
 	if not selected_formation_id.is_empty():
 		_refresh_selected_unit_chip()
@@ -24346,10 +25617,8 @@ func _build_stationed_formation_index_for_icons() -> Dictionary:
 						arr2.append(existing)
 						samples[pid2] = arr2
 					continue
-			var tag2 := str(dep.get("country_tag", "")).strip_edges().to_upper()
-			counts[pid2] = int(counts.get(pid2, 0)) + 1
-			if not by_pid.has(pid2):
-				by_pid[pid2] = tag2 if not tag2.is_empty() else "UNK"
+			# No Formation object — do not invent a map pin from a tag string.
+			continue
 	by_pid["_counts"] = counts
 	by_pid["_samples"] = samples
 	return by_pid
@@ -24423,13 +25692,18 @@ func _unit_tex_path_for_formation_object(fo: Object, era_folder: String) -> Stri
 		var tpl = GameData.design_data.get_template(dsn)
 		if tpl != null:
 			arch = str(tpl.visual_archetype).to_lower()
-	# Lightweight keyword path — UnitIconLibrary for full fidelity when available.
-	const UIL = preload("res://scripts/ui/UnitIconLibrary.gd")
-	var stem: String = UIL.resolve_stem(ftype, ftype, arch, dsn)
-	var p := UIL.icon_path(stem, 32)
-	if not p.is_empty():
-		return p
-	return "res://assets/graphics/units/nato/" + era_folder + "/infantry_32.png"
+	# Map counters are NATO on the living plate — not UnitIconLibrary retrowave pins.
+	var stem_hay := ("%s %s %s" % [ftype, arch, dsn]).to_lower()
+	var nato := "res://assets/graphics/units/nato/" + era_folder + "/"
+	if "fighter" in stem_hay or "bomber" in stem_hay or "air" in stem_hay:
+		return nato + "fighter_32.png"
+	if "destroyer" in stem_hay or "cruiser" in stem_hay or "naval" in stem_hay:
+		return nato + "destroyer_32.png"
+	if "tank" in stem_hay or "armor" in stem_hay:
+		return nato + "medium_tank_32.png"
+	if "artillery" in stem_hay:
+		return nato + "artillery_32.png"
+	return nato + "infantry_32.png"
 
 
 ## Pass 5/8: stack badge when multiple formations share a province (+ pulse meta).
@@ -24586,6 +25860,8 @@ func refresh_after_capture_light(province_id: int = -1, from_province_id: int = 
 		var pid := int(v)
 		if pid >= 0 and not pids.has(pid):
 			pids.append(pid)
+			if pid not in _living_land_chip_pids:
+				_living_land_chip_pids.append(pid)
 	_refresh_province_fill_pids(pids)
 	_update_unit_icons_for_pids(pids)
 
@@ -24640,6 +25916,13 @@ func _sync_shared_edge_frontiers(_scan_pids: Array) -> void:
 			var a: Vector2 = pts[i]
 			var b: Vector2 = pts[(i + 1) % pts.size()]
 			var key := _canonical_edge_key(a, b)
+			if edge_map.has(key):
+				var exist: Dictionary = edge_map[key]
+				var emid: Vector2 = ((exist.get("a", a) as Vector2) + (exist.get("b", b) as Vector2)) * 0.5
+				var nmid: Vector2 = (a + b) * 0.5
+				# Same quantized key but a different place — do not merge (false "international").
+				if nmid.distance_squared_to(emid) > 36.0:
+					key = "%s#%d" % [key, pid]
 			if not edge_map.has(key):
 				edge_map[key] = {"a": a, "b": b, "owners": {}, "count": 0, "has_sea": false, "has_land": false}
 			var rec: Dictionary = edge_map[key]
@@ -24677,6 +25960,10 @@ func _sync_shared_edge_frontiers(_scan_pids: Array) -> void:
 		var a: Vector2 = rec.get("a", Vector2.ZERO)
 		var b: Vector2 = rec.get("b", Vector2.ZERO)
 		if is_international:
+			# 20-vert NUTS hulls leave tiny matched edges that read as sharpie ticks
+			# around LUX / NLD / SWI (play 2026-09-11).
+			if a.distance_squared_to(b) < 16.0:
+				continue
 			var seg := Line2D.new()
 			seg.name = COUNTRY_FRONTIER_PREFIX + str(seg_idx)
 			seg.points = PackedVector2Array([a, b])

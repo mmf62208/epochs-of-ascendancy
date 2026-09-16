@@ -68,7 +68,7 @@ The game emphasizes **player freedom in design** — from customizing divisions,
 | Input | Action |
 |-------|--------|
 | **Left click** | Select province → scrollable InfoPanel |
-| **Ctrl+click** | Assault adjacent enemy province (after staging a friendly division) |
+| **Ctrl+click** / **right-click** | Order selected division: own land marches, enemy hex opens the fight sheet |
 | **B** / toolbar Fronts | Live border assault targets |
 | **Shift+I** / WarLoop | First-session war path (flow + fronts + brief) |
 | **G** | Supply hub → front corridor (fuel brief) |

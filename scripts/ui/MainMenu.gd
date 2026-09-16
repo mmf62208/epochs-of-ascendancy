@@ -807,7 +807,7 @@ func _show_help() -> void:
 		+ "Shift+I — WarLoop first-session path\n"
 		+ "I — EquipmentFlow glyphs\n"
 		+ "G — Supply corridor hub → front\n"
-		+ "Ctrl+click — Assault adjacent enemy\n\n"
+		+ "Ctrl+click / right-click — Assault adjacent enemy (selected chip)\n\n"
 		+ "— Mapmodes —\n"
 		+ "F1–F4 political/strain/vitality/development\n"
 		+ "F5 supply · F6 loyalty · F7 infra · F8 weather\n"

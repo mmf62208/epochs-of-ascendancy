@@ -109,12 +109,12 @@ static func build_strategic_hover_tooltip(province: Province) -> String:
 		if MapManager.has_strategic_chokepoint(province.id):
 			choke = "⚓ Naval chokepoint"
 	if not choke.is_empty() and not region.is_empty():
-		return "%s\n%s · %s\n%s" % [nation, region, province.name, choke]
+		return "%s\n%s · %s\n%s" % [province.name, nation, region, choke]
 	if not choke.is_empty():
-		return "%s\n%s\n%s" % [nation, province.name, choke]
+		return "%s\n%s\n%s" % [province.name, nation, choke]
 	if not region.is_empty():
-		return "%s\n%s · %s" % [nation, region, province.name]
-	return "%s\n%s" % [nation, province.name]
+		return "%s\n%s · %s" % [province.name, nation, region]
+	return "%s\n%s" % [province.name, nation]
 
 
 static func build_hover_tooltip(

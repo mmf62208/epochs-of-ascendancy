@@ -503,9 +503,26 @@ func start_land_battle(
 	var def_tag := str(preview.get("defender_tag", "")).strip_edges().to_upper()
 	var def_divs: Array[Dictionary] = get_divisions_at_province(to_id, def_tag)
 	if def_divs.is_empty():
-		if _interactive_light_sim():
-			_apply_attacker_win_capture_light(tag, to_id, from_pid, fid)
-			return {"success": true, "instant": true, "opened": false, "light_capture": true}
+		def_divs = _enemy_land_rows_at(to_id, tag)
+		if not def_divs.is_empty():
+			def_tag = str(def_divs[0].get("country_tag", def_tag)).strip_edges().to_upper()
+	if def_divs.is_empty() and _interactive_light_sim():
+		var player := ""
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+			player = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		# Occupation walk-in is player-only. AI was chaining empty-hex fights and leaking RAM.
+		if tag == player and not player.is_empty():
+			return {
+				"success": true,
+				"opened": false,
+				"instant": false,
+				"occupy_move": true,
+				"from_id": from_pid,
+				"to_id": to_id,
+				"fid": fid,
+				"def_tag": def_tag,
+			}
+		return {"success": false, "reason": "No defenders", "opened": false, "instant": false}
 		var instant: Dictionary = execute_province_assault(tag, to_id, from_pid, fid)
 		instant["instant"] = true
 		instant["opened"] = false
@@ -548,6 +565,8 @@ func start_land_battle(
 		"def_fid": def_fid,
 		"att_fids": [fid],
 		"def_fids": [def_fid],
+		"att_pending_fids": [],
+		"def_pending_fids": [],
 		"att_n": 1,
 		"def_n": 1,
 		"att_org": att_org,
@@ -566,15 +585,128 @@ func start_land_battle(
 		"ground_hard": _target_is_ground_hard(target, to_id),
 		"next_hook": "",
 	}
-	_rebuild_land_battle_powers(battle)
+	if not _interactive_light_sim():
+		_rebuild_land_battle_powers(battle)
 	_next_land_battle_seq += 1
 	_open_land_battles.append(battle)
 	_set_formation_in_combat(fid, true)
 	_set_formation_in_combat(def_fid, true)
-	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("ensure_demo_combat_stock"):
+	if not _interactive_light_sim() and typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("ensure_demo_combat_stock"):
 		ProductionManager.ensure_demo_combat_stock(fid, tag)
 		ProductionManager.ensure_demo_combat_stock(def_fid, def_tag)
+	print("BattleManager: opened land battle %s %s→%s" % [str(battle.get("id", "")), str(from_pid), str(to_id)])
 	return {"success": true, "instant": false, "opened": true, "battle": battle.duplicate()}
+
+
+func _enemy_land_rows_at(province_id: int, attacker_tag: String) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var pid := int(province_id)
+	var att := attacker_tag.strip_edges().to_upper()
+	if pid <= 0 or att.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return out
+	var forms: Variant = LeaderManager.formations if "formations" in LeaderManager else {}
+	if typeof(forms) != TYPE_DICTIONARY:
+		return out
+	for fid_v in (forms as Dictionary).keys():
+		var f: Formation = (forms as Dictionary)[fid_v] as Formation
+		if f == null:
+			continue
+		var tag := str(f.country_tag).strip_edges().to_upper() if "country_tag" in f else ""
+		if tag.is_empty() or tag == att:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft != Formation.TYPE_DIVISION and ft != Formation.TYPE_GARRISON:
+			continue
+		var sid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+		if sid != pid:
+			continue
+		var fid := str(f.formation_id) if "formation_id" in f else str(fid_v)
+		out.append({
+			"formation_id": fid,
+			"display_name": str(f.name) if "name" in f else fid,
+			"country_tag": tag,
+			"stationed_province_id": pid,
+		})
+	return out
+
+
+func _open_occupation_battle(
+	tag: String,
+	to_id: int,
+	from_pid: int,
+	fid: String,
+	def_tag: String,
+) -> Dictionary:
+	var terrain := "plains"
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var p: Province = MapManager.get_province(to_id)
+		if p != null:
+			terrain = str(p.terrain)
+	var att_fo: Object = _formation_from_id(fid, tag)
+	var att_org := _formation_stat(att_fo, "organization", 1.0) if att_fo != null else 1.0
+	var att_power := land_combat_power(att_fo, terrain, "attack", null) if att_fo != null else 80.0
+	var day0 := 0
+	if typeof(TimeManager) != TYPE_NIL:
+		day0 = int(TimeManager.total_days_elapsed) if "total_days_elapsed" in TimeManager else 0
+	var battle := {
+		"id": "lb_%d" % _next_land_battle_seq,
+		"from_id": from_pid,
+		"to_id": to_id,
+		"att_tag": tag,
+		"def_tag": def_tag,
+		"att_fid": fid,
+		"def_fid": "",
+		"att_fids": [fid],
+		"def_fids": [],
+		"att_pending_fids": [],
+		"def_pending_fids": [],
+		"att_n": 1,
+		"def_n": 0,
+		"att_org": att_org,
+		"def_org": 0.42,
+		"att_power": att_power,
+		"def_power": 48.0,
+		"combat_width": 80.0,
+		"att_used_width": 0.0,
+		"terrain": terrain,
+		"day_started": day0,
+		"days_elapsed": 0,
+		"est_days": 1,
+		"lean": "attacker",
+		"withdraw_pending": false,
+		"att_stance": "press",
+		"ground_hard": false,
+		"next_hook": "",
+		"occupation": true,
+	}
+	_next_land_battle_seq += 1
+	_open_land_battles.append(battle)
+	_set_formation_in_combat(fid, true)
+	print("BattleManager: opened occupation %s %s→%s" % [str(battle.get("id", "")), str(from_pid), str(to_id)])
+	return {"success": true, "instant": false, "opened": true, "occupation": true, "battle": battle.duplicate()}
+
+
+## Empty-hex occupy arrival: capture if still empty, else they walked in → real fight from `from_id`.
+func resolve_occupy_arrival(
+	formation_id: String,
+	dest_id: int,
+	country_tag: String,
+	from_id: int = -1,
+) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	var dest := int(dest_id)
+	if fid.is_empty() or dest <= 0:
+		return {"ok": false, "reason": "bad args"}
+	var enemies: Array[Dictionary] = _enemy_land_rows_at(dest, tag)
+	if not enemies.is_empty():
+		var fr := from_id if from_id > 0 else dest
+		var fight: Dictionary = start_land_battle(tag, dest, fr, fid)
+		print("BattleManager: occupy meeting engagement %s %d→%d" % [fid, fr, dest])
+		return {"ok": true, "fought": true, "captured": false, "result": fight}
+	_apply_attacker_win_capture_light(tag, dest, from_id if from_id > 0 else dest, fid)
+	print("BattleManager: occupy empty %s took %d" % [fid, dest])
+	return {"ok": true, "fought": false, "captured": true}
 
 
 ## Interactive F5: at most one AI start_land_battle per day + 1 spare march + 1 follow-on.
@@ -918,9 +1050,214 @@ func get_land_battle_for_formation(formation_id: String) -> Dictionary:
 			continue
 		var battle: Dictionary = raw
 		if _fid_list(battle, "att_fids", "att_fid").has(fid) \
-				or _fid_list(battle, "def_fids", "def_fid").has(fid):
+				or _fid_list(battle, "def_fids", "def_fid").has(fid) \
+				or _fid_list(battle, "att_pending_fids", "").has(fid) \
+				or _fid_list(battle, "def_pending_fids", "").has(fid):
 			return battle.duplicate()
 	return {}
+
+
+## Outlook band (no player-facing %). likely / tight / bad + progress 0–1.
+func staff_outlook(battle: Dictionary) -> Dictionary:
+	var att_p := maxf(0.0, float(battle.get("att_power", 0.0)))
+	var def_p := maxf(0.0, float(battle.get("def_power", 0.0)))
+	var att_org := clampf(float(battle.get("att_org", 0.0)), 0.0, 1.0)
+	var def_org := clampf(float(battle.get("def_org", 0.0)), 0.0, 1.0)
+	var band := "tight"
+	if att_p > def_p * 1.15:
+		band = "likely"
+	elif def_p > att_p * 1.15:
+		band = "bad"
+	var denom := att_org + def_org
+	var progress := 0.5
+	if denom > 0.001:
+		progress = att_org / denom
+	var att_n := _fid_list(battle, "att_fids", "att_fid").size()
+	var def_n := _fid_list(battle, "def_fids", "def_fid").size()
+	var join_n := _fid_list(battle, "att_pending_fids", "").size()
+	var word := "Tight"
+	if band == "likely":
+		word = "Likely"
+	elif band == "bad":
+		word = "Bad"
+	return {
+		"band": band,
+		"word": word,
+		"progress": progress,
+		"att_org": att_org,
+		"def_org": def_org,
+		"att_n": att_n,
+		"def_n": def_n,
+		"joining_n": join_n,
+		"lean": str(battle.get("lean", "even")),
+	}
+
+
+## Marching toward an open fight hex → listed as JOINING until hop-in reinforce.
+func note_march_toward_battle(formation_id: String, dest_id: int, country_tag: String = "") -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var dest := int(dest_id)
+	if fid.is_empty() or dest <= 0:
+		return {"ok": false, "noted": false}
+	var tag := country_tag.strip_edges().to_upper()
+	if tag.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var f: Formation = LeaderManager.get_formation(fid)
+		if f != null:
+			tag = str(f.country_tag).strip_edges().to_upper()
+	for raw in _open_land_battles:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var battle: Dictionary = raw
+		var from_id := int(battle.get("from_id", -1))
+		var to_id := int(battle.get("to_id", -1))
+		if dest != from_id and dest != to_id:
+			continue
+		var att_tag := str(battle.get("att_tag", "")).to_upper()
+		var def_tag := str(battle.get("def_tag", "")).to_upper()
+		if _fid_list(battle, "att_fids", "att_fid").has(fid) or _fid_list(battle, "def_fids", "def_fid").has(fid):
+			return {"ok": true, "noted": false, "reason": "already engaged", "battle_id": battle.get("id")}
+		if tag == att_tag:
+			var pend: Array = _fid_list(battle, "att_pending_fids", "")
+			if not pend.has(fid):
+				pend.append(fid)
+			battle["att_pending_fids"] = pend
+			return {"ok": true, "noted": true, "side": "attacker", "battle_id": battle.get("id")}
+		if tag == def_tag:
+			var dpend: Array = _fid_list(battle, "def_pending_fids", "")
+			if not dpend.has(fid):
+				dpend.append(fid)
+			battle["def_pending_fids"] = dpend
+			return {"ok": true, "noted": true, "side": "defender", "battle_id": battle.get("id")}
+	return {"ok": false, "noted": false}
+
+
+func build_fight_briefing(battle: Dictionary, player_tag: String = "") -> Dictionary:
+	var ptag := player_tag.strip_edges().to_upper()
+	var outlook: Dictionary = staff_outlook(battle)
+	var to_id := int(battle.get("to_id", -1))
+	var place := "Province %d" % to_id
+	var fortified := false
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var p: Province = MapManager.get_province(to_id)
+		if p != null:
+			place = str(p.name)
+			var terr := str(p.terrain).to_lower()
+			if terr in ["urban", "fort", "mountain", "mountains"]:
+				fortified = true
+			if "special_features" in p and p.special_features is Dictionary:
+				var sf: Dictionary = p.special_features
+				if bool(sf.get("fort", false)) or bool(sf.get("fortress", false)) or float(sf.get("fort_level", 0.0)) > 0.0:
+					fortified = true
+	if to_id == 710739:
+		fortified = true
+	var att_fids: Array = _fid_list(battle, "att_fids", "att_fid")
+	var att_pend: Array = _fid_list(battle, "att_pending_fids", "")
+	var def_fids: Array = _fid_list(battle, "def_fids", "def_fid")
+	var ours: Array = []
+	for fid_v in att_fids:
+		ours.append(_roster_row(str(fid_v), "engaged"))
+	for fid_p in att_pend:
+		ours.append(_roster_row(str(fid_p), "joining"))
+	var theirs_n := def_fids.size() + _fid_list(battle, "def_pending_fids", "").size()
+	var armor_hint := false
+	for dfid in def_fids:
+		var df: Formation = _formation_from_id(str(dfid), str(battle.get("def_tag", "")))
+		if df != null and _formation_is_armor(df):
+			armor_hint = true
+			break
+	var empty_stock := false
+	if not att_fids.is_empty() and typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("get_unit_equipment_stock"):
+		var st: Dictionary = ProductionManager.get_unit_equipment_stock(str(att_fids[0]))
+		var any := false
+		for k in st.keys():
+			if int(st[k]) > 0:
+				any = true
+				break
+		empty_stock = not any
+	var line := _staff_flavor_line(
+		str(outlook.get("band", "tight")),
+		_leader_for_fid(str(att_fids[0]) if not att_fids.is_empty() else ""),
+		fortified,
+		empty_stock,
+	)
+	return {
+		"battle_id": str(battle.get("id", "")),
+		"place": place,
+		"to_id": to_id,
+		"from_id": int(battle.get("from_id", -1)),
+		"att_tag": str(battle.get("att_tag", "")),
+		"def_tag": str(battle.get("def_tag", "")),
+		"outlook": outlook,
+		"ours": ours,
+		"theirs_n": theirs_n,
+		"theirs_joining": _fid_list(battle, "def_pending_fids", "").size(),
+		"fortified": fortified,
+		"armor_present": armor_hint,
+		"empty_stock": empty_stock,
+		"staff_line": line,
+		"days_elapsed": int(battle.get("days_elapsed", 0)),
+		"est_days": int(battle.get("est_days", 0)),
+		"att_stance": str(battle.get("att_stance", "press")),
+		"player_tag": ptag,
+	}
+
+
+func _roster_row(fid: String, status: String) -> Dictionary:
+	var name_s := fid
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var f: Formation = LeaderManager.get_formation(fid)
+		if f != null and "name" in f:
+			name_s = str(f.name)
+	return {"formation_id": fid, "name": name_s, "status": status}
+
+
+func _leader_for_fid(fid: String) -> Object:
+	if fid.is_empty() or typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return null
+	var f: Formation = LeaderManager.get_formation(fid)
+	if f == null or not ("leader_id" in f) or str(f.leader_id).is_empty():
+		return null
+	if LeaderManager.has_method("get_leader"):
+		return LeaderManager.get_leader(str(f.leader_id)) as Object
+	return null
+
+
+func _staff_flavor_line(band: String, leader: Object, fortified: bool, empty_stock: bool) -> String:
+	if empty_stock:
+		return "No rifles in the dump. This is a raid, not an assault."
+	var armor := false
+	var guns := false
+	var cautious := false
+	var aggressive := false
+	if leader != null and leader.has_method("has_trait"):
+		armor = bool(leader.call("has_trait", "panzer_leader")) or bool(leader.call("has_trait", "armor_leader")) \
+			or bool(leader.call("has_trait", "blitz"))
+		guns = bool(leader.call("has_trait", "artillery_specialist")) or bool(leader.call("has_trait", "fortress_buster"))
+		cautious = bool(leader.call("has_trait", "cautious")) or bool(leader.call("has_trait", "defensive"))
+		aggressive = bool(leader.call("has_trait", "reckless")) or bool(leader.call("has_trait", "offensive"))
+	if band == "likely":
+		if armor:
+			return "Tanks will finish this. Press."
+		if aggressive:
+			return "They're breaking. Don't let them breathe."
+		return "Staff expects a win if we keep Press."
+	if band == "bad":
+		if guns:
+			return "More guns. This concrete doesn't care about bravery."
+		if cautious:
+			return "We can take it. We won't like the bill."
+		if fortified:
+			return "Maginot will hold unless we break a flank."
+		return "Unfavorable — soften, wait, or withdraw."
+	if armor:
+		return "A few more tanks and we punch this."
+	if guns:
+		return "A few more guns and the line cracks."
+	if cautious:
+		return "Tight fight. Hold if we need them intact."
+	if fortified:
+		return "Maginot will hold unless we break them in the flank."
+	return "Could go either way — reinforce or Hold."
 
 
 func set_land_battle_stance(formation_id: String, stance: String) -> Dictionary:
@@ -1030,6 +1367,15 @@ func withdraw_from_land_battle(formation_id: String) -> Dictionary:
 func land_combat_power(formation: Object, terrain: String = "plains", role: String = "", opponent: Object = null) -> float:
 	if formation == null:
 		return 0.0
+	# F5: skip template composition (second attack hung inside LandCombatPower).
+	if _interactive_light_sim():
+		var org_l := _formation_stat(formation, "organization", 1.0)
+		var strn_l := _formation_stat(formation, "strength", 1.0)
+		var rdy_l := _formation_stat(formation, "readiness", 1.0)
+		var hint_l := LAND_TEMPLATE_HINT
+		if _formation_is_armor(formation) and _land_terrain_key(terrain) == "plains":
+			hint_l *= LAND_ARMOR_PLAINS_MULT
+		return maxf(0.0, org_l * strn_l * rdy_l * hint_l)
 	if typeof(LandCombatPower) != TYPE_NIL:
 		return maxf(0.0, float(LandCombatPower.combat_power(formation, terrain, role, opponent)))
 	var org := _formation_stat(formation, "organization", 1.0)
@@ -1075,11 +1421,17 @@ func try_reinforce_land_battle(formation_id: String, province_id: int, country_t
 		if side == "attacker":
 			att_fids.append(fid)
 			battle["att_fids"] = att_fids
+			var pend_a: Array = _fid_list(battle, "att_pending_fids", "")
+			pend_a.erase(fid)
+			battle["att_pending_fids"] = pend_a
 			var n := att_fids.size()
 			battle["att_org"] = (float(battle.get("att_org", 1.0)) * float(n - 1) + _formation_stat(f, "organization", 1.0)) / float(n)
 		else:
 			def_fids.append(fid)
 			battle["def_fids"] = def_fids
+			var pend_d: Array = _fid_list(battle, "def_pending_fids", "")
+			pend_d.erase(fid)
+			battle["def_pending_fids"] = pend_d
 			var dn := def_fids.size()
 			battle["def_org"] = (float(battle.get("def_org", 1.0)) * float(dn - 1) + _formation_stat(f, "organization", 1.0)) / float(dn)
 		_set_formation_in_combat(fid, true)
@@ -1109,9 +1461,10 @@ func _fid_list(battle: Dictionary, arr_key: String, one_key: String) -> Array:
 			var s := str(v).strip_edges()
 			if not s.is_empty() and not out.has(s):
 				out.append(s)
-	var one := str(battle.get(one_key, "")).strip_edges()
-	if not one.is_empty() and not out.has(one):
-		out.insert(0, one)
+	if not one_key.is_empty():
+		var one := str(battle.get(one_key, "")).strip_edges()
+		if not one.is_empty() and not out.has(one):
+			out.insert(0, one)
 	return out
 
 
@@ -1201,6 +1554,9 @@ func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
 		"to_id": to_id,
 		"from_id": from_id,
 		"instant": false,
+		"id": str(battle.get("id", "")),
+		"att_tag": str(battle.get("att_tag", "")),
+		"def_tag": str(battle.get("def_tag", "")),
 	}
 	# Withdraw bounce: skip further org-break requirement after at least one day.
 	if bool(battle.get("withdraw_pending", false)):
@@ -1293,17 +1649,20 @@ func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
 		var att_tag := str(battle.get("att_tag", ""))
 		var att_fid := str(battle.get("att_fid", ""))
 		if _interactive_light_sim():
-			# Hang-class: F5 capture stays deferred so the day tick returns.
-			# Compact playtest clock is already a sync loop — apply light capture
-			# now (no execute, no land-path BFS) so idle deferred cannot BFS later.
-			if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+			var player := ""
+			if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+				player = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+			if player.is_empty() or player == "USA":
+				player = "GER"
+			if att_tag == player:
+				_begin_occupy_after_victory(battle)
+				ev["success"] = true
+				ev["occupy_pending"] = true
+				ev["att_tag"] = att_tag
+			else:
 				_apply_attacker_win_capture_light(att_tag, to_id, from_id, att_fid)
 				ev["success"] = true
 				ev["deferred_capture"] = false
-			else:
-				call_deferred("_deferred_resolve_attacker_win", att_tag, to_id, from_id, att_fid)
-				ev["success"] = true
-				ev["deferred_capture"] = true
 		else:
 			var exec: Dictionary = execute_province_assault(att_tag, to_id, from_id, att_fid)
 			ev["success"] = bool(exec.get("success", false))
@@ -1324,6 +1683,30 @@ func _interactive_light_sim() -> bool:
 		and TimeManager.has_method("is_interactive_light_sim")
 		and bool(TimeManager.is_interactive_light_sim())
 	)
+
+
+func _begin_occupy_after_victory(battle: Dictionary) -> void:
+	var to_id := int(battle.get("to_id", -1))
+	var from_id := int(battle.get("from_id", -1))
+	var att_tag := str(battle.get("att_tag", "")).strip_edges().to_upper()
+	var disp := {
+		"defender_tag": str(battle.get("def_tag", "")),
+		"defender_formation_id": str(battle.get("def_fid", "")),
+	}
+	_displace_defender_from_captured_province(disp, to_id)
+	var fids: Array = _fid_list(battle, "att_fids", "att_fid")
+	for fid_v in fids:
+		var fid := str(fid_v)
+		if fid.is_empty():
+			continue
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+			var f: Formation = LeaderManager.get_formation(fid)
+			if f != null and "is_in_combat" in f:
+				f.is_in_combat = false
+		if typeof(FormationMovement) != TYPE_NIL:
+			var enq: Dictionary = FormationMovement.enqueue_occupy_adjacent(fid, to_id, att_tag)
+			print("BattleManager: occupy-after-win enqueue %s %s" % [fid, str(enq)])
+	print("BattleManager: occupy-after-win %s → %d (hex not flipped yet)" % [att_tag, to_id])
 
 
 func _deferred_resolve_attacker_win(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:
@@ -2567,7 +2950,13 @@ func get_divisions_at_province(province_id: int, country_tag: String) -> Array[D
 	## Prefer SupplyManager deployments (template-backed), then world_full OOB land stations
 	## on LeaderManager (formation_id like GER_formation_0 without DivisionTemplate).
 	var out: Array[Dictionary] = []
-	if typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("get_land_divisions_at_province"):
+	# F5: never scan all SupplyManager deployments (Alsace click hung ~16GB).
+	var light := (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_interactive_light_sim")
+		and bool(TimeManager.is_interactive_light_sim())
+	)
+	if not light and typeof(SupplyManager) != TYPE_NIL and SupplyManager.has_method("get_land_divisions_at_province"):
 		out = SupplyManager.get_land_divisions_at_province(province_id, country_tag)
 	if not out.is_empty():
 		return out

@@ -205,6 +205,8 @@ def build_order_panel_play_strip_product(
         play_fn = _gd_fn(src, "_rebuild_play_mode_strip")
         open_fn = _gd_fn(src, "_open_play_strip_production")
         btn_fn = _gd_fn(src, "_add_play_strip_production_button")
+        assault_open = _gd_fn(src, "_open_play_strip_assault")
+        assault_btn = _gd_fn(src, "_add_play_strip_assault_button")
         wiring["play_strip_section"] = (
             "EOA_PLAY_STRIP" in src
             or "_rebuild_play_mode_strip" in src
@@ -226,6 +228,13 @@ def build_order_panel_play_strip_product(
             and "_add_play_strip_production_button" in play_fn
             and "pressed.connect(_open_play_strip_production)" in btn_fn
             and "apply_production" not in btn_fn
+        )
+        wiring["play_mode_opens_living_assault"] = (
+            "_add_play_strip_assault_button" in play_fn
+            and "open_living_assault" in assault_open
+            and "apply_assault" not in assault_btn
+            and "pressed.connect(_open_play_strip_assault)" in assault_btn
+            and '_add_apply_button("[2] Assault", "apply_assault"' not in play_fn
         )
         for k, v in wiring.items():
             if v:
@@ -279,6 +288,7 @@ def build_order_panel_play_strip_product(
         and "play_mode_apply_production" not in fails
         and "wire_play_mode_not_apply_production" not in fails
         and "wire_play_mode_opens_living_production" not in fails
+        and "wire_play_mode_opens_living_assault" not in fails
         and "top_bar_production_live" not in fails
         and "top_bar_binds_living_tag" not in fails
         and "hook_open_living_production" not in fails

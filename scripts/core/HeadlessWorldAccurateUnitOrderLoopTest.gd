@@ -93,6 +93,7 @@ func _run() -> void:
 	_test_era_resources()
 	_test_peace_occupation()
 	_test_march_and_assault()
+	_test_occupy_after_win()
 	_test_chi_jap_theater()
 	_test_ai_take_land()
 	_test_nation_era_next()
@@ -328,6 +329,21 @@ func _test_front_chips() -> void:
 		_fail("no DemoUnitIcon node on %d" % GER_FRONT)
 		return
 	_pass("DemoUnitIcon on %d" % GER_FRONT)
+	var rear_on := false
+	if _lm != null and _lm.has_method("get_formations_for_country"):
+		for rf in _lm.call("get_formations_for_country", ATT_TAG):
+			if rf == null or not ("stationed_province_id" in rf):
+				continue
+			var rft := str(rf.formation_type) if "formation_type" in rf else ""
+			if rft != "division" and rft != "garrison":
+				continue
+			if int(rf.stationed_province_id) != GER_FRONT and int(rf.stationed_province_id) > 0:
+				rear_on = true
+				break
+	if not rear_on:
+		_fail("no GER rear land chip (want a second division off Maginot)")
+	else:
+		_pass("GER rear division off Maginot for march-in")
 	var jap_on := false
 	if _lm != null and _lm.has_method("get_formations_for_country"):
 		for jf in _lm.call("get_formations_for_country", JAP_TAG):
@@ -1550,6 +1566,51 @@ func _test_march_and_assault() -> void:
 		return
 	_pass("enqueue_own_land_march ok hops=%s dest=%d" % [str(marched.get("hops", "?")), dest])
 
+	# Click-order API: selected chip vs clicked hex (march own / open fight enemy).
+	ger_f.stationed_province_id = GER_FRONT
+	if _mr.has_method("_select_map_unit"):
+		_mr.call("_select_map_unit", ger_f)
+	var fra_p = _mm.call("get_province", FRA_FRONT) if _mm.has_method("get_province") else null
+	if fra_p != null and _mr.has_method("order_selected_unit_at_province"):
+		var ordered: Dictionary = _mr.call("order_selected_unit_at_province", fra_p)
+		print("  [INFO] order_selected_unit_at_province FRA %s" % str(ordered))
+		var kind := str(ordered.get("kind", ""))
+		if kind == "will_gate":
+			if _lm.has_method("declare_war"):
+				_lm.call("declare_war", ATT_TAG, DEF_TAG)
+			ordered = _mr.call("order_selected_unit_at_province", fra_p)
+			kind = str(ordered.get("kind", ""))
+			print("  [INFO] after declare_war %s" % str(ordered))
+		if kind != "start_battle" and kind != "instant_capture" and kind != "already_fighting":
+			_fail("click-order start_battle want start_battle got %s" % str(ordered))
+			return
+		if int(ordered.get("from_id", -1)) != GER_FRONT or int(ordered.get("to_id", -1)) != FRA_FRONT:
+			_fail("click-order start_battle from/to %s" % str(ordered))
+			return
+		_pass("click-order start_battle GER %d → FRA %d kind=%s" % [GER_FRONT, FRA_FRONT, kind])
+	else:
+		_fail("order_selected_unit_at_province missing")
+		return
+	var dest_p = _mm.call("get_province", dest) if _mm.has_method("get_province") else null
+	if dest_p != null:
+		var marched_click: Dictionary = _mr.call("order_selected_unit_at_province", dest_p)
+		print("  [INFO] click-order march %s" % str(marched_click))
+		if str(marched_click.get("kind", "")) != "march":
+			_fail("click-order march want march got %s" % str(marched_click))
+			return
+		_pass("click-order march dest=%d" % dest)
+	if _mr.has_method("open_living_assault"):
+		ger_f.stationed_province_id = GER_FRONT
+		var living: Dictionary = _mr.call("open_living_assault")
+		print("  [INFO] open_living_assault %s" % str(living))
+		if not bool(living.get("ok", false)):
+			_fail("open_living_assault not ok: %s" % str(living))
+			return
+		_pass("open_living_assault kind=%s" % str(living.get("kind", "")))
+	else:
+		_fail("open_living_assault missing")
+		return
+
 	# Re-station on the front hex for the assault (march must not strand the unit).
 	ger_f.stationed_province_id = GER_FRONT
 	if not _bm.has_method("start_land_battle"):
@@ -1566,6 +1627,68 @@ func _test_march_and_assault() -> void:
 		_pass("start_land_battle instant empty-defender")
 	else:
 		_pass("start_land_battle opened=%s" % str(opened.get("opened", false)))
+
+
+func _test_occupy_after_win() -> void:
+	var fra_p = _mm.call("get_province", FRA_FRONT) if _mm.has_method("get_province") else null
+	if fra_p == null:
+		_fail("occupy-after-win missing FRA province")
+		return
+	fra_p.set("owner_tag", DEF_TAG)
+	fra_p.set("controller_tag", DEF_TAG)
+	var ger_f: Object = _ger_on_front()
+	if ger_f == null:
+		_fail("occupy-after-win no GER on front")
+		return
+	ger_f.stationed_province_id = GER_FRONT
+	if "is_in_combat" in ger_f:
+		ger_f.is_in_combat = false
+	var fid := str(ger_f.formation_id)
+	if _lm.has_method("declare_war"):
+		_lm.call("declare_war", ATT_TAG, DEF_TAG)
+	# Clear leftover battles.
+	if _bm.has_method("get_open_land_battles"):
+		var open0: Array = _bm.call("get_open_land_battles")
+		print("  [INFO] occupy-after-win pre-open n=%d" % open0.size())
+	var opened: Dictionary = _bm.call("start_land_battle", ATT_TAG, FRA_FRONT, GER_FRONT, fid)
+	print("  [INFO] occupy-after-win start %s" % str(opened))
+	if bool(opened.get("occupy_move", false)):
+		_pass("occupy-after-win empty hex is occupy_move (no fight box)")
+		return
+	if not bool(opened.get("opened", false)):
+		_fail("occupy-after-win want opened battle got %s" % str(opened))
+		return
+	var tm: Node = _autoload("TimeManager")
+	for _i in 16:
+		if _bm.has_method("tick_open_land_battles"):
+			_bm.call("tick_open_land_battles")
+		var still: Array = _bm.call("get_open_land_battles") if _bm.has_method("get_open_land_battles") else []
+		if still.is_empty():
+			break
+	var owner_mid := str(fra_p.get("owner_tag")).strip_edges().to_upper()
+	if owner_mid != DEF_TAG:
+		_fail("occupy-after-win hex flipped on break want FRA got %s" % owner_mid)
+		return
+	_pass("occupy-after-win hex still FRA after break")
+	var mv_scr: Script = load("res://scripts/formations/FormationMovement.gd") as Script
+	var occ_n := 0
+	if mv_scr != null and mv_scr.has_method("list_occupy_orders"):
+		occ_n = (mv_scr.call("list_occupy_orders") as Array).size()
+	print("  [INFO] occupy orders n=%d" % occ_n)
+	if occ_n == 0 and mv_scr != null:
+		var enq: Dictionary = mv_scr.call("enqueue_occupy_adjacent", fid, FRA_FRONT, ATT_TAG)
+		print("  [INFO] occupy enqueue fallback %s" % str(enq))
+	if tm != null and "total_days_elapsed" in tm:
+		tm.total_days_elapsed = int(tm.total_days_elapsed) + 3
+	if mv_scr != null:
+		mv_scr.call("tick_all_marches", 1.0)
+		mv_scr.call("tick_all_marches", 1.0)
+	fra_p = _mm.call("get_province", FRA_FRONT)
+	var owner_end := str(fra_p.get("owner_tag")).strip_edges().to_upper() if fra_p != null else ""
+	if owner_end != ATT_TAG:
+		_fail("occupy-after-win hex not GER after walk-in got %s" % owner_end)
+		return
+	_pass("occupy-after-win hex GER after walk-in")
 
 
 func _test_chi_jap_theater() -> void:

@@ -54,6 +54,10 @@ func token_count() -> int:
 
 
 func _on_day(_a: int = 0, _b: int = 0, _c: int = 0) -> void:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+		var day_n := int(TimeManager.total_days_elapsed) if "total_days_elapsed" in TimeManager else 0
+		if day_n % 5 != 0:
+			return
 	rebuild()
 
 

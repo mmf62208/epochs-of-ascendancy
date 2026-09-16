@@ -56,6 +56,10 @@ func get_marker(pid: int) -> Dictionary:
 
 
 func _on_day(_year: int = 0, _month: int = 0, _day: int = 0) -> void:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+		var day_n := int(TimeManager.total_days_elapsed) if "total_days_elapsed" in TimeManager else 0
+		if day_n % 5 != 0:
+			return
 	rebuild()
 
 

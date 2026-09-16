@@ -376,6 +376,7 @@ var _historical_leaders_source_path: String = ""
 var national_prestige: Dictionary = {}  # country_tag -> float
 var national_unity: Dictionary = {}  # country_tag -> float
 var countries_at_war: Dictionary = {}  # country_tag -> bool (stub for +2 wartime XP)
+var _wars: Dictionary = {}  # "GER|FRA" -> true, bilateral declared wars
 
 # === Officer Training Progress (per country_tag) ===
 var officer_training_quality: Dictionary = {}  # country_tag -> float 0–100
@@ -2617,6 +2618,32 @@ func set_country_at_war(country_tag: String, at_war: bool) -> void:
 	if country_tag.is_empty():
 		return
 	countries_at_war[country_tag] = at_war
+
+
+func _war_key(a: String, b: String) -> String:
+	var x := a.strip_edges().to_upper()
+	var y := b.strip_edges().to_upper()
+	if x < y:
+		return "%s|%s" % [x, y]
+	return "%s|%s" % [y, x]
+
+
+func is_at_war_with(a: String, b: String) -> bool:
+	var x := a.strip_edges().to_upper()
+	var y := b.strip_edges().to_upper()
+	if x.is_empty() or y.is_empty() or x == y:
+		return false
+	return bool(_wars.get(_war_key(x, y), false))
+
+
+func declare_war(a: String, b: String) -> void:
+	var x := a.strip_edges().to_upper()
+	var y := b.strip_edges().to_upper()
+	if x.is_empty() or y.is_empty() or x == y:
+		return
+	_wars[_war_key(x, y)] = true
+	set_country_at_war(x, true)
+	set_country_at_war(y, true)
 
 
 func award_major_victory_xp(leader_id: String, bonus: int = 60) -> void:

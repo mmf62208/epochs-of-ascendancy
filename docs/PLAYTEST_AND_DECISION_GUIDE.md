@@ -34,11 +34,11 @@ tools/run_godot.sh --path . res://scenes/TestScenario.tscn
 | 8 | Toolbar **WarLoop** or **Shift+I** | Flow ON + fronts + war-path toast | |
 | 9 | **I** alone | Toggles EquipmentFlow glyphs (toast tier/max) | |
 | 10 | Select front province · **G** | Supply corridor capital→front polyline | |
-| 11 | Friendly province w/ formation · **Ctrl+click** enemy adj **or** inspector **Attack** | Preview / assault attempt (may fail if no units — note) | |
+| 11 | Click GER Maginot chip · **right-click** Alsace (or card **Attack**) | Fight **starts** (no extra box if already allowed); unpause drains org | |
 | 12 | Toolbar **Corridor** / supply mode | Readable logistics story | |
 | 13 | **Ctrl+S** quicksave · mutate · **Ctrl+L** quickload | State survives (settlement/owner if changed). Bare F5/F9 are mapmodes. | |
-| 14 | Advance **~5–10 days** (time controls) | No freeze; toasts readable | |
-| 15 | Optional: open OrderCommandPanel assault/flow actions | Not required if map path works | |
+| 14 | Advance **~5–10 days** (time controls) | No freeze; toasts readable; open fight ticks | |
+| 15 | Click the **rear GER** chip (neighbor of Maginot) · click Maginot to **march** · after fight opens, hop onto the front to **reinforce** | March toast · reinforce toast if a battle is open | |
 
 ### What to write back (short)
 

@@ -447,6 +447,7 @@ func _flush_sim_events() -> void:
 	# used to freeze the main thread for so long the clock looked stuck at Feb 28).
 	var ev: Dictionary = _pending_sim_events.pop_front() as Dictionary
 	var kind := str(ev.get("kind", ""))
+	var t0 := Time.get_ticks_msec()
 	var n_res := 0
 	if kind == "day" or kind == "day_emit":
 		game_day_advanced.emit(int(ev.get("year", 0)), int(ev.get("month", 0)), int(ev.get("day", 0)))
@@ -481,6 +482,13 @@ func _flush_sim_events() -> void:
 		var m := int(ev.get("month", 0))
 		print("TimeManager: flushing month boundary %04d-%02d (interactive, isolated frame)" % [y, m])
 		_emit_month_year_boundary(y, m, bool(ev.get("crossed_year", false)))
+
+	var dt := Time.get_ticks_msec() - t0
+	if dt >= 80:
+		print(
+			"TimeManager: flush %s %dms pending=%d"
+			% [kind, dt, _pending_sim_events.size()]
+		)
 
 	if not _pending_sim_events.is_empty() and not _draining_f5_flush:
 		if n_res > 0 and is_interactive_light_sim():
@@ -536,6 +544,9 @@ func _should_run_interactive_multi_ai() -> bool:
 
 
 func _maybe_run_interactive_multi_ai() -> void:
+	# F5 Maginot playtest: 8-nation production was ~1.4s/day and leaked RAM.
+	if is_interactive_light_sim():
+		return
 	if not _should_run_interactive_multi_ai():
 		return
 	if typeof(GameData) == TYPE_NIL:
@@ -565,6 +576,8 @@ func _maybe_run_ai_infra_invest() -> void:
 ## Budgeted AI start_land_battle (max 1/day). Same F5 light-sim gate as multi-AI.
 ## Killswitch: EOA_AI_LAND_BATTLES=0 (also skipped when interactive multi-AI is off).
 func _maybe_run_ai_land_battle_starts() -> void:
+	if is_interactive_light_sim():
+		return
 	if _living_playtest_clock:
 		# Compact 20d Maginot clock ticks open fights only — new AI assaults
 		# were opening extra fronts (and execute-risk on empty hexes).
@@ -583,10 +596,10 @@ func _maybe_run_ai_land_battle_starts() -> void:
 	BattleManager.try_ai_start_land_battles(day_i)
 
 
-func _tick_own_land_marches() -> void:
+func _tick_own_land_marches(days: float = 1.0) -> void:
 	if typeof(FormationMovement) == TYPE_NIL:
 		return
-	var moved: Array = FormationMovement.tick_all_marches(1.0)
+	var moved: Array = FormationMovement.tick_all_marches(maxf(days, 0.0))
 	if moved.is_empty():
 		return
 	var arrived_n := 0
@@ -611,7 +624,17 @@ func _tick_open_land_battles() -> int:
 			n += 1
 	if n > 0:
 		print("TimeManager: open land battles resolved=%d" % n)
+		_notify_map_land_battles_resolved(resolved)
 	return n
+
+
+func _notify_map_land_battles_resolved(resolved: Array) -> void:
+	var tree := Engine.get_main_loop()
+	if tree == null or not (tree is SceneTree):
+		return
+	for mr in (tree as SceneTree).get_nodes_in_group("map_renderer"):
+		if mr.has_method("_on_land_battles_resolved"):
+			mr.call_deferred("_on_land_battles_resolved", resolved)
 
 
 func _tick_organize_queue() -> void:
@@ -723,12 +746,23 @@ func advance_hours(hours: float) -> void:
 	if whole <= 0:
 		return
 	_accumulated_game_hours -= float(whole)
+	# 3× used to dump 3–6h through 23:00 in one tick and freeze in day_emit/ai.
+	if is_interactive_light_sim() and current_hour >= 21:
+		whole = mini(whole, 1)
 	var days_crossed := 0
 	for _i in whole:
 		current_hour += 1
 		if current_hour >= 24:
+			# Don't pile another midnight while yesterday's day_emit/ai/battles are still queued
+			# (clock looked stuck at 23:00 while the main thread was in a day handler).
+			if is_interactive_light_sim() and not _pending_sim_events.is_empty():
+				current_hour = 23
+				break
 			current_hour = 0
 			days_crossed += 1
+	# Living chips hop on hours so a golden path is not waiting on midnight flush.
+	if is_interactive_light_sim() and whole > 0:
+		_tick_own_land_marches(float(whole) / 24.0)
 	if days_crossed > 0:
 		# Advance whole days (emits day signals / multi-AI once per day, not per hour).
 		advance_days(float(days_crossed))

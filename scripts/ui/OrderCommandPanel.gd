@@ -1188,10 +1188,10 @@ func _rebuild_campaign_alpha_primary_strip() -> void:
 func _rebuild_play_mode_strip() -> void:
 	_add_section_title("— Play commands —")
 	_add_plain_label(
-		"Assault · Production · Station · Save · WarLoop/Fronts/G on map · Ctrl+click enemy to attack",
+		"Assault · Production · Station · Save · click chip · right-click / Ctrl+click enemy to fight",
 		280
 	)
-	_add_apply_button("[2] Assault", "apply_assault", true)
+	_add_play_strip_assault_button()
 	_add_play_strip_production_button()
 	_add_apply_button("[1] Station forces", "apply_station", true)
 	_add_apply_button("[8] Checkpoint save", "save_resume_checkpoint", true)
@@ -1223,6 +1223,42 @@ func _rebuild_play_mode_strip() -> void:
 	_add_map_surface_button(map_row, "WarLoop (Shift+I)", "show_first_session_war_path")
 	_add_map_surface_button(map_row, "Fronts (B)", "show_live_border_fronts")
 	_add_map_surface_button(map_row, "Corridor (G)", "highlight_corridor_capital_to_selected")
+
+
+## Player-mode Assault — living fight sheet for the selected chip, not apply_assault dual.
+func _add_play_strip_assault_button() -> void:
+	var row := HBoxContainer.new()
+	var lbl := Label.new()
+	lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	lbl.text = "[2] Assault"
+	row.add_child(lbl)
+	var btn := Button.new()
+	btn.text = "Open fight"
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.tooltip_text = "Selected division vs adjacent enemy · Start battle on the sheet"
+	btn.pressed.connect(_open_play_strip_assault)
+	row.add_child(btn)
+	_target_body().add_child(row)
+
+
+func _open_play_strip_assault() -> void:
+	var tree := get_tree()
+	var mr: Node = null
+	if tree != null:
+		mr = tree.get_first_node_in_group("map_renderer") if tree.has_method("get_first_node_in_group") else null
+		if mr == null and tree.current_scene != null:
+			mr = tree.current_scene.find_child("MapRenderer", true, false)
+	if mr != null and mr.has_method("open_living_assault"):
+		mr.call("open_living_assault")
+		return
+	if mr != null and mr.has_method("_open_fight_from_formation_id"):
+		var fid := ""
+		if "selected_formation_id" in mr:
+			fid = str(mr.selected_formation_id)
+		mr.call("_open_fight_from_formation_id", fid)
+		return
+	if typeof(DebugOverlay) != TYPE_NIL:
+		DebugOverlay.toast_map_debug("Assault · pick a GER chip then right-click Alsace")
 
 
 ## Player-mode Production — living factory board, not apply_production dual.

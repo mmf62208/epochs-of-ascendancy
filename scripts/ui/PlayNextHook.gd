@@ -253,7 +253,7 @@ static func rank_from_snapshot(facts: Dictionary = {}) -> Dictionary:
 			"ok": true,
 			"action": "open_fight",
 			"label": "Maginot — 1. Infanterie can assault Alsace",
-			"hint": "GER 710173 → FRA 710739 · Open fight / Ctrl+click Alsace",
+			"hint": "GER 710173 → FRA 710739 · Open fight / right-click or Ctrl+click Alsace",
 			"fid": maginot_fid,
 			"to_id": maginot_to,
 			"from_id": maginot_from,

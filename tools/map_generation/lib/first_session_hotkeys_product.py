@@ -54,6 +54,7 @@ HOTKEYS: List[Dict[str, str]] = [
     {"key": "I", "action": "Toggle EquipmentFlow glyphs", "group": "war"},
     {"key": "G", "action": "Supply corridor hub → front", "group": "war"},
     {"key": "Ctrl+click", "action": "Assault adjacent enemy (formation selected)", "group": "war"},
+    {"key": "Right-click", "action": "Order selected unit (march own land / fight enemy)", "group": "war"},
     {"key": "Left-drag", "action": "Pan map (click still picks)", "group": "nav"},
     {"key": "Home", "action": "Center Europe", "group": "nav"},
     {"key": "Shift+Home", "action": "Fit full world", "group": "nav"},
@@ -72,7 +73,7 @@ FIRST_SESSION_STEPS: List[str] = [
     "3. Press B or toolbar Fronts — cycle enemy border targets (Maginot class)",
     "4. Shift+I WarLoop — EquipmentFlow ON + fronts + assault brief",
     "5. Select front province · G — supply hub → front corridor",
-    "6. Formation selected · Ctrl+click adjacent enemy or inspector Attack",
+    "6. Formation selected · right-click or Ctrl+click adjacent enemy or inspector Attack",
     "7. Ctrl+S quicksave · advance a few days · Ctrl+L to resume",
 ]
 
@@ -397,7 +398,10 @@ def build_first_session_hotkeys_product(
             and "_left_release_frame" in _slice_func(ren, "_allow_left_pan_skip_to_die")
             and "is_mouse_button_pressed" in _slice_func(ren, "_begin_left_map_gesture")
             and "_left_ready_for_still_click" in _slice_func(ren, "_begin_left_map_gesture")
-            and "_left_ready_for_still_click" in _slice_func(ren, "_mark_left_pan_blocked_pick")
+            and (
+                "_left_ready_for_still_click" in _slice_func(ren, "_mark_left_pan_blocked_pick")
+                or "Keep still-click armed" in _slice_func(ren, "_mark_left_pan_blocked_pick")
+            )
             and "_arm_still_click_after_pan" in _slice_func(ren, "_apply_home_key")
             and "_left_sticky_is_drag" in _slice_func(ren, "_begin_left_map_gesture")
             and "_left_sticky_is_drag" in _slice_func(ren, "_left_map_pick_blocked")

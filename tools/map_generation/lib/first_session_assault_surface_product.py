@@ -108,8 +108,8 @@ ASSAULT_STEPS: List[str] = [
     "1. Select friendly province with a formation (capital / hub / border)",
     "2. Press B or toolbar Fronts — cycle enemy border target",
     "3. Select the enemy target province (or keep front highlighted)",
-    "4. Inspector Attack button OR Ctrl+click adjacent enemy land",
-    "5. Or Order strip Assault (play mode) — apply_assault",
+    "4. Inspector Attack / Open fight OR right-click / Ctrl+click adjacent enemy land",
+    "5. Or Order strip Assault (play mode) — living Open fight",
 ]
 
 
@@ -126,11 +126,11 @@ def format_assault_ready_toast(
     to = int(to_province_id or 0)
     if fr > 0 and to > 0:
         return (
-            "Assault ready · %s #%d → %s #%d · Ctrl+click enemy or strip Assault"
+            "Assault ready · %s #%d → %s #%d · right-click / Ctrl+click enemy or strip Assault"
             % (tag, fr, def_t, to)
         )
     return (
-        "Assault · select friendly formation · B fronts · Ctrl+click enemy adj · strip Assault"
+        "Assault · select friendly formation · B fronts · right-click / Ctrl+click enemy adj · strip Assault"
     )
 
 

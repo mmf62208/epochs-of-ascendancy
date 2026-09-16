@@ -4,9 +4,9 @@ extends PanelContainer
 ## Floating multiline province tooltip for map hover (BBCode for retrowave accents).
 
 # Compact hover card (~½ prior size) — short province glance, not full inspector.
-@export var max_width: float = 190.0
-@export var max_height: float = 190.0
-@export var font_size: int = 11
+@export var max_width: float = 220.0
+@export var max_height: float = 220.0
+@export var font_size: int = 12
 
 var _rich: RichTextLabel
 var _panel_style: StyleBoxFlat
@@ -369,6 +369,20 @@ func show_text(
 		reset_size()
 		size = get_minimum_size()
 	# Cap reported size so positioning never assumes a huge card.
+	size.x = minf(size.x, max_width)
+	size.y = minf(size.y, max_height)
+	var pos := screen_pos + Vector2(12, 10)
+	if pos.x + size.x > viewport_size.x - 8.0:
+		pos.x = viewport_size.x - size.x - 8.0
+	if pos.y + size.y > viewport_size.y - 8.0:
+		pos.y = screen_pos.y - size.y - 12.0
+	position = pos
+
+
+func reposition_to_mouse(screen_pos: Vector2, viewport_size: Vector2) -> void:
+	if not visible:
+		return
+	var size := get_minimum_size()
 	size.x = minf(size.x, max_width)
 	size.y = minf(size.y, max_height)
 	var pos := screen_pos + Vector2(12, 10)

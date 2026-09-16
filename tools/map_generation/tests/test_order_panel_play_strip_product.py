@@ -88,6 +88,13 @@ class TestOrderPanelPlayStripProduct(unittest.TestCase):
         self.assertIn("open_living_surface", open_fn)
         self.assertIn('"production"', open_fn)
         self.assertIn("pressed.connect(_open_play_strip_production)", btn_fn)
+        assault_i = src.find("func _open_play_strip_assault")
+        assault_n = src.find("\nfunc ", assault_i + 1) if assault_i >= 0 else -1
+        assault_fn = src[assault_i:assault_n] if assault_i >= 0 else ""
+        self.assertTrue(assault_fn, msg="missing _open_play_strip_assault")
+        self.assertIn("open_living_assault", assault_fn)
+        self.assertNotIn("apply_order_panel_action", assault_fn)
+        self.assertIn("_add_play_strip_assault_button", play_fn)
         self.assertNotIn("apply_production", btn_fn)
         self.assertIn("typeof(PlayNextHook) != TYPE_NIL", open_fn)
         self.assertNotIn('has_method("open_living_production")', open_fn)
@@ -106,6 +113,7 @@ class TestOrderPanelPlayStripProduct(unittest.TestCase):
         self.assertIn('_open_living_surface("production"', apply_fn)
         p = build_order_panel_play_strip_product(check_wiring=True)
         self.assertTrue(p.get("wiring", {}).get("play_mode_opens_living_production"), msg=p)
+        self.assertTrue(p.get("wiring", {}).get("play_mode_opens_living_assault"), msg=p)
         self.assertTrue(p.get("wiring", {}).get("play_mode_not_apply_production"), msg=p)
         self.assertIn("unit_card_fill_stockpile", p.get("pass") or [])
         self.assertIn("top_bar_binds_living_tag", p.get("pass") or [])

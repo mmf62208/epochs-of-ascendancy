@@ -579,11 +579,57 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     wiring["click_own_land_marches"] = move_ok
     (passes if move_ok else fails).append("click_own_land_marches")
 
+    order_fn = _slice(ren, "order_selected_unit_at_province")
+    order_ok = (
+        bool(order_fn)
+        and "_try_move_selected_unit_to_province" in order_fn
+        and "_deferred_commit_attack" in order_fn
+        and "will_gate" in order_fn
+        and "not_adjacent" in order_fn
+        and "start_land_battle" in _slice(ren, "_commit_selected_attack")
+        and "_refresh_order_intent_arrows" in _slice(ren, "_commit_selected_attack")
+        and "stationed_province_id = GER_FRONT" not in order_fn
+    )
+    wiring["click_order_api"] = order_ok
+    (passes if order_ok else fails).append("click_order_api")
+
+    live_assault = _slice(ren, "open_living_assault")
+    live_ok = (
+        bool(live_assault)
+        and "order_selected_unit_at_province" in live_assault
+        and "_open_fight_from_formation_id" in live_assault
+    )
+    wiring["open_living_assault"] = live_ok
+    (passes if live_ok else fails).append("open_living_assault")
+
+    input_fn = _slice(ren, "_input")
+    right_ok = (
+        "_arm_right_unit_order" in input_fn
+        and "_release_right_unit_order" in input_fn
+        and "MOUSE_BUTTON_RIGHT" in input_fn
+        and bool(_slice(ren, "_arm_right_unit_order"))
+        and "order_selected_unit_at_province" in _slice(ren, "_try_right_order_at_mouse")
+    )
+    wiring["right_click_orders"] = right_ok
+    (passes if right_ok else fails).append("right_click_orders")
+
+    rear_ok = (
+        "ger_rear" in park
+        and "field_designed_unit" in park
+        and "infantry_1936" in park
+        and "ger_land[1].stationed_province_id = rear_pid" in park
+        and "_living_land_chip_pids" in park
+        and "_living_land_chip_pids" in _slice(ren, "_rebuild_demo_unit_icons")
+    )
+    wiring["rear_ger_chip"] = rear_ok
+    (passes if rear_ok else fails).append("rear_ger_chip")
+
     exec_fn = _slice(ren, "_try_execute_province_attack")
     ctrl_ok = (
         "ctrl_pressed" in spatial
         and "_try_execute_province_attack" in spatial
         and "start_land_battle" in exec_fn
+        and "order_selected_unit_at_province" in exec_fn
     )
     wiring["ctrl_click_starts_battle"] = ctrl_ok
     (passes if ctrl_ok else fails).append("ctrl_click_starts_battle")
@@ -755,6 +801,10 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "enqueue_own_land_march" in harness
         and "enqueue_own_sea_hop" in harness
         and "start_land_battle" in harness
+        and "order_selected_unit_at_province" in harness
+        and "open_living_assault" in harness
+        and "click-order start_battle" in harness
+        and "click-order march" in harness
         and "ensure_playable_front_chips" in harness
         and "DemoUnitIcon" in harness
         and "formation_id" in harness

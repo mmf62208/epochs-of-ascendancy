@@ -16,6 +16,9 @@ const COL_ATT := Color(0.28, 0.82, 0.42, 0.95)
 const COL_DEF := Color(0.90, 0.30, 0.22, 0.95)
 const COL_DEF_AMBER := Color(0.95, 0.62, 0.22, 0.95)
 const COL_BAR_BG := Color(0.12, 0.13, 0.16, 0.92)
+const COL_LIKELY := Color(0.32, 0.84, 0.46, 0.95)
+const COL_TIGHT := Color(0.95, 0.78, 0.22, 0.95)
+const COL_BAD := Color(0.90, 0.32, 0.22, 0.95)
 
 var _centroids: Dictionary = {}
 var _battles: Array = []
@@ -80,45 +83,42 @@ func _draw() -> void:
 			continue
 		var att_org := clampf(float(entry.get("att_org", 0.0)), 0.0, 1.0)
 		var def_org := clampf(float(entry.get("def_org", 0.0)), 0.0, 1.0)
-		var lean := str(entry.get("lean", "even")).strip_edges().to_lower()
-		_draw_org_plate(pos, att_org, def_org, pulse, lean)
+		var att_p := maxf(0.0, float(entry.get("att_power", 0.0)))
+		var def_p := maxf(0.0, float(entry.get("def_power", 0.0)))
+		var band := "tight"
+		if att_p > def_p * 1.15:
+			band = "likely"
+		elif def_p > att_p * 1.15:
+			band = "bad"
+		var denom := att_org + def_org
+		var progress := 0.5 if denom <= 0.001 else att_org / denom
+		_draw_org_plate(pos, progress, band, pulse)
 		_last_n += 1
 
 
-func _draw_org_plate(pos: Vector2, att_org: float, def_org: float, pulse: float, lean: String) -> void:
-	var w := 54.0
-	var h := 20.0
+func _draw_org_plate(pos: Vector2, progress: float, band: String, pulse: float) -> void:
+	var w := 62.0
+	var h := 16.0
 	var plate := Rect2(pos.x - w * 0.5, pos.y - h * 0.5, w, h)
 	var plate_col := Color(COL_PLATE.r, COL_PLATE.g, COL_PLATE.b, COL_PLATE.a * pulse)
 	draw_rect(plate, plate_col, true)
-	var edge := COL_EDGE
-	if lean == "attacker":
-		edge = Color(0.28, 0.72, 0.40, 0.95)
-	elif lean == "defender":
-		edge = Color(0.90, 0.38, 0.24, 0.95)
-	draw_rect(plate, edge, false, 1.0)
-	var bar_w := w - 6.0
-	var bar_h := 3.5
+	var edge := COL_TIGHT
+	var fill := COL_TIGHT
+	if band == "likely":
+		edge = COL_LIKELY
+		fill = COL_LIKELY
+	elif band == "bad":
+		edge = COL_BAD
+		fill = COL_BAD
+	draw_rect(plate, edge, false, 1.2)
+	var bar_w := w - 8.0
+	var bar_h := 6.0
 	var ax := pos.x - bar_w * 0.5
-	var ay := pos.y - 5.0
+	var ay := pos.y - bar_h * 0.5
 	draw_rect(Rect2(ax, ay, bar_w, bar_h), COL_BAR_BG, true)
-	# OrgBar: attacker org (green)
-	var org_bar_w := bar_w * att_org
-	if org_bar_w > 0.5:
-		draw_rect(Rect2(ax, ay, org_bar_w, bar_h), COL_ATT, true)
-	var dy := pos.y + 1.5
-	draw_rect(Rect2(ax, dy, bar_w, bar_h), COL_BAR_BG, true)
-	var def_w := bar_w * def_org
-	if def_w > 0.5:
-		var def_col := COL_DEF if def_org > 0.35 else COL_DEF_AMBER
-		draw_rect(Rect2(ax, dy, def_w, bar_h), def_col, true)
-	# Lean pip (who the fight is tilting toward).
-	var pip := Color(0.70, 0.72, 0.74, 0.85)
-	if lean == "attacker":
-		pip = COL_ATT
-	elif lean == "defender":
-		pip = COL_DEF
-	draw_circle(Vector2(pos.x - w * 0.5 + 3.0, pos.y - h * 0.5 + 3.0), 1.6, pip)
+	var fw := bar_w * clampf(progress, 0.0, 1.0)
+	if fw > 0.5:
+		draw_rect(Rect2(ax, ay, fw, bar_h), fill, true)
 
 
 func _bubble_pos(entry: Dictionary) -> Vector2:
@@ -182,11 +182,25 @@ func _sync_day_labels() -> void:
 		var est := int(entry.get("est_days", 0))
 		var att_n := int(entry.get("att_n", 0))
 		var def_n := int(entry.get("def_n", 0))
-		var day_s := "Day %d/%d" % [day_n, est] if est > 0 else "Day %d" % day_n
-		if att_n > 0 and def_n > 0:
-			lb.text = "%s · %dv%d" % [day_s, att_n, def_n]
+		var att_p := maxf(0.0, float(entry.get("att_power", 0.0)))
+		var def_p := maxf(0.0, float(entry.get("def_power", 0.0)))
+		var word := "TIGHT"
+		if att_p > def_p * 1.15:
+			word = "LIKELY"
+		elif def_p > att_p * 1.15:
+			word = "BAD"
+		var join_n := 0
+		var pend: Variant = entry.get("att_pending_fids", [])
+		if pend is Array:
+			join_n = (pend as Array).size()
+		var vs := "%dv%d" % [att_n, def_n] if att_n > 0 and def_n > 0 else ""
+		if join_n > 0:
+			vs = ("%s +%d" % [vs, join_n]).strip_edges()
+		var day_s := "D%d/%d" % [day_n, est] if est > 0 else "D%d" % day_n
+		if vs.is_empty():
+			lb.text = "%s · %s" % [word, day_s]
 		else:
-			lb.text = day_s
+			lb.text = "%s · %s · %s" % [word, vs, day_s]
 		# Cheap CAS / planning chips — text only, no extra nodes.
 		if float(entry.get("cas_att", 0.0)) > 0.0 or float(entry.get("cas_def", 0.0)) > 0.0:
 			lb.text += " CAS"
@@ -195,5 +209,5 @@ func _sync_day_labels() -> void:
 		if bool(entry.get("enc_att", false)) or bool(entry.get("enc_def", false)) \
 				or bool(entry.get("pocket_att", false)) or bool(entry.get("pocket_def", false)):
 			lb.text += " ENC"
-		lb.position = pos + Vector2(-22.0, -22.0)
+		lb.position = pos + Vector2(-40.0, 10.0)
 		lb.visible = true

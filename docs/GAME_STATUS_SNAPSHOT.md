@@ -1,6 +1,6 @@
 # EOA — Game Status Snapshot (full-test readiness)
 
-**Date:** 2026-08-22 (L1 land loop + living units + organize + composition + industry TOE + era resources + occupier harvest + **NEXT daily command beat** + **play-strip factory board** + **capture AAR economy** + completing bars · `--quick` green · board ~3520 · M6 human-only open)  
+**Date:** 2026-09-16 (L1 Maginot **click-order combat loop**: war gate, red attack/occupy arrows, Fight card, occupy-after-win walk-in, player-only capture toasts · F5 day_ai/autosave stripped so 1× doesn't leak 10GB · living units + organize + composition + industry TOE + era resources + occupier harvest + **NEXT daily command beat** + **play-strip factory board** · board ~3520 · M6 human-only open)  
 **Residual board:** [`EOA_RESIDUAL_PRIORITY_BOARD.md`](EOA_RESIDUAL_PRIORITY_BOARD.md) · skeptic [`EOA_SKEPTIC_PASS_2026_08_03.md`](EOA_SKEPTIC_PASS_2026_08_03.md) · forward program [`FORWARD_PROGRAM_2026_08_12.md`](FORWARD_PROGRAM_2026_08_12.md)  
 **How to keep going:** 5-step protocol in §0. Next human: F5 §0b 3–15 + a 20d unpause (M6 notes). Next machine: only playtest-driven shipped-path fixes. Do **not** merge `origin/cursor/*` or `execute-plan/ceb60fdd-*`.
 
@@ -26,7 +26,7 @@ Every Cursor / Grok / human session on this tree:
 
 | Next | Action |
 |------|--------|
-| **Human** | Not required for units. F5 GER 1936: play-strip **Production** opens the factory board; NEXT names Maginot when the 710173 chip is ready. M6 20d/60d still open. |
+| **Human** | F5 GER 1936 **paused**: Maginot chip → **one** right-click Alsace → **Not at war / Declare war** → red arrow + Fight card → 1× until FRA breaks → hex stays FRA → GER auto-walks in → hex GER. Empty FRA hex = red occupy arrow, no Fight box. Don't spam clicks. M6 20d/60d still open. |
 | **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS** (organize/train/priority included). Soft 30fps still FAIL honest. |
 | **GitHub** | `origin/main` @ `9d24efe` (no retrowave fort dummy units; chip text not Control). Play branch `eoa/l1-war-loop-slice` matches. Do not force-push over June Cursor history. |
 
@@ -36,6 +36,9 @@ Every Cursor / Grok / human session on this tree:
 - Assault hang-class **closed** at `30910c2` (greps green: fill-pids, no full icon rebuild, BM notify `target_pid`, success-path busy clears in `_assault_post_ui_light`; failure still clears synchronously).
 - Interactive multi-AI tag-scope is on the **official gate** (`test_interactive_multi_ai_day_product` in `eoa_full_test_gates.sh`).
 - **L1 living unit order loop (machine):** `living_unit_order_loop_product` on `--quick` · `HeadlessWorldAccurateUnitOrderLoopTest` parks GER `710173` / FRA `710739`, proves DemoUnitIcon + org/str/str% + `enqueue_own_land_march` + `start_land_battle`. F5 QA: `EOA_UNIT_ORDER_QA=1`. Strategic chips culled; pick also early-outs when counters not wanted (ocean/terrain/capitals beat chips). Pin-first when chips visible. Inspector Close restores input.
+- **L1 click-order (playtest):** selected chip **right-click** / **Ctrl+click** enemy **starts the fight** (`start_land_battle`) when the assault is legal — no extra box. Compact **will-gate** (Declare war / Negotiate access) only if `can_assault` fails. Own land still marches. Unit card **Attack** is the same path. Minimap hidden; card clips.
+- **L1 fight card:** one briefing per battle (all `att_fids` + `att_pending_fids` JOINING). Map pulse = Likely/Tight/Bad bar (no %). Click red arrow or a fighting chip opens **Fight · place** with staff one-liner, fogged enemy, Maginot fortified. Updates on join + daily.
+- **L1 war gate + occupy:** FRA attack shows **Not at war** until Declare war. Empty/post-break hex: red occupy arrow, no Fight box, fill flips on walk-in. Capture toasts default **player nation only**. Click-order debounce ~0.8s. Headless: will_gate→declare→start_battle PASS.
 - **Beta B1 world living OOB (machine):** `ensure_playable_front_chips` also stations ENG/USA/SOV/ITA/POL at capitals and **JAP `903981`** on the CHI–JAP edge (`902598`, rear `903966`). Headless: JAP chip pickable; Maginot still **RESULT=PASS**. Not beta-complete (naval/air/peace/AI still dual-thin).
 - **Beta B2 second theater (machine):** CHI–JAP living march + `start_land_battle` **opened** (not empty-hex instant). Maginot GER→FRA still PASS.
 - **Beta B3 naval living loop (machine):** ENG fleet chip on English Channel sea `950001`, adjacent-sea hop to North Sea `950000` (`enqueue_own_sea_hop`, no land BFS). Channel choke flagged (G toast / NEXT `choke_flag`, supply × from shipped choke bonus). Maginot + CHI–JAP still PASS. Not beta-complete (air/peace/AI/UX still open).
@@ -89,7 +92,7 @@ Every Cursor / Grok / human session on this tree:
 - **L1 occupier harvest + stockpile refuel (machine):** Harvest pays the **controller** (occupier), not the legal owner; occupied yield ×0.65. Out-of-combat truck/tank **refuel draws national fuel/oil** — empty stock invents nothing (foot unhindered). Headless: GER holding FRA oil hex harvests; empty fuel stock no refill; stockpile 0.20→higher. Still not V3 occupation/markets.
 - **L1 formation combat save (machine):** LeaderManager persists combat_experience + planning + entrenchment (and land mission). Mid-campaign load no longer resets XP/trench. Calendar autosave toasts “Autosaved · day N”.
 
-**Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3.
+**Deferred (not this session, not a gate):** M6 human 20d/60d · soft 30fps FAIL honest · `renderer_frame` · GameData split · densify / SE Asia · DESIGN_LADDER_A corridor/transit (`ceb60fdd-pr-2` / `pr-3` stay parked) · museum / 13k / MP / V3 · full-game loop intent [`DESIGN_EPOCH_LOOP_INTENT.md`](DESIGN_EPOCH_LOOP_INTENT.md) (fit budgets, lift→move, plans/deals/RE — **not landed**, not a gate).
 
 **Do not merge:** `origin/cursor/*` (this clone has `origin/cursor/fix-void-return-2453`) · `feature/goals-forward-2026-06-18` · any `execute-plan/ceb60fdd-*` / `ceb60fdd-stack-assembly`. Work this tree (`505d91d`+). Dual board only via `EOA_SCENARIO=world_full`. Godot only via `tools/run_godot.sh`. Never renumber `world_full` IDs.
 
