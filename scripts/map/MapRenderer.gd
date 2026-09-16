@@ -2092,6 +2092,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			if _try_set_attack_staging(resolved_province):
 				pass  # still open inspector below
+			# Hang-class: never open the 3520 inspector while a chip is selected.
+			if not selected_formation_id.is_empty():
+				get_viewport().set_input_as_handled()
+				return
 			if supply_mode and _handle_supply_province_click(resolved_province):
 				if _left_map_pick_blocked():
 					get_viewport().set_input_as_handled()

@@ -27,7 +27,7 @@ Every Cursor / Grok / human session on this tree:
 | Next | Action |
 |------|--------|
 | **Human** | F5 GER 1936 **paused**: Maginot chip → **one** right-click Alsace → **Not at war / Declare war** → red arrow + Fight card → 1× until FRA breaks → hex stays FRA → GER auto-walks in → hex GER. Empty FRA hex = red occupy arrow, no Fight box. Don't spam clicks. M6 20d/60d still open. |
-| **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS** (organize/train/priority included). Soft 30fps still FAIL honest. |
+| **Machine** | Occupy-after-win headless: break keeps FRA, walk-in GER. JOINING roster. No inspector on command click. Learnings: [`SESSION_NOTES/2026-09-16_maginot_combat_learnings.md`](SESSION_NOTES/2026-09-16_maginot_combat_learnings.md). Soft 30fps still FAIL honest. |
 | **GitHub** | `origin/main` @ `9d24efe` (no retrowave fort dummy units; chip text not Control). Play branch `eoa/l1-war-loop-slice` matches. Do not force-push over June Cursor history. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
