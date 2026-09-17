@@ -395,6 +395,7 @@ static func enqueue_retreat_adjacent(
 		"from_id": from_id,
 		"order_type": ORDER_RETREAT,
 		"retreat": true,
+		"rout": hop_cost < 0.7,
 	}
 	_orders[fid] = order
 	return {
@@ -419,6 +420,22 @@ static func list_occupy_orders() -> Array:
 			"from_id": int(order.get("from_id", -1)),
 			"to_id": int(order.get("dest_id", -1)),
 			"occupy": true,
+		})
+	return out
+
+
+static func list_retreat_orders() -> Array:
+	var out: Array = []
+	for fid_v in _orders.keys():
+		var order: Dictionary = _orders[fid_v] as Dictionary
+		if not bool(order.get("retreat", false)):
+			continue
+		out.append({
+			"formation_id": str(fid_v),
+			"from_id": int(order.get("from_id", -1)),
+			"to_id": int(order.get("dest_id", -1)),
+			"retreat": true,
+			"rout": bool(order.get("rout", false)),
 		})
 	return out
 

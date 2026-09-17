@@ -2623,6 +2623,7 @@ func _displace_defender_from_captured_province(result: Dictionary, captured_pid:
 				)
 				moved = bool(enq.get("ok", false))
 				if moved:
+					_apply_retreat_remnant(f2, rout)
 					print("[RETREAT] %s %s → %d hop=%.2f rout=%s" % [move_fid, def_tag, retreat_pid, hopc, str(rout)])
 			if not moved and typeof(FormationMovement) != TYPE_NIL and not _interactive_light_sim():
 				var res: Dictionary = FormationMovement.move_formation_to_province(
@@ -2696,6 +2697,31 @@ func _pick_defender_retreat_province(captured_pid: int, defender_tag: String) ->
 				continue
 			return pid2
 	return -1
+
+
+func _apply_retreat_remnant(f: Formation, rout: bool) -> void:
+	if f == null:
+		return
+	if rout:
+		if "strength" in f:
+			f.strength = maxf(0.12, float(f.strength) * 0.55)
+		if "organization" in f:
+			f.organization = 0.12
+		if "readiness" in f:
+			f.readiness = maxf(0.12, float(f.readiness) * 0.40)
+		_apply_combat_equipment_loss_for_formation(
+			str(f.formation_id) if "formation_id" in f else "", 1.0, 0.35, false, false
+		)
+	else:
+		if "strength" in f:
+			f.strength = maxf(0.35, float(f.strength) * 0.88)
+		if "organization" in f:
+			f.organization = maxf(0.28, float(f.organization) * 0.55)
+		if "readiness" in f:
+			f.readiness = maxf(0.25, float(f.readiness) * 0.75)
+		_apply_combat_equipment_loss_for_formation(
+			str(f.formation_id) if "formation_id" in f else "", 1.0, 0.82, false, true
+		)
 
 
 func _score_retreat_province(p: Province, pid: int, tag: String) -> int:

@@ -6,8 +6,11 @@ const Z_INTENT := 26
 const MARCH_COL := Color(1.0, 0.82, 0.22, 0.92)
 const ATTACK_COL := Color(0.92, 0.18, 0.16, 0.95)
 const ATTACK_GLOW := Color(0.95, 0.28, 0.18, 0.28)
+const RETREAT_COL := Color(0.94, 0.94, 0.96, 0.92)
+const RETREAT_GLOW := Color(0.85, 0.85, 0.90, 0.28)
 const MARCH_WIDTH := 3.6
 const ATTACK_WIDTH := 4.4
+const RETREAT_WIDTH := 3.8
 const HEAD_LEN := 16.0
 const HEAD_HALF := 9.0
 const HIT_R := 22.0
@@ -54,7 +57,7 @@ func pick_attack_at(world: Vector2, hit_r: float = HIT_R) -> Dictionary:
 		var b: Vector2 = raw.get("to", Vector2.ZERO)
 		if a == Vector2.ZERO or b == Vector2.ZERO:
 			continue
-		if bool(raw.get("occupy", false)):
+		if bool(raw.get("occupy", false)) or bool(raw.get("retreat", false)):
 			continue
 		var d := _dist_to_segment(world, a, b)
 		if d <= best_d:
@@ -87,6 +90,12 @@ func _draw() -> void:
 		var a: Vector2 = raw.get("from", Vector2.ZERO)
 		var b: Vector2 = raw.get("to", Vector2.ZERO)
 		if a == Vector2.ZERO or b == Vector2.ZERO or a.distance_squared_to(b) < 4.0:
+			continue
+		if bool(raw.get("retreat", false)):
+			var rc := Color(RETREAT_COL.r, RETREAT_COL.g, RETREAT_COL.b, RETREAT_COL.a * pulse)
+			draw_line(a, b, RETREAT_GLOW, RETREAT_WIDTH + 5.0, true)
+			draw_line(a, b, rc, RETREAT_WIDTH, true)
+			_draw_head(a, b, rc)
 			continue
 		var col := Color(ATTACK_COL.r, ATTACK_COL.g, ATTACK_COL.b, ATTACK_COL.a * pulse)
 		draw_line(a, b, ATTACK_GLOW, ATTACK_WIDTH + 6.0, true)

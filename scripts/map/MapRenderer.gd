@@ -17618,6 +17618,22 @@ func _refresh_order_intent_arrows() -> void:
 				"to_id": oto,
 				"occupy": true,
 			})
+		for ret in FormationMovement.list_retreat_orders():
+			if not (ret is Dictionary):
+				continue
+			var rfrom := int((ret as Dictionary).get("from_id", -1))
+			var rto := int((ret as Dictionary).get("to_id", -1))
+			var a3 := _centroid_for_intent(rfrom)
+			var b3 := _centroid_for_intent(rto)
+			if a3 == Vector2.ZERO or b3 == Vector2.ZERO:
+				continue
+			rows.append({
+				"from": a3,
+				"to": b3,
+				"from_id": rfrom,
+				"to_id": rto,
+				"retreat": true,
+			})
 	_order_intent.call("set_attacks", rows)
 
 

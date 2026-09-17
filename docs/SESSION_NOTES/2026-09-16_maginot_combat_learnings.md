@@ -45,6 +45,8 @@ Guidelines from HOI4 + WWII withdrawal studies (Dupuy / CSI):
 - **Rout** (org collapsed): faster hop (~0.45 day), heavy abandoned guns/trucks (occupier harvest), air loses readiness ~45% — planes/pilots more likely out, ground crews and spares not.
 - **Where they run (adjacent friendly only):** capital/VP > urban/factory/port/depot > not overcrowded. Never into a hex with **enemy land**. Not into empty enemy land (no unit-level recon yet).
 - **Air on a lost airfield:** rebase to the same retreat hex; flying missions implied by being assigned. Era later (2026) can lift more; 1936 is trucks and trains — not modeled as a second sim yet.
+- **White arrow:** retreat path (organized ~1d hop, rout ~0.45d). Click prefers **player** chip if two units share a hex.
+- **Remnant:** organized keeps ~88% strength / org ~0.32 / ~18% gear loss. Rout keeps ~55% strength / org 0.12 / ~65% gear abandoned. No legal hex = overrun (existing station=-1).
 
 ## Machine while human is out
 
