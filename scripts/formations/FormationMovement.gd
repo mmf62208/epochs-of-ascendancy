@@ -8,6 +8,7 @@ extends RefCounted
 const ORDER_MOVE_TO_PROVINCE := "move_to_province"
 const ORDER_OWN_LAND_MARCH := "own_land_march"
 const ORDER_OCCUPY_EMPTY := "occupy_empty"
+const ORDER_RETREAT := "retreat"
 
 const BASE_HOP_DAYS := 1.0
 const HOP_DAYS_MIN := 0.25
@@ -359,6 +360,51 @@ static func enqueue_occupy_adjacent(
 		"dest_id": dest_id,
 		"formation_id": fid,
 		"occupy": true,
+	}
+
+
+## Defender leaves a lost hex over travel time (rout is faster, more gear lost elsewhere).
+static func enqueue_retreat_adjacent(
+	formation_id: String,
+	dest_id: int,
+	country_tag: String,
+	from_id_override: int = -1,
+	hop_cost: float = 1.0,
+) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	if fid.is_empty() or tag.is_empty() or dest_id <= 0:
+		return {"ok": false, "reason": "bad args"}
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return {"ok": false, "reason": "no formation"}
+	var f: Formation = LeaderManager.get_formation(fid)
+	if f == null:
+		return {"ok": false, "reason": "unknown unit"}
+	var from_id := from_id_override if from_id_override > 0 else (int(f.stationed_province_id) if "stationed_province_id" in f else -1)
+	if from_id <= 0 or from_id == dest_id:
+		return {"ok": false, "reason": "bad station"}
+	var path: Array[int] = [from_id, dest_id]
+	var order := {
+		"formation_id": fid,
+		"country_tag": tag,
+		"path": path,
+		"hop_index": 1,
+		"progress": 0.0,
+		"hop_cost": maxf(0.35, hop_cost),
+		"dest_id": dest_id,
+		"from_id": from_id,
+		"order_type": ORDER_RETREAT,
+		"retreat": true,
+	}
+	_orders[fid] = order
+	return {
+		"ok": true,
+		"path": path,
+		"hops": 1,
+		"from_id": from_id,
+		"dest_id": dest_id,
+		"formation_id": fid,
+		"retreat": true,
 	}
 
 

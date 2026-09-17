@@ -1693,7 +1693,10 @@ func _begin_occupy_after_victory(battle: Dictionary) -> void:
 		"defender_tag": str(battle.get("def_tag", "")),
 		"defender_formation_id": str(battle.get("def_fid", "")),
 	}
+	var rout := float(battle.get("def_org", 1.0)) < 0.22
+	disp["rout"] = rout
 	_displace_defender_from_captured_province(disp, to_id)
+	_rebase_air_from_captured_province(to_id, str(battle.get("def_tag", "")), rout)
 	var fids: Array = _fid_list(battle, "att_fids", "att_fid")
 	for fid_v in fids:
 		var fid := str(fid_v)
@@ -2612,7 +2615,16 @@ func _displace_defender_from_captured_province(result: Dictionary, captured_pid:
 			continue
 		if retreat_pid >= 0 and not def_tag.is_empty():
 			var moved := false
-			if typeof(FormationMovement) != TYPE_NIL and not _interactive_light_sim():
+			if _interactive_light_sim() and typeof(FormationMovement) != TYPE_NIL:
+				var rout := bool(result.get("rout", false))
+				var hopc := 0.45 if rout else 1.0
+				var enq: Dictionary = FormationMovement.enqueue_retreat_adjacent(
+					move_fid, retreat_pid, def_tag, captured_pid, hopc
+				)
+				moved = bool(enq.get("ok", false))
+				if moved:
+					print("[RETREAT] %s %s → %d hop=%.2f rout=%s" % [move_fid, def_tag, retreat_pid, hopc, str(rout)])
+			if not moved and typeof(FormationMovement) != TYPE_NIL and not _interactive_light_sim():
 				var res: Dictionary = FormationMovement.move_formation_to_province(
 					move_fid, retreat_pid, def_tag,
 				)
@@ -2639,18 +2651,29 @@ func _pick_defender_retreat_province(captured_pid: int, defender_tag: String) ->
 	var tag := defender_tag.strip_edges().to_upper()
 	if tag.is_empty() or typeof(MapManager) == TYPE_NIL:
 		return -1
-	# Adjacent friendly land first (after capture ownership already flipped).
+	# Adjacent friendly land, scored: VP/capital/urban/infra, then supply, then not crowded.
+	# Never into a hex that already has enemy land. Empty enemy hex only if no friendly option.
 	if MapManager.has_method("get_adjacent_provinces"):
 		var adj: Array = MapManager.get_adjacent_provinces(captured_pid, true)
+		var best_pid := -1
+		var best_score := -99999
 		for apid_v in adj:
 			var apid := int(apid_v)
 			if apid == captured_pid or apid < 0:
 				continue
-			if _province_controlled_by(apid, tag):
-				var p: Province = MapManager.get_province(apid) if MapManager.has_method("get_province") else null
-				if p != null and p.is_sea:
-					continue
-				return apid
+			if not _province_controlled_by(apid, tag):
+				continue
+			var p: Province = MapManager.get_province(apid) if MapManager.has_method("get_province") else null
+			if p == null or p.is_sea:
+				continue
+			if not _enemy_land_rows_at(apid, tag).is_empty():
+				continue
+			var sc := _score_retreat_province(p, apid, tag)
+			if sc > best_score:
+				best_score = sc
+				best_pid = apid
+		if best_pid > 0:
+			return best_pid
 	# Any remaining friendly-controlled land (non-captured).
 	if MapManager.has_method("get_provinces_by_controller"):
 		var owned: Array = MapManager.get_provinces_by_controller(tag)
@@ -2673,6 +2696,55 @@ func _pick_defender_retreat_province(captured_pid: int, defender_tag: String) ->
 				continue
 			return pid2
 	return -1
+
+
+func _score_retreat_province(p: Province, pid: int, tag: String) -> int:
+	var sc := 10
+	if p.has_method("has_feature") and p.has_feature("capital"):
+		sc += 100
+	var terr := str(p.terrain).to_lower()
+	if terr in ["urban", "city"]:
+		sc += 40
+	if "special_features" in p and p.special_features is Dictionary:
+		var sf: Dictionary = p.special_features
+		if bool(sf.get("factory", false)) or float(sf.get("industry", 0.0)) > 0.0:
+			sc += 30
+		if bool(sf.get("port", false)) or bool(sf.get("naval_base", false)):
+			sc += 25
+		if bool(sf.get("supply_hub", false)) or bool(sf.get("depot", false)):
+			sc += 20
+	var crowd := 0
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formations_for_country"):
+		for f in LeaderManager.get_formations_for_country(tag):
+			if f != null and "stationed_province_id" in f and int(f.stationed_province_id) == pid:
+				crowd += 1
+	sc -= crowd * 12
+	return sc
+
+
+func _rebase_air_from_captured_province(captured_pid: int, def_tag: String, rout: bool) -> void:
+	var tag := def_tag.strip_edges().to_upper()
+	if tag.is_empty() or captured_pid < 0 or typeof(LeaderManager) == TYPE_NIL:
+		return
+	if not LeaderManager.has_method("get_formations_for_country"):
+		return
+	var dest := _pick_defender_retreat_province(captured_pid, tag)
+	if dest <= 0:
+		return
+	for f_any in LeaderManager.get_formations_for_country(tag):
+		var f: Formation = f_any as Formation
+		if f == null or not ("stationed_province_id" in f):
+			continue
+		if int(f.stationed_province_id) != captured_pid:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft != Formation.TYPE_AIR_WING and ft != Formation.TYPE_AIR_SQUADRON and ft != Formation.TYPE_AIR_GROUP:
+			continue
+		f.stationed_province_id = dest
+		if "readiness" in f:
+			var hit := 0.45 if rout else 0.22
+			f.readiness = maxf(0.15, float(f.readiness) * (1.0 - hit))
+		print("[AIR REBASE] %s leaves %d → %d rout=%s rdy hit" % [str(f.formation_id), captured_pid, dest, str(rout)])
 
 
 func _province_controlled_by(province_id: int, tag: String) -> bool:

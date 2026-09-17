@@ -17756,7 +17756,8 @@ func _show_fight_card(battle: Dictionary) -> void:
 		return
 	var old := ui.get_node_or_null("FightCard")
 	if old != null:
-		old.queue_free()
+		ui.remove_child(old)
+		old.free()
 	var brief: Dictionary = {}
 	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("build_fight_briefing"):
 		brief = BattleManager.build_fight_briefing(battle, _player_tag())
@@ -17910,7 +17911,6 @@ func _show_fight_card(battle: Dictionary) -> void:
 		b.pressed.connect(func() -> void:
 			if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("set_land_battle_stance"):
 				BattleManager.set_land_battle_stance(selected_formation_id, stn)
-			_refresh_fight_card_if_open()
 		)
 		cmd.add_child(b)
 
@@ -21968,6 +21968,17 @@ func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 
 
 ## Offset living chips off the capital star so both stay distinct click targets.
+func _formation_is_air_chip(fo: Object) -> bool:
+	if fo == null:
+		return false
+	if fo.has_method("get_category"):
+		var cat := str(fo.call("get_category")).to_lower()
+		if "air" in cat:
+			return true
+	var ft := str(fo.formation_type) if "formation_type" in fo else ""
+	return ft == Formation.TYPE_AIR_WING or ft == "air_wing" or ft == "air_squadron" or ft == "air_group"
+
+
 func _unit_chip_offset_for_pid(pid: int) -> Vector2:
 	# Beiping 902487: keep the CHI capital star clear of garrison/division chips.
 	if pid == 902487:
@@ -25594,6 +25605,13 @@ func _build_stationed_formation_index_for_icons() -> Dictionary:
 			counts[sid] = int(counts.get(sid, 0)) + 1
 			if not by_pid.has(sid):
 				by_pid[sid] = fo
+			else:
+				# Prefer land as the visible primary chip so air wings don't bury divisions.
+				var cur: Object = by_pid[sid] as Object
+				var cur_air := _formation_is_air_chip(cur)
+				var new_air := _formation_is_air_chip(fo)
+				if cur_air and not new_air:
+					by_pid[sid] = fo
 			var arr: Array = samples.get(sid, []) as Array
 			if arr.size() < 4:
 				arr.append(fo)

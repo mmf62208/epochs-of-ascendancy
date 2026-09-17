@@ -37,6 +37,15 @@ Human F5 Maginot (GER 710173 → FRA 710739) plus headless click-order. Not M6 c
 5. **Chip vs NUTS size** — mainland Europe hex must fit a NATO plate (Malta/Gibraltar can clip). Separate map track.
 6. **Recon later** — un-fog enemy org/TOE with time-on-border / CAS / agents. Not this slice.
 
+## Retreat / air (2026-09-17)
+
+Guidelines from HOI4 + WWII withdrawal studies (Dupuy / CSI):
+
+- **Organized withdrawal** (org still above ~0.22): hop ~1 day, light gear loss, air often rebases with crews.
+- **Rout** (org collapsed): faster hop (~0.45 day), heavy abandoned guns/trucks (occupier harvest), air loses readiness ~45% — planes/pilots more likely out, ground crews and spares not.
+- **Where they run (adjacent friendly only):** capital/VP > urban/factory/port/depot > not overcrowded. Never into a hex with **enemy land**. Not into empty enemy land (no unit-level recon yet).
+- **Air on a lost airfield:** rebase to the same retreat hex; flying missions implied by being assigned. Era later (2026) can lift more; 1936 is trucks and trains — not modeled as a second sim yet.
+
 ## Machine while human is out
 
 - Occupy-after-win: hex FRA after break, GER after `tick_all_marches` (headless).
