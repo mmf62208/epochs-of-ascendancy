@@ -551,11 +551,11 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     input_i = ren.find("func _input")
     unh_i = ren.find("func _unhandled_input")
     input_fn = ren[input_i:unh_i] if input_i >= 0 and unh_i > input_i else ""
-    gi = input_fn.find("keycode == KEY_G")
+    gi = input_fn.find("KEY_G")
     if gi >= 0:
         g_slice = input_fn[gi : gi + 400]
     else:
-        gi = ren.find("keycode == KEY_G")
+        gi = ren.find("KEY_G")
         if gi >= 0:
             g_slice = ren[gi : gi + 400]
     g_request = "_request_hang_safe_supply_corridor" in g_slice
