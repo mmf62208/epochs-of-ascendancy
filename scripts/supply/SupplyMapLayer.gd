@@ -58,6 +58,7 @@ var _compare_ttl: float = 0.0
 func setup(centroids: Dictionary, rules: SupplyRules) -> void:
 	_centroids = centroids
 	_rules = rules
+	z_as_relative = false
 	z_index = 60
 	_ensure_convoy_tex()
 	set_process(true)
@@ -75,6 +76,9 @@ func highlight_route_points(pts: PackedVector2Array, seconds: float = -1.0) -> v
 	_highlight_pts = pts.duplicate()
 	_highlight_ttl = seconds if seconds > 0.0 else highlight_seconds
 	visible = true
+	z_as_relative = false
+	if z_index < 90:
+		z_index = 90
 	queue_redraw()
 
 
@@ -245,18 +249,32 @@ func _draw() -> void:
 		_draw_route_highlight()
 
 
+func _highlight_polyline_width() -> float:
+	# Zoom-aware so G / minimap highlight stays ~10 screen px at Europe Home.
+	var z := 1.0
+	var vp := get_viewport()
+	if vp != null:
+		var cam := vp.get_camera_2d()
+		if cam != null:
+			z = maxf(absf(cam.zoom.x), 0.06)
+	return clampf(12.0 / z, 10.0, 120.0)
+
+
 func _draw_route_highlight() -> void:
 	if _highlight_pts.size() < 2:
 		return
 	var t := clampf(_highlight_ttl / maxf(0.1, highlight_seconds), 0.0, 1.0)
-	var pulse := 0.55 + 0.45 * sin(_flash_phase * 1.7)
-	var col := Color(1.0, 0.85, 0.25, 0.35 + 0.45 * t * pulse)
-	var w := line_width * (2.2 + pulse * 0.8)
-	draw_polyline(_highlight_pts, Color(1.0, 0.5, 0.15, 0.25 * t), w * 1.6, true)
+	var pulse := 0.70 + 0.30 * sin(_flash_phase * 1.7)
+	var col := Color(1.0, 0.92, 0.16, 0.75 + 0.25 * t * pulse)
+	var w := _highlight_polyline_width()
+	draw_polyline(_highlight_pts, Color(0.04, 0.05, 0.10, 0.88), w * 2.4, true)
+	draw_polyline(_highlight_pts, Color(1.0, 0.55, 0.12, 0.55 * t), w * 1.6, true)
 	draw_polyline(_highlight_pts, col, w, true)
+	draw_polyline(_highlight_pts, Color(1.0, 1.0, 0.94, 0.95), maxf(3.0, w * 0.32), true)
 	# Endpoint gems
-	draw_circle(_highlight_pts[0], 5.0, Color(1.0, 0.9, 0.4, 0.7 * t))
-	draw_circle(_highlight_pts[_highlight_pts.size() - 1], 5.5, Color(1.0, 0.55, 0.25, 0.8 * t))
+	var gem_r := maxf(8.0, w * 0.45)
+	draw_circle(_highlight_pts[0], gem_r, Color(1.0, 0.95, 0.45, 0.95))
+	draw_circle(_highlight_pts[_highlight_pts.size() - 1], gem_r * 1.1, Color(1.0, 0.72, 0.18, 1.0))
 
 
 func _draw_route_compare() -> void:

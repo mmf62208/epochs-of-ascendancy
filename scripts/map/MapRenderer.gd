@@ -307,6 +307,8 @@ var _select_outline_line: Line2D = null
 var _select_outline_glow: Line2D = null
 var _march_path_line: Line2D = null
 var _supply_corridor_line: Line2D = null
+var _supply_corridor_glow: Line2D = null
+var _supply_corridor_spine: Line2D = null
 var _next_hook_chip: Button = null
 var _current_theater_bounds: Rect2 = GRAND_THEATER_CANONICAL_BOUNDS  # updated on theater/chunk/world load; used for camera clamp to avoid gray lost space on pan/zoom to NA etc.
 
@@ -2993,31 +2995,98 @@ func force_map_tint_demo(mode: String = "") -> void:
 ## Supports: "political" (default clean), "strain" (welfare), "vitality" (settlement), "development" (dev boost), "supply" (L overlay),
 ## "naval"/"chokepoints" (data-driven strait highlight from MapManager.get_naval_chokepoint_provinces).
 ## Clear labels + toast guidance provided by callers (DebugOverlay). Emits refresh for live map updates.
-## Pass 18: highlight a supply/trade route by province path (from minimap double-click).
+## Pass 18 / first-session G: highlight a supply/trade route by province path.
+## Polyline only. Never toggle supply mode or refresh 3520 outlines.
 func highlight_supply_route_path(province_path: Array, seconds: float = 4.5) -> void:
 	if province_path.is_empty():
 		return
-	# G / hang-safe: polyline only. Never toggle supply mode or refresh 3520 outlines.
-	_ensure_corridor_polyline_layer()
-	if supply_map_layer == null:
-		return
 	var pts: PackedVector2Array = PackedVector2Array()
 	for pid_v in province_path:
-		var pid := int(pid_v)
-		if province_centroids.has(pid):
-			pts.append(province_centroids[pid] as Vector2)
-		elif typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
-			var c: Vector2 = MapManager.get_province_centroid(pid)
-			if c != Vector2.ZERO:
-				pts.append(c)
+		var c: Vector2 = _centroid_for_pid(int(pid_v))
+		if c != Vector2.ZERO:
+			pts.append(c)
 	if pts.size() < 2:
 		return
-	if "corridor_focus_only" in supply_map_layer:
-		supply_map_layer.corridor_focus_only = true
-	if supply_map_layer.has_method("highlight_route_points"):
-		supply_map_layer.call("highlight_route_points", pts, seconds)
+	# Zoom-aware Line2D is the readable Europe-Home stroke (canvas draw is ~1px at Home zoom).
+	_apply_visible_supply_route_polyline(pts)
+	# Existing SupplyMapLayer highlight path — keep for overlay/minimap; not required to show.
+	_ensure_corridor_polyline_layer()
+	if supply_map_layer != null and is_instance_valid(supply_map_layer):
+		if "corridor_focus_only" in supply_map_layer:
+			supply_map_layer.corridor_focus_only = true
+		if supply_map_layer.has_method("highlight_route_points"):
+			supply_map_layer.call("highlight_route_points", pts, seconds)
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug("Route highlight · %d provinces" % province_path.size())
+
+
+## Keep ~10–14 screen px at Europe Home zoom so first-session G corridor reads.
+func _supply_route_polyline_width() -> float:
+	var z := 1.0
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	if cam != null:
+		z = maxf(absf(cam.zoom.x), 0.06)
+	return clampf(12.0 / z, 10.0, 120.0)
+
+
+func _clear_visible_supply_route_polyline() -> void:
+	if _supply_corridor_glow != null and is_instance_valid(_supply_corridor_glow):
+		_supply_corridor_glow.queue_free()
+	if _supply_corridor_line != null and is_instance_valid(_supply_corridor_line):
+		_supply_corridor_line.queue_free()
+	if _supply_corridor_spine != null and is_instance_valid(_supply_corridor_spine):
+		_supply_corridor_spine.queue_free()
+	_supply_corridor_glow = null
+	_supply_corridor_line = null
+	_supply_corridor_spine = null
+
+
+## Dark halo + gold core + white spine. z_as_relative false so fills/chips cannot bury G.
+func _apply_visible_supply_route_polyline(pts: PackedVector2Array) -> void:
+	if pts.size() < 2:
+		return
+	_clear_visible_supply_route_polyline()
+	var host: Node = container if container != null else self
+	var w := _supply_route_polyline_width()
+	var glow := Line2D.new()
+	glow.name = "SupplyCorridorGlow"
+	glow.width = w * 2.4
+	glow.default_color = Color(0.04, 0.05, 0.10, 0.92)
+	glow.antialiased = true
+	glow.joint_mode = Line2D.LINE_JOINT_ROUND
+	glow.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	glow.end_cap_mode = Line2D.LINE_CAP_ROUND
+	glow.points = pts
+	glow.z_as_relative = false
+	glow.z_index = 94
+	host.add_child(glow)
+	_supply_corridor_glow = glow
+	var line := Line2D.new()
+	line.name = "SupplyCorridorLine"
+	line.width = w
+	line.default_color = Color(1.0, 0.92, 0.16, 1.0)
+	line.antialiased = true
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	line.points = pts
+	line.z_as_relative = false
+	line.z_index = 95
+	host.add_child(line)
+	_supply_corridor_line = line
+	var spine := Line2D.new()
+	spine.name = "SupplyCorridorSpine"
+	spine.width = maxf(3.0, w * 0.32)
+	spine.default_color = Color(1.0, 1.0, 0.94, 1.0)
+	spine.antialiased = true
+	spine.joint_mode = Line2D.LINE_JOINT_ROUND
+	spine.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	spine.end_cap_mode = Line2D.LINE_CAP_ROUND
+	spine.points = pts
+	spine.z_as_relative = false
+	spine.z_index = 96
+	host.add_child(spine)
+	_supply_corridor_spine = spine
 
 
 ## Cheap Line2D host for G. Does not _toggle_supply_overlay or _refresh_supply_routes.
@@ -3031,7 +3100,8 @@ func _ensure_corridor_polyline_layer() -> void:
 			supply_map_layer.corridor_focus_only = true
 		container.add_child(supply_map_layer)
 	supply_map_layer.visible = true
-	supply_map_layer.z_index = 60
+	supply_map_layer.z_as_relative = false
+	supply_map_layer.z_index = 90
 	supply_map_layer.set_process(true)
 
 
@@ -3295,7 +3365,7 @@ func _deferred_budgeted_supply_corridor(target_id: int) -> void:
 	_draw_hang_safe_corridor_line(source, target)
 
 
-## Readable capital→front Line2D from centroids only. Never BFS, never supply overlay setup.
+## Readable capital→front polyline from centroids only. Never BFS, never supply overlay setup.
 func _draw_hang_safe_corridor_line(from_id: int, to_id: int) -> void:
 	var a := _centroid_for_pid(from_id)
 	var b := _centroid_for_pid(to_id)
@@ -3305,23 +3375,8 @@ func _draw_hang_safe_corridor_line(from_id: int, to_id: int) -> void:
 			DebugOverlay.toast_map_debug(miss)
 		_show_inspector_toast(miss, 3.5, true)
 		return
-	if _supply_corridor_line != null and is_instance_valid(_supply_corridor_line):
-		_supply_corridor_line.queue_free()
-		_supply_corridor_line = null
-	var line := Line2D.new()
-	line.name = "SupplyCorridorLine"
-	line.width = 4.5
-	line.default_color = Color(0.25, 0.95, 0.85, 0.95)
-	line.joint_mode = Line2D.LINE_JOINT_ROUND
-	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	line.end_cap_mode = Line2D.LINE_CAP_ROUND
-	line.points = PackedVector2Array([a, b])
-	line.z_index = 26
-	if container != null:
-		container.add_child(line)
-	else:
-		add_child(line)
-	_supply_corridor_line = line
+	# Same highlight path as minimap / corridor API — visibility lives there.
+	highlight_supply_route_path([from_id, to_id], 8.0)
 	var toast := "Supply · %s → %s" % [_province_display_name(from_id), _province_display_name(to_id)]
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.toast_map_debug(toast)
@@ -21093,6 +21148,7 @@ func _sync_map_label_glyph_stack(zoom_metric: float = -1.0) -> void:
 func _sync_supply_route_canvas_stack() -> void:
 	if supply_map_layer == null or not is_instance_valid(supply_map_layer):
 		return
+	supply_map_layer.z_as_relative = false
 	supply_map_layer.z_index = clampi(supply_route_layer_z_order, -40, 120)
 	var lm := clampf(supply_route_layer_modulate_with_overlay, 0.5, 1.0)
 	if supply_mode and supply_map_layer.visible:

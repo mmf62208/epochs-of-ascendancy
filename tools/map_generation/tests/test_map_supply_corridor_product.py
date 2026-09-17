@@ -14,6 +14,7 @@ from map_supply_corridor_product import (  # noqa: E402
     GER_FRONT,
     bfs_land_path,
     build_supply_corridor_product,
+    g_polyline_visibility_wiring,
     supply_corridor_integrity_from_board,
 )
 
@@ -65,6 +66,22 @@ class TestMapSupplyCorridorProduct(unittest.TestCase):
         tb = TOOLBAR.read_text(encoding="utf-8")
         self.assertIn("corridor", tb.lower())
         self.assertIn("Corridor", tb)
+
+    def test_g_polyline_visibility_wiring(self) -> None:
+        vis = g_polyline_visibility_wiring()
+        self.assertTrue(vis.get("ok"), msg=vis)
+        ren = RENDERER.read_text(encoding="utf-8")
+        self.assertIn("func _supply_route_polyline_width", ren)
+        self.assertIn("func _apply_visible_supply_route_polyline", ren)
+        self.assertIn("z_as_relative = false", ren)
+        hang = ""
+        i = ren.find("func _draw_hang_safe_corridor_line")
+        if i >= 0:
+            nxt = ren.find("\nfunc ", i + 1)
+            hang = ren[i : nxt if nxt > 0 else i + 2000]
+        self.assertIn("highlight_supply_route_path", hang)
+        self.assertNotIn("find_land_path", hang)
+        self.assertNotIn("highlight_supply_corridor", hang)
 
 
 if __name__ == "__main__":

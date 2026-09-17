@@ -228,6 +228,27 @@ def map_war_path_surface_integrity() -> Dict[str, Any]:
         passes.append("g_hang_safe_in_input")
     else:
         fails.append("g_not_hang_safe_in_input")
+    # First-session G polyline must stay readable at Europe Home zoom.
+    highlight_fn = ""
+    hi = ren.find("func highlight_supply_route_path")
+    if hi >= 0:
+        hn = ren.find("\nfunc ", hi + 1)
+        highlight_fn = ren[hi : hn if hn > 0 else hi + 2500]
+    hang_fn = ""
+    hgi = ren.find("func _draw_hang_safe_corridor_line")
+    if hgi >= 0:
+        hgn = ren.find("\nfunc ", hgi + 1)
+        hang_fn = ren[hgi : hgn if hgn > 0 else hgi + 2000]
+    if (
+        "func _supply_route_polyline_width" in ren
+        and "_apply_visible_supply_route_polyline" in highlight_fn
+        and "highlight_supply_route_path" in hang_fn
+        and "z_as_relative = false" in ren
+        and "find_land_path" not in hang_fn
+    ):
+        passes.append("g_polyline_visible")
+    else:
+        fails.append("g_polyline_unseen")
     ok = len(fails) == 0
     return {
         "ok": ok,
