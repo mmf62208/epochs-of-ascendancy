@@ -122,15 +122,8 @@ def lines_for(formation: Any) -> List[str]:
 
 def _fill_percent_line(data: Mapping[str, Any]) -> str:
     if "toe_fill" not in data and data.get("fill_percent") is None:
-        if data.get("strength") is not None:
-            try:
-                st = float(data.get("strength") or 0.0)
-            except (TypeError, ValueError):
-                st = 1.0
-            if st <= 1.5:
-                st *= 100.0
-            return "Fill %.0f%%" % max(0.0, min(150.0, st))
-        return ""
+        # Strength% is casualties remaining — never alias it as Fill%.
+        return "Fill —%"
     try:
         fill_pct = float(data.get("toe_fill") if data.get("toe_fill") is not None else 0.0) * 100.0
     except (TypeError, ValueError):
@@ -317,10 +310,11 @@ def build_unit_card_combat_strip_product(*, check_wiring: bool = True) -> Dict[s
         "entrenchment": 0.30,
         "last_equip_loss_plain": "Lost 12 rifles",
         "strength": 0.87,
+        "toe_fill": 0.55,
     }
     full_lines = lines_for(full)
     expected_full = [
-        "Fill 87%",
+        "Fill 55%",
         "XP Veteran",
         "Planning 45%",
         "Entrenchment 30%",

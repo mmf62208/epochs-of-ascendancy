@@ -18137,23 +18137,23 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	panel.z_index = 70
 	# First-session Fill%/TOE must stay above the clip fold — do not clip the promoted line.
 	panel.clip_contents = false
-	panel.custom_minimum_size = Vector2(320, 360)
+	panel.custom_minimum_size = Vector2(320, 220)
 	RetrowaveTheme.style_detail_panel_flat(panel)
 	# Docked HOI-style unit card (bottom-left). UNIT_CARD_DOCK / unit_card_dock — not a mouse popup.
 	var vp := get_viewport().get_visible_rect().size if get_viewport() else Vector2(1280, 720)
-	var dock := Vector2(18.0, maxf(64.0, vp.y - 416.0))
+	var dock := Vector2(18.0, maxf(64.0, vp.y - 252.0))
 	panel.position = dock
 	panel.set_meta("unit_card_dock", true)
 	ui.add_child(panel)
 
 	var margin := MarginContainer.new()
-	margin.add_theme_constant_override("margin_left", 12)
-	margin.add_theme_constant_override("margin_right", 12)
-	margin.add_theme_constant_override("margin_top", 10)
-	margin.add_theme_constant_override("margin_bottom", 10)
+	margin.add_theme_constant_override("margin_left", 10)
+	margin.add_theme_constant_override("margin_right", 10)
+	margin.add_theme_constant_override("margin_top", 8)
+	margin.add_theme_constant_override("margin_bottom", 8)
 	panel.add_child(margin)
 	var vbox := VBoxContainer.new()
-	vbox.add_theme_constant_override("separation", 6)
+	vbox.add_theme_constant_override("separation", 4)
 	margin.add_child(vbox)
 
 	var title_row := HBoxContainer.new()
@@ -18185,14 +18185,17 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		if fill_txt.is_empty():
 			fill_txt = "Fill —% · TOE —"
 		fill_lbl.text = fill_txt
-		fill_lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
+		fill_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		fill_lbl.custom_minimum_size = Vector2(290, 0)
+		fill_lbl.clip_text = false
 		RetrowaveTheme.style_body_label(fill_lbl)
 		var fill_ratio := UnitCardCombatStrip._fill_ratio_for(formation)
-		if fill_ratio < 0.0:
-			fill_ratio = str_v
-		var fill_col: Color = RetrowaveTheme.SUCCESS
-		if fill_ratio < 0.5:
+		# Fill is equipment/TOE, never Strength%. Unknown ratio stays cyan, not warning.
+		var fill_col: Color = RetrowaveTheme.CYAN
+		if fill_ratio >= 0.0 and fill_ratio < 0.5:
 			fill_col = RetrowaveTheme.WARNING
+		elif fill_ratio >= 0.5:
+			fill_col = RetrowaveTheme.SUCCESS
 		fill_lbl.add_theme_color_override("font_color", fill_col)
 		fill_lbl.add_theme_font_size_override("font_size", 16)
 		vbox.add_child(fill_lbl)
@@ -18233,7 +18236,9 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		lines.append("Design: %s" % dsn)
 	lines.append("Stationed: %s" % prov_name)
 	lines.append("Leader: %s" % leader_s)
-	lines.append(
+	var chrome_tips: PackedStringArray = PackedStringArray()
+	# Org/Str/Rdy/XP bury Fill% on a 220px dock — tooltip only (Strength% ≠ Fill%).
+	chrome_tips.append(
 		"Org %.0f%% · Str %.0f%% · Rdy %.0f%% · XP %.0f%%"
 		% [org_v * 100.0, str_v * 100.0, rdy_v * 100.0, xp_v * 100.0]
 	)
@@ -18245,10 +18250,20 @@ func _show_unit_detail_popup(formation: Object) -> void:
 				# Last-3 combat_log dates stay on tooltip so Fill/TOE stay above the fold.
 				if rest_ln.length() >= 7 and rest_ln.substr(0, 4).is_valid_int() and rest_ln[4] == "-":
 					continue
-				lines.append(rest_ln)
+				if rest_ln.is_empty():
+					continue
+				# Training/refit stay on-card; XP/plan/trench/Strength%/fuel chrome go to tooltip.
+				if rest_ln.begins_with("Training") or rest_ln.begins_with("Refit"):
+					lines.append(rest_ln)
+				else:
+					chrome_tips.append(rest_ln)
 		var tips: PackedStringArray = UnitCardCombatStrip.tooltip_lines_for(formation)
-		if not tips.is_empty():
-			body.tooltip_text = "\n".join(tips)
+		for t in tips:
+			chrome_tips.append(t)
+		if not chrome_tips.is_empty():
+			body.tooltip_text = "\n".join(chrome_tips)
+	elif not chrome_tips.is_empty():
+		body.tooltip_text = "\n".join(chrome_tips)
 	if not fid.is_empty():
 		lines.append("ID: %s" % fid)
 	# Stack at this province (one pin; cycle via [ ] or card buttons).
@@ -18265,7 +18280,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	body.text = "\n".join(lines)
 	RetrowaveTheme.style_body_label(body)
 	var body_scroll := ScrollContainer.new()
-	body_scroll.custom_minimum_size = Vector2(300, 88)
+	body_scroll.custom_minimum_size = Vector2(300, 52)
 	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	vbox.add_child(body_scroll)
 	body_scroll.add_child(body)
@@ -18427,8 +18442,9 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		stack_row.add_child(next_btn)
 
 	var hint := Label.new()
-	hint.text = "SELECTED · click friendly land to MARCH (arrives in N days) · Ctrl+click enemy to ASSAULT · Esc clears"
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	hint.text = "March · Ctrl+assault · Esc"
+	hint.tooltip_text = "SELECTED · click friendly land to MARCH (arrives in N days) · Ctrl+click enemy to ASSAULT · Esc clears"
+	hint.autowrap_mode = TextServer.AUTOWRAP_OFF
 	hint.custom_minimum_size = Vector2(290, 0)
 	RetrowaveTheme.style_body_label(hint)
 	hint.add_theme_color_override("font_color", RetrowaveTheme.TEXT_DIM)
