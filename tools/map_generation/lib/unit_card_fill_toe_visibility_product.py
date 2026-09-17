@@ -1,7 +1,8 @@
 """Unit-card Fill%/TOE first-session visibility — promoted fold line above clip.
 
 Player value: first click on a unit always shows Fill NN% · TOE … as its own
-15–16px SUCCESS/WARNING label (not TEXT_DIM body), unclipped. Speed/Armor/Men
+15–16px CYAN/SUCCESS/WARNING label (not TEXT_DIM body) on a 320×220 dock,
+unclipped and not Strength%. Org/Str/Rdy/XP/plan/trench/Speed/Armor/Men
 and last-3 combat log stay on tooltip, not equal-weight body lines.
 """
 from __future__ import annotations
@@ -9,6 +10,8 @@ from __future__ import annotations
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+from unit_card_combat_strip_product import fill_toe_fold_line, lines_for
 
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
@@ -36,6 +39,24 @@ def fill_fold_color_token(fill_ratio: float) -> str:
     except (TypeError, ValueError):
         r = 0.0
     return "WARNING" if r < 0.5 else "SUCCESS"
+
+
+def fill_not_aliased_to_strength() -> bool:
+    """Fill% must not copy Strength% when toe_fill is absent or different."""
+    strength_only = fill_toe_fold_line({"strength": 0.40})
+    mixed = fill_toe_fold_line({"strength": 1.0, "toe_fill": 0.28})
+    fold_lines = lines_for({"strength": 0.40, "toe_fill": 0.80})
+    join = "\n".join(fold_lines)
+    return (
+        "Fill —%" in strength_only
+        and "40%" not in strength_only
+        and "Fill 28%" in mixed
+        and "100%" not in mixed
+        and fold_lines
+        and fold_lines[0].startswith("Fill 80%")
+        and "Strength 40%" in join
+        and "Fill 80%" in join
+    )
 
 
 def _panel_min_height(popup: str) -> Optional[float]:
@@ -134,12 +155,52 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     wiring["fill_warning_success_color"] = color_path
     (passes if color_path else fails).append("fill_warning_success_color")
 
+    gd_no_str_fill = (
+        'return "Fill —%"' in strip
+        or 'return "Fill —%"' in lines_fn
+        or "Fill —%" in strip
+    )
+    py_distinct = fill_not_aliased_to_strength()
+    wiring["fill_distinct_from_strength"] = bool(gd_no_str_fill and py_distinct)
+    (passes if wiring["fill_distinct_from_strength"] else fails).append(
+        "fill_distinct_from_strength"
+    )
+
     clip_off = "clip_contents = false" in popup
     min_h = _panel_min_height(popup)
-    tall_enough = min_h is not None and min_h >= 350.0
-    clip_or_tall = clip_off or tall_enough
+    dock_220 = min_h is not None and 200.0 <= min_h <= 240.0
+    clip_or_tall = clip_off and dock_220
     wiring["clip_false_or_min_height_360"] = clip_or_tall
     (passes if clip_or_tall else fails).append("clip_false_or_min_height_360")
+    wiring["docked_320_220"] = bool(re.search(r"Vector2\(\s*320\s*,\s*220\s*\)", popup)) and dock_220
+    (passes if wiring["docked_320_220"] else fails).append("docked_320_220")
+
+    wrap_ok = (
+        "AUTOWRAP_WORD" in fill_blk
+        and "AUTOWRAP_OFF" not in fill_blk
+        and "clip_text = false" in fill_blk
+    )
+    wiring["fill_wrap_not_clip"] = wrap_ok
+    (passes if wrap_ok else fails).append("fill_wrap_not_clip")
+
+    bar_ok = "FillToeBar" in popup and "ProgressBar.new()" in fill_blk
+    wiring["fill_bar_present"] = bar_ok
+    (passes if bar_ok else fails).append("fill_bar_present")
+
+    # Strength% must not paint the Fill label (no fill_ratio = str_v).
+    no_str_alias = "fill_ratio = str_v" not in fill_blk and "fill_ratio = str_v" not in popup
+    wiring["fill_not_strength_fallback"] = no_str_alias
+    (passes if no_str_alias else fails).append("fill_not_strength_fallback")
+
+    org_tip = "Org %.0f%% · Str %.0f%%" in popup
+    org_not_body_append = "lines.append(\n\t\t\"Org" not in popup and 'lines.append("Org' not in popup
+    strip_rest_not_all_body = (
+        "chrome_tips.append(rest_ln)" in popup
+        and "begins_with(\"Training\")" in popup
+    )
+    chrome_tip_ok = org_tip and org_not_body_append and strip_rest_not_all_body
+    wiring["chrome_org_str_tooltip_not_body"] = chrome_tip_ok
+    (passes if chrome_tip_ok else fails).append("chrome_org_str_tooltip_not_body")
 
     speed_not_body = (
         "Speed %.1f" not in popup

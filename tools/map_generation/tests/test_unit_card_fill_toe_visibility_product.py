@@ -17,6 +17,7 @@ from unit_card_combat_strip_product import (  # noqa: E402
 from unit_card_fill_toe_visibility_product import (  # noqa: E402
     build_unit_card_fill_toe_visibility_product,
     fill_fold_color_token,
+    fill_not_aliased_to_strength,
     unit_card_fill_toe_visibility_integrity,
 )
 
@@ -42,6 +43,12 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
             "fill_font_15_or_16",
             "fill_warning_success_color",
             "clip_false_or_min_height_360",
+            "docked_320_220",
+            "fill_wrap_not_clip",
+            "fill_bar_present",
+            "fill_not_strength_fallback",
+            "chrome_org_str_tooltip_not_body",
+            "fill_distinct_from_strength",
             "speed_armor_men_tooltip_not_body",
             "combat_log_not_card_body",
             "fold_fill_toe_first",
@@ -96,6 +103,15 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         self.assertIn("_fill_toe_fold_line", strip)
         self.assertIn("_fill_ratio_for", strip)
         self.assertIn("func tooltip_lines_for", strip)
+        self.assertIn("Fill —%", strip)
+
+    def test_fill_not_aliased_to_strength(self) -> None:
+        self.assertTrue(fill_not_aliased_to_strength())
+        self.assertEqual(fill_toe_fold_line({"strength": 0.40}), "Fill —%")
+        self.assertEqual(
+            fill_toe_fold_line({"strength": 1.0, "toe_fill": 0.28}),
+            "Fill 28%",
+        )
 
 
 if __name__ == "__main__":

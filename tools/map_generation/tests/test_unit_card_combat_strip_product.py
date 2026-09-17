@@ -63,11 +63,11 @@ class TestUnitCardCombatStripProduct(unittest.TestCase):
         self.assertEqual(lines_for(None), [])
         self.assertEqual(
             lines_for({"strength": 1.0}),
-            ["Fill 100%", "XP Regular", "Strength 100%"],
+            ["Fill —%", "XP Regular", "Strength 100%"],
         )
         self.assertEqual(
             lines_for({"combat_experience": 12.0, "planning": 0.5, "strength": 0.4}),
-            ["Fill 40%", "XP Green", "Planning 50%", "Strength 40%"],
+            ["Fill —%", "XP Green", "Planning 50%", "Strength 40%"],
         )
         self.assertIn("Planning", "\n".join(lines_for({"planning": 0.1})))
         self.assertIn(
@@ -88,6 +88,7 @@ class TestUnitCardCombatStripProduct(unittest.TestCase):
         bb = bbcode_for({"combat_experience": 90.0, "strength": 1.0})
         self.assertIn("XP Veteran", bb)
         self.assertIn("Strength 100%", bb)
+        self.assertIn("Fill —%", bb)
         self.assertEqual(day_label_extras({"cas_att": 2.0}), "CAS")
         self.assertEqual(day_label_extras({"cas_def": 0.1, "planning_used": True}), "CAS P")
         self.assertEqual(day_label_extras({"planning_used": False}), "")
@@ -125,6 +126,10 @@ class TestUnitCardCombatStripProduct(unittest.TestCase):
         self.assertIn("Width", tip_text)
         self.assertIn("Fuel", tip_text)
         self.assertIn("Armor", tip_text)
+        self.assertNotEqual(
+            next((ln for ln in fold if ln.startswith("Fill")), ""),
+            next((ln for ln in fold if ln.startswith("Strength")), ""),
+        )
 
     def test_gd_greps(self) -> None:
         path = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"

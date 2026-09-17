@@ -170,10 +170,8 @@ static func _fill_ratio_for(formation: Object) -> float:
 static func _fill_percent_line(formation: Object) -> String:
 	var fill := _fill_ratio_for(formation)
 	if fill < 0.0:
-		if formation != null and "strength" in formation:
-			fill = clampf(float(formation.get("strength")), 0.0, 2.0)
-		else:
-			fill = 1.0
+		# Strength% is casualties remaining — never alias it as Fill%.
+		return "Fill —%"
 	return "Fill %.0f%%" % (fill * 100.0)
 
 
