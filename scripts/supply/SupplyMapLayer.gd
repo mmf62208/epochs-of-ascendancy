@@ -250,14 +250,14 @@ func _draw() -> void:
 
 
 func _highlight_polyline_width() -> float:
-	# Zoom-aware so G / minimap highlight stays ~10 screen px at Europe Home.
+	# Camera-space: ~26 screen px at Europe Home (matches MapRenderer G overlay).
 	var z := 1.0
 	var vp := get_viewport()
 	if vp != null:
 		var cam := vp.get_camera_2d()
 		if cam != null:
-			z = maxf(absf(cam.zoom.x), 0.06)
-	return clampf(12.0 / z, 10.0, 120.0)
+			z = maxf(absf(cam.zoom.x), 0.045)
+	return clampf(26.0 / z, 24.0, 480.0)
 
 
 func _draw_route_highlight() -> void:
@@ -265,16 +265,16 @@ func _draw_route_highlight() -> void:
 		return
 	var t := clampf(_highlight_ttl / maxf(0.1, highlight_seconds), 0.0, 1.0)
 	var pulse := 0.70 + 0.30 * sin(_flash_phase * 1.7)
-	var col := Color(1.0, 0.92, 0.16, 0.75 + 0.25 * t * pulse)
+	var col := Color(0.12, 1.0, 0.82, 0.80 + 0.20 * t * pulse)
 	var w := _highlight_polyline_width()
-	draw_polyline(_highlight_pts, Color(0.04, 0.05, 0.10, 0.88), w * 2.4, true)
-	draw_polyline(_highlight_pts, Color(1.0, 0.55, 0.12, 0.55 * t), w * 1.6, true)
+	draw_polyline(_highlight_pts, Color(0.02, 0.05, 0.10, 0.90), w * 2.8, true)
+	draw_polyline(_highlight_pts, Color(0.08, 0.75, 0.95, 0.50 * t), w * 1.6, true)
 	draw_polyline(_highlight_pts, col, w, true)
-	draw_polyline(_highlight_pts, Color(1.0, 1.0, 0.94, 0.95), maxf(3.0, w * 0.32), true)
+	draw_polyline(_highlight_pts, Color(1.0, 1.0, 0.96, 0.95), maxf(4.0, w * 0.30), true)
 	# Endpoint gems
-	var gem_r := maxf(8.0, w * 0.45)
-	draw_circle(_highlight_pts[0], gem_r, Color(1.0, 0.95, 0.45, 0.95))
-	draw_circle(_highlight_pts[_highlight_pts.size() - 1], gem_r * 1.1, Color(1.0, 0.72, 0.18, 1.0))
+	var gem_r := maxf(12.0, w * 0.55)
+	draw_circle(_highlight_pts[0], gem_r, Color(1.0, 0.98, 0.55, 0.95))
+	draw_circle(_highlight_pts[_highlight_pts.size() - 1], gem_r * 1.1, Color(0.20, 1.0, 0.75, 1.0))
 
 
 func _draw_route_compare() -> void:

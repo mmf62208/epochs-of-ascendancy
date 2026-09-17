@@ -241,7 +241,7 @@ def _slice_func(src: str, func_name: str) -> str:
 
 
 def g_polyline_visibility_wiring(renderer_src: str = "") -> Dict[str, Any]:
-    """First-session G must draw a zoom-aware, high-z, high-contrast polyline.
+    """First-session G must draw a camera-space, high-contrast overlay polyline.
 
     Hang-safe toast + deferred two-centroid path stays; this only gates visibility
     on the existing highlight_supply_route_path / hang-safe Line2D host.
@@ -260,20 +260,21 @@ def g_polyline_visibility_wiring(renderer_src: str = "") -> Dict[str, Any]:
     width_fn = _slice_func(ren, "_supply_route_polyline_width")
     request = _slice_func(ren, "_request_hang_safe_supply_corridor")
     deferred = _slice_func(ren, "_deferred_hang_safe_corridor_line")
-    if "func _supply_route_polyline_width" in ren and "12.0 / z" in width_fn:
-        passes.append("zoom_aware_width")
+    if "func _supply_route_polyline_width" in ren and "26.0 / z" in width_fn:
+        passes.append("camera_space_width")
     else:
-        fails.append("missing_zoom_aware_width")
+        fails.append("missing_camera_space_width")
     if (
         "func _apply_visible_supply_route_polyline" in ren
-        and "z_as_relative = false" in apply_fn
-        and "z_index = 95" in apply_fn
+        and "func _ensure_supply_route_highlight_host" in ren
+        and "follow_viewport_enabled = true" in ren
+        and "layer = 10" in apply_fn + _slice_func(ren, "_ensure_supply_route_highlight_host")
         and "SupplyCorridorLine" in apply_fn
-        and "Color(1.0, 0.92, 0.16, 1.0)" in apply_fn
+        and "Color(0.12, 1.0, 0.82, 1.0)" in apply_fn
     ):
-        passes.append("high_contrast_z")
+        passes.append("high_contrast_overlay")
     else:
-        fails.append("missing_high_contrast_z")
+        fails.append("missing_high_contrast_overlay")
     if "highlight_supply_route_path" in hang and "find_land_path" not in hang:
         passes.append("hang_safe_uses_highlight")
     else:
@@ -293,8 +294,9 @@ def g_polyline_visibility_wiring(renderer_src: str = "") -> Dict[str, Any]:
     else:
         fails.append("g_hang_class_regressed")
     draw_hl = _slice_func(sml, "_draw_route_highlight")
-    if "_highlight_polyline_width" in draw_hl and "z_as_relative = false" in sml:
-        passes.append("sml_highlight_zoom")
+    width_sml = _slice_func(sml, "_highlight_polyline_width")
+    if "26.0 / z" in width_sml and "Color(0.12, 1.0, 0.82" in draw_hl:
+        passes.append("sml_highlight_camera_space")
     else:
         fails.append("sml_highlight_thin")
     ok = len(fails) == 0

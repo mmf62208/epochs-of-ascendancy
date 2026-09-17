@@ -241,9 +241,11 @@ def map_war_path_surface_integrity() -> Dict[str, Any]:
         hang_fn = ren[hgi : hgn if hgn > 0 else hgi + 2000]
     if (
         "func _supply_route_polyline_width" in ren
+        and "26.0 / z" in ren
         and "_apply_visible_supply_route_polyline" in highlight_fn
         and "highlight_supply_route_path" in hang_fn
-        and "z_as_relative = false" in ren
+        and "follow_viewport_enabled = true" in ren
+        and "SupplyRouteHighlightLayer" in ren
         and "find_land_path" not in hang_fn
     ):
         passes.append("g_polyline_visible")
