@@ -12,6 +12,7 @@ sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 from map_supply_corridor_product import (  # noqa: E402
     GER_CAPITAL,
     GER_FRONT,
+    _slice_func,
     bfs_land_path,
     build_supply_corridor_product,
     g_polyline_visibility_wiring,
@@ -74,11 +75,12 @@ class TestMapSupplyCorridorProduct(unittest.TestCase):
         self.assertIn("func _supply_route_polyline_width", ren)
         self.assertIn("func _apply_visible_supply_route_polyline", ren)
         self.assertIn("z_as_relative = false", ren)
-        hang = ""
-        i = ren.find("func _draw_hang_safe_corridor_line")
-        if i >= 0:
-            nxt = ren.find("\nfunc ", i + 1)
-            hang = ren[i : nxt if nxt > 0 else i + 2000]
+        self.assertIn("map_host.add_child(host)", ren)
+        host = _slice_func(ren, "_ensure_supply_route_highlight_host")
+        request = _slice_func(ren, "_request_hang_safe_supply_corridor")
+        self.assertNotIn("follow_viewport_enabled = true", host)
+        self.assertIn("_draw_hang_safe_corridor_line", request)
+        hang = _slice_func(ren, "_draw_hang_safe_corridor_line")
         self.assertIn("highlight_supply_route_path", hang)
         self.assertNotIn("find_land_path", hang)
         self.assertNotIn("highlight_supply_corridor", hang)

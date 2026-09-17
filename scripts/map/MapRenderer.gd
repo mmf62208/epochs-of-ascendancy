@@ -1659,7 +1659,12 @@ func _input(event: InputEvent) -> void:
 	# Esc / I / Home must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
 	if event is InputEventKey and event.pressed and not event.echo:
 		# Search / any LineEdit: do not steal letters (Play: typing "i" fired I-glyphs).
-		if _gui_text_field_has_focus() and event.keycode != KEY_ESCAPE:
+		# G is a first-session surface (like Esc): must still draw the corridor.
+		if (
+			_gui_text_field_has_focus()
+			and event.keycode != KEY_ESCAPE
+			and event.keycode != KEY_G
+		):
 			return
 		if event.keycode == KEY_HOME:
 			_apply_home_key(event.shift_pressed)
@@ -3013,7 +3018,7 @@ func highlight_supply_route_path(province_path: Array, seconds: float = 4.5) -> 
 			pts.append(c)
 	if pts.size() < 2:
 		return
-	# Camera-space overlay stroke — PR 37 world-unit gold stack was ~12px under chips at Home.
+	# Container-space stroke — same camera as fills/chips (PR 38 CanvasLayer was off-Home).
 	_apply_visible_supply_route_polyline(pts)
 	# Existing SupplyMapLayer highlight path — keep for overlay/minimap; not required to show.
 	_ensure_corridor_polyline_layer()
@@ -3036,32 +3041,44 @@ func _supply_route_polyline_width() -> float:
 
 
 func _ensure_supply_route_highlight_host() -> Node2D:
-	# Own canvas above map fills/chips (layer 0) and below HUD UI (layer 20).
-	if _supply_route_highlight_layer == null or not is_instance_valid(_supply_route_highlight_layer):
-		var layer := CanvasLayer.new()
-		layer.name = "SupplyRouteHighlightLayer"
-		layer.layer = 10
-		layer.follow_viewport_enabled = true
-		add_child(layer)
-		_supply_route_highlight_layer = layer
-	if _supply_route_highlight_host == null or not is_instance_valid(_supply_route_highlight_host):
+	# Parent on ProvinceContainers — same Camera2D space as fills/chips/select outline.
+	# PR 38 CanvasLayer 10 + follow_viewport placed world centroids in a detached
+	# canvas, so Europe Home G drew off-camera (toast only).
+	var map_host: Node2D = container if container != null else self
+	if _supply_route_highlight_layer != null and is_instance_valid(_supply_route_highlight_layer):
+		_supply_route_highlight_layer.queue_free()
+		_supply_route_highlight_layer = null
+	var host_ok := (
+		_supply_route_highlight_host != null
+		and is_instance_valid(_supply_route_highlight_host)
+		and _supply_route_highlight_host.get_parent() == map_host
+	)
+	if not host_ok:
+		if _supply_route_highlight_host != null and is_instance_valid(_supply_route_highlight_host):
+			_supply_route_highlight_host.queue_free()
 		var host := Node2D.new()
 		host.name = "SupplyRouteHighlightHost"
 		host.z_as_relative = false
 		host.z_index = 250
-		_supply_route_highlight_layer.add_child(host)
+		map_host.add_child(host)
 		_supply_route_highlight_host = host
-	_supply_route_highlight_layer.visible = true
 	_supply_route_highlight_host.visible = true
 	return _supply_route_highlight_host
 
 
 func _map_pts_to_supply_route_host(pts: PackedVector2Array, host: Node2D) -> PackedVector2Array:
-	# Follow-viewport canvas uses world/map space — same as centroids. Do not
-	# to_local through the camera transform (that would place the stroke off-map).
+	# Centroids are container/map space. Host is a child of container — to_local
+	# so a non-identity host cannot place the stroke off-camera.
 	if host == null or pts.size() < 2:
 		return pts
-	return pts
+	var space: Node2D = container if container != null else self
+	if host == space:
+		return pts
+	var out := PackedVector2Array()
+	out.resize(pts.size())
+	for i in pts.size():
+		out[i] = host.to_local(space.to_global(pts[i]))
+	return out
 
 
 func _make_supply_route_endpoint_gem(radius: float, col: Color) -> Polygon2D:
@@ -3112,7 +3129,7 @@ func _refresh_visible_supply_route_polyline_width() -> void:
 		_supply_corridor_gem_b.scale = Vector2.ONE * (gem_r / 12.0)
 
 
-## Dark halo + cyan core + white spine on follow-viewport layer 10 (above chips, below HUD).
+## Dark halo + cyan core + white spine on ProvinceContainers (z 250, above chips).
 func _apply_visible_supply_route_polyline(pts: PackedVector2Array) -> void:
 	if pts.size() < 2:
 		return
@@ -3417,7 +3434,7 @@ func highlight_corridor_capital_to_selected() -> Dictionary:
 	return highlight_supply_corridor(source, target, 7.0, tag)
 
 
-## G: toast + defer only. Never BFS / collect_live_border / preview_player_route on this frame.
+## G: toast + two-centroid highlight + defer redraw. Never BFS / collect_live_border / preview_player_route.
 func _request_hang_safe_supply_corridor() -> void:
 	var toast := "Supply corridor · drawing capital → front…"
 	# Named Channel choke only — never scan 3520 or BFS on this frame.
@@ -3432,6 +3449,10 @@ func _request_hang_safe_supply_corridor() -> void:
 	var vp_g := get_viewport()
 	if vp_g != null:
 		vp_g.gui_release_focus()
+	print("MapRenderer: G hang-safe corridor requested (no BFS)")
+	# Cheap two-centroid highlight this frame (no BFS). Deferred redraw if
+	# Home/camera settle lands after the key. Never toast-only.
+	_draw_hang_safe_corridor_line(710300, 710173)
 	call_deferred("_deferred_hang_safe_corridor_line")
 
 
@@ -20608,7 +20629,7 @@ func _toast_easy_unit_orders() -> void:
 	_show_inspector_toast(toast, 6.0)
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast(toast, 6.0)
-	print("MapRenderer: G toast-only (no corridor BFS)")
+	print("MapRenderer: playable-front order toast (no corridor BFS)")
 
 
 ## First-session help toast (? / Shift+/) — mirrors first_session_hotkeys_product.

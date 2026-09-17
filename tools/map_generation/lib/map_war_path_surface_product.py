@@ -244,8 +244,8 @@ def map_war_path_surface_integrity() -> Dict[str, Any]:
         and "26.0 / z" in ren
         and "_apply_visible_supply_route_polyline" in highlight_fn
         and "highlight_supply_route_path" in hang_fn
-        and "follow_viewport_enabled = true" in ren
-        and "SupplyRouteHighlightLayer" in ren
+        and "map_host.add_child(host)" in ren
+        and "SupplyRouteHighlightHost" in ren
         and "find_land_path" not in hang_fn
     ):
         passes.append("g_polyline_visible")

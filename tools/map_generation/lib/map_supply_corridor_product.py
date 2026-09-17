@@ -245,6 +245,8 @@ def g_polyline_visibility_wiring(renderer_src: str = "") -> Dict[str, Any]:
 
     Hang-safe toast + deferred two-centroid path stays; this only gates visibility
     on the existing highlight_supply_route_path / hang-safe Line2D host.
+    Host must live on ProvinceContainers (Camera2D space). A follow-viewport
+    CanvasLayer at world centroids draws off-camera at Europe Home.
     """
     ren = renderer_src
     if not ren:
@@ -260,6 +262,10 @@ def g_polyline_visibility_wiring(renderer_src: str = "") -> Dict[str, Any]:
     width_fn = _slice_func(ren, "_supply_route_polyline_width")
     request = _slice_func(ren, "_request_hang_safe_supply_corridor")
     deferred = _slice_func(ren, "_deferred_hang_safe_corridor_line")
+    host_fn = _slice_func(ren, "_ensure_supply_route_highlight_host")
+    input_i = ren.find("func _input")
+    unh_i = ren.find("func _unhandled_input")
+    input_fn = ren[input_i:unh_i] if input_i >= 0 and unh_i > input_i else ""
     if "func _supply_route_polyline_width" in ren and "26.0 / z" in width_fn:
         passes.append("camera_space_width")
     else:
@@ -267,10 +273,13 @@ def g_polyline_visibility_wiring(renderer_src: str = "") -> Dict[str, Any]:
     if (
         "func _apply_visible_supply_route_polyline" in ren
         and "func _ensure_supply_route_highlight_host" in ren
-        and "follow_viewport_enabled = true" in ren
-        and "layer = 10" in apply_fn + _slice_func(ren, "_ensure_supply_route_highlight_host")
+        and "map_host.add_child(host)" in host_fn
+        and "container if container != null else self" in host_fn
+        and "SupplyRouteHighlightLayer" not in host_fn
+        and "follow_viewport_enabled" not in host_fn
         and "SupplyCorridorLine" in apply_fn
         and "Color(0.12, 1.0, 0.82, 1.0)" in apply_fn
+        and "z_index = 250" in host_fn
     ):
         passes.append("high_contrast_overlay")
     else:
@@ -285,6 +294,7 @@ def g_polyline_visibility_wiring(renderer_src: str = "") -> Dict[str, Any]:
         fails.append("highlight_no_visible_stroke")
     if (
         "call_deferred" in request
+        and "_draw_hang_safe_corridor_line" in request
         and "find_land_path" not in request
         and "preview_player_route" not in request
         and "710173" in deferred
@@ -293,6 +303,10 @@ def g_polyline_visibility_wiring(renderer_src: str = "") -> Dict[str, Any]:
         passes.append("g_hang_class_kept")
     else:
         fails.append("g_hang_class_regressed")
+    if "event.keycode != KEY_G" in input_fn and "_request_hang_safe_supply_corridor" in input_fn:
+        passes.append("g_beats_search_focus")
+    else:
+        fails.append("g_swallowed_by_search")
     draw_hl = _slice_func(sml, "_draw_route_highlight")
     width_sml = _slice_func(sml, "_highlight_polyline_width")
     if "26.0 / z" in width_sml and "Color(0.12, 1.0, 0.82" in draw_hl:
