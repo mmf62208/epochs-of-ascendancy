@@ -222,7 +222,7 @@ def map_war_path_surface_integrity() -> Dict[str, Any]:
         fails.append("i_glyph_default_blob")
     else:
         passes.append("i_glyph_default_not_blob")
-    g_i = input_fn.find("KEY_G")
+    g_i = input_fn.find("keycode == KEY_G")
     g_slice = input_fn[g_i : g_i + 400] if g_i >= 0 else ""
     if "_request_hang_safe_supply_corridor" in g_slice and "preview_player_route()" not in g_slice:
         passes.append("g_hang_safe_in_input")

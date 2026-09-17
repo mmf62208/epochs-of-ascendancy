@@ -54,7 +54,7 @@ class TestMapSupplyCorridorProduct(unittest.TestCase):
         self.assertIn("highlight_supply_route_path", ren)
         self.assertIn("func _request_hang_safe_supply_corridor", ren)
         self.assertIn("func _deferred_budgeted_supply_corridor", ren)
-        gi = ren.find("KEY_G")
+        gi = ren.find("keycode == KEY_G")
         g_slice = ren[gi : gi + 400] if gi >= 0 else ""
         self.assertIn("_request_hang_safe_supply_corridor", g_slice)
         self.assertNotIn("highlight_corridor_capital_to_selected", g_slice)
