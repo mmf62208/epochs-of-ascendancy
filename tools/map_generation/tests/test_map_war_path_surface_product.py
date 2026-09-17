@@ -58,6 +58,10 @@ class TestMapWarPathSurface(unittest.TestCase):
         self.assertIn("func _deferred_budgeted_warloop_flow", ren)
         self.assertIn("func _request_hang_safe_warloop_flow", ren)
         self.assertIn("_request_hang_safe_warloop_flow", ren)
+        self.assertIn("g_polyline_visible", g.get("pass") or [], msg=g)
+        self.assertNotIn("g_polyline_unseen", g.get("fail") or [])
+        self.assertIn("func _supply_route_polyline_width", ren)
+        self.assertIn("func _apply_visible_supply_route_polyline", ren)
         layer = ROOT / "scripts" / "map" / "StrategicFlowOverlayLayer.gd"
         lyr = layer.read_text(encoding="utf-8")
         self.assertIn("func setup_budgeted", lyr)

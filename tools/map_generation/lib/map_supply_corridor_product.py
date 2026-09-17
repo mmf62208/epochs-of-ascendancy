@@ -229,3 +229,80 @@ def supply_corridor_integrity_from_board(board_dir: str = "") -> Dict[str, Any]:
         "summary": p.get("summary"),
         "empty": False,
     }
+
+
+def _slice_func(src: str, func_name: str) -> str:
+    needle = "func %s" % func_name
+    i = src.find(needle)
+    if i < 0:
+        return ""
+    nxt = src.find("\nfunc ", i + 1)
+    return src[i : nxt if nxt > 0 else i + 4000]
+
+
+def g_polyline_visibility_wiring(renderer_src: str = "") -> Dict[str, Any]:
+    """First-session G must draw a zoom-aware, high-z, high-contrast polyline.
+
+    Hang-safe toast + deferred two-centroid path stays; this only gates visibility
+    on the existing highlight_supply_route_path / hang-safe Line2D host.
+    """
+    ren = renderer_src
+    if not ren:
+        gd = ROOT / "scripts" / "map" / "MapRenderer.gd"
+        ren = gd.read_text(encoding="utf-8") if gd.is_file() else ""
+    sml_path = ROOT / "scripts" / "supply" / "SupplyMapLayer.gd"
+    sml = sml_path.read_text(encoding="utf-8") if sml_path.is_file() else ""
+    fails: List[str] = []
+    passes: List[str] = []
+    highlight = _slice_func(ren, "highlight_supply_route_path")
+    hang = _slice_func(ren, "_draw_hang_safe_corridor_line")
+    apply_fn = _slice_func(ren, "_apply_visible_supply_route_polyline")
+    width_fn = _slice_func(ren, "_supply_route_polyline_width")
+    request = _slice_func(ren, "_request_hang_safe_supply_corridor")
+    deferred = _slice_func(ren, "_deferred_hang_safe_corridor_line")
+    if "func _supply_route_polyline_width" in ren and "12.0 / z" in width_fn:
+        passes.append("zoom_aware_width")
+    else:
+        fails.append("missing_zoom_aware_width")
+    if (
+        "func _apply_visible_supply_route_polyline" in ren
+        and "z_as_relative = false" in apply_fn
+        and "z_index = 95" in apply_fn
+        and "SupplyCorridorLine" in apply_fn
+        and "Color(1.0, 0.92, 0.16, 1.0)" in apply_fn
+    ):
+        passes.append("high_contrast_z")
+    else:
+        fails.append("missing_high_contrast_z")
+    if "highlight_supply_route_path" in hang and "find_land_path" not in hang:
+        passes.append("hang_safe_uses_highlight")
+    else:
+        fails.append("hang_safe_skips_highlight")
+    if "_apply_visible_supply_route_polyline" in highlight:
+        passes.append("highlight_draws_visible")
+    else:
+        fails.append("highlight_no_visible_stroke")
+    if (
+        "call_deferred" in request
+        and "find_land_path" not in request
+        and "preview_player_route" not in request
+        and "710173" in deferred
+        and "highlight_supply_corridor" not in request
+    ):
+        passes.append("g_hang_class_kept")
+    else:
+        fails.append("g_hang_class_regressed")
+    draw_hl = _slice_func(sml, "_draw_route_highlight")
+    if "_highlight_polyline_width" in draw_hl and "z_as_relative = false" in sml:
+        passes.append("sml_highlight_zoom")
+    else:
+        fails.append("sml_highlight_thin")
+    ok = len(fails) == 0
+    return {
+        "ok": ok,
+        "empty": False,
+        "status": "PASS" if ok else "FAIL",
+        "pass": passes,
+        "fail": fails,
+        "summary": "G polyline visibility %s" % ("PASS" if ok else "FAIL"),
+    }
