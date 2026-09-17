@@ -309,6 +309,10 @@ var _march_path_line: Line2D = null
 var _supply_corridor_line: Line2D = null
 var _supply_corridor_glow: Line2D = null
 var _supply_corridor_spine: Line2D = null
+var _supply_route_highlight_layer: CanvasLayer = null
+var _supply_route_highlight_host: Node2D = null
+var _supply_corridor_gem_a: Polygon2D = null
+var _supply_corridor_gem_b: Polygon2D = null
 var _next_hook_chip: Button = null
 var _current_theater_bounds: Rect2 = GRAND_THEATER_CANONICAL_BOUNDS  # updated on theater/chunk/world load; used for camera clamp to avoid gray lost space on pan/zoom to NA etc.
 
@@ -1869,6 +1873,8 @@ func _refresh_terrain_zoom_light() -> void:
 	_sync_unit_counter_scales(z)
 	_sync_unit_counter_visibility(z)
 	_sync_capital_star_scales(z)
+	# Camera-space G stroke: keep ~26 screen px after Home wheel-zoom (no path rebuild).
+	_refresh_visible_supply_route_polyline_width()
 	# Do not rebuild 3520 fills on a wheel notch — LOD/counters only. Fill bucket
 	# updates happen on mapmode change / boot, not per zoom tick (Rhine chip carpet hang).
 
@@ -3007,7 +3013,7 @@ func highlight_supply_route_path(province_path: Array, seconds: float = 4.5) -> 
 			pts.append(c)
 	if pts.size() < 2:
 		return
-	# Zoom-aware Line2D is the readable Europe-Home stroke (canvas draw is ~1px at Home zoom).
+	# Camera-space overlay stroke — PR 37 world-unit gold stack was ~12px under chips at Home.
 	_apply_visible_supply_route_polyline(pts)
 	# Existing SupplyMapLayer highlight path — keep for overlay/minimap; not required to show.
 	_ensure_corridor_polyline_layer()
@@ -3020,13 +3026,56 @@ func highlight_supply_route_path(province_path: Array, seconds: float = 4.5) -> 
 		DebugOverlay.toast_map_debug("Route highlight · %d provinces" % province_path.size())
 
 
-## Keep ~10–14 screen px at Europe Home zoom so first-session G corridor reads.
+## Camera-space width: ~26 screen px at Europe Home (chips are 48–58px; PR 37 12/z floor 10 vanished).
 func _supply_route_polyline_width() -> float:
 	var z := 1.0
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	if cam != null:
-		z = maxf(absf(cam.zoom.x), 0.06)
-	return clampf(12.0 / z, 10.0, 120.0)
+		z = maxf(absf(cam.zoom.x), 0.045)
+	return clampf(26.0 / z, 24.0, 480.0)
+
+
+func _ensure_supply_route_highlight_host() -> Node2D:
+	# Own canvas above map fills/chips (layer 0) and below HUD UI (layer 20).
+	if _supply_route_highlight_layer == null or not is_instance_valid(_supply_route_highlight_layer):
+		var layer := CanvasLayer.new()
+		layer.name = "SupplyRouteHighlightLayer"
+		layer.layer = 10
+		layer.follow_viewport_enabled = true
+		add_child(layer)
+		_supply_route_highlight_layer = layer
+	if _supply_route_highlight_host == null or not is_instance_valid(_supply_route_highlight_host):
+		var host := Node2D.new()
+		host.name = "SupplyRouteHighlightHost"
+		host.z_as_relative = false
+		host.z_index = 250
+		_supply_route_highlight_layer.add_child(host)
+		_supply_route_highlight_host = host
+	_supply_route_highlight_layer.visible = true
+	_supply_route_highlight_host.visible = true
+	return _supply_route_highlight_host
+
+
+func _map_pts_to_supply_route_host(pts: PackedVector2Array, host: Node2D) -> PackedVector2Array:
+	# Follow-viewport canvas uses world/map space — same as centroids. Do not
+	# to_local through the camera transform (that would place the stroke off-map).
+	if host == null or pts.size() < 2:
+		return pts
+	return pts
+
+
+func _make_supply_route_endpoint_gem(radius: float, col: Color) -> Polygon2D:
+	var poly := Polygon2D.new()
+	var ring := PackedVector2Array()
+	var n := 16
+	for i in n:
+		var a := TAU * float(i) / float(n)
+		ring.append(Vector2(cos(a), sin(a)) * radius)
+	poly.polygon = ring
+	poly.color = col
+	poly.z_as_relative = true
+	poly.z_index = 3
+	return poly
 
 
 func _clear_visible_supply_route_polyline() -> void:
@@ -3036,57 +3085,93 @@ func _clear_visible_supply_route_polyline() -> void:
 		_supply_corridor_line.queue_free()
 	if _supply_corridor_spine != null and is_instance_valid(_supply_corridor_spine):
 		_supply_corridor_spine.queue_free()
+	if _supply_corridor_gem_a != null and is_instance_valid(_supply_corridor_gem_a):
+		_supply_corridor_gem_a.queue_free()
+	if _supply_corridor_gem_b != null and is_instance_valid(_supply_corridor_gem_b):
+		_supply_corridor_gem_b.queue_free()
 	_supply_corridor_glow = null
 	_supply_corridor_line = null
 	_supply_corridor_spine = null
+	_supply_corridor_gem_a = null
+	_supply_corridor_gem_b = null
 
 
-## Dark halo + gold core + white spine. z_as_relative false so fills/chips cannot bury G.
+func _refresh_visible_supply_route_polyline_width() -> void:
+	if _supply_corridor_line == null or not is_instance_valid(_supply_corridor_line):
+		return
+	var w := _supply_route_polyline_width()
+	if _supply_corridor_glow != null and is_instance_valid(_supply_corridor_glow):
+		_supply_corridor_glow.width = w * 2.8
+	_supply_corridor_line.width = w
+	if _supply_corridor_spine != null and is_instance_valid(_supply_corridor_spine):
+		_supply_corridor_spine.width = maxf(4.0, w * 0.30)
+	var gem_r := maxf(12.0, w * 0.55)
+	if _supply_corridor_gem_a != null and is_instance_valid(_supply_corridor_gem_a):
+		_supply_corridor_gem_a.scale = Vector2.ONE * (gem_r / 12.0)
+	if _supply_corridor_gem_b != null and is_instance_valid(_supply_corridor_gem_b):
+		_supply_corridor_gem_b.scale = Vector2.ONE * (gem_r / 12.0)
+
+
+## Dark halo + cyan core + white spine on follow-viewport layer 10 (above chips, below HUD).
 func _apply_visible_supply_route_polyline(pts: PackedVector2Array) -> void:
 	if pts.size() < 2:
 		return
 	_clear_visible_supply_route_polyline()
-	var host: Node = container if container != null else self
+	var host: Node2D = _ensure_supply_route_highlight_host()
+	var local_pts: PackedVector2Array = _map_pts_to_supply_route_host(pts, host)
 	var w := _supply_route_polyline_width()
 	var glow := Line2D.new()
 	glow.name = "SupplyCorridorGlow"
-	glow.width = w * 2.4
-	glow.default_color = Color(0.04, 0.05, 0.10, 0.92)
+	glow.width = w * 2.8
+	glow.default_color = Color(0.02, 0.05, 0.10, 0.96)
 	glow.antialiased = true
 	glow.joint_mode = Line2D.LINE_JOINT_ROUND
 	glow.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	glow.end_cap_mode = Line2D.LINE_CAP_ROUND
-	glow.points = pts
-	glow.z_as_relative = false
-	glow.z_index = 94
+	glow.points = local_pts
+	glow.z_as_relative = true
+	glow.z_index = 0
 	host.add_child(glow)
 	_supply_corridor_glow = glow
 	var line := Line2D.new()
 	line.name = "SupplyCorridorLine"
 	line.width = w
-	line.default_color = Color(1.0, 0.92, 0.16, 1.0)
+	line.default_color = Color(0.12, 1.0, 0.82, 1.0)
 	line.antialiased = true
 	line.joint_mode = Line2D.LINE_JOINT_ROUND
 	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	line.end_cap_mode = Line2D.LINE_CAP_ROUND
-	line.points = pts
-	line.z_as_relative = false
-	line.z_index = 95
+	line.points = local_pts
+	line.z_as_relative = true
+	line.z_index = 1
 	host.add_child(line)
 	_supply_corridor_line = line
 	var spine := Line2D.new()
 	spine.name = "SupplyCorridorSpine"
-	spine.width = maxf(3.0, w * 0.32)
-	spine.default_color = Color(1.0, 1.0, 0.94, 1.0)
+	spine.width = maxf(4.0, w * 0.30)
+	spine.default_color = Color(1.0, 1.0, 0.96, 1.0)
 	spine.antialiased = true
 	spine.joint_mode = Line2D.LINE_JOINT_ROUND
 	spine.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	spine.end_cap_mode = Line2D.LINE_CAP_ROUND
-	spine.points = pts
-	spine.z_as_relative = false
-	spine.z_index = 96
+	spine.points = local_pts
+	spine.z_as_relative = true
+	spine.z_index = 2
 	host.add_child(spine)
 	_supply_corridor_spine = spine
+	var gem_r := maxf(12.0, w * 0.55)
+	var gem_a := _make_supply_route_endpoint_gem(12.0, Color(1.0, 0.98, 0.55, 1.0))
+	gem_a.name = "SupplyCorridorGemA"
+	gem_a.position = local_pts[0]
+	gem_a.scale = Vector2.ONE * (gem_r / 12.0)
+	host.add_child(gem_a)
+	_supply_corridor_gem_a = gem_a
+	var gem_b := _make_supply_route_endpoint_gem(12.0, Color(0.20, 1.0, 0.75, 1.0))
+	gem_b.name = "SupplyCorridorGemB"
+	gem_b.position = local_pts[local_pts.size() - 1]
+	gem_b.scale = Vector2.ONE * (gem_r / 12.0)
+	host.add_child(gem_b)
+	_supply_corridor_gem_b = gem_b
 
 
 ## Cheap Line2D host for G. Does not _toggle_supply_overlay or _refresh_supply_routes.
