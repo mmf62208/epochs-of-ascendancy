@@ -9374,6 +9374,9 @@ static func _agent_network_line(province_id: int, country_tag: String) -> String
 static func get_battle_preview(attacker: Province, defender: Province) -> Dictionary:
 	if attacker == null or defender == null:
 		return {}
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") \
+			and bool(TimeManager.is_interactive_light_sim()):
+		return {"light_stub": true, "terrain": str(defender.terrain) if defender != null else ""}
 	var terrain := defender.terrain if not defender.terrain.is_empty() else attacker.terrain
 	var resolver := CombatResolver.new()
 	var rules_width := resolver.get_combat_width_for_battle(attacker.id, defender.id, terrain)

@@ -90,6 +90,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if is_interactive_light_sim() and Engine.get_process_frames() % 45 == 0:
+		_maybe_trip_rss_budget()
 	# Safety net: if deferred flush stalled (e.g. pause race), keep draining the queue.
 	if not paused and not _pending_sim_events.is_empty() and not _sim_flush_scheduled:
 		_schedule_sim_flush()
@@ -484,6 +486,8 @@ func _flush_sim_events() -> void:
 		_emit_month_year_boundary(y, m, bool(ev.get("crossed_year", false)))
 
 	var dt := Time.get_ticks_msec() - t0
+	if is_interactive_light_sim() and (kind == "day_battles" or kind == "day"):
+		_maybe_trip_rss_budget()
 	if dt >= 80:
 		print(
 			"TimeManager: flush %s %dms pending=%d"
@@ -654,50 +658,130 @@ func _tick_out_of_combat_recovery() -> void:
 		var f: Formation = forms[fid] as Formation
 		if f == null:
 			continue
+		if is_interactive_light_sim():
+			var ptag := ""
+			if LeaderManager.has_method("get_player_country_tag"):
+				ptag = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+			if ptag.is_empty() or ptag == "USA":
+				ptag = "GER"
+			var ftag := str(f.country_tag).strip_edges().to_upper() if "country_tag" in f else ""
+			if ftag != ptag and ftag != "FRA":
+				continue
 		if "is_training" in f and bool(f.is_training):
 			continue
 		if "is_in_combat" in f and bool(f.is_in_combat):
 			continue
-		if "fuel_level" in f:
-			var marching := false
-			if typeof(FormationMovement) != TYPE_NIL:
-				marching = bool(FormationMovement.has_march(str(fid)))
-			if not marching:
-				var fuel_need := float(LandCombatPower.composition_from_formation(f).get("fuel_use", 0.0))
-				if fuel_need > 1e-9:
-					if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("refuel_formation_from_stockpile"):
-						var rfid := str(f.formation_id) if "formation_id" in f else str(fid)
-						ProductionManager.refuel_formation_from_stockpile(rfid, 0.10)
-					else:
-						LandCombatPower.apply_fuel_resupply(f, 0.10)
+		var marching := false
+		if typeof(FormationMovement) != TYPE_NIL:
+			marching = bool(FormationMovement.has_march(str(fid)))
+		# Field commanders rebuild sitting units. No player click. No snap-from-stockpile.
+		if marching:
+			continue
 		var org := float(f.organization) if "organization" in f else 1.0
 		var plan := float(f.planning) if "planning" in f else 1.0
 		var strn := float(f.strength) if "strength" in f else 1.0
 		if budgeted and org >= 0.99 and plan >= 1.0 and strn >= 0.99:
 			continue
+		var cmd := _field_reorg_mult(f)
+		var in_supply := _formation_in_friendly_supply(f)
+		var routed := org < 0.20
+		# Manpower replacements: slow pipeline (~6–8 weeks from a 55% remnant).
 		if "strength" in f and strn < 1.0:
-			var new_s := clampf(strn + 0.03, 0.0, 1.0)
+			var man := 0.012 * cmd
+			if routed:
+				man *= 0.45
+			if not in_supply:
+				man *= 0.35
+			var new_s := clampf(strn + man, 0.0, 1.0)
 			var gain := new_s - strn
 			f.strength = new_s
-			if gain > 0.0001 and "combat_experience" in f:
+			if gain > 0.0001 and "combat_experience" in f and typeof(LandCombatPower) != TYPE_NIL:
 				f.combat_experience = LandCombatPower.dilute_xp_replacements(
 					float(f.combat_experience), gain, new_s, 22.0
 				)
-		var rec := 0.06
-		var pid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
-		if pid >= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
-			var p: Province = MapManager.get_province(pid)
-			if p != null and p.has_method("get_organization_recovery_modifier"):
-				rec = 0.06 * float(p.get_organization_recovery_modifier())
+		# Org/readiness: commanders; routed remnants reorg slower until org climbs.
+		var rec := 0.045 * cmd
+		if routed:
+			rec *= 0.5
+		if not in_supply:
+			rec *= 0.4
 		if "organization" in f:
 			f.organization = clampf(org + rec, 0.0, 1.0)
 		if "readiness" in f:
-			f.readiness = clampf(float(f.readiness) + 0.04, 0.0, 1.0)
+			var rdy := 0.03 * cmd
+			if not in_supply:
+				rdy *= 0.3
+			f.readiness = clampf(float(f.readiness) + rdy, 0.0, 1.0)
 		var defend := "current_land_mission" in f and str(f.current_land_mission) == Formation.LAND_MISSION_DEFEND
 		if defend and "entrenchment" in f:
 			f.entrenchment = clampf(float(f.entrenchment) + 0.06, 0.0, 1.0)
 		if "planning" in f:
-			f.planning = clampf(plan + 0.08, 0.0, 1.0)
+			f.planning = clampf(plan + 0.08 * cmd, 0.0, 1.0)
+
+
+func _field_reorg_mult(f: Formation) -> float:
+	var m := 1.0
+	if f == null or typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_leader"):
+		return m
+	var lid := str(f.leader_id) if "leader_id" in f else ""
+	if lid.is_empty():
+		return m
+	var L: Object = LeaderManager.get_leader(lid)
+	if L == null or not L.has_method("has_trait"):
+		return m
+	if bool(L.call("has_trait", "organizer")) or bool(L.call("has_trait", "logistics_wizard")):
+		m += 0.30
+	if bool(L.call("has_trait", "infantry_leader")) or bool(L.call("has_trait", "trickster")):
+		m += 0.12
+	if bool(L.call("has_trait", "old_guard")) or bool(L.call("has_trait", "inflexible")):
+		m -= 0.18
+	return clampf(m, 0.55, 1.55)
+
+
+func _formation_in_friendly_supply(f: Formation) -> bool:
+	if f == null:
+		return false
+	var tag := str(f.country_tag).strip_edges().to_upper() if "country_tag" in f else ""
+	var pid := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+	if tag.is_empty() or pid < 0 or typeof(MapManager) == TYPE_NIL:
+		return false
+	if MapManager.has_method("get_province_controller"):
+		return str(MapManager.get_province_controller(pid)).strip_edges().to_upper() == tag
+	var p: Province = MapManager.get_province(pid) if MapManager.has_method("get_province") else null
+	if p == null:
+		return false
+	var ctrl := str(p.controller_tag).strip_edges().to_upper()
+	if ctrl.is_empty():
+		ctrl = str(p.owner_tag).strip_edges().to_upper()
+	return ctrl == tag
+
+
+var _rss_trip_fired: bool = false
+const _RSS_PAUSE_KB := 2500000
+
+
+func _rss_kb() -> int:
+	var f := FileAccess.open("/proc/self/status", FileAccess.READ)
+	if f != null:
+		while not f.eof_reached():
+			var line := f.get_line()
+			if line.begins_with("VmRSS:"):
+				var rest := line.get_slice(":", 1).strip_edges()
+				var n := int(rest.get_slice(" ", 0))
+				if n > 0:
+					return n
+	return int(OS.get_static_memory_usage() / 1024)
+
+
+func _maybe_trip_rss_budget() -> void:
+	if _rss_trip_fired or not is_interactive_light_sim():
+		return
+	var kb := _rss_kb()
+	if kb < _RSS_PAUSE_KB:
+		return
+	_rss_trip_fired = true
+	set_paused(true)
+	print("TimeManager: RSS tripwire %d KB — paused 1× ( Maginot freeze class )" % kb)
 
 
 ## True for normal graphical F5 play — keep day ticks light so HUD/map stay responsive.

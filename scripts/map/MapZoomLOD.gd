@@ -42,8 +42,9 @@ static func tier_name(t: Tier) -> String:
 			return "unknown"
 
 
-static func show_nation_labels(t: Tier) -> bool:
-	return t == Tier.STRATEGIC or t == Tier.OPERATIONAL
+static func show_nation_labels(_t: Tier) -> bool:
+	# In-view names stay at tactical zoom; the label layer culls to the camera rect.
+	return true
 
 
 static func show_region_labels(t: Tier) -> bool:
@@ -77,7 +78,8 @@ static func show_country_borders(t: Tier) -> bool:
 
 
 static func show_province_hover_detail(t: Tier) -> bool:
-	return t == Tier.TACTICAL
+	# One hovered province outline at every LOD so political fills stay readable.
+	return true
 
 
 static func show_compact_hover_tooltip(t: Tier) -> bool:
@@ -92,11 +94,11 @@ static func country_border_width(t: Tier) -> float:
 	## International frontiers only (dark). Slightly thicker so Maginot/GER-FRA reads at a glance.
 	match t:
 		Tier.STRATEGIC:
-			return 4.2
+			return 2.6
 		Tier.OPERATIONAL:
-			return 3.4
+			return 2.2
 		_:
-			return 2.8
+			return 1.8
 
 
 static func country_border_alpha(t: Tier) -> float:
@@ -286,7 +288,20 @@ static func nation_label_font_px(t: Tier) -> int:
 		Tier.OPERATIONAL:
 			return 28
 		_:
-			return 16
+			return 22
+
+
+static func nation_label_zoom_t(zoom: float) -> float:
+	var z := maxf(snappedf(zoom, 0.1), 0.18)
+	return clampf((z - 0.22) / 1.25, 0.0, 1.0)
+
+
+## Desired on-screen pixels. Pair with label.scale = 1/zoom so Camera2D does not blow them up.
+static func nation_label_screen_px(zoom: float, base_px: int) -> int:
+	var t := nation_label_zoom_t(zoom)
+	var far_px := float(clampi(base_px, 14, 22)) * 1.5
+	var near_px := 23.0
+	return clampi(int(round(lerpf(far_px, near_px, t))), 22, 40)
 
 
 static func region_label_font_px(t: Tier) -> int:

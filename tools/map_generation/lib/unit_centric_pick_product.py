@@ -16,8 +16,8 @@ MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 STRATEGIC_PICK_TOAST = "Click a unit chip to command (Shift+U toggles counters)."
 STACK_CYCLE_HINT = "Stack %d/%d · [ ] or buttons to cycle"
 SELECTED_FRAME_HOOK = "_refresh_selected_unit_chip"
-HIT_RADIUS_PX = 48.0
-HIT_RADIUS_FLOOR = 20.0
+HIT_RADIUS_PX = 80.0
+HIT_RADIUS_FLOOR = 40.0
 
 
 def _gd_func_slice(src: str, func_name: str) -> str:
@@ -52,10 +52,10 @@ def _spatial_left_click_slice(renderer_src: str) -> str:
 def _hit_radius_ok(pick_fn: str) -> bool:
     if not pick_fn:
         return False
-    has_48 = bool(re.search(r"\b48(?:\.0)?\b", pick_fn))
-    has_20 = bool(re.search(r"\b20(?:\.0)?\b", pick_fn))
-    has_maxf_floor = "maxf" in pick_fn and ("20.0" in pick_fn or "20" in pick_fn)
-    return has_48 and has_20 and has_maxf_floor
+    has_80 = bool(re.search(r"\b80(?:\.0)?\b", pick_fn))
+    has_40 = bool(re.search(r"\b40(?:\.0)?\b", pick_fn))
+    has_maxf_floor = "maxf" in pick_fn and ("40.0" in pick_fn or "40" in pick_fn)
+    return has_80 and has_40 and has_maxf_floor
 
 
 def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, Any]:
@@ -103,11 +103,11 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
 
     # 2) Hit disk ≥48 px / zoom with floor ≥20 world units.
     hit_ok = _hit_radius_ok(pick_fn)
-    wiring["hit_radius_48_floor_20"] = hit_ok
+    wiring["hit_radius_80_floor_40"] = hit_ok
     if hit_ok:
-        passes.append("hit_radius_48_floor_20")
+        passes.append("hit_radius_80_floor_40")
     else:
-        fails.append("hit_radius_48_floor_20")
+        fails.append("hit_radius_80_floor_40")
 
     # 3) hang-class: no show_info_panel in pin open path.
     pin_no_insp = bool(pin_fn) and "show_info_panel" not in pin_fn
@@ -161,6 +161,71 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         passes.append("stack_cycle")
     else:
         fails.append("stack_cycle")
+
+    cycle_fn = _gd_func_slice(ren, "_cycle_selected_stack_unit")
+    stack_map = (
+        bool(cycle_fn)
+        and "_bind_chip_to_selected_formation" in cycle_fn
+        and "_sync_selected_unit_order_paths" in cycle_fn
+    )
+    wiring["stack_cycle_map_chip"] = stack_map
+    if stack_map:
+        passes.append("stack_cycle_map_chip")
+    else:
+        fails.append("stack_cycle_map_chip")
+
+    cycle_no_rebuild = (
+        bool(cycle_fn)
+        and "_show_unit_detail_popup_for_selected" not in cycle_fn
+        and "_patch_open_unit_card_for_selected" in cycle_fn
+    )
+    wiring["stack_cycle_no_card_rebuild"] = cycle_no_rebuild
+    if cycle_no_rebuild:
+        passes.append("stack_cycle_no_card_rebuild")
+    else:
+        fails.append("stack_cycle_no_card_rebuild")
+
+    badge_fn = _gd_func_slice(ren, "_make_formation_stack_badge")
+    plates_fn = _gd_func_slice(ren, "_make_stack_offset_plates")
+    stack_vis = (
+        "_make_stack_offset_plates" in ren
+        and "StackBack" in ren
+        and bool(badge_fn)
+        and "Label.new" not in badge_fn
+        and ("_UnitChipTextScr" in badge_fn or "UnitChipText" in badge_fn)
+        and "Line2D" in plates_fn
+        and "StackEdge" in plates_fn
+    )
+    wiring["stack_visible_badge"] = stack_vis
+    if stack_vis:
+        passes.append("stack_visible_badge")
+    else:
+        fails.append("stack_visible_badge")
+
+    land_fn = _gd_func_slice(ren, "_try_open_land_unit_at_world")
+    deferred_fn = _gd_func_slice(ren, "_deferred_command_click")
+    i_chip = deferred_fn.find("_try_open_land_unit_at_world") if deferred_fn else -1
+    i_arrow = deferred_fn.find("_try_pick_order_intent") if deferred_fn else -1
+    chip_before_arrow = i_chip >= 0 and i_arrow >= 0 and i_chip < i_arrow
+    wiring["chip_before_fight_arrow"] = chip_before_arrow
+    if chip_before_arrow:
+        passes.append("chip_before_fight_arrow")
+    else:
+        fails.append("chip_before_fight_arrow")
+    ctrl_safe = (
+        bool(deferred_fn)
+        and "ctrl_click" in deferred_fn
+        and "ctrl-order enemy chip" in deferred_fn
+        and bool(land_fn)
+        and "_open_fight_from_formation_id" not in land_fn
+        and "not event.shift_pressed" in spatial
+        and "_deferred_command_click" in spatial
+    )
+    wiring["ctrl_click_no_stack_freeze"] = ctrl_safe
+    if ctrl_safe:
+        passes.append("ctrl_click_no_stack_freeze")
+    else:
+        fails.append("ctrl_click_no_stack_freeze")
 
     # 8) Selection applies chip chrome (select path calls refresh).
     select_refreshes = bool(select_fn) and SELECTED_FRAME_HOOK in select_fn

@@ -55,6 +55,7 @@ def capital_landmass_centroid(
 
 
 def build_map_nation_label_landmass_product() -> Dict[str, Any]:
+    # Zoom-in FOV resize is grepped from the live label layer + LOD.
     # Synthetic UK-like: capital on coast (London-like), bulk of mass inland/west.
     # Capital at (10, 0); main mass around (0, 0).
     owned = [1, 2, 3, 4, 5]
@@ -106,6 +107,14 @@ def build_map_nation_label_landmass_product() -> Dict[str, Any]:
         passes.append("gd_landmass_fn")
     else:
         fails.append("missing_gd_landmass")
+    if "_nudge_microstate_nation_labels" in gd and "LIE" in gd:
+        passes.append("lie_clear_of_switzerland")
+    else:
+        fails.append("missing_lie_nudge")
+    if "base_font_px" in gd and "_apply_nation_label_zoom" in gd:
+        passes.append("fov_zoom_resize")
+    else:
+        fails.append("missing_fov_zoom_resize")
     if "extends CanvasLayer" in menu and "CanvasLayer" in tscn:
         passes.append("menu_canvas_layer")
     else:

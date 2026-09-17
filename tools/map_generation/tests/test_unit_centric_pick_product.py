@@ -36,13 +36,18 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         for key in (
             "pin_before_hex",
             "capital_star_before_chip",
-            "hit_radius_48_floor_20",
+            "hit_radius_80_floor_40",
             "pin_select_no_inspector",
             "selected_frame_hook",
             "hidden_pins_skip",
             "prefer_player_pin",
             "strategic_pick_toast",
             "stack_cycle",
+            "stack_cycle_map_chip",
+            "stack_cycle_no_card_rebuild",
+            "stack_visible_badge",
+            "ctrl_click_no_stack_freeze",
+            "chip_before_fight_arrow",
             "select_refreshes_chip",
             "chip_match_by_province",
             "selected_frame_immediate_free",
@@ -56,12 +61,16 @@ class TestUnitCentricPickProduct(unittest.TestCase):
     def test_renderer_integrity_strings(self) -> None:
         ren = RENDERER.read_text(encoding="utf-8")
         self.assertIn("_try_open_unit_at_world", ren)
-        self.assertIn("maxf(48.0", ren)
-        self.assertIn("20.0", ren)
+        self.assertIn("maxf(80.0", ren)
+        self.assertIn("40.0", ren)
         self.assertIn("SelectedFrame", ren)
         self.assertIn("_refresh_selected_unit_chip", ren)
         self.assertIn(STRATEGIC_PICK_TOAST, ren)
         self.assertIn("_cycle_selected_stack_unit", ren)
+        self.assertIn("_bind_chip_to_selected_formation", ren)
+        self.assertIn("_sync_selected_unit_order_paths", ren)
+        self.assertIn("StackBack", ren)
+        self.assertIn("_make_stack_offset_plates", ren)
         self.assertIn("not counter.visible", ren)
         # Hang-class: pin open path must not open inspector.
         pin_i = ren.find("func _try_open_unit_at_world")

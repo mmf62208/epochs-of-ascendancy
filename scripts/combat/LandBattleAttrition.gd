@@ -56,8 +56,12 @@ static func format_loss_plain(removed: Dictionary) -> String:
 static func apply_daily_to_formation(formation_id: String, severity: float) -> Dictionary:
 	var fid := formation_id.strip_edges()
 	var removed: Dictionary = {}
+	var light := false
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim"):
+		light = bool(TimeManager.is_interactive_light_sim())
 	if (
-		not fid.is_empty()
+		not light
+		and not fid.is_empty()
 		and typeof(ProductionManager) != TYPE_NIL
 		and ProductionManager.has_method("apply_combat_equipment_loss")
 	):
@@ -74,32 +78,35 @@ static func apply_daily_to_formation(formation_id: String, severity: float) -> D
 			form.strength = clampf(str_before - drain, 0.0, 1.0)
 			strength_after = float(form.strength)
 			var toe := 3000
-			var comp: Dictionary = LandCombatPower.composition_from_formation(form)
-			if int(comp.get("manpower", 0)) > 0:
-				toe = int(comp.get("manpower"))
+			if not light:
+				var comp: Dictionary = LandCombatPower.composition_from_formation(form)
+				if int(comp.get("manpower", 0)) > 0:
+					toe = int(comp.get("manpower"))
 			manpower_lost = maxi(0, int(round(float(toe) * str_before * drain)))
 			if "last_manpower_loss" in form:
 				form.last_manpower_loss = manpower_lost
 			else:
 				form.set_meta("last_manpower_loss", manpower_lost)
-			var tag := str(form.country_tag).strip_edges().to_upper()
-			if manpower_lost > 0 and tag != "" and typeof(GameData) != TYPE_NIL and GameData.has_method("adjust_manpower"):
-				GameData.adjust_manpower(tag, -manpower_lost, "land_battle")
-			if drain >= 0.08 and "combat_experience" in form:
-				form.combat_experience = LandCombatPower.dilute_xp_heavy_loss(
-					float(form.combat_experience), drain
-				)
-			LandCombatPower.apply_fuel_burn(form, "combat")
+			if not light:
+				var tag := str(form.country_tag).strip_edges().to_upper()
+				if manpower_lost > 0 and tag != "" and typeof(GameData) != TYPE_NIL and GameData.has_method("adjust_manpower"):
+					GameData.adjust_manpower(tag, -manpower_lost, "land_battle")
+				if drain >= 0.08 and "combat_experience" in form:
+					form.combat_experience = LandCombatPower.dilute_xp_heavy_loss(
+						float(form.combat_experience), drain
+					)
+				LandCombatPower.apply_fuel_burn(form, "combat")
 	var plain := format_loss_plain(removed)
 	if manpower_lost > 0:
 		if plain == NO_STOCK:
 			plain = "men −%d" % manpower_lost
 		else:
 			plain = "men −%d · %s" % [manpower_lost, plain]
-	print(
-		"[LAND BATTLE ATTRITION] %s %s str=%.2f sev=%.2f men=%d"
-		% [fid, plain, strength_after, severity, manpower_lost]
-	)
+	if not light:
+		print(
+			"[LAND BATTLE ATTRITION] %s %s str=%.2f sev=%.2f men=%d"
+			% [fid, plain, strength_after, severity, manpower_lost]
+		)
 	return {
 		"removed": removed,
 		"strength_after": strength_after,

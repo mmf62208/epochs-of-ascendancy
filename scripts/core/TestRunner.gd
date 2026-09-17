@@ -673,6 +673,16 @@ func _show_living_title_boot() -> void:
 	if boot.has_signal("boot_closed"):
 		boot.connect("boot_closed", _on_living_title_boot_closed)
 	print("TestRunner: living title boot — pick scenario date, country, or load")
+	# Maginot F5: don't leave the overlay up (looks frozen; Begin never logged closed).
+	call_deferred("_auto_begin_living_title_maginot")
+
+
+func _auto_begin_living_title_maginot() -> void:
+	var boot := get_node_or_null("LivingTitleBoot")
+	if boot == null:
+		return
+	if boot.has_method("_on_begin_new"):
+		boot.call("_on_begin_new")
 
 
 func _on_living_title_boot_closed(result: Dictionary) -> void:

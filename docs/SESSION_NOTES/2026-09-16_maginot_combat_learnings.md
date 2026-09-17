@@ -2,6 +2,8 @@
 
 Human F5 Maginot (GER 710173 → FRA 710739) plus headless click-order. Not M6 complete.
 
+**2026-09-17 session catalogue** (stacks, callee firewall, freeze table, next loop): [`2026-09-17_maginot_play_catalogue.md`](2026-09-17_maginot_play_catalogue.md).
+
 ## What we learned (keep)
 
 | Lesson | Keep |
@@ -18,15 +20,56 @@ Human F5 Maginot (GER 710173 → FRA 710739) plus headless click-order. Not M6 c
 | F5 must stay cheap | No 8-nation `day_ai`, no 7-day 2MB autosave, no inspector on command clicks |
 | Toasts | Default **player nation only** (GER). USA–MEX was the USA stub tag |
 
+## Combat bones (keep building on these)
+
+| Bone | F5 rule |
+|------|---------|
+| Chip is the unit | Click stack / `[` `]` cycles card **and** NATO. Badge `1/3`. One DemoUnitIcon per hex |
+| Orders are per division | Two units in one hex can march/attack different hexes. Cycle shows **that** unit’s path (bright); others dim |
+| Adjacent click | Gold march / red fight / occupy only the **next** hex. Shift-click appends the next own hex, then a planned attack |
+| Fight only if someone is there | Occupied → Fight card `NvM` + Likely/Tight/Bad. Empty / post-break → red occupy arrow, walk-in, then fill |
+| Join | Second division into the same fight `try_reinforce` → 2v1. Do not rebuild the unit card |
+| 1× | Org tick, occupy hop, sitting recovery. No 8-nation `day_ai`, no calendar autosave, no CombatResolver on the click |
+
+## Freeze taxonomy (F5 must never)
+
+| GB | What the player did | Actual cost | Rule |
+|----|---------------------|-------------|------|
+| 16–19 | Click Alsace | Inspector + 3520 supply | Command click never `show_info_panel` |
+| 20 | Hover | Tooltip / NUTS outline every frame | Once per hex |
+| 25 | AI empty hexes | `lb_2`… chain + composition | Occupy player-only; skip AI land battles |
+| 13–25 | Mash stack | Rebuild UnitDetailPopup / chrome / arrows | Cycle patches text + NATO in place |
+| 7–13 | Right-click fight + 1× | `CombatResolver.get_effective_combat_power` on **every** `can_assault` (`_estimate_attack_power`) + `LandCombatPower.composition_from_formation` on daily attrition + `ProvinceInsight.get_battle_preview` | Light sim: `land_combat_power` org×str×rdy only |
+| 10 | Shift-click / far click | 80-hop GER BFS + inspector fallthrough | Shift = adjacent waypoint only |
+| grey map | `has_method` on a GDScript class | Call the statics | Direct `FormationMovement.enqueue_*` |
+
+Log tells: `[AA] Defender AA` on a click means CombatResolver still ran. `[DEMO COMBAT STOCK]` + composition means TOE rebuilt. `[pick] land unit` spam without a cycle toast means card rebuild.
+
 ## Hangs we hit (do not regress)
 
 - Province inspector on Alsace click (~16–19 GB)
 - Hover tooltip rebuilt every frame while paused (~20 GB)
 - AI empty-hex occupation chain `lb_2`…`lb_7` (~25 GB)
-- `LandCombatPower` composition on a second attack
+- `LandCombatPower` composition on a second attack / daily attrition
+- `CombatResolver` on `can_assault` / `_estimate_attack_power` (right-click Maginot, 2026-09-17)
 - `FormationMovement.has_method` on the class → grey map
 - Instant capture teleport + leftover FRA chip
 - Player tag stub **USA** → Mexico capture toasts
+- Stack cycle rebuilt the unit card (~13 GB)
+- Shift-click fell through to inspector (~10 GB)
+
+## Stability plan (2026-09-17) — callee firewall, not more caller skips
+
+Three options were reviewed by two skeptics:
+
+| Option | Verdict |
+|--------|---------|
+| A. More `_interactive_light_sim` returns at MapRenderer | **Veto.** Missed `_estimate_attack_power` 10+ times. |
+| B. Combat on a worker thread | **Veto.** CombatResolver is a Node; Godot ownership. |
+| C. RSS watchdog only | **Veto as sole fix.** Click already allocated. |
+| **D. Harden the callees** | **Ship.** `CombatResolver.get_effective_combat_power`, `LandCombatPower.composition_from_formation`, `ProvinceInsight.get_battle_preview`, `ProductionManager.get_division_final_combat_stats` return `light_stub` on F5. TimeManager pauses 1× if VmRSS ≥ 2.8 GB. |
+
+PlayLane extract (planner option A) is next session, not this one.
 
 ## Next build (priority)
 

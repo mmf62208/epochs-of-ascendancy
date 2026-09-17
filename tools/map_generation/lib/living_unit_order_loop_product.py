@@ -586,8 +586,13 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
         and "_deferred_commit_attack" in order_fn
         and "will_gate" in order_fn
         and "not_adjacent" in order_fn
+        and "try_reinforce_land_battle" in order_fn
+        and "join_fight" in order_fn
         and "start_land_battle" in _slice(ren, "_commit_selected_attack")
-        and "_refresh_order_intent_arrows" in _slice(ren, "_commit_selected_attack")
+        and (
+            "_refresh_order_intent_arrows" in _slice(ren, "_commit_selected_attack")
+            or "_sync_selected_unit_order_paths" in _slice(ren, "_commit_selected_attack")
+        )
         and "stationed_province_id = GER_FRONT" not in order_fn
     )
     wiring["click_order_api"] = order_ok
@@ -759,11 +764,41 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     wiring["resolve_hang_safe"] = resolve_ok
     (passes if resolve_ok else fails).append("resolve_hang_safe")
 
+    est = _slice(bm, "_estimate_attack_power")
+    cheap_est = bool(est) and "_interactive_light_sim" in est and "land_combat_power" in est
+    wiring["f5_cheap_attack_estimate"] = cheap_est
+    (passes if cheap_est else fails).append("f5_cheap_attack_estimate")
+    assault_fn = _slice(bm, "can_assault_province")
+    no_preview = bool(assault_fn) and "_interactive_light_sim" in assault_fn
+    wiring["f5_skip_battle_preview"] = no_preview
+    (passes if no_preview else fails).append("f5_skip_battle_preview")
+    cr = (ROOT / "scripts" / "combat" / "CombatResolver.gd").read_text(encoding="utf-8")
+    lcp = (ROOT / "scripts" / "combat" / "LandCombatPower.gd").read_text(encoding="utf-8")
+    ins = (ROOT / "scripts" / "map" / "ProvinceInsight.gd").read_text(encoding="utf-8")
+    callee_ok = (
+        "is_interactive_light_sim" in _slice(cr, "get_effective_combat_power")
+        and "light_stub" in _slice(cr, "get_effective_combat_power")
+        and "is_interactive_light_sim" in _slice(lcp, "composition_from_formation")
+        and "is_interactive_light_sim" in _slice(ins, "get_battle_preview")
+        and "_maybe_trip_rss_budget" in tm
+    )
+    wiring["f5_callee_light_stub"] = callee_ok
+    (passes if callee_ok else fails).append("f5_callee_light_stub")
+    bubble_gd = (ROOT / "scripts" / "map" / "LandBattleBubbleLayer.gd").read_text(encoding="utf-8")
+    pip_ok = "Label.new" not in bubble_gd
+    wiring["fight_bubble_nato_pips"] = pip_ok
+    (passes if pip_ok else fails).append("fight_bubble_nato_pips")
+
     strat_skip = bool(pick_fn) and "_unit_counters_want_visible" in pick_fn
     wiring["strategic_pick_skip"] = strat_skip
     (passes if strat_skip else fails).append("strategic_pick_skip")
 
-    mv_ok = "func enqueue_own_land_march" in mv and "func enqueue_own_sea_hop" in mv
+    mv_ok = (
+        "func enqueue_own_land_march" in mv
+        and "func enqueue_own_sea_hop" in mv
+        and "func append_own_land_march" in mv
+        and "_adjacent_land" in mv
+    )
     bm_ok = "func start_land_battle" in bm
     wiring["march_api"] = mv_ok
     wiring["battle_api"] = bm_ok

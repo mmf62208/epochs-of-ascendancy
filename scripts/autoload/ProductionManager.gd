@@ -759,7 +759,10 @@ func ensure_demo_combat_stock(formation_id: String, country_tag: String = "") ->
 		"infantry_equipment": 80,
 		"support_equipment": 10,
 	}
-	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+	var light := false
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim"):
+		light = bool(TimeManager.is_interactive_light_sim())
+	if not light and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
 		var form: Formation = LeaderManager.get_formation(fid)
 		if form != null:
 			var toe: Dictionary = LandCombatPower.equipment_toe(LandCombatPower.composition_from_formation(form))
@@ -918,6 +921,9 @@ func get_division_combat_modifiers(division_template_id: String) -> Dictionary:
 
 
 func get_division_final_combat_stats(division_template_id: String, unit_id: String = "") -> Dictionary:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") \
+			and bool(TimeManager.is_interactive_light_sim()):
+		return {"soft_attack": 40.0, "hard_attack": 8.0, "defense": 28.0, "breakthrough": 16.0, "light_stub": true}
 	if division_template_id.is_empty() or GameData.design_data == null:
 		# Formation-id callers (BattleManager passes formation_id as first arg): design equipment path.
 		var fid := unit_id if not unit_id.is_empty() else division_template_id
@@ -1144,7 +1150,14 @@ func daily_reinforcement_tick(required_map: Dictionary) -> Dictionary:
 		var uid := str(unit_id)
 		if uid.is_empty() or uid.begins_with("_"):
 			continue
-		toe_from_stockpile[uid] = reinforce_unit_toe_from_stockpile(uid)
+		# F5: no snap-fill from national stockpile. Kit is in transit / field recovery.
+		var light := (
+			typeof(TimeManager) != TYPE_NIL
+			and TimeManager.has_method("is_interactive_light_sim")
+			and bool(TimeManager.is_interactive_light_sim())
+		)
+		if not light:
+			toe_from_stockpile[uid] = reinforce_unit_toe_from_stockpile(uid)
 	var reinf := {
 		"units": {},
 		"equipment_flows": flows,

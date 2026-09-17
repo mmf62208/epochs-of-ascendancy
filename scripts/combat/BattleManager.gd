@@ -282,6 +282,9 @@ func can_assault_province(
 	source["target_name"] = target.name
 	source["defender_tag"] = defender_tag
 	source["attacker_tag"] = tag
+	# F5: ProvinceInsight.get_battle_preview constructs CombatResolver + width + supply (RAM leak).
+	if _interactive_light_sim():
+		return source
 	# Carry air dominance from ProvinceInsight for battle context (used in result merge + logs + AAR)
 	if typeof(ProvinceInsight) != TYPE_NIL and typeof(MapManager) != TYPE_NIL:
 		var from_p: Province = MapManager.get_province(from_province_id) if from_province_id >= 0 else target
@@ -1023,6 +1026,8 @@ func tick_open_land_battles(days: float = 1.0) -> Array:
 
 
 func get_open_land_battles() -> Array:
+	if _interactive_light_sim():
+		return _open_land_battles
 	var out: Array = []
 	for raw in _open_land_battles:
 		if typeof(raw) == TYPE_DICTIONARY:
@@ -1158,7 +1163,12 @@ func build_fight_briefing(battle: Dictionary, player_tag: String = "") -> Dictio
 		ours.append(_roster_row(str(fid_v), "engaged"))
 	for fid_p in att_pend:
 		ours.append(_roster_row(str(fid_p), "joining"))
-	var theirs_n := def_fids.size() + _fid_list(battle, "def_pending_fids", "").size()
+	var theirs: Array = []
+	for dfid2 in def_fids:
+		theirs.append(_roster_row(str(dfid2), "engaged"))
+	for dpend in _fid_list(battle, "def_pending_fids", ""):
+		theirs.append(_roster_row(str(dpend), "joining"))
+	var theirs_n := theirs.size()
 	var armor_hint := false
 	for dfid in def_fids:
 		var df: Formation = _formation_from_id(str(dfid), str(battle.get("def_tag", "")))
@@ -1166,7 +1176,8 @@ func build_fight_briefing(battle: Dictionary, player_tag: String = "") -> Dictio
 			armor_hint = true
 			break
 	var empty_stock := false
-	if not att_fids.is_empty() and typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("get_unit_equipment_stock"):
+	if not _interactive_light_sim() and not att_fids.is_empty() \
+			and typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("get_unit_equipment_stock"):
 		var st: Dictionary = ProductionManager.get_unit_equipment_stock(str(att_fids[0]))
 		var any := false
 		for k in st.keys():
@@ -1189,6 +1200,7 @@ func build_fight_briefing(battle: Dictionary, player_tag: String = "") -> Dictio
 		"def_tag": str(battle.get("def_tag", "")),
 		"outlook": outlook,
 		"ours": ours,
+		"theirs": theirs,
 		"theirs_n": theirs_n,
 		"theirs_joining": _fid_list(battle, "def_pending_fids", "").size(),
 		"fortified": fortified,
@@ -1208,7 +1220,23 @@ func _roster_row(fid: String, status: String) -> Dictionary:
 		var f: Formation = LeaderManager.get_formation(fid)
 		if f != null and "name" in f:
 			name_s = str(f.name)
-	return {"formation_id": fid, "name": name_s, "status": status}
+	var letter := "I"
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var ff: Formation = LeaderManager.get_formation(fid)
+		if ff != null:
+			var blob := ""
+			if ff.has_meta("visual_archetype"):
+				blob = str(ff.get_meta("visual_archetype"))
+			if "design_id" in ff:
+				blob += " " + str(ff.design_id)
+			if "name" in ff:
+				blob += " " + str(ff.name)
+			var k := blob.to_lower()
+			if "artillery" in k:
+				letter = "G"
+			elif "panzer" in k or "armor" in k or "tank" in k:
+				letter = "A"
+	return {"formation_id": fid, "name": name_s, "status": status, "letter": letter}
 
 
 func _leader_for_fid(fid: String) -> Object:
@@ -1333,12 +1361,25 @@ func withdraw_from_land_battle(formation_id: String) -> Dictionary:
 		if typeof(raw) != TYPE_DICTIONARY:
 			continue
 		var row: Dictionary = raw
-		if str(row.get("att_fid", "")) == fid or str(row.get("def_fid", "")) == fid:
+		var in_att := _fid_list(row, "att_fids", "att_fid").has(fid)
+		var in_def := _fid_list(row, "def_fids", "def_fid").has(fid)
+		if in_att or in_def or str(row.get("att_fid", "")) == fid or str(row.get("def_fid", "")) == fid:
 			idx = i
 			battle = row
 			break
 	if idx < 0:
 		return {"ok": false, "reason": "Formation not in an open land battle"}
+	# Multi-attacker: pull this division only; the fight continues.
+	var att_list: Array = _fid_list(battle, "att_fids", "att_fid")
+	if att_list.has(fid) and att_list.size() > 1:
+		att_list.erase(fid)
+		battle["att_fids"] = att_list
+		battle["att_fid"] = str(att_list[0])
+		_open_land_battles[idx] = battle
+		_set_formation_in_combat(fid, false)
+		_rebuild_land_battle_powers(battle)
+		land_battles_changed.emit()
+		return {"ok": true, "left_stack": true, "to_id": int(battle.get("to_id", -1))}
 	# Defender-favor bounce: attacker leaves, owner stays.
 	if int(battle.get("days_elapsed", 0)) >= 1:
 		_finish_land_battle_hold(battle)
@@ -2017,6 +2058,8 @@ func land_battle_cas_power(battle: Dictionary) -> Dictionary:
 func _land_battle_cas(battle: Dictionary) -> Dictionary:
 	var cas_att := 0.0
 	var cas_def := 0.0
+	if _interactive_light_sim():
+		return {"cas_att": cas_att, "cas_def": cas_def}
 	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
 		return {"cas_att": cas_att, "cas_def": cas_def}
 	var forms: Variant = LeaderManager.formations
@@ -2157,7 +2200,8 @@ func _apply_daily_land_battle_equipment_loss(battle: Dictionary, lean: String) -
 func _store_daily_equip_loss(fid: String, severity: float, country_tag: String) -> void:
 	if fid.is_empty():
 		return
-	if typeof(ProductionManager) != TYPE_NIL and ProductionManager.has_method("ensure_demo_combat_stock"):
+	if not _interactive_light_sim() and typeof(ProductionManager) != TYPE_NIL \
+			and ProductionManager.has_method("ensure_demo_combat_stock"):
 		ProductionManager.ensure_demo_combat_stock(fid, country_tag)
 	var removed: Dictionary = {}
 	var plain := "equip sev=%.2f" % severity
@@ -2291,6 +2335,8 @@ func _land_daily_tick(
 
 
 func _log_unit_combat(formation_id: String, province: int, other_province: int, result: Dictionary, role: String) -> void:
+	if _interactive_light_sim():
+		return
 	if formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
 		return
 	var fm = LeaderManager.get_formation(formation_id) if LeaderManager.has_method("get_formation") else null
@@ -3144,9 +3190,12 @@ func _pick_strongest_division(
 
 
 func _estimate_attack_power(formation_id: String, province: Province, country_tag: String) -> float:
+	var terrain: String = province.terrain if province != null and province.terrain != "" else "plains"
+	if _interactive_light_sim():
+		var f: Formation = _formation_from_id(formation_id, country_tag)
+		return land_combat_power(f, terrain, "attack", null)
 	if _resolver == null:
 		return 0.0
-	var terrain: String = province.terrain if province != null and province.terrain != "" else "plains"
 	var pid := province.id if province != null else -1
 	# Demo: use effective child terrain if sample subdiv applied
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_effective_terrain_for_demo"):

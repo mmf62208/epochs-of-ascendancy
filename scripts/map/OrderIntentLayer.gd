@@ -59,6 +59,9 @@ func pick_attack_at(world: Vector2, hit_r: float = HIT_R) -> Dictionary:
 			continue
 		if bool(raw.get("occupy", false)) or bool(raw.get("retreat", false)):
 			continue
+		# Dim arrows belong to another stack member — do not steal that unit's hex click.
+		if bool(raw.get("dim", false)):
+			continue
 		var d := _dist_to_segment(world, a, b)
 		if d <= best_d:
 			best_d = d
@@ -91,15 +94,20 @@ func _draw() -> void:
 		var b: Vector2 = raw.get("to", Vector2.ZERO)
 		if a == Vector2.ZERO or b == Vector2.ZERO or a.distance_squared_to(b) < 4.0:
 			continue
+		var dim := bool(raw.get("dim", false))
+		var a_mul := 0.12 if dim else 1.0
+		var w_mul := 0.40 if dim else 1.0
 		if bool(raw.get("retreat", false)):
-			var rc := Color(RETREAT_COL.r, RETREAT_COL.g, RETREAT_COL.b, RETREAT_COL.a * pulse)
-			draw_line(a, b, RETREAT_GLOW, RETREAT_WIDTH + 5.0, true)
-			draw_line(a, b, rc, RETREAT_WIDTH, true)
+			var rc := Color(RETREAT_COL.r, RETREAT_COL.g, RETREAT_COL.b, RETREAT_COL.a * pulse * a_mul)
+			draw_line(a, b, RETREAT_GLOW, (RETREAT_WIDTH + 5.0) * w_mul, true)
+			draw_line(a, b, rc, RETREAT_WIDTH * w_mul, true)
 			_draw_head(a, b, rc)
 			continue
-		var col := Color(ATTACK_COL.r, ATTACK_COL.g, ATTACK_COL.b, ATTACK_COL.a * pulse)
-		draw_line(a, b, ATTACK_GLOW, ATTACK_WIDTH + 6.0, true)
-		draw_line(a, b, col, ATTACK_WIDTH, true)
+		var col := Color(ATTACK_COL.r, ATTACK_COL.g, ATTACK_COL.b, ATTACK_COL.a * pulse * a_mul)
+		if bool(raw.get("planned", false)):
+			col = Color(0.95, 0.55, 0.18, 0.72 * pulse * a_mul)
+		draw_line(a, b, ATTACK_GLOW, (ATTACK_WIDTH + 6.0) * w_mul, true)
+		draw_line(a, b, col, ATTACK_WIDTH * w_mul, true)
 		_draw_head(a, b, col)
 
 

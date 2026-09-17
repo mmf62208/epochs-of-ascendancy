@@ -297,6 +297,100 @@ static func enqueue_own_land_march(
 	}
 
 
+static func _adjacent_land(from_id: int, dest_id: int) -> bool:
+	if from_id <= 0 or dest_id <= 0 or from_id == dest_id:
+		return false
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_adjacent_provinces"):
+		return false
+	for nv in MapManager.get_adjacent_provinces(from_id, true):
+		if int(nv) == dest_id:
+			return true
+	return false
+
+
+## Shift-click: one adjacent own-land hop from the last waypoint. No BFS (hang-class).
+static func append_own_land_march(
+	formation_id: String,
+	dest_id: int,
+	country_tag: String,
+) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	if fid.is_empty() or tag.is_empty() or dest_id <= 0:
+		return {"ok": false, "reason": "bad args"}
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return {"ok": false, "reason": "no formation"}
+	var f: Formation = LeaderManager.get_formation(fid)
+	if f == null:
+		return {"ok": false, "reason": "unknown unit"}
+	if str(f.country_tag).strip_edges().to_upper() != tag:
+		return {"ok": false, "reason": "not your unit"}
+	var station := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+	var cur: Dictionary = get_march(fid)
+	if bool(cur.get("occupy", false)) or bool(cur.get("retreat", false)):
+		cur = {}
+	var from_id := int(cur.get("dest_id", -1)) if not cur.is_empty() else station
+	if from_id <= 0:
+		from_id = station
+	if from_id == dest_id:
+		return {"ok": true, "reason": "", "already_here": true, "path": cur.get("path", []), "hops": 0, "formation_id": fid, "dest_id": dest_id}
+	if typeof(MapManager) == TYPE_NIL:
+		return {"ok": false, "reason": "no map"}
+	var dest: Province = MapManager.get_province(dest_id)
+	if dest == null:
+		return {"ok": false, "reason": "no dest"}
+	if not march_legal(_ctrl_tag(dest), tag, not bool(dest.is_sea)):
+		return {"ok": false, "reason": "not your land"}
+	if not _adjacent_land(from_id, dest_id):
+		return {"ok": false, "reason": "adjacent hex only"}
+	var path: Array = []
+	if not cur.is_empty() and (cur.get("path", []) as Array).size() >= 2:
+		path = cur.get("path", []) as Array
+		path.append(dest_id)
+	else:
+		path = [from_id, dest_id]
+	var prof: Dictionary = template_profile(f)
+	var first_cost := _hop_cost_into(int(path[1]) if path.size() > 1 else dest_id, prof)
+	var hop_i := int(cur.get("hop_index", 1)) if not cur.is_empty() else 1
+	var order := {
+		"formation_id": fid,
+		"country_tag": tag,
+		"path": path,
+		"hop_index": hop_i,
+		"progress": float(cur.get("progress", 0.0)) if not cur.is_empty() else 0.0,
+		"hop_cost": float(cur.get("hop_cost", first_cost)) if not cur.is_empty() else first_cost,
+		"dest_id": dest_id,
+		"from_id": int(cur.get("from_id", from_id)) if not cur.is_empty() else from_id,
+		"order_type": ORDER_OWN_LAND_MARCH,
+	}
+	if int(cur.get("planned_attack_to_id", -1)) > 0:
+		order["planned_attack_to_id"] = int(cur.get("planned_attack_to_id", -1))
+	_orders[fid] = order
+	var eta := remaining_eta_days(order)
+	return {
+		"ok": true,
+		"reason": "",
+		"path": path,
+		"hops": 1,
+		"eta_days": eta,
+		"calendar_days": calendar_days(eta),
+		"from_id": from_id,
+		"dest_id": dest_id,
+		"formation_id": fid,
+		"appended": not cur.is_empty(),
+	}
+
+
+static func set_planned_attack(formation_id: String, to_id: int) -> bool:
+	var fid := formation_id.strip_edges()
+	if fid.is_empty() or to_id <= 0 or not _orders.has(fid):
+		return false
+	var order: Dictionary = _orders[fid] as Dictionary
+	order["planned_attack_to_id"] = to_id
+	_orders[fid] = order
+	return true
+
+
 ## One hop onto an adjacent empty enemy hex. Red arrow, travel time, no fight box.
 static func enqueue_occupy_adjacent(
 	formation_id: String,
@@ -708,6 +802,10 @@ static func _commit_ready_hops(order: Dictionary) -> Array:
 		if f2 != null:
 			LandCombatPower.apply_fuel_burn(f2, "march")
 		if arrived:
+			var plan_to := int(order.get("planned_attack_to_id", -1))
+			if plan_to > 0 and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("start_land_battle"):
+				var assault: Dictionary = BattleManager.start_land_battle(tag, plan_to, to_pid, fid)
+				hop_row["planned_attack"] = assault
 			order["arrived"] = true
 			order["hop_index"] = path.size()
 			break

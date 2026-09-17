@@ -4,8 +4,8 @@ extends PanelContainer
 ## Floating multiline province tooltip for map hover (BBCode for retrowave accents).
 
 # Compact hover card (~½ prior size) — short province glance, not full inspector.
-@export var max_width: float = 220.0
-@export var max_height: float = 220.0
+@export var max_width: float = 180.0
+@export var max_height: float = 64.0
 @export var font_size: int = 12
 
 var _rich: RichTextLabel

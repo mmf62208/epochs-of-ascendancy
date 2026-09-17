@@ -483,7 +483,7 @@ def build_first_session_hotkeys_product(
             and "710739" in open_fn
             and "ensure_playable_front_chips" not in open_fn
             and "func _try_open_land_unit_at_world" in ren
-            and "_open_fight_from_formation_id" in _slice_func(ren, "_try_open_land_unit_at_world")
+            and "_open_fight_from_formation_id" not in _slice_func(ren, "_try_open_land_unit_at_world")
             and "_open_fight_from_formation_id" in _slice_func(ren, "_try_execute_province_attack")
             and "start_land_battle" in _slice_func(ren, "_try_execute_province_attack")
             and "Division fold" in (ROOT / "scripts" / "ui" / "ProvinceOOBStrip.gd").read_text(encoding="utf-8")

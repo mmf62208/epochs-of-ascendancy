@@ -13,6 +13,10 @@ func get_effective_combat_power(
 	province_dev: int = -1,
 	province_infra: int = -1,
 ) -> Dictionary:
+	# F5: missed call sites used to leak 7–25GB. Refuse here, not only at MapRenderer.
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") \
+			and bool(TimeManager.is_interactive_light_sim()):
+		return {"soft_attack": 40.0, "hard_attack": 8.0, "defense": 28.0, "breakthrough": 16.0, "light_stub": true}
 	# Prefer explicit unit_id; BattleManager often passes formation_id as division_template_id.
 	var resolve_unit := unit_id if not unit_id.is_empty() else army_id
 	if resolve_unit.is_empty():

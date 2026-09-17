@@ -355,6 +355,9 @@ static func composition_stats(
 
 
 static func composition_from_formation(formation: Object) -> Dictionary:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") \
+			and bool(TimeManager.is_interactive_light_sim()):
+		return {"has_composition": false, "soft": 1.0, "hard": 0.0, "kind": "infantry", "light_stub": true}
 	var mob := "foot"
 	var arm := ""
 	var sup := ""

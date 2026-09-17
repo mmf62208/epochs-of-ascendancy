@@ -14,6 +14,7 @@ var _current_map_mode: String = "political"
 var _hover_region_id: int = -1
 var _viewport_rect: Rect2 = Rect2()
 var _viewport_culling_active: bool = false
+var _camera_zoom: float = 1.0
 
 
 func _ready() -> void:
@@ -61,9 +62,13 @@ func set_hovered_region(region_id: int, tier: int = -1) -> void:
 	_apply_region_label_visibility()
 
 
-func sync_viewport(world_rect: Rect2, active: bool) -> void:
+func sync_viewport(world_rect: Rect2, active: bool, zoom: float = -1.0) -> void:
 	_viewport_rect = world_rect
 	_viewport_culling_active = active
+	if zoom > 0.0:
+		_camera_zoom = zoom
+	elif get_viewport() != null:
+		_camera_zoom = MapZoomLODScript.read_camera_zoom(get_viewport())
 	if not _built:
 		return
 	_apply_tier_visibility(_current_tier)
@@ -398,10 +403,19 @@ func _build_nation_labels(province_centroids: Dictionary, provinces: Dictionary)
 			font_px = 14
 		var lbl := _make_label(str(e["name"]), center, font_px, e["color"] as Color)
 		lbl.name = "NationLabel_%s" % tag
+		lbl.set_meta("province_n", n)
+		lbl.set_meta("nation_tag", tag)
+		lbl.set_meta("base_font_px", font_px)
+		var cap_id := _resolve_capital_province_id(tag, provinces)
+		if cap_id >= 0 and province_centroids.has(cap_id):
+			lbl.set_meta("capital_anchor", province_centroids[cap_id] as Vector2)
+		else:
+			lbl.set_meta("capital_anchor", center)
 		add_child(lbl)
 		_fit_and_center_label(lbl)
 		_nation_labels[tag] = lbl
 		nation_label_nodes.append(lbl)
+	_nudge_microstate_nation_labels()
 	_resolve_label_collisions(nation_label_nodes, 120.0)
 
 
@@ -628,10 +642,51 @@ func _geo_grid_pick_state_rows(rows: Array, budget: int, cols: int = 6, row_n: i
 	return out
 
 
+## Tiny countries whose landmass center sits under a larger neighbor's name.
+func _nudge_microstate_nation_labels() -> void:
+	# Liechtenstein is east of the Swiss plateau; "Switzerland" is a long word that
+	# covers LIE at Europe zoom (play 2026-09-11).
+	# Keep LIE on Liechtenstein — only walk east until the AABB clears Switzerland.
+	_nudge_tag_clear_of("LIE", ["SWI", "CHE"], Vector2(18, 6))
+	_nudge_tag_clear_of("LUX", ["BEL", "GER", "FRA"], Vector2(12, 16))
+	_nudge_tag_clear_of("AND", ["FRA", "SPA"], Vector2(10, 16))
+	_nudge_tag_clear_of("SMR", ["ITA"], Vector2(14, 10))
+	_nudge_tag_clear_of("MCO", ["FRA"], Vector2(14, 10))
+
+
+func _nudge_tag_clear_of(tag: String, neighbors: Array, step: Vector2) -> void:
+	if not _nation_labels.has(tag):
+		return
+	var lbl: Label = _nation_labels[tag] as Label
+	if lbl == null or not is_instance_valid(lbl):
+		return
+	var own: Vector2 = lbl.position + lbl.size * 0.5
+	if lbl.has_meta("label_anchor"):
+		own = lbl.get_meta("label_anchor") as Vector2
+	for nt_v in neighbors:
+		var nt := str(nt_v)
+		if not _nation_labels.has(nt):
+			continue
+		var other: Label = _nation_labels[nt] as Label
+		if other == null or not is_instance_valid(other):
+			continue
+		for _k in 8:
+			var ra := Rect2(lbl.position, lbl.size)
+			var rb := Rect2(other.position, other.size).grow(4.0)
+			if not ra.intersects(rb):
+				break
+			own += step
+			lbl.set_meta("label_anchor", own)
+			_fit_and_center_label(lbl)
+		return
+
+
 func _resolve_label_collisions(labels: Array, min_sep: float) -> void:
 	if labels.size() < 2:
 		return
-	for _pass in 3:
+	var pad := maxf(min_sep * 0.12, 10.0)
+	for _pass in 8:
+		var moved := false
 		for i in range(labels.size()):
 			var la: Label = labels[i] as Label
 			if la == null:
@@ -644,15 +699,25 @@ func _resolve_label_collisions(labels: Array, min_sep: float) -> void:
 					continue
 				if lb.has_meta("force_visible") and bool(lb.get_meta("force_visible")):
 					continue
-				var delta := la.position - lb.position
-				var dist := delta.length()
-				if dist >= min_sep:
+				var ra := Rect2(la.position, la.size).grow(pad)
+				var rb := Rect2(lb.position, lb.size).grow(pad)
+				if not ra.intersects(rb):
 					continue
-				var push := Vector2(min_sep, 0.0)
-				if dist > 0.01:
-					push = delta.normalized() * ((min_sep - dist) * 0.5)
-				la.position += push
-				lb.position -= push
+				var na := int(la.get_meta("province_n", 1))
+				var nb := int(lb.get_meta("province_n", 1))
+				var mover: Label = la if na <= nb else lb
+				var stay: Label = lb if na <= nb else la
+				var stay_c := stay.position + stay.size * 0.5
+				var mov_c := mover.position + mover.size * 0.5
+				var dir := mov_c - stay_c
+				if dir.length_squared() < 0.01:
+					dir = Vector2(1.0, 0.35)
+				dir = dir.normalized()
+				mover.position += dir * 18.0
+				mover.set_meta("label_anchor", mover.position + mover.size * 0.5)
+				moved = true
+		if not moved:
+			break
 
 
 func _make_label(text: String, pos: Vector2, font_px: int, col: Color) -> Label:
@@ -666,8 +731,8 @@ func _make_label(text: String, pos: Vector2, font_px: int, col: Color) -> Label:
 	readable = readable.lerp(Color(col.r, col.g, col.b, 1.0), 0.18)
 	lbl.add_theme_font_size_override("font_size", maxi(font_px, 14))
 	lbl.add_theme_color_override("font_color", readable)
-	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 0.95))
-	lbl.add_theme_constant_override("outline_size", 3)
+	lbl.add_theme_color_override("font_outline_color", Color(0.02, 0.03, 0.06, 0.72))
+	lbl.add_theme_constant_override("outline_size", 2)
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.z_index = 12
@@ -705,6 +770,34 @@ func force_nation_label_at(tag: String, world_pos: Vector2, display_name: String
 	_fit_and_center_label(lbl)
 
 
+func _apply_nation_label_zoom(l: Label) -> void:
+	var base := int(l.get_meta("base_font_px", 20))
+	var px := MapZoomLODScript.nation_label_screen_px(_camera_zoom, base)
+	var last := int(l.get_meta("last_font_px", 0))
+	if absi(last - px) >= 1:
+		l.add_theme_font_size_override("font_size", px)
+		l.set_meta("last_font_px", px)
+		var c := l.get_theme_color("font_color")
+		c.a = MapZoomLODScript.label_alpha_for_tier(_current_tier, "nation")
+		l.add_theme_color_override("font_color", c)
+		l.reset_size()
+		var ms := l.get_minimum_size()
+		l.custom_minimum_size = Vector2(ms.x + 16.0, ms.y + 10.0)
+		l.reset_size()
+	var home := l.position + l.size * 0.5
+	if l.has_meta("label_anchor"):
+		home = l.get_meta("label_anchor") as Vector2
+	var cap := home
+	if l.has_meta("capital_anchor"):
+		cap = l.get_meta("capital_anchor") as Vector2
+	var t := MapZoomLODScript.nation_label_zoom_t(_camera_zoom)
+	var pos := home.lerp(cap, t * 0.85)
+	l.position = pos - l.size * 0.5
+	var s := 1.0 / maxf(_camera_zoom, 0.2)
+	l.pivot_offset = l.size * 0.5
+	l.scale = Vector2(s, s)
+
+
 func _fit_and_center_label(lbl: Label) -> void:
 	lbl.reset_size()
 	var ms := lbl.get_minimum_size()
@@ -722,15 +815,19 @@ func _apply_tier_visibility(tier: int) -> void:
 	# Hide nation labels when states mapmode is active so state names own the surface.
 	if _current_map_mode == "states":
 		show_n = false
-	var nation_px: int = MapZoomLODScript.nation_label_font_px(tier)
 	var region_px: int = MapZoomLODScript.region_label_font_px(tier)
 	for lbl in _nation_labels.values():
 		if lbl is Label:
 			var l := lbl as Label
 			var force := l.has_meta("force_visible") and bool(l.get_meta("force_visible"))
-			var anchor: Vector2 = l.position
+			var home: Vector2 = l.position
 			if l.has_meta("label_anchor"):
-				anchor = l.get_meta("label_anchor") as Vector2
+				home = l.get_meta("label_anchor") as Vector2
+			var cap: Vector2 = home
+			if l.has_meta("capital_anchor"):
+				cap = l.get_meta("capital_anchor") as Vector2
+			var zt := MapZoomLODScript.nation_label_zoom_t(_camera_zoom)
+			var anchor := home.lerp(cap, zt * 0.85)
 			var in_view := (
 				force
 				or not _viewport_culling_active
@@ -739,12 +836,8 @@ func _apply_tier_visibility(tier: int) -> void:
 				or _viewport_rect.has_point(l.position)
 			)
 			l.visible = (show_n or force) and in_view
-			if show_n:
-				l.add_theme_font_size_override("font_size", nation_px)
-				var c := l.get_theme_color("font_color")
-				c.a = MapZoomLODScript.label_alpha_for_tier(tier, "nation")
-				l.add_theme_color_override("font_color", c)
-				_fit_and_center_label(l)
+			if l.visible:
+				_apply_nation_label_zoom(l)
 	for rid_var in _region_labels.keys():
 		var lbl_r: Variant = _region_labels[rid_var]
 		if lbl_r is Label:
