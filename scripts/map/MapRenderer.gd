@@ -15451,21 +15451,22 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 		return node
 	node.set_meta("outline_ring", ring)
 
+	var parts: Array = ProvincePolygonUtil.convex_parts(ring)
+	if parts.is_empty():
+		parts = [ring]
 	var poly := Polygon2D.new()
 	poly.name = "Fill"
-	var assigned: PackedVector2Array = ProvincePolygonUtil.assign_polygon2d(poly, ring)
+	poly.polygon = parts[0]
 	poly.color = _get_province_color(province)
 	poly.antialiased = true
-	var parts: Array = ProvincePolygonUtil.convex_parts(ring)
-	if parts.size() > 1:
-		# Extra convex pieces so a C-shaped NUTS ring (Moselle around LUX) fills without hulling.
-		for i in range(1, parts.size()):
-			var extra := Polygon2D.new()
-			extra.name = "Fill_%d" % i
-			extra.polygon = parts[i]
-			extra.color = poly.color
-			extra.antialiased = true
-			node.add_child(extra)
+	var assigned: PackedVector2Array = parts[0]
+	for i in range(1, parts.size()):
+		var extra := Polygon2D.new()
+		extra.name = "Fill_%d" % i
+		extra.polygon = parts[i]
+		extra.color = poly.color
+		extra.antialiased = true
+		node.add_child(extra)
 
 	# Area2D is now completely optional.
 	# In the recommended production pure-spatial configuration (use_spatial_picking=true AND

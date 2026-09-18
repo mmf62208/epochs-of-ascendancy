@@ -69,20 +69,29 @@ static func make_drawable(points: PackedVector2Array) -> PackedVector2Array:
 	return sanitize(points)
 
 
-## Convex pieces for canvas fill when the NUTS ring will not triangulate. Not a hull of neighbors.
+## Convex pieces for canvas fill. Prefer decompose so Groß-Gerau is not glass shards.
+## Hull only when it barely grows area (won't swallow Luxembourg).
 static func convex_parts(points: PackedVector2Array) -> Array:
 	var clean := sanitize(points)
 	if clean.size() < 3:
 		return []
+	var deco: Array = Geometry2D.decompose_polygon_in_convex(clean)
+	var parts: Array = []
+	for p in deco:
+		var ring: PackedVector2Array = sanitize(p)
+		if ring.size() >= 3 and approx_area(ring) >= MIN_AREA:
+			parts.append(ring)
+	if parts.size() >= 1 and parts.size() <= 32:
+		return parts
 	if is_drawable(clean):
 		return [clean]
-	var parts: Array = Geometry2D.decompose_polygon_in_convex(clean)
-	var out: Array = []
-	for p in parts:
-		var ring: PackedVector2Array = sanitize(p)
-		if ring.size() >= 3:
-			out.append(ring)
-	return out
+	var hull: PackedVector2Array = Geometry2D.convex_hull(clean)
+	hull = sanitize(hull)
+	if hull.size() >= 3 and approx_area(hull) <= approx_area(clean) * 1.35 + 1.0:
+		return [hull]
+	if parts.size() >= 1:
+		return parts
+	return [clean]
 
 
 ## Assign to Polygon2D safely. Prefers the real ring; never hulls over neighbors.
