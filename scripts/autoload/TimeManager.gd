@@ -772,14 +772,14 @@ func last_callee() -> String:
 
 
 func _rss_kb() -> int:
-	# Graphical Godot FileAccess often cannot read /proc; OS.execute sees real VmRSS.
-	# Without this the 2.5 GB tripwire never fires and F5 climbs to 12 GB then freezes.
-	var stdout: Array = []
-	if OS.execute("awk", PackedStringArray(["/VmRSS:/ {print $2}", "/proc/self/status"]), stdout, true) == 0:
-		if stdout.size() > 0:
-			var n := int(str(stdout[0]).strip_edges())
-			if n > 0:
-				return n
+	# /proc/self/statm: pages of RSS. No fork — OS.execute(awk) froze F5 every capture.
+	var statm := FileAccess.get_file_as_string("/proc/self/statm")
+	if not statm.is_empty():
+		var bits := statm.strip_edges().split(" ")
+		if bits.size() >= 2:
+			var pages := int(bits[1])
+			if pages > 0:
+				return pages * 4
 	var f := FileAccess.open("/proc/self/status", FileAccess.READ)
 	if f != null:
 		while not f.eof_reached():

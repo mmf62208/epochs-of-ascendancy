@@ -1810,6 +1810,9 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		"winner": "attacker",
 	}
 	_displace_defender_from_captured_province(row, to_id)
+	if not def_tag.is_empty():
+		_rebase_air_from_captured_province(to_id, def_tag, false)
+	_forward_player_air_on_capture(to_id, tag)
 	# F5: skip news/toast on capture — hop UI already toasts; news stack froze Maginot 1×.
 	if not _interactive_light_sim():
 		_post_battle_news(row, true)
@@ -2841,6 +2844,37 @@ func _rebase_air_from_captured_province(captured_pid: int, def_tag: String, rout
 			var hit := 0.45 if rout else 0.22
 			f.readiness = maxf(0.15, float(f.readiness) * (1.0 - hit))
 		print("[AIR REBASE] %s leaves %d → %d rout=%s rdy hit" % [str(f.formation_id), captured_pid, dest, str(rout)])
+
+
+## Player CAS covering Maginot (region 100) retasks onto the captured hex's air region.
+func _forward_player_air_on_capture(captured_pid: int, att_tag: String) -> void:
+	var tag := att_tag.strip_edges().to_upper()
+	if tag.is_empty() or captured_pid < 0 or typeof(LeaderManager) == TYPE_NIL:
+		return
+	var rid := -1
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
+		rid = int(MapManager.get_province_region_id(captured_pid))
+	if rid <= 0:
+		return
+	if not LeaderManager.has_method("get_formations_for_country"):
+		return
+	for f_any in LeaderManager.get_formations_for_country(tag):
+		var f: Formation = f_any as Formation
+		if f == null:
+			continue
+		var ft := str(f.formation_type) if "formation_type" in f else ""
+		if ft != Formation.TYPE_AIR_WING and ft != Formation.TYPE_AIR_SQUADRON and ft != Formation.TYPE_AIR_GROUP:
+			continue
+		var fid := str(f.formation_id) if "formation_id" in f else ""
+		if fid.is_empty():
+			continue
+		if LeaderManager.has_method("assign_air_wing_to_region"):
+			var assigned: Variant = LeaderManager.assign_air_wing_to_region(fid, rid, "CAS")
+			print("[AIR FORWARD] %s CAS region %d (captured %d) %s" % [fid, rid, captured_pid, str(assigned)])
+		elif "assigned_region_id" in f:
+			f.assigned_region_id = rid
+			print("[AIR FORWARD] %s assigned_region_id=%d" % [fid, rid])
+		break
 
 
 func _province_controlled_by(province_id: int, tag: String) -> bool:

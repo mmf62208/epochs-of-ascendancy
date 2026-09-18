@@ -93,8 +93,7 @@ def _hang_class_checks(
         and "preview_player_route" not in l_key
         and "find_land_path" not in l_key,
         "rss_pause_2_5gb": "_RSS_PAUSE_KB := 2500000" in time_src
-        and 'awk' in time_src
-        and "/proc/self/status" in time_src,
+        and "/proc/self/statm" in time_src,
         "last_callee_api": "func note_last_callee" in time_src
         and "func last_callee" in time_src,
         "start_notes_last_callee": "note_last_callee" in start_bm

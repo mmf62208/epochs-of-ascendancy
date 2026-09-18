@@ -1757,8 +1757,12 @@ func _unhandled_input(event: InputEvent) -> void:
 			terrain_layer_stack.toggle_rivers()
 			get_viewport().set_input_as_handled()
 			return
-		if event.keycode == KEY_H and terrain_layer_stack:
-			terrain_layer_stack.toggle_elevation()
+		if event.keycode == KEY_H:
+			if _selected_formation_is_air():
+				_assign_selected_air_to_hover_hex()
+			else:
+				# Hang-class: elevation on 3520 is not on the H key frame.
+				_show_inspector_toast("H · air: select the wing then H / right-click a hex for CAS", 3.5)
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_V and terrain_layer_stack:
@@ -19734,6 +19738,58 @@ func _try_right_order_at_mouse() -> bool:
 	return bool(res.get("handled", false))
 
 
+func _selected_formation_is_air() -> bool:
+	if selected_formation_id.is_empty() or typeof(LeaderManager) == TYPE_NIL:
+		return false
+	if not LeaderManager.has_method("get_formation"):
+		return false
+	var fo: Object = LeaderManager.get_formation(selected_formation_id)
+	if fo == null:
+		return false
+	var ft := str(fo.formation_type) if "formation_type" in fo else ""
+	return ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_AIR_SQUADRON or ft == Formation.TYPE_AIR_GROUP
+
+
+func _assign_selected_air_to_hover_hex() -> void:
+	if not _selected_formation_is_air():
+		_show_inspector_toast("Select the air wing, then H or right-click a hex for CAS", 3.5)
+		return
+	var pid := -1
+	if _hover_province != null:
+		pid = int(_hover_province.id)
+	if pid <= 0:
+		_show_inspector_toast("Hover a hex, then press H to assign CAS", 3.5)
+		return
+	var fo: Object = LeaderManager.get_formation(selected_formation_id)
+	_assign_air_cas_to_province(fo, pid)
+
+
+func _assign_air_cas_to_province(fo: Object, pid: int) -> bool:
+	if fo == null or pid <= 0:
+		return false
+	var fid := str(fo.formation_id) if "formation_id" in fo else selected_formation_id
+	var rid := -1
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_region_id"):
+		rid = int(MapManager.get_province_region_id(pid))
+	if rid <= 0:
+		_show_inspector_toast("No air region on that hex", 3.0, true)
+		return false
+	var pname := str(pid)
+	if provinces.has(pid):
+		var p: Province = provinces[pid] as Province
+		if p != null:
+			pname = p.name
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("assign_air_wing_to_region"):
+		var assigned: Variant = LeaderManager.assign_air_wing_to_region(fid, rid, "CAS")
+		print("MapRenderer: air CAS %s → region %d (%s) %s" % [fid, rid, pname, str(assigned)])
+	elif "assigned_region_id" in fo:
+		fo.assigned_region_id = rid
+		if "current_air_mission" in fo:
+			fo.current_air_mission = "CAS"
+	_show_inspector_toast("CAS · %s covering %s (region %d)" % [fid, pname, rid], 4.0)
+	return true
+
+
 ## Living click-order: selected chip → own land marches, adjacent enemy ATTACKS.
 ## Extra box only when not at war / no access. Never execute_province_assault on the click.
 func order_selected_unit_at_province(province: Province) -> Dictionary:
@@ -19766,6 +19822,13 @@ func order_selected_unit_at_province(province: Province) -> Dictionary:
 		out["kind"] = "no_unit"
 		return out
 	var from_pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	var ft := str(fo.formation_type) if "formation_type" in fo else ""
+	if ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_AIR_SQUADRON or ft == Formation.TYPE_AIR_GROUP:
+		out["handled"] = true
+		out["ok"] = _assign_air_cas_to_province(fo, int(province.id))
+		out["kind"] = "air_cas"
+		out["from_id"] = from_pid
+		return out
 	# Right-click own hex: cancel march / attack for THIS division only.
 	if from_pid == int(province.id):
 		var prompted := _prompt_cancel_selected_orders()
