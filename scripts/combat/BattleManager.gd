@@ -700,6 +700,21 @@ func resolve_occupy_arrival(
 		var fight: Dictionary = start_land_battle(tag, dest, fr, fid)
 		print("BattleManager: occupy meeting engagement %s %d→%d" % [fid, fr, dest])
 		return {"ok": true, "fought": true, "captured": false, "result": fight}
+	if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+		var fo: Formation = LeaderManager.get_formation(fid)
+		if fo != null:
+			fo.stationed_province_id = dest
+			if "is_in_combat" in fo:
+				fo.is_in_combat = false
+	var ctrl := ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var live: Province = MapManager.get_province(dest)
+		if live != null:
+			ctrl = _province_controller_tag(live)
+	# Already ours: later stacks just walk in. Recapture was displacing GER occupiers home.
+	if ctrl == tag:
+		print("BattleManager: occupy already ours %s at %d" % [fid, dest])
+		return {"ok": true, "fought": false, "captured": false, "already": true}
 	_apply_attacker_win_capture_light(tag, dest, from_id if from_id > 0 else dest, fid)
 	print("BattleManager: occupy empty %s took %d" % [fid, dest])
 	return {"ok": true, "fought": false, "captured": true}
@@ -1758,6 +1773,8 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		var live: Province = MapManager.get_province(to_id) if MapManager.has_method("get_province") else null
 		if live != null:
 			def_tag = _province_controller_tag(live)
+		if def_tag == tag:
+			def_tag = ""
 		if MapManager.has_method("update_province_owner"):
 			MapManager.update_province_owner(to_id, tag, tag, false, true)
 	if not att_fid.is_empty() and typeof(LeaderManager) != TYPE_NIL:
@@ -2614,6 +2631,9 @@ func _displace_defender_from_captured_province(result: Dictionary, captured_pid:
 	if captured_pid < 0 or typeof(LeaderManager) == TYPE_NIL:
 		return
 	var def_tag := str(result.get("defender_tag", "")).strip_edges().to_upper()
+	var att_tag := str(result.get("attacker_tag", "")).strip_edges().to_upper()
+	if def_tag.is_empty() or (not att_tag.is_empty() and def_tag == att_tag):
+		return
 	var def_fid := str(result.get("defender_formation_id", "")).strip_edges()
 	var retreat_pid := _pick_defender_retreat_province(captured_pid, def_tag)
 	result["retreat_province_id"] = retreat_pid

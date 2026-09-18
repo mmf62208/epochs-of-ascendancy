@@ -471,6 +471,7 @@ func _flush_sim_events() -> void:
 		_maybe_run_ai_infra_invest()
 		_maybe_run_ai_land_battle_starts()
 	elif kind == "day_battles":
+		_maybe_trip_rss_budget()
 		_tick_own_land_marches()
 		n_res = _tick_open_land_battles()
 		if n_res > 0 and is_interactive_light_sim():

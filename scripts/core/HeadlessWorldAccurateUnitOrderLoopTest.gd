@@ -1757,6 +1757,18 @@ func _test_occupy_after_win() -> void:
 		_fail("occupy-after-win hex not GER after walk-in got %s" % owner_end)
 		return
 	_pass("occupy-after-win hex GER after walk-in")
+	if int(ger_f.stationed_province_id) != FRA_FRONT:
+		_fail("occupy-after-win GER displaced off taken hex got %d" % int(ger_f.stationed_province_id))
+		return
+	_pass("occupy-after-win GER stayed on %d" % FRA_FRONT)
+	# Second stack walking in must not treat GER as the defender and bounce them home.
+	if _bm.has_method("resolve_occupy_arrival"):
+		var again: Dictionary = _bm.call("resolve_occupy_arrival", fid, FRA_FRONT, ATT_TAG, GER_FRONT)
+		print("  [INFO] second occupy arrival %s" % str(again))
+	if int(ger_f.stationed_province_id) != FRA_FRONT:
+		_fail("second occupy arrival displaced GER occupier to %d" % int(ger_f.stationed_province_id))
+		return
+	_pass("second occupy arrival left GER on %d" % FRA_FRONT)
 
 
 func _test_chi_jap_theater() -> void:
