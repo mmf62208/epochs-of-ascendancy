@@ -85,6 +85,7 @@ func _run() -> void:
 		return
 	if not _setup_map_renderer_pins():
 		return
+	_test_last_callee()
 	_test_front_chips()
 	_test_eng_channel_fleet()
 	_test_ger_maginot_air_wing()
@@ -302,6 +303,48 @@ func _chip_on(pid: int) -> Node:
 	if n == null:
 		return null
 	return n.get_node_or_null("DemoUnitIcon_%d" % pid)
+
+
+func _source_fn(path: String, fn_name: String) -> String:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return ""
+	var text := f.get_as_text()
+	var marker := "func %s" % fn_name
+	var i := text.find(marker)
+	if i < 0:
+		return ""
+	var j := text.find("\nfunc ", i + 1)
+	if j < 0:
+		j = text.length()
+	return text.substr(i, j - i)
+
+
+func _test_last_callee() -> void:
+	var tm: Node = _autoload("TimeManager")
+	if tm == null or not tm.has_method("note_last_callee") or not tm.has_method("last_callee"):
+		_fail("TimeManager.note_last_callee / last_callee missing")
+		return
+	tm.call("note_last_callee", "start_land_battle")
+	if str(tm.call("last_callee")) != "start_land_battle":
+		_fail("last_callee() != start_land_battle (got %s)" % str(tm.call("last_callee")))
+		return
+	_pass("last_callee getter")
+	var ger_f: Object = _ger_on_front()
+	if ger_f != null and _mr != null and _mr.has_method("_select_map_unit"):
+		_mr.call("_select_map_unit", ger_f)
+		if str(tm.call("last_callee")) != "pick":
+			_fail("pick did not note last_callee (got %s)" % str(tm.call("last_callee")))
+			return
+		_pass("pick notes last_callee")
+	var assault_fn := _source_fn("res://scripts/map/MapRenderer.gd", "_try_execute_province_attack")
+	if assault_fn.is_empty():
+		_fail("_try_execute_province_attack missing")
+		return
+	if assault_fn.contains("BattleManager.execute_province_assault") or assault_fn.contains("execute_province_assault("):
+		_fail("living-assault else still execute_province_assault")
+		return
+	_pass("living-assault click path no execute fallback")
 
 
 func _test_front_chips() -> void:
@@ -1566,6 +1609,10 @@ func _test_march_and_assault() -> void:
 		return
 	var opened: Dictionary = _bm.call("start_land_battle", ATT_TAG, FRA_FRONT, GER_FRONT, fid)
 	print("  [INFO] start_land_battle %s" % str(opened))
+	var tm_cal: Node = _autoload("TimeManager")
+	if tm_cal == null or not tm_cal.has_method("last_callee") or str(tm_cal.call("last_callee")) != "start_land_battle":
+		_fail("start_land_battle begin did not note last_callee")
+		return
 	if not bool(opened.get("success", false)):
 		_fail("start_land_battle not ok: %s" % str(opened.get("reason", opened)))
 		return

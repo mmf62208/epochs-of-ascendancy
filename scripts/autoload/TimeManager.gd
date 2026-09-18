@@ -83,6 +83,20 @@ var _draining_f5_flush: bool = false
 ## Soft budget (ms) for deferred sim work per frame — keeps pan/hover live past month ends.
 const INTERACTIVE_SIM_FLUSH_BUDGET_MS := 10
 
+## Last F5 callee name for RSS tripwire breadcrumb (not saved).
+var _last_callee: String = ""
+var _rss_trip_fired: bool = false
+const _RSS_PAUSE_KB := 2500000
+
+
+func note_last_callee(s: String) -> void:
+	_last_callee = s.strip_edges()
+
+
+func last_callee() -> String:
+	return _last_callee
+
+
 func _ready() -> void:
 	print("TimeManager: Initialized (default 1936-01-01)")
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -90,6 +104,8 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	if is_interactive_light_sim() and Engine.get_process_frames() % 45 == 0:
+		_maybe_trip_rss_budget()
 	# Safety net: if deferred flush stalled (e.g. pause race), keep draining the queue.
 	if not paused and not _pending_sim_events.is_empty() and not _sim_flush_scheduled:
 		_schedule_sim_flush()
@@ -444,6 +460,9 @@ func _flush_sim_events() -> void:
 		print("TimeManager: flushing month boundary %04d-%02d (interactive, isolated frame)" % [y, m])
 		_emit_month_year_boundary(y, m, bool(ev.get("crossed_year", false)))
 
+	if is_interactive_light_sim() and (kind == "day_battles" or kind == "day"):
+		_maybe_trip_rss_budget()
+
 	if not _pending_sim_events.is_empty() and not _draining_f5_flush:
 		if n_res > 0 and is_interactive_light_sim():
 			# Extra idle frame so F5 capture never shares a frame with the next day.
@@ -656,6 +675,30 @@ func is_interactive_light_sim() -> bool:
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return false
 	return true
+
+
+func _rss_kb() -> int:
+	var f := FileAccess.open("/proc/self/status", FileAccess.READ)
+	if f != null:
+		while not f.eof_reached():
+			var line := f.get_line()
+			if line.begins_with("VmRSS:"):
+				var rest := line.get_slice(":", 1).strip_edges()
+				var n := int(rest.get_slice(" ", 0))
+				if n > 0:
+					return n
+	return int(OS.get_static_memory_usage() / 1024)
+
+
+func _maybe_trip_rss_budget() -> void:
+	if _rss_trip_fired or not is_interactive_light_sim():
+		return
+	var kb := _rss_kb()
+	if kb < _RSS_PAUSE_KB:
+		return
+	_rss_trip_fired = true
+	set_paused(true)
+	print("TimeManager: RSS tripwire %d KB — paused 1× last=%s" % [kb, _last_callee])
 
 
 ## Called by real-time timers (e.g. TopInfoBar) to advance simulation based on wall time.

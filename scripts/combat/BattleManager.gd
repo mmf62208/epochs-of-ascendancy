@@ -479,6 +479,8 @@ func start_land_battle(
 	from_province_id = -1,
 	attacker_formation_id = "",
 ) -> Dictionary:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("note_last_callee"):
+		TimeManager.note_last_callee("start_land_battle")
 	var preview: Dictionary = can_assault_province(
 		str(attacker_tag), int(target_province_id), int(from_province_id)
 	)
