@@ -96,6 +96,7 @@ func _run() -> void:
 	_test_peace_occupation()
 	_test_march_and_assault()
 	_test_joining()
+	_test_occupy_after_win()
 	_test_chi_jap_theater()
 	_test_ai_take_land()
 	_test_nation_era_next()
@@ -1797,6 +1798,90 @@ func _test_joining() -> void:
 	ger2.stationed_province_id = GER_REAR
 	if "is_in_combat" in ger2:
 		ger2.is_in_combat = false
+
+
+func _test_occupy_after_win() -> void:
+	var fra_p = _mm.call("get_province", FRA_FRONT) if _mm.has_method("get_province") else null
+	if fra_p == null:
+		_fail("occupy-after-win missing FRA province")
+		return
+	fra_p.set("owner_tag", DEF_TAG)
+	fra_p.set("controller_tag", DEF_TAG)
+	var ger_f: Object = _lm.call("get_formation", GER_FID) if _lm.has_method("get_formation") else null
+	if ger_f == null:
+		ger_f = _ger_on_front()
+	if ger_f == null:
+		_fail("occupy-after-win no GER on front")
+		return
+	ger_f.stationed_province_id = GER_FRONT
+	if "is_in_combat" in ger_f:
+		ger_f.is_in_combat = false
+	var fid := str(ger_f.formation_id)
+	var rear_f: Object = _lm.call("get_formation", GER_FID_2) if _lm.has_method("get_formation") else null
+	if rear_f == null:
+		_fail("occupy-after-win missing GER_FID_2")
+		return
+	# Rear stack is adjacent to Alsace 710739; occupy-after-win must not teleport it.
+	rear_f.stationed_province_id = GER_REAR
+	if "is_in_combat" in rear_f:
+		rear_f.is_in_combat = false
+	if _lm.has_method("declare_war"):
+		_lm.call("declare_war", ATT_TAG, DEF_TAG)
+	var battle: Dictionary = {}
+	if _bm.has_method("get_land_battle_at"):
+		battle = _bm.call("get_land_battle_at", FRA_FRONT) as Dictionary
+	if battle.is_empty():
+		var opened: Dictionary = _bm.call("start_land_battle", ATT_TAG, FRA_FRONT, GER_FRONT, fid)
+		print("  [INFO] occupy-after-win start %s" % str(opened))
+		if bool(opened.get("occupy_move", false)):
+			_pass("occupy-after-win empty hex is occupy_move (no fight box)")
+			_assert_ger_fid_2_on_rastatt()
+			return
+		if bool(opened.get("opened", false)) or bool(opened.get("success", false)):
+			if opened.get("battle") is Dictionary:
+				battle = opened["battle"] as Dictionary
+		elif _bm.has_method("get_land_battle_at"):
+			battle = _bm.call("get_land_battle_at", FRA_FRONT) as Dictionary
+	else:
+		print("  [INFO] occupy-after-win reuse open Maginot %s" % str(battle.get("id", "")))
+	if battle.is_empty():
+		_fail("occupy-after-win want opened Maginot battle")
+		return
+	fid = str(battle.get("att_fid", fid))
+	if fid.is_empty() or fid == GER_FID_2:
+		fid = GER_FID
+	# Headless attacker-win would execute_province_assault + BFS-retreat (hang-class).
+	# Maginot capture is _apply_attacker_win_capture_light(att_fid) — single fighting fid.
+	if _bm.has_method("_begin_occupy_after_victory"):
+		_bm.call("_begin_occupy_after_victory", battle)
+	elif _bm.has_method("_apply_attacker_win_capture_light"):
+		_bm.call("_apply_attacker_win_capture_light", ATT_TAG, FRA_FRONT, GER_FRONT, fid)
+	else:
+		_fail("_apply_attacker_win_capture_light missing")
+		return
+	var mv_scr: Script = load("res://scripts/formations/FormationMovement.gd") as Script
+	var occ_n := 0
+	if mv_scr != null and mv_scr.has_method("list_occupy_orders"):
+		occ_n = (mv_scr.call("list_occupy_orders") as Array).size()
+	print("  [INFO] occupy orders n=%d fighting=%s" % [occ_n, fid])
+	if occ_n == 0 and mv_scr != null and mv_scr.has_method("enqueue_occupy_adjacent"):
+		var enq: Dictionary = mv_scr.call("enqueue_occupy_adjacent", fid, FRA_FRONT, ATT_TAG)
+		print("  [INFO] occupy enqueue fallback %s" % str(enq))
+	if mv_scr != null and mv_scr.has_method("tick_all_marches"):
+		mv_scr.call("tick_all_marches", 1.0)
+		mv_scr.call("tick_all_marches", 1.0)
+	_assert_ger_fid_2_on_rastatt()
+
+
+func _assert_ger_fid_2_on_rastatt() -> void:
+	var rear_f: Object = _lm.call("get_formation", GER_FID_2) if _lm.has_method("get_formation") else null
+	var rear_pid := -1
+	if rear_f != null and "stationed_province_id" in rear_f:
+		rear_pid = int(rear_f.stationed_province_id)
+	if rear_pid != GER_REAR:
+		_fail("occupy-after-win GER_FID_2 teleported want %d got %s" % [GER_REAR, str(rear_pid)])
+		return
+	_pass("occupy-after-win GER_FID_2 stays on Rastatt %d" % GER_REAR)
 
 
 func _test_chi_jap_theater() -> void:
