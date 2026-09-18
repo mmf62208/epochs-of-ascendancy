@@ -78,6 +78,8 @@ Watch progress in `/workflows`. Agents run `tools/eoa_full_test_gates.sh`; allow
 
 ### 5. Play the game (graphical)
 
+**Play tree (2026-09-18):** `execute-plan/856bb385-pr-3-factory-toe-on-the-default-play-strip` — not stale `main`. Next sitting paste: [`SESSION_NOTES/GROK_PASTE_2026-09-18.md`](SESSION_NOTES/GROK_PASTE_2026-09-18.md). Closeout queue: [`SESSION_NOTES/2026-09-18_playtest_closeout_plan.md`](SESSION_NOTES/2026-09-18_playtest_closeout_plan.md). Slash **`/eoa-check-work`** / **`/eoa-godot`** after Maginot/UI/hang work.
+
 ```bash
 tools/run_godot.sh --path . res://scenes/TestScenario.tscn
 ```
