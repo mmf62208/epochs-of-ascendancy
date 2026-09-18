@@ -231,6 +231,13 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         passes.append("hover_canvas_not_camera_node")
     else:
         fails.append("hover_canvas_not_camera_node")
+    off = _gd_func_slice(ren, "_unit_chip_offset_for_pid")
+    spread = bool(off) and "2654435761" in off and "absi(pid" in off
+    wiring["chip_pid_hash_spread"] = spread
+    if spread:
+        passes.append("chip_pid_hash_spread")
+    else:
+        fails.append("chip_pid_hash_spread")
 
     badge_fn = _gd_func_slice(ren, "_make_formation_stack_badge")
     plates_fn = _gd_func_slice(ren, "_make_stack_offset_plates")

@@ -87,10 +87,11 @@ func _ready() -> void:
 	print("TimeManager: Initialized (default 1936-01-01)")
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process(true)
+	print("TimeManager: RSS sampler %d KB (pause at %d)" % [_rss_kb(), _RSS_PAUSE_KB])
 
 
 func _process(_delta: float) -> void:
-	if is_interactive_light_sim() and Engine.get_process_frames() % 45 == 0:
+	if Engine.get_process_frames() % 15 == 0:
 		_maybe_trip_rss_budget()
 	# Safety net: if deferred flush stalled (e.g. pause race), keep draining the queue.
 	if not paused and not _pending_sim_events.is_empty() and not _sim_flush_scheduled:
@@ -772,8 +773,13 @@ func last_callee() -> String:
 
 
 func _rss_kb() -> int:
-	# /proc/self/statm: pages of RSS. No fork — OS.execute(awk) froze F5 every capture.
-	var statm := FileAccess.get_file_as_string("/proc/self/statm")
+	# Prefer open()+get_as_text: get_file_as_string often misses /proc in graphical Godot.
+	var statm := ""
+	var sf := FileAccess.open("/proc/self/statm", FileAccess.READ)
+	if sf != null:
+		statm = sf.get_as_text()
+	if statm.is_empty():
+		statm = FileAccess.get_file_as_string("/proc/self/statm")
 	if not statm.is_empty():
 		var bits := statm.strip_edges().split(" ")
 		if bits.size() >= 2:
@@ -797,7 +803,9 @@ func _rss_kb() -> int:
 
 
 func _maybe_trip_rss_budget() -> void:
-	if _rss_trip_fired or not is_interactive_light_sim():
+	if _rss_trip_fired:
+		return
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return
 	var kb := _rss_kb()
 	if kb < _RSS_PAUSE_KB:

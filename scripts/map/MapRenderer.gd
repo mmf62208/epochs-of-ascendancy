@@ -22688,7 +22688,23 @@ func _unit_chip_offset_for_pid(pid: int) -> Vector2:
 	var p: Province = provinces.get(pid) as Province if provinces.has(pid) else null
 	if p != null and p.has_method("has_feature") and p.has_feature("capital"):
 		return Vector2(22, -28)
-	return Vector2(0, -12)
+	# Adjacent Rhine NUTS centroids are closer than the plate. Hash the pid so
+	# Maginot / Kusel stacks don't share a pixel. Same-hex still peeks via ×N.
+	var slot := absi(pid * 2654435761) % 6
+	const D := 18.0
+	match slot:
+		0:
+			return Vector2(0, -D)
+		1:
+			return Vector2(D, -D * 0.45)
+		2:
+			return Vector2(D, D * 0.45)
+		3:
+			return Vector2(0, D)
+		4:
+			return Vector2(-D, D * 0.45)
+		_:
+			return Vector2(-D, -D * 0.45)
 
 
 func _sync_unit_counter_scales(z: float = -1.0) -> void:

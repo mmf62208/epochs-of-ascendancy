@@ -51,6 +51,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
             "right_click_same_hex_cancel",
             "hover_hex_under_cursor",
             "hover_canvas_not_camera_node",
+            "chip_pid_hash_spread",
             "stack_visible_badge",
             "ctrl_click_no_stack_freeze",
             "chip_before_fight_arrow",
