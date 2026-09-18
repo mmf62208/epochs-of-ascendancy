@@ -1686,7 +1686,36 @@ func _test_joining() -> void:
 		return
 	_pass("joining beat 2 pending before arrival")
 
+	var redir: Dictionary = mv_scr.call("enqueue_own_land_march", GER_FID_2, GER_NEIGHBOR, ATT_TAG)
+	print("  [INFO] joining redirect dest=%d %s" % [GER_NEIGHBOR, str(redir)])
+	if not bool(redir.get("ok", false)):
+		_fail("joining redirect dest %d: %s" % [GER_NEIGHBOR, str(redir.get("reason", redir))])
+		return
+	battle = _bm.call("get_land_battle_at", FRA_FRONT)
+	if _fid_listed(battle.get("att_pending_fids", []), GER_FID_2):
+		_fail("joining redirect dest %d still JOINING" % GER_NEIGHBOR)
+		return
+	brief = _bm.call("build_fight_briefing", battle, ATT_TAG)
+	if _briefing_ours_status(brief, GER_FID_2) == "joining":
+		_fail("joining redirect briefing still joining")
+		return
+	_pass("joining redirect dest %d drops JOIN" % GER_NEIGHBOR)
+
+	var rejoin: Dictionary = mv_scr.call("enqueue_own_land_march", GER_FID_2, GER_FRONT, ATT_TAG)
+	if not bool(rejoin.get("ok", false)):
+		_fail("joining re-enqueue dest %d: %s" % [GER_FRONT, str(rejoin.get("reason", rejoin))])
+		return
+	battle = _bm.call("get_land_battle_at", FRA_FRONT)
+	if not _fid_listed(battle.get("att_pending_fids", []), GER_FID_2):
+		_fail("joining re-enqueue dest %d missing pending" % GER_FRONT)
+		return
+
 	mv_scr.call("tick_all_marches", 3.0)
+	if int(ger2.stationed_province_id) != GER_FRONT:
+		_fail("joining beat 3 hop did not station %s on %d got %s" % [
+			GER_FID_2, GER_FRONT, str(ger2.stationed_province_id),
+		])
+		return
 	if _bm.has_method("try_reinforce_land_battle"):
 		var rf: Dictionary = _bm.call("try_reinforce_land_battle", GER_FID_2, GER_FRONT, ATT_TAG)
 		print("  [INFO] joining hop-in reinforce %s" % str(rf))
@@ -1703,6 +1732,21 @@ func _test_joining() -> void:
 		return
 	_pass("joining beat 3 hop-in ENGAGED")
 
+	if "_open_land_battles" in _bm:
+		for raw in _bm._open_land_battles:
+			if typeof(raw) != TYPE_DICTIONARY:
+				continue
+			var live: Dictionary = raw
+			var atts: Array = []
+			if live.get("att_fids", []) is Array:
+				atts = (live["att_fids"] as Array).duplicate()
+			atts.erase(GER_FID_2)
+			live["att_fids"] = atts
+			var pends: Array = []
+			if live.get("att_pending_fids", []) is Array:
+				pends = (live["att_pending_fids"] as Array).duplicate()
+			pends.erase(GER_FID_2)
+			live["att_pending_fids"] = pends
 	ger2.stationed_province_id = GER_REAR
 	if "is_in_combat" in ger2:
 		ger2.is_in_combat = false

@@ -370,7 +370,10 @@ static func clear_march(formation_id: String) -> bool:
 	var fid := formation_id.strip_edges()
 	if fid.is_empty() or not _orders.has(fid):
 		return false
+	var tag := str((_orders[fid] as Dictionary).get("country_tag", ""))
 	_orders.erase(fid)
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("note_march_toward_battle"):
+		BattleManager.note_march_toward_battle(fid, 0, tag)
 	return true
 
 

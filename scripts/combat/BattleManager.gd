@@ -920,124 +920,76 @@ func get_land_battle_for_formation(formation_id: String) -> Dictionary:
 			continue
 		var battle: Dictionary = raw
 		if _fid_list(battle, "att_fids", "att_fid").has(fid) \
-				or _fid_list(battle, "def_fids", "def_fid").has(fid) \
-				or _fid_list(battle, "att_pending_fids", "").has(fid) \
-				or _fid_list(battle, "def_pending_fids", "").has(fid):
+				or _fid_list(battle, "def_fids", "def_fid").has(fid):
 			return battle.duplicate()
 	return {}
 
 
-## Outlook band (no player-facing %). likely / tight / bad + progress 0–1.
-func staff_outlook(battle: Dictionary) -> Dictionary:
-	var att_p := maxf(0.0, float(battle.get("att_power", 0.0)))
-	var def_p := maxf(0.0, float(battle.get("def_power", 0.0)))
-	var att_org := clampf(float(battle.get("att_org", 0.0)), 0.0, 1.0)
-	var def_org := clampf(float(battle.get("def_org", 0.0)), 0.0, 1.0)
-	var band := "tight"
-	if att_p > def_p * 1.15:
-		band = "likely"
-	elif def_p > att_p * 1.15:
-		band = "bad"
-	var denom := att_org + def_org
-	var progress := 0.5
-	if denom > 0.001:
-		progress = att_org / denom
-	var att_n := _fid_list(battle, "att_fids", "att_fid").size()
-	var def_n := _fid_list(battle, "def_fids", "def_fid").size()
-	var join_n := _fid_list(battle, "att_pending_fids", "").size()
-	var word := "Tight"
-	if band == "likely":
-		word = "Likely"
-	elif band == "bad":
-		word = "Bad"
-	return {
-		"band": band,
-		"word": word,
-		"progress": progress,
-		"att_org": att_org,
-		"def_org": def_org,
-		"att_n": att_n,
-		"def_n": def_n,
-		"joining_n": join_n,
-		"lean": str(battle.get("lean", "even")),
-	}
-
-
 ## Dest is the open fight from_id/to_id → JOINING until hop-in reinforce.
+## dest <= 0 (Halt) or a non-fight dest drops fid from every pending list.
 func note_march_toward_battle(formation_id: String, dest_id: int, country_tag: String = "") -> Dictionary:
 	var fid := formation_id.strip_edges()
 	var dest := int(dest_id)
-	if fid.is_empty() or dest <= 0:
+	if fid.is_empty():
 		return {"ok": false, "noted": false}
 	var tag := country_tag.strip_edges().to_upper()
 	if tag.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
 		var f: Formation = LeaderManager.get_formation(fid)
 		if f != null:
 			tag = str(f.country_tag).strip_edges().to_upper()
+	var noted := false
+	var noted_id: Variant = ""
+	var noted_side := ""
 	for raw in _open_land_battles:
 		if typeof(raw) != TYPE_DICTIONARY:
 			continue
 		var battle: Dictionary = raw
+		var pend: Array = _fid_list(battle, "att_pending_fids", "")
+		pend.erase(fid)
+		battle["att_pending_fids"] = pend
+		var dpend: Array = _fid_list(battle, "def_pending_fids", "")
+		dpend.erase(fid)
+		battle["def_pending_fids"] = dpend
+		if dest <= 0:
+			continue
 		var from_id := int(battle.get("from_id", -1))
 		var to_id := int(battle.get("to_id", -1))
 		if dest != from_id and dest != to_id:
 			continue
+		if _fid_list(battle, "att_fids", "att_fid").has(fid) or _fid_list(battle, "def_fids", "def_fid").has(fid):
+			continue
 		var att_tag := str(battle.get("att_tag", "")).to_upper()
 		var def_tag := str(battle.get("def_tag", "")).to_upper()
-		if _fid_list(battle, "att_fids", "att_fid").has(fid) or _fid_list(battle, "def_fids", "def_fid").has(fid):
-			return {"ok": true, "noted": false, "reason": "already engaged", "battle_id": battle.get("id")}
 		if tag == att_tag:
-			var pend: Array = _fid_list(battle, "att_pending_fids", "")
-			if not pend.has(fid):
-				pend.append(fid)
+			pend.append(fid)
 			battle["att_pending_fids"] = pend
-			return {"ok": true, "noted": true, "side": "attacker", "battle_id": battle.get("id")}
-		if tag == def_tag:
-			var dpend: Array = _fid_list(battle, "def_pending_fids", "")
-			if not dpend.has(fid):
-				dpend.append(fid)
+			noted = true
+			noted_id = battle.get("id")
+			noted_side = "attacker"
+		elif tag == def_tag:
+			dpend.append(fid)
 			battle["def_pending_fids"] = dpend
-			return {"ok": true, "noted": true, "side": "defender", "battle_id": battle.get("id")}
-	return {"ok": false, "noted": false}
+			noted = true
+			noted_id = battle.get("id")
+			noted_side = "defender"
+	return {"ok": true, "noted": noted, "side": noted_side, "battle_id": noted_id}
 
 
 func build_fight_briefing(battle: Dictionary, player_tag: String = "") -> Dictionary:
 	var ptag := player_tag.strip_edges().to_upper()
-	var outlook: Dictionary = staff_outlook(battle)
-	var to_id := int(battle.get("to_id", -1))
-	var place := "Province %d" % to_id
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
-		var p: Province = MapManager.get_province(to_id)
-		if p != null:
-			place = str(p.name)
-	var att_fids: Array = _fid_list(battle, "att_fids", "att_fid")
-	var att_pend: Array = _fid_list(battle, "att_pending_fids", "")
-	var def_fids: Array = _fid_list(battle, "def_fids", "def_fid")
 	var ours: Array = []
-	for fid_v in att_fids:
+	for fid_v in _fid_list(battle, "att_fids", "att_fid"):
 		ours.append(_roster_row(str(fid_v), "engaged"))
-	for fid_p in att_pend:
+	for fid_p in _fid_list(battle, "att_pending_fids", ""):
 		ours.append(_roster_row(str(fid_p), "joining"))
 	var theirs: Array = []
-	for dfid2 in def_fids:
+	for dfid2 in _fid_list(battle, "def_fids", "def_fid"):
 		theirs.append(_roster_row(str(dfid2), "engaged"))
 	for dpend in _fid_list(battle, "def_pending_fids", ""):
 		theirs.append(_roster_row(str(dpend), "joining"))
 	return {
-		"battle_id": str(battle.get("id", "")),
-		"place": place,
-		"to_id": to_id,
-		"from_id": int(battle.get("from_id", -1)),
-		"att_tag": str(battle.get("att_tag", "")),
-		"def_tag": str(battle.get("def_tag", "")),
-		"outlook": outlook,
 		"ours": ours,
 		"theirs": theirs,
-		"theirs_n": theirs.size(),
-		"theirs_joining": _fid_list(battle, "def_pending_fids", "").size(),
-		"days_elapsed": int(battle.get("days_elapsed", 0)),
-		"est_days": int(battle.get("est_days", 0)),
-		"att_stance": str(battle.get("att_stance", "press")),
 		"player_tag": ptag,
 	}
 
