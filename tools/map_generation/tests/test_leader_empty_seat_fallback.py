@@ -10,13 +10,7 @@ DETAIL = ROOT / "scripts" / "ui" / "LeaderDetailScreen.gd"
 ASSIGN = ROOT / "scripts" / "ui" / "LeaderAssignmentScreen.gd"
 EMPTY_SEAT = "res://assets/graphics/ui/leader_empty_seat.png"
 EMPTY_SEAT_64 = "res://assets/graphics/ui/leader_empty_seat_64.png"
-HELPER = (
-    'func _portrait_or_seat(path: String, seat: String) -> String:\n'
-    '\tvar p := path.strip_edges()\n'
-    '\tif p.is_empty() or not p.begins_with("res://") or not ResourceLoader.exists(p):\n'
-    '\t\treturn seat\n'
-    '\treturn p'
-)
+SEAT_CHECK = 'is_empty() or not {var}.begins_with("res://") or not ResourceLoader.exists({var})'
 
 
 def portrait_or_seat(path: str, seat: str, exists=None) -> str:
@@ -48,13 +42,21 @@ class TestLeaderEmptySeatFallback(unittest.TestCase):
         kept = "res://assets/graphics/portraits/leaders/guderian.png"
         self.assertEqual(portrait_or_seat(kept, EMPTY_SEAT, exists=lambda _p: True), kept)
 
-    def test_helper_and_constants_in_screens(self) -> None:
-        for path in (DETAIL, ASSIGN):
-            src = path.read_text(encoding="utf-8")
-            self.assertIn(f'const EMPTY_SEAT := "{EMPTY_SEAT}"', src, msg=path.name)
-            self.assertIn(f'const EMPTY_SEAT_64 := "{EMPTY_SEAT_64}"', src, msg=path.name)
-            self.assertIn(HELPER, src, msg=path.name)
-            self.assertIn("_portrait_or_seat(", src, msg=path.name)
+    def test_one_const_per_screen_and_inline_check(self) -> None:
+        detail = DETAIL.read_text(encoding="utf-8")
+        assign = ASSIGN.read_text(encoding="utf-8")
+        self.assertIn(f'const EMPTY_SEAT := "{EMPTY_SEAT}"', detail)
+        self.assertNotIn("EMPTY_SEAT_64", detail)
+        self.assertIn(f'const EMPTY_SEAT_64 := "{EMPTY_SEAT_64}"', assign)
+        self.assertNotIn("const EMPTY_SEAT :=", assign)
+        self.assertNotIn("func _portrait_or_seat", detail)
+        self.assertNotIn("func _portrait_or_seat", assign)
+        self.assertIn(SEAT_CHECK.format(var="path"), detail)
+        self.assertIn(SEAT_CHECK.format(var="ppath"), assign)
+        self.assertIn("if tex == null and path != EMPTY_SEAT:", detail)
+        self.assertIn("tex = load(EMPTY_SEAT) as Texture2D", detail)
+        self.assertIn("if tex == null and ppath != EMPTY_SEAT_64:", assign)
+        self.assertIn("tex = load(EMPTY_SEAT_64) as Texture2D", assign)
 
     def test_texture_rect_never_hidden(self) -> None:
         detail = DETAIL.read_text(encoding="utf-8")
@@ -63,8 +65,6 @@ class TestLeaderEmptySeatFallback(unittest.TestCase):
         self.assertIn("portrait_rect.visible = true", detail)
         self.assertNotIn("p_rect.visible = p_rect.texture != null", assign)
         self.assertIn("p_rect.visible = true", assign)
-        self.assertIn("_portrait_or_seat(str(current_leader.portrait_path), EMPTY_SEAT)", detail)
-        self.assertIn("_portrait_or_seat(str(summary.get(\"portrait_path\", \"\")), EMPTY_SEAT_64)", assign)
 
     def test_json_wiring_not_invented_in_ui(self) -> None:
         gen = (ROOT / "scripts" / "leaders" / "LeaderGenerator.gd").read_text(encoding="utf-8")

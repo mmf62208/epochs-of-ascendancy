@@ -5,7 +5,6 @@ extends DraggablePanel
 const XP_HIGHLIGHT_COLOR := Color(0.4, 0.9, 0.6)
 const TRAINING_PATH_BONUS_COLOR := Color(0.4, 0.85, 0.95)
 const EMPTY_SEAT := "res://assets/graphics/ui/leader_empty_seat.png"
-const EMPTY_SEAT_64 := "res://assets/graphics/ui/leader_empty_seat_64.png"
 
 @export var leader_id: String = ""
 
@@ -296,13 +295,6 @@ func _get_training_path_indicator() -> Label:
 	return indicator
 
 
-func _portrait_or_seat(path: String, seat: String) -> String:
-	var p := path.strip_edges()
-	if p.is_empty() or not p.begins_with("res://") or not ResourceLoader.exists(p):
-		return seat
-	return p
-
-
 func _update_header() -> void:
 	name_label.text = current_leader.name
 	name_label.add_theme_font_size_override("font_size", 20)
@@ -310,8 +302,12 @@ func _update_header() -> void:
 	age_assignment_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 
 	if portrait_rect:
-		var path := _portrait_or_seat(str(current_leader.portrait_path), EMPTY_SEAT)
+		var path := str(current_leader.portrait_path).strip_edges()
+		if path.is_empty() or not path.begins_with("res://") or not ResourceLoader.exists(path):
+			path = EMPTY_SEAT
 		var tex := load(path) as Texture2D
+		if tex == null and path != EMPTY_SEAT:
+			tex = load(EMPTY_SEAT) as Texture2D
 		if tex:
 			portrait_rect.texture = tex
 		portrait_rect.visible = true
