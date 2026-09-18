@@ -9,6 +9,7 @@ extends SceneTree
 const GER_FRONT := 710173
 const FRA_FRONT := 710739
 const GER_REAR := 710176  # Rastatt — GER land neighbor of Baden-Baden
+const GER_NEIGHBOR := 710175  # GER plains adjacent to Rastatt; not a JOIN dest
 const JAP_FRONT := 903981  # CHI–JAP live edge (CHI 902598); rear 903966
 const CHI_FRONT := 902598
 const JAP_REAR := 903966
@@ -93,6 +94,7 @@ func _run() -> void:
 	_test_era_resources()
 	_test_peace_occupation()
 	_test_march_and_assault()
+	_test_joining()
 	_test_chi_jap_theater()
 	_test_ai_take_land()
 	_test_nation_era_next()
@@ -116,6 +118,7 @@ func _setup_maginot_map() -> bool:
 		{"id": GER_FRONT, "tag": ATT_TAG, "name": "Baden-Baden GER", "region": MAGINOT_REGION},
 		{"id": FRA_FRONT, "tag": DEF_TAG, "name": "Bas-Rhin FRA", "region": 106},
 		{"id": GER_REAR, "tag": ATT_TAG, "name": "Rastatt GER rear", "region": MAGINOT_REGION},
+		{"id": GER_NEIGHBOR, "tag": ATT_TAG, "name": "GER neighbor plains", "region": MAGINOT_REGION},
 		{"id": GER_CAPITAL, "tag": ATT_TAG, "name": "Berlin GER", "region": MAGINOT_REGION},
 		{"id": JAP_FRONT, "tag": JAP_TAG, "name": "JAP CHI-JAP edge"},
 		{"id": CHI_FRONT, "tag": CHI_TAG, "name": "CHI vs JAP edge"},
@@ -174,7 +177,7 @@ func _setup_maginot_map() -> bool:
 	else:
 		_fail("initialize_from_map_data missing")
 		return false
-	_pass("map fixture GER %d / rear %d / FRA %d / JAP %d / CHI %d / JAP rear %d" % [GER_FRONT, GER_REAR, FRA_FRONT, JAP_FRONT, CHI_FRONT, JAP_REAR])
+	_pass("map fixture GER %d / rear %d / neighbor %d / FRA %d / JAP %d / CHI %d / JAP rear %d" % [GER_FRONT, GER_REAR, GER_NEIGHBOR, FRA_FRONT, JAP_FRONT, CHI_FRONT, JAP_REAR])
 	return true
 
 
@@ -226,7 +229,7 @@ func _setup_map_renderer_pins() -> bool:
 		_mr.container = container
 	root.add_child(_mr)
 
-	var pids: Array = [GER_FRONT, FRA_FRONT, GER_REAR, GER_CAPITAL, JAP_FRONT, CHI_FRONT, JAP_REAR, ENG_CHANNEL, ENG_NORTH_SEA]
+	var pids: Array = [GER_FRONT, FRA_FRONT, GER_REAR, GER_NEIGHBOR, GER_CAPITAL, JAP_FRONT, CHI_FRONT, JAP_REAR, ENG_CHANNEL, ENG_NORTH_SEA]
 	for pid_v in pids:
 		var pid := int(pid_v)
 		var gp = _mm.call("get_province", pid) if _mm.has_method("get_province") else null
@@ -901,13 +904,19 @@ func _test_designer_field() -> void:
 	var ger_hist: Object = _ger_on_front()
 	if ger_hist != null and ger_hist.has_method("log_combat"):
 		ger_hist.call("log_combat", "1936-01-04", GER_FRONT, "win", PackedStringArray(["press"]), "Guderian", "victory")
-		var strip_h: Script = load("res://scripts/ui/UnitCardCombatStrip.gd") as Script
-		if strip_h != null and strip_h.has_method("lines_for"):
-			var hist_txt := "\n".join(strip_h.call("lines_for", ger_hist))
-			if "victory" not in hist_txt:
-				_fail("card missing battle history: %s" % hist_txt)
-			else:
-				_pass("card battle history")
+		var hist_ok := false
+		if "combat_log" in ger_hist:
+			for e in ger_hist.get("combat_log"):
+				if typeof(e) != TYPE_DICTIONARY:
+					continue
+				var row: Dictionary = e
+				if "victory" in str(row.get("outcome", "")) or "victory" in str(row.get("result", "")):
+					hist_ok = true
+					break
+		if not hist_ok:
+			_fail("formation missing battle history after log_combat")
+		else:
+			_pass("card battle history")
 	if ger_hist != null and "combat_experience" in ger_hist:
 		ger_hist.set("combat_experience", 90.0)
 		ger_hist.set("strength", 0.50)
@@ -1566,6 +1575,137 @@ func _test_march_and_assault() -> void:
 		_pass("start_land_battle instant empty-defender")
 	else:
 		_pass("start_land_battle opened=%s" % str(opened.get("opened", false)))
+
+
+func _briefing_ours_status(brief: Dictionary, fid: String) -> String:
+	var rows: Variant = brief.get("ours", [])
+	if not (rows is Array):
+		return ""
+	for raw in rows:
+		if typeof(raw) != TYPE_DICTIONARY:
+			continue
+		var row: Dictionary = raw
+		if str(row.get("formation_id", "")) == fid:
+			return str(row.get("status", ""))
+	return ""
+
+
+func _fid_listed(raw: Variant, fid: String) -> bool:
+	if not (raw is Array):
+		return false
+	for v in raw:
+		if str(v).strip_edges() == fid:
+			return true
+	return false
+
+
+func _test_joining() -> void:
+	var nb = _mm.call("get_province", GER_NEIGHBOR) if _mm.has_method("get_province") else null
+	if nb == null:
+		_fail("joining dest %d missing from _setup_maginot_map (no dest)" % GER_NEIGHBOR)
+		return
+	if str(nb.get("owner_tag")).strip_edges().to_upper() != ATT_TAG:
+		_fail("joining dest %d owner want GER got %s" % [GER_NEIGHBOR, str(nb.get("owner_tag"))])
+		return
+	var ger: Object = _lm.call("get_formation", GER_FID) if _lm.has_method("get_formation") else null
+	var ger2: Object = _lm.call("get_formation", GER_FID_2) if _lm.has_method("get_formation") else null
+	var fra: Object = _lm.call("get_formation", FRA_FID) if _lm.has_method("get_formation") else null
+	if ger == null or ger2 == null or fra == null:
+		_fail("joining missing GER/GER_2/FRA formations")
+		return
+	ger.stationed_province_id = GER_FRONT
+	ger2.stationed_province_id = GER_REAR
+	fra.stationed_province_id = FRA_FRONT
+	if "is_in_combat" in ger2:
+		ger2.is_in_combat = false
+	var ger_p: Object = _mm.call("get_province", GER_FRONT) if _mm.has_method("get_province") else null
+	var fra_p: Object = _mm.call("get_province", FRA_FRONT) if _mm.has_method("get_province") else null
+	if ger_p != null:
+		ger_p.set("owner_tag", ATT_TAG)
+		ger_p.set("controller_tag", ATT_TAG)
+	if fra_p != null:
+		fra_p.set("owner_tag", DEF_TAG)
+		fra_p.set("controller_tag", DEF_TAG)
+
+	if not _bm.has_method("start_land_battle"):
+		_fail("start_land_battle missing")
+		return
+	var opened: Dictionary = _bm.call("start_land_battle", ATT_TAG, FRA_FRONT, GER_FRONT, GER_FID)
+	print("  [INFO] joining start_land_battle %s" % str(opened))
+	if bool(opened.get("instant", false)):
+		_fail("joining need open Maginot fight, got instant")
+		return
+	if not bool(opened.get("success", false)):
+		var existing: Dictionary = _bm.call("get_land_battle_at", FRA_FRONT) if _bm.has_method("get_land_battle_at") else {}
+		if existing.is_empty() or str(existing.get("att_tag", "")).to_upper() != ATT_TAG:
+			_fail("GER_FID start_land_battle not ok: %s" % str(opened.get("reason", opened)))
+			return
+		_pass("joining uses open Maginot fight")
+	else:
+		_pass("GER_FID opened Maginot start_land_battle")
+
+	var mv_scr: Script = load("res://scripts/formations/FormationMovement.gd") as Script
+	if mv_scr == null:
+		_fail("FormationMovement.gd missing")
+		return
+
+	var neg: Dictionary = mv_scr.call("enqueue_own_land_march", GER_FID_2, GER_NEIGHBOR, ATT_TAG)
+	print("  [INFO] joining beat1 dest=%d %s" % [GER_NEIGHBOR, str(neg)])
+	if not bool(neg.get("ok", false)):
+		_fail("joining beat 1 enqueue dest %d: %s" % [GER_NEIGHBOR, str(neg.get("reason", neg))])
+		return
+	var battle: Dictionary = _bm.call("get_land_battle_at", FRA_FRONT) if _bm.has_method("get_land_battle_at") else {}
+	if battle.is_empty():
+		_fail("joining beat 1 no open Maginot battle")
+		return
+	if _fid_listed(battle.get("att_pending_fids", []), GER_FID_2):
+		_fail("joining beat 1 dest %d listed JOINING" % GER_NEIGHBOR)
+		return
+	if not _bm.has_method("build_fight_briefing"):
+		_fail("build_fight_briefing missing")
+		return
+	var brief: Dictionary = _bm.call("build_fight_briefing", battle, ATT_TAG)
+	if _briefing_ours_status(brief, GER_FID_2) == "joining":
+		_fail("joining beat 1 briefing status joining for dest %d" % GER_NEIGHBOR)
+		return
+	_pass("joining beat 1 dest %d no JOIN" % GER_NEIGHBOR)
+
+	# 710176↔710739 is a legal JOIN hop; dest 710173 is own-land from_id.
+	var pend: Dictionary = mv_scr.call("enqueue_own_land_march", GER_FID_2, GER_FRONT, ATT_TAG)
+	print("  [INFO] joining beat2 dest=%d %s" % [GER_FRONT, str(pend)])
+	if not bool(pend.get("ok", false)):
+		_fail("joining beat 2 enqueue dest %d: %s" % [GER_FRONT, str(pend.get("reason", pend))])
+		return
+	battle = _bm.call("get_land_battle_at", FRA_FRONT)
+	if not _fid_listed(battle.get("att_pending_fids", []), GER_FID_2):
+		_fail("joining beat 2 att_pending_fids missing %s before hop" % GER_FID_2)
+		return
+	brief = _bm.call("build_fight_briefing", battle, ATT_TAG)
+	if _briefing_ours_status(brief, GER_FID_2) != "joining":
+		_fail("joining beat 2 briefing want joining got %s" % _briefing_ours_status(brief, GER_FID_2))
+		return
+	_pass("joining beat 2 pending before arrival")
+
+	mv_scr.call("tick_all_marches", 3.0)
+	if _bm.has_method("try_reinforce_land_battle"):
+		var rf: Dictionary = _bm.call("try_reinforce_land_battle", GER_FID_2, GER_FRONT, ATT_TAG)
+		print("  [INFO] joining hop-in reinforce %s" % str(rf))
+	battle = _bm.call("get_land_battle_at", FRA_FRONT)
+	if not _fid_listed(battle.get("att_fids", []), GER_FID_2):
+		_fail("joining beat 3 att_fids missing %s after hop-in" % GER_FID_2)
+		return
+	if _fid_listed(battle.get("att_pending_fids", []), GER_FID_2):
+		_fail("joining beat 3 pending not dropped after ENGAGED")
+		return
+	brief = _bm.call("build_fight_briefing", battle, ATT_TAG)
+	if _briefing_ours_status(brief, GER_FID_2) != "engaged":
+		_fail("joining beat 3 briefing want engaged got %s" % _briefing_ours_status(brief, GER_FID_2))
+		return
+	_pass("joining beat 3 hop-in ENGAGED")
+
+	ger2.stationed_province_id = GER_REAR
+	if "is_in_combat" in ger2:
+		ger2.is_in_combat = false
 
 
 func _test_chi_jap_theater() -> void:

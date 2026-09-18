@@ -277,6 +277,8 @@ static func enqueue_own_land_march(
 		"order_type": ORDER_OWN_LAND_MARCH,
 	}
 	_orders[fid] = order
+	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("note_march_toward_battle"):
+		BattleManager.note_march_toward_battle(fid, dest_id, tag)
 	var eta := remaining_eta_days(order)
 	var hops_n := path.size() - 1
 	return {
