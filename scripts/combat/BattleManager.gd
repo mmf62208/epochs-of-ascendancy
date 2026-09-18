@@ -1751,10 +1751,21 @@ func _begin_occupy_after_victory(battle: Dictionary) -> void:
 		var fid := str(fid_v)
 		if fid.is_empty():
 			continue
+		var f: Formation = null
 		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
-			var f: Formation = LeaderManager.get_formation(fid)
-			if f != null and "is_in_combat" in f:
-				f.is_in_combat = false
+			f = LeaderManager.get_formation(fid)
+		if f != null and "is_in_combat" in f:
+			f.is_in_combat = false
+		# Only the stack still on the assault hex walks in. A division the player
+		# already marched away (or a rear joiner on another pid) stays put.
+		if f != null and "stationed_province_id" in f and int(f.stationed_province_id) != from_id:
+			print("BattleManager: occupy skip %s stationed=%d not from=%d" % [fid, int(f.stationed_province_id), from_id])
+			continue
+		if typeof(FormationMovement) != TYPE_NIL and FormationMovement.has_march(fid):
+			var march: Dictionary = FormationMovement.get_march(fid)
+			if not bool(march.get("occupy", false)) and int(march.get("dest_id", -1)) != to_id:
+				print("BattleManager: occupy skip %s marching to %s" % [fid, str(march.get("dest_id", -1))])
+				continue
 		if typeof(FormationMovement) != TYPE_NIL:
 			var enq: Dictionary = FormationMovement.enqueue_occupy_adjacent(fid, to_id, att_tag)
 			print("BattleManager: occupy-after-win enqueue %s %s" % [fid, str(enq)])

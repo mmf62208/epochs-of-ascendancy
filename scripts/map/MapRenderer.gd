@@ -18462,14 +18462,18 @@ func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictio
 		if p != null:
 			pname = p.name
 	var occ: Dictionary = hop.get("occupy", {}) as Dictionary if hop is Dictionary else {}
-	if bool(occ.get("captured", false)):
+	var hop_from := int(hop.get("from_id", -1)) if hop is Dictionary else -1
+	if bool(occ.get("captured", false)) or bool(occ.get("already", false)):
 		_refresh_order_intent_arrows()
-		refresh_after_capture_light(to_pid, int(hop.get("from_id", -1)), -1)
+		refresh_after_capture_light(to_pid, hop_from, -1)
 		var occ_tag := ""
 		if hop is Dictionary:
 			occ_tag = str(hop.get("country_tag", "")).to_upper()
 		if occ_tag.is_empty() or occ_tag == _player_tag():
-			_show_inspector_toast("Took %s · no opposition" % pname, 4.0)
+			if bool(occ.get("already", false)):
+				_show_inspector_toast("Walked into %s" % pname, 3.5)
+			else:
+				_show_inspector_toast("Took %s · no opposition" % pname, 4.0)
 		return
 	if bool(occ.get("fought", false)):
 		_refresh_order_intent_arrows()
@@ -25486,7 +25490,11 @@ func _update_unit_icons_for_test() -> void:
 	_rebuild_demo_unit_icons({})
 
 
+var _maginot_chips_parked: bool = false
+
+
 ## Park GER/FRA land on the Maginot edge so F5 has pickable strength chips.
+## Stations only once — a later call must not yank marched units back to Maginot.
 func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	const GER_FRONT := 710173
 	const FRA_FRONT := 710739
@@ -25539,6 +25547,11 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 			var ft4 := str(f4.formation_type) if "formation_type" in f4 else ""
 			if ft4 == Formation.TYPE_DIVISION or ft4 == Formation.TYPE_GARRISON:
 				ger_land.append(f4)
+	if _maginot_chips_parked:
+		result["ok"] = true
+		result["already"] = true
+		_update_unit_icons_for_pids(_living_land_chip_pids)
+		return result
 	if ger_land.size() >= 1 and "stationed_province_id" in ger_land[0]:
 		ger_land[0].stationed_province_id = GER_FRONT
 		if "design_id" in ger_land[0] and str(ger_land[0].design_id).is_empty():
@@ -25586,6 +25599,8 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	_sync_unit_counter_visibility()
 	_sync_unit_counter_scales()
 	result["ok"] = int(result["ger"]) > 0
+	if bool(result["ok"]):
+		_maginot_chips_parked = true
 	if bool(result["ok"]):
 		_refresh_next_hook_chip()
 	var graphical := DisplayServer.get_name() != "headless"

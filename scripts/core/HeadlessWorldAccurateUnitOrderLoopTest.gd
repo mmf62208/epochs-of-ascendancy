@@ -1761,6 +1761,29 @@ func _test_occupy_after_win() -> void:
 		_fail("occupy-after-win GER displaced off taken hex got %d" % int(ger_f.stationed_province_id))
 		return
 	_pass("occupy-after-win GER stayed on %d" % FRA_FRONT)
+	var rear_f: Object = null
+	if _lm.has_method("get_formation"):
+		rear_f = _lm.call("get_formation", GER_FID_2)
+	if rear_f != null:
+		rear_f.stationed_province_id = GER_REAR
+		if "is_in_combat" in rear_f:
+			rear_f.is_in_combat = false
+		var fake := {
+			"to_id": FRA_FRONT,
+			"from_id": GER_FRONT,
+			"att_tag": ATT_TAG,
+			"def_tag": DEF_TAG,
+			"att_fid": fid,
+			"att_fids": [fid, GER_FID_2],
+			"def_fid": "",
+			"def_org": 0.1,
+		}
+		if _bm.has_method("_begin_occupy_after_victory"):
+			_bm.call("_begin_occupy_after_victory", fake)
+		if int(rear_f.stationed_province_id) != GER_REAR:
+			_fail("occupy yanked rear GER_FID_2 off %d to %d" % [GER_REAR, int(rear_f.stationed_province_id)])
+			return
+		_pass("occupy left rear stack on %d" % GER_REAR)
 	# Second stack walking in must not treat GER as the defender and bounce them home.
 	if _bm.has_method("resolve_occupy_arrival"):
 		var again: Dictionary = _bm.call("resolve_occupy_arrival", fid, FRA_FRONT, ATT_TAG, GER_FRONT)
