@@ -220,6 +220,18 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     else:
         fails.append("hover_pin_first")
 
+    stw = _gd_func_slice(ren, "_screen_to_world")
+    canvas_hover = (
+        bool(stw)
+        and "get_canvas_transform().affine_inverse()" in stw
+        and "cam.get_canvas_transform()" not in stw
+    )
+    wiring["hover_canvas_not_camera_node"] = canvas_hover
+    if canvas_hover:
+        passes.append("hover_canvas_not_camera_node")
+    else:
+        fails.append("hover_canvas_not_camera_node")
+
     badge_fn = _gd_func_slice(ren, "_make_formation_stack_badge")
     plates_fn = _gd_func_slice(ren, "_make_stack_offset_plates")
     stack_vis = (

@@ -2389,19 +2389,17 @@ func _zoom_toward_mouse(zoom_change: float) -> void:
 	if new_zoom == old_zoom:
 		return
 
-	var world_before := cam.get_canvas_transform().affine_inverse() * mouse_screen
+	var world_before := _screen_to_world(mouse_screen)
 	cam.zoom = new_zoom
-	var world_after := cam.get_canvas_transform().affine_inverse() * mouse_screen
+	var world_after := _screen_to_world(mouse_screen)
 	cam.global_position += world_before - world_after
 	_clamp_camera_to_theater()
 
-## Converts screen (pixel) mouse position to world/map space using the active Camera2D.
-## This is the key bridge for using MapPickGrid / MapManager picking.
+## Viewport mouse → map canvas (same space as province polygons and chip global_position).
+## Camera2D.get_canvas_transform() is the camera *node* (view × cam.global) and puts
+## hover/pick south of the cursor; tooltip stays on the mouse in screen space.
 func _screen_to_world(screen_pos: Vector2) -> Vector2:
-	var cam := get_viewport().get_camera_2d()
-	if not cam:
-		return screen_pos
-	return cam.get_canvas_transform().affine_inverse() * screen_pos
+	return get_canvas_transform().affine_inverse() * screen_pos
 
 
 func _on_close_pressed() -> void:

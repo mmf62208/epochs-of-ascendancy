@@ -1365,11 +1365,11 @@ func resolve_pick_province_id(hit: int) -> int:
 		return 82
 	return hit
 
-## Convenience for MapRenderer / UI (converts screen mouse pos using the current Camera2D).
+## Convenience for MapRenderer / UI (viewport mouse → canvas world, same as Camera2D view).
 func get_province_at_screen_pos(screen_pos: Vector2, use_pick_grid: bool = true) -> int:
-	var cam := get_viewport().get_camera_2d() if Engine.get_main_loop() else null
-	if cam:
-		var world_pos := cam.get_canvas_transform().affine_inverse() * screen_pos
+	var vp := get_viewport()
+	if vp:
+		var world_pos: Vector2 = vp.get_canvas_transform().affine_inverse() * screen_pos
 		return get_province_at_world_pos(world_pos, use_pick_grid)
 	return -1
 
