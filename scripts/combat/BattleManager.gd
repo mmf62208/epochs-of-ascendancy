@@ -1810,10 +1810,10 @@ func _apply_attacker_win_capture_light(att_tag: String, to_id: int, from_id: int
 		"winner": "attacker",
 	}
 	_displace_defender_from_captured_province(row, to_id)
-	# News history is cheap; toast UI is skipped headless / during compact clock.
-	_post_battle_news(row, true)
+	# F5: skip news/toast on capture — hop UI already toasts; news stack froze Maginot 1×.
+	if not _interactive_light_sim():
+		_post_battle_news(row, true)
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
-		# Compact clock: skip deferred map refresh (Maginot quit hung on renderer).
 		return
 	_notify_map_refresh(to_id, from_id, int(row.get("retreat_province_id", -1)))
 

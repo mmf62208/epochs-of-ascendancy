@@ -753,7 +753,13 @@ static func _commit_ready_hops(order: Dictionary) -> Array:
 	var tag := str(order.get("country_tag", ""))
 	var fid := str(order.get("formation_id", ""))
 	var dest_id := int(order.get("dest_id", -1))
-	while float(order.get("progress", 0.0)) + 1e-6 >= float(order.get("hop_cost", 1.0)):
+	var hop_cost := maxf(HOP_DAYS_MIN, float(order.get("hop_cost", 1.0)))
+	order["hop_cost"] = hop_cost
+	var guard := 0
+	while float(order.get("progress", 0.0)) + 1e-6 >= hop_cost:
+		guard += 1
+		if guard > 8:
+			break
 		var hop_i := int(order.get("hop_index", 1))
 		if hop_i >= path.size():
 			order["arrived"] = true
@@ -810,7 +816,8 @@ static func _commit_ready_hops(order: Dictionary) -> Array:
 			order["hop_index"] = path.size()
 			break
 		order["hop_index"] = hop_i + 1
-		order["hop_cost"] = _hop_cost_into(int(path[hop_i + 1]), template_profile(f2))
+		hop_cost = maxf(HOP_DAYS_MIN, _hop_cost_into(int(path[hop_i + 1]), template_profile(f2)))
+		order["hop_cost"] = hop_cost
 	return out
 
 

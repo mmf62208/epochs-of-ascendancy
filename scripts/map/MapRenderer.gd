@@ -18193,8 +18193,8 @@ func _refresh_fight_card_if_open() -> void:
 
 
 func _on_land_battles_resolved(resolved: Array) -> void:
-	_refresh_order_intent_arrows()
-	_sync_land_battle_bubbles()
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("_maybe_trip_rss_budget"):
+		TimeManager.call("_maybe_trip_rss_budget")
 	var player := _player_tag()
 	if player == "USA":
 		player = "GER"
@@ -18215,9 +18215,6 @@ func _on_land_battles_resolved(resolved: Array) -> void:
 		to_id = int(ev.get("to_id", -1))
 		winner = str(ev.get("winner", ""))
 		occupy_pending = bool(ev.get("occupy_pending", false))
-	if not player_fight:
-		_refresh_order_intent_arrows()
-		return
 	if occupy_pending:
 		var place := _province_display_name(to_id) if to_id > 0 else "the hex"
 		_show_inspector_toast("They broke · occupying %s · walk in to take it" % place, 4.5)
@@ -18227,12 +18224,16 @@ func _on_land_battles_resolved(resolved: Array) -> void:
 			if card != null:
 				card.queue_free()
 		_open_fight_battle_id = ""
-		_refresh_order_intent_arrows()
-		_sync_land_battle_bubbles()
-	elif winner == "attacker":
+		call_deferred("_refresh_order_intent_arrows")
+		return
+	if not player_fight:
+		call_deferred("_refresh_order_intent_arrows")
+		return
+	if winner == "attacker":
 		_close_fight_card_taken(to_id, "They broke.")
 	elif not _open_fight_battle_id.is_empty():
 		_refresh_fight_card_if_open()
+	call_deferred("_refresh_order_intent_arrows")
 
 
 func _close_fight_card_taken(to_id: int, line: String) -> void:
@@ -21735,7 +21736,7 @@ func _sync_land_battle_bubbles() -> int:
 	if typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_open_land_battles"):
 		battles = BattleManager.get_open_land_battles()
 	_land_battle_bubble_layer.call("set_battles", battles)
-	_refresh_next_hook_chip()
+	call_deferred("_refresh_next_hook_chip")
 	return battles.size()
 
 
