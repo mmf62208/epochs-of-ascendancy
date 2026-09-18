@@ -63,6 +63,8 @@ const HEADER_SPECS: Array[Dictionary] = [
 	{"text": "Details", "width": 80},
 ]
 const ROW_HEIGHT := 36
+const EMPTY_SEAT := "res://assets/graphics/ui/leader_empty_seat.png"
+const EMPTY_SEAT_64 := "res://assets/graphics/ui/leader_empty_seat_64.png"
 
 
 func _ready() -> void:
@@ -621,6 +623,13 @@ func _populate_unassigned_formations() -> void:
 		formations_content.add_child(row)
 
 
+func _portrait_or_seat(path: String, seat: String) -> String:
+	var p := path.strip_edges()
+	if p.is_empty() or not p.begins_with("res://") or not ResourceLoader.exists(p):
+		return seat
+	return p
+
+
 func _create_leader_row(summary: Dictionary) -> HBoxContainer:
 	var hbox := HBoxContainer.new()
 	hbox.custom_minimum_size = Vector2(0, ROW_HEIGHT)
@@ -631,12 +640,11 @@ func _create_leader_row(summary: Dictionary) -> HBoxContainer:
 	p_rect.custom_minimum_size = Vector2(24, 24)
 	p_rect.expand_mode = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
 	p_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	var ppath := str(summary.get("portrait_path", ""))
-	if ppath != "" and ResourceLoader.exists(ppath):
-		var tex := load(ppath) as Texture2D
-		if tex:
-			p_rect.texture = tex
-	p_rect.visible = p_rect.texture != null
+	var ppath := _portrait_or_seat(str(summary.get("portrait_path", "")), EMPTY_SEAT_64)
+	var tex := load(ppath) as Texture2D
+	if tex:
+		p_rect.texture = tex
+	p_rect.visible = true
 	hbox.add_child(p_rect)
 
 	var name_btn := Button.new()
