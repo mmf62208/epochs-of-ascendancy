@@ -789,7 +789,11 @@ func _rss_kb() -> int:
 				var n2 := int(rest.get_slice(" ", 0))
 				if n2 > 0:
 					return n2
-	return int(OS.get_static_memory_usage() / 1024)
+	var tex_kb := 0
+	if RenderingServer.has_method("get_rendering_info"):
+		tex_kb = int(RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TEXTURE_MEM_USED) / 1024)
+	var static_kb := int(OS.get_static_memory_usage() / 1024)
+	return maxi(tex_kb + static_kb, 1)
 
 
 func _maybe_trip_rss_budget() -> void:

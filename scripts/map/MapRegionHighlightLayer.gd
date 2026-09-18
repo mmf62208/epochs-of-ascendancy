@@ -38,8 +38,9 @@ func rebuild_from_geometry(geometry: Dictionary, world_canvas: bool) -> void:
 			_wn = MapManager.is_geometry_world_native()
 		var transformed := MapCanvasConfig.transform_province_points(raw, world_canvas, true, _wn)
 		# Only store drawable outlines — hover region fills must never triangulate-fail.
-		var drawable := ProvincePolygonUtil.make_drawable(transformed)
-		if drawable.size() >= 3:
+		# Never convex-hull: hull of Moselle/Meurthe swallows Luxembourg.
+		var drawable := ProvincePolygonUtil.sanitize(transformed)
+		if drawable.size() >= 3 and ProvincePolygonUtil.is_drawable(drawable):
 			_province_points[pid] = drawable
 	_clear_overlay_cache()
 	_hover_region_id = -1
@@ -65,9 +66,10 @@ func set_hovered_region(region_id: int, tier: int) -> void:
 
 
 func _apply_visibility() -> void:
+	# Maginot / Europe Home is operational — region hulls overlapped LUX and neighbors.
 	var show := (
 		_hover_region_id >= 0
-		and _current_tier == MapZoomLODScript.Tier.OPERATIONAL
+		and _current_tier == MapZoomLODScript.Tier.STRATEGIC
 	)
 	if _overlay_root != null and is_instance_valid(_overlay_root):
 		_overlay_root.visible = show

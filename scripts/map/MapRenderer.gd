@@ -1570,6 +1570,12 @@ func _input(event: InputEvent) -> void:
 				var did_left_pan: bool = _left_gesture_dragged or _map_click_should_skip_pick()
 				_end_left_button_down()
 				_note_close_button_release()
+				if event.shift_pressed and not event.ctrl_pressed and not selected_formation_id.is_empty():
+					var plan_pos := _screen_to_world(get_viewport().get_mouse_position())
+					print("[pick] shift-plan from _input ", plan_pos)
+					call_deferred("_deferred_plan_click", plan_pos)
+					get_viewport().set_input_as_handled()
+					return
 				if did_left_pan:
 					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
