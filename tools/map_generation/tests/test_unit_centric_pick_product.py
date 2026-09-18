@@ -47,6 +47,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
             "stack_cycle_no_card_rebuild",
             "left_click_cycles_not_cancel",
             "right_click_same_hex_cancel",
+            "hover_pin_first",
             "stack_visible_badge",
             "ctrl_click_no_stack_freeze",
             "chip_before_fight_arrow",

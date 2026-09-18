@@ -68,9 +68,11 @@ class TestWorldAccurateCapitalPickProduct(unittest.TestCase):
         self.assertIn("func _capital_star_pid_at", ren)
         self.assertIn("_capital_star_pid_at(world_pos)", ren)
         cap_i = mm.find("func prefer_capital_province_at")
-        cap_slice = mm[cap_i : cap_i + 1800]
+        cap_slice = mm[cap_i : cap_i + 2200]
         self.assertIn("return best_cap", cap_slice)
         self.assertNotIn("best_d < d_hit", cap_slice)
+        self.assertIn("hit_owner != cap_owner", cap_slice)
+        self.assertIn("get_province_owner", cap_slice)
         self.assertIn('Settle %s', ren)
         self.assertNotIn('Settle #%d', ren)
 

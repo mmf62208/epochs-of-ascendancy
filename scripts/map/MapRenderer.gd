@@ -16855,7 +16855,13 @@ func _update_spatial_hover() -> void:
 
 	var world_pos := _screen_to_world(mouse_screen)
 
-	var pid := _resolve_map_pick_pid(world_pos)
+	# Pin-first: chip under the cursor owns hover so Maginot GER is not LUX fill.
+	var pid := -1
+	var chip_fo: Object = _pick_unit_formation_at_world(world_pos)
+	if chip_fo != null and "stationed_province_id" in chip_fo:
+		pid = int(chip_fo.stationed_province_id)
+	if pid <= 0:
+		pid = _resolve_map_pick_pid(world_pos)
 	var new_hover_province: Province = null
 	if pid >= 0 and provinces.has(pid):
 		new_hover_province = provinces[pid]

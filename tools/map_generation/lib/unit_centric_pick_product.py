@@ -208,6 +208,18 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     else:
         fails.append("right_click_same_hex_cancel")
 
+    hover_fn = _gd_func_slice(ren, "_update_spatial_hover")
+    hover_pin = (
+        bool(hover_fn)
+        and "_pick_unit_formation_at_world" in hover_fn
+        and "stationed_province_id" in hover_fn
+    )
+    wiring["hover_pin_first"] = hover_pin
+    if hover_pin:
+        passes.append("hover_pin_first")
+    else:
+        fails.append("hover_pin_first")
+
     badge_fn = _gd_func_slice(ren, "_make_formation_stack_badge")
     plates_fn = _gd_func_slice(ren, "_make_stack_offset_plates")
     stack_vis = (

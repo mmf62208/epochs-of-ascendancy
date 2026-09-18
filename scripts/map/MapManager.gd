@@ -1264,8 +1264,14 @@ func prefer_capital_province_at(world_pos: Vector2, primary_hit: int) -> int:
 			best_cap = cap_id
 	if best_cap <= 0:
 		return primary_hit
-	# Gold-star disk wins even when the click sits on a neighbouring borough
-	# polygon (London 711414 over Wandsworth) or a colocated chip hex.
+	# Gold-star disk wins nested boroughs (London over Wandsworth). Do not steal a
+	# foreign hex: at Maginot zoom the LUX disk is bigger than Luxembourg and paints
+	# GER/FRA fill as Luxembourg when the cursor is on a division chip.
+	if primary_hit > 0 and primary_hit != best_cap:
+		var hit_owner := get_province_owner(primary_hit).strip_edges().to_upper()
+		var cap_owner := get_province_owner(best_cap).strip_edges().to_upper()
+		if not hit_owner.is_empty() and not cap_owner.is_empty() and hit_owner != cap_owner:
+			return primary_hit
 	return best_cap
 
 
