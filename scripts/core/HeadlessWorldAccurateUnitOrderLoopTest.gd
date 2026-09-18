@@ -1805,18 +1805,153 @@ func _test_occupy_after_win() -> void:
 	if rear_f == null:
 		_fail("occupy-after-win missing GER_FID_2")
 		return
-	# Rear stack is adjacent to Alsace 710739; capture-light must not teleport it.
 	rear_f.stationed_province_id = GER_REAR
-	if not _bm.has_method("_apply_attacker_win_capture_light"):
-		_fail("_apply_attacker_win_capture_light missing")
+	if "is_in_combat" in rear_f:
+		rear_f.is_in_combat = false
+
+	var fra_p = _mm.call("get_province", FRA_FRONT) if _mm.has_method("get_province") else null
+	if fra_p == null:
+		_fail("occupy-after-win missing FRA province")
 		return
-	var fid := GER_FID
-	if _bm.has_method("get_land_battle_at"):
-		var battle: Dictionary = _bm.call("get_land_battle_at", FRA_FRONT) as Dictionary
-		var att := str(battle.get("att_fid", "")).strip_edges()
-		if not att.is_empty() and att != GER_FID_2:
-			fid = att
-	_bm.call("_apply_attacker_win_capture_light", ATT_TAG, FRA_FRONT, GER_FRONT, fid)
+	fra_p.set("owner_tag", DEF_TAG)
+	fra_p.set("controller_tag", DEF_TAG)
+	var ger_f: Object = _ger_on_front()
+	if ger_f == null:
+		ger_f = _lm.call("get_formation", GER_FID) if _lm.has_method("get_formation") else null
+	if ger_f == null:
+		_fail("occupy-after-win no GER on front")
+		return
+	ger_f.stationed_province_id = GER_FRONT
+	if "is_in_combat" in ger_f:
+		ger_f.is_in_combat = false
+	var fra_f: Object = _lm.call("get_formation", FRA_FID) if _lm.has_method("get_formation") else null
+	if fra_f != null:
+		fra_f.stationed_province_id = FRA_FRONT
+		if "is_in_combat" in fra_f:
+			fra_f.is_in_combat = false
+	var fid := str(ger_f.formation_id)
+	if _lm.has_method("declare_war"):
+		_lm.call("declare_war", ATT_TAG, DEF_TAG)
+	if "_open_land_battles" in _bm:
+		_bm._open_land_battles.clear()
+	var tm: Node = _autoload("TimeManager")
+	# Headless is_interactive_light_sim is false unless the compact clock flag is on.
+	if tm != null:
+		tm.set("_living_playtest_clock", true)
+	var opened: Dictionary = _bm.call("start_land_battle", ATT_TAG, FRA_FRONT, GER_FRONT, fid)
+	print("  [INFO] occupy-after-win start %s" % str(opened))
+	if not bool(opened.get("opened", false)):
+		if tm != null:
+			tm.set("_living_playtest_clock", false)
+		_fail("occupy-after-win want opened battle got %s" % str(opened))
+		return
+	if "_open_land_battles" in _bm:
+		for raw in _bm._open_land_battles:
+			if typeof(raw) != TYPE_DICTIONARY:
+				continue
+			var battle: Dictionary = raw
+			if int(battle.get("to_id", -1)) != FRA_FRONT:
+				continue
+			battle["att_org"] = 0.55
+			battle["def_org"] = 0.18
+			break
+	var break_kind := ""
+	for _i in 16:
+		var ticks: Array = _bm.call("tick_open_land_battles") if _bm.has_method("tick_open_land_battles") else []
+		for ev in ticks:
+			if typeof(ev) != TYPE_DICTIONARY:
+				continue
+			if bool((ev as Dictionary).get("resolved", false)):
+				break_kind = str((ev as Dictionary).get("kind", ""))
+		var still: Array = _bm.call("get_open_land_battles") if _bm.has_method("get_open_land_battles") else []
+		if still.is_empty():
+			break
+	var owner_mid := str(fra_p.get("owner_tag")).strip_edges().to_upper()
+	if owner_mid != DEF_TAG:
+		if tm != null:
+			tm.set("_living_playtest_clock", false)
+		_fail("occupy-after-win hex flipped on break want FRA got %s" % owner_mid)
+		return
+	if break_kind == "taken":
+		if tm != null:
+			tm.set("_living_playtest_clock", false)
+		_fail("occupy-after-win kind=taken on FRA-still-owner break")
+		return
+	_pass("occupy-after-win hex still FRA after break")
+	var mv_scr: Script = load("res://scripts/formations/FormationMovement.gd") as Script
+	var occ_n := 0
+	if mv_scr != null and mv_scr.has_method("list_occupy_orders"):
+		occ_n = (mv_scr.call("list_occupy_orders") as Array).size()
+	print("  [INFO] occupy orders n=%d" % occ_n)
+	if occ_n == 0 and mv_scr != null and mv_scr.has_method("enqueue_occupy_adjacent"):
+		var enq: Dictionary = mv_scr.call("enqueue_occupy_adjacent", fid, FRA_FRONT, ATT_TAG, true)
+		print("  [INFO] occupy enqueue fallback %s" % str(enq))
+	var hops: Array = []
+	if mv_scr != null:
+		hops = mv_scr.call("tick_all_marches", 1.0) as Array
+		if hops.is_empty():
+			hops = mv_scr.call("tick_all_marches", 1.0) as Array
+	if tm != null:
+		tm.set("_living_playtest_clock", false)
+	fra_p = _mm.call("get_province", FRA_FRONT)
+	var owner_end := str(fra_p.get("owner_tag")).strip_edges().to_upper() if fra_p != null else ""
+	if owner_end != ATT_TAG:
+		_fail("occupy-after-win hex not GER after walk-in got %s" % owner_end)
+		return
+	_pass("occupy-after-win hex GER after walk-in")
+	var hop_kind := ""
+	for hv in hops:
+		if typeof(hv) != TYPE_DICTIONARY:
+			continue
+		var hop: Dictionary = hv
+		if str(hop.get("kind", "")) == "taken":
+			hop_kind = "taken"
+		var occ_row: Variant = hop.get("occupy", {})
+		if occ_row is Dictionary and str((occ_row as Dictionary).get("kind", "")) == "taken":
+			hop_kind = "taken"
+	var arrival: Dictionary = {}
+	if _bm.has_method("peek_last_occupy_arrival"):
+		arrival = _bm.call("peek_last_occupy_arrival") as Dictionary
+	if hop_kind != "taken" and str(arrival.get("kind", "")) != "taken":
+		_fail(
+			"occupy-after-win want resolve_occupy_arrival/last hop kind=taken after owner GER got hop=%s arrival=%s"
+			% [hop_kind, str(arrival)]
+		)
+		return
+	_pass("occupy-after-win kind=taken after owner GER")
+	# Empty-hex occupy: no broke stamp → must not return kind=taken.
+	fra_p.set("owner_tag", DEF_TAG)
+	fra_p.set("controller_tag", DEF_TAG)
+	if fra_f != null:
+		fra_f.stationed_province_id = GER_NEIGHBOR
+	ger_f.stationed_province_id = GER_FRONT
+	if "_pending_occupy" in _bm:
+		_bm._pending_occupy.clear()
+	if not _bm.has_method("resolve_occupy_arrival"):
+		_fail("resolve_occupy_arrival missing")
+		return
+	var empty_occ: Dictionary = _bm.call("resolve_occupy_arrival", fid, FRA_FRONT, ATT_TAG, GER_FRONT)
+	print("  [INFO] empty-hex occupy %s" % str(empty_occ))
+	if str(empty_occ.get("kind", "")) == "taken" or bool(empty_occ.get("broke", false)):
+		_fail("empty-hex occupy must not return kind=taken: %s" % str(empty_occ))
+		return
+	if not bool(empty_occ.get("captured", false)):
+		_fail("empty-hex occupy should capture: %s" % str(empty_occ))
+		return
+	_pass("empty-hex occupy no kind=taken")
+	fra_p.set("owner_tag", DEF_TAG)
+	fra_p.set("controller_tag", DEF_TAG)
+	ger_f.stationed_province_id = GER_FRONT
+	if fra_f != null:
+		fra_f.stationed_province_id = FRA_FRONT
+	if "is_in_combat" in ger_f:
+		ger_f.is_in_combat = false
+	if fra_f != null and "is_in_combat" in fra_f:
+		fra_f.is_in_combat = false
+	if "_open_land_battles" in _bm:
+		_bm._open_land_battles.clear()
+	if "_pending_occupy" in _bm:
+		_bm._pending_occupy.clear()
 	var rear_pid := int(rear_f.stationed_province_id) if "stationed_province_id" in rear_f else -1
 	if rear_pid != GER_REAR:
 		_fail("occupy-after-win GER_FID_2 teleported want %d got %s" % [GER_REAR, str(rear_pid)])

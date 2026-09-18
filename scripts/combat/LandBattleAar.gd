@@ -35,6 +35,21 @@ static func format_line(
 	return "Battle ended at %s" % name
 
 
+## Post-break walk-in line. Maginot 710739 = Bas-Rhin — never hardcode Haut-Rhin (710740).
+static func taken_event(to_id: int, place: String, economy: String = "") -> Dictionary:
+	var line := "Took %s · they broke" % place
+	if not economy.is_empty():
+		line += " · " + economy
+	return {
+		"ok": true,
+		"kind": "taken",
+		"to_id": to_id,
+		"place": place,
+		"line": line,
+		"broke": true,
+	}
+
+
 ## One captured pid only. Era-visible oil/steel/coal via harvest scale; occupied ×0.65.
 static func economy_sentence(
 	resources: Dictionary,

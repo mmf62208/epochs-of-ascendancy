@@ -18120,11 +18120,29 @@ func _highlight_march_path(province_path: Array) -> void:
 
 
 func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictionary = {}) -> void:
-	var pname := "province %d" % to_pid
-	if provinces.has(to_pid):
-		var p: Province = provinces[to_pid] as Province
-		if p != null:
-			pname = p.name
+	var pname := _province_display_name(to_pid) if to_pid > 0 else "the hex"
+	if pname.begins_with("#") and provinces.has(to_pid):
+		var p0: Province = provinces[to_pid] as Province
+		if p0 != null and not str(p0.name).is_empty():
+			pname = str(p0.name)
+	var occ: Dictionary = {}
+	if hop is Dictionary and hop.get("occupy") is Dictionary:
+		occ = hop.get("occupy") as Dictionary
+	if bool(occ.get("captured", false)):
+		var place := _province_display_name(to_pid) if to_pid > 0 else pname
+		var they_broke := (
+			bool(occ.get("broke", false))
+			or bool(occ.get("from_pending_occupy", false))
+			or bool(hop.get("broke", false))
+			or bool(hop.get("from_pending_occupy", false))
+			or str(occ.get("kind", "")) == "taken"
+		)
+		if they_broke:
+			var ev: Dictionary = LandBattleAar.taken_event(to_pid, place, str(occ.get("economy", "")))
+			_show_inspector_toast(str(ev.get("line", "Took %s · they broke" % place)), 4.5)
+		else:
+			_show_inspector_toast("Took %s · no opposition" % place, 4.0)
+		return
 	var rf: Dictionary = hop.get("reinforce", {}) as Dictionary if hop is Dictionary else {}
 	if bool(rf.get("joined", false)):
 		_sync_land_battle_bubbles()

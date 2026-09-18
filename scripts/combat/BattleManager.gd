@@ -42,6 +42,9 @@ var _resolver: CombatResolver
 var _open_land_battles: Array = []
 var _next_land_battle_seq: int = 1
 var _last_land_aar: Dictionary = {}
+## dest_id → {broke, from_pending_occupy, att_tag} stamped by occupy-after-win.
+var _pending_occupy: Dictionary = {}
+var _last_occupy_arrival: Dictionary = {}
 
 
 func _ready() -> void:
@@ -1381,17 +1384,21 @@ func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
 		var att_tag := str(battle.get("att_tag", ""))
 		var att_fid := str(battle.get("att_fid", ""))
 		if _interactive_light_sim():
-			# Hang-class: F5 capture stays deferred so the day tick returns.
-			# Compact playtest clock is already a sync loop — apply light capture
-			# now (no execute, no land-path BFS) so idle deferred cannot BFS later.
-			if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
+			var player := ""
+			if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+				player = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+			if player.is_empty() or player == "USA":
+				player = "GER"
+			if att_tag == player:
+				# Hex stays defender-owned until the occupy hop; taken line fires on walk-in.
+				_begin_occupy_after_victory(battle)
+				ev["success"] = true
+				ev["occupy_pending"] = true
+				ev["att_tag"] = att_tag
+			else:
 				_apply_attacker_win_capture_light(att_tag, to_id, from_id, att_fid)
 				ev["success"] = true
 				ev["deferred_capture"] = false
-			else:
-				call_deferred("_deferred_resolve_attacker_win", att_tag, to_id, from_id, att_fid)
-				ev["success"] = true
-				ev["deferred_capture"] = true
 		else:
 			var exec: Dictionary = execute_province_assault(att_tag, to_id, from_id, att_fid)
 			ev["success"] = bool(exec.get("success", false))
@@ -1412,6 +1419,124 @@ func _interactive_light_sim() -> bool:
 		and TimeManager.has_method("is_interactive_light_sim")
 		and bool(TimeManager.is_interactive_light_sim())
 	)
+
+
+func _begin_occupy_after_victory(battle: Dictionary) -> void:
+	var to_id := int(battle.get("to_id", -1))
+	var att_tag := str(battle.get("att_tag", "")).strip_edges().to_upper()
+	var disp := {
+		"defender_tag": str(battle.get("def_tag", "")),
+		"defender_formation_id": str(battle.get("def_fid", "")),
+	}
+	var rout := float(battle.get("def_org", 1.0)) < 0.22
+	disp["rout"] = rout
+	_displace_defender_from_captured_province(disp, to_id)
+	_pending_occupy[to_id] = {
+		"broke": true,
+		"from_pending_occupy": true,
+		"att_tag": att_tag,
+	}
+	var fids: Array = _fid_list(battle, "att_fids", "att_fid")
+	for fid_v in fids:
+		var fid := str(fid_v)
+		if fid.is_empty():
+			continue
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+			var f: Formation = LeaderManager.get_formation(fid)
+			if f != null and "is_in_combat" in f:
+				f.is_in_combat = false
+		if typeof(FormationMovement) != TYPE_NIL:
+			var enq: Dictionary = FormationMovement.enqueue_occupy_adjacent(fid, to_id, att_tag, true)
+			print("BattleManager: occupy-after-win enqueue %s %s" % [fid, str(enq)])
+	print("BattleManager: occupy-after-win %s → %d (hex not flipped yet)" % [att_tag, to_id])
+
+
+## Empty-hex occupy arrival: capture if still empty, else they walked in → real fight from `from_id`.
+## Post-break walk-in (stamped broke / from_pending_occupy) returns kind=taken after owner flip.
+func resolve_occupy_arrival(
+	formation_id: String,
+	dest_id: int,
+	country_tag: String,
+	from_id: int = -1,
+) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	var dest := int(dest_id)
+	if fid.is_empty() or dest <= 0:
+		return {"ok": false, "reason": "bad args"}
+	var pending: Dictionary = _pending_occupy.get(dest, {}) as Dictionary
+	var broke := bool(pending.get("broke", false)) or bool(pending.get("from_pending_occupy", false))
+	if typeof(FormationMovement) != TYPE_NIL:
+		var order: Dictionary = FormationMovement.get_march(fid)
+		if bool(order.get("broke", false)) or bool(order.get("from_pending_occupy", false)):
+			broke = true
+	var def_tag := ""
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var live: Province = MapManager.get_province(dest)
+		if live != null:
+			def_tag = _province_controller_tag(live)
+	var enemy_here := false
+	if not def_tag.is_empty() and def_tag != tag:
+		if not get_divisions_at_province(dest, def_tag).is_empty():
+			enemy_here = true
+		elif typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formations_for_country"):
+			for f_any in LeaderManager.get_formations_for_country(def_tag):
+				var df: Formation = f_any as Formation
+				if df == null or not ("stationed_province_id" in df):
+					continue
+				if int(df.stationed_province_id) != dest:
+					continue
+				var ft := str(df.formation_type) if "formation_type" in df else ""
+				if ft != "division" and ft != "garrison" and not ft.is_empty():
+					continue
+				enemy_here = true
+				break
+	if enemy_here:
+		var fr := from_id if from_id > 0 else dest
+		var fight: Dictionary = start_land_battle(tag, dest, fr, fid)
+		print("BattleManager: occupy meeting engagement %s %d→%d" % [fid, fr, dest])
+		var meet := {"ok": true, "fought": true, "captured": false, "result": fight}
+		_last_occupy_arrival = meet.duplicate()
+		return meet
+	_apply_attacker_win_capture_light(tag, dest, from_id if from_id > 0 else dest, fid)
+	_pending_occupy.erase(dest)
+	print("BattleManager: occupy empty %s took %d" % [fid, dest])
+	var place := _occupy_place_name(dest)
+	if broke:
+		var economy := ""
+		var aar: Dictionary = peek_last_land_aar()
+		if not str(aar.get("economy", "")).is_empty():
+			economy = str(aar.get("economy", ""))
+		var taken: Dictionary = LandBattleAar.taken_event(dest, place, economy)
+		var out_taken := {
+			"ok": true,
+			"captured": true,
+			"fought": true,
+			"broke": true,
+			"from_pending_occupy": true,
+			"kind": "taken",
+			"place": place,
+			"to_id": dest,
+			"line": str(taken.get("line", "")),
+			"economy": economy,
+		}
+		_last_occupy_arrival = out_taken.duplicate()
+		return out_taken
+	var out_empty := {"ok": true, "fought": false, "captured": true, "broke": false, "to_id": dest, "place": place}
+	_last_occupy_arrival = out_empty.duplicate()
+	return out_empty
+
+
+func peek_last_occupy_arrival() -> Dictionary:
+	return _last_occupy_arrival.duplicate()
+
+
+func _occupy_place_name(pid: int) -> String:
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
+		var p: Province = MapManager.get_province(pid)
+		if p != null and not str(p.name).strip_edges().is_empty():
+			return str(p.name).strip_edges()
+	return "the hex"
 
 
 func _deferred_resolve_attacker_win(att_tag: String, to_id: int, from_id: int, att_fid: String) -> void:

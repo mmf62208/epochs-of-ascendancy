@@ -7,6 +7,7 @@ extends RefCounted
 
 const ORDER_MOVE_TO_PROVINCE := "move_to_province"
 const ORDER_OWN_LAND_MARCH := "own_land_march"
+const ORDER_OCCUPY_EMPTY := "occupy_empty"
 
 const BASE_HOP_DAYS := 1.0
 const HOP_DAYS_MIN := 0.25
@@ -366,6 +367,91 @@ static func enqueue_own_sea_hop(
 	}
 
 
+## One hop onto an adjacent empty enemy hex. Red arrow, travel time, no fight box.
+## `broke` stamps post-break occupy-after-win (taken line); empty-hex leaves it false.
+static func enqueue_occupy_adjacent(
+	formation_id: String,
+	dest_id: int,
+	country_tag: String,
+	broke: bool = false,
+) -> Dictionary:
+	var fid := formation_id.strip_edges()
+	var tag := country_tag.strip_edges().to_upper()
+	if fid.is_empty() or tag.is_empty() or dest_id <= 0:
+		return {"ok": false, "reason": "bad args"}
+	if typeof(LeaderManager) == TYPE_NIL or not LeaderManager.has_method("get_formation"):
+		return {"ok": false, "reason": "no formation"}
+	var f: Formation = LeaderManager.get_formation(fid)
+	if f == null:
+		return {"ok": false, "reason": "unknown unit"}
+	if str(f.country_tag).strip_edges().to_upper() != tag:
+		return {"ok": false, "reason": "not your unit"}
+	var from_id := int(f.stationed_province_id) if "stationed_province_id" in f else -1
+	if from_id <= 0 or from_id == dest_id:
+		return {"ok": false, "reason": "bad station"}
+	if typeof(MapManager) == TYPE_NIL:
+		return {"ok": false, "reason": "no map"}
+	var dest: Province = MapManager.get_province(dest_id)
+	if dest == null or bool(dest.is_sea):
+		return {"ok": false, "reason": "not land"}
+	var adj := false
+	for nb in MapManager.get_adjacent_provinces(from_id, true):
+		if int(nb) == dest_id:
+			adj = true
+			break
+	if not adj:
+		return {"ok": false, "reason": "not adjacent"}
+	var path: Array = [from_id, dest_id]
+	var prof: Dictionary = template_profile(f)
+	var first_cost := maxf(1.0, _hop_cost_into(dest_id, prof))
+	var skip_day := 0
+	if DisplayServer.get_name() != "headless" and typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+		skip_day = int(TimeManager.total_days_elapsed) + 1
+	var order := {
+		"formation_id": fid,
+		"country_tag": tag,
+		"path": path,
+		"hop_index": 1,
+		"progress": 0.0,
+		"hop_cost": first_cost,
+		"dest_id": dest_id,
+		"from_id": from_id,
+		"order_type": ORDER_OCCUPY_EMPTY,
+		"occupy": true,
+		"skip_until_day": skip_day,
+		"broke": broke,
+		"from_pending_occupy": broke,
+	}
+	_orders[fid] = order
+	var eta := remaining_eta_days(order)
+	return {
+		"ok": true,
+		"reason": "",
+		"path": path,
+		"hops": 1,
+		"eta_days": eta,
+		"from_id": from_id,
+		"dest_id": dest_id,
+		"formation_id": fid,
+		"occupy": true,
+		"broke": broke,
+		"from_pending_occupy": broke,
+	}
+
+
+static func list_occupy_orders() -> Array:
+	var out: Array = []
+	for fid_v in _orders.keys():
+		var order: Dictionary = _orders[fid_v] as Dictionary
+		if not bool(order.get("occupy", false)):
+			continue
+		var row: Dictionary = get_march(str(fid_v))
+		if not row.is_empty():
+			row["occupy"] = true
+			out.append(row)
+	return out
+
+
 static func clear_march(formation_id: String) -> bool:
 	var fid := formation_id.strip_edges()
 	if fid.is_empty() or not _orders.has(fid):
@@ -484,6 +570,13 @@ static func tick_all_marches(days: float = 1.0) -> Array:
 		if not _orders.has(fid):
 			continue
 		var order: Dictionary = _orders[fid] as Dictionary
+		if bool(order.get("occupy", false)):
+			var skip_until := int(order.get("skip_until_day", 0))
+			var day_n := 0
+			if typeof(TimeManager) != TYPE_NIL and "total_days_elapsed" in TimeManager:
+				day_n = int(TimeManager.total_days_elapsed)
+			if skip_until > day_n:
+				continue
 		order["progress"] = float(order.get("progress", 0.0)) + days
 		var hops_done: Array = _commit_ready_hops(order)
 		for h in hops_done:
@@ -499,6 +592,7 @@ static func tick_all_marches(days: float = 1.0) -> Array:
 				int(mv.get("to_id", -1)),
 				bool(mv.get("arrived", false)),
 				int(mv.get("dest_id", -1)),
+				mv,
 			)
 	return moved
 
@@ -517,6 +611,28 @@ static func _commit_ready_hops(order: Dictionary) -> Array:
 		var to_pid := int(path[hop_i])
 		var from_pid := int(path[hop_i - 1]) if hop_i > 0 else int(order.get("from_id", -1))
 		order["progress"] = float(order.get("progress", 0.0)) - float(order.get("hop_cost", 1.0))
+		var arrived_now := hop_i >= path.size() - 1 or to_pid == dest_id
+		var do_occupy := bool(order.get("occupy", false)) and arrived_now
+		if do_occupy and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("resolve_occupy_arrival"):
+			var occ: Dictionary = BattleManager.resolve_occupy_arrival(fid, to_pid, tag, from_pid)
+			var hop_broke := bool(order.get("broke", false)) or bool(occ.get("broke", false))
+			var hop_pending := bool(order.get("from_pending_occupy", false)) or bool(occ.get("from_pending_occupy", false))
+			var hop_occ := {
+				"formation_id": fid,
+				"from_id": from_pid,
+				"to_id": to_pid,
+				"dest_id": dest_id,
+				"arrived": true,
+				"country_tag": tag,
+				"occupy": occ,
+				"broke": hop_broke,
+				"from_pending_occupy": hop_pending,
+				"kind": str(occ.get("kind", "")),
+			}
+			out.append(hop_occ)
+			order["arrived"] = true
+			order["hop_index"] = path.size()
+			break
 		var res: Dictionary = move_formation_to_province(fid, to_pid, tag)
 		if not bool(res.get("ok", false)) and typeof(LeaderManager) != TYPE_NIL:
 			var f: Formation = LeaderManager.get_formation(fid)
@@ -549,7 +665,13 @@ static func _commit_ready_hops(order: Dictionary) -> Array:
 	return out
 
 
-static func _notify_map_light(from_pid: int, to_pid: int, arrived: bool = false, dest_id: int = -1) -> void:
+static func _notify_map_light(
+	from_pid: int,
+	to_pid: int,
+	arrived: bool = false,
+	dest_id: int = -1,
+	hop: Dictionary = {},
+) -> void:
 	var tree := Engine.get_main_loop()
 	if tree == null or not (tree is SceneTree):
 		return
@@ -557,4 +679,4 @@ static func _notify_map_light(from_pid: int, to_pid: int, arrived: bool = false,
 		if mr.has_method("refresh_after_capture_light"):
 			mr.call_deferred("refresh_after_capture_light", to_pid, from_pid)
 		if mr.has_method("_on_march_hop_ui"):
-			mr.call_deferred("_on_march_hop_ui", to_pid, arrived, dest_id, {})
+			mr.call_deferred("_on_march_hop_ui", to_pid, arrived, dest_id, hop)
