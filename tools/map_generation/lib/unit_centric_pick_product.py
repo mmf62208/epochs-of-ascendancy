@@ -185,6 +185,29 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     else:
         fails.append("stack_cycle_no_card_rebuild")
 
+    land_open = _gd_func_slice(ren, "_try_open_land_unit_at_world")
+    left_cycles = (
+        bool(land_open)
+        and "_cycle_selected_stack_unit(1)" in land_open
+        and "_prompt_cancel_selected_orders" not in land_open
+    )
+    wiring["left_click_cycles_not_cancel"] = left_cycles
+    if left_cycles:
+        passes.append("left_click_cycles_not_cancel")
+    else:
+        fails.append("left_click_cycles_not_cancel")
+    own_hex = _gd_func_slice(ren, "order_selected_unit_at_province")
+    right_cancel = (
+        bool(own_hex)
+        and "_prompt_cancel_selected_orders" in own_hex
+        and 'from_pid == int(province.id)' in own_hex
+    )
+    wiring["right_click_same_hex_cancel"] = right_cancel
+    if right_cancel:
+        passes.append("right_click_same_hex_cancel")
+    else:
+        fails.append("right_click_same_hex_cancel")
+
     badge_fn = _gd_func_slice(ren, "_make_formation_stack_badge")
     plates_fn = _gd_func_slice(ren, "_make_stack_offset_plates")
     stack_vis = (

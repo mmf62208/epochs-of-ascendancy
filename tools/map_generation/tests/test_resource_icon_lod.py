@@ -32,6 +32,16 @@ class TestResourceIconLOD(unittest.TestCase):
         self.assertIn("uranium", self.src)
         self.assertIn("_draw_resource_icons_culled", self.src)
         self.assertIn("max_resource_icons_for_board", self.src)
+        self.assertIn("var show_resource_icons: bool = false", self.src)
+        self.assertIn("func set_map_mode_for_glyphs", self.src)
+        draw_i = self.src.find("func _draw():")
+        draw_slice = self.src[draw_i : draw_i + 900]
+        self.assertIn("if show_resource_icons:", draw_slice)
+        culled = self.src[self.src.find("func _draw_resource_icons_culled") :]
+        culled = culled[: culled.find("\nfunc ", 1)]
+        self.assertIn("if not show_resource_icons:", culled)
+        self.assertNotIn("draw_circle", culled)
+        self.assertNotIn("draw_string", culled)
 
 
 if __name__ == "__main__":

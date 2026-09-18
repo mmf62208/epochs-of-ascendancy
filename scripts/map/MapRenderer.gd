@@ -17380,11 +17380,7 @@ func _try_open_land_unit_at_world(world_pos: Vector2, _ctrl_click: bool = false)
 				return false
 	var click_fid := str(fo.formation_id) if "formation_id" in fo else ""
 	if not selected_formation_id.is_empty() and click_fid == selected_formation_id:
-		# Own hex / same chip: cancel this division's march or attack.
-		if _selected_unit_has_orders():
-			_prompt_cancel_selected_orders()
-			return true
-		# Same chip again: cycle stack if ×N, else do not rebuild the card (25GB leak).
+		# Left-click same chip: cycle the stack. Cancel is right-click this hex.
 		_cycle_selected_stack_unit(1)
 		return true
 	if not selected_formation_id.is_empty() and "stationed_province_id" in fo:
@@ -17439,7 +17435,7 @@ func _select_map_unit(formation: Object) -> void:
 	if pid >= 0:
 		attack_staging_province_id = pid
 		debug_combat_attacker_province_id = pid
-	var toast := "Unit selected · %s · click / right-click own land to MARCH · right-click or Ctrl+click enemy to FIGHT · Esc clears" % name_s
+	var toast := "Unit selected · %s · click stack to cycle · right-click this hex to cancel orders · own land MARCH · enemy FIGHT" % name_s
 	_show_inspector_toast(toast, 3.0)
 
 
@@ -19767,7 +19763,7 @@ func order_selected_unit_at_province(province: Province) -> Dictionary:
 		out["kind"] = "no_unit"
 		return out
 	var from_pid := int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
-	# Click own hex: cancel march / attack for THIS division only.
+	# Right-click own hex: cancel march / attack for THIS division only.
 	if from_pid == int(province.id):
 		var prompted := _prompt_cancel_selected_orders()
 		out["handled"] = true

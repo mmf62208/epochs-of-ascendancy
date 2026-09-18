@@ -42,6 +42,9 @@ var _supply_corridor_edges: Dictionary = {}
 var show_rails: bool = false
 var show_cities: bool = false  # Off by default — toggle C or F10; draw fallback was grey-box spam at playtest zoom.
 var show_sites: bool = false  # Off by default on political; enable via Y / Infra mapmode / F10
+## Resource goods glyphs — F9 resources mapmode only. Political stays clean fills.
+var show_resource_icons: bool = false
+var _glyph_map_mode: String = "political"
 var proposed_children: Array = []
 var proposed_data_loaded: bool = false
 const PROPOSED_SPLIT_PATH := "res://tools/map_generation/output/phase1_europe/proposed_children_geometry.json"
@@ -1060,7 +1063,8 @@ func _draw():
         if not (city_layer and city_layer.get_child_count() > 0):
             _draw_cities_culled(zoom, draw_provs)
 
-    _draw_resource_icons_culled(zoom, draw_provs)
+    if show_resource_icons:
+        _draw_resource_icons_culled(zoom, draw_provs)
 
     if show_proposed_splits and OS.is_debug_build():
         _draw_proposed_splits(zoom)
@@ -1427,7 +1431,16 @@ func _draw_cities_culled(zoom: float, provinces: Dictionary) -> void:
 
 # === Simple Resource Icons (map improvement for visibility) ===
 # Draws small indicators for primary resources when zoomed in.
+func set_map_mode_for_glyphs(mode: String) -> void:
+    var m := mode.strip_edges().to_lower()
+    _glyph_map_mode = m
+    show_resource_icons = m == "resources"
+    queue_redraw()
+
+
 func _draw_resource_icons(zoom: float = 1.0) -> void:
+    if not show_resource_icons:
+        return
     _draw_resource_icons_culled(zoom, _get_provinces_for_layers())
 
 
@@ -1479,6 +1492,8 @@ func _resource_tex(key: String) -> Texture2D:
 
 
 func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
+    if not show_resource_icons:
+        return
     if not map_manager:
         return
 
@@ -1527,54 +1542,12 @@ func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
 
         drawn += 1
         var px := icon_px_for_amount(primary_amt)
-        var icon_pos = center + Vector2(12, 12)
-        var ring := Color(0.05, 0.05, 0.08, 0.55)
-        draw_circle(icon_pos, px * 0.62, ring)
+        var icon_pos = center + Vector2(10, 10)
         var tex: Texture2D = _resource_tex(primary)
-        if tex != null:
-            var sz := Vector2(px, px)
-            draw_texture_rect(tex, Rect2(icon_pos - sz * 0.5, sz), false)
+        if tex == null:
             continue
-        var symbol = "●"
-        var col = Color(0.8, 0.8, 0.6, 0.9)
-        match primary.to_lower():
-            "iron", "steel":
-                symbol = "⚙"
-                col = Color(0.55, 0.6, 0.68, 0.95)
-            "coal":
-                symbol = "⬛"
-                col = Color(0.22, 0.22, 0.24, 0.95)
-            "oil", "fuel":
-                symbol = "🛢"
-                col = Color(0.12, 0.12, 0.14, 0.95)
-            "uranium":
-                symbol = "☢"
-                col = Color(0.45, 0.85, 0.35, 0.95)
-            "rubber":
-                symbol = "●"
-                col = Color(0.35, 0.28, 0.22, 0.95)
-            "aluminum", "aluminium":
-                symbol = "◇"
-                col = Color(0.75, 0.78, 0.85, 0.95)
-            "chromium":
-                symbol = "◆"
-                col = Color(0.55, 0.35, 0.85, 0.95)
-            "tungsten":
-                symbol = "◆"
-                col = Color(0.75, 0.55, 0.20, 0.95)
-            "rare_earths", "semiconductors":
-                symbol = "◆"
-                col = Color(0.35, 0.85, 0.65, 0.95)
-            "food", "grain", "agriculture":
-                symbol = "🌾"
-                col = Color(0.75, 0.7, 0.25, 0.9)
-            _:
-                symbol = "●"
-                col = Color(0.7, 0.65, 0.5, 0.85)
-        draw_circle(icon_pos, px * 0.42, col)
-        var font := ThemeDB.fallback_font
-        if font:
-            draw_string(font, icon_pos + Vector2(-5, 4), symbol, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color(1, 1, 1, 0.92))
+        var sz := Vector2(px, px)
+        draw_texture_rect(tex, Rect2(icon_pos - sz * 0.5, sz), false)
 
 
 func _get_current_zoom() -> float:

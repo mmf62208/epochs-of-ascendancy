@@ -47,6 +47,12 @@ class TestMapResourcesMapmodeProduct(unittest.TestCase):
         self.assertIn("debug_tint_mode == \"resources\"", ren)
         self.assertIn("func resources_mapmode_color_from_dict", ren)
         self.assertIn("_resources_mapmode_color_for_province", ren)
+        self.assertIn("set_map_mode_for_glyphs", ren)
+        overlay = (ROOT / "scripts" / "map" / "InfrastructureOverlayLayer.gd").read_text(
+            encoding="utf-8"
+        )
+        self.assertIn("func set_map_mode_for_glyphs", overlay)
+        self.assertIn("var show_resource_icons: bool = false", overlay)
         tb = TOOLBAR.read_text(encoding="utf-8")
         self.assertIn('"resources"', tb)
         self.assertIn("Resources", tb)
