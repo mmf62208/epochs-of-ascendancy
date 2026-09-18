@@ -18453,10 +18453,8 @@ func _fight_card_nato_row(rows: Array, fogged: bool) -> HBoxContainer:
 
 
 func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictionary = {}) -> void:
-	if to_pid > 0 and to_pid not in _living_land_chip_pids:
-		_living_land_chip_pids.append(to_pid)
-	if dest_id > 0 and dest_id not in _living_land_chip_pids:
-		_living_land_chip_pids.append(dest_id)
+	_living_chip_pid_maybe(to_pid)
+	_living_chip_pid_maybe(dest_id)
 	var pname := "province %d" % to_pid
 	if provinces.has(to_pid):
 		var p: Province = provinces[to_pid] as Province
@@ -26528,15 +26526,37 @@ func _force_border_update_deferred() -> void:
 
 ## Light post-capture: recolor + pins for the passed pids only. Skips full-board work.
 func refresh_after_capture_light(province_id: int = -1, from_province_id: int = -1, retreat_pid: int = -1) -> void:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("_maybe_trip_rss_budget"):
+		TimeManager.call("_maybe_trip_rss_budget")
 	var pids: Array = []
 	for v in [province_id, from_province_id, retreat_pid]:
 		var pid := int(v)
 		if pid >= 0 and not pids.has(pid):
 			pids.append(pid)
-			if pid not in _living_land_chip_pids:
-				_living_land_chip_pids.append(pid)
+			_living_chip_pid_maybe(pid)
 	_refresh_province_fill_pids(pids)
 	_update_unit_icons_for_pids(pids)
+	_prune_empty_living_chip_pids(pids)
+
+
+func _living_chip_pid_maybe(pid: int) -> void:
+	if pid <= 0:
+		return
+	if pid in _living_land_chip_pids:
+		return
+	_living_land_chip_pids.append(pid)
+
+
+func _prune_empty_living_chip_pids(check: Array) -> void:
+	# Maginot pair + seed capitals stay even if empty this frame.
+	var keep := {710173: true, 710739: true, 711414: true, 800792: true, 903534: true, 710963: true, 903981: true, 711112: true}
+	for v in check:
+		var pid := int(v)
+		if pid <= 0 or keep.has(pid):
+			continue
+		if pid in _demo_unit_icon_pids:
+			continue
+		_living_land_chip_pids.erase(pid)
 
 
 func _ensure_border_layer() -> void:
