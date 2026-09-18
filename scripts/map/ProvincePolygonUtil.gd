@@ -64,39 +64,49 @@ static func is_drawable(points: PackedVector2Array) -> bool:
 	return not indices.is_empty()
 
 
-## Best-effort drawable outline: sanitize → optional convex hull fallback.
-## Returns empty if even hull fails (caller should use circle).
+## Sanitize only. Never convex-hull: Moselle/Bas-Rhin hulls swallow Luxembourg and GER neighbors.
 static func make_drawable(points: PackedVector2Array) -> PackedVector2Array:
+	return sanitize(points)
+
+
+## Convex pieces for canvas fill when the NUTS ring will not triangulate. Not a hull of neighbors.
+static func convex_parts(points: PackedVector2Array) -> Array:
 	var clean := sanitize(points)
 	if clean.size() < 3:
-		return PackedVector2Array()
+		return []
 	if is_drawable(clean):
-		return clean
-	# Convex hull is always simple (non-self-intersecting) when ≥3 points.
-	var hull: PackedVector2Array = Geometry2D.convex_hull(clean)
-	hull = sanitize(hull)
-	if hull.size() >= 3 and is_drawable(hull):
-		return hull
-	return PackedVector2Array()
+		return [clean]
+	var parts: Array = Geometry2D.decompose_polygon_in_convex(clean)
+	var out: Array = []
+	for p in parts:
+		var ring: PackedVector2Array = sanitize(p)
+		if ring.size() >= 3:
+			out.append(ring)
+	return out
 
 
-## Assign to Polygon2D safely. Returns points actually stored (may be hull).
+## Assign to Polygon2D safely. Prefers the real ring; never hulls over neighbors.
 static func assign_polygon2d(poly: Polygon2D, points: PackedVector2Array) -> PackedVector2Array:
 	if poly == null:
 		return PackedVector2Array()
-	var drawable := make_drawable(points)
-	if drawable.size() < 3:
-		# Minimal triangle around centroid so node still has something
-		var c := centroid(sanitize(points))
-		if c == Vector2.ZERO and points.size() > 0:
-			c = points[0]
-		drawable = PackedVector2Array([
-			c + Vector2(0, -6),
-			c + Vector2(5.2, 3),
-			c + Vector2(-5.2, 3),
-		])
-	poly.polygon = drawable
-	return drawable
+	var clean := sanitize(points)
+	if is_drawable(clean):
+		poly.polygon = clean
+		return clean
+	var parts: Array = convex_parts(clean)
+	if parts.size() >= 1:
+		poly.polygon = parts[0]
+		return clean
+	var c := centroid(clean)
+	if c == Vector2.ZERO and points.size() > 0:
+		c = points[0]
+	var tri := PackedVector2Array([
+		c + Vector2(0, -6),
+		c + Vector2(5.2, 3),
+		c + Vector2(-5.2, 3),
+	])
+	poly.polygon = tri
+	return clean
 
 
 ## Assign CollisionPolygon2D — prefers convex (physics-friendly).

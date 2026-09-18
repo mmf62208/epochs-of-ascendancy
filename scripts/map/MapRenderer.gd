@@ -15446,15 +15446,26 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 	if MapManager != null and MapManager.has_method("is_geometry_world_native"):
 		_wn = MapManager.is_geometry_world_native()
 	points = MapCanvasConfig.transform_province_points(points, _is_world_canvas_active(), true, _wn)
-	# Sanitize at create time so every clickable province is drawable / collidable (world_full).
-	points = ProvincePolygonUtil.make_drawable(points)
-	if points.size() < 3:
+	var ring: PackedVector2Array = ProvincePolygonUtil.sanitize(points)
+	if ring.size() < 3:
 		return node
+	node.set_meta("outline_ring", ring)
 
 	var poly := Polygon2D.new()
-	points = ProvincePolygonUtil.assign_polygon2d(poly, points)
+	poly.name = "Fill"
+	var assigned: PackedVector2Array = ProvincePolygonUtil.assign_polygon2d(poly, ring)
 	poly.color = _get_province_color(province)
 	poly.antialiased = true
+	var parts: Array = ProvincePolygonUtil.convex_parts(ring)
+	if parts.size() > 1:
+		# Extra convex pieces so a C-shaped NUTS ring (Moselle around LUX) fills without hulling.
+		for i in range(1, parts.size()):
+			var extra := Polygon2D.new()
+			extra.name = "Fill_%d" % i
+			extra.polygon = parts[i]
+			extra.color = poly.color
+			extra.antialiased = true
+			node.add_child(extra)
 
 	# Area2D is now completely optional.
 	# In the recommended production pure-spatial configuration (use_spatial_picking=true AND
@@ -15462,7 +15473,7 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 	if create_area_nodes_for_fallback or not use_spatial_picking:
 		var area := Area2D.new()
 		var collision := CollisionPolygon2D.new()
-		ProvincePolygonUtil.assign_collision_polygon(collision, points)
+		ProvincePolygonUtil.assign_collision_polygon(collision, ring)
 		if collision.polygon.size() >= 3:
 			area.add_child(collision)
 			area.input_event.connect(_on_province_input.bind(province, node))
@@ -15471,6 +15482,7 @@ func _create_province_node(province: Province, geo: Dictionary) -> Node2D:
 			node.add_child(area)
 
 	node.add_child(poly)
+	points = assigned if assigned.size() >= 3 else ring
 
 	var center := _calculate_centroid(points)
 	province_centroids[province.id] = center
@@ -22520,7 +22532,7 @@ func _refresh_province_fill_pids(pids: Array) -> void:
 		col = _apply_agent_pressure_base_tint(col, province)
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("has_active_riot") and GameData.has_active_riot(pid):
 			col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)
-		poly.color = col
+		_set_province_fill_color(node as Node2D, col)
 
 
 func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
@@ -22557,7 +22569,7 @@ func _refresh_province_fill_colors(refresh_all: bool = false) -> void:
 		# Riot tint for active_riots provinces (red overlay hint when political or any mode; visible on inspector hover too via single refresh)
 		if typeof(GameData) != TYPE_NIL and GameData.has_method("has_active_riot") and GameData.has_active_riot(int(pid)):
 			col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)  # riot red tint
-		poly.color = col
+		_set_province_fill_color(node as Node2D, col)
 	_refresh_supply_highlights()
 	_fill_zoom_at_last_paint = _zoom_fill_characterization_scale
 
@@ -23151,6 +23163,10 @@ func _get_nato_sheet_region(tag: String, arch: String, era: String = "ww2") -> R
 
 
 func _province_polygon(node: Node2D) -> PackedVector2Array:
+	if node != null and node.has_meta("outline_ring"):
+		var ring: PackedVector2Array = node.get_meta("outline_ring")
+		if ring.size() >= 3:
+			return ring
 	var poly := _get_province_polygon(node)
 	if poly == null:
 		return PackedVector2Array()
@@ -23163,9 +23179,31 @@ func _province_node(province_id: int) -> Node2D:
 
 ## Robust helper to find the Polygon2D child regardless of whether an Area2D was also added.
 ## Essential for pure spatial mode (no Area2D) and hybrid mode.
+func _set_province_fill_color(node: Node2D, col: Color) -> void:
+	if node == null:
+		return
+	var n := 0
+	for child in node.get_children():
+		if child is Polygon2D and str(child.name).begins_with("Fill"):
+			(child as Polygon2D).color = col
+			n += 1
+	if n == 0:
+		var poly := _get_province_polygon(node)
+		if poly != null:
+			poly.color = col
+
+
 func _get_province_polygon(node: Node2D) -> Polygon2D:
 	if node == null:
 		return null
+	var named := node.get_node_or_null("Fill") as Polygon2D
+	if named != null:
+		return named
+	for child in node.get_children():
+		if child is Polygon2D:
+			var n := str(child.name)
+			if n.begins_with("Fill") or n.begins_with("Prov"):
+				return child as Polygon2D
 	for child in node.get_children():
 		if child is Polygon2D:
 			return child as Polygon2D
@@ -23294,7 +23332,7 @@ func _set_hover_outline(province_id: int, visible: bool) -> void:
 	if node == null:
 		return
 	if visible:
-		var width := 3.8 if province_id == selected_province_id else 3.4
+		var width := 2.0 if province_id == selected_province_id else 1.7
 		if provinces.has(province_id):
 			var hp: Province = provinces[province_id] as Province
 			if ProvinceInsight.agent_has_today_pressure_tick(hp):
@@ -23316,7 +23354,7 @@ func _set_hover_outline(province_id: int, visible: bool) -> void:
 			oc["color"],
 			width,
 			oc["glow"],
-			3.5,
+			1.1,
 			ProvinceMapVisuals.Z_HOVER,
 		)
 	else:
@@ -23495,7 +23533,7 @@ func _refresh_single_province_fill(province_id: int) -> void:
 	# Riot tint (live on data_changed for riot pids)
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("has_active_riot") and GameData.has_active_riot(province_id):
 		col = col.lerp(Color(0.85, 0.25, 0.25, 0.55), 0.40)
-	poly.color = col
+	_set_province_fill_color(node, col)
 
 
 ## Public helper for F10 harness / tester: force re-compute all province fills (tints).
@@ -24093,7 +24131,7 @@ func _apply_hover_fill(province_id: int, active: bool) -> void:
 		col = col.lerp(agent_tint, fill_strength)
 	elif contested:
 		col = col.lerp(_CONFLICT_FILL_TINT, 0.09)
-	poly.color = col.lerp(_HOVER_FILL_TINT, boost)
+	_set_province_fill_color(node, col.lerp(_HOVER_FILL_TINT, boost))
 
 
 func _update_outline_pulse() -> void:
