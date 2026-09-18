@@ -17426,6 +17426,8 @@ func _try_open_unit_at_world(world_pos: Vector2) -> bool:
 func _select_map_unit(formation: Object) -> void:
 	if formation == null:
 		return
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("note_last_callee"):
+		TimeManager.note_last_callee("pick")
 	var fid := ""
 	if "formation_id" in formation:
 		fid = str(formation.formation_id)
@@ -19876,13 +19878,17 @@ func order_selected_unit_at_province(province: Province) -> Dictionary:
 		% [tag, from_pid, int(province.id)]
 	)
 	_order_busy_until_msec = now_ms + 800
-	call_deferred(
-		"_deferred_commit_attack",
-		tag,
-		from_pid,
-		int(province.id),
-		selected_formation_id
-	)
+	# Headless -s never pumps idle: commit now so start_land_battle is on the click path.
+	if DisplayServer.get_name() == "headless":
+		_deferred_commit_attack(tag, from_pid, int(province.id), selected_formation_id)
+	else:
+		call_deferred(
+			"_deferred_commit_attack",
+			tag,
+			from_pid,
+			int(province.id),
+			selected_formation_id
+		)
 	out["handled"] = true
 	out["ok"] = true
 	out["kind"] = "start_battle"
@@ -20409,11 +20415,15 @@ func _try_execute_province_attack(target_pid: int, target_province: Province) ->
 		return true
 	_assault_execute_busy = true
 	var assault: Dictionary = {}
-	# Multi-day open (HOI front) when start_land_battle exists; execute_province_assault is resolve-only.
+	# Multi-day open (HOI front) when start_land_battle exists; capture execute is resolve-only.
 	if BattleManager.has_method("start_land_battle"):
 		assault = BattleManager.start_land_battle(p_tag, target_pid, from_pid, selected_formation_id)
 	else:
-		assault = BattleManager.execute_province_assault(p_tag, target_pid, from_pid)
+		_assault_execute_busy = false
+		push_error("MapRenderer: F5 click must use start_land_battle, never resolve-only execute")
+		assert(false, "F5 click never resolve-only execute")
+		_show_inspector_toast("Assault API missing · start_land_battle required", 3.2, true)
+		return true
 	push_map_assault_marker(target_pid, "engage", 0.75)
 	if bool(assault.get("opened", false)):
 		_assault_execute_busy = false
@@ -22286,23 +22296,31 @@ func _toggle_supply_overlay() -> void:
 		if ol_infra.has_method("queue_redraw"):
 			ol_infra.queue_redraw()
 	if supply_mode:
-		_setup_supply_layer()
-		# Hang-class: do not BFS a 3520-board corridor on the L/G frame.
+		# Hang-class: no full-board pathing or outline walk on the L key frame.
 		_show_inspector_toast("Supply legend ON · click a unit chip to order (march / Ctrl+click assault)", 4.0)
 		_update_supply_overlay_legend()
+		call_deferred("_deferred_l_on_supply")
 	else:
 		_end_supply_reroute()
 		if supply_map_layer != null and supply_map_layer.has_method("clear_route_highlight"):
 			supply_map_layer.call("clear_route_highlight")
-	# Skip full fill recolor on toggle — was expensive; tint handles on next mapmode.
-	_refresh_supply_highlights()
-	_update_supply_overlay_legend()
+		# Skip full fill recolor on toggle — was expensive; tint handles on next mapmode.
+		call_deferred("_refresh_supply_highlights")
+		_update_supply_overlay_legend()
 	if _hover_province != null:
 		_refresh_hover_tooltip(_hover_province)
 	if supply_overlay_panel:
 		if not supply_mode:
 			supply_overlay_panel.hide_panel()
 	_sync_supply_route_canvas_stack()
+
+
+func _deferred_l_on_supply() -> void:
+	if not supply_mode:
+		return
+	_setup_supply_layer()
+	_refresh_supply_highlights()
+	_update_supply_overlay_legend()
 
 
 func _refresh_supply_routes() -> void:

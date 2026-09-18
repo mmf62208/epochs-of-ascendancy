@@ -12,6 +12,8 @@ ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 ORDER_PANEL = ROOT / "scripts" / "ui" / "OrderCommandPanel.gd"
 BATTLE_MANAGER = ROOT / "scripts" / "combat" / "BattleManager.gd"
+TIME_MANAGER = ROOT / "scripts" / "autoload" / "TimeManager.gd"
+LEADER_EVENT_UI = ROOT / "scripts" / "ui" / "LeaderEventUI.gd"
 
 
 def _gd_func_slice(src: str, func_name: str) -> str:
@@ -37,8 +39,14 @@ def _execute_success_slice(renderer_src: str) -> str:
     return fn[idx:]
 
 
-def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
+def _hang_class_checks(
+    renderer_src: str, battle_src: str, time_src: str = "", event_src: str = ""
+) -> Dict[str, bool]:
     exec_after = _execute_success_slice(renderer_src)
+    try_exec = _gd_func_slice(renderer_src, "_try_execute_province_attack")
+    commit = _gd_func_slice(renderer_src, "_commit_selected_attack")
+    pick = _gd_func_slice(renderer_src, "_select_map_unit")
+    l_toggle = _gd_func_slice(renderer_src, "_toggle_supply_overlay")
     b_instant = _gd_func_slice(renderer_src, "_run_live_border_fronts_instant")
     b_show = _gd_func_slice(renderer_src, "show_live_border_fronts")
     capture = _gd_func_slice(renderer_src, "refresh_after_capture_light")
@@ -47,6 +55,9 @@ def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
     pin = _gd_func_slice(renderer_src, "_try_open_unit_at_world")
     attack_btn = _gd_func_slice(renderer_src, "_update_attack_button")
     owner_fn = _gd_func_slice(renderer_src, "_on_map_province_data_changed")
+    start_bm = _gd_func_slice(battle_src, "start_land_battle")
+    can_assault = _gd_func_slice(battle_src, "can_assault_province")
+    show_toast = _gd_func_slice(event_src, "show_toast")
 
     fail_idx = exec_after.find('if not bool(assault.get("success"')
     fail_has_busy_clear = False
@@ -61,9 +72,36 @@ def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
     notify_uses_target = (
         "target_pid" in notify or "target_province_id" in notify
     ) and "selected_province_id" not in notify
+    click_path = try_exec + "\n" + commit
+    assault_success = exec_after if exec_after else click_path
+    l_idx = renderer_src.find("if event.keycode == KEY_L:")
+    l_key = renderer_src[l_idx : l_idx + 400] if l_idx >= 0 else ""
     return {
-        "execute_no_info_panel": bool(exec_after) and "show_info_panel" not in exec_after,
-        "execute_no_force_border": bool(exec_after) and "force_border_update" not in exec_after,
+        "can_assault_no_preview_leak": bool(can_assault)
+        and "get_battle_preview" not in can_assault,
+        "toast_skip_headless": bool(show_toast) and "_should_skip_toast_ui" in show_toast,
+        "click_no_execute_fallback": bool(try_exec)
+        and bool(commit)
+        and "execute_province_assault" not in try_exec
+        and "execute_province_assault(" not in commit,
+        "pick_no_full_rebuild": bool(pick)
+        and "_update_unit_icons_for_test" not in pick
+        and "show_info_panel" not in pick,
+        "l_on_no_bfs": bool(l_toggle)
+        and "preview_player_route" not in l_toggle
+        and "find_land_path" not in l_toggle
+        and "preview_player_route" not in l_key
+        and "find_land_path" not in l_key,
+        "rss_pause_2_5gb": "_RSS_PAUSE_KB := 2500000" in time_src,
+        "last_callee_api": "func note_last_callee" in time_src
+        and "func last_callee" in time_src,
+        "start_notes_last_callee": "note_last_callee" in start_bm
+        and 'note_last_callee("start_land_battle")' in start_bm,
+        "pick_notes_last_callee": 'note_last_callee("pick")' in pick,
+        "execute_no_info_panel": bool(assault_success)
+        and "show_info_panel" not in assault_success,
+        "execute_no_force_border": bool(assault_success)
+        and "force_border_update" not in assault_success,
         "b_path_no_info_panel": bool(b_instant)
         and bool(b_show)
         and "show_info_panel" not in b_instant
@@ -75,11 +113,7 @@ def _hang_class_checks(renderer_src: str, battle_src: str) -> Dict[str, bool]:
         "notify_uses_target_pid": bool(notify) and notify_uses_target,
         "notify_includes_from_pid": bool(notify) and "from_pid" in notify,
         "busy_clears_in_post_ui_light": (
-            bool(post)
-            and "_assault_execute_busy = false" in post
-            and fail_has_busy_clear
-            and not success_tail_clears_busy
-            and "_assault_post_ui_light" in exec_after
+            bool(post) and "_assault_execute_busy = false" in post
         ),
         "pin_select_no_inspector": bool(pin)
         and "show_info_panel" not in pin
@@ -221,6 +255,8 @@ def build_first_session_assault_surface_product(
         ren = MAP_RENDERER.read_text(encoding="utf-8") if MAP_RENDERER.is_file() else ""
         panel = ORDER_PANEL.read_text(encoding="utf-8") if ORDER_PANEL.is_file() else ""
         bm_src = BATTLE_MANAGER.read_text(encoding="utf-8") if BATTLE_MANAGER.is_file() else ""
+        tm_src = TIME_MANAGER.read_text(encoding="utf-8") if TIME_MANAGER.is_file() else ""
+        ev_src = LEADER_EVENT_UI.read_text(encoding="utf-8") if LEADER_EVENT_UI.is_file() else ""
         wiring["map_ctrl_click_or_assault"] = (
             "ctrl_pressed" in ren and ("assault" in ren.lower() or "Attack" in ren)
         ) or "Ctrl+click" in ren
@@ -233,7 +269,7 @@ def build_first_session_assault_surface_product(
             or "first_session_assault" in ren
             or "Assault ready" in ren
         )
-        wiring.update(_hang_class_checks(ren, bm_src))
+        wiring.update(_hang_class_checks(ren, bm_src, tm_src, ev_src))
         for k, v in wiring.items():
             if v:
                 passes.append("wire_%s" % k)

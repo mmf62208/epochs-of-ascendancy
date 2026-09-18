@@ -758,6 +758,16 @@ func _formation_in_friendly_supply(f: Formation) -> bool:
 
 var _rss_trip_fired: bool = false
 const _RSS_PAUSE_KB := 2500000
+## Last F5 callee name for RSS tripwire breadcrumb (not saved).
+var _last_callee: String = ""
+
+
+func note_last_callee(s: String) -> void:
+	_last_callee = s.strip_edges()
+
+
+func last_callee() -> String:
+	return _last_callee
 
 
 func _rss_kb() -> int:
@@ -781,7 +791,7 @@ func _maybe_trip_rss_budget() -> void:
 		return
 	_rss_trip_fired = true
 	set_paused(true)
-	print("TimeManager: RSS tripwire %d KB — paused 1× ( Maginot freeze class )" % kb)
+	print("TimeManager: RSS tripwire %d KB — paused 1× last=%s" % [kb, _last_callee])
 
 
 ## True for normal graphical F5 play — keep day ticks light so HUD/map stay responsive.

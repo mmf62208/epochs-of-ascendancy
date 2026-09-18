@@ -67,6 +67,15 @@ class TestFirstSessionAssaultSurfaceProduct(unittest.TestCase):
         p = build_first_session_assault_surface_product(check_wiring=True)
         wiring = p.get("wiring") or {}
         for key in (
+            "click_no_execute_fallback",
+            "can_assault_no_preview_leak",
+            "toast_skip_headless",
+            "pick_no_full_rebuild",
+            "l_on_no_bfs",
+            "rss_pause_2_5gb",
+            "last_callee_api",
+            "start_notes_last_callee",
+            "pick_notes_last_callee",
             "execute_no_info_panel",
             "execute_no_force_border",
             "b_path_no_info_panel",

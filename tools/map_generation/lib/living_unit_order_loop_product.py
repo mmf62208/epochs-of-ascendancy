@@ -769,7 +769,7 @@ def build_living_unit_order_loop_product(*, check_wiring: bool = True) -> Dict[s
     wiring["f5_cheap_attack_estimate"] = cheap_est
     (passes if cheap_est else fails).append("f5_cheap_attack_estimate")
     assault_fn = _slice(bm, "can_assault_province")
-    no_preview = bool(assault_fn) and "_interactive_light_sim" in assault_fn
+    no_preview = bool(assault_fn) and "get_battle_preview" not in assault_fn
     wiring["f5_skip_battle_preview"] = no_preview
     (passes if no_preview else fails).append("f5_skip_battle_preview")
     cr = (ROOT / "scripts" / "combat" / "CombatResolver.gd").read_text(encoding="utf-8")

@@ -57,6 +57,18 @@ class TestMapSupplyCorridorProduct(unittest.TestCase):
         self.assertIn("_request_hang_safe_supply_corridor", g_slice)
         self.assertNotIn("highlight_corridor_capital_to_selected", g_slice)
         self.assertNotIn("preview_player_route", g_slice)
+        self.assertNotIn("find_land_path", g_slice)
+        li = ren.find("if event.keycode == KEY_L:")
+        l_slice = ren[li : li + 400] if li >= 0 else ""
+        self.assertIn("_toggle_supply_overlay", l_slice)
+        self.assertNotIn("preview_player_route", l_slice)
+        self.assertNotIn("find_land_path", l_slice)
+        l_fn_i = ren.find("func _toggle_supply_overlay")
+        l_fn_j = ren.find("\nfunc ", l_fn_i + 1) if l_fn_i >= 0 else -1
+        l_fn = ren[l_fn_i : l_fn_j if l_fn_j > l_fn_i else l_fn_i + 800]
+        self.assertIn("call_deferred", l_fn)
+        self.assertNotIn("preview_player_route", l_fn)
+        self.assertNotIn("find_land_path", l_fn)
         # supply preview pulses corridor polyline
         self.assertIn("M4:", ren)
         mm = MAP_MANAGER.read_text(encoding="utf-8")

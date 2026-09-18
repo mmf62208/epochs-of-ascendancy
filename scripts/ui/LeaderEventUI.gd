@@ -83,6 +83,9 @@ func _ensure_toast_layer() -> void:
 # Enhanced for important messages (toasts first): Always has close/dismiss X. For is_important, adds "Respond" button (e.g. opens PolicyLawScreen or launches dialogue for welfare/crisis choices).
 # Clean, interactive, fun: Player informed immediately, can dismiss or act on cultural war / policy decisions.
 func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = false, is_important: bool = false, on_respond: Callable = Callable()) -> void:
+	if _should_skip_toast_ui():
+		print("LeaderEventUI: %s%s" % ["ERROR " if is_error else "", message])
+		return
 	_ensure_toast_layer()
 	var entry := {
 		"title": "Notice" if not is_error else "Error",

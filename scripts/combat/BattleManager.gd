@@ -4,6 +4,7 @@ extends Node
 
 signal battle_started(context: Dictionary)
 signal battle_resolved(result: Dictionary)
+signal land_battles_changed()
 
 const DEFAULT_GARRISON_TEMPLATE := "german_infantry_division_1943_mixed"
 
@@ -282,17 +283,7 @@ func can_assault_province(
 	source["target_name"] = target.name
 	source["defender_tag"] = defender_tag
 	source["attacker_tag"] = tag
-	# F5: ProvinceInsight.get_battle_preview constructs CombatResolver + width + supply (RAM leak).
-	if _interactive_light_sim():
-		return source
-	# Carry air dominance from ProvinceInsight for battle context (used in result merge + logs + AAR)
-	if typeof(ProvinceInsight) != TYPE_NIL and typeof(MapManager) != TYPE_NIL:
-		var from_p: Province = MapManager.get_province(from_province_id) if from_province_id >= 0 else target
-		if from_p:
-			var bprev := ProvinceInsight.get_battle_preview(from_p, target)
-			source["air_dominance_level"] = bprev.get("air_dominance_level", "none")
-			source["air_power_ratio"] = bprev.get("air_power_ratio", 1.0)
-			source["air_superiority_attacker"] = bprev.get("air_superiority", false)
+	# Click / start_land_battle: skip CombatResolver preview (RAM leak / freeze).
 	return source
 
 
@@ -482,6 +473,8 @@ func start_land_battle(
 	from_province_id = -1,
 	attacker_formation_id = "",
 ) -> Dictionary:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("note_last_callee"):
+		TimeManager.note_last_callee("start_land_battle")
 	var preview: Dictionary = can_assault_province(
 		str(attacker_tag), int(target_province_id), int(from_province_id)
 	)
@@ -1689,21 +1682,21 @@ func _tick_one_open_land_battle(battle: Dictionary) -> Dictionary:
 		_apply_open_battle_org_to_formations(battle)
 		var att_tag := str(battle.get("att_tag", ""))
 		var att_fid := str(battle.get("att_fid", ""))
-		if _interactive_light_sim():
-			var player := ""
-			if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
-				player = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
-			if player.is_empty() or player == "USA":
-				player = "GER"
-			if att_tag == player:
-				_begin_occupy_after_victory(battle)
-				ev["success"] = true
-				ev["occupy_pending"] = true
-				ev["att_tag"] = att_tag
-			else:
-				_apply_attacker_win_capture_light(att_tag, to_id, from_id, att_fid)
-				ev["success"] = true
-				ev["deferred_capture"] = false
+		var player := ""
+		if typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+			player = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
+		if player.is_empty() or player == "USA":
+			player = "GER"
+		# Player Maginot: occupy walk-in (hex stays FRA until hop). Never resolve-only execute on this path.
+		if att_tag == player:
+			_begin_occupy_after_victory(battle)
+			ev["success"] = true
+			ev["occupy_pending"] = true
+			ev["att_tag"] = att_tag
+		elif _interactive_light_sim():
+			_apply_attacker_win_capture_light(att_tag, to_id, from_id, att_fid)
+			ev["success"] = true
+			ev["deferred_capture"] = false
 		else:
 			var exec: Dictionary = execute_province_assault(att_tag, to_id, from_id, att_fid)
 			ev["success"] = bool(exec.get("success", false))
