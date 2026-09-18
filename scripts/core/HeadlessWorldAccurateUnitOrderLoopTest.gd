@@ -1879,18 +1879,21 @@ func _test_occupy_after_win() -> void:
 		return
 	_pass("occupy-after-win hex still FRA after break")
 	var mv_scr: Script = load("res://scripts/formations/FormationMovement.gd") as Script
-	var occ_n := 0
-	if mv_scr != null and mv_scr.has_method("list_occupy_orders"):
-		occ_n = (mv_scr.call("list_occupy_orders") as Array).size()
-	print("  [INFO] occupy orders n=%d" % occ_n)
-	if occ_n == 0 and mv_scr != null and mv_scr.has_method("enqueue_occupy_adjacent"):
-		var enq: Dictionary = mv_scr.call("enqueue_occupy_adjacent", fid, FRA_FRONT, ATT_TAG, true)
-		print("  [INFO] occupy enqueue fallback %s" % str(enq))
-	var hops: Array = []
-	if mv_scr != null:
+	if mv_scr == null or not mv_scr.has_method("get_march"):
+		if tm != null:
+			tm.set("_living_playtest_clock", false)
+		_fail("occupy-after-win FormationMovement.get_march missing")
+		return
+	var queued: Dictionary = mv_scr.call("get_march", fid) as Dictionary
+	print("  [INFO] occupy-after-win queued %s" % str(queued))
+	if not bool(queued.get("occupy", false)) or not bool(queued.get("broke", false)):
+		if tm != null:
+			tm.set("_living_playtest_clock", false)
+		_fail("occupy-after-win production enqueue missing after break got %s" % str(queued))
+		return
+	var hops: Array = mv_scr.call("tick_all_marches", 1.0) as Array
+	if hops.is_empty():
 		hops = mv_scr.call("tick_all_marches", 1.0) as Array
-		if hops.is_empty():
-			hops = mv_scr.call("tick_all_marches", 1.0) as Array
 	if tm != null:
 		tm.set("_living_playtest_clock", false)
 	fra_p = _mm.call("get_province", FRA_FRONT)
@@ -1909,24 +1912,18 @@ func _test_occupy_after_win() -> void:
 		var occ_row: Variant = hop.get("occupy", {})
 		if occ_row is Dictionary and str((occ_row as Dictionary).get("kind", "")) == "taken":
 			hop_kind = "taken"
-	var arrival: Dictionary = {}
-	if _bm.has_method("peek_last_occupy_arrival"):
-		arrival = _bm.call("peek_last_occupy_arrival") as Dictionary
-	if hop_kind != "taken" and str(arrival.get("kind", "")) != "taken":
-		_fail(
-			"occupy-after-win want resolve_occupy_arrival/last hop kind=taken after owner GER got hop=%s arrival=%s"
-			% [hop_kind, str(arrival)]
-		)
+	if hop_kind != "taken":
+		_fail("occupy-after-win want last hop kind=taken after owner GER got %s" % str(hops))
 		return
 	_pass("occupy-after-win kind=taken after owner GER")
-	# Empty-hex occupy: no broke stamp → must not return kind=taken.
+	# Empty-hex occupy: no broke stamp on the order → must not return kind=taken.
 	fra_p.set("owner_tag", DEF_TAG)
 	fra_p.set("controller_tag", DEF_TAG)
 	if fra_f != null:
 		fra_f.stationed_province_id = GER_NEIGHBOR
 	ger_f.stationed_province_id = GER_FRONT
-	if "_pending_occupy" in _bm:
-		_bm._pending_occupy.clear()
+	if mv_scr.has_method("clear_march"):
+		mv_scr.call("clear_march", fid)
 	if not _bm.has_method("resolve_occupy_arrival"):
 		_fail("resolve_occupy_arrival missing")
 		return
@@ -1950,8 +1947,6 @@ func _test_occupy_after_win() -> void:
 		fra_f.is_in_combat = false
 	if "_open_land_battles" in _bm:
 		_bm._open_land_battles.clear()
-	if "_pending_occupy" in _bm:
-		_bm._pending_occupy.clear()
 	var rear_pid := int(rear_f.stationed_province_id) if "stationed_province_id" in rear_f else -1
 	if rear_pid != GER_REAR:
 		_fail("occupy-after-win GER_FID_2 teleported want %d got %s" % [GER_REAR, str(rear_pid)])

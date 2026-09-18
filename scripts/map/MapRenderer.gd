@@ -18130,14 +18130,7 @@ func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictio
 		occ = hop.get("occupy") as Dictionary
 	if bool(occ.get("captured", false)):
 		var place := _province_display_name(to_pid) if to_pid > 0 else pname
-		var they_broke := (
-			bool(occ.get("broke", false))
-			or bool(occ.get("from_pending_occupy", false))
-			or bool(hop.get("broke", false))
-			or bool(hop.get("from_pending_occupy", false))
-			or str(occ.get("kind", "")) == "taken"
-		)
-		if they_broke:
+		if str(occ.get("kind", "")) == "taken":
 			var ev: Dictionary = LandBattleAar.taken_event(to_pid, place, str(occ.get("economy", "")))
 			_show_inspector_toast(str(ev.get("line", "Took %s · they broke" % place)), 4.5)
 		else:

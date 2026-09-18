@@ -439,19 +439,6 @@ static func enqueue_occupy_adjacent(
 	}
 
 
-static func list_occupy_orders() -> Array:
-	var out: Array = []
-	for fid_v in _orders.keys():
-		var order: Dictionary = _orders[fid_v] as Dictionary
-		if not bool(order.get("occupy", false)):
-			continue
-		var row: Dictionary = get_march(str(fid_v))
-		if not row.is_empty():
-			row["occupy"] = true
-			out.append(row)
-	return out
-
-
 static func clear_march(formation_id: String) -> bool:
 	var fid := formation_id.strip_edges()
 	if fid.is_empty() or not _orders.has(fid):
@@ -615,8 +602,6 @@ static func _commit_ready_hops(order: Dictionary) -> Array:
 		var do_occupy := bool(order.get("occupy", false)) and arrived_now
 		if do_occupy and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("resolve_occupy_arrival"):
 			var occ: Dictionary = BattleManager.resolve_occupy_arrival(fid, to_pid, tag, from_pid)
-			var hop_broke := bool(order.get("broke", false)) or bool(occ.get("broke", false))
-			var hop_pending := bool(order.get("from_pending_occupy", false)) or bool(occ.get("from_pending_occupy", false))
 			var hop_occ := {
 				"formation_id": fid,
 				"from_id": from_pid,
@@ -625,8 +610,6 @@ static func _commit_ready_hops(order: Dictionary) -> Array:
 				"arrived": true,
 				"country_tag": tag,
 				"occupy": occ,
-				"broke": hop_broke,
-				"from_pending_occupy": hop_pending,
 				"kind": str(occ.get("kind", "")),
 			}
 			out.append(hop_occ)

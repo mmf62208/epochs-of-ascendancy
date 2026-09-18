@@ -42,9 +42,6 @@ var _resolver: CombatResolver
 var _open_land_battles: Array = []
 var _next_land_battle_seq: int = 1
 var _last_land_aar: Dictionary = {}
-## dest_id → {broke, from_pending_occupy, att_tag} stamped by occupy-after-win.
-var _pending_occupy: Dictionary = {}
-var _last_occupy_arrival: Dictionary = {}
 
 
 func _ready() -> void:
@@ -1431,11 +1428,6 @@ func _begin_occupy_after_victory(battle: Dictionary) -> void:
 	var rout := float(battle.get("def_org", 1.0)) < 0.22
 	disp["rout"] = rout
 	_displace_defender_from_captured_province(disp, to_id)
-	_pending_occupy[to_id] = {
-		"broke": true,
-		"from_pending_occupy": true,
-		"att_tag": att_tag,
-	}
 	var fids: Array = _fid_list(battle, "att_fids", "att_fid")
 	for fid_v in fids:
 		var fid := str(fid_v)
@@ -1464,12 +1456,10 @@ func resolve_occupy_arrival(
 	var dest := int(dest_id)
 	if fid.is_empty() or dest <= 0:
 		return {"ok": false, "reason": "bad args"}
-	var pending: Dictionary = _pending_occupy.get(dest, {}) as Dictionary
-	var broke := bool(pending.get("broke", false)) or bool(pending.get("from_pending_occupy", false))
+	var broke := false
 	if typeof(FormationMovement) != TYPE_NIL:
 		var order: Dictionary = FormationMovement.get_march(fid)
-		if bool(order.get("broke", false)) or bool(order.get("from_pending_occupy", false)):
-			broke = true
+		broke = bool(order.get("broke", false)) or bool(order.get("from_pending_occupy", false))
 	var def_tag := ""
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
 		var live: Province = MapManager.get_province(dest)
@@ -1495,11 +1485,8 @@ func resolve_occupy_arrival(
 		var fr := from_id if from_id > 0 else dest
 		var fight: Dictionary = start_land_battle(tag, dest, fr, fid)
 		print("BattleManager: occupy meeting engagement %s %d→%d" % [fid, fr, dest])
-		var meet := {"ok": true, "fought": true, "captured": false, "result": fight}
-		_last_occupy_arrival = meet.duplicate()
-		return meet
+		return {"ok": true, "fought": true, "captured": false, "result": fight}
 	_apply_attacker_win_capture_light(tag, dest, from_id if from_id > 0 else dest, fid)
-	_pending_occupy.erase(dest)
 	print("BattleManager: occupy empty %s took %d" % [fid, dest])
 	var place := _occupy_place_name(dest)
 	if broke:
@@ -1508,7 +1495,7 @@ func resolve_occupy_arrival(
 		if not str(aar.get("economy", "")).is_empty():
 			economy = str(aar.get("economy", ""))
 		var taken: Dictionary = LandBattleAar.taken_event(dest, place, economy)
-		var out_taken := {
+		return {
 			"ok": true,
 			"captured": true,
 			"fought": true,
@@ -1520,15 +1507,7 @@ func resolve_occupy_arrival(
 			"line": str(taken.get("line", "")),
 			"economy": economy,
 		}
-		_last_occupy_arrival = out_taken.duplicate()
-		return out_taken
-	var out_empty := {"ok": true, "fought": false, "captured": true, "broke": false, "to_id": dest, "place": place}
-	_last_occupy_arrival = out_empty.duplicate()
-	return out_empty
-
-
-func peek_last_occupy_arrival() -> Dictionary:
-	return _last_occupy_arrival.duplicate()
+	return {"ok": true, "fought": false, "captured": true, "broke": false, "to_id": dest, "place": place}
 
 
 func _occupy_place_name(pid: int) -> String:
