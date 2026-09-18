@@ -142,6 +142,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_unit_composition_combat_product \
     tools.map_generation.tests.test_equipment_flow_product \
     tools.map_generation.tests.test_era_resource_deposits_product \
+    tools.map_generation.tests.test_historical_leaders_2026_on_disk_portraits \
     -v || fail
 
 run_step unit_save_path \

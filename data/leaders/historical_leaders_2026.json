@@ -520,7 +520,8 @@
         "cautious": 1
       },
       "birth_year": 1972,
-      "start_year": 2020
+      "start_year": 2020,
+      "portrait": "res://assets/graphics/portraits/leaders/ind_sharma_2026.png"
     },
     {
       "leader_id": "isr_cohen_2026",
@@ -540,7 +541,8 @@
         "aggressive": 1
       },
       "birth_year": 1970,
-      "start_year": 2019
+      "start_year": 2019,
+      "portrait": "res://assets/graphics/portraits/leaders/isr_cohen_2026.png"
     },
     {
       "leader_id": "irn_rezaei_2026",
@@ -580,7 +582,8 @@
         "combined_arms_master": 1
       },
       "birth_year": 1973,
-      "start_year": 2022
+      "start_year": 2022,
+      "portrait": "res://assets/graphics/portraits/leaders/kor_park_2026.png"
     },
     {
       "leader_id": "pol_kowalski_2026",
@@ -600,7 +603,8 @@
         "methodical": 2
       },
       "birth_year": 1975,
-      "start_year": 2023
+      "start_year": 2023,
+      "portrait": "res://assets/graphics/portraits/leaders/pol_kowalski_2026.png"
     },
     {
       "leader_id": "ukr_shevchenko_2026",
@@ -718,7 +722,8 @@
         "logistics_wizard": 1
       },
       "birth_year": 1975,
-      "start_year": 2022
+      "start_year": 2022,
+      "portrait": "res://assets/graphics/portraits/leaders/bra_silva_2026.png"
     },
     {
       "leader_id": "mex_herrera_2026",
@@ -738,7 +743,8 @@
         "bold": 1
       },
       "birth_year": 1977,
-      "start_year": 2024
+      "start_year": 2024,
+      "portrait": "res://assets/graphics/portraits/leaders/mex_herrera_2026.png"
     },
     {
       "leader_id": "can_fraser_2026",
@@ -758,7 +764,8 @@
         "arctic_bear": 1
       },
       "birth_year": 1971,
-      "start_year": 2020
+      "start_year": 2020,
+      "portrait": "res://assets/graphics/portraits/leaders/can_fraser_2026.png"
     },
     {
       "leader_id": "nor_hansen_2026",
@@ -797,7 +804,8 @@
         "jungle_panther": 2
       },
       "birth_year": 1972,
-      "start_year": 2020
+      "start_year": 2020,
+      "portrait": "res://assets/graphics/portraits/leaders/aus_mitchell_2026.png"
     },
     {
       "leader_id": "rus_air_cmd_2026",
@@ -2939,7 +2947,8 @@
         "blockade_runner": 1
       },
       "birth_year": 1974,
-      "start_year": 2020
+      "start_year": 2020,
+      "portrait": "res://assets/graphics/portraits/leaders/ind_navy_2026.png"
     },
     {
       "leader_id": "ind_air_2026",
@@ -2958,7 +2967,8 @@
         "combined_arms_master": 1
       },
       "birth_year": 1976,
-      "start_year": 2022
+      "start_year": 2022,
+      "portrait": "res://assets/graphics/portraits/leaders/ind_air_2026.png"
     },
     {
       "leader_id": "kor_navy_2026",
@@ -2977,7 +2987,8 @@
         "carrier_admiral": 1
       },
       "birth_year": 1975,
-      "start_year": 2021
+      "start_year": 2021,
+      "portrait": "res://assets/graphics/portraits/leaders/kor_navy_2026.png"
     },
     {
       "leader_id": "kor_air_2026",
@@ -2996,7 +3007,8 @@
         "methodical": 1
       },
       "birth_year": 1978,
-      "start_year": 2023
+      "start_year": 2023,
+      "portrait": "res://assets/graphics/portraits/leaders/kor_air_2026.png"
     },
     {
       "leader_id": "chn_air_2026",
@@ -3074,7 +3086,8 @@
         "iron_will": 1
       },
       "birth_year": 1977,
-      "start_year": 2023
+      "start_year": 2023,
+      "portrait": "res://assets/graphics/portraits/leaders/pol_air_2026.png"
     },
     {
       "leader_id": "pol_navy_2026",
@@ -3093,7 +3106,8 @@
         "sea_wolf": 1
       },
       "birth_year": 1974,
-      "start_year": 2021
+      "start_year": 2021,
+      "portrait": "res://assets/graphics/portraits/leaders/pol_navy_2026.png"
     },
     {
       "leader_id": "ukr_navy_2026",
@@ -3265,7 +3279,8 @@
         "jungle_panther": 1
       },
       "birth_year": 1974,
-      "start_year": 2021
+      "start_year": 2021,
+      "portrait": "res://assets/graphics/portraits/leaders/bra_navy_2026.png"
     },
     {
       "leader_id": "bra_air_2026",
@@ -3284,7 +3299,8 @@
         "bold": 1
       },
       "birth_year": 1977,
-      "start_year": 2023
+      "start_year": 2023,
+      "portrait": "res://assets/graphics/portraits/leaders/bra_air_2026.png"
     },
     {
       "leader_id": "mex_air_2026",
@@ -3303,7 +3319,8 @@
         "aggressive": 1
       },
       "birth_year": 1980,
-      "start_year": 2024
+      "start_year": 2024,
+      "portrait": "res://assets/graphics/portraits/leaders/mex_air_2026.png"
     },
     {
       "leader_id": "mex_navy_2026",
@@ -3322,7 +3339,8 @@
         "cautious": 1
       },
       "birth_year": 1978,
-      "start_year": 2022
+      "start_year": 2022,
+      "portrait": "res://assets/graphics/portraits/leaders/mex_navy_2026.png"
     },
     {
       "leader_id": "can_air_2026",
@@ -3341,7 +3359,8 @@
         "arctic_bear": 1
       },
       "birth_year": 1976,
-      "start_year": 2021
+      "start_year": 2021,
+      "portrait": "res://assets/graphics/portraits/leaders/can_air_2026.png"
     },
     {
       "leader_id": "can_navy_2026",
@@ -3360,7 +3379,8 @@
         "cautious": 2
       },
       "birth_year": 1972,
-      "start_year": 2020
+      "start_year": 2020,
+      "portrait": "res://assets/graphics/portraits/leaders/can_navy_2026.png"
     },
     {
       "leader_id": "aus_navy_2026",
@@ -3379,7 +3399,8 @@
         "sea_wolf": 1
       },
       "birth_year": 1973,
-      "start_year": 2021
+      "start_year": 2021,
+      "portrait": "res://assets/graphics/portraits/leaders/aus_navy_2026.png"
     },
     {
       "leader_id": "aus_air_2026",
@@ -3398,7 +3419,8 @@
         "jungle_panther": 1
       },
       "birth_year": 1975,
-      "start_year": 2022
+      "start_year": 2022,
+      "portrait": "res://assets/graphics/portraits/leaders/aus_air_2026.png"
     },
     {
       "leader_id": "nor_air_2026",
@@ -3436,7 +3458,8 @@
         "cautious": 1
       },
       "birth_year": 1971,
-      "start_year": 2020
+      "start_year": 2020,
+      "portrait": "res://assets/graphics/portraits/leaders/isr_navy_2026.png"
     },
     {
       "leader_id": "isr_air_2026",
@@ -3455,7 +3478,8 @@
         "bold": 1
       },
       "birth_year": 1973,
-      "start_year": 2022
+      "start_year": 2022,
+      "portrait": "res://assets/graphics/portraits/leaders/isr_air_2026.png"
     },
     {
       "leader_id": "irn_air_2026",
