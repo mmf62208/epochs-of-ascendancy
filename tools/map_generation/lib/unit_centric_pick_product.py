@@ -16,8 +16,8 @@ MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 STRATEGIC_PICK_TOAST = "Click a unit chip to command (Shift+U toggles counters)."
 STACK_CYCLE_HINT = "Stack %d/%d · [ ] or buttons to cycle"
 SELECTED_FRAME_HOOK = "_refresh_selected_unit_chip"
-HIT_RADIUS_PX = 80.0
-HIT_RADIUS_FLOOR = 40.0
+HIT_RADIUS_PX = 32.0
+HIT_RADIUS_FLOOR = 16.0
 
 
 def _gd_func_slice(src: str, func_name: str) -> str:
@@ -52,10 +52,10 @@ def _spatial_left_click_slice(renderer_src: str) -> str:
 def _hit_radius_ok(pick_fn: str) -> bool:
     if not pick_fn:
         return False
-    has_80 = bool(re.search(r"\b80(?:\.0)?\b", pick_fn))
-    has_40 = bool(re.search(r"\b40(?:\.0)?\b", pick_fn))
-    has_maxf_floor = "maxf" in pick_fn and ("40.0" in pick_fn or "40" in pick_fn)
-    return has_80 and has_40 and has_maxf_floor
+    has_px = bool(re.search(r"\b32(?:\.0)?\b", pick_fn))
+    has_floor = bool(re.search(r"\b16(?:\.0)?\b", pick_fn))
+    has_maxf_floor = "maxf" in pick_fn and ("16.0" in pick_fn or "16" in pick_fn)
+    return has_px and has_floor and has_maxf_floor
 
 
 def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, Any]:
@@ -101,13 +101,13 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     else:
         fails.append("capital_star_before_chip")
 
-    # 2) Hit disk ≥48 px / zoom with floor ≥20 world units.
+    # 2) Hit disk = plate radius (not a 80px steal-all disk).
     hit_ok = _hit_radius_ok(pick_fn)
-    wiring["hit_radius_80_floor_40"] = hit_ok
+    wiring["hit_radius_32_floor_16"] = hit_ok
     if hit_ok:
-        passes.append("hit_radius_80_floor_40")
+        passes.append("hit_radius_32_floor_16")
     else:
-        fails.append("hit_radius_80_floor_40")
+        fails.append("hit_radius_32_floor_16")
 
     # 3) hang-class: no show_info_panel in pin open path.
     pin_no_insp = bool(pin_fn) and "show_info_panel" not in pin_fn
@@ -209,16 +209,16 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         fails.append("right_click_same_hex_cancel")
 
     hover_fn = _gd_func_slice(ren, "_update_spatial_hover")
-    hover_pin = (
+    hover_hex = (
         bool(hover_fn)
-        and "_pick_unit_formation_at_world" in hover_fn
-        and "stationed_province_id" in hover_fn
+        and "_resolve_map_pick_pid" in hover_fn
+        and "_pick_unit_formation_at_world" not in hover_fn
     )
-    wiring["hover_pin_first"] = hover_pin
-    if hover_pin:
-        passes.append("hover_pin_first")
+    wiring["hover_hex_under_cursor"] = hover_hex
+    if hover_hex:
+        passes.append("hover_hex_under_cursor")
     else:
-        fails.append("hover_pin_first")
+        fails.append("hover_hex_under_cursor")
 
     stw = _gd_func_slice(ren, "_screen_to_world")
     canvas_hover = (

@@ -22,8 +22,10 @@ RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 
 class TestUnitCentricPickProduct(unittest.TestCase):
     def test_constants(self) -> None:
-        self.assertGreaterEqual(HIT_RADIUS_PX, 48.0)
-        self.assertGreaterEqual(HIT_RADIUS_FLOOR, 20.0)
+        self.assertGreaterEqual(HIT_RADIUS_PX, 28.0)
+        self.assertLessEqual(HIT_RADIUS_PX, 40.0)
+        self.assertGreaterEqual(HIT_RADIUS_FLOOR, 12.0)
+        self.assertLessEqual(HIT_RADIUS_FLOOR, 24.0)
         self.assertIn("Shift+U", STRATEGIC_PICK_TOAST)
         self.assertIn("unit chip", STRATEGIC_PICK_TOAST)
         self.assertIn("toggles counters", STRATEGIC_PICK_TOAST)
@@ -36,7 +38,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         for key in (
             "pin_before_hex",
             "capital_star_before_chip",
-            "hit_radius_80_floor_40",
+            "hit_radius_32_floor_16",
             "pin_select_no_inspector",
             "selected_frame_hook",
             "hidden_pins_skip",
@@ -47,7 +49,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
             "stack_cycle_no_card_rebuild",
             "left_click_cycles_not_cancel",
             "right_click_same_hex_cancel",
-            "hover_pin_first",
+            "hover_hex_under_cursor",
             "hover_canvas_not_camera_node",
             "stack_visible_badge",
             "ctrl_click_no_stack_freeze",

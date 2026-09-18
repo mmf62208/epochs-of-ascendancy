@@ -16853,13 +16853,9 @@ func _update_spatial_hover() -> void:
 
 	var world_pos := _screen_to_world(mouse_screen)
 
-	# Pin-first: chip under the cursor owns hover so Maginot GER is not LUX fill.
-	var pid := -1
-	var chip_fo: Object = _pick_unit_formation_at_world(world_pos)
-	if chip_fo != null and "stationed_province_id" in chip_fo:
-		pid = int(chip_fo.stationed_province_id)
-	if pid <= 0:
-		pid = _resolve_map_pick_pid(world_pos)
+	# Hover the hex under the cursor. Chip pin-first is click-only — a 80px disk
+	# was painting Maginot/region fill for every nearby province.
+	var pid := _resolve_map_pick_pid(world_pos)
 	var new_hover_province: Province = null
 	if pid >= 0 and provinces.has(pid):
 		new_hover_province = provinces[pid]
@@ -18524,8 +18520,8 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 	var z := 1.0
 	if cam:
 		z = maxf(cam.zoom.x, cam.zoom.y)
-	# Chip + bars are ~44×60 local; keep the disk at least plate-sized at tactical zoom.
-	var hit_r := maxf(80.0 / maxf(z, 0.05), 40.0)
+	# Plate is ~48–58 screen px. Disk is plate *radius* so neighbor NUTS hexes stay clickable.
+	var hit_r := maxf(32.0 / maxf(z, 0.05), 16.0)
 	var hit_r2 := hit_r * hit_r
 	var best_player: Object = null
 	var best_player_d := INF
