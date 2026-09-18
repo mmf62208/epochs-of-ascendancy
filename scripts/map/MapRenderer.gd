@@ -23331,36 +23331,11 @@ func _set_hover_outline(province_id: int, visible: bool) -> void:
 	var node := _province_node(province_id)
 	if node == null:
 		return
-	if visible:
-		var width := 2.0 if province_id == selected_province_id else 1.7
-		if provinces.has(province_id):
-			var hp: Province = provinces[province_id] as Province
-			if ProvinceInsight.agent_has_today_pressure_tick(hp):
-				width += 0.3
-			if (
-				ProvinceInsight.is_province_contested(hp)
-				and ProvinceInsight.has_active_agent_network(hp)
-			):
-				width += 0.35
-				if province_id == selected_province_id:
-					width += 0.2
-				if ProvinceInsight.agent_applies_daily_pressure(hp):
-					width += 0.15
-		var oc: Dictionary = _hover_outline_colors(province_id)
-		ProvinceMapVisuals.ensure_polished_outline(
-			node,
-			_province_polygon(node),
-			ProvinceMapVisuals.NODE_HOVER,
-			oc["color"],
-			width,
-			oc["glow"],
-			1.1,
-			ProvinceMapVisuals.Z_HOVER,
-		)
-	else:
-		ProvinceMapVisuals.hide_polished_outline(node, ProvinceMapVisuals.NODE_HOVER)
-		if _hover_outline_province_id == province_id:
-			_hover_outline_province_id = -1
+	# NUTS Landkreis rings overlap (Moselle/LUX, Freiburg inside a county). Line2D
+	# drew that whole overlapping ring. Hover is fill-tint only.
+	ProvinceMapVisuals.hide_polished_outline(node, ProvinceMapVisuals.NODE_HOVER)
+	if not visible and _hover_outline_province_id == province_id:
+		_hover_outline_province_id = -1
 
 
 func _ensure_select_outline_layer() -> void:
@@ -23462,36 +23437,15 @@ func _set_selection_outline(province_id: int, visible: bool) -> void:
 		if _province_has_support_radio_benefit(sp):
 			sel_col = sel_col.lerp(ProvinceMapVisuals.OUTLINE_SUPPORT_RADIO, 0.12)
 			sel_glow = sel_glow.lerp(ProvinceMapVisuals.OUTLINE_SUPPORT_RADIO_GLOW, 0.18)
-	# Per-node outline (when poly exists on node).
+	# Fill-tint only — NUTS overlap made Line2D rings lie on top of LUX/FRA/GER.
 	if node != null:
-		var poly_local := _province_polygon(node)
-		if poly_local.size() >= 3:
-			var w_node := _selection_outline_width()
-			ProvinceMapVisuals.ensure_polished_outline(
-				node,
-				poly_local,
-				ProvinceMapVisuals.NODE_SELECT,
-				sel_col,
-				w_node,
-				sel_glow,
-				w_node * 1.35,
-				ProvinceMapVisuals.Z_SELECT,
-			)
-	# Map-space layer outline (always-on backup so shape is visible even if node poly missing/thin).
-	var map_pts := _map_space_province_polygon(province_id)
-	if map_pts.size() >= 3:
-		_ensure_select_outline_layer()
-		var w := _selection_outline_width()
-		if _select_outline_glow != null:
-			_select_outline_glow.points = map_pts
-			_select_outline_glow.default_color = sel_glow
-			_select_outline_glow.width = w * 1.8
-			_select_outline_glow.visible = true
-		if _select_outline_line != null:
-			_select_outline_line.points = map_pts
-			_select_outline_line.default_color = sel_col
-			_select_outline_line.width = w
-			_select_outline_line.visible = true
+		ProvinceMapVisuals.hide_polished_outline(node, ProvinceMapVisuals.NODE_SELECT)
+	if _select_outline_line != null:
+		_select_outline_line.visible = false
+	if _select_outline_glow != null:
+		_select_outline_glow.visible = false
+	if node != null and visible:
+		_apply_hover_fill(province_id, true)
 
 
 func _clear_compare_preview_outline() -> void:
@@ -24092,7 +24046,7 @@ func _apply_hover_fill(province_id: int, active: bool) -> void:
 	col = _apply_agent_pressure_base_tint(col, province)
 	col = _apply_recovering_fill_tint(col, province_id)
 	col = _apply_support_radio_fill_tint(col, province)
-	var boost := 0.2
+	var boost := 0.34
 	if _compare_preview_province_id >= 0 and province_id == _hover_outline_province_id:
 		col = col.lerp(_COMPARE_FILL_TINT, 0.14)
 		boost = 0.16
