@@ -68224,6 +68224,27 @@
       "special_features": [],
       "island_class": "mainland",
       "facility_tier": 1
+    },
+    {
+      "id": 711520,
+      "name": "Gibraltar",
+      "terrain": "mountains",
+      "domain": "land",
+      "theater": "europe_core",
+      "strategic_region_hint": "Iberia",
+      "population_base": 20000,
+      "nuts_id": "GI001",
+      "cntr_code": "UK",
+      "core_for_tags": [
+        "ENG"
+      ],
+      "natural_resources": {},
+      "special_features": [
+        "fortress",
+        "naval_base"
+      ],
+      "island_class": "island",
+      "facility_tier": 2
     }
   ]
 }

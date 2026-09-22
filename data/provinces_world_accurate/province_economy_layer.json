@@ -4037,6 +4037,12 @@
       "infrastructure": 4,
       "development_level": 2
     },
+    "711520": {
+      "population": 20000,
+      "factories": 1,
+      "infrastructure": 5,
+      "development_level": 2
+    },
     "710672": {
       "population": 38023,
       "factories": 3,
