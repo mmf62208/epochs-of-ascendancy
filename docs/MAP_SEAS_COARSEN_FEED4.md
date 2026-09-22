@@ -66,7 +66,8 @@ Board count stays **3527** (land ~3187 + sea block 340). Seas stay domain water.
 
 - Other Med basins (Balearic / Ligurian / Tyrrhenian leftover seeds) — only if Scott unlocks.
 - North Atlantic strip coarsen — already readable vs Iberian land; not this GO.
-- Hong Kong or other keys — only if still missing after a later Scott GO.
+- **FEED-5:** Hong Kong island-scale land key — see [`MAP_HONG_KONG_ISLAND_LAND.md`](MAP_HONG_KONG_ISLAND_LAND.md) (HOLD merge).
+- Other keys — only if still missing after a later Scott GO.
 
 ## Gates (machine)
 

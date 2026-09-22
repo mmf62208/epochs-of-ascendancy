@@ -819,16 +819,17 @@ def build_gibraltar_island_land_product(board_dir: str = "") -> Dict[str, Any]:
     elif named == [GIBRALTAR_ID]:
         passes.append("one_land_gibraltar")
 
-    # No HK / other-key carve in this FEED.
+    # Later FEEDs may append a dedicated HK land key. FEED-3 must not reuse
+    # the Gibraltar ID for it.
     hk = [
         int(pid)
         for pid, p in base.items()
         if "hong kong" in str(p.get("name") or "").lower() and str(p.get("domain") or "land").lower() == "land"
     ]
-    if any(int(pid) >= 711520 and int(pid) != GIBRALTAR_ID for pid in hk):
-        fails.append(f"hong_kong_appended {hk}")
+    if GIBRALTAR_ID in hk:
+        fails.append(f"gibraltar_id_named_hong_kong {hk}")
     else:
-        passes.append("no_hk_carve")
+        passes.append("gibraltar_id_not_hk")
 
     sea_n = sum(1 for p in base.values() if str(p.get("domain") or "").lower() in ("sea", "strait", "ocean"))
     # Lakes are domain=lake; seas+straits stay the 340-cell water block plus lakes.

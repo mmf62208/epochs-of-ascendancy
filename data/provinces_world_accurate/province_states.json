@@ -9374,7 +9374,8 @@
       "id": 325,
       "name": "Hong Kong S.A.R.",
       "province_ids": [
-        902486
+        902486,
+        905844
       ],
       "meta": {
         "adm0_a3": "HKG",

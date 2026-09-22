@@ -75,19 +75,12 @@ class TestGibraltarIslandLandProduct(unittest.TestCase):
         self.assertIn(GIBRALTAR_ID, [int(x) for x in (adj.get(str(CADIZ_ID)) or [])])
         self.assertIn(GIBRALTAR_ID, [int(x) for x in (adj.get(str(STRAIT_ID)) or [])])
 
-    def test_no_hong_kong_or_world_full_write(self) -> None:
+    def test_gibraltar_id_not_hong_kong_and_no_world_full_write(self) -> None:
         base = {
             int(p["id"]): p
             for p in json.loads((D / "provinces_base.json").read_text(encoding="utf-8"))["provinces"]
         }
-        hk_new = [
-            pid
-            for pid, p in base.items()
-            if "hong kong" in str(p.get("name") or "").lower()
-            and str(p.get("domain") or "land").lower() == "land"
-            and int(pid) >= 711520
-        ]
-        self.assertEqual(hk_new, [])
+        self.assertNotEqual(str(base[GIBRALTAR_ID].get("name") or "").lower(), "hong kong")
         if WF.is_dir():
             wf_ids = {
                 int(p["id"])
