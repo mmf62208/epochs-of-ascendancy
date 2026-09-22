@@ -54,6 +54,7 @@ Board scale stays **~3520**. No new IDs. Caspian / Victoria leftover seed cells 
 - **FEED-3:** Gibraltar island-scale land key (bar #2) — see [`MAP_GIBRALTAR_ISLAND_LAND.md`](MAP_GIBRALTAR_ISLAND_LAND.md) (draft theater proof; HOLD merge).
 - **FEED-4:** seas/oceans coarsen (bar #3) — see [`MAP_SEAS_COARSEN_FEED4.md`](MAP_SEAS_COARSEN_FEED4.md) (Alboran basin theater proof; HOLD merge).
 - **FEED-5:** Hong Kong island-scale land key (bar #2) — see [`MAP_HONG_KONG_ISLAND_LAND.md`](MAP_HONG_KONG_ISLAND_LAND.md) (draft theater proof; HOLD merge).
+- **FEED-6:** Caribbean ordinary-island sizing (bar #2 islands) — see [`MAP_CARIBBEAN_ISLAND_SIZING_FEED6.md`](MAP_CARIBBEAN_ISLAND_SIZING_FEED6.md) (Windward strip; HOLD merge).
 - **Later:** other keys only if still missing.
 
 ## Play smoke (human)

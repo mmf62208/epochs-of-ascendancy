@@ -60,7 +60,7 @@ Board scale stays **~3520** (3527 + 1 = **3528**). Seas stay **340**. `world_ful
 
 ## Later FEEDs (not this PR)
 
-- Other island keys — only if still missing after a later Scott GO.
+- Other island keys — FEED-6 Caribbean ordinary islands: [`MAP_CARIBBEAN_ISLAND_SIZING_FEED6.md`](MAP_CARIBBEAN_ISLAND_SIZING_FEED6.md). Further strips only if still missing after a later Scott GO.
 - Do not remesh whole South China / Pearl River here.
 
 ## Gates (machine)

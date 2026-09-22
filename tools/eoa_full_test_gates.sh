@@ -98,6 +98,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_gibraltar_island_land_product \
     tools.map_generation.tests.test_seas_coarsen_feed4_product \
     tools.map_generation.tests.test_hong_kong_island_land_product \
+    tools.map_generation.tests.test_caribbean_island_sizing_feed6_product \
     tools.map_generation.tests.test_world_accurate_capital_pick_product \
     tools.map_generation.tests.test_world_accurate_strategic_and_assault \
     tools.map_generation.tests.test_world_accurate_multi_front_and_deploy \

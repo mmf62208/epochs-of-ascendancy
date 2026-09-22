@@ -269,4 +269,16 @@ python3 -m unittest tools.map_generation.tests.test_hong_kong_island_land_produc
 
 On `--quick` via `tools/eoa_full_test_gates.sh`. Gibraltar land / Alboran seas / Maginot land / Great Lakes / Esc / G / Dig2 / combat are out of scope for this theater proof.
 
-Honest: `--quick` living-unit wiring fails are **tip-pre-existing** on `ce8d7c2021a5bf01eeb841edfd9f379ad82847b5` (same files). This FEED does not touch those GD files. 
+Honest: `--quick` living-unit wiring fails are **tip-pre-existing** on `ce8d7c2021a5bf01eeb841edfd9f379ad82847b5` (same files). This FEED does not touch those GD files.
+
+### Caribbean ordinary-island sizing (FEED-6)
+
+Pure product + board QC (no Godot):
+
+```bash
+python3 -m unittest tools.map_generation.tests.test_caribbean_island_sizing_feed6_product -v
+```
+
+On `--quick` via `tools/eoa_full_test_gates.sh`. Gibraltar land / Hong Kong land / Alboran seas / Maginot land / Great Lakes / Esc / G / Dig2 / combat are out of scope for this theater proof.
+
+Honest: `--quick` living-unit wiring fails are **tip-pre-existing** on `8bd654c206a20833ce9d446061f93ed964d55d88` (same files). This FEED does not touch those GD files. 
