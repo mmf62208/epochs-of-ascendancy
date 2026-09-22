@@ -9,6 +9,8 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
+> **2026-09-22 FEED-2 Maginot land uniformity:** Mike bar #1 theater proof on `world_accurate`. Tight corridor land max 511→~262, max/median 8.9→~4.7. Six FR département splits append IDs `711514–711519`; `710173`/`710739` kept and still adjacent. Three front Stadtkreise grown into own-country Landkreis (no FRA bite). Esc / CC / Dig2 / G / combat / Control Labels / duals / Godot / seas / Great Lakes / world_full IDs **untouched**. HOLD merge for Scott/Play.
+>
 > **2026-09-22 Stream 2 Maginot near-front label budget:** Equal-size Europe NUTS quota ranked A–F and dropped Lorraine / Rhineland / Île-de-France. `select_state_labels_for_budget` now reserves Maginot / near-front (16) then Europe-local geo-grid (5×4), then world grid. Political still hides labels. GD `_select_state_labels_for_budget` mirrored after the product test. Esc / CC / Dig2 pan / G polyline / combat / Control Labels / duals / Godot / world_full IDs **untouched**. HOLD merge for Scott.
 >
 > **2026-09-17 G polyline Home visibility residual:** Play MIXED on `232c9b2` (PR 37) — Esc HARD PASS (kept). Soft FAIL: gold Line2D in `ProvinceContainers` at `12.0/z` floor 10 (~12 screen px) still unreadible under 48–58px Home chips. Residual only: camera-space `26.0/z` (24–480) cyan core + dark halo + white spine + endpoint gems on follow-viewport `SupplyRouteHighlightLayer` (canvas layer 10, below HUD 20). Hang-safe toast + deferred two-centroid `highlight_supply_route_path` unchanged; no corridor BFS. Esc / CC / Pan Dig2 / leftover-reseed / PR 31 sea / PR 16/19/24 / chip Fill%/TOE / combat / duals / Godot bump / world_full IDs **untouched**. Product `g_polyline_visibility_wiring`. HOLD merge for Scott.
