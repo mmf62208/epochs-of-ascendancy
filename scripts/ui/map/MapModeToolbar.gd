@@ -88,6 +88,8 @@ const EXPANDED_HEIGHT_PRESETS := 88.0
 
 var _map_renderer: Node = null
 var _buttons: Dictionary = {}
+## Exclusive group so only the live mapmode chip stays pressed (F-keys + click).
+var _mode_group: ButtonGroup = null
 var _legend: Label = null
 var _body: VBoxContainer = null
 var _collapse_btn: Button = null
@@ -149,10 +151,13 @@ func _build_ui() -> void:
 	row.add_theme_constant_override("separation", 3)
 	_body.add_child(row)
 
+	_mode_group = ButtonGroup.new()
+	_mode_group.allow_unpress = false
 	for mode in MODES:
 		var btn := Button.new()
 		btn.text = MODE_LABELS.get(mode, mode.capitalize())
 		btn.toggle_mode = true
+		btn.button_group = _mode_group
 		btn.focus_mode = Control.FOCUS_NONE
 		btn.add_theme_font_size_override("font_size", 11)
 		btn.custom_minimum_size = Vector2(0, 28)
@@ -168,6 +173,7 @@ func _build_ui() -> void:
 		)
 		row.add_child(btn)
 		_buttons[mode] = btn
+	_sync_mode_chip_pressed()
 
 	# Pass 14: quick mapmode presets.
 	_preset_row = HBoxContainer.new()
@@ -583,11 +589,10 @@ func set_mode(mode: String, notify_renderer: bool = true) -> void:
 	if not m in MODES:
 		m = "political"
 	if m == _current_mode and notify_renderer:
+		_sync_mode_chip_pressed()
 		return
 	_current_mode = m
-	for key in _buttons.keys():
-		var btn: Button = _buttons[key]
-		btn.button_pressed = (key == m)
+	_sync_mode_chip_pressed()
 	_update_legend(m)
 	if notify_renderer and _map_renderer != null and _map_renderer.has_method("set_map_mode"):
 		_map_renderer.call("set_map_mode", m)
@@ -599,6 +604,37 @@ func set_mode(mode: String, notify_renderer: bool = true) -> void:
 			stack_live = live.duplicate()
 	_rebuild_secondary_tint_chips(stack_live, m)
 	mode_changed.emit(m)
+
+
+## Exclusive pressed + idle restyle. F2/F9/toolbar click must leave only one chip selected.
+func _sync_mode_chip_pressed() -> void:
+	for key in _buttons.keys():
+		var btn: Button = _buttons[key]
+		var on: bool = (str(key) == _current_mode)
+		btn.set_pressed_no_signal(on)
+		_apply_mode_chip_idle_style(btn, on)
+
+
+func _apply_mode_chip_idle_style(btn: Button, selected: bool) -> void:
+	if btn == null:
+		return
+	if selected:
+		btn.modulate = Color(1.14, 1.14, 1.20, 1.0)
+		btn.add_theme_font_size_override("font_size", 12)
+	else:
+		btn.modulate = Color(0.82, 0.86, 0.94, 0.90)
+		btn.add_theme_font_size_override("font_size", 11)
+
+
+func get_mode_pressed_state() -> Dictionary:
+	var out: Dictionary = {}
+	for mode in MODES:
+		var btn: Button = _buttons.get(mode) as Button
+		var pressed: bool = false
+		if btn != null:
+			pressed = btn.button_pressed
+		out[mode] = pressed
+	return out
 
 
 func _update_legend(mode: String) -> void:
