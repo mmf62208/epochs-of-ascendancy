@@ -104,36 +104,122 @@ def build_state_label_rows(board_dir: str = "", max_labels: int = 80) -> List[Di
                 "europe_province_n": int(nuts_provs_by_state.get(sid) or 0),
             }
         )
-    # Geo-balanced budget: Europe NUTS quota first, then grid fill for RoW/US.
+    # Geo-balanced budget: Maginot near-front + Europe NUTS quota, then world grid.
     return select_state_labels_for_budget(rows, max_labels=max(1, int(max_labels)))
+
+
+# Operational Maginot / Low Countries / GER-west names. Skip "Northern *"
+# duplicates so the theater quota is not eaten by Northern Baden / Rhineland.
+MAGINOT_NEAR_FRONT_KEYS: Tuple[str, ...] = (
+    "alsace",
+    "lorraine",
+    "rhineland",
+    "baden",
+    "champagne",
+    "burgundy",
+    "île-de-france",
+    "ile-de-france",
+    "flanders",
+    "wallonia",
+    "westphalia",
+    "saarland",
+    "moselle",
+    "palatinate",
+    "picardy",
+    "bavaria",
+    "hesse",
+)
+# Europe-local grid: leftover Europe quota must not collapse to A–F name rank
+# (Abruzzo / Albania / Anhalt starving Lorraine / Rhineland).
+EUROPE_GRID_COLS: int = 5
+EUROPE_GRID_ROWS: int = 4
+
+
+def is_maginot_near_front_label(row: Dict[str, Any]) -> bool:
+    """True for core Maginot / near-front Europe NUTS labels (not Northern*)."""
+    if not bool(row.get("is_europe_nuts")):
+        return False
+    name = str(row.get("name") or "").strip()
+    low = name.lower()
+    if low.startswith("northern "):
+        return False
+    return any(key in low for key in MAGINOT_NEAR_FRONT_KEYS)
+
+
+def maginot_near_front_named_hits(rows: List[Dict[str, Any]]) -> List[str]:
+    return [str(r.get("name") or "") for r in rows if is_maginot_near_front_label(r)]
+
+
+def _europe_count(rows: Sequence[Dict[str, Any]]) -> int:
+    return sum(1 for r in rows if bool(r.get("is_europe_nuts")))
 
 
 def select_state_labels_for_budget(
     rows: List[Dict[str, Any]],
     max_labels: int = 96,
     europe_quota: int = 48,
+    maginot_theater_quota: int = 16,
 ) -> List[Dict[str, Any]]:
     """Pick ≤max_labels state labels without letting RoW mega-states starve Europe.
 
-    1) Reserve europe_quota slots for Europe NUTS states (IDs 710k provinces).
-    2) Fill remaining budget via geo-grid stratification (diversity).
-    3) If still under budget, fill by province_n among leftovers.
+    1) Reserve maginot_theater_quota slots for Maginot / near-front Europe NUTS.
+    2) Fill remaining europe_quota via Europe-local geo-grid (not A–F name rank).
+    3) Fill remaining budget via world geo-grid (RoW / US diversity).
+    4) If still under budget, fill by province_n among leftovers.
     """
     if not rows:
         return []
     budget = max(1, int(max_labels))
-    eq = max(8, min(int(europe_quota), budget))
+    # Respect the passed quota; do not inflate past budget (A–F slice would
+    # otherwise evict Lorraine / Rhineland after a Maginot reserve).
+    eq = max(1, min(int(europe_quota), budget))
+    tq = max(0, min(int(maginot_theater_quota), eq))
     europe = [r for r in rows if bool(r.get("is_europe_nuts"))]
-    rest = [r for r in rows if not bool(r.get("is_europe_nuts"))]
-    europe_sorted = sorted(
-        europe,
-        key=lambda r: (-int(r.get("province_n") or 0), str(r.get("name") or ""), int(r.get("state_id") or 0)),
-    )
-    picked: List[Dict[str, Any]] = list(europe_sorted[:eq])
-    picked_ids = {int(r["state_id"]) for r in picked}
-    remain = budget - len(picked)
+    picked: List[Dict[str, Any]] = []
+    picked_ids = set()
 
-    # Geo-grid on remaining world (and any leftover Europe)
+    theater = [r for r in europe if is_maginot_near_front_label(r)]
+    theater_sorted = sorted(
+        theater,
+        key=lambda r: (
+            -int(r.get("province_n") or 0),
+            str(r.get("name") or ""),
+            int(r.get("state_id") or 0),
+        ),
+    )
+    for r in theater_sorted[:tq]:
+        picked.append(r)
+        picked_ids.add(int(r["state_id"]))
+
+    europe_remain = eq - len(picked)
+    europe_left = [r for r in europe if int(r["state_id"]) not in picked_ids]
+    if europe_remain > 0 and europe_left:
+        for r in _geo_grid_pick(
+            europe_left, europe_remain, cols=EUROPE_GRID_COLS, row_n=EUROPE_GRID_ROWS
+        ):
+            sid = int(r["state_id"])
+            if sid in picked_ids:
+                continue
+            picked.append(r)
+            picked_ids.add(sid)
+            if _europe_count(picked) >= eq:
+                break
+        if _europe_count(picked) < eq:
+            leftover_eu = sorted(
+                [r for r in europe_left if int(r["state_id"]) not in picked_ids],
+                key=lambda r: (
+                    -int(r.get("province_n") or 0),
+                    str(r.get("name") or ""),
+                    int(r.get("state_id") or 0),
+                ),
+            )
+            for r in leftover_eu:
+                if _europe_count(picked) >= eq:
+                    break
+                picked.append(r)
+                picked_ids.add(int(r["state_id"]))
+
+    remain = budget - len(picked)
     leftover = [r for r in rows if int(r["state_id"]) not in picked_ids]
     if remain > 0 and leftover:
         grid_pick = _geo_grid_pick(leftover, remain)
@@ -155,10 +241,10 @@ def select_state_labels_for_budget(
         for r in rest_sorted[:remain]:
             picked.append(r)
 
-    # Stable order: Europe first then rest by name
+    # Near-front first so a later budget slice cannot evict Maginot names.
     picked.sort(
         key=lambda r: (
-            0 if r.get("is_europe_nuts") else 1,
+            0 if is_maginot_near_front_label(r) else (1 if r.get("is_europe_nuts") else 2),
             -int(r.get("province_n") or 0),
             str(r.get("name") or ""),
         )
@@ -262,10 +348,11 @@ def build_map_state_labels_surface_product(
     has_named = any(n and not n.startswith("State ") for n in names)
     eu_n = europe_theater_label_count(rows)
     mag_hits = maginot_theater_named_hits(rows)
-    ok = len(rows) >= 20 and has_named and eu_n >= 12
+    near_hits = maginot_near_front_named_hits(rows)
+    ok = len(rows) >= 20 and has_named and eu_n >= 12 and len(near_hits) >= 8
     legend = (
-        "State labels · %s @ %s · n=%d eu=%d · %s"
-        % (map_mode, tier, len(rows), eu_n, "visible" if show else "hidden")
+        "State labels · %s @ %s · n=%d eu=%d near=%d · %s"
+        % (map_mode, tier, len(rows), eu_n, len(near_hits), "visible" if show else "hidden")
     )
     return {
         "ok": ok,
@@ -278,6 +365,8 @@ def build_map_state_labels_surface_product(
         "europe_label_n": eu_n,
         "maginot_theater_names": mag_hits,
         "maginot_theater_hit_n": len(mag_hits),
+        "maginot_near_front_names": near_hits,
+        "maginot_near_front_hit_n": len(near_hits),
         "labels": rows,
         "sample_names": names[:8],
         "has_named_states": has_named,
@@ -285,7 +374,7 @@ def build_map_state_labels_surface_product(
         "summary": legend,
         "hotkey": "Shift+F9",
         "action": "states_mapmode_state_labels",
-        "policy": "states_mode_and_operational_only+europe_quota_geo_grid",
+        "policy": "states_mode_and_operational_only+europe_quota_geo_grid+maginot_near_front",
     }
 
 
@@ -319,6 +408,12 @@ def map_state_labels_surface_integrity() -> Dict[str, Any]:
         passes.append("maginot_names=%s" % p.get("maginot_theater_names"))
     else:
         fails.append("maginot_theater_thin=%s" % p.get("maginot_theater_names"))
+    near = [str(n) for n in (p.get("maginot_near_front_names") or [])]
+    near_need = ("Alsace", "Lorraine", "Rhineland", "Baden")
+    if int(p.get("maginot_near_front_hit_n") or 0) >= 8 and all(n in near for n in near_need):
+        passes.append("maginot_near_front=%s" % near)
+    else:
+        fails.append("maginot_near_front_thin=%s" % near)
 
     lod = ZOOM_LOD.read_text(encoding="utf-8") if ZOOM_LOD.is_file() else ""
     lab = LABELS.read_text(encoding="utf-8") if LABELS.is_file() else ""
@@ -328,6 +423,7 @@ def map_state_labels_surface_integrity() -> Dict[str, Any]:
         ("_state_labels", lab, "layer_state_labels"),
         ("_build_state_labels", lab, "layer_build"),
         ("_select_state_labels_for_budget", lab, "layer_budget"),
+        ("_is_maginot_near_front_row", lab, "layer_maginot_near_front"),
         ("europe_nuts", lab, "layer_europe_flag"),
         ("set_map_mode_context", lab, "layer_mode_ctx"),
         ("set_map_mode_context", ren, "renderer_mode_ctx"),

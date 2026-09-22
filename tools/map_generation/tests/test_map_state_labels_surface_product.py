@@ -13,6 +13,8 @@ from map_state_labels_surface_product import (  # noqa: E402
     build_map_state_labels_surface_product,
     build_state_label_rows,
     europe_theater_label_count,
+    is_maginot_near_front_label,
+    maginot_near_front_named_hits,
     maginot_theater_named_hits,
     map_state_labels_surface_integrity,
     select_state_labels_for_budget,
@@ -71,6 +73,40 @@ class TestMapStateLabelsSurface(unittest.TestCase):
         self.assertIn("Baden", names)
         self.assertNotIn("CHN", names)
 
+    def test_select_budget_keeps_maginot_near_front_not_alpha(self) -> None:
+        """Equal-size Europe NUTS used to rank A–F and drop Lorraine / Rhineland."""
+        fake = [
+            {"state_id": 1, "name": "CHN", "cx": 6000, "cy": 1400, "province_n": 173, "is_europe_nuts": False},
+            {"state_id": 2, "name": "Abruzzo", "cx": 4390, "cy": 1179, "province_n": 8, "is_europe_nuts": True},
+            {"state_id": 3, "name": "Albania", "cx": 4640, "cy": 1328, "province_n": 8, "is_europe_nuts": True},
+            {"state_id": 4, "name": "Anhalt", "cx": 4402, "cy": 904, "province_n": 8, "is_europe_nuts": True},
+            {"state_id": 58, "name": "Alsace", "cx": 4113, "cy": 1034, "province_n": 8, "is_europe_nuts": True},
+            {"state_id": 59, "name": "Lorraine", "cx": 4068, "cy": 1098, "province_n": 8, "is_europe_nuts": True},
+            {"state_id": 69, "name": "Rhineland", "cx": 4283, "cy": 1027, "province_n": 8, "is_europe_nuts": True},
+            {"state_id": 78, "name": "Baden", "cx": 4353, "cy": 974, "province_n": 8, "is_europe_nuts": True},
+            {"state_id": 100, "name": "Northern Rhineland", "cx": 4284, "cy": 915, "province_n": 8, "is_europe_nuts": True},
+        ]
+        picked = select_state_labels_for_budget(
+            fake, max_labels=6, europe_quota=6, maginot_theater_quota=4
+        )
+        names = {str(r.get("name")) for r in picked}
+        for must in ("Alsace", "Lorraine", "Rhineland", "Baden"):
+            self.assertIn(must, names, msg="near-front dropped: %s" % sorted(names))
+        self.assertNotIn("CHN", names)
+        self.assertTrue(is_maginot_near_front_label(fake[4]))
+        self.assertFalse(is_maginot_near_front_label(fake[-1]))
+
+    def test_board_budget_keeps_maginot_near_front_states(self) -> None:
+        """Shift+F9 operational: Maginot + near-front stay labeled under the 96 cap."""
+        rows = build_state_label_rows(max_labels=96)
+        names = {str(r.get("name") or "") for r in rows}
+        for must in ("Alsace", "Lorraine", "Rhineland", "Baden", "Île-de-France"):
+            self.assertIn(must, names, msg="missing %s in %s" % (must, sorted(names)))
+        near = maginot_near_front_named_hits(rows)
+        self.assertGreaterEqual(len(near), 8, msg="near-front=%s" % near)
+        self.assertLessEqual(len(rows), 96)
+        self.assertFalse(show_state_labels_for_context("operational", "political"))
+
     def test_product_visible_on_states_operational(self) -> None:
         p = build_map_state_labels_surface_product(tier="operational", map_mode="states", max_labels=96)
         self.assertTrue(p.get("ok"), msg=p)
@@ -78,6 +114,10 @@ class TestMapStateLabelsSurface(unittest.TestCase):
         self.assertGreaterEqual(int(p.get("label_n") or 0), 20)
         self.assertGreaterEqual(int(p.get("europe_label_n") or 0), 12)
         self.assertGreaterEqual(int(p.get("maginot_theater_hit_n") or 0), 2)
+        self.assertGreaterEqual(int(p.get("maginot_near_front_hit_n") or 0), 8)
+        near_names = {str(n) for n in (p.get("maginot_near_front_names") or [])}
+        for must in ("Alsace", "Lorraine", "Rhineland", "Baden"):
+            self.assertIn(must, near_names)
         self.assertEqual(str(p.get("hotkey") or ""), "Shift+F9")
         p2 = build_map_state_labels_surface_product(tier="operational", map_mode="political")
         self.assertFalse(p2.get("show"))
@@ -87,6 +127,7 @@ class TestMapStateLabelsSurface(unittest.TestCase):
         self.assertTrue(g.get("ok"), msg=g)
         gd = LABELS_GD.read_text(encoding="utf-8")
         self.assertIn("_select_state_labels_for_budget", gd)
+        self.assertIn("_is_maginot_near_front_row", gd)
         self.assertIn("europe_nuts", gd)
         self.assertIn("_geo_grid_pick_state_rows", gd)
         lod = (ROOT / "scripts" / "map" / "MapZoomLOD.gd").read_text(encoding="utf-8")
