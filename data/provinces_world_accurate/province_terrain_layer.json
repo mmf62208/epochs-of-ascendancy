@@ -7220,6 +7220,10 @@
       "terrain": "plains",
       "domain": "land"
     },
+    "905844": {
+      "terrain": "mountains",
+      "domain": "land"
+    },
     "902487": {
       "terrain": "plains",
       "domain": "land"

@@ -68245,6 +68245,29 @@
       ],
       "island_class": "island",
       "facility_tier": 2
+    },
+    {
+      "id": 905844,
+      "name": "Hong Kong",
+      "terrain": "mountains",
+      "domain": "land",
+      "core_for_tags": [
+        "ENG"
+      ],
+      "natural_resources": {},
+      "population_base": 250000,
+      "meta": {
+        "source": "ne_10m_admin_1",
+        "adm0_a3": "HKG",
+        "admin": "Hong Kong S.A.R.",
+        "hong_kong_land_feed": "v1_hong_kong_island_land"
+      },
+      "island_class": "island",
+      "facility_tier": 3,
+      "special_features": [
+        "naval_base",
+        "port"
+      ]
     }
   ]
 }

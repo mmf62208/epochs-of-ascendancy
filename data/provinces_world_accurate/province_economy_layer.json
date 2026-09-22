@@ -10851,6 +10851,12 @@
       "infrastructure": 3,
       "development_level": 2
     },
+    "905844": {
+      "population": 250000,
+      "factories": 3,
+      "infrastructure": 6,
+      "development_level": 3
+    },
     "902487": {
       "population": 557946,
       "factories": 5,
