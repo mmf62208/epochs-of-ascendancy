@@ -245,4 +245,16 @@ python3 -m unittest tools.map_generation.tests.test_gibraltar_island_land_produc
 
 On `--quick` via `tools/eoa_full_test_gates.sh`. Seas coarsening / Hong Kong / Maginot combat / Esc / G / Dig2 are out of scope for this theater proof.
 
-Honest: `--quick` still fails `test_living_unit_order_loop_product` on tip `caa3c8e7` (playtest-clock / air-CAS / peace / nation-era / map-country wiring). This FEED does not touch those files. 
+Honest: `--quick` still fails `test_living_unit_order_loop_product` on tip `caa3c8e7` (playtest-clock / air-CAS / peace / nation-era / map-country wiring). This FEED does not touch those files.
+
+### Alboran seas coarsen (FEED-4)
+
+Pure product + board QC (no Godot):
+
+```bash
+python3 -m unittest tools.map_generation.tests.test_seas_coarsen_feed4_product -v
+```
+
+On `--quick` via `tools/eoa_full_test_gates.sh`. Gibraltar land / Maginot land / Great Lakes / Esc / G / Dig2 / combat are out of scope for this theater proof.
+
+Honest: `--quick` living-unit wiring fails are **tip-pre-existing** on `8340c05d` (same files). This FEED does not touch those GD files. 

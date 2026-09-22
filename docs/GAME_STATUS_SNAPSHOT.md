@@ -191,6 +191,7 @@ From [`WORLD_CLASS_MAP_REVIEW.md`](WORLD_CLASS_MAP_REVIEW.md) §4 + forward plan
 | Great Lakes missing as water cells (Mike bar #4) | **FEED-1 theater proof** — reuse IDs `950333–950337`, basin rings + coast adj; see [`MAP_PROVINCE_SIZING_BAR.md`](MAP_PROVINCE_SIZING_BAR.md) · HOLD merge |
 | Maginot land cells not uniform (Mike bar #1) | **FEED-2 theater proof** — split 6 FR départements (append `711514–711519`) + grow 3 front Stadtkreise; IDs otherwise kept; see [`MAP_MAGINOT_LAND_UNIFORMITY.md`](MAP_MAGINOT_LAND_UNIFORMITY.md) · HOLD merge |
 | Gibraltar not island-scale land (Mike bar #2) | **FEED-3 theater proof** — append land `711520` Gibraltar (rock key); Cadiz `710671` / Ceuta `710679` / strait `950019` kept; see [`MAP_GIBRALTAR_ISLAND_LAND.md`](MAP_GIBRALTAR_ISLAND_LAND.md) · HOLD merge |
+| Seas/oceans not coarse vs land (Mike bar #3) | **FEED-4 theater proof** — reuse sea `950128` Alboran basin ring (241→1881); strait `950019` choke kept; land IDs untouched; see [`MAP_SEAS_COARSEN_FEED4.md`](MAP_SEAS_COARSEN_FEED4.md) · HOLD merge |
 | F2/F3/F4 looked dead | **Fixed** — full visible strain/vitality/dev gradients (not data-gated) |
 | Void hex / can’t reach Europe | **Fixed v2** — content AABB underlay fit · wrap **off** · **Home** re-center |
 | Notices unreadable (red corners) | **Fixed** — flat toast panels (no 9-slice ornament frame) |

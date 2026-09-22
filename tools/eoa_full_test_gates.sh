@@ -96,6 +96,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_great_lakes_water_province_product \
     tools.map_generation.tests.test_maginot_land_uniformity_product \
     tools.map_generation.tests.test_gibraltar_island_land_product \
+    tools.map_generation.tests.test_seas_coarsen_feed4_product \
     tools.map_generation.tests.test_world_accurate_capital_pick_product \
     tools.map_generation.tests.test_world_accurate_strategic_and_assault \
     tools.map_generation.tests.test_world_accurate_multi_front_and_deploy \
