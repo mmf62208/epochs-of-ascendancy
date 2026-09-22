@@ -121,7 +121,7 @@ Every Cursor / Grok / human session on this tree:
 | **A2b RoW sparse merge** | **DONE full** — T1 Africa/AUS/Oceania + T2 CA/SA/India/sparse Asia · dead **~2150** total · Moscow/Tokyo protected · `merge_row_sparse_to_playable.py` |
 | **A3 city/factory LOD** | **DONE** — accurate cull threshold **3000** (board ~3.5k) · city min zoom **0.58** · site min zoom **0.62** |
 | **Phase C live fronts** | **DONE** — **B** hotkey + toolbar **Fronts** preset · `MapRenderer.show_live_border_fronts` → `MapManager.collect_live_border_assault_targets` · cycles targets + toast/legend |
-| **Stream 2 state labels** | **DONE** — states mapmode (**Shift+F9**) @ operational · **Europe NUTS budget quota** + geo-grid (not pure province_n) so Maginot theater stays labeled · pure `select_state_labels_for_budget` |
+| **Stream 2 state labels** | **DONE** — states mapmode (**Shift+F9**) @ operational · **Europe NUTS budget quota** + Maginot/near-front reserve + Europe-local geo-grid (not A–F / not pure province_n) so Alsace/Lorraine/Rhineland stay labeled · political still hides · pure `select_state_labels_for_budget` |
 | **WarLoop first-session** | **DONE** — toolbar **WarLoop** · **Shift+I** · `show_first_session_war_path` (EquipmentFlow ON + Fronts + assault brief) · pure `map_war_path_surface_product` |
 | **Human playtest kit** | **DONE** — `PLAYTEST_AND_DECISION_GUIDE.md` §0b post-merge checklist · **M6 20d/60d narrative still open** |
 | **§0b machine composer** | **DONE (PR 1)** — `first_session_play_surface_product` ANDs eight shipped builders **+ unit_pick** · on `eoa_full_test_gates.sh --quick` · **not M6** |

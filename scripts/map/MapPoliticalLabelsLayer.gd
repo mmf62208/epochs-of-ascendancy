@@ -435,8 +435,8 @@ func _build_region_labels(province_centroids: Dictionary) -> void:
 
 
 ## Stream 2: state names for states mapmode (operational zoom). Prefer ScenarioLoader names.
-## Budget: Europe NUTS quota first (first-session Maginot theater), then geo-grid RoW —
-## never pure province_n global rank (RoW mega-states starved Europe).
+## Budget: Maginot / near-front reserve, then Europe-local geo-grid, then RoW grid —
+## never pure province_n or A–F name rank (that starved Lorraine / Rhineland).
 func _build_state_labels(province_centroids: Dictionary, provinces: Dictionary) -> void:
 	var by_state: Dictionary = {}  # sid -> {sum, count, name, europe_nuts}
 	var loader: Node = null
@@ -497,7 +497,7 @@ func _build_state_labels(province_centroids: Dictionary, provinces: Dictionary) 
 			budget = 120
 		elif nprov >= 2000:
 			budget = 96
-	var selected: Array = _select_state_labels_for_budget(all_rows, budget, 48)
+	var selected: Array = _select_state_labels_for_budget(all_rows, budget, 48, 16)
 	var state_nodes: Array[Label] = []
 	for row in selected:
 		var sid := int(row["sid"])
@@ -512,19 +512,47 @@ func _build_state_labels(province_centroids: Dictionary, provinces: Dictionary) 
 	_resolve_label_collisions(state_nodes, 110.0)
 
 
+## Mirror pure map_state_labels_surface_product.is_maginot_near_front_label.
+func _is_maginot_near_front_row(row: Dictionary) -> bool:
+	if not bool(row.get("europe_nuts", false)):
+		return false
+	var n := str(row.get("name", "")).strip_edges().to_lower()
+	if n.begins_with("northern "):
+		return false
+	var keys: PackedStringArray = PackedStringArray([
+		"alsace", "lorraine", "rhineland", "baden", "champagne", "burgundy",
+		"île-de-france", "ile-de-france", "flanders", "wallonia", "westphalia",
+		"saarland", "moselle", "palatinate", "picardy", "bavaria", "hesse",
+	])
+	for k in keys:
+		if n.contains(k):
+			return true
+	return false
+
+
+func _europe_nuts_count(rows: Array) -> int:
+	var n := 0
+	for r in rows:
+		if bool(r.get("europe_nuts", false)):
+			n += 1
+	return n
+
+
 ## Mirror pure map_state_labels_surface_product.select_state_labels_for_budget.
-func _select_state_labels_for_budget(all_rows: Array, budget: int, europe_quota: int) -> Array:
+func _select_state_labels_for_budget(all_rows: Array, budget: int, europe_quota: int, maginot_theater_quota: int = 16) -> Array:
 	if all_rows.is_empty() or budget <= 0:
 		return []
-	var eq := maxi(8, mini(europe_quota, budget))
+	var eq := maxi(1, mini(europe_quota, budget))
+	var tq := maxi(0, mini(maginot_theater_quota, eq))
 	var europe: Array = []
-	var rest: Array = []
 	for r in all_rows:
 		if bool(r.get("europe_nuts", false)):
 			europe.append(r)
-		else:
-			rest.append(r)
-	europe.sort_custom(func(a, b):
+	var theater: Array = []
+	for er0 in europe:
+		if _is_maginot_near_front_row(er0):
+			theater.append(er0)
+	theater.sort_custom(func(a, b):
 		var ca := int(a.get("count", 0))
 		var cb := int(b.get("count", 0))
 		if ca != cb:
@@ -533,10 +561,35 @@ func _select_state_labels_for_budget(all_rows: Array, budget: int, europe_quota:
 	)
 	var picked: Array = []
 	var picked_ids: Dictionary = {}
-	for i in range(mini(eq, europe.size())):
-		var er: Dictionary = europe[i]
-		picked.append(er)
-		picked_ids[int(er["sid"])] = true
+	for i in range(mini(tq, theater.size())):
+		var tr: Dictionary = theater[i]
+		picked.append(tr)
+		picked_ids[int(tr["sid"])] = true
+	var europe_remain := eq - picked.size()
+	var europe_left: Array = []
+	for er1 in europe:
+		if not picked_ids.has(int(er1["sid"])):
+			europe_left.append(er1)
+	if europe_remain > 0 and not europe_left.is_empty():
+		var eu_grid: Array = _geo_grid_pick_state_rows(europe_left, europe_remain, 5, 4)
+		for g0 in eu_grid:
+			var esid := int(g0["sid"])
+			if picked_ids.has(esid):
+				continue
+			picked.append(g0)
+			picked_ids[esid] = true
+			if _europe_nuts_count(picked) >= eq:
+				break
+		if _europe_nuts_count(picked) < eq:
+			europe_left.sort_custom(func(a, b): return int(a.get("count", 0)) > int(b.get("count", 0)))
+			for er2 in europe_left:
+				var sid_e := int(er2["sid"])
+				if picked_ids.has(sid_e):
+					continue
+				picked.append(er2)
+				picked_ids[sid_e] = true
+				if _europe_nuts_count(picked) >= eq:
+					break
 	var remain := budget - picked.size()
 	var leftover: Array = []
 	for r2 in all_rows:
