@@ -243,4 +243,6 @@ Pure product + board QC (no Godot):
 python3 -m unittest tools.map_generation.tests.test_gibraltar_island_land_product -v
 ```
 
-On `--quick` via `tools/eoa_full_test_gates.sh`. Seas coarsening / Hong Kong / Maginot combat / Esc / G / Dig2 are out of scope for this theater proof. 
+On `--quick` via `tools/eoa_full_test_gates.sh`. Seas coarsening / Hong Kong / Maginot combat / Esc / G / Dig2 are out of scope for this theater proof.
+
+Honest: `--quick` still fails `test_living_unit_order_loop_product` on tip `caa3c8e7` (playtest-clock / air-CAS / peace / nation-era / map-country wiring). This FEED does not touch those files. 

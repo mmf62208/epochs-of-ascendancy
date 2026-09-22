@@ -53,6 +53,18 @@ Board scale stays **~3520** (3526 + 1 = **3527**). Seas stay **340**. `world_ful
 - **Hong Kong** or other keys — only if still missing after a later Scott GO.
 - Do not remesh whole Iberia / Africa here.
 
+## Gates (machine)
+
+Slice green on this PR:
+
+```bash
+python3 -m unittest tools.map_generation.tests.test_gibraltar_island_land_product -v
+```
+
+`map_accuracy_qc` on the written board: hard_ok, matched **3527**, orphans 0, NE land hit **0.985**. Maginot FEED-2 QC still green. `world_accurate` hierarchy/ownership/choke tests green.
+
+`--quick` still fails `test_living_unit_order_loop_product` (wiring: `air_region_cas`, `peace_occupation`, `nation_era_next`, `map_country_select`, `playtest_clock`). **Same fails on tip** `caa3c8e7` — this FEED does not touch those GD files. Out of scope (not a Gibraltar board issue).
+
 ## Play smoke (human)
 
 Home Iberia / Gibraltar operational zoom: pick the rock — inspector should read **Gibraltar** (land `711520`), not Cadiz and not "Gibraltar Strait Zone". Strait pick still reads the sea choke. Esc HARD PASS on the tip. Dig2 / G / Maginot combat not in this FEED.
