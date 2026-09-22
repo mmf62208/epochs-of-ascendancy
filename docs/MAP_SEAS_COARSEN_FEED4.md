@@ -80,7 +80,9 @@ python3 -m unittest tools.map_generation.tests.test_gibraltar_island_land_produc
   tools.map_generation.tests.test_world_accurate_board -v
 ```
 
-`map_accuracy_qc` must stay hard_ok. Hierarchy / ownership / choke tests stay PASS.
+`map_accuracy_qc` on the written board: hard_ok, matched **3527**, orphans 0, NE land hit **0.9852**. Maginot FEED-2 + Gibraltar FEED-3 product tests PASS. `world_accurate` hierarchy/ownership/choke tests PASS.
+
+`--quick` still fails `test_living_unit_order_loop_product` (wiring: `air_region_cas`, `peace_occupation`, `nation_era_next`, `map_country_select`, `playtest_clock`). **Same fails on tip** `8340c05d` — this FEED does not touch those GD files. Out of scope (not a seas-board issue).
 
 ## Play smoke (human)
 
