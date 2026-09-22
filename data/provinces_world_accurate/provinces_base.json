@@ -68268,6 +68268,94 @@
         "naval_base",
         "port"
       ]
+    },
+    {
+      "id": 905845,
+      "name": "Barbados",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "ENG"
+      ],
+      "natural_resources": {},
+      "population_base": 80000,
+      "meta": {
+        "source": "ne_10m_admin_1",
+        "adm0_a3": "ENG",
+        "admin": "Barbados",
+        "caribbean_island_feed": "v1_caribbean_island_sizing_feed6"
+      },
+      "island_class": "island",
+      "facility_tier": 2,
+      "special_features": [
+        "port"
+      ]
+    },
+    {
+      "id": 905846,
+      "name": "Saint Lucia",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "ENG"
+      ],
+      "natural_resources": {},
+      "population_base": 80000,
+      "meta": {
+        "source": "ne_10m_admin_1",
+        "adm0_a3": "ENG",
+        "admin": "Saint Lucia",
+        "caribbean_island_feed": "v1_caribbean_island_sizing_feed6"
+      },
+      "island_class": "island",
+      "facility_tier": 2,
+      "special_features": [
+        "port"
+      ]
+    },
+    {
+      "id": 905847,
+      "name": "Saint Vincent",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "ENG"
+      ],
+      "natural_resources": {},
+      "population_base": 80000,
+      "meta": {
+        "source": "ne_10m_admin_1",
+        "adm0_a3": "ENG",
+        "admin": "Saint Vincent",
+        "caribbean_island_feed": "v1_caribbean_island_sizing_feed6"
+      },
+      "island_class": "island",
+      "facility_tier": 2,
+      "special_features": [
+        "port"
+      ]
+    },
+    {
+      "id": 905848,
+      "name": "Grenada",
+      "terrain": "plains",
+      "domain": "land",
+      "core_for_tags": [
+        "ENG"
+      ],
+      "natural_resources": {},
+      "population_base": 80000,
+      "meta": {
+        "source": "ne_10m_admin_1",
+        "adm0_a3": "ENG",
+        "admin": "Grenada",
+        "caribbean_island_feed": "v1_caribbean_island_sizing_feed6"
+      },
+      "island_class": "island",
+      "facility_tier": 2,
+      "special_features": [
+        "port"
+      ]
     }
   ]
 }
