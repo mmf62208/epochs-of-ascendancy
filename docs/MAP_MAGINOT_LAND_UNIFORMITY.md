@@ -93,7 +93,8 @@ Residual tinies **not** in this FEED (documented, not a fail): Basel-Stadt, Spey
 
 ## Later FEEDs (not this PR)
 
-- **FEED-3+:** seas/oceans coarsen (bar #3); island-scale chokepoints (bar #2) only if still missing.
+- **FEED-3:** Gibraltar island-scale land key (bar #2) — see [`MAP_GIBRALTAR_ISLAND_LAND.md`](MAP_GIBRALTAR_ISLAND_LAND.md).
+- **FEED-4+:** seas/oceans coarsen (bar #3); Hong Kong / other keys only if still missing.
 - Optional later land pass: remaining Rhine/Pfalz Stadtkreise; do not remesh whole Europe here.
 
 ## Play smoke (human)

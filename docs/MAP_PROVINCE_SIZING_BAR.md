@@ -51,7 +51,8 @@ Board scale stays **~3520**. No new IDs. Caspian / Victoria leftover seed cells 
 ## Later FEEDs (not this PR)
 
 - **FEED-2:** Maginot / Europe land-area uniformity — see [`MAP_MAGINOT_LAND_UNIFORMITY.md`](MAP_MAGINOT_LAND_UNIFORMITY.md) (draft theater proof; HOLD merge).
-- **FEED-3+:** seas/oceans coarsen (bar #3); island-scale chokepoints (bar #2) only if still missing.
+- **FEED-3:** Gibraltar island-scale land key (bar #2) — see [`MAP_GIBRALTAR_ISLAND_LAND.md`](MAP_GIBRALTAR_ISLAND_LAND.md) (draft theater proof; HOLD merge).
+- **FEED-4+:** seas/oceans coarsen (bar #3); Hong Kong / other keys only if still missing.
 
 ## Play smoke (human)
 
