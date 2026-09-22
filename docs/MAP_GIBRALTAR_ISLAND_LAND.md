@@ -49,7 +49,7 @@ Board scale stays **~3520** (3526 + 1 = **3527**). Seas stay **340**. `world_ful
 
 ## Later FEEDs (not this PR)
 
-- **Seas/oceans coarsen** (bar #3) — separate GO.
+- **Seas/oceans coarsen** (bar #3) — see [`MAP_SEAS_COARSEN_FEED4.md`](MAP_SEAS_COARSEN_FEED4.md) (Alboran basin; HOLD merge).
 - **Hong Kong** or other keys — only if still missing after a later Scott GO.
 - Do not remesh whole Iberia / Africa here.
 

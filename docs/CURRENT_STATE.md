@@ -9,6 +9,8 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
+> **2026-09-22 FEED-4 Alboran seas coarsen:** Mike bar #3 theater proof on `world_accurate`. Reused sea `950128` Alboran (leftover seed 241 @ 3°E → basin ring **1881** in-basin @ −3.11°E). Strait `950019` choke kept. Gibraltar `711520` / Cadiz `710671` / Ceuta `710679` / Maginot / Great Lakes / `world_full` IDs **untouched**. Theater median 165→985. Seas stay 340. Slice + map_qc expected green. `--quick` living-unit wiring fails are **tip-pre-existing**. Esc / CC / Dig2 / G / combat / Control Labels / duals / Godot / HK / NAtl remesh **untouched**. HOLD merge for Scott/Play.
+>
 > **2026-09-22 FEED-3 Gibraltar island-scale land:** Mike bar #2 theater proof on `world_accurate`. Dedicated land `711520` Gibraltar (Malta-like 13.67 canvas area) covers the rock; Cadiz `710671` / Ceuta `710679` / strait `950019` IDs kept. Owner ENG. Seas stay 340. Slice + map_qc green (NE 0.985, n=3527). `--quick` living-unit wiring fails are **tip-pre-existing** (not this FEED). Esc / CC / Dig2 / G / combat / Control Labels / duals / Godot / HK / seas coarsening / Maginot / Great Lakes / world_full IDs **untouched**. HOLD merge for Scott/Play.
 >
 > **2026-09-22 FEED-2 Maginot land uniformity:** Mike bar #1 theater proof on `world_accurate`. Tight corridor land max 511→~262, max/median 8.9→~4.7. Six FR département splits append IDs `711514–711519`; `710173`/`710739` kept and still adjacent. Three front Stadtkreise grown into own-country Landkreis (no FRA bite). Esc / CC / Dig2 / G / combat / Control Labels / duals / Godot / seas / Great Lakes / world_full IDs **untouched**. HOLD merge for Scott/Play.
