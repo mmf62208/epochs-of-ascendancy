@@ -87,7 +87,7 @@ Slice green on this PR:
 python3 -m unittest tools.map_generation.tests.test_caribbean_island_sizing_feed6_product -v
 ```
 
-`map_accuracy_qc` on the written board: hard_ok expected, orphans 0. Maginot FEED-2 + Gibraltar FEED-3 + Alboran FEED-4 + Hong Kong FEED-5 product tests still PASS. `world_accurate` hierarchy/ownership/choke tests PASS.
+`map_accuracy_qc` on the written board: hard_ok, matched **3532**, orphans 0, NE land hit **0.9853**. Maginot FEED-2 + Gibraltar FEED-3 + Alboran FEED-4 + Hong Kong FEED-5 product tests still PASS. `world_accurate` hierarchy/ownership/choke tests PASS.
 
 `--quick` living-unit wiring fails are **tip-pre-existing** on `8bd654c206a20833ce9d446061f93ed964d55d88`. This FEED does not touch those GD files.
 
