@@ -2937,6 +2937,10 @@
       "city_name": "Haute-Saône",
       "tier": 2
     },
+    "711516": {
+      "city_name": "Haute-Sa\u00f4ne East",
+      "tier": 2
+    },
     "710728": {
       "city_name": "Territoire de Belfort",
       "tier": 2
@@ -2988,8 +2992,16 @@
       "city_name": "Bas-Rhin",
       "tier": 2
     },
+    "711518": {
+      "city_name": "Bas-Rhin South",
+      "tier": 2
+    },
     "710740": {
       "city_name": "Haut-Rhin",
+      "tier": 2
+    },
+    "711519": {
+      "city_name": "Haut-Rhin North",
       "tier": 2
     },
     "710741": {
@@ -3012,6 +3024,10 @@
       "city_name": "Meurthe-et-Moselle",
       "tier": 2
     },
+    "711517": {
+      "city_name": "Meurthe-et-Moselle South",
+      "tier": 2
+    },
     "710746": {
       "city_name": "Meuse",
       "tier": 2
@@ -3020,8 +3036,16 @@
       "city_name": "Moselle",
       "tier": 2
     },
+    "711514": {
+      "city_name": "Moselle West",
+      "tier": 2
+    },
     "710748": {
       "city_name": "Vosges",
+      "tier": 2
+    },
+    "711515": {
+      "city_name": "Vosges East",
       "tier": 2
     },
     "710749": {

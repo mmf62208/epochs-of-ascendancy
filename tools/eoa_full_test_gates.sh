@@ -94,6 +94,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_row_sparse_density_product \
     tools.map_generation.tests.test_us_state_province_density_product \
     tools.map_generation.tests.test_great_lakes_water_province_product \
+    tools.map_generation.tests.test_maginot_land_uniformity_product \
     tools.map_generation.tests.test_world_accurate_capital_pick_product \
     tools.map_generation.tests.test_world_accurate_strategic_and_assault \
     tools.map_generation.tests.test_world_accurate_multi_front_and_deploy \

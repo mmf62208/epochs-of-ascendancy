@@ -223,4 +223,14 @@ EOA_HEADLESS_EVIDENCE=1 EOA_RUN_50_TURN_SIM=1 godot --headless --path . res://sc
 
 Assets paths absolute: /home/mikef/epochs-of-ascendancy/assets/graphics/icons/events/riot_crowd_64.png etc + units/nato/modern/*. Also update imports on first graphical (or rm *.import for new pngs).
 
-See CURRENT_STATE graphics/perf + TODO. Coords with 50T agent via env. 
+See CURRENT_STATE graphics/perf + TODO. Coords with 50T agent via env.
+
+### Maginot land uniformity (FEED-2)
+
+Pure product + board QC (no Godot):
+
+```bash
+python3 -m unittest tools.map_generation.tests.test_maginot_land_uniformity_product -v
+```
+
+On `--quick` via `tools/eoa_full_test_gates.sh`. Combat / Esc / G / Dig2 are out of scope for this theater proof. 

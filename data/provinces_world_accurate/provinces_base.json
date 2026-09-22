@@ -13093,7 +13093,7 @@
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "France",
-      "population_base": 250000,
+      "population_base": 125822,
       "nuts_id": "FRC23",
       "cntr_code": "FR",
       "core_for_tags": [
@@ -13309,7 +13309,7 @@
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "France",
-      "population_base": 250000,
+      "population_base": 126823,
       "nuts_id": "FRF11",
       "cntr_code": "FR",
       "core_for_tags": [
@@ -13327,7 +13327,7 @@
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "France",
-      "population_base": 250000,
+      "population_base": 125077,
       "nuts_id": "FRF12",
       "cntr_code": "FR",
       "core_for_tags": [
@@ -13417,7 +13417,7 @@
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "France",
-      "population_base": 250000,
+      "population_base": 121414,
       "nuts_id": "FRF31",
       "cntr_code": "FR",
       "core_for_tags": [
@@ -13453,7 +13453,7 @@
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "France",
-      "population_base": 250000,
+      "population_base": 128158,
       "nuts_id": "FRF33",
       "cntr_code": "FR",
       "core_for_tags": [
@@ -13471,7 +13471,7 @@
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "France",
-      "population_base": 250000,
+      "population_base": 125613,
       "nuts_id": "FRF34",
       "cntr_code": "FR",
       "core_for_tags": [
@@ -68116,6 +68116,114 @@
       "facility_tier": "none",
       "theater": "sea",
       "naval_importance": 0
+    },
+    {
+      "id": 711514,
+      "name": "Moselle West",
+      "terrain": "plains",
+      "domain": "land",
+      "theater": "europe_core",
+      "strategic_region_hint": "France",
+      "population_base": 121842,
+      "nuts_id": "FRF33",
+      "cntr_code": "FR",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "natural_resources": {},
+      "special_features": [],
+      "island_class": "mainland",
+      "facility_tier": 1
+    },
+    {
+      "id": 711515,
+      "name": "Vosges East",
+      "terrain": "plains",
+      "domain": "land",
+      "theater": "europe_core",
+      "strategic_region_hint": "France",
+      "population_base": 124387,
+      "nuts_id": "FRF34",
+      "cntr_code": "FR",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "natural_resources": {},
+      "special_features": [],
+      "island_class": "mainland",
+      "facility_tier": 1
+    },
+    {
+      "id": 711516,
+      "name": "Haute-Sa\u00f4ne East",
+      "terrain": "plains",
+      "domain": "land",
+      "theater": "europe_core",
+      "strategic_region_hint": "France",
+      "population_base": 124178,
+      "nuts_id": "FRC23",
+      "cntr_code": "FR",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "natural_resources": {},
+      "special_features": [],
+      "island_class": "mainland",
+      "facility_tier": 1
+    },
+    {
+      "id": 711517,
+      "name": "Meurthe-et-Moselle South",
+      "terrain": "plains",
+      "domain": "land",
+      "theater": "europe_core",
+      "strategic_region_hint": "France",
+      "population_base": 128586,
+      "nuts_id": "FRF31",
+      "cntr_code": "FR",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "natural_resources": {},
+      "special_features": [],
+      "island_class": "mainland",
+      "facility_tier": 1
+    },
+    {
+      "id": 711518,
+      "name": "Bas-Rhin South",
+      "terrain": "plains",
+      "domain": "land",
+      "theater": "europe_core",
+      "strategic_region_hint": "France",
+      "population_base": 123177,
+      "nuts_id": "FRF11",
+      "cntr_code": "FR",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "natural_resources": {},
+      "special_features": [],
+      "island_class": "mainland",
+      "facility_tier": 1
+    },
+    {
+      "id": 711519,
+      "name": "Haut-Rhin North",
+      "terrain": "plains",
+      "domain": "land",
+      "theater": "europe_core",
+      "strategic_region_hint": "France",
+      "population_base": 124923,
+      "nuts_id": "FRF12",
+      "cntr_code": "FR",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "natural_resources": {},
+      "special_features": [],
+      "island_class": "mainland",
+      "facility_tier": 1
     }
   ]
 }
