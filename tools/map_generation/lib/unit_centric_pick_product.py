@@ -5,12 +5,16 @@ Does not rewrite assault/move behavior or unit-card assign mode.
 """
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 from typing import Any, Dict, List
 
+from map_unit_counter_lod_product import europe_home_zoom_wants_counters
+
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
+LOD_GD = ROOT / "scripts" / "map" / "MapZoomLOD.gd"
 
 # Discoverability / integrity strings grepped from MapRenderer (must stay in live path).
 STRATEGIC_PICK_TOAST = "Click a unit chip to command (Shift+U toggles counters)."
@@ -18,6 +22,10 @@ STACK_CYCLE_HINT = "Stack %d/%d · [ ] or buttons to cycle"
 SELECTED_FRAME_HOOK = "_refresh_selected_unit_chip"
 HIT_RADIUS_PX = 48.0
 HIT_RADIUS_FLOOR = 20.0
+SPRITE_PX = 32.0
+COUNTER_SCALE_FLOOR = 0.85
+COUNTER_SCALE_CEIL = 16.0
+EUROPE_HOME_HIT_Z = 0.33
 
 
 def _gd_func_slice(src: str, func_name: str) -> str:
@@ -49,13 +57,65 @@ def _spatial_left_click_slice(renderer_src: str) -> str:
     return renderer_src[left:end]
 
 
-def _hit_radius_ok(pick_fn: str) -> bool:
+def unit_counter_scale_for_zoom(z: float) -> float:
+    """Mirror MapRenderer._unit_counter_scale_for_zoom (paint scale)."""
+    zz = max(float(z), 0.04)
+    t = min(1.0, max(0.0, (zz - 0.2) / 1.6))
+    screen_px = 48.0 + (58.0 - 48.0) * t
+    target = screen_px / (SPRITE_PX * zz)
+    return min(COUNTER_SCALE_CEIL, max(COUNTER_SCALE_FLOOR, target))
+
+
+def unit_chip_hit_screen_px(z: float) -> float:
+    """Screen-space hit radius. Home-band covers full plate+label AABB, not half-plate."""
+    cscale = unit_counter_scale_for_zoom(z)
+    label_pad = 16.0 if cscale >= 2.0 else 0.0
+    return max(HIT_RADIUS_PX, 0.5 * SPRITE_PX * cscale * math.sqrt(2.0) + label_pad)
+
+
+def home_band_hit_disk_tracks_scale() -> bool:
+    """Europe Home (~0.33–0.49) must cover plate+label, not half-plate only."""
+    home = unit_chip_hit_screen_px(EUROPE_HOME_HIT_Z)
+    mid = unit_chip_hit_screen_px(0.49)
+    tactical = unit_chip_hit_screen_px(1.0)
+    old_half_plate = max(
+        HIT_RADIUS_PX, 0.5 * SPRITE_PX * unit_counter_scale_for_zoom(EUROPE_HOME_HIT_Z)
+    )
+    return (
+        home > HIT_RADIUS_PX + 8.0
+        and home >= old_half_plate * 1.35
+        and home >= 100.0
+        and mid > HIT_RADIUS_PX
+        and abs(tactical - HIT_RADIUS_PX) < 0.05
+    )
+
+
+def _hit_radius_ok(pick_fn: str, helper_fn: str = "") -> bool:
     if not pick_fn:
         return False
-    has_48 = bool(re.search(r"\b48(?:\.0)?\b", pick_fn))
-    has_20 = bool(re.search(r"\b20(?:\.0)?\b", pick_fn))
-    has_maxf_floor = "maxf" in pick_fn and ("20.0" in pick_fn or "20" in pick_fn)
+    blob = pick_fn + "\n" + helper_fn
+    has_48 = bool(re.search(r"\b48(?:\.0)?\b", blob))
+    has_20 = bool(re.search(r"\b20(?:\.0)?\b", blob))
+    has_maxf_floor = "maxf" in blob and ("20.0" in blob or "20" in blob)
     return has_48 and has_20 and has_maxf_floor
+
+
+def _home_hit_disk_wiring_ok(pick_fn: str, helper_fn: str) -> bool:
+    """Pick must cover full plate+label AABB (not a half-plate / 48-only disk)."""
+    if not pick_fn or not helper_fn:
+        return False
+    uses_helper = "_unit_counter_hit_radius_world" in pick_fn
+    helper_tracks = (
+        "0.5 * sprite_px" in helper_fn
+        and "sqrt(2.0)" in helper_fn
+        and "label_pad" in helper_fn
+        and "_unit_counter_aabb_hit_screen" in helper_fn
+        and "_unit_counter_scale_for_zoom" in helper_fn
+        and "maxf(48.0" in helper_fn
+        and "20.0" in helper_fn
+    )
+    live_plate = "counter.position" in pick_fn
+    return uses_helper and helper_tracks and live_plate and home_band_hit_disk_tracks_scale()
 
 
 def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, Any]:
@@ -77,6 +137,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
 
     pin_fn = _gd_func_slice(ren, "_try_open_unit_at_world")
     pick_fn = _gd_func_slice(ren, "_pick_unit_formation_at_world")
+    hit_fn = _gd_func_slice(ren, "_unit_counter_hit_radius_world")
     select_fn = _gd_func_slice(ren, "_select_map_unit")
     spatial = _spatial_left_click_slice(ren)
 
@@ -102,12 +163,19 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         fails.append("capital_star_before_chip")
 
     # 2) Hit disk ≥48 px / zoom with floor ≥20 world units.
-    hit_ok = _hit_radius_ok(pick_fn)
+    hit_ok = _hit_radius_ok(pick_fn, hit_fn)
     wiring["hit_radius_48_floor_20"] = hit_ok
     if hit_ok:
         passes.append("hit_radius_48_floor_20")
     else:
         fails.append("hit_radius_48_floor_20")
+    # 2b) Home-band painted chips are 2–3× the old 48px disk — track scale.
+    home_hit_ok = _home_hit_disk_wiring_ok(pick_fn, hit_fn)
+    wiring["home_hit_disk_tracks_counter_scale"] = home_hit_ok
+    if home_hit_ok:
+        passes.append("home_hit_disk_tracks_counter_scale")
+    else:
+        fails.append("home_hit_disk_tracks_counter_scale")
 
     # 3) hang-class: no show_info_panel in pin open path.
     pin_no_insp = bool(pin_fn) and "show_info_panel" not in pin_fn
@@ -194,6 +262,167 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     else:
         fails.append("selected_frame_immediate_free")
 
+    # Play DIG FAIL: glance tooltip stole Division clicks. Land chip still-click
+    # must run in `_input` (before GUI) and tooltip must not be a pick blocker.
+    input_i = ren.find("func _input")
+    unh_i = ren.find("func _unhandled_input")
+    input_fn = ren[input_i:unh_i] if input_i >= 0 and unh_i > input_i else ""
+    chip_in_fn = _gd_func_slice(ren, "_try_open_land_chip_from_input")
+    block_fn = _gd_func_slice(ren, "_is_mouse_over_blocking_ui")
+    land_chip_in_input = (
+        "_try_open_land_chip_from_input" in input_fn
+        and bool(chip_in_fn)
+        and "_try_open_land_unit_at_world" in chip_in_fn
+        and "show_info_panel" not in chip_in_fn
+        and "_handle_escape_key" not in chip_in_fn
+    )
+    wiring["land_chip_in_input"] = land_chip_in_input
+    if land_chip_in_input:
+        passes.append("land_chip_in_input")
+    else:
+        fails.append("land_chip_in_input")
+    land_fn = _gd_func_slice(ren, "_try_open_land_unit_at_world")
+    land_pick_fn = _gd_func_slice(ren, "_pick_land_unit_formation_at_world")
+    spill_fn = _gd_func_slice(ren, "_nearest_player_land_formation_at_world")
+    block_type_fn = _gd_func_slice(ren, "_formation_type_blocks_land_open")
+    stack_fn = _gd_func_slice(ren, "_player_land_formation_at_province")
+    land_skips_air = (
+        bool(land_fn)
+        and "_pick_land_unit_formation_at_world" in land_fn
+        and bool(land_pick_fn)
+        and "land_only" in land_pick_fn
+        and "land_only" in pick_fn
+        and "_formation_type_blocks_land_open" in pick_fn
+        and bool(block_type_fn)
+        and "TYPE_AIR_WING" in block_type_fn
+        and "TYPE_FLEET" in block_type_fn
+        and "TYPE_SPACE_WING" in block_type_fn
+        and "DIG_CHIP_MISS" not in ren
+        and "DIG_CHIP_SKIP" not in ren
+    )
+    wiring["land_still_click_skips_air_fleet"] = land_skips_air
+    if land_skips_air:
+        passes.append("land_still_click_skips_air_fleet")
+    else:
+        fails.append("land_still_click_skips_air_fleet")
+    # Play MIXED: foreign best_any opened SOV/DNK. Land still-click is player-tag
+    # land only; air chrome resolves stack via _collect_formations_at_province.
+    land_player_only = (
+        bool(land_fn)
+        and "_formation_is_player_tag" in land_fn
+        and "_player_land_formation_at_province" in land_fn
+        and bool(land_pick_fn)
+        and "player_only" in land_pick_fn
+        and "player_only" in pick_fn
+        and "if player_only:" in pick_fn
+        and "return null" in pick_fn
+        and bool(stack_fn)
+        and "_collect_formations_at_province" in stack_fn
+        and "_formation_type_blocks_land_open" in stack_fn
+        and "_formation_is_player_tag" in stack_fn
+    )
+    wiring["land_still_click_player_tag_only"] = land_player_only
+    if land_player_only:
+        passes.append("land_still_click_player_tag_only")
+    else:
+        fails.append("land_still_click_player_tag_only")
+    # Play MIXED on 09cfc51: disk miss fell through to CZE/GER tooltip; open-unit
+    # fallthrough opened incidental PER land. Hex-only province-stack player land
+    # on miss (not capital-star prefer); still-click open-unit is air/fleet/space.
+    hex_fn = _gd_func_slice(ren, "_resolve_hex_pick_pid")
+    land_province_fallback = (
+        bool(land_fn)
+        and "_resolve_hex_pick_pid" in land_fn
+        and "_resolve_map_pick_pid" not in land_fn
+        and "_capital_star_pid_at" not in land_fn
+        and land_fn.find("_resolve_hex_pick_pid") > land_fn.find("_pick_land_unit_formation_at_world")
+        and land_fn.count("_player_land_formation_at_province") >= 2
+        and bool(hex_fn)
+        and "get_province_at_world_pos" in hex_fn
+        and "resolve_pick_province_id" in hex_fn
+        and "_capital_star_pid_at" not in hex_fn
+        and "prefer_capital" not in hex_fn
+    )
+    wiring["land_still_click_province_player_land"] = land_province_fallback
+    if land_province_fallback:
+        passes.append("land_still_click_province_player_land")
+    else:
+        fails.append("land_still_click_province_player_land")
+    # Play MIXED on 4fb65b4 / 60e7f59: miss_pid hex has no GER land; Home / Berlin
+    # chrome spills while stations stay on 710173 (~278u). Spill must cover that.
+    _spill_m = re.search(r"const CHROME_SPILL_WORLD:\s*float\s*=\s*([0-9.]+)", spill_fn)
+    _spill_r = float(_spill_m.group(1)) if _spill_m else 0.0
+    land_chrome_spill = (
+        bool(land_fn)
+        and "_nearest_player_land_formation_at_world" in land_fn
+        and land_fn.find("_nearest_player_land_formation_at_world")
+        > land_fn.find("_resolve_hex_pick_pid")
+        and land_fn.find("_nearest_player_land_formation_at_world")
+        > land_fn.rfind("_player_land_formation_at_province")
+        and bool(spill_fn)
+        and "CHROME_SPILL_WORLD" in spill_fn
+        and _spill_r >= 320.0
+        and "land_only" in spill_fn
+        and "player_only" in spill_fn
+        and "_unit_counter_hit_radius_world" in spill_fn
+        and "DemoUnitIcon_" in spill_fn
+        and "counter.global_position" in spill_fn
+        and "maxf(hit_r, CHROME_SPILL_WORLD)" in spill_fn
+        and "_formation_is_player_tag" in spill_fn
+    )
+    wiring["land_still_click_chrome_spill_player_land"] = land_chrome_spill
+    if land_chrome_spill:
+        passes.append("land_still_click_chrome_spill_player_land")
+    else:
+        fails.append("land_still_click_chrome_spill_player_land")
+    open_unit_skips_land = (
+        bool(pin_fn)
+        and "_formation_type_blocks_land_open" in pin_fn
+        and pin_fn.find("_formation_type_blocks_land_open") < pin_fn.find("_select_map_unit")
+        and "show_info_panel" not in pin_fn
+    )
+    wiring["still_click_open_unit_skips_land"] = open_unit_skips_land
+    if open_unit_skips_land:
+        passes.append("still_click_open_unit_skips_land")
+    else:
+        fails.append("still_click_open_unit_skips_land")
+    tooltip_not_blocker = bool(block_fn) and '"ProvinceHoverTooltip"' not in block_fn
+    wiring["tooltip_not_pick_blocker"] = tooltip_not_blocker
+    if tooltip_not_blocker:
+        passes.append("tooltip_not_pick_blocker")
+    else:
+        fails.append("tooltip_not_pick_blocker")
+
+    # DIG-FIRST: chips were absent at Begin GER → Europe Home (zoom ~0.33–0.49
+    # still strategic-tier). Lock counters-want-visible on that band + Home/Begin paint.
+    lod = LOD_GD.read_text(encoding="utf-8") if LOD_GD.is_file() else ""
+    want_fn = _gd_func_slice(ren, "_unit_counters_want_visible")
+    home_fn = _gd_func_slice(ren, "center_europe_in_world_view")
+    begin_fn = _gd_func_slice(ren, "_center_camera_on_province")
+    scale_fn = _gd_func_slice(ren, "_unit_counter_scale_for_zoom")
+    europe_want = (
+        europe_home_zoom_wants_counters()
+        and "show_unit_counters_for_zoom" in want_fn
+        and "EUROPE_HOME_COUNTER_MIN_ZOOM" in lod
+    )
+    wiring["europe_home_counters_want_visible"] = europe_want
+    if europe_want:
+        passes.append("europe_home_counters_want_visible")
+    else:
+        fails.append("europe_home_counters_want_visible")
+    home_sync = "_sync_unit_counter_paint" in home_fn and "_sync_unit_counter_paint" in begin_fn
+    wiring["home_syncs_counter_visibility"] = home_sync
+    if home_sync:
+        passes.append("home_syncs_counter_visibility")
+    else:
+        fails.append("home_syncs_counter_visibility")
+    scale_floor = "clampf(target, 0.85, 16.0)" in scale_fn
+    wiring["counter_scale_floor_readable"] = scale_floor
+    if scale_floor:
+        passes.append("counter_scale_floor_readable")
+    else:
+        fails.append("counter_scale_floor_readable")
+
     if not check_wiring:
         ok = toast_ok and hit_ok
     else:
@@ -205,6 +434,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         "status": "PASS" if ok else "FAIL",
         "hit_radius_px": HIT_RADIUS_PX,
         "hit_radius_floor": HIT_RADIUS_FLOOR,
+        "home_hit_screen_px": unit_chip_hit_screen_px(EUROPE_HOME_HIT_Z),
         "strategic_toast": STRATEGIC_PICK_TOAST,
         "stack_cycle_hint": STACK_CYCLE_HINT,
         "wiring": wiring,
@@ -219,7 +449,14 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
             "MapRenderer _pick_unit_formation_at_world",
         ],
         "policy": "pin_first_hit_disk_48_floor_20_selected_chip_no_inspector"
-        "; capital_star_before_chip; chip_match_station_province_one_pin_per_hex",
+        "; home_hit_disk_tracks_counter_scale"
+        "; home_hit_covers_full_plate_label_aabb"
+        "; capital_star_before_chip; chip_match_station_province_one_pin_per_hex"
+        "; land_still_click_skips_air_fleet"
+        "; land_still_click_player_tag_only"
+        "; land_still_click_province_player_land"
+        "; land_still_click_chrome_spill_player_land"
+        "; still_click_open_unit_skips_land",
     }
 
 

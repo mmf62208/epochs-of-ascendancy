@@ -133,10 +133,28 @@ static func province_internal_border_width(t: Tier) -> float:
 ## Unit / OOB map counters (DemoUnitIcon pins).
 ## Master off hides all. Strategic hides chips so capitals/fronts stay clickable.
 ## Operational+ = full chips (pin-first pick when visible).
+##
+## Europe Home (Berlin+Paris+Rome + pad) lands ~0.33 on 720p and ~0.49 on 1080p —
+## that is ≤ STRATEGIC_MAX 0.55, so tier_for_zoom calls Home "strategic". World
+## fit is ~0.09–0.14. Do not widen the general strategic tier (labels/hover/mesh);
+## counters use EUROPE_HOME_COUNTER_MIN_ZOOM so Begin GER → Home still paints.
+const EUROPE_HOME_COUNTER_MIN_ZOOM: float = 0.24
+
+
 static func show_unit_counters(t: Tier, master_enabled: bool = true) -> bool:
 	if not master_enabled:
 		return false
 	return t != Tier.STRATEGIC
+
+
+## Zoom-based chip paint. Home band is above this floor even when the LOD tier
+## is still strategic. World Shift+Home stays culled.
+static func show_unit_counters_for_zoom(z: float, master_enabled: bool = true) -> bool:
+	if not master_enabled:
+		return false
+	if z > EUROPE_HOME_COUNTER_MIN_ZOOM:
+		return true
+	return show_unit_counters(tier_for_zoom(z), true)
 
 
 static func unit_counter_compact(t: Tier) -> bool:
@@ -144,8 +162,8 @@ static func unit_counter_compact(t: Tier) -> bool:
 
 
 static func unit_counter_min_zoom() -> float:
-	## Full-chip band starts just above strategic (chips culled at world zoom).
-	return STRATEGIC_MAX_ZOOM + 0.02
+	## Full-chip band starts at Europe Home, not world-fit strategic.
+	return EUROPE_HOME_COUNTER_MIN_ZOOM
 
 
 static func show_province_glyphs(t: Tier) -> bool:

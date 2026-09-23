@@ -23,6 +23,7 @@ from unit_card_fill_toe_visibility_product import (  # noqa: E402
 
 RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 STRIP = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
+TOOLTIP = ROOT / "scripts" / "map" / "ProvinceHoverTooltip.gd"
 
 
 class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
@@ -52,6 +53,23 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
             "speed_armor_men_tooltip_not_body",
             "combat_log_not_card_body",
             "fold_fill_toe_first",
+            "tooltip_mouse_ignore",
+            "tooltip_not_map_pick_blocker",
+            "chip_open_in_input",
+            "land_still_click_skips_air_fleet",
+            "land_still_click_player_tag_only",
+            "land_still_click_province_player_land",
+            "land_still_click_chrome_spill_player_land",
+            "still_click_open_unit_skips_land",
+            "europe_home_counters_want_visible",
+            "home_syncs_counter_visibility",
+            "counter_scale_floor_readable",
+            "home_hit_disk_tracks_counter_scale",
+            "always_paint_fill_before_strip",
+            "force_popup_size_320_220",
+            "tooltip_suppressed_while_unit_card",
+            "strip_safe_ger_demo",
+            "no_class_has_method_on_strip",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 
@@ -104,6 +122,72 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         self.assertIn("_fill_ratio_for", strip)
         self.assertIn("func tooltip_lines_for", strip)
         self.assertIn("Fill —%", strip)
+        self.assertIn("func _try_open_land_chip_from_input", src)
+        self.assertIn("_try_open_land_chip_from_input", src)
+        self.assertIn("func _pick_land_unit_formation_at_world", src)
+        self.assertIn("func _nearest_player_land_formation_at_world", src)
+        self.assertIn("func _formation_type_blocks_land_open", src)
+        self.assertIn("func _player_land_formation_at_province", src)
+        self.assertIn("func _formation_is_player_tag", src)
+        self.assertIn("_collect_formations_at_province", src)
+        self.assertIn("player_only", src)
+        self.assertIn("CHROME_SPILL_WORLD", src)
+        self.assertIn("func _resolve_hex_pick_pid", src)
+        land_i = src.find("func _try_open_land_unit_at_world")
+        self.assertGreaterEqual(land_i, 0)
+        land_slice = src[land_i : land_i + 2400]
+        next_land = land_slice.find("\nfunc ", 1)
+        if next_land > 0:
+            land_slice = land_slice[:next_land]
+        self.assertIn("_resolve_hex_pick_pid", land_slice)
+        self.assertNotIn("_resolve_map_pick_pid", land_slice)
+        self.assertGreaterEqual(land_slice.count("_player_land_formation_at_province"), 2)
+        self.assertIn("_nearest_player_land_formation_at_world", land_slice)
+        self.assertGreater(
+            land_slice.find("_nearest_player_land_formation_at_world"),
+            land_slice.find("_resolve_hex_pick_pid"),
+        )
+        pin_i = src.find("func _try_open_unit_at_world")
+        self.assertGreaterEqual(pin_i, 0)
+        pin_slice = src[pin_i : pin_i + 800]
+        next_pin = pin_slice.find("\nfunc ", 1)
+        if next_pin > 0:
+            pin_slice = pin_slice[:next_pin]
+        self.assertIn("_formation_type_blocks_land_open", pin_slice)
+        self.assertNotIn("DIG_CHIP_MISS", src)
+        self.assertNotIn("DIG_CHIP_SKIP", src)
+        self.assertIn("func _unit_counter_hit_radius_world", src)
+        self.assertIn("0.5 * sprite_px", src)
+        self.assertIn("sqrt(2.0)", src)
+        self.assertIn("label_pad", src)
+        self.assertIn("func _unit_counter_aabb_hit_screen", src)
+        self.assertIn("counter.position", src)
+        self.assertIn("body_scroll.add_child(body)", src)
+        self.assertIn("_safe_unit_card_strip_lines", src)
+        self.assertLess(
+            src.find("body_scroll.add_child(body)"),
+            src.find("strip0 = _safe_unit_card_strip_lines"),
+        )
+        self.assertIn("composition_from_formation", strip)
+        self.assertNotIn("_formation_has_composition_meta", strip)
+        self.assertNotIn("UnitCardCombatStrip.has_method(", src)
+        self.assertIn("typeof(UnitCardCombatStrip) != TYPE_NIL", src)
+        self.assertNotIn(
+            '"ProvinceHoverTooltip"',
+            src[src.find("func _is_mouse_over_blocking_ui") : src.find("func _refresh_hover_tooltip")],
+        )
+        tip = TOOLTIP.read_text(encoding="utf-8")
+        self.assertIn("func _ignore_mouse_tree", tip)
+        self.assertIn("margin.mouse_filter = Control.MOUSE_FILTER_IGNORE", tip)
+        # Panel style stays in `_ready` (PR 26 accidentally nested it in the helper).
+        self.assertIn("_panel_style = StyleBoxFlat.new()", tip)
+        ready_i = tip.find("func _ready")
+        ignore_i = tip.find("func _ignore_mouse_tree")
+        self.assertGreater(ignore_i, ready_i)
+        self.assertLess(
+            tip.find("_panel_style = StyleBoxFlat.new()"),
+            ignore_i,
+        )
 
     def test_fill_not_aliased_to_strength(self) -> None:
         self.assertTrue(fill_not_aliased_to_strength())

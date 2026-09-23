@@ -1612,6 +1612,7 @@ func _apply_home_key(shift_pressed: bool) -> void:
 	ensure_world_navigation_ready()
 	if shift_pressed:
 		fit_camera_to_full_world()
+		_sync_unit_counter_paint()
 	else:
 		center_europe_in_world_view()
 		if typeof(DebugOverlay) != TYPE_NIL:
@@ -1869,6 +1870,10 @@ func _input(event: InputEvent) -> void:
 				if did_left_pan:
 					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
+				elif not event.shift_pressed and _try_open_land_chip_from_input(event.ctrl_pressed):
+					# Still-click land chip in `_input` so ProvinceHoverTooltip
+					# cannot steal GER Division Fill%/TOE (Play DIG FAIL).
+					return
 	if event is InputEventMouseMotion:
 		_note_mouse_up_arms_still_click()
 		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
@@ -13588,6 +13593,9 @@ func _refresh_province_detail_visibility() -> void:
 				_apply_hover_visuals(_hover_outline_province_id, false)
 
 	_sync_viewport_culling()
+	# Zoom/Home can cross the chip floor while paused process skips this path;
+	# when it does run, keep DemoUnitIcon_* in sync with the live zoom band.
+	_sync_unit_counter_paint(current_zoom)
 	var show_details: bool = MapZoomLODScript.show_province_glyphs(tier) or current_zoom > province_detail_min_zoom
 	var show_prov_names: bool = show_province_names and MapZoomLODScript.show_province_labels(tier)
 	_zoom_fill_characterization_scale = current_zoom
@@ -13847,6 +13855,7 @@ func _boot_political_map_complete() -> void:
 	_apply_clean_political_clear_color()
 	center_europe_in_world_view()
 	_force_all_province_nodes_visible()
+	_sync_unit_counter_paint()
 	if _map_search != null and _map_search.has_method("rebuild_index"):
 		_map_search.call("rebuild_index")
 	var ol := get_overlay_layer("InfrastructureOverlayLayer")
@@ -14041,7 +14050,7 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 		ensure_playable_front_chips(false)
 	else:
 		_update_unit_icons_for_test()
-	_sync_unit_counter_visibility()
+	_sync_unit_counter_paint()
 	call_deferred("_rebuild_province_mesh_layer")
 	call_deferred("_sync_batched_mesh_fills", true)
 
@@ -15206,6 +15215,9 @@ func center_europe_in_world_view() -> void:
 		# Always re-fit (not pan-only) so a zoom-out red void recovers on first Home.
 		fit_camera_to_bounds(frame, focus, MapCanvasConfig.EUROPE_VIEW_FILL_RATIO)
 	_clamp_camera_to_theater()
+	# Home zoom is often still strategic-tier (~0.33–0.49). Re-paint chips here —
+	# paused first-session never reaches _refresh_province_detail_visibility.
+	_sync_unit_counter_paint()
 	print("MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view")
 
 
@@ -17327,6 +17339,9 @@ func _center_camera_on_province(province_id: int, zoom_mode: String = "soft") ->
 	var cam_x := pos.x - (target_screen_x - vp.x * 0.5) / z
 	var cam_y := pos.y - (target_screen_y - vp.y * 0.5) / z
 	cam.global_position = _apply_camera_bounds(Vector2(cam_x, cam_y))
+	# Begin GER soft-centers Berlin on the Home band; sync paint so chips appear
+	# without requiring a wheel notch.
+	_sync_unit_counter_paint()
 
 
 func _clear_hover_state() -> void:
@@ -17394,7 +17409,6 @@ func _is_mouse_over_blocking_ui() -> bool:
 			"LeaderAssignmentScreen",
 			"AgentAssignmentScreen",
 			"NationalSpiritsScreen",
-			"ProvinceHoverTooltip",
 			"OpenFightSheet",
 			"UnitDetailPopup",
 			"ProvinceOOBStrip",
@@ -17413,6 +17427,9 @@ func _is_mouse_over_blocking_ui() -> bool:
 
 func _refresh_hover_tooltip(province: Province) -> void:
 	if hover_tooltip == null or province == null:
+		return
+	if _unit_detail_popup_is_visible():
+		_hide_hover_tooltip()
 		return
 	if _is_mouse_over_blocking_ui():
 		_hide_hover_tooltip()
@@ -17562,7 +17579,8 @@ func _update_spatial_hover() -> void:
 	_last_hover_mouse = mouse_screen
 
 	# Don't show map province tooltips while the cursor is over a UI window/popup.
-	if _is_mouse_over_blocking_ui():
+	# Also suppress glance chrome while the docked unit card is up (Play: Wiener Umland).
+	if _unit_detail_popup_is_visible() or _is_mouse_over_blocking_ui():
 		if _hover_province != null or (hover_tooltip != null and hover_tooltip.visible):
 			_clear_hover_state()
 		return
@@ -17921,6 +17939,17 @@ func _resolve_map_pick_pid(world_pos: Vector2) -> int:
 	return pid
 
 
+## Hex/land under cursor only — no capital-star prefer.
+## Land still-click miss_pid uses this so Berlin star cannot steal land-open.
+func _resolve_hex_pick_pid(world_pos: Vector2) -> int:
+	var pid := -1
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
+		pid = MapManager.get_province_at_world_pos(world_pos, true)
+		if MapManager.has_method("resolve_pick_province_id"):
+			pid = MapManager.resolve_pick_province_id(pid)
+	return pid
+
+
 ## Click navy/armor/infantry map counters → select unit for move/assault + detail card.
 func _toast_living_diplomacy_pick(pid: int) -> void:
 	var dip: Dictionary = PlayNextHook.living_diplomacy_from_province(pid, _player_tag())
@@ -17947,12 +17976,170 @@ func _try_living_title_map_pick(pid: int) -> bool:
 	return false
 
 
-func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
-	var fo := _pick_unit_formation_at_world(world_pos)
+func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
+	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
+	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
+	# Esc helpers + Dig2 / Drag2+3 pan helpers untouched.
+	if _mouse_over_search_control() or _mouse_over_close_control():
+		return false
+	if _is_mouse_over_blocking_ui():
+		return false
+	if MapViewInput.modal_blocks_map_nav(get_viewport()):
+		return false
+	var world_pos: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+	if _try_open_land_unit_at_world(world_pos, ctrl_click):
+		get_viewport().set_input_as_handled()
+		return true
+	return false
+
+
+func _formation_type_blocks_land_open(fo: Object) -> bool:
+	# Same TYPE_* set already rejected by land still-click open.
 	if fo == null:
 		return false
-	var ft := str(fo.formation_type) if "formation_type" in fo else ""
-	if ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_FLEET or ft == Formation.TYPE_SPACE_WING:
+	var ft: String = str(fo.formation_type) if "formation_type" in fo else ""
+	return ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_FLEET or ft == Formation.TYPE_SPACE_WING
+
+
+func _formation_is_player_tag(fo: Object) -> bool:
+	if fo == null:
+		return false
+	var p_tag: String = _player_tag()
+	if p_tag.is_empty() or not ("country_tag" in fo):
+		return false
+	return str(fo.country_tag).strip_edges().to_upper() == p_tag
+
+
+func _player_land_formation_at_province(province_id: int) -> Object:
+	# Stack under chrome: one DemoUnitIcon per pid can be air while GER land is stationed.
+	if province_id < 0:
+		return null
+	var forms: Array = _collect_formations_at_province(province_id)
+	var best: Object = null
+	for f_v in forms:
+		if f_v == null or not (f_v is Object):
+			continue
+		var cand: Object = f_v as Object
+		if _formation_type_blocks_land_open(cand):
+			continue
+		if not _formation_is_player_tag(cand):
+			continue
+		var ft: String = str(cand.formation_type) if "formation_type" in cand else ""
+		if ft == Formation.TYPE_DIVISION:
+			return cand
+		if best == null:
+			best = cand
+	return best
+
+
+func _pick_land_unit_formation_at_world(world_pos: Vector2) -> Object:
+	# Same hit-disk / visible-icon walk as `_pick_unit_formation_at_world`,
+	# but player-tag land only (skip air/fleet/space + foreign best_any).
+	var land_only: bool = true
+	var player_only: bool = true
+	return _pick_unit_formation_at_world(world_pos, land_only, player_only)
+
+
+func _nearest_player_land_formation_at_world(world_pos: Vector2) -> Object:
+	# Home chrome spills onto nearby hexes / Berlin-Home while GER land stays
+	# on 710173 (+ nbr). After disk + hex miss_pid miss, bind closest visible
+	# player-land DemoUnitIcon (chrome → station). Not hex membership.
+	const CHROME_SPILL_WORLD: float = 340.0
+	var land_only: bool = true
+	var player_only: bool = true
+	if _demo_unit_icon_pids.is_empty():
+		return null
+	if not _unit_counters_want_visible():
+		return null
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	var z: float = 1.0
+	if cam:
+		z = maxf(cam.zoom.x, cam.zoom.y)
+	var best: Object = null
+	var best_d: float = INF
+	var p_tag: String = _player_tag()
+	if player_only and p_tag.is_empty():
+		return null
+	for id_v in _demo_unit_icon_pids:
+		var id: int = int(id_v)
+		if not province_nodes.has(id):
+			continue
+		var n: Node2D = province_nodes[id] as Node2D
+		if n == null:
+			continue
+		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+		if counter == null or not is_instance_valid(counter):
+			continue
+		if not counter.visible:
+			continue
+		# Painted chrome after Home/fit — not AABB-floor widen.
+		var chip_pos: Vector2 = counter.global_position
+		if chip_pos == Vector2.ZERO:
+			chip_pos = counter.position
+			if chip_pos == Vector2.ZERO:
+				chip_pos = province_centroids.get(id, Vector2.ZERO) as Vector2
+				if chip_pos != Vector2.ZERO:
+					chip_pos += _unit_chip_offset_for_pid(id)
+		var hit_r: float = _unit_counter_hit_radius_world(z, counter)
+		var accept_r: float = maxf(hit_r, CHROME_SPILL_WORLD)
+		var d: float = world_pos.distance_to(chip_pos)
+		if d > accept_r:
+			continue
+		var fo: Object = null
+		if counter.has_meta("formation"):
+			var fmeta: Variant = counter.get_meta("formation")
+			if fmeta is Object and is_instance_valid(fmeta as Object):
+				fo = fmeta as Object
+		if fo == null:
+			var fid: String = str(counter.get_meta("formation_id", ""))
+			if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+				var f2: Variant = LeaderManager.get_formation(fid)
+				if f2 is Object:
+					fo = f2 as Object
+		# Chrome → station: air/fleet/space pin can sit on a GER land hex.
+		if fo != null and land_only and _formation_type_blocks_land_open(fo):
+			var chrome_pid: int = int(fo.stationed_province_id) if "stationed_province_id" in fo else id
+			fo = _player_land_formation_at_province(chrome_pid)
+		if fo == null:
+			var pin_pid: int = int(counter.get_meta("province_id", id))
+			fo = _player_land_formation_at_province(pin_pid)
+		if fo == null:
+			continue
+		if land_only and _formation_type_blocks_land_open(fo):
+			continue
+		if player_only and not _formation_is_player_tag(fo):
+			continue
+		if d <= best_d:
+			best_d = d
+			best = fo
+	return best
+
+
+func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
+	var fo_any: Object = _pick_unit_formation_at_world(world_pos)
+	var fo: Object = _pick_land_unit_formation_at_world(world_pos)
+	if fo_any != null and _formation_type_blocks_land_open(fo_any):
+		# Air/fleet/space chrome: resolve player land at that province before
+		# neighbor foreign land icons can win an overlapping disk.
+		var chrome_pid: int = int(fo_any.stationed_province_id) if "stationed_province_id" in fo_any else -1
+		var stacked: Object = _player_land_formation_at_province(chrome_pid)
+		if stacked != null:
+			fo = stacked
+	if fo == null:
+		# Disk miss (empty / non-player): player land stationed on the hex
+		# under the click — even when first pick is not air/fleet/space.
+		# Hex-only: capital star stays the next still-click step after land-open.
+		var miss_pid: int = _resolve_hex_pick_pid(world_pos)
+		fo = _player_land_formation_at_province(miss_pid)
+	if fo == null:
+		# Home chrome over Neustadt / Schwäbisch Hall / FRA / Berlin-Home:
+		# nearest painted player-land icon (station 710173 / ger_nbr).
+		fo = _nearest_player_land_formation_at_world(world_pos)
+	if fo == null:
+		return false
+	if _formation_type_blocks_land_open(fo):
+		return false
+	if not _formation_is_player_tag(fo):
 		return false
 	_select_map_unit(fo)
 	# Pin click must not _select_province (3520 supply outlines hung input after chip).
@@ -17971,6 +18158,11 @@ func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) 
 func _try_open_unit_at_world(world_pos: Vector2) -> bool:
 	var fo := _pick_unit_formation_at_world(world_pos)
 	if fo == null:
+		return false
+	# Still-click fallthrough is air/fleet/space only. Land already tried via
+	# _try_open_land_unit_at_world (player-tag disk + province stack).
+	# Never open foreign land (Play: incidental PER Fill%/TOE).
+	if not _formation_type_blocks_land_open(fo):
 		return false
 	_select_map_unit(fo)
 	_show_unit_detail_popup(fo)
@@ -18181,7 +18373,7 @@ func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictio
 		_show_inspector_toast("Marching · now at %s" % pname, 2.8)
 
 
-func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
+func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, player_only: bool = false) -> Object:
 	if _demo_unit_icon_pids.is_empty():
 		return null
 	# Strategic cull / master off: terrain, capitals, ocean beat chips.
@@ -18191,9 +18383,6 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 	var z := 1.0
 	if cam:
 		z = maxf(cam.zoom.x, cam.zoom.y)
-	# ~48px screen radius in world units; floor so tactical zoom stays finger-sized.
-	var hit_r := maxf(48.0 / maxf(z, 0.05), 20.0)
-	var hit_r2 := hit_r * hit_r
 	var best_player: Object = null
 	var best_player_d := INF
 	var best_any: Object = null
@@ -18212,12 +18401,17 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 		# Hidden pins (strategic LOD) must not steal hex clicks.
 		if not counter.visible:
 			continue
-		# Centroids live in pick/camera space; global_position can drift after Close.
-		var chip_pos: Vector2 = province_centroids.get(id, Vector2.ZERO) as Vector2
+		# Live painted plate after Home/fit. Prefer chrome world pos (not AABB-floor widen).
+		var chip_pos: Vector2 = counter.global_position
 		if chip_pos == Vector2.ZERO:
-			chip_pos = counter.global_position
-		else:
-			chip_pos += _unit_chip_offset_for_pid(id)
+			chip_pos = counter.position
+			if chip_pos == Vector2.ZERO:
+				chip_pos = province_centroids.get(id, Vector2.ZERO) as Vector2
+				if chip_pos != Vector2.ZERO:
+					chip_pos += _unit_chip_offset_for_pid(id)
+		# Home-band chips paint plate+label; half-plate disk misses chrome/label.
+		var hit_r := _unit_counter_hit_radius_world(z, counter)
+		var hit_r2 := hit_r * hit_r
 		var d := world_pos.distance_squared_to(chip_pos)
 		if d > hit_r2:
 			continue
@@ -18234,6 +18428,13 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 					fo = f2 as Object
 		if fo == null:
 			continue
+		if land_only and _formation_type_blocks_land_open(fo):
+			continue
+		if player_only:
+			if p_tag.is_empty() or not ("country_tag" in fo):
+				continue
+			if str(fo.country_tag).strip_edges().to_upper() != p_tag:
+				continue
 		# Inclusive disk: accept boundary (d == hit_r2) as a valid best.
 		if d <= best_any_d:
 			best_any_d = d
@@ -18245,6 +18446,8 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 				best_player = fo
 	if best_player != null:
 		return best_player
+	if player_only:
+		return null
 	return best_any
 
 
@@ -18348,53 +18551,49 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	close_btn.pressed.connect(_dismiss_inspector_and_restore_input)
 	title_row.add_child(close_btn)
 
-	if typeof(UnitCardCombatStrip) != TYPE_NIL:
-		var fill_lbl := Label.new()
-		var fill_txt := ""
-		var strip0: PackedStringArray = UnitCardCombatStrip.lines_for(formation)
-		if not strip0.is_empty():
-			fill_txt = str(strip0[0])
-		if fill_txt.is_empty():
-			fill_txt = "Fill —% · TOE —"
-		fill_lbl.text = fill_txt
-		fill_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		fill_lbl.custom_minimum_size = Vector2(290, 0)
-		fill_lbl.clip_text = false
-		RetrowaveTheme.style_body_label(fill_lbl)
-		var fill_ratio := UnitCardCombatStrip._fill_ratio_for(formation)
-		# Fill is equipment/TOE, never Strength%. Unknown ratio stays cyan, not warning.
-		var fill_col: Color = RetrowaveTheme.CYAN
-		if fill_ratio >= 0.0 and fill_ratio < 0.5:
-			fill_col = RetrowaveTheme.WARNING
-		elif fill_ratio >= 0.5:
-			fill_col = RetrowaveTheme.SUCCESS
-		fill_lbl.add_theme_color_override("font_color", fill_col)
-		fill_lbl.add_theme_font_size_override("font_size", 16)
-		vbox.add_child(fill_lbl)
-		var fill_bar := ProgressBar.new()
-		fill_bar.name = "FillToeBar"
-		fill_bar.custom_minimum_size = Vector2(0, 4)
-		fill_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		fill_bar.max_value = 100.0
-		fill_bar.value = clampf(fill_ratio, 0.0, 1.0) * 100.0
-		fill_bar.show_percentage = false
-		RetrowaveTheme.style_progress_bar(fill_bar)
-		vbox.add_child(fill_bar)
-		var fight_row := HBoxContainer.new()
-		fight_row.add_theme_constant_override("separation", 6)
-		vbox.add_child(fight_row)
-		var fight_btn := Button.new()
-		fight_btn.name = "BtnOpenFight"
-		fight_btn.text = "Open fight"
-		fight_btn.focus_mode = Control.FOCUS_NONE
-		fight_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-		fight_btn.tooltip_text = "Start a multi-day land battle from this unit into an adjacent enemy."
-		RetrowaveTheme.style_primary_button(fight_btn)
-		var fight_fid := fid
-		fight_btn.pressed.connect(func() -> void:
-			_open_fight_from_formation_id(fight_fid)
-		)
-		fight_row.add_child(fight_btn)
+	# Always paint Fill%/TOE on open (never title-row-only). Parent fallback first so
+	# UnitCardCombatStrip.lines_for / _fill_ratio_for NIL/throws cannot abort before body.
+	var fill_lbl := Label.new()
+	var fill_txt := "Fill —% · TOE —"
+	var fill_ratio := -1.0
+	fill_lbl.text = fill_txt
+	fill_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	fill_lbl.custom_minimum_size = Vector2(290, 0)
+	fill_lbl.clip_text = false
+	RetrowaveTheme.style_body_label(fill_lbl)
+	# Fill is equipment/TOE, never Strength%. Unknown ratio stays cyan, not warning.
+	var fill_col: Color = RetrowaveTheme.CYAN
+	if fill_ratio >= 0.0 and fill_ratio < 0.5:
+		fill_col = RetrowaveTheme.WARNING
+	elif fill_ratio >= 0.5:
+		fill_col = RetrowaveTheme.SUCCESS
+	fill_lbl.add_theme_color_override("font_color", fill_col)
+	fill_lbl.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(fill_lbl)
+	var fill_bar := ProgressBar.new()
+	fill_bar.name = "FillToeBar"
+	fill_bar.custom_minimum_size = Vector2(0, 4)
+	fill_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fill_bar.max_value = 100.0
+	fill_bar.value = 0.0
+	fill_bar.show_percentage = false
+	RetrowaveTheme.style_progress_bar(fill_bar)
+	vbox.add_child(fill_bar)
+	var fight_row := HBoxContainer.new()
+	fight_row.add_theme_constant_override("separation", 6)
+	vbox.add_child(fight_row)
+	var fight_btn := Button.new()
+	fight_btn.name = "BtnOpenFight"
+	fight_btn.text = "Open fight"
+	fight_btn.focus_mode = Control.FOCUS_NONE
+	fight_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	fight_btn.tooltip_text = "Start a multi-day land battle from this unit into an adjacent enemy."
+	RetrowaveTheme.style_primary_button(fight_btn)
+	var fight_fid := fid
+	fight_btn.pressed.connect(func() -> void:
+		_open_fight_from_formation_id(fight_fid)
+	)
+	fight_row.add_child(fight_btn)
 
 	var body := Label.new()
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -18414,11 +18613,40 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		"Org %.0f%% · Str %.0f%% · Rdy %.0f%% · XP %.0f%%"
 		% [org_v * 100.0, str_v * 100.0, rdy_v * 100.0, xp_v * 100.0]
 	)
-	if typeof(UnitCardCombatStrip) != TYPE_NIL:
-		var strip_rest: PackedStringArray = UnitCardCombatStrip.lines_for(formation)
-		if strip_rest.size() > 1:
-			for si in range(1, strip_rest.size()):
-				var rest_ln := str(strip_rest[si]).strip_edges()
+	if not fid.is_empty():
+		lines.append("ID: %s" % fid)
+	body.text = "\n".join(lines)
+	RetrowaveTheme.style_body_label(body)
+	var body_scroll := ScrollContainer.new()
+	body_scroll.custom_minimum_size = Vector2(300, 52)
+	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(body_scroll)
+	body_scroll.add_child(body)
+
+	# Strip upgrade AFTER body is parented — lines_for / _fill_ratio_for cannot
+	# leave title+Close or Fill-only (Play: Division 2 ~80px shell).
+	var strip0: PackedStringArray = PackedStringArray()
+	if _unit_card_combat_strip_ready():
+		strip0 = _safe_unit_card_strip_lines(formation)
+		if not strip0.is_empty():
+			var first_ln := str(strip0[0]).strip_edges()
+			if not first_ln.is_empty() and not first_ln.begins_with("Strength"):
+				fill_txt = first_ln
+		if fill_txt.is_empty() or fill_txt.begins_with("Strength"):
+			fill_txt = "Fill —% · TOE —"
+		elif not ("TOE" in fill_txt):
+			fill_txt = "%s · TOE —" % fill_txt
+		fill_lbl.text = fill_txt
+		fill_ratio = _safe_unit_card_fill_ratio(formation)
+		if fill_ratio >= 0.0 and fill_ratio < 0.5:
+			fill_col = RetrowaveTheme.WARNING
+		elif fill_ratio >= 0.5:
+			fill_col = RetrowaveTheme.SUCCESS
+		fill_lbl.add_theme_color_override("font_color", fill_col)
+		fill_bar.value = clampf(fill_ratio, 0.0, 1.0) * 100.0
+		if strip0.size() > 1:
+			for si in range(1, strip0.size()):
+				var rest_ln := str(strip0[si]).strip_edges()
 				# Last-3 combat_log dates stay on tooltip so Fill/TOE stay above the fold.
 				if rest_ln.length() >= 7 and rest_ln.substr(0, 4).is_valid_int() and rest_ln[4] == "-":
 					continue
@@ -18429,16 +18657,13 @@ func _show_unit_detail_popup(formation: Object) -> void:
 					lines.append(rest_ln)
 				else:
 					chrome_tips.append(rest_ln)
-		var tips: PackedStringArray = UnitCardCombatStrip.tooltip_lines_for(formation)
+		var tips: PackedStringArray = _safe_unit_card_tooltip_lines(formation)
 		for t in tips:
 			chrome_tips.append(t)
-		if not chrome_tips.is_empty():
-			body.tooltip_text = "\n".join(chrome_tips)
-	elif not chrome_tips.is_empty():
+		body.text = "\n".join(lines)
+	if not chrome_tips.is_empty():
 		body.tooltip_text = "\n".join(chrome_tips)
-	if not fid.is_empty():
-		lines.append("ID: %s" % fid)
-	# Stack at this province (one pin; cycle via [ ] or card buttons).
+	# Stack after body is parented — BattleManager must not abort Stationed/Leader.
 	var stack_divs: Array = []
 	var stack_idx := 0
 	if pid >= 0 and not tag.is_empty() and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
@@ -18449,13 +18674,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 				break
 	if stack_divs.size() > 1:
 		lines.append("Stack %d/%d · [ ] or buttons to cycle" % [stack_idx + 1, stack_divs.size()])
-	body.text = "\n".join(lines)
-	RetrowaveTheme.style_body_label(body)
-	var body_scroll := ScrollContainer.new()
-	body_scroll.custom_minimum_size = Vector2(300, 52)
-	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	vbox.add_child(body_scroll)
-	body_scroll.add_child(body)
+		body.text = "\n".join(lines)
 
 	var cmd_row := HBoxContainer.new()
 	cmd_row.add_theme_constant_override("separation", 6)
@@ -18627,6 +18846,69 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		if ev is InputEventMouseButton and ev.pressed:
 			ui.move_child(panel, ui.get_child_count() - 1)
 	)
+	_apply_unit_detail_popup_min_size(panel)
+	_hide_hover_tooltip()
+
+
+func _unit_card_combat_strip_ready() -> bool:
+	# Godot 4: has_method is instance-only. UnitCardCombatStrip is class_name —
+	# calling has_method on it is a parse error (blank gray map).
+	return typeof(UnitCardCombatStrip) != TYPE_NIL
+
+
+func _safe_unit_card_strip_lines(formation: Object) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	if formation == null or not _unit_card_combat_strip_ready():
+		return out
+	var raw: Variant = UnitCardCombatStrip.lines_for(formation)
+	if raw is PackedStringArray:
+		return raw as PackedStringArray
+	if raw is Array:
+		for item in (raw as Array):
+			out.append(str(item))
+	return out
+
+
+func _safe_unit_card_fill_ratio(formation: Object) -> float:
+	if formation == null or typeof(UnitCardCombatStrip) == TYPE_NIL:
+		return -1.0
+	var raw: Variant = UnitCardCombatStrip._fill_ratio_for(formation)
+	if typeof(raw) == TYPE_FLOAT or typeof(raw) == TYPE_INT:
+		return clampf(float(raw), 0.0, 2.0)
+	return -1.0
+
+
+func _safe_unit_card_tooltip_lines(formation: Object) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	if formation == null or typeof(UnitCardCombatStrip) == TYPE_NIL:
+		return out
+	var raw: Variant = UnitCardCombatStrip.tooltip_lines_for(formation)
+	if raw is PackedStringArray:
+		return raw as PackedStringArray
+	if raw is Array:
+		for item in (raw as Array):
+			out.append(str(item))
+	return out
+
+
+func _apply_unit_detail_popup_min_size(panel: Control) -> void:
+	if panel == null:
+		return
+	var min_sz := Vector2(320, 220)
+	panel.custom_minimum_size = min_sz
+	var next := Vector2(maxf(min_sz.x, panel.size.x), maxf(min_sz.y, panel.size.y))
+	panel.size = next
+	if panel.has_method("reset_size"):
+		panel.reset_size()
+	if panel.size.x < min_sz.x or panel.size.y < min_sz.y:
+		panel.size = min_sz
+
+
+func _unit_detail_popup_is_visible() -> bool:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return false
+	return _overlay_node_is_up(ui.get_node_or_null("UnitDetailPopup"))
 
 
 func _ensure_station_engineers_button() -> void:
@@ -21759,7 +22041,103 @@ func _prefer_retrowave_unit_icon(tex_path: String) -> String:
 	return p
 
 
+## World-space hit radius for a painted land chip. Home-band counters are a
+## NATO plate + UnitChipText nameplate; chrome/label sit outside a half-plate
+## disk (`0.5 * sprite_px * cscale`). Cover the full painted AABB (live
+## DemoUnitIcon half-diagonal when the node is up; else plate half-diag + pad).
+## Tactical zoom keeps the historic 48px / 20-world floor (finger-sized).
+func _unit_counter_hit_radius_world(z: float, counter: Node2D = null) -> float:
+	var zz: float = maxf(z, 0.05)
+	var cscale: float = 0.0
+	if counter != null and is_instance_valid(counter):
+		cscale = maxf(counter.scale.x, counter.scale.y)
+	if cscale < 0.05:
+		cscale = _unit_counter_scale_for_zoom(z)
+	var sprite_px: float = 32.0
+	# Home-band nameplate sits below the NATO plate; tactical chips stay 48px.
+	var label_pad: float = 16.0 if cscale >= 2.0 else 0.0
+	var hit_screen: float = maxf(48.0, 0.5 * sprite_px * cscale * sqrt(2.0) + label_pad)
+	if counter != null and is_instance_valid(counter) and counter.is_inside_tree():
+		var live_s: float = _unit_counter_aabb_hit_screen(counter)
+		if live_s > hit_screen:
+			hit_screen = live_s
+	return maxf(hit_screen / zz, 20.0)
+
+
+## Screen-space half-diagonal of the painted plate + UnitChipText from the
+## counter origin (pick disk center). 0 when the node is not in-tree / empty.
+func _unit_counter_aabb_hit_screen(counter: Node2D) -> float:
+	if counter == null or not is_instance_valid(counter) or not counter.is_inside_tree():
+		return 0.0
+	var origin_s: Vector2 = counter.get_global_transform_with_canvas() * Vector2.ZERO
+	var farthest: float = 0.0
+	for ch in counter.get_children():
+		farthest = maxf(farthest, _unit_counter_item_farthest_screen(ch, origin_s))
+		if ch is Node:
+			for sub in (ch as Node).get_children():
+				farthest = maxf(farthest, _unit_counter_item_farthest_screen(sub, origin_s))
+	return farthest
+
+
+func _unit_counter_item_farthest_screen(n: Node, origin_s: Vector2) -> float:
+	if n == null or not (n is CanvasItem) or not (n is Node2D):
+		return 0.0
+	var r: Rect2 = _unit_counter_child_own_rect(n as CanvasItem)
+	if r.size.x <= 0.0 and r.size.y <= 0.0:
+		return 0.0
+	var xf: Transform2D = (n as Node2D).get_global_transform_with_canvas()
+	var p0: Vector2 = r.position
+	var p1: Vector2 = r.position + r.size
+	var farthest: float = (xf * p0).distance_to(origin_s)
+	farthest = maxf(farthest, (xf * Vector2(p1.x, p0.y)).distance_to(origin_s))
+	farthest = maxf(farthest, (xf * p1).distance_to(origin_s))
+	farthest = maxf(farthest, (xf * Vector2(p0.x, p1.y)).distance_to(origin_s))
+	return farthest
+
+
+func _unit_counter_child_own_rect(item: CanvasItem) -> Rect2:
+	if item is Polygon2D:
+		var poly: Polygon2D = item as Polygon2D
+		if poly.polygon.is_empty():
+			return Rect2()
+		var mn: Vector2 = poly.polygon[0]
+		var mx: Vector2 = mn
+		for v in poly.polygon:
+			var pv: Vector2 = v
+			mn = Vector2(minf(mn.x, pv.x), minf(mn.y, pv.y))
+			mx = Vector2(maxf(mx.x, pv.x), maxf(mx.y, pv.y))
+		return Rect2(mn, mx - mn)
+	if item is Sprite2D:
+		var spr: Sprite2D = item as Sprite2D
+		if spr.texture == null:
+			return Rect2()
+		var sz: Vector2 = spr.texture.get_size()
+		if spr.region_enabled:
+			sz = spr.region_rect.size
+		var hf: float = maxf(float(spr.hframes), 1.0)
+		var vf: float = maxf(float(spr.vframes), 1.0)
+		sz = Vector2(sz.x / hf, sz.y / vf)
+		if spr.centered:
+			return Rect2(-sz * 0.5, sz)
+		return Rect2(Vector2.ZERO, sz)
+	if "text" in item:
+		var t: String = str(item.get("text"))
+		if t.is_empty():
+			return Rect2()
+		var fs: int = 13
+		if "font_size" in item:
+			fs = int(item.get("font_size"))
+		var w: float = maxf(8.0, float(t.length()) * float(fs) * 0.62)
+		var h: float = float(fs) + 8.0
+		var ox: float = 0.0
+		if "align_right" in item and bool(item.get("align_right")):
+			ox = -w
+		return Rect2(Vector2(ox, -2.0), Vector2(w, h))
+	return Rect2()
+
+
 ## Keep chips ~48–58 screen px at Europe zoom so org/str/designation stay readable.
+## Floor 0.85 so a stale/high zoom read cannot shrink Home chips to specks.
 func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 	var z := z_override
 	if z < 0.0:
@@ -21771,7 +22149,7 @@ func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 			z = absf(container.scale.x)
 	var screen_px := lerpf(48.0, 58.0, clampf((z - 0.2) / 1.6, 0.0, 1.0))
 	var target := screen_px / (32.0 * maxf(z, 0.04))
-	return clampf(target, 0.35, 16.0)
+	return clampf(target, 0.85, 16.0)
 
 
 ## Offset living chips off the capital star so both stay distinct click targets.
@@ -21806,8 +22184,14 @@ func _unit_counters_want_visible(z: float = -1.0) -> bool:
 	var zz := z
 	if zz < 0.0:
 		zz = _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
-	var tier: int = MapZoomLODScript.tier_for_zoom(zz)
-	return MapZoomLODScript.show_unit_counters(tier, show_unit_counters)
+	# Home Europe (~0.33–0.49) is still strategic by tier; use zoom floor so
+	# Begin GER → Home paints DemoUnitIcon_* (world fit ~0.14 stays culled).
+	return MapZoomLODScript.show_unit_counters_for_zoom(zz, show_unit_counters)
+
+
+func _sync_unit_counter_paint(z: float = -1.0) -> void:
+	_sync_unit_counter_visibility(z)
+	_sync_unit_counter_scales(z)
 
 
 func _sync_unit_counter_visibility(z: float = -1.0) -> void:
@@ -21821,6 +22205,9 @@ func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 		var node: Node2D = province_nodes[id] as Node2D
 		if node == null:
 			continue
+		# Host must stay on when chips want paint (leftover cull must not eat GER).
+		if vis:
+			node.visible = true
 		for c in node.get_children():
 			if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
 				(c as Node2D).visible = vis
@@ -24690,8 +25077,7 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	result["wing_region"] = int(wing.get("region_id", 0))
 	show_unit_counters = true
 	_update_unit_icons_for_test()
-	_sync_unit_counter_visibility()
-	_sync_unit_counter_scales()
+	_sync_unit_counter_paint()
 	result["ok"] = int(result["ger"]) > 0
 	var graphical := DisplayServer.get_name() != "headless"
 	if graphical and bool(result["ok"]) and focus_camera:

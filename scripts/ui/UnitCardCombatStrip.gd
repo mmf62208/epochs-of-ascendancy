@@ -7,24 +7,22 @@ extends RefCounted
 
 static func lines_for(formation: Object) -> PackedStringArray:
 	var lines: PackedStringArray = PackedStringArray()
-	if formation == null:
+	if formation == null or not is_instance_valid(formation):
 		return lines
 	# Promote Fill · TOE above XP/plan so the fold clip still shows equipment (Play P0).
-	var comp_early: Dictionary = LandCombatPower.composition_from_formation(formation)
-	var fold := _fill_toe_fold_line(formation, comp_early)
+	# GER Division demo must not throw when LandCombatPower / ProductionManager meta is missing.
+	var fold := _fill_toe_fold_line(formation, _safe_composition(formation))
 	if fold.is_empty():
 		fold = _fill_percent_line(formation)
-	if fold.is_empty():
-		fold = "Fill 100% · TOE —"
+	if fold.is_empty() or fold.begins_with("Strength"):
+		fold = "Fill —% · TOE —"
 	lines.append(fold)
-	var xp := 48.0
-	if "combat_experience" in formation:
-		xp = float(formation.get("combat_experience"))
+	var xp := _safe_float_prop(formation, "combat_experience", 48.0)
 	lines.append("XP %s" % xp_band(xp))
 	if "planning" in formation:
-		lines.append("Planning %.0f%%" % _as_percent(float(formation.get("planning"))))
+		lines.append("Planning %.0f%%" % _as_percent(_safe_float_prop(formation, "planning", 0.0)))
 	if "entrenchment" in formation:
-		lines.append("Entrenchment %.0f%%" % _as_percent(float(formation.get("entrenchment"))))
+		lines.append("Entrenchment %.0f%%" % _as_percent(_safe_float_prop(formation, "entrenchment", 0.0)))
 	if "last_equip_loss_plain" in formation:
 		var loss := str(formation.get("last_equip_loss_plain")).strip_edges()
 		if not loss.is_empty():
@@ -33,20 +31,20 @@ static func lines_for(formation: Object) -> PackedStringArray:
 		var sup := str(formation.get("last_supply_plain")).strip_edges()
 		if not sup.is_empty():
 			lines.append(sup)
-	var str_v := 1.0
-	if "strength" in formation:
-		str_v = float(formation.get("strength"))
+	var str_v := _safe_float_prop(formation, "strength", 1.0)
 	lines.append("Strength %.0f%%" % _as_percent(str_v))
 	var ft := str(formation.get("formation_type")) if "formation_type" in formation else ""
 	if ft == "air_wing" or ft == "air_squadron" or ft == "air_group":
 		var mission := str(formation.get("current_air_mission")) if "current_air_mission" in formation else "CAS"
 		if mission.strip_edges().is_empty():
 			mission = "CAS"
-		var rid := int(formation.get("assigned_region_id")) if "assigned_region_id" in formation else 0
+		var rid := 0
+		if "assigned_region_id" in formation:
+			var rid_v: Variant = formation.get("assigned_region_id")
+			if typeof(rid_v) == TYPE_INT or typeof(rid_v) == TYPE_FLOAT:
+				rid = int(rid_v)
 		var rng := str(formation.get("air_range_config")) if "air_range_config" in formation else "COMBAT_LOAD"
-		var fuel_pct := 100.0
-		if "fuel_level" in formation:
-			fuel_pct = clampf(float(formation.get("fuel_level")), 0.0, 1.0) * 100.0
+		var fuel_pct := clampf(_safe_float_prop(formation, "fuel_level", 1.0), 0.0, 1.0) * 100.0
 		lines.append(
 			"%s · region %d · range %s · fuel %.0f%%" % [mission, rid, rng, fuel_pct]
 		)
@@ -55,16 +53,19 @@ static func lines_for(formation: Object) -> PackedStringArray:
 		else:
 			lines.append("CAS unassigned · Assign")
 	if "last_manpower_loss" in formation:
-		var men_l := int(formation.get("last_manpower_loss"))
+		var men_v: Variant = formation.get("last_manpower_loss")
+		var men_l := 0
+		if typeof(men_v) == TYPE_INT or typeof(men_v) == TYPE_FLOAT:
+			men_l = int(men_v)
 		if men_l > 0 and "last_equip_loss_plain" not in formation:
 			lines.append("men −%d" % men_l)
 	if "is_training" in formation and bool(formation.get("is_training")):
-		var prog := float(formation.get("training_progress")) if "training_progress" in formation else 0.0
+		var prog := _safe_float_prop(formation, "training_progress", 0.0)
 		var need := 14.0
 		var mode := "new"
 		if formation.has_method("has_meta"):
 			if bool(formation.has_meta("organize_days")):
-				need = float(formation.get_meta("organize_days"))
+				need = _safe_meta_float(formation, "organize_days", 14.0)
 			if bool(formation.has_meta("organize_mode")):
 				mode = str(formation.get_meta("organize_mode"))
 		if mode == "refit":
@@ -81,12 +82,10 @@ static func bbcode_for(formation: Object) -> String:
 
 static func tooltip_lines_for(formation: Object) -> PackedStringArray:
 	var tips: PackedStringArray = PackedStringArray()
-	if formation == null:
+	if formation == null or not is_instance_valid(formation):
 		return tips
-	var str_v := 1.0
-	if "strength" in formation:
-		str_v = float(formation.get("strength"))
-	var comp: Dictionary = LandCombatPower.composition_from_formation(formation)
+	var str_v := _safe_float_prop(formation, "strength", 1.0)
+	var comp: Dictionary = _safe_composition(formation)
 	if bool(comp.get("has_composition", false)) or float(comp.get("armor", 0.0)) > 0.001:
 		var toe := int(comp.get("manpower", 0))
 		var left := maxi(0, int(round(float(toe) * str_v)))
@@ -140,7 +139,7 @@ static func _combat_log_tip_lines(formation: Object) -> PackedStringArray:
 
 static func _toe_bits_from_comp(comp: Dictionary) -> PackedStringArray:
 	var bits: PackedStringArray = PackedStringArray()
-	var toe_eq: Dictionary = LandCombatPower.equipment_toe(comp)
+	var toe_eq: Dictionary = _safe_equipment_toe(comp)
 	if toe_eq.is_empty():
 		return bits
 	var keys: Array = toe_eq.keys()
@@ -156,14 +155,46 @@ static func _toe_bits_from_comp(comp: Dictionary) -> PackedStringArray:
 static func _fill_ratio_for(formation: Object) -> float:
 	if formation == null:
 		return -1.0
-	if ProductionManager != null and ProductionManager.has_method("unit_toe_fill_ratio"):
-		var fid := ""
-		if "formation_id" in formation:
-			fid = str(formation.get("formation_id")).strip_edges()
-		if not fid.is_empty():
-			return clampf(float(ProductionManager.unit_toe_fill_ratio(fid)), 0.0, 2.0)
+	if not is_instance_valid(formation):
+		return -1.0
+	# Local toe_fill first — GER Division demo may have no ProductionManager stock.
 	if "toe_fill" in formation:
-		return clampf(float(formation.get("toe_fill")), 0.0, 2.0)
+		var tv: Variant = formation.get("toe_fill")
+		if typeof(tv) == TYPE_FLOAT or typeof(tv) == TYPE_INT:
+			return clampf(float(tv), 0.0, 2.0)
+	if formation.has_method("has_meta") and bool(formation.has_meta("toe_fill")):
+		var meta_fill := _safe_meta_float(formation, "toe_fill", -1.0)
+		if meta_fill >= 0.0:
+			return clampf(meta_fill, 0.0, 2.0)
+	# Avoid calling ProductionManager.unit_toe_fill_ratio — get_formation_toe
+	# type-casts Formation and can abort the card before body is parented.
+	var fid := ""
+	if "formation_id" in formation:
+		var fid_v: Variant = formation.get("formation_id")
+		if typeof(fid_v) == TYPE_STRING or typeof(fid_v) == TYPE_INT:
+			fid = str(fid_v).strip_edges()
+	if (
+		not fid.is_empty()
+		and typeof(ProductionManager) != TYPE_NIL
+		and ProductionManager != null
+		and ProductionManager.has_method("get_unit_equipment_stock")
+	):
+		var toe: Dictionary = _safe_equipment_toe(_safe_composition(formation))
+		if not toe.is_empty():
+			var have_stock: Dictionary = {}
+			var stock_v: Variant = ProductionManager.call("get_unit_equipment_stock", fid)
+			if stock_v is Dictionary:
+				have_stock = stock_v as Dictionary
+			var need := 0
+			var have := 0
+			for k in toe.keys():
+				var n := int(toe[k])
+				if n <= 0:
+					continue
+				need += n
+				have += mini(n, maxi(0, int(have_stock.get(k, 0))))
+			if need > 0:
+				return clampf(float(have) / float(need), 0.0, 2.0)
 	return -1.0
 
 
@@ -189,14 +220,17 @@ static func _fill_toe_fold_line(formation: Object, comp: Dictionary) -> String:
 
 
 static func _stockpile_stock_line(formation: Object) -> String:
-	if ProductionManager == null:
+	if typeof(ProductionManager) == TYPE_NIL or ProductionManager == null:
 		return ""
 	var tag := ""
-	if "country_tag" in formation:
+	if formation != null and is_instance_valid(formation) and "country_tag" in formation:
 		tag = str(formation.get("country_tag")).strip_edges().to_upper()
 	if tag.is_empty() or not ProductionManager.has_method("get_country_equipment_stockpile"):
 		return ""
-	var st: Dictionary = ProductionManager.get_country_equipment_stockpile(tag)
+	var st_v: Variant = ProductionManager.call("get_country_equipment_stockpile", tag)
+	if not (st_v is Dictionary):
+		return ""
+	var st: Dictionary = st_v as Dictionary
 	var rifles := int(st.get("rifles", st.get("infantry_equipment", 0)))
 	var trucks := int(st.get("trucks", st.get("truck", 0)))
 	if rifles <= 0 and trucks <= 0:
@@ -227,3 +261,51 @@ static func _as_percent(raw: float) -> float:
 	if v <= 1.5:
 		v *= 100.0
 	return clampf(v, 0.0, 150.0)
+
+
+static func _safe_composition(formation: Object) -> Dictionary:
+	if formation == null or not is_instance_valid(formation):
+		return {}
+	# GER Division demo has design_id (tiger/panzer) but no composition meta.
+	# Infer via LandCombatPower; never require mobility/armor_element first.
+	if typeof(LandCombatPower) == TYPE_NIL:
+		return {}
+	var raw: Variant = LandCombatPower.composition_from_formation(formation)
+	if raw is Dictionary:
+		return raw as Dictionary
+	return {}
+
+
+static func _safe_equipment_toe(comp: Dictionary) -> Dictionary:
+	if comp.is_empty():
+		return {}
+	if typeof(LandCombatPower) == TYPE_NIL:
+		return {}
+	var raw: Variant = LandCombatPower.equipment_toe(comp)
+	if raw is Dictionary:
+		return raw as Dictionary
+	return {}
+
+
+static func _safe_float_prop(formation: Object, key: String, fallback: float) -> float:
+	if formation == null or key.is_empty() or not (key in formation):
+		return fallback
+	var v: Variant = formation.get(key)
+	if typeof(v) == TYPE_FLOAT or typeof(v) == TYPE_INT:
+		return float(v)
+	if typeof(v) == TYPE_STRING and str(v).is_valid_float():
+		return float(str(v))
+	return fallback
+
+
+static func _safe_meta_float(formation: Object, key: String, fallback: float) -> float:
+	if formation == null or not formation.has_method("has_meta"):
+		return fallback
+	if not bool(formation.has_meta(key)):
+		return fallback
+	var v: Variant = formation.get_meta(key)
+	if typeof(v) == TYPE_FLOAT or typeof(v) == TYPE_INT:
+		return float(v)
+	if typeof(v) == TYPE_STRING and str(v).is_valid_float():
+		return float(str(v))
+	return fallback

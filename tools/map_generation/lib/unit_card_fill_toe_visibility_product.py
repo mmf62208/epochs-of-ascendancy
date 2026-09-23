@@ -11,11 +11,17 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from map_unit_counter_lod_product import europe_home_zoom_wants_counters
 from unit_card_combat_strip_product import fill_toe_fold_line, lines_for
+from unit_centric_pick_product import (
+    home_band_hit_disk_tracks_scale,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 STRIP_GD = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
+TOOLTIP_GD = ROOT / "scripts" / "map" / "ProvinceHoverTooltip.gd"
+LOD_GD = ROOT / "scripts" / "map" / "MapZoomLOD.gd"
 
 
 def _gd_func_slice(src: str, func_name: str) -> str:
@@ -112,6 +118,7 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
             "integration": [
                 "unit_card_fill_toe_visibility_product",
                 "MapRenderer._show_unit_detail_popup",
+                "MapRenderer._try_open_land_chip_from_input",
                 "UnitCardCombatStrip.lines_for",
             ],
         }
@@ -134,7 +141,12 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
         and "vbox.add_child(fill_lbl)" in fill_blk
         and "var body :=" in popup
         and popup.find("fill_lbl") < popup.find("var body :=")
-        and ("strip0[0]" in fill_blk or "strip[0]" in fill_blk or "_fill_toe_fold_line" in fill_blk)
+        and (
+            "Fill —% · TOE —" in fill_blk
+            or "strip0[0]" in fill_blk
+            or "strip[0]" in fill_blk
+            or "_fill_toe_fold_line" in fill_blk
+        )
     )
     wiring["promoted_fill_label_before_body"] = promoted
     (passes if promoted else fails).append("promoted_fill_label_before_body")
@@ -149,7 +161,8 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
         "fill_ratio < 0.5" in fill_blk or "fill < 0.5" in fill_blk
     )
     ok_col = "RetrowaveTheme.SUCCESS" in fill_blk or "RetrowaveTheme.CYAN" in fill_blk
-    ratio_ok = "_fill_ratio_for" in fill_blk
+    # Ratio upgrade may run after body so a strip throw cannot abort Stationed/Leader.
+    ratio_ok = "_fill_ratio_for" in popup or "_safe_unit_card_fill_ratio" in popup
     not_dim = "TEXT_DIM" not in fill_blk
     color_path = warn_ok and ok_col and ratio_ok and not_dim
     wiring["fill_warning_success_color"] = color_path
@@ -235,6 +248,224 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     wiring["fold_fill_toe_first"] = fold_first
     (passes if fold_first else fails).append("fold_fill_toe_first")
 
+    # Play DIG FAIL: province glance tooltip stole GER Division clicks so the
+    # Fill%/TOE card never opened. Chip still-click must run in `_input`
+    # (before GUI) and tooltip children must IGNORE.
+    tip = TOOLTIP_GD.read_text(encoding="utf-8") if TOOLTIP_GD.is_file() else ""
+    input_i = ren.find("func _input")
+    unh_i = ren.find("func _unhandled_input")
+    input_fn = ren[input_i:unh_i] if input_i >= 0 and unh_i > input_i else ""
+    chip_in_fn = _gd_func_slice(ren, "_try_open_land_chip_from_input")
+    block_fn = _gd_func_slice(ren, "_is_mouse_over_blocking_ui")
+    land_fn = _gd_func_slice(ren, "_try_open_land_unit_at_world")
+    tooltip_ignore = (
+        bool(tip)
+        and "func _ignore_mouse_tree" in tip
+        and "margin.mouse_filter = Control.MOUSE_FILTER_IGNORE" in tip
+        and "_ignore_mouse_tree(self)" in tip
+        and "MOUSE_FILTER_IGNORE" in tip
+    )
+    wiring["tooltip_mouse_ignore"] = tooltip_ignore
+    (passes if tooltip_ignore else fails).append("tooltip_mouse_ignore")
+
+    tooltip_not_blocker = bool(block_fn) and '"ProvinceHoverTooltip"' not in block_fn
+    wiring["tooltip_not_map_pick_blocker"] = tooltip_not_blocker
+    (passes if tooltip_not_blocker else fails).append("tooltip_not_map_pick_blocker")
+
+    chip_open_in_input = (
+        "_try_open_land_chip_from_input" in input_fn
+        and bool(chip_in_fn)
+        and "_try_open_land_unit_at_world" in chip_in_fn
+        and "_show_unit_detail_popup" in land_fn
+        and "show_info_panel" not in land_fn
+        and "_handle_escape_key" not in chip_in_fn
+        and "_mouse_over_search_control" in chip_in_fn
+        and "_is_mouse_over_blocking_ui" in chip_in_fn
+    )
+    wiring["chip_open_in_input"] = chip_open_in_input
+    (passes if chip_open_in_input else fails).append("chip_open_in_input")
+
+    # DIG-FIRST: open-path is useless while chips are unpainted at Europe Home.
+    lod = LOD_GD.read_text(encoding="utf-8") if LOD_GD.is_file() else ""
+    want_fn = _gd_func_slice(ren, "_unit_counters_want_visible")
+    home_fn = _gd_func_slice(ren, "center_europe_in_world_view")
+    begin_fn = _gd_func_slice(ren, "_center_camera_on_province")
+    scale_fn = _gd_func_slice(ren, "_unit_counter_scale_for_zoom")
+    europe_want = (
+        europe_home_zoom_wants_counters()
+        and "show_unit_counters_for_zoom" in want_fn
+        and "EUROPE_HOME_COUNTER_MIN_ZOOM" in lod
+    )
+    wiring["europe_home_counters_want_visible"] = europe_want
+    (passes if europe_want else fails).append("europe_home_counters_want_visible")
+    home_sync = "_sync_unit_counter_paint" in home_fn and "_sync_unit_counter_paint" in begin_fn
+    wiring["home_syncs_counter_visibility"] = home_sync
+    (passes if home_sync else fails).append("home_syncs_counter_visibility")
+    scale_floor = "clampf(target, 0.85, 16.0)" in scale_fn
+    wiring["counter_scale_floor_readable"] = scale_floor
+    (passes if scale_floor else fails).append("counter_scale_floor_readable")
+
+    # DIG-FIRST (be1d480): chips paint at Home but 48px disk misses chrome/label.
+    pick_fn = _gd_func_slice(ren, "_pick_unit_formation_at_world")
+    hit_fn = _gd_func_slice(ren, "_unit_counter_hit_radius_world")
+    home_hit = (
+        home_band_hit_disk_tracks_scale()
+        and "_unit_counter_hit_radius_world" in pick_fn
+        and "0.5 * sprite_px" in hit_fn
+        and "sqrt(2.0)" in hit_fn
+        and "label_pad" in hit_fn
+        and "_unit_counter_aabb_hit_screen" in hit_fn
+        and "_unit_counter_scale_for_zoom" in hit_fn
+        and "maxf(48.0" in hit_fn
+        and "counter.position" in pick_fn
+    )
+    wiring["home_hit_disk_tracks_counter_scale"] = home_hit
+    (passes if home_hit else fails).append("home_hit_disk_tracks_counter_scale")
+    land_pick_fn = _gd_func_slice(ren, "_pick_land_unit_formation_at_world")
+    spill_fn = _gd_func_slice(ren, "_nearest_player_land_formation_at_world")
+    block_type_fn = _gd_func_slice(ren, "_formation_type_blocks_land_open")
+    stack_fn = _gd_func_slice(ren, "_player_land_formation_at_province")
+    land_skips_air = (
+        bool(land_fn)
+        and "_pick_land_unit_formation_at_world" in land_fn
+        and bool(land_pick_fn)
+        and "land_only" in land_pick_fn
+        and "land_only" in pick_fn
+        and "_formation_type_blocks_land_open" in pick_fn
+        and bool(block_type_fn)
+        and "TYPE_AIR_WING" in block_type_fn
+        and "TYPE_FLEET" in block_type_fn
+        and "TYPE_SPACE_WING" in block_type_fn
+        and "DIG_CHIP_MISS" not in ren
+        and "DIG_CHIP_SKIP" not in ren
+    )
+    wiring["land_still_click_skips_air_fleet"] = land_skips_air
+    (passes if land_skips_air else fails).append("land_still_click_skips_air_fleet")
+    land_player_only = (
+        bool(land_fn)
+        and "_formation_is_player_tag" in land_fn
+        and "_player_land_formation_at_province" in land_fn
+        and bool(land_pick_fn)
+        and "player_only" in land_pick_fn
+        and "player_only" in pick_fn
+        and "if player_only:" in pick_fn
+        and "return null" in pick_fn
+        and bool(stack_fn)
+        and "_collect_formations_at_province" in stack_fn
+        and "_formation_type_blocks_land_open" in stack_fn
+        and "_formation_is_player_tag" in stack_fn
+    )
+    wiring["land_still_click_player_tag_only"] = land_player_only
+    (passes if land_player_only else fails).append("land_still_click_player_tag_only")
+    pin_fn = _gd_func_slice(ren, "_try_open_unit_at_world")
+    hex_fn = _gd_func_slice(ren, "_resolve_hex_pick_pid")
+    land_province_fallback = (
+        bool(land_fn)
+        and "_resolve_hex_pick_pid" in land_fn
+        and "_resolve_map_pick_pid" not in land_fn
+        and "_capital_star_pid_at" not in land_fn
+        and land_fn.find("_resolve_hex_pick_pid") > land_fn.find("_pick_land_unit_formation_at_world")
+        and land_fn.count("_player_land_formation_at_province") >= 2
+        and bool(hex_fn)
+        and "get_province_at_world_pos" in hex_fn
+        and "resolve_pick_province_id" in hex_fn
+        and "_capital_star_pid_at" not in hex_fn
+        and "prefer_capital" not in hex_fn
+    )
+    wiring["land_still_click_province_player_land"] = land_province_fallback
+    (passes if land_province_fallback else fails).append("land_still_click_province_player_land")
+    _spill_m = re.search(r"const CHROME_SPILL_WORLD:\s*float\s*=\s*([0-9.]+)", spill_fn)
+    _spill_r = float(_spill_m.group(1)) if _spill_m else 0.0
+    land_chrome_spill = (
+        bool(land_fn)
+        and "_nearest_player_land_formation_at_world" in land_fn
+        and land_fn.find("_nearest_player_land_formation_at_world")
+        > land_fn.find("_resolve_hex_pick_pid")
+        and land_fn.find("_nearest_player_land_formation_at_world")
+        > land_fn.rfind("_player_land_formation_at_province")
+        and bool(spill_fn)
+        and "CHROME_SPILL_WORLD" in spill_fn
+        and _spill_r >= 320.0
+        and "land_only" in spill_fn
+        and "player_only" in spill_fn
+        and "_unit_counter_hit_radius_world" in spill_fn
+        and "DemoUnitIcon_" in spill_fn
+        and "counter.global_position" in spill_fn
+        and "maxf(hit_r, CHROME_SPILL_WORLD)" in spill_fn
+        and "_formation_is_player_tag" in spill_fn
+    )
+    wiring["land_still_click_chrome_spill_player_land"] = land_chrome_spill
+    (passes if land_chrome_spill else fails).append("land_still_click_chrome_spill_player_land")
+    open_unit_skips_land = (
+        bool(pin_fn)
+        and "_formation_type_blocks_land_open" in pin_fn
+        and pin_fn.find("_formation_type_blocks_land_open") < pin_fn.find("_select_map_unit")
+        and "show_info_panel" not in pin_fn
+    )
+    wiring["still_click_open_unit_skips_land"] = open_unit_skips_land
+    (passes if open_unit_skips_land else fails).append("still_click_open_unit_skips_land")
+
+    # DIG-FIRST (d998fcd): still-click opened title+Close only — strip fault before body.
+    always_fill = (
+        "Fill —% · TOE —" in fill_blk
+        and "vbox.add_child(fill_lbl)" in fill_blk
+        and popup.find("vbox.add_child(fill_lbl)") < popup.find("var body :=")
+        and popup.find("body_scroll.add_child(body)") < popup.find("_safe_unit_card_strip_lines")
+        and "_safe_unit_card_fill_ratio" in popup
+        and "begins_with(\"Strength\")" in popup
+    )
+    wiring["always_paint_fill_before_strip"] = always_fill
+    (passes if always_fill else fails).append("always_paint_fill_before_strip")
+
+    force_sz = (
+        "_apply_unit_detail_popup_min_size" in popup
+        and "panel.size" in _gd_func_slice(ren, "_apply_unit_detail_popup_min_size")
+        and "Vector2(320, 220)" in _gd_func_slice(ren, "_apply_unit_detail_popup_min_size")
+    )
+    wiring["force_popup_size_320_220"] = force_sz
+    (passes if force_sz else fails).append("force_popup_size_320_220")
+
+    refresh_fn = _gd_func_slice(ren, "_refresh_hover_tooltip")
+    spatial_fn = _gd_func_slice(ren, "_update_spatial_hover")
+    tip_hide = (
+        "_unit_detail_popup_is_visible" in refresh_fn
+        and "_hide_hover_tooltip" in refresh_fn
+        and refresh_fn.find("_unit_detail_popup_is_visible") < refresh_fn.find("_is_mouse_over_blocking_ui")
+        and "_unit_detail_popup_is_visible" in spatial_fn
+        and "_hide_hover_tooltip" in popup
+    )
+    wiring["tooltip_suppressed_while_unit_card"] = tip_hide
+    (passes if tip_hide else fails).append("tooltip_suppressed_while_unit_card")
+
+    strip_safe = (
+        "_safe_composition" in strip
+        and "_safe_float_prop" in strip
+        and "is_instance_valid(formation)" in lines_fn
+        and "get_unit_equipment_stock" in _gd_func_slice(strip, "_fill_ratio_for")
+        and "unit_toe_fill_ratio" in strip
+        and "composition_from_formation" in _gd_func_slice(strip, "_safe_composition")
+        and "_formation_has_composition_meta" not in strip
+    )
+    wiring["strip_safe_ger_demo"] = strip_safe
+    (passes if strip_safe else fails).append("strip_safe_ger_demo")
+
+    # Play FAIL tip 194027d: class_name.has_method is a Godot 4 parse error.
+    ready_fn = _gd_func_slice(ren, "_unit_card_combat_strip_ready")
+    fill_fn = _gd_func_slice(ren, "_safe_unit_card_fill_ratio")
+    tip_safe_fn = _gd_func_slice(ren, "_safe_unit_card_tooltip_lines")
+    no_class_has_method = (
+        "UnitCardCombatStrip.has_method(" not in ren
+        and "typeof(UnitCardCombatStrip) != TYPE_NIL" in ready_fn
+        and "UnitCardCombatStrip.lines_for(" in _gd_func_slice(ren, "_safe_unit_card_strip_lines")
+        and "UnitCardCombatStrip._fill_ratio_for(" in fill_fn
+        and "UnitCardCombatStrip.tooltip_lines_for(" in tip_safe_fn
+        and "has_method(" not in ready_fn
+        and "has_method(" not in fill_fn
+        and "has_method(" not in tip_safe_fn
+    )
+    wiring["no_class_has_method_on_strip"] = no_class_has_method
+    (passes if no_class_has_method else fails).append("no_class_has_method_on_strip")
+
     ok = len(fails) == 0
     return {
         "ok": ok,
@@ -248,6 +479,7 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
         "integration": [
             "unit_card_fill_toe_visibility_product",
             "MapRenderer._show_unit_detail_popup",
+            "MapRenderer._try_open_land_chip_from_input",
             "UnitCardCombatStrip.lines_for",
         ],
     }
