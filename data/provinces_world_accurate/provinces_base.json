@@ -13219,7 +13219,7 @@
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "France",
-      "population_base": 250000,
+      "population_base": 63097,
       "nuts_id": "FRE11",
       "cntr_code": "FR",
       "core_for_tags": [
@@ -68356,6 +68356,42 @@
       "special_features": [
         "port"
       ]
+    },
+    {
+      "id": 711521,
+      "name": "Nord East",
+      "terrain": "plains",
+      "domain": "land",
+      "theater": "europe_core",
+      "strategic_region_hint": "France",
+      "population_base": 121452,
+      "nuts_id": "FRE11",
+      "cntr_code": "FR",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "natural_resources": {},
+      "special_features": [],
+      "island_class": "mainland",
+      "facility_tier": 1
+    },
+    {
+      "id": 711522,
+      "name": "Nord South",
+      "terrain": "plains",
+      "domain": "land",
+      "theater": "europe_core",
+      "strategic_region_hint": "France",
+      "population_base": 65451,
+      "nuts_id": "FRE11",
+      "cntr_code": "FR",
+      "core_for_tags": [
+        "FRA"
+      ],
+      "natural_resources": {},
+      "special_features": [],
+      "island_class": "mainland",
+      "facility_tier": 1
     }
   ]
 }

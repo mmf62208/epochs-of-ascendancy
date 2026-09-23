@@ -2976,6 +2976,20 @@
       "country_tag": "FRA",
       "hub": true
     },
+    "711522": {
+      "city_name": "Nord South",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "FRA",
+      "hub": true
+    },
+    "711521": {
+      "city_name": "Nord East",
+      "tier": 3,
+      "is_capital": false,
+      "country_tag": "FRA",
+      "hub": true
+    },
     "710735": {
       "city_name": "Pas-de-Calais",
       "tier": 2
