@@ -54,6 +54,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
             "chip_match_by_province",
             "selected_frame_immediate_free",
             "land_chip_in_input",
+            "land_still_click_skips_air_fleet",
             "tooltip_not_pick_blocker",
             "europe_home_counters_want_visible",
             "home_syncs_counter_visibility",
@@ -88,6 +89,18 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn(STRATEGIC_PICK_TOAST, ren)
         self.assertIn("_cycle_selected_stack_unit", ren)
         self.assertIn("not counter.visible", ren)
+        self.assertIn("func _pick_land_unit_formation_at_world", ren)
+        self.assertIn("func _formation_type_blocks_land_open", ren)
+        self.assertIn("_pick_unit_formation_at_world(world_pos, land_only)", ren)
+        self.assertNotIn("DIG_CHIP_MISS", ren)
+        self.assertNotIn("DIG_CHIP_SKIP", ren)
+        land_i = ren.find("func _try_open_land_unit_at_world")
+        self.assertGreaterEqual(land_i, 0)
+        land_slice = ren[land_i : land_i + 900]
+        next_land = land_slice.find("\nfunc ", 1)
+        if next_land > 0:
+            land_slice = land_slice[:next_land]
+        self.assertIn("_pick_land_unit_formation_at_world", land_slice)
         # Hang-class: pin open path must not open inspector.
         pin_i = ren.find("func _try_open_unit_at_world")
         self.assertGreaterEqual(pin_i, 0)

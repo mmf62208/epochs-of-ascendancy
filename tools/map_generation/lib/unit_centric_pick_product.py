@@ -281,6 +281,28 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         passes.append("land_chip_in_input")
     else:
         fails.append("land_chip_in_input")
+    land_fn = _gd_func_slice(ren, "_try_open_land_unit_at_world")
+    land_pick_fn = _gd_func_slice(ren, "_pick_land_unit_formation_at_world")
+    block_type_fn = _gd_func_slice(ren, "_formation_type_blocks_land_open")
+    land_skips_air = (
+        bool(land_fn)
+        and "_pick_land_unit_formation_at_world" in land_fn
+        and bool(land_pick_fn)
+        and "land_only" in land_pick_fn
+        and "land_only" in pick_fn
+        and "_formation_type_blocks_land_open" in pick_fn
+        and bool(block_type_fn)
+        and "TYPE_AIR_WING" in block_type_fn
+        and "TYPE_FLEET" in block_type_fn
+        and "TYPE_SPACE_WING" in block_type_fn
+        and "DIG_CHIP_MISS" not in ren
+        and "DIG_CHIP_SKIP" not in ren
+    )
+    wiring["land_still_click_skips_air_fleet"] = land_skips_air
+    if land_skips_air:
+        passes.append("land_still_click_skips_air_fleet")
+    else:
+        fails.append("land_still_click_skips_air_fleet")
     tooltip_not_blocker = bool(block_fn) and '"ProvinceHoverTooltip"' not in block_fn
     wiring["tooltip_not_pick_blocker"] = tooltip_not_blocker
     if tooltip_not_blocker:
@@ -346,7 +368,8 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         "policy": "pin_first_hit_disk_48_floor_20_selected_chip_no_inspector"
         "; home_hit_disk_tracks_counter_scale"
         "; home_hit_covers_full_plate_label_aabb"
-        "; capital_star_before_chip; chip_match_station_province_one_pin_per_hex",
+        "; capital_star_before_chip; chip_match_station_province_one_pin_per_hex"
+        "; land_still_click_skips_air_fleet",
     }
 
 

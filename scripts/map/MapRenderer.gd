@@ -17979,103 +17979,31 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 	if _try_open_land_unit_at_world(world_pos, ctrl_click):
 		get_viewport().set_input_as_handled()
 		return true
-	if DIG_CHIP_STILL_CLICK_MISS:
-		_dig_log_land_chip_still_click_miss(world_pos)
 	return false
 
 
-## DIG-FIRST (Scott GO DIG A): one-shot still-click miss log. Product path
-## unchanged except this print. Do not use to change hit radius / AABB / LOD.
-const DIG_CHIP_STILL_CLICK_MISS := true
+func _formation_type_blocks_land_open(fo: Object) -> bool:
+	# Same TYPE_* set already rejected by land still-click open.
+	if fo == null:
+		return false
+	var ft: String = str(fo.formation_type) if "formation_type" in fo else ""
+	return ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_FLEET or ft == Formation.TYPE_SPACE_WING
 
 
-func _dig_log_land_chip_still_click_miss(world_pos: Vector2) -> void:
-	# Same chip_pos / visible-icon walk as `_pick_unit_formation_at_world`,
-	# but nearest-by-distance (not hit-disk filtered) so AABB miss is measurable.
-	var cam := get_viewport().get_camera_2d() if get_viewport() else null
-	var z: float = 1.0
-	if cam:
-		z = maxf(cam.zoom.x, cam.zoom.y)
-	var nearest_pid: int = -1
-	var nearest_name: String = "none"
-	var nearest_dist: float = INF
-	var nearest_hit_r: float = 0.0
-	var nearest_counter: Node2D = null
-	for id_v in _demo_unit_icon_pids:
-		var id: int = int(id_v)
-		if not province_nodes.has(id):
-			continue
-		var n: Node2D = province_nodes[id] as Node2D
-		if n == null:
-			continue
-		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
-		if counter == null or not is_instance_valid(counter):
-			continue
-		if not counter.visible:
-			continue
-		var chip_pos: Vector2 = counter.position
-		if chip_pos == Vector2.ZERO:
-			chip_pos = province_centroids.get(id, Vector2.ZERO) as Vector2
-			if chip_pos != Vector2.ZERO:
-				chip_pos += _unit_chip_offset_for_pid(id)
-			else:
-				chip_pos = counter.global_position
-		var dist: float = world_pos.distance_to(chip_pos)
-		if dist >= nearest_dist:
-			continue
-		nearest_dist = dist
-		nearest_pid = id
-		nearest_counter = counter
-		var fo: Object = null
-		if counter.has_meta("formation"):
-			var fmeta: Variant = counter.get_meta("formation")
-			if fmeta is Object and is_instance_valid(fmeta as Object):
-				fo = fmeta as Object
-		if fo == null:
-			var fid: String = str(counter.get_meta("formation_id", ""))
-			if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
-				var f2: Variant = LeaderManager.get_formation(fid)
-				if f2 is Object:
-					fo = f2 as Object
-		var nm: String = ""
-		var tag: String = ""
-		if fo != null:
-			if "name" in fo:
-				nm = str(fo.name).strip_edges()
-			if "country_tag" in fo:
-				tag = str(fo.country_tag).strip_edges().to_upper()
-		if nm.is_empty():
-			nm = str(counter.get_meta("formation_id", "")).strip_edges()
-		if nm.is_empty():
-			nm = "pid_%d" % id
-		if not tag.is_empty():
-			nearest_name = "%s/%s" % [tag, nm]
-		else:
-			nearest_name = nm
-	if nearest_counter != null:
-		nearest_hit_r = _unit_counter_hit_radius_world(z, nearest_counter)
-	var dist_out: float = nearest_dist if nearest_counter != null else -1.0
-	var inside: int = 0
-	if nearest_counter != null and nearest_dist <= nearest_hit_r:
-		inside = 1
-	print(
-		"DIG_CHIP_MISS world=(%.2f,%.2f) nearest_pid=%d name=%s dist=%.2f hit_r=%.2f inside=%d zoom=%.3f"
-		% [world_pos.x, world_pos.y, nearest_pid, nearest_name, dist_out, nearest_hit_r, inside, z]
-	)
-	var picked: Object = _pick_unit_formation_at_world(world_pos)
-	if picked == null:
-		return
-	var ft: String = str(picked.formation_type) if "formation_type" in picked else ""
-	if ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_FLEET or ft == Formation.TYPE_SPACE_WING:
-		print("DIG_CHIP_SKIP reason=%s" % ft)
+func _pick_land_unit_formation_at_world(world_pos: Vector2) -> Object:
+	# Same hit-disk / visible-icon / player-tag walk as `_pick_unit_formation_at_world`,
+	# but skip air_wing / fleet / space_wing so a player air pin cannot steal land.
+	var land_only: bool = true
+	return _pick_unit_formation_at_world(world_pos, land_only)
 
 
 func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
-	var fo := _pick_unit_formation_at_world(world_pos)
+	var fo: Object = _pick_unit_formation_at_world(world_pos)
+	if fo != null and _formation_type_blocks_land_open(fo):
+		fo = _pick_land_unit_formation_at_world(world_pos)
 	if fo == null:
 		return false
-	var ft := str(fo.formation_type) if "formation_type" in fo else ""
-	if ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_FLEET or ft == Formation.TYPE_SPACE_WING:
+	if _formation_type_blocks_land_open(fo):
 		return false
 	_select_map_unit(fo)
 	# Pin click must not _select_province (3520 supply outlines hung input after chip).
@@ -18304,7 +18232,7 @@ func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictio
 		_show_inspector_toast("Marching · now at %s" % pname, 2.8)
 
 
-func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
+func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false) -> Object:
 	if _demo_unit_icon_pids.is_empty():
 		return null
 	# Strategic cull / master off: terrain, capitals, ocean beat chips.
@@ -18359,6 +18287,8 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 				if f2 is Object:
 					fo = f2 as Object
 		if fo == null:
+			continue
+		if land_only and _formation_type_blocks_land_open(fo):
 			continue
 		# Inclusive disk: accept boundary (d == hit_r2) as a valid best.
 		if d <= best_any_d:

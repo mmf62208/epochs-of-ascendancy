@@ -321,6 +321,24 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     )
     wiring["home_hit_disk_tracks_counter_scale"] = home_hit
     (passes if home_hit else fails).append("home_hit_disk_tracks_counter_scale")
+    land_pick_fn = _gd_func_slice(ren, "_pick_land_unit_formation_at_world")
+    block_type_fn = _gd_func_slice(ren, "_formation_type_blocks_land_open")
+    land_skips_air = (
+        bool(land_fn)
+        and "_pick_land_unit_formation_at_world" in land_fn
+        and bool(land_pick_fn)
+        and "land_only" in land_pick_fn
+        and "land_only" in pick_fn
+        and "_formation_type_blocks_land_open" in pick_fn
+        and bool(block_type_fn)
+        and "TYPE_AIR_WING" in block_type_fn
+        and "TYPE_FLEET" in block_type_fn
+        and "TYPE_SPACE_WING" in block_type_fn
+        and "DIG_CHIP_MISS" not in ren
+        and "DIG_CHIP_SKIP" not in ren
+    )
+    wiring["land_still_click_skips_air_fleet"] = land_skips_air
+    (passes if land_skips_air else fails).append("land_still_click_skips_air_fleet")
 
     # DIG-FIRST (d998fcd): still-click opened title+Close only — strip fault before body.
     always_fill = (
