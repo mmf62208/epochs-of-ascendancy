@@ -60,6 +60,10 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
             "home_syncs_counter_visibility",
             "counter_scale_floor_readable",
             "home_hit_disk_tracks_counter_scale",
+            "always_paint_fill_before_strip",
+            "force_popup_size_320_220",
+            "tooltip_suppressed_while_unit_card",
+            "strip_safe_ger_demo",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 

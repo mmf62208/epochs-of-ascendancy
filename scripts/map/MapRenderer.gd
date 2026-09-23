@@ -17428,6 +17428,9 @@ func _is_mouse_over_blocking_ui() -> bool:
 func _refresh_hover_tooltip(province: Province) -> void:
 	if hover_tooltip == null or province == null:
 		return
+	if _unit_detail_popup_is_visible():
+		_hide_hover_tooltip()
+		return
 	if _is_mouse_over_blocking_ui():
 		_hide_hover_tooltip()
 		return
@@ -17576,7 +17579,8 @@ func _update_spatial_hover() -> void:
 	_last_hover_mouse = mouse_screen
 
 	# Don't show map province tooltips while the cursor is over a UI window/popup.
-	if _is_mouse_over_blocking_ui():
+	# Also suppress glance chrome while the docked unit card is up (Play: Wiener Umland).
+	if _unit_detail_popup_is_visible() or _is_mouse_over_blocking_ui():
 		if _hover_province != null or (hover_tooltip != null and hover_tooltip.visible):
 			_clear_hover_state()
 		return
@@ -18382,53 +18386,63 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	close_btn.pressed.connect(_dismiss_inspector_and_restore_input)
 	title_row.add_child(close_btn)
 
-	if typeof(UnitCardCombatStrip) != TYPE_NIL:
-		var fill_lbl := Label.new()
-		var fill_txt := ""
-		var strip0: PackedStringArray = UnitCardCombatStrip.lines_for(formation)
+	# Always paint Fill%/TOE on open (never title-row-only). Parent fallback first so
+	# UnitCardCombatStrip.lines_for / _fill_ratio_for NIL/throws cannot abort before body.
+	var fill_lbl := Label.new()
+	var fill_txt := "Fill —% · TOE —"
+	var fill_ratio := -1.0
+	fill_lbl.text = fill_txt
+	fill_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	fill_lbl.custom_minimum_size = Vector2(290, 0)
+	fill_lbl.clip_text = false
+	RetrowaveTheme.style_body_label(fill_lbl)
+	# Fill is equipment/TOE, never Strength%. Unknown ratio stays cyan, not warning.
+	var fill_col: Color = RetrowaveTheme.CYAN
+	fill_lbl.add_theme_color_override("font_color", fill_col)
+	fill_lbl.add_theme_font_size_override("font_size", 16)
+	vbox.add_child(fill_lbl)
+	var fill_bar := ProgressBar.new()
+	fill_bar.name = "FillToeBar"
+	fill_bar.custom_minimum_size = Vector2(0, 4)
+	fill_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	fill_bar.max_value = 100.0
+	fill_bar.value = 0.0
+	fill_bar.show_percentage = false
+	RetrowaveTheme.style_progress_bar(fill_bar)
+	vbox.add_child(fill_bar)
+	var strip0: PackedStringArray = PackedStringArray()
+	if _unit_card_combat_strip_ready():
+		strip0 = _safe_unit_card_strip_lines(formation)
 		if not strip0.is_empty():
-			fill_txt = str(strip0[0])
-		if fill_txt.is_empty():
+			var first_ln := str(strip0[0]).strip_edges()
+			if not first_ln.is_empty() and not first_ln.begins_with("Strength"):
+				fill_txt = first_ln
+		if fill_txt.is_empty() or fill_txt.begins_with("Strength"):
 			fill_txt = "Fill —% · TOE —"
 		fill_lbl.text = fill_txt
-		fill_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		fill_lbl.custom_minimum_size = Vector2(290, 0)
-		fill_lbl.clip_text = false
-		RetrowaveTheme.style_body_label(fill_lbl)
-		var fill_ratio := UnitCardCombatStrip._fill_ratio_for(formation)
-		# Fill is equipment/TOE, never Strength%. Unknown ratio stays cyan, not warning.
-		var fill_col: Color = RetrowaveTheme.CYAN
+		# Color from _fill_ratio_for (never Strength%).
+		fill_ratio = _safe_unit_card_fill_ratio(formation)
 		if fill_ratio >= 0.0 and fill_ratio < 0.5:
 			fill_col = RetrowaveTheme.WARNING
 		elif fill_ratio >= 0.5:
 			fill_col = RetrowaveTheme.SUCCESS
 		fill_lbl.add_theme_color_override("font_color", fill_col)
-		fill_lbl.add_theme_font_size_override("font_size", 16)
-		vbox.add_child(fill_lbl)
-		var fill_bar := ProgressBar.new()
-		fill_bar.name = "FillToeBar"
-		fill_bar.custom_minimum_size = Vector2(0, 4)
-		fill_bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		fill_bar.max_value = 100.0
 		fill_bar.value = clampf(fill_ratio, 0.0, 1.0) * 100.0
-		fill_bar.show_percentage = false
-		RetrowaveTheme.style_progress_bar(fill_bar)
-		vbox.add_child(fill_bar)
-		var fight_row := HBoxContainer.new()
-		fight_row.add_theme_constant_override("separation", 6)
-		vbox.add_child(fight_row)
-		var fight_btn := Button.new()
-		fight_btn.name = "BtnOpenFight"
-		fight_btn.text = "Open fight"
-		fight_btn.focus_mode = Control.FOCUS_NONE
-		fight_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
-		fight_btn.tooltip_text = "Start a multi-day land battle from this unit into an adjacent enemy."
-		RetrowaveTheme.style_primary_button(fight_btn)
-		var fight_fid := fid
-		fight_btn.pressed.connect(func() -> void:
-			_open_fight_from_formation_id(fight_fid)
-		)
-		fight_row.add_child(fight_btn)
+	var fight_row := HBoxContainer.new()
+	fight_row.add_theme_constant_override("separation", 6)
+	vbox.add_child(fight_row)
+	var fight_btn := Button.new()
+	fight_btn.name = "BtnOpenFight"
+	fight_btn.text = "Open fight"
+	fight_btn.focus_mode = Control.FOCUS_NONE
+	fight_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	fight_btn.tooltip_text = "Start a multi-day land battle from this unit into an adjacent enemy."
+	RetrowaveTheme.style_primary_button(fight_btn)
+	var fight_fid := fid
+	fight_btn.pressed.connect(func() -> void:
+		_open_fight_from_formation_id(fight_fid)
+	)
+	fight_row.add_child(fight_btn)
 
 	var body := Label.new()
 	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -18448,8 +18462,8 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		"Org %.0f%% · Str %.0f%% · Rdy %.0f%% · XP %.0f%%"
 		% [org_v * 100.0, str_v * 100.0, rdy_v * 100.0, xp_v * 100.0]
 	)
-	if typeof(UnitCardCombatStrip) != TYPE_NIL:
-		var strip_rest: PackedStringArray = UnitCardCombatStrip.lines_for(formation)
+	if _unit_card_combat_strip_ready():
+		var strip_rest: PackedStringArray = _safe_unit_card_strip_lines(formation)
 		if strip_rest.size() > 1:
 			for si in range(1, strip_rest.size()):
 				var rest_ln := str(strip_rest[si]).strip_edges()
@@ -18463,7 +18477,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 					lines.append(rest_ln)
 				else:
 					chrome_tips.append(rest_ln)
-		var tips: PackedStringArray = UnitCardCombatStrip.tooltip_lines_for(formation)
+		var tips: PackedStringArray = _safe_unit_card_tooltip_lines(formation)
 		for t in tips:
 			chrome_tips.append(t)
 		if not chrome_tips.is_empty():
@@ -18661,6 +18675,71 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		if ev is InputEventMouseButton and ev.pressed:
 			ui.move_child(panel, ui.get_child_count() - 1)
 	)
+	_apply_unit_detail_popup_min_size(panel)
+	_hide_hover_tooltip()
+
+
+func _unit_card_combat_strip_ready() -> bool:
+	return typeof(UnitCardCombatStrip) != TYPE_NIL and UnitCardCombatStrip.has_method("lines_for")
+
+
+func _safe_unit_card_strip_lines(formation: Object) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	if formation == null or not _unit_card_combat_strip_ready():
+		return out
+	var raw: Variant = UnitCardCombatStrip.lines_for(formation)
+	if raw is PackedStringArray:
+		return raw as PackedStringArray
+	if raw is Array:
+		for item in (raw as Array):
+			out.append(str(item))
+	return out
+
+
+func _safe_unit_card_fill_ratio(formation: Object) -> float:
+	if formation == null or typeof(UnitCardCombatStrip) == TYPE_NIL:
+		return -1.0
+	if not UnitCardCombatStrip.has_method("_fill_ratio_for"):
+		return -1.0
+	var raw: Variant = UnitCardCombatStrip._fill_ratio_for(formation)
+	if typeof(raw) == TYPE_FLOAT or typeof(raw) == TYPE_INT:
+		return clampf(float(raw), 0.0, 2.0)
+	return -1.0
+
+
+func _safe_unit_card_tooltip_lines(formation: Object) -> PackedStringArray:
+	var out: PackedStringArray = PackedStringArray()
+	if formation == null or typeof(UnitCardCombatStrip) == TYPE_NIL:
+		return out
+	if not UnitCardCombatStrip.has_method("tooltip_lines_for"):
+		return out
+	var raw: Variant = UnitCardCombatStrip.tooltip_lines_for(formation)
+	if raw is PackedStringArray:
+		return raw as PackedStringArray
+	if raw is Array:
+		for item in (raw as Array):
+			out.append(str(item))
+	return out
+
+
+func _apply_unit_detail_popup_min_size(panel: Control) -> void:
+	if panel == null:
+		return
+	var min_sz := Vector2(320, 220)
+	panel.custom_minimum_size = min_sz
+	var next := Vector2(maxf(min_sz.x, panel.size.x), maxf(min_sz.y, panel.size.y))
+	panel.size = next
+	if panel.has_method("reset_size"):
+		panel.reset_size()
+	if panel.size.x < min_sz.x or panel.size.y < min_sz.y:
+		panel.size = min_sz
+
+
+func _unit_detail_popup_is_visible() -> bool:
+	var ui := get_node_or_null("UI") as CanvasLayer
+	if ui == null:
+		return false
+	return _overlay_node_is_up(ui.get_node_or_null("UnitDetailPopup"))
 
 
 func _ensure_station_engineers_button() -> void:

@@ -316,6 +316,48 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     wiring["home_hit_disk_tracks_counter_scale"] = home_hit
     (passes if home_hit else fails).append("home_hit_disk_tracks_counter_scale")
 
+    # DIG-FIRST (d998fcd): still-click opened title+Close only — strip fault before body.
+    always_fill = (
+        "Fill —% · TOE —" in fill_blk
+        and "vbox.add_child(fill_lbl)" in fill_blk
+        and fill_blk.find("vbox.add_child(fill_lbl)") < fill_blk.find("strip0")
+        and "_safe_unit_card_strip_lines" in fill_blk
+        and "_safe_unit_card_fill_ratio" in fill_blk
+        and "begins_with(\"Strength\")" in fill_blk
+    )
+    wiring["always_paint_fill_before_strip"] = always_fill
+    (passes if always_fill else fails).append("always_paint_fill_before_strip")
+
+    force_sz = (
+        "_apply_unit_detail_popup_min_size" in popup
+        and "panel.size" in _gd_func_slice(ren, "_apply_unit_detail_popup_min_size")
+        and "Vector2(320, 220)" in _gd_func_slice(ren, "_apply_unit_detail_popup_min_size")
+    )
+    wiring["force_popup_size_320_220"] = force_sz
+    (passes if force_sz else fails).append("force_popup_size_320_220")
+
+    refresh_fn = _gd_func_slice(ren, "_refresh_hover_tooltip")
+    spatial_fn = _gd_func_slice(ren, "_update_spatial_hover")
+    tip_hide = (
+        "_unit_detail_popup_is_visible" in refresh_fn
+        and "_hide_hover_tooltip" in refresh_fn
+        and refresh_fn.find("_unit_detail_popup_is_visible") < refresh_fn.find("_is_mouse_over_blocking_ui")
+        and "_unit_detail_popup_is_visible" in spatial_fn
+        and "_hide_hover_tooltip" in popup
+    )
+    wiring["tooltip_suppressed_while_unit_card"] = tip_hide
+    (passes if tip_hide else fails).append("tooltip_suppressed_while_unit_card")
+
+    strip_safe = (
+        "_safe_composition" in strip
+        and "_safe_float_prop" in strip
+        and "is_instance_valid(formation)" in lines_fn
+        and "get_unit_equipment_stock" in _gd_func_slice(strip, "_fill_ratio_for")
+        and "unit_toe_fill_ratio" in strip
+    )
+    wiring["strip_safe_ger_demo"] = strip_safe
+    (passes if strip_safe else fails).append("strip_safe_ger_demo")
+
     ok = len(fails) == 0
     return {
         "ok": ok,
