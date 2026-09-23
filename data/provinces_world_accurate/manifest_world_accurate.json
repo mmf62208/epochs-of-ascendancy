@@ -1,12 +1,12 @@
 {
   "name": "provinces_world_accurate",
   "stats": {
-    "provinces": 3532,
-    "land": 3192,
+    "provinces": 3534,
+    "land": 3194,
     "sea": 340
   },
   "blocks": {
-    "europe_nuts3": 1521,
+    "europe_nuts3": 1523,
     "us_tiger": 130,
     "row_ne_admin1": 2487,
     "seas": 340,
@@ -17,7 +17,7 @@
   },
   "method": "nuts3_europe + us_block + ne_admin1_row + world_full_seas",
   "parent_world_full_renumbered": false,
-  "geometry_quality": "gis_hybrid_v1_7_row_geoboundaries_t3+us_merge_v1+row_sparse_merge_v1+row_sparse_merge_v1+v1_maginot_land_uniform+v1_gibraltar_island_land+v1_hong_kong_island_land+v1_caribbean_island_sizing_feed6",
+  "geometry_quality": "gis_hybrid_v1_7_row_geoboundaries_t3+us_merge_v1+row_sparse_merge_v1+row_sparse_merge_v1+v1_maginot_land_uniform+v1_gibraltar_island_land+v1_hong_kong_island_land+v1_caribbean_island_sizing_feed6+v1_flanders_nord_land_uniform",
   "adjacency": "shared_edge_near_vertex_plus_knn",
   "layers": [
     "states",

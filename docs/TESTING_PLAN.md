@@ -282,4 +282,16 @@ python3 -m unittest tools.map_generation.tests.test_caribbean_island_sizing_feed
 
 On `--quick` via `tools/eoa_full_test_gates.sh`. Gibraltar land / Hong Kong land / Alboran seas / Maginot land / Great Lakes / Esc / G / Dig2 / combat are out of scope for this theater proof.
 
-Honest: `--quick` living-unit wiring fails are **tip-pre-existing** on `8bd654c206a20833ce9d446061f93ed964d55d88` (same files). This FEED does not touch those GD files. 
+Honest: `--quick` living-unit wiring fails are **tip-pre-existing** on `8bd654c206a20833ce9d446061f93ed964d55d88` (same files). This FEED does not touch those GD files.
+
+### Flanders / Nord land uniformity (FEED-7)
+
+Pure product + board QC (no Godot):
+
+```bash
+python3 -m unittest tools.map_generation.tests.test_flanders_nord_land_uniformity_product -v
+```
+
+On `--quick` via `tools/eoa_full_test_gates.sh`. Maginot re-touch / Ruhr/NRW / Dig2 / G / combat / Taken / JOINING / Esc are out of scope for this theater proof.
+
+Honest: `--quick` living-unit wiring fails are **tip-pre-existing** on `8cae5f903dbcc5dce4cbbdfff2cbb3826636753b` (same files). This FEED does not touch those GD files. 

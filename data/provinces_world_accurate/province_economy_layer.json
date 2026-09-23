@@ -4430,6 +4430,20 @@
       "development_level": 3,
       "industrial_hub": true
     },
+    "711522": {
+      "population": 800000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 3,
+      "industrial_hub": true
+    },
+    "711521": {
+      "population": 800000,
+      "factories": 4,
+      "infrastructure": 5,
+      "development_level": 3,
+      "industrial_hub": true
+    },
     "710735": {
       "population": 22032,
       "factories": 3,
