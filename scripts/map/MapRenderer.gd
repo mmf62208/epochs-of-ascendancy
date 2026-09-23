@@ -18222,9 +18222,6 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 	var z := 1.0
 	if cam:
 		z = maxf(cam.zoom.x, cam.zoom.y)
-	# ~48px screen radius in world units; floor so tactical zoom stays finger-sized.
-	var hit_r := maxf(48.0 / maxf(z, 0.05), 20.0)
-	var hit_r2 := hit_r * hit_r
 	var best_player: Object = null
 	var best_player_d := INF
 	var best_any: Object = null
@@ -18243,12 +18240,18 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 		# Hidden pins (strategic LOD) must not steal hex clicks.
 		if not counter.visible:
 			continue
-		# Centroids live in pick/camera space; global_position can drift after Close.
-		var chip_pos: Vector2 = province_centroids.get(id, Vector2.ZERO) as Vector2
+		# Live painted plate (province nodes sit at origin). Centroid+offset can
+		# drift from chrome/label after Home/Close; prefer counter.position.
+		var chip_pos: Vector2 = counter.position
 		if chip_pos == Vector2.ZERO:
-			chip_pos = counter.global_position
-		else:
-			chip_pos += _unit_chip_offset_for_pid(id)
+			chip_pos = province_centroids.get(id, Vector2.ZERO) as Vector2
+			if chip_pos != Vector2.ZERO:
+				chip_pos += _unit_chip_offset_for_pid(id)
+			else:
+				chip_pos = counter.global_position
+		# Home-band chips paint ~100–150px; 48-only screen disk misses chrome/label.
+		var hit_r := _unit_counter_hit_radius_world(z, counter)
+		var hit_r2 := hit_r * hit_r
 		var d := world_pos.distance_squared_to(chip_pos)
 		if d > hit_r2:
 			continue
@@ -21788,6 +21791,20 @@ func _prefer_retrowave_unit_icon(tex_path: String) -> String:
 		if ResourceLoader.exists(rw64):
 			return rw64
 	return p
+
+
+## World-space hit radius for a painted land chip. Home-band counter scale is
+## 3–4× so a fixed 48px screen disk misses chrome/label; track that footprint.
+## Tactical zoom keeps the historic 48px / 20-world floor (finger-sized).
+func _unit_counter_hit_radius_world(z: float, counter: Node2D = null) -> float:
+	var cscale := 0.0
+	if counter != null and is_instance_valid(counter):
+		cscale = maxf(counter.scale.x, counter.scale.y)
+	if cscale < 0.05:
+		cscale = _unit_counter_scale_for_zoom(z)
+	var sprite_px := 32.0
+	var hit_screen := maxf(48.0, 0.5 * sprite_px * cscale)
+	return maxf(hit_screen / maxf(z, 0.05), 20.0)
 
 
 ## Keep chips ~48–58 screen px at Europe zoom so org/str/designation stay readable.

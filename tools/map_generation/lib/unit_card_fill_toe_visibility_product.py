@@ -13,6 +13,9 @@ from typing import Any, Dict, List, Optional
 
 from map_unit_counter_lod_product import europe_home_zoom_wants_counters
 from unit_card_combat_strip_product import fill_toe_fold_line, lines_for
+from unit_centric_pick_product import (
+    home_band_hit_disk_tracks_scale,
+)
 
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
@@ -295,6 +298,20 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     scale_floor = "clampf(target, 0.85, 16.0)" in scale_fn
     wiring["counter_scale_floor_readable"] = scale_floor
     (passes if scale_floor else fails).append("counter_scale_floor_readable")
+
+    # DIG-FIRST (be1d480): chips paint at Home but 48px disk misses chrome/label.
+    pick_fn = _gd_func_slice(ren, "_pick_unit_formation_at_world")
+    hit_fn = _gd_func_slice(ren, "_unit_counter_hit_radius_world")
+    home_hit = (
+        home_band_hit_disk_tracks_scale()
+        and "_unit_counter_hit_radius_world" in pick_fn
+        and "0.5 * sprite_px" in hit_fn
+        and "_unit_counter_scale_for_zoom" in hit_fn
+        and "maxf(48.0" in hit_fn
+        and "counter.position" in pick_fn
+    )
+    wiring["home_hit_disk_tracks_counter_scale"] = home_hit
+    (passes if home_hit else fails).append("home_hit_disk_tracks_counter_scale")
 
     ok = len(fails) == 0
     return {

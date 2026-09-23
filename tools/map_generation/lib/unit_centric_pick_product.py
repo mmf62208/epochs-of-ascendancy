@@ -21,6 +21,10 @@ STACK_CYCLE_HINT = "Stack %d/%d · [ ] or buttons to cycle"
 SELECTED_FRAME_HOOK = "_refresh_selected_unit_chip"
 HIT_RADIUS_PX = 48.0
 HIT_RADIUS_FLOOR = 20.0
+SPRITE_PX = 32.0
+COUNTER_SCALE_FLOOR = 0.85
+COUNTER_SCALE_CEIL = 16.0
+EUROPE_HOME_HIT_Z = 0.33
 
 
 def _gd_func_slice(src: str, func_name: str) -> str:
@@ -52,13 +56,55 @@ def _spatial_left_click_slice(renderer_src: str) -> str:
     return renderer_src[left:end]
 
 
-def _hit_radius_ok(pick_fn: str) -> bool:
+def unit_counter_scale_for_zoom(z: float) -> float:
+    """Mirror MapRenderer._unit_counter_scale_for_zoom (paint scale)."""
+    zz = max(float(z), 0.04)
+    t = min(1.0, max(0.0, (zz - 0.2) / 1.6))
+    screen_px = 48.0 + (58.0 - 48.0) * t
+    target = screen_px / (SPRITE_PX * zz)
+    return min(COUNTER_SCALE_CEIL, max(COUNTER_SCALE_FLOOR, target))
+
+
+def unit_chip_hit_screen_px(z: float) -> float:
+    """Screen-space hit radius. Home-band tracks painted scale, not 48-only."""
+    return max(HIT_RADIUS_PX, 0.5 * SPRITE_PX * unit_counter_scale_for_zoom(z))
+
+
+def home_band_hit_disk_tracks_scale() -> bool:
+    """Europe Home (~0.33–0.49) must exceed the historic 48px floor."""
+    home = unit_chip_hit_screen_px(EUROPE_HOME_HIT_Z)
+    mid = unit_chip_hit_screen_px(0.49)
+    tactical = unit_chip_hit_screen_px(1.0)
+    return (
+        home > HIT_RADIUS_PX + 8.0
+        and mid > HIT_RADIUS_PX
+        and abs(tactical - HIT_RADIUS_PX) < 0.05
+    )
+
+
+def _hit_radius_ok(pick_fn: str, helper_fn: str = "") -> bool:
     if not pick_fn:
         return False
-    has_48 = bool(re.search(r"\b48(?:\.0)?\b", pick_fn))
-    has_20 = bool(re.search(r"\b20(?:\.0)?\b", pick_fn))
-    has_maxf_floor = "maxf" in pick_fn and ("20.0" in pick_fn or "20" in pick_fn)
+    blob = pick_fn + "\n" + helper_fn
+    has_48 = bool(re.search(r"\b48(?:\.0)?\b", blob))
+    has_20 = bool(re.search(r"\b20(?:\.0)?\b", blob))
+    has_maxf_floor = "maxf" in blob and ("20.0" in blob or "20" in blob)
     return has_48 and has_20 and has_maxf_floor
+
+
+def _home_hit_disk_wiring_ok(pick_fn: str, helper_fn: str) -> bool:
+    """Pick must call the scale-tracking helper (not a fixed 48/z disk)."""
+    if not pick_fn or not helper_fn:
+        return False
+    uses_helper = "_unit_counter_hit_radius_world" in pick_fn
+    helper_tracks = (
+        "0.5 * sprite_px" in helper_fn
+        and "_unit_counter_scale_for_zoom" in helper_fn
+        and "maxf(48.0" in helper_fn
+        and "20.0" in helper_fn
+    )
+    live_plate = "counter.position" in pick_fn
+    return uses_helper and helper_tracks and live_plate and home_band_hit_disk_tracks_scale()
 
 
 def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, Any]:
@@ -80,6 +126,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
 
     pin_fn = _gd_func_slice(ren, "_try_open_unit_at_world")
     pick_fn = _gd_func_slice(ren, "_pick_unit_formation_at_world")
+    hit_fn = _gd_func_slice(ren, "_unit_counter_hit_radius_world")
     select_fn = _gd_func_slice(ren, "_select_map_unit")
     spatial = _spatial_left_click_slice(ren)
 
@@ -105,12 +152,19 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         fails.append("capital_star_before_chip")
 
     # 2) Hit disk ≥48 px / zoom with floor ≥20 world units.
-    hit_ok = _hit_radius_ok(pick_fn)
+    hit_ok = _hit_radius_ok(pick_fn, hit_fn)
     wiring["hit_radius_48_floor_20"] = hit_ok
     if hit_ok:
         passes.append("hit_radius_48_floor_20")
     else:
         fails.append("hit_radius_48_floor_20")
+    # 2b) Home-band painted chips are 2–3× the old 48px disk — track scale.
+    home_hit_ok = _home_hit_disk_wiring_ok(pick_fn, hit_fn)
+    wiring["home_hit_disk_tracks_counter_scale"] = home_hit_ok
+    if home_hit_ok:
+        passes.append("home_hit_disk_tracks_counter_scale")
+    else:
+        fails.append("home_hit_disk_tracks_counter_scale")
 
     # 3) hang-class: no show_info_panel in pin open path.
     pin_no_insp = bool(pin_fn) and "show_info_panel" not in pin_fn
@@ -264,6 +318,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         "status": "PASS" if ok else "FAIL",
         "hit_radius_px": HIT_RADIUS_PX,
         "hit_radius_floor": HIT_RADIUS_FLOOR,
+        "home_hit_screen_px": unit_chip_hit_screen_px(EUROPE_HOME_HIT_Z),
         "strategic_toast": STRATEGIC_PICK_TOAST,
         "stack_cycle_hint": STACK_CYCLE_HINT,
         "wiring": wiring,
@@ -278,6 +333,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
             "MapRenderer _pick_unit_formation_at_world",
         ],
         "policy": "pin_first_hit_disk_48_floor_20_selected_chip_no_inspector"
+        "; home_hit_disk_tracks_counter_scale"
         "; capital_star_before_chip; chip_match_station_province_one_pin_per_hex",
     }
 

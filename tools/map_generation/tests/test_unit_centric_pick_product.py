@@ -10,11 +10,14 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 
 from unit_centric_pick_product import (  # noqa: E402
+    EUROPE_HOME_HIT_Z,
     HIT_RADIUS_FLOOR,
     HIT_RADIUS_PX,
     STRATEGIC_PICK_TOAST,
     build_unit_centric_pick_product,
+    home_band_hit_disk_tracks_scale,
     unit_centric_pick_integrity,
+    unit_chip_hit_screen_px,
 )
 
 RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
@@ -27,6 +30,9 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn("Shift+U", STRATEGIC_PICK_TOAST)
         self.assertIn("unit chip", STRATEGIC_PICK_TOAST)
         self.assertIn("toggles counters", STRATEGIC_PICK_TOAST)
+        self.assertTrue(home_band_hit_disk_tracks_scale())
+        self.assertGreater(unit_chip_hit_screen_px(EUROPE_HOME_HIT_Z), HIT_RADIUS_PX)
+        self.assertAlmostEqual(unit_chip_hit_screen_px(1.0), HIT_RADIUS_PX, places=2)
 
     def test_product_wiring(self) -> None:
         p = build_unit_centric_pick_product(check_wiring=True)
@@ -37,6 +43,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
             "pin_before_hex",
             "capital_star_before_chip",
             "hit_radius_48_floor_20",
+            "home_hit_disk_tracks_counter_scale",
             "pin_select_no_inspector",
             "selected_frame_hook",
             "hidden_pins_skip",
@@ -63,6 +70,16 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn("_try_open_unit_at_world", ren)
         self.assertIn("maxf(48.0", ren)
         self.assertIn("20.0", ren)
+        self.assertIn("func _unit_counter_hit_radius_world", ren)
+        self.assertIn("0.5 * sprite_px", ren)
+        pick_i = ren.find("func _pick_unit_formation_at_world")
+        self.assertGreaterEqual(pick_i, 0)
+        pick_slice = ren[pick_i : pick_i + 2200]
+        next_pick = pick_slice.find("\nfunc ", 1)
+        if next_pick > 0:
+            pick_slice = pick_slice[:next_pick]
+        self.assertIn("_unit_counter_hit_radius_world", pick_slice)
+        self.assertIn("counter.position", pick_slice)
         self.assertIn("SelectedFrame", ren)
         self.assertIn("_refresh_selected_unit_chip", ren)
         self.assertIn(STRATEGIC_PICK_TOAST, ren)

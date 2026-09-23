@@ -59,6 +59,7 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
             "europe_home_counters_want_visible",
             "home_syncs_counter_visibility",
             "counter_scale_floor_readable",
+            "home_hit_disk_tracks_counter_scale",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 
@@ -113,6 +114,9 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         self.assertIn("Fill —%", strip)
         self.assertIn("func _try_open_land_chip_from_input", src)
         self.assertIn("_try_open_land_chip_from_input", src)
+        self.assertIn("func _unit_counter_hit_radius_world", src)
+        self.assertIn("0.5 * sprite_px", src)
+        self.assertIn("counter.position", src)
         self.assertNotIn(
             '"ProvinceHoverTooltip"',
             src[src.find("func _is_mouse_over_blocking_ui") : src.find("func _refresh_hover_tooltip")],
