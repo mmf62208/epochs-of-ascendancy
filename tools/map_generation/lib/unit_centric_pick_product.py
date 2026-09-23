@@ -283,6 +283,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         fails.append("land_chip_in_input")
     land_fn = _gd_func_slice(ren, "_try_open_land_unit_at_world")
     land_pick_fn = _gd_func_slice(ren, "_pick_land_unit_formation_at_world")
+    spill_fn = _gd_func_slice(ren, "_nearest_player_land_formation_at_world")
     block_type_fn = _gd_func_slice(ren, "_formation_type_blocks_land_open")
     stack_fn = _gd_func_slice(ren, "_player_land_formation_at_province")
     land_skips_air = (
@@ -339,6 +340,30 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         passes.append("land_still_click_province_player_land")
     else:
         fails.append("land_still_click_province_player_land")
+    # Play MIXED on 4fb65b4: miss_pid hex (Neustadt/Schwäbisch Hall/FRA) has no
+    # GER land; Home chrome spills while stations stay on 710173 (+ nbr).
+    land_chrome_spill = (
+        bool(land_fn)
+        and "_nearest_player_land_formation_at_world" in land_fn
+        and land_fn.find("_nearest_player_land_formation_at_world")
+        > land_fn.find("_resolve_map_pick_pid")
+        and land_fn.find("_nearest_player_land_formation_at_world")
+        > land_fn.rfind("_player_land_formation_at_province")
+        and bool(spill_fn)
+        and "CHROME_SPILL_WORLD" in spill_fn
+        and "land_only" in spill_fn
+        and "player_only" in spill_fn
+        and "_unit_counter_hit_radius_world" in spill_fn
+        and "DemoUnitIcon_" in spill_fn
+        and "counter.global_position" in spill_fn
+        and "maxf(hit_r, CHROME_SPILL_WORLD)" in spill_fn
+        and "_formation_is_player_tag" in spill_fn
+    )
+    wiring["land_still_click_chrome_spill_player_land"] = land_chrome_spill
+    if land_chrome_spill:
+        passes.append("land_still_click_chrome_spill_player_land")
+    else:
+        fails.append("land_still_click_chrome_spill_player_land")
     open_unit_skips_land = (
         bool(pin_fn)
         and "_formation_type_blocks_land_open" in pin_fn
@@ -419,6 +444,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         "; land_still_click_skips_air_fleet"
         "; land_still_click_player_tag_only"
         "; land_still_click_province_player_land"
+        "; land_still_click_chrome_spill_player_land"
         "; still_click_open_unit_skips_land",
     }
 

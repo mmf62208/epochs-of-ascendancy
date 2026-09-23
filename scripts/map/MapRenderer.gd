@@ -18029,6 +18029,81 @@ func _pick_land_unit_formation_at_world(world_pos: Vector2) -> Object:
 	return _pick_unit_formation_at_world(world_pos, land_only, player_only)
 
 
+func _nearest_player_land_formation_at_world(world_pos: Vector2) -> Object:
+	# Home chrome spills onto nearby hexes while GER land stays on 710173 (+ nbr).
+	# After disk + miss_pid province miss, bind closest visible player-land
+	# DemoUnitIcon (chrome → station). Not hex-under-cursor membership.
+	const CHROME_SPILL_WORLD: float = 180.0
+	var land_only: bool = true
+	var player_only: bool = true
+	if _demo_unit_icon_pids.is_empty():
+		return null
+	if not _unit_counters_want_visible():
+		return null
+	var cam := get_viewport().get_camera_2d() if get_viewport() else null
+	var z: float = 1.0
+	if cam:
+		z = maxf(cam.zoom.x, cam.zoom.y)
+	var best: Object = null
+	var best_d: float = INF
+	var p_tag: String = _player_tag()
+	if player_only and p_tag.is_empty():
+		return null
+	for id_v in _demo_unit_icon_pids:
+		var id: int = int(id_v)
+		if not province_nodes.has(id):
+			continue
+		var n: Node2D = province_nodes[id] as Node2D
+		if n == null:
+			continue
+		var counter: Node2D = n.get_node_or_null("DemoUnitIcon_" + str(id)) as Node2D
+		if counter == null or not is_instance_valid(counter):
+			continue
+		if not counter.visible:
+			continue
+		# Painted chrome after Home/fit — not AABB-floor widen.
+		var chip_pos: Vector2 = counter.global_position
+		if chip_pos == Vector2.ZERO:
+			chip_pos = counter.position
+			if chip_pos == Vector2.ZERO:
+				chip_pos = province_centroids.get(id, Vector2.ZERO) as Vector2
+				if chip_pos != Vector2.ZERO:
+					chip_pos += _unit_chip_offset_for_pid(id)
+		var hit_r: float = _unit_counter_hit_radius_world(z, counter)
+		var accept_r: float = maxf(hit_r, CHROME_SPILL_WORLD)
+		var d: float = world_pos.distance_to(chip_pos)
+		if d > accept_r:
+			continue
+		var fo: Object = null
+		if counter.has_meta("formation"):
+			var fmeta: Variant = counter.get_meta("formation")
+			if fmeta is Object and is_instance_valid(fmeta as Object):
+				fo = fmeta as Object
+		if fo == null:
+			var fid: String = str(counter.get_meta("formation_id", ""))
+			if not fid.is_empty() and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_formation"):
+				var f2: Variant = LeaderManager.get_formation(fid)
+				if f2 is Object:
+					fo = f2 as Object
+		# Chrome → station: air/fleet/space pin can sit on a GER land hex.
+		if fo != null and land_only and _formation_type_blocks_land_open(fo):
+			var chrome_pid: int = int(fo.stationed_province_id) if "stationed_province_id" in fo else id
+			fo = _player_land_formation_at_province(chrome_pid)
+		if fo == null:
+			var pin_pid: int = int(counter.get_meta("province_id", id))
+			fo = _player_land_formation_at_province(pin_pid)
+		if fo == null:
+			continue
+		if land_only and _formation_type_blocks_land_open(fo):
+			continue
+		if player_only and not _formation_is_player_tag(fo):
+			continue
+		if d <= best_d:
+			best_d = d
+			best = fo
+	return best
+
+
 func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
 	var fo_any: Object = _pick_unit_formation_at_world(world_pos)
 	var fo: Object = _pick_land_unit_formation_at_world(world_pos)
@@ -18045,6 +18120,10 @@ func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) 
 		# Before capital star / _try_open_unit_at_world / province tooltip.
 		var miss_pid: int = _resolve_map_pick_pid(world_pos)
 		fo = _player_land_formation_at_province(miss_pid)
+	if fo == null:
+		# Home chrome over Neustadt / Schwäbisch Hall / FRA edge: nearest
+		# painted player-land icon (station 710173 / ger_nbr), not hex membership.
+		fo = _nearest_player_land_formation_at_world(world_pos)
 	if fo == null:
 		return false
 	if _formation_type_blocks_land_open(fo):
@@ -18311,15 +18390,14 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, 
 		# Hidden pins (strategic LOD) must not steal hex clicks.
 		if not counter.visible:
 			continue
-		# Live painted plate (province nodes sit at origin). Centroid+offset can
-		# drift from chrome/label after Home/Close; prefer counter.position.
-		var chip_pos: Vector2 = counter.position
+		# Live painted plate after Home/fit. Prefer chrome world pos (not AABB-floor widen).
+		var chip_pos: Vector2 = counter.global_position
 		if chip_pos == Vector2.ZERO:
-			chip_pos = province_centroids.get(id, Vector2.ZERO) as Vector2
-			if chip_pos != Vector2.ZERO:
-				chip_pos += _unit_chip_offset_for_pid(id)
-			else:
-				chip_pos = counter.global_position
+			chip_pos = counter.position
+			if chip_pos == Vector2.ZERO:
+				chip_pos = province_centroids.get(id, Vector2.ZERO) as Vector2
+				if chip_pos != Vector2.ZERO:
+					chip_pos += _unit_chip_offset_for_pid(id)
 		# Home-band chips paint plate+label; half-plate disk misses chrome/label.
 		var hit_r := _unit_counter_hit_radius_world(z, counter)
 		var hit_r2 := hit_r * hit_r

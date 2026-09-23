@@ -57,6 +57,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
             "land_still_click_skips_air_fleet",
             "land_still_click_player_tag_only",
             "land_still_click_province_player_land",
+            "land_still_click_chrome_spill_player_land",
             "still_click_open_unit_skips_land",
             "tooltip_not_pick_blocker",
             "europe_home_counters_want_visible",
@@ -93,16 +94,18 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn("_cycle_selected_stack_unit", ren)
         self.assertIn("not counter.visible", ren)
         self.assertIn("func _pick_land_unit_formation_at_world", ren)
+        self.assertIn("func _nearest_player_land_formation_at_world", ren)
         self.assertIn("func _formation_type_blocks_land_open", ren)
         self.assertIn("func _player_land_formation_at_province", ren)
         self.assertIn("func _formation_is_player_tag", ren)
         self.assertIn("_pick_unit_formation_at_world(world_pos, land_only, player_only)", ren)
         self.assertIn("player_only", ren)
+        self.assertIn("CHROME_SPILL_WORLD", ren)
         self.assertNotIn("DIG_CHIP_MISS", ren)
         self.assertNotIn("DIG_CHIP_SKIP", ren)
         land_i = ren.find("func _try_open_land_unit_at_world")
         self.assertGreaterEqual(land_i, 0)
-        land_slice = ren[land_i : land_i + 1800]
+        land_slice = ren[land_i : land_i + 2400]
         next_land = land_slice.find("\nfunc ", 1)
         if next_land > 0:
             land_slice = land_slice[:next_land]
@@ -111,6 +114,24 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn("_formation_is_player_tag", land_slice)
         self.assertIn("_resolve_map_pick_pid", land_slice)
         self.assertGreaterEqual(land_slice.count("_player_land_formation_at_province"), 2)
+        self.assertIn("_nearest_player_land_formation_at_world", land_slice)
+        self.assertGreater(
+            land_slice.find("_nearest_player_land_formation_at_world"),
+            land_slice.find("_resolve_map_pick_pid"),
+        )
+        spill_i = ren.find("func _nearest_player_land_formation_at_world")
+        self.assertGreaterEqual(spill_i, 0)
+        spill_slice = ren[spill_i : spill_i + 2800]
+        next_spill = spill_slice.find("\nfunc ", 1)
+        if next_spill > 0:
+            spill_slice = spill_slice[:next_spill]
+        self.assertIn("CHROME_SPILL_WORLD", spill_slice)
+        self.assertIn("land_only", spill_slice)
+        self.assertIn("player_only", spill_slice)
+        self.assertIn("_unit_counter_hit_radius_world", spill_slice)
+        self.assertIn("DemoUnitIcon_", spill_slice)
+        self.assertIn("counter.global_position", spill_slice)
+        self.assertIn("maxf(hit_r, CHROME_SPILL_WORLD)", spill_slice)
         # Hang-class: pin open path must not open inspector.
         # Still-click fallthrough never opens land (foreign PER leak).
         pin_i = ren.find("func _try_open_unit_at_world")

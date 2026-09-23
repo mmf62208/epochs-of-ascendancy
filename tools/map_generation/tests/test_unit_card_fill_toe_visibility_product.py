@@ -59,6 +59,7 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
             "land_still_click_skips_air_fleet",
             "land_still_click_player_tag_only",
             "land_still_click_province_player_land",
+            "land_still_click_chrome_spill_player_land",
             "still_click_open_unit_skips_land",
             "europe_home_counters_want_visible",
             "home_syncs_counter_visibility",
@@ -124,19 +125,26 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         self.assertIn("func _try_open_land_chip_from_input", src)
         self.assertIn("_try_open_land_chip_from_input", src)
         self.assertIn("func _pick_land_unit_formation_at_world", src)
+        self.assertIn("func _nearest_player_land_formation_at_world", src)
         self.assertIn("func _formation_type_blocks_land_open", src)
         self.assertIn("func _player_land_formation_at_province", src)
         self.assertIn("func _formation_is_player_tag", src)
         self.assertIn("_collect_formations_at_province", src)
         self.assertIn("player_only", src)
+        self.assertIn("CHROME_SPILL_WORLD", src)
         land_i = src.find("func _try_open_land_unit_at_world")
         self.assertGreaterEqual(land_i, 0)
-        land_slice = src[land_i : land_i + 1600]
+        land_slice = src[land_i : land_i + 2400]
         next_land = land_slice.find("\nfunc ", 1)
         if next_land > 0:
             land_slice = land_slice[:next_land]
         self.assertIn("_resolve_map_pick_pid", land_slice)
         self.assertGreaterEqual(land_slice.count("_player_land_formation_at_province"), 2)
+        self.assertIn("_nearest_player_land_formation_at_world", land_slice)
+        self.assertGreater(
+            land_slice.find("_nearest_player_land_formation_at_world"),
+            land_slice.find("_resolve_map_pick_pid"),
+        )
         pin_i = src.find("func _try_open_unit_at_world")
         self.assertGreaterEqual(pin_i, 0)
         pin_slice = src[pin_i : pin_i + 800]
