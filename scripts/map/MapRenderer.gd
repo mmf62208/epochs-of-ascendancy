@@ -18044,22 +18044,42 @@ func _nearest_player_land_formation_at_world(world_pos: Vector2) -> Object:
 	# Home chrome spills onto nearby hexes / Berlin-Home while GER land stays
 	# on 710173 (+ nbr). After disk + hex miss_pid miss, bind closest visible
 	# player-land DemoUnitIcon (chrome → station). Not hex membership.
+	var spill: Dictionary = _collect_nearest_player_land_chrome_spill(world_pos)
+	var fo_v: Variant = spill.get("fo", null)
+	if fo_v is Object:
+		return fo_v as Object
+	return null
+
+
+## Same walk as land still-click chrome spill. Log-only metrics; pick uses fo only.
+func _collect_nearest_player_land_chrome_spill(world_pos: Vector2) -> Dictionary:
 	const CHROME_SPILL_WORLD: float = 340.0
+	var out: Dictionary = {
+		"fo": null,
+		"fo_id": "",
+		"tag": "",
+		"type": "",
+		"stationed_pid": -1,
+		"dist": -1.0,
+		"accept_r": -1.0,
+		"CHROME_SPILL_WORLD": CHROME_SPILL_WORLD,
+	}
 	var land_only: bool = true
 	var player_only: bool = true
 	if _demo_unit_icon_pids.is_empty():
-		return null
+		return out
 	if not _unit_counters_want_visible():
-		return null
+		return out
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
 	var z: float = 1.0
 	if cam:
 		z = maxf(cam.zoom.x, cam.zoom.y)
 	var best: Object = null
 	var best_d: float = INF
+	var best_accept_r: float = CHROME_SPILL_WORLD
 	var p_tag: String = _player_tag()
 	if player_only and p_tag.is_empty():
-		return null
+		return out
 	for id_v in _demo_unit_icon_pids:
 		var id: int = int(id_v)
 		if not province_nodes.has(id):
@@ -18111,13 +18131,83 @@ func _nearest_player_land_formation_at_world(world_pos: Vector2) -> Object:
 			continue
 		if d <= best_d:
 			best_d = d
+			best_accept_r = accept_r
 			best = fo
-	return best
+	if best != null:
+		out["fo"] = best
+		out["fo_id"] = str(best.formation_id) if "formation_id" in best else ""
+		out["tag"] = str(best.country_tag) if "country_tag" in best else ""
+		out["type"] = str(best.formation_type) if "formation_type" in best else ""
+		out["stationed_pid"] = int(best.stationed_province_id) if "stationed_province_id" in best else -1
+		out["dist"] = best_d
+		out["accept_r"] = best_accept_r
+	return out
+
+
+func _dig_fmt_formation(fo: Object) -> String:
+	if fo == null:
+		return "null"
+	var fo_id: String = str(fo.formation_id) if "formation_id" in fo else ""
+	var tag: String = str(fo.country_tag) if "country_tag" in fo else ""
+	var stationed_pid: int = int(fo.stationed_province_id) if "stationed_province_id" in fo else -1
+	var ftype: String = str(fo.formation_type) if "formation_type" in fo else ""
+	return "fo_id=%s tag=%s stationed_pid=%d type=%s" % [fo_id, tag, stationed_pid, ftype]
+
+
+## Always-on Play/F5 still-click dig. Not gated (prior EOA_DIG_* was silent).
+func _dig_log_land_click(
+	world_pos: Vector2,
+	disk_fo: Object,
+	land_disk_fo: Object,
+	final_fo: Object,
+	opened: bool
+) -> void:
+	var miss_pid: int = _resolve_hex_pick_pid(world_pos)
+	var miss_fo: Object = _player_land_formation_at_province(miss_pid)
+	var spill: Dictionary = _collect_nearest_player_land_chrome_spill(world_pos)
+	var spill_fo_id: String = str(spill.get("fo_id", ""))
+	if spill_fo_id.is_empty():
+		spill_fo_id = "null"
+	var spill_pid: int = int(spill.get("stationed_pid", -1))
+	var spill_dist: float = float(spill.get("dist", -1.0))
+	var spill_accept: float = float(spill.get("accept_r", -1.0))
+	var spill_chrome: float = float(spill.get("CHROME_SPILL_WORLD", 340.0))
+	var final_id: String = "null"
+	if final_fo != null and "formation_id" in final_fo:
+		final_id = str(final_fo.formation_id)
+	var wx: float = snappedf(world_pos.x, 0.1)
+	var wy: float = snappedf(world_pos.y, 0.1)
+	var note: String = ""
+	if miss_pid == 710173 or spill_pid == 710173:
+		note += " MAGINOT_710173"
+	if miss_pid == 710300 or spill_pid == 710300:
+		note += " BERLIN_710300"
+	print(
+		"DIG_LAND_CLICK world_pos=(%.1f,%.1f) disk=%s land_disk=%s miss_pid=%d miss_fo=%s spill={fo_id=%s stationed_pid=%d dist=%.1f accept_r=%.1f CHROME_SPILL_WORLD=%.1f} fo_id=%s opened=%s%s"
+		% [
+			wx,
+			wy,
+			_dig_fmt_formation(disk_fo),
+			_dig_fmt_formation(land_disk_fo),
+			miss_pid,
+			_dig_fmt_formation(miss_fo),
+			spill_fo_id,
+			spill_pid,
+			spill_dist,
+			spill_accept,
+			spill_chrome,
+			final_id,
+			str(opened),
+			note,
+		]
+	)
 
 
 func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
 	var fo_any: Object = _pick_unit_formation_at_world(world_pos)
 	var fo: Object = _pick_land_unit_formation_at_world(world_pos)
+	var disk_fo: Object = fo_any
+	var land_disk_fo: Object = fo
 	if fo_any != null and _formation_type_blocks_land_open(fo_any):
 		# Air/fleet/space chrome: resolve player land at that province before
 		# neighbor foreign land icons can win an overlapping disk.
@@ -18136,10 +18226,13 @@ func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) 
 		# nearest painted player-land icon (station 710173 / ger_nbr).
 		fo = _nearest_player_land_formation_at_world(world_pos)
 	if fo == null:
+		_dig_log_land_click(world_pos, disk_fo, land_disk_fo, null, false)
 		return false
 	if _formation_type_blocks_land_open(fo):
+		_dig_log_land_click(world_pos, disk_fo, land_disk_fo, fo, false)
 		return false
 	if not _formation_is_player_tag(fo):
+		_dig_log_land_click(world_pos, disk_fo, land_disk_fo, fo, false)
 		return false
 	_select_map_unit(fo)
 	# Pin click must not _select_province (3520 supply outlines hung input after chip).
@@ -18150,8 +18243,10 @@ func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) 
 	var fid := str(fo.formation_id) if "formation_id" in fo else ""
 	if ctrl_click:
 		_open_fight_from_formation_id(fid)
+		_dig_log_land_click(world_pos, disk_fo, land_disk_fo, fo, true)
 		return true
 	_show_unit_detail_popup(fo)
+	_dig_log_land_click(world_pos, disk_fo, land_disk_fo, fo, true)
 	return true
 
 
