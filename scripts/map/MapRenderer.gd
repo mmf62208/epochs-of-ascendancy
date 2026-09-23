@@ -18398,6 +18398,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	RetrowaveTheme.style_body_label(fill_lbl)
 	# Fill is equipment/TOE, never Strength%. Unknown ratio stays cyan, not warning.
 	var fill_col: Color = RetrowaveTheme.CYAN
+	if fill_ratio >= 0.0 and fill_ratio < 0.5:
+		fill_col = RetrowaveTheme.WARNING
+	elif fill_ratio >= 0.5:
+		fill_col = RetrowaveTheme.SUCCESS
 	fill_lbl.add_theme_color_override("font_color", fill_col)
 	fill_lbl.add_theme_font_size_override("font_size", 16)
 	vbox.add_child(fill_lbl)
@@ -18410,24 +18414,6 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	fill_bar.show_percentage = false
 	RetrowaveTheme.style_progress_bar(fill_bar)
 	vbox.add_child(fill_bar)
-	var strip0: PackedStringArray = PackedStringArray()
-	if _unit_card_combat_strip_ready():
-		strip0 = _safe_unit_card_strip_lines(formation)
-		if not strip0.is_empty():
-			var first_ln := str(strip0[0]).strip_edges()
-			if not first_ln.is_empty() and not first_ln.begins_with("Strength"):
-				fill_txt = first_ln
-		if fill_txt.is_empty() or fill_txt.begins_with("Strength"):
-			fill_txt = "Fill —% · TOE —"
-		fill_lbl.text = fill_txt
-		# Color from _fill_ratio_for (never Strength%).
-		fill_ratio = _safe_unit_card_fill_ratio(formation)
-		if fill_ratio >= 0.0 and fill_ratio < 0.5:
-			fill_col = RetrowaveTheme.WARNING
-		elif fill_ratio >= 0.5:
-			fill_col = RetrowaveTheme.SUCCESS
-		fill_lbl.add_theme_color_override("font_color", fill_col)
-		fill_bar.value = clampf(fill_ratio, 0.0, 1.0) * 100.0
 	var fight_row := HBoxContainer.new()
 	fight_row.add_theme_constant_override("separation", 6)
 	vbox.add_child(fight_row)
@@ -18462,11 +18448,40 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		"Org %.0f%% · Str %.0f%% · Rdy %.0f%% · XP %.0f%%"
 		% [org_v * 100.0, str_v * 100.0, rdy_v * 100.0, xp_v * 100.0]
 	)
+	if not fid.is_empty():
+		lines.append("ID: %s" % fid)
+	body.text = "\n".join(lines)
+	RetrowaveTheme.style_body_label(body)
+	var body_scroll := ScrollContainer.new()
+	body_scroll.custom_minimum_size = Vector2(300, 52)
+	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	vbox.add_child(body_scroll)
+	body_scroll.add_child(body)
+
+	# Strip upgrade AFTER body is parented — lines_for / _fill_ratio_for cannot
+	# leave title+Close or Fill-only (Play: Division 2 ~80px shell).
+	var strip0: PackedStringArray = PackedStringArray()
 	if _unit_card_combat_strip_ready():
-		var strip_rest: PackedStringArray = _safe_unit_card_strip_lines(formation)
-		if strip_rest.size() > 1:
-			for si in range(1, strip_rest.size()):
-				var rest_ln := str(strip_rest[si]).strip_edges()
+		strip0 = _safe_unit_card_strip_lines(formation)
+		if not strip0.is_empty():
+			var first_ln := str(strip0[0]).strip_edges()
+			if not first_ln.is_empty() and not first_ln.begins_with("Strength"):
+				fill_txt = first_ln
+		if fill_txt.is_empty() or fill_txt.begins_with("Strength"):
+			fill_txt = "Fill —% · TOE —"
+		elif not ("TOE" in fill_txt):
+			fill_txt = "%s · TOE —" % fill_txt
+		fill_lbl.text = fill_txt
+		fill_ratio = _safe_unit_card_fill_ratio(formation)
+		if fill_ratio >= 0.0 and fill_ratio < 0.5:
+			fill_col = RetrowaveTheme.WARNING
+		elif fill_ratio >= 0.5:
+			fill_col = RetrowaveTheme.SUCCESS
+		fill_lbl.add_theme_color_override("font_color", fill_col)
+		fill_bar.value = clampf(fill_ratio, 0.0, 1.0) * 100.0
+		if strip0.size() > 1:
+			for si in range(1, strip0.size()):
+				var rest_ln := str(strip0[si]).strip_edges()
 				# Last-3 combat_log dates stay on tooltip so Fill/TOE stay above the fold.
 				if rest_ln.length() >= 7 and rest_ln.substr(0, 4).is_valid_int() and rest_ln[4] == "-":
 					continue
@@ -18480,13 +18495,10 @@ func _show_unit_detail_popup(formation: Object) -> void:
 		var tips: PackedStringArray = _safe_unit_card_tooltip_lines(formation)
 		for t in tips:
 			chrome_tips.append(t)
-		if not chrome_tips.is_empty():
-			body.tooltip_text = "\n".join(chrome_tips)
-	elif not chrome_tips.is_empty():
+		body.text = "\n".join(lines)
+	if not chrome_tips.is_empty():
 		body.tooltip_text = "\n".join(chrome_tips)
-	if not fid.is_empty():
-		lines.append("ID: %s" % fid)
-	# Stack at this province (one pin; cycle via [ ] or card buttons).
+	# Stack after body is parented — BattleManager must not abort Stationed/Leader.
 	var stack_divs: Array = []
 	var stack_idx := 0
 	if pid >= 0 and not tag.is_empty() and typeof(BattleManager) != TYPE_NIL and BattleManager.has_method("get_divisions_at_province"):
@@ -18497,13 +18509,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 				break
 	if stack_divs.size() > 1:
 		lines.append("Stack %d/%d · [ ] or buttons to cycle" % [stack_idx + 1, stack_divs.size()])
-	body.text = "\n".join(lines)
-	RetrowaveTheme.style_body_label(body)
-	var body_scroll := ScrollContainer.new()
-	body_scroll.custom_minimum_size = Vector2(300, 52)
-	body_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	vbox.add_child(body_scroll)
-	body_scroll.add_child(body)
+		body.text = "\n".join(lines)
 
 	var cmd_row := HBoxContainer.new()
 	cmd_row.add_theme_constant_override("separation", 6)

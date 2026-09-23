@@ -266,10 +266,8 @@ static func _as_percent(raw: float) -> float:
 static func _safe_composition(formation: Object) -> Dictionary:
 	if formation == null or not is_instance_valid(formation):
 		return {}
-	# Demo GER Division often has no composition meta — skip LandCombatPower so
-	# a missing/throwing helper cannot abort the docked card.
-	if not _formation_has_composition_meta(formation):
-		return {}
+	# GER Division demo has design_id (tiger/panzer) but no composition meta.
+	# Infer via LandCombatPower; never require mobility/armor_element first.
 	if typeof(LandCombatPower) == TYPE_NIL:
 		return {}
 	if not LandCombatPower.has_method("composition_from_formation"):
@@ -278,24 +276,6 @@ static func _safe_composition(formation: Object) -> Dictionary:
 	if raw is Dictionary:
 		return raw as Dictionary
 	return {}
-
-
-static func _formation_has_composition_meta(formation: Object) -> bool:
-	if formation == null:
-		return false
-	if "mobility" in formation or "armor_element" in formation or "equipment" in formation:
-		return true
-	if "infantry_bns" in formation or "tank_bns" in formation or "support" in formation:
-		return true
-	if not formation.has_method("has_meta"):
-		return false
-	return (
-		bool(formation.has_meta("mobility"))
-		or bool(formation.has_meta("armor_element"))
-		or bool(formation.has_meta("infantry_bns"))
-		or bool(formation.has_meta("tank_bns"))
-		or bool(formation.has_meta("support"))
-	)
 
 
 static func _safe_equipment_toe(comp: Dictionary) -> Dictionary:

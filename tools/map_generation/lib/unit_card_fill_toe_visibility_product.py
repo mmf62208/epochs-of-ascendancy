@@ -141,7 +141,12 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
         and "vbox.add_child(fill_lbl)" in fill_blk
         and "var body :=" in popup
         and popup.find("fill_lbl") < popup.find("var body :=")
-        and ("strip0[0]" in fill_blk or "strip[0]" in fill_blk or "_fill_toe_fold_line" in fill_blk)
+        and (
+            "Fill —% · TOE —" in fill_blk
+            or "strip0[0]" in fill_blk
+            or "strip[0]" in fill_blk
+            or "_fill_toe_fold_line" in fill_blk
+        )
     )
     wiring["promoted_fill_label_before_body"] = promoted
     (passes if promoted else fails).append("promoted_fill_label_before_body")
@@ -156,7 +161,8 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
         "fill_ratio < 0.5" in fill_blk or "fill < 0.5" in fill_blk
     )
     ok_col = "RetrowaveTheme.SUCCESS" in fill_blk or "RetrowaveTheme.CYAN" in fill_blk
-    ratio_ok = "_fill_ratio_for" in fill_blk
+    # Ratio upgrade may run after body so a strip throw cannot abort Stationed/Leader.
+    ratio_ok = "_fill_ratio_for" in popup or "_safe_unit_card_fill_ratio" in popup
     not_dim = "TEXT_DIM" not in fill_blk
     color_path = warn_ok and ok_col and ratio_ok and not_dim
     wiring["fill_warning_success_color"] = color_path
@@ -320,10 +326,10 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     always_fill = (
         "Fill —% · TOE —" in fill_blk
         and "vbox.add_child(fill_lbl)" in fill_blk
-        and fill_blk.find("vbox.add_child(fill_lbl)") < fill_blk.find("strip0")
-        and "_safe_unit_card_strip_lines" in fill_blk
-        and "_safe_unit_card_fill_ratio" in fill_blk
-        and "begins_with(\"Strength\")" in fill_blk
+        and popup.find("vbox.add_child(fill_lbl)") < popup.find("var body :=")
+        and popup.find("body_scroll.add_child(body)") < popup.find("_safe_unit_card_strip_lines")
+        and "_safe_unit_card_fill_ratio" in popup
+        and "begins_with(\"Strength\")" in popup
     )
     wiring["always_paint_fill_before_strip"] = always_fill
     (passes if always_fill else fails).append("always_paint_fill_before_strip")
@@ -354,6 +360,8 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
         and "is_instance_valid(formation)" in lines_fn
         and "get_unit_equipment_stock" in _gd_func_slice(strip, "_fill_ratio_for")
         and "unit_toe_fill_ratio" in strip
+        and "composition_from_formation" in _gd_func_slice(strip, "_safe_composition")
+        and "_formation_has_composition_meta" not in strip
     )
     wiring["strip_safe_ger_demo"] = strip_safe
     (passes if strip_safe else fails).append("strip_safe_ger_demo")

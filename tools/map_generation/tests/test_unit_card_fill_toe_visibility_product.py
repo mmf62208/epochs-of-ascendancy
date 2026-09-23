@@ -124,6 +124,14 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         self.assertIn("label_pad", src)
         self.assertIn("func _unit_counter_aabb_hit_screen", src)
         self.assertIn("counter.position", src)
+        self.assertIn("body_scroll.add_child(body)", src)
+        self.assertIn("_safe_unit_card_strip_lines", src)
+        self.assertLess(
+            src.find("body_scroll.add_child(body)"),
+            src.find("strip0 = _safe_unit_card_strip_lines"),
+        )
+        self.assertIn("composition_from_formation", strip)
+        self.assertNotIn("_formation_has_composition_meta", strip)
         self.assertNotIn(
             '"ProvinceHoverTooltip"',
             src[src.find("func _is_mouse_over_blocking_ui") : src.find("func _refresh_hover_tooltip")],
