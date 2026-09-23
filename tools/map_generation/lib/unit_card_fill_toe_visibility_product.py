@@ -356,6 +356,23 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     )
     wiring["land_still_click_player_tag_only"] = land_player_only
     (passes if land_player_only else fails).append("land_still_click_player_tag_only")
+    pin_fn = _gd_func_slice(ren, "_try_open_unit_at_world")
+    land_province_fallback = (
+        bool(land_fn)
+        and "_resolve_map_pick_pid" in land_fn
+        and land_fn.find("_resolve_map_pick_pid") > land_fn.find("_pick_land_unit_formation_at_world")
+        and land_fn.count("_player_land_formation_at_province") >= 2
+    )
+    wiring["land_still_click_province_player_land"] = land_province_fallback
+    (passes if land_province_fallback else fails).append("land_still_click_province_player_land")
+    open_unit_skips_land = (
+        bool(pin_fn)
+        and "_formation_type_blocks_land_open" in pin_fn
+        and pin_fn.find("_formation_type_blocks_land_open") < pin_fn.find("_select_map_unit")
+        and "show_info_panel" not in pin_fn
+    )
+    wiring["still_click_open_unit_skips_land"] = open_unit_skips_land
+    (passes if open_unit_skips_land else fails).append("still_click_open_unit_skips_land")
 
     # DIG-FIRST (d998fcd): still-click opened title+Close only — strip fault before body.
     always_fill = (

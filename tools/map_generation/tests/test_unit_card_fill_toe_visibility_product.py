@@ -58,6 +58,8 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
             "chip_open_in_input",
             "land_still_click_skips_air_fleet",
             "land_still_click_player_tag_only",
+            "land_still_click_province_player_land",
+            "still_click_open_unit_skips_land",
             "europe_home_counters_want_visible",
             "home_syncs_counter_visibility",
             "counter_scale_floor_readable",
@@ -127,6 +129,21 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         self.assertIn("func _formation_is_player_tag", src)
         self.assertIn("_collect_formations_at_province", src)
         self.assertIn("player_only", src)
+        land_i = src.find("func _try_open_land_unit_at_world")
+        self.assertGreaterEqual(land_i, 0)
+        land_slice = src[land_i : land_i + 1600]
+        next_land = land_slice.find("\nfunc ", 1)
+        if next_land > 0:
+            land_slice = land_slice[:next_land]
+        self.assertIn("_resolve_map_pick_pid", land_slice)
+        self.assertGreaterEqual(land_slice.count("_player_land_formation_at_province"), 2)
+        pin_i = src.find("func _try_open_unit_at_world")
+        self.assertGreaterEqual(pin_i, 0)
+        pin_slice = src[pin_i : pin_i + 800]
+        next_pin = pin_slice.find("\nfunc ", 1)
+        if next_pin > 0:
+            pin_slice = pin_slice[:next_pin]
+        self.assertIn("_formation_type_blocks_land_open", pin_slice)
         self.assertNotIn("DIG_CHIP_MISS", src)
         self.assertNotIn("DIG_CHIP_SKIP", src)
         self.assertIn("func _unit_counter_hit_radius_world", src)

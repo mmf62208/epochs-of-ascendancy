@@ -325,6 +325,31 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         passes.append("land_still_click_player_tag_only")
     else:
         fails.append("land_still_click_player_tag_only")
+    # Play MIXED on 09cfc51: disk miss fell through to CZE/GER tooltip; open-unit
+    # fallthrough opened incidental PER land. Province-stack player land on miss;
+    # still-click _try_open_unit_at_world is air/fleet/space only.
+    land_province_fallback = (
+        bool(land_fn)
+        and "_resolve_map_pick_pid" in land_fn
+        and land_fn.find("_resolve_map_pick_pid") > land_fn.find("_pick_land_unit_formation_at_world")
+        and land_fn.count("_player_land_formation_at_province") >= 2
+    )
+    wiring["land_still_click_province_player_land"] = land_province_fallback
+    if land_province_fallback:
+        passes.append("land_still_click_province_player_land")
+    else:
+        fails.append("land_still_click_province_player_land")
+    open_unit_skips_land = (
+        bool(pin_fn)
+        and "_formation_type_blocks_land_open" in pin_fn
+        and pin_fn.find("_formation_type_blocks_land_open") < pin_fn.find("_select_map_unit")
+        and "show_info_panel" not in pin_fn
+    )
+    wiring["still_click_open_unit_skips_land"] = open_unit_skips_land
+    if open_unit_skips_land:
+        passes.append("still_click_open_unit_skips_land")
+    else:
+        fails.append("still_click_open_unit_skips_land")
     tooltip_not_blocker = bool(block_fn) and '"ProvinceHoverTooltip"' not in block_fn
     wiring["tooltip_not_pick_blocker"] = tooltip_not_blocker
     if tooltip_not_blocker:
@@ -392,7 +417,9 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         "; home_hit_covers_full_plate_label_aabb"
         "; capital_star_before_chip; chip_match_station_province_one_pin_per_hex"
         "; land_still_click_skips_air_fleet"
-        "; land_still_click_player_tag_only",
+        "; land_still_click_player_tag_only"
+        "; land_still_click_province_player_land"
+        "; still_click_open_unit_skips_land",
     }
 
 

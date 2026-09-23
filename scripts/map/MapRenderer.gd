@@ -18040,6 +18040,12 @@ func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) 
 		if stacked != null:
 			fo = stacked
 	if fo == null:
+		# Disk miss (empty / non-player): player land stationed on the province
+		# under the click — even when first pick is not air/fleet/space.
+		# Before capital star / _try_open_unit_at_world / province tooltip.
+		var miss_pid: int = _resolve_map_pick_pid(world_pos)
+		fo = _player_land_formation_at_province(miss_pid)
+	if fo == null:
 		return false
 	if _formation_type_blocks_land_open(fo):
 		return false
@@ -18062,6 +18068,11 @@ func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) 
 func _try_open_unit_at_world(world_pos: Vector2) -> bool:
 	var fo := _pick_unit_formation_at_world(world_pos)
 	if fo == null:
+		return false
+	# Still-click fallthrough is air/fleet/space only. Land already tried via
+	# _try_open_land_unit_at_world (player-tag disk + province stack).
+	# Never open foreign land (Play: incidental PER Fill%/TOE).
+	if not _formation_type_blocks_land_open(fo):
 		return false
 	_select_map_unit(fo)
 	_show_unit_detail_popup(fo)
