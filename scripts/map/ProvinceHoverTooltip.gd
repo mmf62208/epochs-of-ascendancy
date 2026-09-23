@@ -29,6 +29,9 @@ func _ready() -> void:
 	visible = false
 	z_index = 200
 	var margin := MarginContainer.new()
+	# Default STOP on MarginContainer stole GER Division chip clicks
+	# (Play: still-click opened province glance only). Whole tree must IGNORE.
+	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	margin.add_theme_constant_override("margin_left", 6)
 	margin.add_theme_constant_override("margin_right", 6)
 	margin.add_theme_constant_override("margin_top", 5)
@@ -50,6 +53,14 @@ func _ready() -> void:
 	_panel_style = StyleBoxFlat.new()
 	_apply_panel_style()
 	add_theme_stylebox_override("panel", _panel_style)
+	_ignore_mouse_tree(self)
+
+
+func _ignore_mouse_tree(n: Node) -> void:
+	if n is Control:
+		(n as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for c in n.get_children():
+		_ignore_mouse_tree(c)
 
 
 func set_supply_accent(active: bool) -> void:

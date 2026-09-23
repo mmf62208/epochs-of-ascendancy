@@ -1869,6 +1869,10 @@ func _input(event: InputEvent) -> void:
 				if did_left_pan:
 					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
+				elif not event.shift_pressed and _try_open_land_chip_from_input(event.ctrl_pressed):
+					# Still-click land chip in `_input` so ProvinceHoverTooltip
+					# cannot steal GER Division Fill%/TOE (Play DIG FAIL).
+					return
 	if event is InputEventMouseMotion:
 		_note_mouse_up_arms_still_click()
 		if _left_btn_down or _left_pan_armed or Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
@@ -17394,7 +17398,6 @@ func _is_mouse_over_blocking_ui() -> bool:
 			"LeaderAssignmentScreen",
 			"AgentAssignmentScreen",
 			"NationalSpiritsScreen",
-			"ProvinceHoverTooltip",
 			"OpenFightSheet",
 			"UnitDetailPopup",
 			"ProvinceOOBStrip",
@@ -17944,6 +17947,23 @@ func _try_living_title_map_pick(pid: int) -> bool:
 		var picked: Variant = boot.call("select_from_province", pid)
 		if picked is Dictionary and bool((picked as Dictionary).get("ok", false)):
 			return true
+	return false
+
+
+func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
+	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
+	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
+	# Esc helpers + Dig2 / Drag2+3 pan helpers untouched.
+	if _mouse_over_search_control() or _mouse_over_close_control():
+		return false
+	if _is_mouse_over_blocking_ui():
+		return false
+	if MapViewInput.modal_blocks_map_nav(get_viewport()):
+		return false
+	var world_pos: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+	if _try_open_land_unit_at_world(world_pos, ctrl_click):
+		get_viewport().set_input_as_handled()
+		return true
 	return false
 
 

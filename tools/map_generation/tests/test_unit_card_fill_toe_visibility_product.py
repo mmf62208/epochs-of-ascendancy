@@ -23,6 +23,7 @@ from unit_card_fill_toe_visibility_product import (  # noqa: E402
 
 RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 STRIP = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
+TOOLTIP = ROOT / "scripts" / "map" / "ProvinceHoverTooltip.gd"
 
 
 class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
@@ -52,6 +53,9 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
             "speed_armor_men_tooltip_not_body",
             "combat_log_not_card_body",
             "fold_fill_toe_first",
+            "tooltip_mouse_ignore",
+            "tooltip_not_map_pick_blocker",
+            "chip_open_in_input",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 
@@ -104,6 +108,24 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         self.assertIn("_fill_ratio_for", strip)
         self.assertIn("func tooltip_lines_for", strip)
         self.assertIn("Fill —%", strip)
+        self.assertIn("func _try_open_land_chip_from_input", src)
+        self.assertIn("_try_open_land_chip_from_input", src)
+        self.assertNotIn(
+            '"ProvinceHoverTooltip"',
+            src[src.find("func _is_mouse_over_blocking_ui") : src.find("func _refresh_hover_tooltip")],
+        )
+        tip = TOOLTIP.read_text(encoding="utf-8")
+        self.assertIn("func _ignore_mouse_tree", tip)
+        self.assertIn("margin.mouse_filter = Control.MOUSE_FILTER_IGNORE", tip)
+        # Panel style stays in `_ready` (PR 26 accidentally nested it in the helper).
+        self.assertIn("_panel_style = StyleBoxFlat.new()", tip)
+        ready_i = tip.find("func _ready")
+        ignore_i = tip.find("func _ignore_mouse_tree")
+        self.assertGreater(ignore_i, ready_i)
+        self.assertLess(
+            tip.find("_panel_style = StyleBoxFlat.new()"),
+            ignore_i,
+        )
 
     def test_fill_not_aliased_to_strength(self) -> None:
         self.assertTrue(fill_not_aliased_to_strength())
