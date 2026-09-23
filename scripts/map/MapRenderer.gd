@@ -1408,6 +1408,36 @@ func _lock_close_camera() -> void:
 	_close_click_screen = vp.get_mouse_position() if vp != null else Vector2.ZERO
 
 
+func _snapshot_pre_dismiss_camera() -> Dictionary:
+	# Live GIS pose before overlay hide. Do not use europe_center() (Greenland on this board).
+	var snap: Dictionary = {}
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	if cam == null:
+		return snap
+	snap["pos"] = cam.global_position
+	snap["zoom"] = cam.zoom
+	return snap
+
+
+func _restore_pre_dismiss_camera(snap: Dictionary) -> void:
+	# Confirmed C: Esc overlay dismiss left the view on ATA ice (pale blank + Antarctica tooltip).
+	# 902133 spans the southern strip (y~4334–5096), not Europe; hover pick is spatial.
+	# Write the pre-hide pose, then lock so clamp/edge cannot fly south after hide.
+	var cam: Camera2D = get_viewport().get_camera_2d() if get_viewport() else null
+	if cam != null and snap.has("pos") and snap.has("zoom"):
+		cam.global_position = snap["pos"] as Vector2
+		cam.zoom = snap["zoom"] as Vector2
+		_close_camera_lock_pos = cam.global_position
+		_close_camera_lock_zoom = cam.zoom
+		_close_camera_locked = true
+	elif cam != null:
+		_lock_close_camera()
+	_close_click_guard = true
+	_close_suppress_edge = true
+	_close_release_seen = true
+	_hold_camera_now()
+
+
 func _unlock_close_camera() -> void:
 	_close_camera_locked = false
 
@@ -13508,6 +13538,8 @@ func _dismiss_inspector_and_restore_input() -> void:
 		# Re-enable map input in case a leftover Control ate unhandled events.
 		set_process_input(true)
 		set_process_unhandled_input(true)
+	# Hide must not leave a mid-dismiss clamp/nudge on ATA ice (pale-map residual).
+	_reassert_locked_close_camera()
 	print("MapRenderer: inspector Close restored input")
 
 
@@ -21351,6 +21383,8 @@ func build_supply_network(city_layer: Dictionary, player_tag: String = "USA") ->
 ## Never queue_free MainMenu here — idle Esc opens Command Center via `_on_menu_pressed`.
 ## Hidden leftovers must not return true (play: inspector gone, Esc still did nothing).
 func _dismiss_map_overlays_esc() -> bool:
+	# Snapshot before hide. Idle Esc still falls through to the CC open helper.
+	var pre_cam: Dictionary = _snapshot_pre_dismiss_camera()
 	var dismissed := false
 	if supply_mode:
 		_toggle_supply_overlay()
@@ -21364,6 +21398,7 @@ func _dismiss_map_overlays_esc() -> bool:
 			unit_pop.queue_free()
 			_show_map_layer_toast("Unit detail closed (Esc)")
 			_release_search_focus()
+			_restore_pre_dismiss_camera(pre_cam)
 			return true
 	var tree := get_tree()
 	if tree:
@@ -21412,6 +21447,8 @@ func _dismiss_map_overlays_esc() -> bool:
 		var vp_d: Viewport = get_viewport()
 		if vp_d != null:
 			vp_d.gui_release_focus()
+		# Successful overlay dismiss only — idle Esc still falls through to CC open.
+		_restore_pre_dismiss_camera(pre_cam)
 	# Idle Esc opens Command Center via `_handle_escape_key` → `_on_menu_pressed`.
 	# Never queue_free MainMenu here — leftover must not sticky-block the open path.
 	return dismissed

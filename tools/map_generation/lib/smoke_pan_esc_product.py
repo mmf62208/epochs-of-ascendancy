@@ -209,6 +209,26 @@ def build_smoke_pan_esc_product(*, check_wiring: bool = True) -> Dict[str, Any]:
             and "_overlay_node_is_up" in dismiss_fn
             and "_overlay_node_is_up" in stack_fn
         )
+        # Pale-map residual (C): Esc overlay dismiss must pin the pre-hide GIS camera.
+        # ATA 902133 is the southern ice strip — not Europe. Esc→CC open stays deferred.
+        restore_cam_fn = _gd_func_slice(ren, "_restore_pre_dismiss_camera")
+        snap_cam_fn = _gd_func_slice(ren, "_snapshot_pre_dismiss_camera")
+        wiring["esc_overlay_dismiss_restores_camera"] = (
+            bool(snap_cam_fn)
+            and "global_position" in snap_cam_fn
+            and bool(restore_cam_fn)
+            and 'snap["pos"]' in restore_cam_fn
+            and "_close_camera_locked = true" in restore_cam_fn
+            and "europe_center" not in restore_cam_fn
+            and "_esc_open_command_center" not in restore_cam_fn
+            and "_snapshot_pre_dismiss_camera" in dismiss_fn
+            and "_restore_pre_dismiss_camera" in dismiss_fn
+            and dismiss_fn.find("_snapshot_pre_dismiss_camera")
+            < dismiss_fn.find("var dismissed")
+            and dismiss_fn.find("if dismissed:")
+            < dismiss_fn.rfind("_restore_pre_dismiss_camera")
+            and "_esc_open_command_center" not in dismiss_fn
+        )
         wiring["topbar_uses_esc_chain"] = (
             "_handle_escape_key" in top and "_on_menu_pressed" in top
         )
