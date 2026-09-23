@@ -84,6 +84,16 @@ Maginot-class target met: max/median **3.17 ≤ ~5** and max **130.2 ≤ 290**. 
 - Maginot / Gibraltar / Alboran / HK / Windward / Great Lakes stay as shipped.
 - Optional later land pass: Pas-de-Calais / Somme / Aisne (outside this window); Ruhr/NRW only if Scott picks that corridor. Do not remesh whole Europe here.
 
+## Gates
+
+```bash
+python3 -m unittest tools.map_generation.tests.test_flanders_nord_land_uniformity_product -v
+```
+
+`map_accuracy_qc` on the written board: hard_ok, matched **3534**, orphans 0, NE land hit **0.9853**. Maginot / Gibraltar / Alboran / HK / Windward / Great Lakes product tests still PASS. `world_full` git-clean (no 711521/711522 IDs written).
+
+`--quick` still fails `test_living_unit_order_loop_product` (wiring: `air_region_cas`, `peace_occupation`, `nation_era_next`, `map_country_select`, `playtest_clock`). **Same fails on tip** `8cae5f9` — this FEED does not touch those GD files. Out of scope (not a Flanders board issue).
+
 ## Play smoke (human — not this CA)
 
 Home Europe / Flanders–Nord operational zoom: Nord should no longer read as a single giant hole vs neighboring BE arrondissements. Pick parent `710734` + child `711521` (and `711522` if written) — names and FRA ownership stay. Esc HARD PASS on the tip. Dig2 / G / Maginot combat / Taken / JOINING not in this FEED.
