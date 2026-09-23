@@ -33,6 +33,7 @@ class TestSmokePanEscProduct(unittest.TestCase):
             "esc_idle_calls_menu",
             "esc_dismiss_then_idle_cc",
             "dismiss_no_mainmenu_leftover",
+            "esc_overlay_dismiss_restores_camera",
             "topbar_uses_esc_chain",
             "drag_skip_pick_live_slop",
             "repeat_empty_drag_rearm",
