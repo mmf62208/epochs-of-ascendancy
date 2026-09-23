@@ -94,7 +94,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn("func _formation_type_blocks_land_open", ren)
         self.assertIn("func _player_land_formation_at_province", ren)
         self.assertIn("func _formation_is_player_tag", ren)
-        self.assertIn("_pick_unit_formation_at_world(world_pos, land_only)", ren)
+        self.assertIn("_pick_unit_formation_at_world(world_pos, land_only, player_only)", ren)
         self.assertIn("player_only", ren)
         self.assertNotIn("DIG_CHIP_MISS", ren)
         self.assertNotIn("DIG_CHIP_SKIP", ren)
