@@ -17,6 +17,12 @@ TIER_STRATEGIC = 0
 TIER_OPERATIONAL = 1
 TIER_TACTICAL = 2
 
+# Europe Home (Berlin+Paris+Rome + pad) lands ~0.33 on 720p / ~0.49 on 1080p,
+# which is still ≤ STRATEGIC_MAX 0.55. World fit is ~0.09–0.14.
+EUROPE_HOME_COUNTER_MIN_ZOOM = 0.24
+EUROPE_HOME_ZOOM_LO = 0.32
+EUROPE_HOME_ZOOM_HI = 1.55
+
 
 def show_unit_counters(tier: int, master_enabled: bool = True) -> bool:
     if not master_enabled:
@@ -24,8 +30,40 @@ def show_unit_counters(tier: int, master_enabled: bool = True) -> bool:
     return int(tier) != TIER_STRATEGIC
 
 
+def show_unit_counters_for_zoom(z: float, master_enabled: bool = True) -> bool:
+    if not master_enabled:
+        return False
+    return float(z) > EUROPE_HOME_COUNTER_MIN_ZOOM
+
+
+def europe_home_zoom_wants_counters() -> bool:
+    """Source-lock: Home band paints; world-fit strategic stays culled."""
+    return (
+        show_unit_counters_for_zoom(EUROPE_HOME_ZOOM_LO, True)
+        and show_unit_counters_for_zoom(0.49, True)
+        and show_unit_counters_for_zoom(1.3, True)
+        and show_unit_counters_for_zoom(EUROPE_HOME_ZOOM_HI, True)
+        and not show_unit_counters_for_zoom(0.14, True)
+        and not show_unit_counters_for_zoom(EUROPE_HOME_COUNTER_MIN_ZOOM, True)
+    )
+
+
 def unit_counter_compact(tier: int) -> bool:
     return int(tier) == TIER_STRATEGIC
+
+
+def _gd_func_slice(src: str, func_name: str) -> str:
+    needle = "func %s" % func_name
+    i = src.find(needle)
+    if i < 0:
+        return ""
+    lines = src[i:].splitlines()
+    out = [lines[0]]
+    for line in lines[1:]:
+        if line.startswith("func ") or line.startswith("static func "):
+            break
+        out.append(line)
+    return "\n".join(out)
 
 
 def build_map_unit_counter_lod_product() -> Dict[str, Any]:
@@ -114,11 +152,45 @@ def build_map_unit_counter_lod_product() -> Dict[str, Any]:
     else:
         fails.append("strategic_pick_still_hits")
 
+    if europe_home_zoom_wants_counters():
+        passes.append("europe_home_zoom_wants_counters")
+    else:
+        fails.append("europe_home_zoom_hides_counters")
+    if (
+        "EUROPE_HOME_COUNTER_MIN_ZOOM" in lod
+        and "0.24" in lod
+        and "func show_unit_counters_for_zoom" in lod
+    ):
+        passes.append("lod_home_zoom_floor")
+    else:
+        fails.append("missing_lod_home_zoom_floor")
+    want_fn = _gd_func_slice(ren, "_unit_counters_want_visible")
+    if "show_unit_counters_for_zoom" in want_fn:
+        passes.append("renderer_uses_zoom_floor")
+    else:
+        fails.append("renderer_still_tiers_home_as_strategic")
+    home_fn = _gd_func_slice(ren, "center_europe_in_world_view")
+    begin_fn = _gd_func_slice(ren, "_center_camera_on_province")
+    if "_sync_unit_counter_paint" in home_fn:
+        passes.append("home_syncs_counter_paint")
+    else:
+        fails.append("home_skips_counter_paint")
+    if "_sync_unit_counter_paint" in begin_fn:
+        passes.append("begin_syncs_counter_paint")
+    else:
+        fails.append("begin_skips_counter_paint")
+    scale_fn = _gd_func_slice(ren, "_unit_counter_scale_for_zoom")
+    if "clampf(target, 0.85, 16.0)" in scale_fn:
+        passes.append("counter_scale_floor_readable")
+    else:
+        fails.append("counter_scale_floor_too_low")
+
     ok = len(fails) == 0
     return {
         "ok": ok,
         "pass": passes,
         "fail": fails,
         "summary": "unit_counter_lod · %s" % ("PASS" if ok else "FAIL"),
-        "policy": "strategic_cull_operational_full_master_toggle_U_hidden_pins_skip",
+        "policy": "strategic_cull_operational_full_master_toggle_U_hidden_pins_skip"
+        "; europe_home_zoom_band_paints_counters",
     }

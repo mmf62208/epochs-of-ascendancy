@@ -11,12 +11,14 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+from map_unit_counter_lod_product import europe_home_zoom_wants_counters
 from unit_card_combat_strip_product import fill_toe_fold_line, lines_for
 
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
 STRIP_GD = ROOT / "scripts" / "ui" / "UnitCardCombatStrip.gd"
 TOOLTIP_GD = ROOT / "scripts" / "map" / "ProvinceHoverTooltip.gd"
+LOD_GD = ROOT / "scripts" / "map" / "MapZoomLOD.gd"
 
 
 def _gd_func_slice(src: str, func_name: str) -> str:
@@ -273,6 +275,26 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     )
     wiring["chip_open_in_input"] = chip_open_in_input
     (passes if chip_open_in_input else fails).append("chip_open_in_input")
+
+    # DIG-FIRST: open-path is useless while chips are unpainted at Europe Home.
+    lod = LOD_GD.read_text(encoding="utf-8") if LOD_GD.is_file() else ""
+    want_fn = _gd_func_slice(ren, "_unit_counters_want_visible")
+    home_fn = _gd_func_slice(ren, "center_europe_in_world_view")
+    begin_fn = _gd_func_slice(ren, "_center_camera_on_province")
+    scale_fn = _gd_func_slice(ren, "_unit_counter_scale_for_zoom")
+    europe_want = (
+        europe_home_zoom_wants_counters()
+        and "show_unit_counters_for_zoom" in want_fn
+        and "EUROPE_HOME_COUNTER_MIN_ZOOM" in lod
+    )
+    wiring["europe_home_counters_want_visible"] = europe_want
+    (passes if europe_want else fails).append("europe_home_counters_want_visible")
+    home_sync = "_sync_unit_counter_paint" in home_fn and "_sync_unit_counter_paint" in begin_fn
+    wiring["home_syncs_counter_visibility"] = home_sync
+    (passes if home_sync else fails).append("home_syncs_counter_visibility")
+    scale_floor = "clampf(target, 0.85, 16.0)" in scale_fn
+    wiring["counter_scale_floor_readable"] = scale_floor
+    (passes if scale_floor else fails).append("counter_scale_floor_readable")
 
     ok = len(fails) == 0
     return {

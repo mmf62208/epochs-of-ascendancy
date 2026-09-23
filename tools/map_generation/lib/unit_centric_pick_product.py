@@ -9,8 +9,11 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List
 
+from map_unit_counter_lod_product import europe_home_zoom_wants_counters
+
 ROOT = Path(__file__).resolve().parents[3]
 MAP_RENDERER = ROOT / "scripts" / "map" / "MapRenderer.gd"
+LOD_GD = ROOT / "scripts" / "map" / "MapZoomLOD.gd"
 
 # Discoverability / integrity strings grepped from MapRenderer (must stay in live path).
 STRATEGIC_PICK_TOAST = "Click a unit chip to command (Shift+U toggles counters)."
@@ -219,6 +222,36 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         passes.append("tooltip_not_pick_blocker")
     else:
         fails.append("tooltip_not_pick_blocker")
+
+    # DIG-FIRST: chips were absent at Begin GER → Europe Home (zoom ~0.33–0.49
+    # still strategic-tier). Lock counters-want-visible on that band + Home/Begin paint.
+    lod = LOD_GD.read_text(encoding="utf-8") if LOD_GD.is_file() else ""
+    want_fn = _gd_func_slice(ren, "_unit_counters_want_visible")
+    home_fn = _gd_func_slice(ren, "center_europe_in_world_view")
+    begin_fn = _gd_func_slice(ren, "_center_camera_on_province")
+    scale_fn = _gd_func_slice(ren, "_unit_counter_scale_for_zoom")
+    europe_want = (
+        europe_home_zoom_wants_counters()
+        and "show_unit_counters_for_zoom" in want_fn
+        and "EUROPE_HOME_COUNTER_MIN_ZOOM" in lod
+    )
+    wiring["europe_home_counters_want_visible"] = europe_want
+    if europe_want:
+        passes.append("europe_home_counters_want_visible")
+    else:
+        fails.append("europe_home_counters_want_visible")
+    home_sync = "_sync_unit_counter_paint" in home_fn and "_sync_unit_counter_paint" in begin_fn
+    wiring["home_syncs_counter_visibility"] = home_sync
+    if home_sync:
+        passes.append("home_syncs_counter_visibility")
+    else:
+        fails.append("home_syncs_counter_visibility")
+    scale_floor = "clampf(target, 0.85, 16.0)" in scale_fn
+    wiring["counter_scale_floor_readable"] = scale_floor
+    if scale_floor:
+        passes.append("counter_scale_floor_readable")
+    else:
+        fails.append("counter_scale_floor_readable")
 
     if not check_wiring:
         ok = toast_ok and hit_ok

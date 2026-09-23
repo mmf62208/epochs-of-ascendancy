@@ -56,6 +56,9 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
             "tooltip_mouse_ignore",
             "tooltip_not_map_pick_blocker",
             "chip_open_in_input",
+            "europe_home_counters_want_visible",
+            "home_syncs_counter_visibility",
+            "counter_scale_floor_readable",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 

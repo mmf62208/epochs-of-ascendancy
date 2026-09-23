@@ -48,6 +48,9 @@ class TestUnitCentricPickProduct(unittest.TestCase):
             "selected_frame_immediate_free",
             "land_chip_in_input",
             "tooltip_not_pick_blocker",
+            "europe_home_counters_want_visible",
+            "home_syncs_counter_visibility",
+            "counter_scale_floor_readable",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 

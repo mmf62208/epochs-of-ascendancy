@@ -1612,6 +1612,7 @@ func _apply_home_key(shift_pressed: bool) -> void:
 	ensure_world_navigation_ready()
 	if shift_pressed:
 		fit_camera_to_full_world()
+		_sync_unit_counter_paint()
 	else:
 		center_europe_in_world_view()
 		if typeof(DebugOverlay) != TYPE_NIL:
@@ -13592,6 +13593,9 @@ func _refresh_province_detail_visibility() -> void:
 				_apply_hover_visuals(_hover_outline_province_id, false)
 
 	_sync_viewport_culling()
+	# Zoom/Home can cross the chip floor while paused process skips this path;
+	# when it does run, keep DemoUnitIcon_* in sync with the live zoom band.
+	_sync_unit_counter_paint(current_zoom)
 	var show_details: bool = MapZoomLODScript.show_province_glyphs(tier) or current_zoom > province_detail_min_zoom
 	var show_prov_names: bool = show_province_names and MapZoomLODScript.show_province_labels(tier)
 	_zoom_fill_characterization_scale = current_zoom
@@ -13851,6 +13855,7 @@ func _boot_political_map_complete() -> void:
 	_apply_clean_political_clear_color()
 	center_europe_in_world_view()
 	_force_all_province_nodes_visible()
+	_sync_unit_counter_paint()
 	if _map_search != null and _map_search.has_method("rebuild_index"):
 		_map_search.call("rebuild_index")
 	var ol := get_overlay_layer("InfrastructureOverlayLayer")
@@ -14045,7 +14050,7 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 		ensure_playable_front_chips(false)
 	else:
 		_update_unit_icons_for_test()
-	_sync_unit_counter_visibility()
+	_sync_unit_counter_paint()
 	call_deferred("_rebuild_province_mesh_layer")
 	call_deferred("_sync_batched_mesh_fills", true)
 
@@ -15210,6 +15215,9 @@ func center_europe_in_world_view() -> void:
 		# Always re-fit (not pan-only) so a zoom-out red void recovers on first Home.
 		fit_camera_to_bounds(frame, focus, MapCanvasConfig.EUROPE_VIEW_FILL_RATIO)
 	_clamp_camera_to_theater()
+	# Home zoom is often still strategic-tier (~0.33–0.49). Re-paint chips here —
+	# paused first-session never reaches _refresh_province_detail_visibility.
+	_sync_unit_counter_paint()
 	print("MapRenderer: centered on Europe (Berlin+Paris+Rome frame) inside world view")
 
 
@@ -17331,6 +17339,9 @@ func _center_camera_on_province(province_id: int, zoom_mode: String = "soft") ->
 	var cam_x := pos.x - (target_screen_x - vp.x * 0.5) / z
 	var cam_y := pos.y - (target_screen_y - vp.y * 0.5) / z
 	cam.global_position = _apply_camera_bounds(Vector2(cam_x, cam_y))
+	# Begin GER soft-centers Berlin on the Home band; sync paint so chips appear
+	# without requiring a wheel notch.
+	_sync_unit_counter_paint()
 
 
 func _clear_hover_state() -> void:
@@ -21780,6 +21791,7 @@ func _prefer_retrowave_unit_icon(tex_path: String) -> String:
 
 
 ## Keep chips ~48–58 screen px at Europe zoom so org/str/designation stay readable.
+## Floor 0.85 so a stale/high zoom read cannot shrink Home chips to specks.
 func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 	var z := z_override
 	if z < 0.0:
@@ -21791,7 +21803,7 @@ func _unit_counter_scale_for_zoom(z_override: float = -1.0) -> float:
 			z = absf(container.scale.x)
 	var screen_px := lerpf(48.0, 58.0, clampf((z - 0.2) / 1.6, 0.0, 1.0))
 	var target := screen_px / (32.0 * maxf(z, 0.04))
-	return clampf(target, 0.35, 16.0)
+	return clampf(target, 0.85, 16.0)
 
 
 ## Offset living chips off the capital star so both stay distinct click targets.
@@ -21826,8 +21838,14 @@ func _unit_counters_want_visible(z: float = -1.0) -> bool:
 	var zz := z
 	if zz < 0.0:
 		zz = _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
-	var tier: int = MapZoomLODScript.tier_for_zoom(zz)
-	return MapZoomLODScript.show_unit_counters(tier, show_unit_counters)
+	# Home Europe (~0.33–0.49) is still strategic by tier; use zoom floor so
+	# Begin GER → Home paints DemoUnitIcon_* (world fit ~0.14 stays culled).
+	return MapZoomLODScript.show_unit_counters_for_zoom(zz, show_unit_counters)
+
+
+func _sync_unit_counter_paint(z: float = -1.0) -> void:
+	_sync_unit_counter_visibility(z)
+	_sync_unit_counter_scales(z)
 
 
 func _sync_unit_counter_visibility(z: float = -1.0) -> void:
@@ -21841,6 +21859,9 @@ func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 		var node: Node2D = province_nodes[id] as Node2D
 		if node == null:
 			continue
+		# Host must stay on when chips want paint (leftover cull must not eat GER).
+		if vis:
+			node.visible = true
 		for c in node.get_children():
 			if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
 				(c as Node2D).visible = vis
@@ -24710,8 +24731,7 @@ func ensure_playable_front_chips(focus_camera: bool = true) -> Dictionary:
 	result["wing_region"] = int(wing.get("region_id", 0))
 	show_unit_counters = true
 	_update_unit_icons_for_test()
-	_sync_unit_counter_visibility()
-	_sync_unit_counter_scales()
+	_sync_unit_counter_paint()
 	result["ok"] = int(result["ger"]) > 0
 	var graphical := DisplayServer.get_name() != "headless"
 	if graphical and bool(result["ok"]) and focus_camera:
