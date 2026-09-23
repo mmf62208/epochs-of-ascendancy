@@ -306,6 +306,9 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
         home_band_hit_disk_tracks_scale()
         and "_unit_counter_hit_radius_world" in pick_fn
         and "0.5 * sprite_px" in hit_fn
+        and "sqrt(2.0)" in hit_fn
+        and "label_pad" in hit_fn
+        and "_unit_counter_aabb_hit_screen" in hit_fn
         and "_unit_counter_scale_for_zoom" in hit_fn
         and "maxf(48.0" in hit_fn
         and "counter.position" in pick_fn

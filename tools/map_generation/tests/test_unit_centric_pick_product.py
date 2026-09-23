@@ -72,6 +72,9 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn("20.0", ren)
         self.assertIn("func _unit_counter_hit_radius_world", ren)
         self.assertIn("0.5 * sprite_px", ren)
+        self.assertIn("sqrt(2.0)", ren)
+        self.assertIn("label_pad", ren)
+        self.assertIn("func _unit_counter_aabb_hit_screen", ren)
         pick_i = ren.find("func _pick_unit_formation_at_world")
         self.assertGreaterEqual(pick_i, 0)
         pick_slice = ren[pick_i : pick_i + 2200]

@@ -116,6 +116,9 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         self.assertIn("_try_open_land_chip_from_input", src)
         self.assertIn("func _unit_counter_hit_radius_world", src)
         self.assertIn("0.5 * sprite_px", src)
+        self.assertIn("sqrt(2.0)", src)
+        self.assertIn("label_pad", src)
+        self.assertIn("func _unit_counter_aabb_hit_screen", src)
         self.assertIn("counter.position", src)
         self.assertNotIn(
             '"ProvinceHoverTooltip"',

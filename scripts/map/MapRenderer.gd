@@ -18249,7 +18249,7 @@ func _pick_unit_formation_at_world(world_pos: Vector2) -> Object:
 				chip_pos += _unit_chip_offset_for_pid(id)
 			else:
 				chip_pos = counter.global_position
-		# Home-band chips paint ~100–150px; 48-only screen disk misses chrome/label.
+		# Home-band chips paint plate+label; half-plate disk misses chrome/label.
 		var hit_r := _unit_counter_hit_radius_world(z, counter)
 		var hit_r2 := hit_r * hit_r
 		var d := world_pos.distance_squared_to(chip_pos)
@@ -21793,18 +21793,99 @@ func _prefer_retrowave_unit_icon(tex_path: String) -> String:
 	return p
 
 
-## World-space hit radius for a painted land chip. Home-band counter scale is
-## 3–4× so a fixed 48px screen disk misses chrome/label; track that footprint.
+## World-space hit radius for a painted land chip. Home-band counters are a
+## NATO plate + UnitChipText nameplate; chrome/label sit outside a half-plate
+## disk (`0.5 * sprite_px * cscale`). Cover the full painted AABB (live
+## DemoUnitIcon half-diagonal when the node is up; else plate half-diag + pad).
 ## Tactical zoom keeps the historic 48px / 20-world floor (finger-sized).
 func _unit_counter_hit_radius_world(z: float, counter: Node2D = null) -> float:
-	var cscale := 0.0
+	var zz: float = maxf(z, 0.05)
+	var cscale: float = 0.0
 	if counter != null and is_instance_valid(counter):
 		cscale = maxf(counter.scale.x, counter.scale.y)
 	if cscale < 0.05:
 		cscale = _unit_counter_scale_for_zoom(z)
-	var sprite_px := 32.0
-	var hit_screen := maxf(48.0, 0.5 * sprite_px * cscale)
-	return maxf(hit_screen / maxf(z, 0.05), 20.0)
+	var sprite_px: float = 32.0
+	# Home-band nameplate sits below the NATO plate; tactical chips stay 48px.
+	var label_pad: float = 16.0 if cscale >= 2.0 else 0.0
+	var hit_screen: float = maxf(48.0, 0.5 * sprite_px * cscale * sqrt(2.0) + label_pad)
+	if counter != null and is_instance_valid(counter) and counter.is_inside_tree():
+		var live_s: float = _unit_counter_aabb_hit_screen(counter)
+		if live_s > hit_screen:
+			hit_screen = live_s
+	return maxf(hit_screen / zz, 20.0)
+
+
+## Screen-space half-diagonal of the painted plate + UnitChipText from the
+## counter origin (pick disk center). 0 when the node is not in-tree / empty.
+func _unit_counter_aabb_hit_screen(counter: Node2D) -> float:
+	if counter == null or not is_instance_valid(counter) or not counter.is_inside_tree():
+		return 0.0
+	var origin_s: Vector2 = counter.get_global_transform_with_canvas() * Vector2.ZERO
+	var farthest: float = 0.0
+	for ch in counter.get_children():
+		farthest = maxf(farthest, _unit_counter_item_farthest_screen(ch, origin_s))
+		if ch is Node:
+			for sub in (ch as Node).get_children():
+				farthest = maxf(farthest, _unit_counter_item_farthest_screen(sub, origin_s))
+	return farthest
+
+
+func _unit_counter_item_farthest_screen(n: Node, origin_s: Vector2) -> float:
+	if n == null or not (n is CanvasItem) or not (n is Node2D):
+		return 0.0
+	var r: Rect2 = _unit_counter_child_own_rect(n as CanvasItem)
+	if r.size.x <= 0.0 and r.size.y <= 0.0:
+		return 0.0
+	var xf: Transform2D = (n as Node2D).get_global_transform_with_canvas()
+	var p0: Vector2 = r.position
+	var p1: Vector2 = r.position + r.size
+	var farthest: float = (xf * p0).distance_to(origin_s)
+	farthest = maxf(farthest, (xf * Vector2(p1.x, p0.y)).distance_to(origin_s))
+	farthest = maxf(farthest, (xf * p1).distance_to(origin_s))
+	farthest = maxf(farthest, (xf * Vector2(p0.x, p1.y)).distance_to(origin_s))
+	return farthest
+
+
+func _unit_counter_child_own_rect(item: CanvasItem) -> Rect2:
+	if item is Polygon2D:
+		var poly: Polygon2D = item as Polygon2D
+		if poly.polygon.is_empty():
+			return Rect2()
+		var mn: Vector2 = poly.polygon[0]
+		var mx: Vector2 = mn
+		for v in poly.polygon:
+			var pv: Vector2 = v
+			mn = Vector2(minf(mn.x, pv.x), minf(mn.y, pv.y))
+			mx = Vector2(maxf(mx.x, pv.x), maxf(mx.y, pv.y))
+		return Rect2(mn, mx - mn)
+	if item is Sprite2D:
+		var spr: Sprite2D = item as Sprite2D
+		if spr.texture == null:
+			return Rect2()
+		var sz: Vector2 = spr.texture.get_size()
+		if spr.region_enabled:
+			sz = spr.region_rect.size
+		var hf: float = maxf(float(spr.hframes), 1.0)
+		var vf: float = maxf(float(spr.vframes), 1.0)
+		sz = Vector2(sz.x / hf, sz.y / vf)
+		if spr.centered:
+			return Rect2(-sz * 0.5, sz)
+		return Rect2(Vector2.ZERO, sz)
+	if "text" in item:
+		var t: String = str(item.get("text"))
+		if t.is_empty():
+			return Rect2()
+		var fs: int = 13
+		if "font_size" in item:
+			fs = int(item.get("font_size"))
+		var w: float = maxf(8.0, float(t.length()) * float(fs) * 0.62)
+		var h: float = float(fs) + 8.0
+		var ox: float = 0.0
+		if "align_right" in item and bool(item.get("align_right")):
+			ox = -w
+		return Rect2(Vector2(ox, -2.0), Vector2(w, h))
+	return Rect2()
 
 
 ## Keep chips ~48–58 screen px at Europe zoom so org/str/designation stay readable.

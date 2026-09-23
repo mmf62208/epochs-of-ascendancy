@@ -5,6 +5,7 @@ Does not rewrite assault/move behavior or unit-card assign mode.
 """
 from __future__ import annotations
 
+import math
 import re
 from pathlib import Path
 from typing import Any, Dict, List
@@ -66,17 +67,24 @@ def unit_counter_scale_for_zoom(z: float) -> float:
 
 
 def unit_chip_hit_screen_px(z: float) -> float:
-    """Screen-space hit radius. Home-band tracks painted scale, not 48-only."""
-    return max(HIT_RADIUS_PX, 0.5 * SPRITE_PX * unit_counter_scale_for_zoom(z))
+    """Screen-space hit radius. Home-band covers full plate+label AABB, not half-plate."""
+    cscale = unit_counter_scale_for_zoom(z)
+    label_pad = 16.0 if cscale >= 2.0 else 0.0
+    return max(HIT_RADIUS_PX, 0.5 * SPRITE_PX * cscale * math.sqrt(2.0) + label_pad)
 
 
 def home_band_hit_disk_tracks_scale() -> bool:
-    """Europe Home (~0.33–0.49) must exceed the historic 48px floor."""
+    """Europe Home (~0.33–0.49) must cover plate+label, not half-plate only."""
     home = unit_chip_hit_screen_px(EUROPE_HOME_HIT_Z)
     mid = unit_chip_hit_screen_px(0.49)
     tactical = unit_chip_hit_screen_px(1.0)
+    old_half_plate = max(
+        HIT_RADIUS_PX, 0.5 * SPRITE_PX * unit_counter_scale_for_zoom(EUROPE_HOME_HIT_Z)
+    )
     return (
         home > HIT_RADIUS_PX + 8.0
+        and home >= old_half_plate * 1.35
+        and home >= 100.0
         and mid > HIT_RADIUS_PX
         and abs(tactical - HIT_RADIUS_PX) < 0.05
     )
@@ -93,12 +101,15 @@ def _hit_radius_ok(pick_fn: str, helper_fn: str = "") -> bool:
 
 
 def _home_hit_disk_wiring_ok(pick_fn: str, helper_fn: str) -> bool:
-    """Pick must call the scale-tracking helper (not a fixed 48/z disk)."""
+    """Pick must cover full plate+label AABB (not a half-plate / 48-only disk)."""
     if not pick_fn or not helper_fn:
         return False
     uses_helper = "_unit_counter_hit_radius_world" in pick_fn
     helper_tracks = (
         "0.5 * sprite_px" in helper_fn
+        and "sqrt(2.0)" in helper_fn
+        and "label_pad" in helper_fn
+        and "_unit_counter_aabb_hit_screen" in helper_fn
         and "_unit_counter_scale_for_zoom" in helper_fn
         and "maxf(48.0" in helper_fn
         and "20.0" in helper_fn
@@ -334,6 +345,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         ],
         "policy": "pin_first_hit_disk_48_floor_20_selected_chip_no_inspector"
         "; home_hit_disk_tracks_counter_scale"
+        "; home_hit_covers_full_plate_label_aabb"
         "; capital_star_before_chip; chip_match_station_province_one_pin_per_hex",
     }
 
