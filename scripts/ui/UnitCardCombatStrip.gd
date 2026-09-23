@@ -270,8 +270,6 @@ static func _safe_composition(formation: Object) -> Dictionary:
 	# Infer via LandCombatPower; never require mobility/armor_element first.
 	if typeof(LandCombatPower) == TYPE_NIL:
 		return {}
-	if not LandCombatPower.has_method("composition_from_formation"):
-		return {}
 	var raw: Variant = LandCombatPower.composition_from_formation(formation)
 	if raw is Dictionary:
 		return raw as Dictionary
@@ -282,8 +280,6 @@ static func _safe_equipment_toe(comp: Dictionary) -> Dictionary:
 	if comp.is_empty():
 		return {}
 	if typeof(LandCombatPower) == TYPE_NIL:
-		return {}
-	if not LandCombatPower.has_method("equipment_toe"):
 		return {}
 	var raw: Variant = LandCombatPower.equipment_toe(comp)
 	if raw is Dictionary:

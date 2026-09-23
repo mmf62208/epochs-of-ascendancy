@@ -64,6 +64,7 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
             "force_popup_size_320_220",
             "tooltip_suppressed_while_unit_card",
             "strip_safe_ger_demo",
+            "no_class_has_method_on_strip",
         ):
             self.assertTrue(wiring.get(key), msg=(key, wiring, p.get("fail")))
 
@@ -132,6 +133,8 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         )
         self.assertIn("composition_from_formation", strip)
         self.assertNotIn("_formation_has_composition_meta", strip)
+        self.assertNotIn("UnitCardCombatStrip.has_method(", src)
+        self.assertIn("typeof(UnitCardCombatStrip) != TYPE_NIL", src)
         self.assertNotIn(
             '"ProvinceHoverTooltip"',
             src[src.find("func _is_mouse_over_blocking_ui") : src.find("func _refresh_hover_tooltip")],

@@ -366,6 +366,23 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     wiring["strip_safe_ger_demo"] = strip_safe
     (passes if strip_safe else fails).append("strip_safe_ger_demo")
 
+    # Play FAIL tip 194027d: class_name.has_method is a Godot 4 parse error.
+    ready_fn = _gd_func_slice(ren, "_unit_card_combat_strip_ready")
+    fill_fn = _gd_func_slice(ren, "_safe_unit_card_fill_ratio")
+    tip_safe_fn = _gd_func_slice(ren, "_safe_unit_card_tooltip_lines")
+    no_class_has_method = (
+        "UnitCardCombatStrip.has_method(" not in ren
+        and "typeof(UnitCardCombatStrip) != TYPE_NIL" in ready_fn
+        and "UnitCardCombatStrip.lines_for(" in _gd_func_slice(ren, "_safe_unit_card_strip_lines")
+        and "UnitCardCombatStrip._fill_ratio_for(" in fill_fn
+        and "UnitCardCombatStrip.tooltip_lines_for(" in tip_safe_fn
+        and "has_method(" not in ready_fn
+        and "has_method(" not in fill_fn
+        and "has_method(" not in tip_safe_fn
+    )
+    wiring["no_class_has_method_on_strip"] = no_class_has_method
+    (passes if no_class_has_method else fails).append("no_class_has_method_on_strip")
+
     ok = len(fails) == 0
     return {
         "ok": ok,

@@ -18686,7 +18686,9 @@ func _show_unit_detail_popup(formation: Object) -> void:
 
 
 func _unit_card_combat_strip_ready() -> bool:
-	return typeof(UnitCardCombatStrip) != TYPE_NIL and UnitCardCombatStrip.has_method("lines_for")
+	# Godot 4: has_method is instance-only. UnitCardCombatStrip is class_name —
+	# calling has_method on it is a parse error (blank gray map).
+	return typeof(UnitCardCombatStrip) != TYPE_NIL
 
 
 func _safe_unit_card_strip_lines(formation: Object) -> PackedStringArray:
@@ -18705,8 +18707,6 @@ func _safe_unit_card_strip_lines(formation: Object) -> PackedStringArray:
 func _safe_unit_card_fill_ratio(formation: Object) -> float:
 	if formation == null or typeof(UnitCardCombatStrip) == TYPE_NIL:
 		return -1.0
-	if not UnitCardCombatStrip.has_method("_fill_ratio_for"):
-		return -1.0
 	var raw: Variant = UnitCardCombatStrip._fill_ratio_for(formation)
 	if typeof(raw) == TYPE_FLOAT or typeof(raw) == TYPE_INT:
 		return clampf(float(raw), 0.0, 2.0)
@@ -18716,8 +18716,6 @@ func _safe_unit_card_fill_ratio(formation: Object) -> float:
 func _safe_unit_card_tooltip_lines(formation: Object) -> PackedStringArray:
 	var out: PackedStringArray = PackedStringArray()
 	if formation == null or typeof(UnitCardCombatStrip) == TYPE_NIL:
-		return out
-	if not UnitCardCombatStrip.has_method("tooltip_lines_for"):
 		return out
 	var raw: Variant = UnitCardCombatStrip.tooltip_lines_for(formation)
 	if raw is PackedStringArray:
