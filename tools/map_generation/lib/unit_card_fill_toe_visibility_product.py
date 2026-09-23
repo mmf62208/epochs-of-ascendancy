@@ -358,23 +358,34 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     wiring["land_still_click_player_tag_only"] = land_player_only
     (passes if land_player_only else fails).append("land_still_click_player_tag_only")
     pin_fn = _gd_func_slice(ren, "_try_open_unit_at_world")
+    hex_fn = _gd_func_slice(ren, "_resolve_hex_pick_pid")
     land_province_fallback = (
         bool(land_fn)
-        and "_resolve_map_pick_pid" in land_fn
-        and land_fn.find("_resolve_map_pick_pid") > land_fn.find("_pick_land_unit_formation_at_world")
+        and "_resolve_hex_pick_pid" in land_fn
+        and "_resolve_map_pick_pid" not in land_fn
+        and "_capital_star_pid_at" not in land_fn
+        and land_fn.find("_resolve_hex_pick_pid") > land_fn.find("_pick_land_unit_formation_at_world")
         and land_fn.count("_player_land_formation_at_province") >= 2
+        and bool(hex_fn)
+        and "get_province_at_world_pos" in hex_fn
+        and "resolve_pick_province_id" in hex_fn
+        and "_capital_star_pid_at" not in hex_fn
+        and "prefer_capital" not in hex_fn
     )
     wiring["land_still_click_province_player_land"] = land_province_fallback
     (passes if land_province_fallback else fails).append("land_still_click_province_player_land")
+    _spill_m = re.search(r"const CHROME_SPILL_WORLD:\s*float\s*=\s*([0-9.]+)", spill_fn)
+    _spill_r = float(_spill_m.group(1)) if _spill_m else 0.0
     land_chrome_spill = (
         bool(land_fn)
         and "_nearest_player_land_formation_at_world" in land_fn
         and land_fn.find("_nearest_player_land_formation_at_world")
-        > land_fn.find("_resolve_map_pick_pid")
+        > land_fn.find("_resolve_hex_pick_pid")
         and land_fn.find("_nearest_player_land_formation_at_world")
         > land_fn.rfind("_player_land_formation_at_province")
         and bool(spill_fn)
         and "CHROME_SPILL_WORLD" in spill_fn
+        and _spill_r >= 320.0
         and "land_only" in spill_fn
         and "player_only" in spill_fn
         and "_unit_counter_hit_radius_world" in spill_fn

@@ -2,6 +2,7 @@
 """Gates: unit-centric pin pick (hit disk, selected chip, no inspector)."""
 from __future__ import annotations
 
+import re
 import sys
 import unittest
 from pathlib import Path
@@ -101,6 +102,7 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn("_pick_unit_formation_at_world(world_pos, land_only, player_only)", ren)
         self.assertIn("player_only", ren)
         self.assertIn("CHROME_SPILL_WORLD", ren)
+        self.assertIn("func _resolve_hex_pick_pid", ren)
         self.assertNotIn("DIG_CHIP_MISS", ren)
         self.assertNotIn("DIG_CHIP_SKIP", ren)
         land_i = ren.find("func _try_open_land_unit_at_world")
@@ -112,13 +114,23 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn("_pick_land_unit_formation_at_world", land_slice)
         self.assertIn("_player_land_formation_at_province", land_slice)
         self.assertIn("_formation_is_player_tag", land_slice)
-        self.assertIn("_resolve_map_pick_pid", land_slice)
+        self.assertIn("_resolve_hex_pick_pid", land_slice)
+        self.assertNotIn("_resolve_map_pick_pid", land_slice)
         self.assertGreaterEqual(land_slice.count("_player_land_formation_at_province"), 2)
         self.assertIn("_nearest_player_land_formation_at_world", land_slice)
         self.assertGreater(
             land_slice.find("_nearest_player_land_formation_at_world"),
-            land_slice.find("_resolve_map_pick_pid"),
+            land_slice.find("_resolve_hex_pick_pid"),
         )
+        hex_i = ren.find("func _resolve_hex_pick_pid")
+        self.assertGreaterEqual(hex_i, 0)
+        hex_slice = ren[hex_i : hex_i + 800]
+        next_hex = hex_slice.find("\nfunc ", 1)
+        if next_hex > 0:
+            hex_slice = hex_slice[:next_hex]
+        self.assertIn("get_province_at_world_pos", hex_slice)
+        self.assertIn("resolve_pick_province_id", hex_slice)
+        self.assertNotIn("_capital_star_pid_at", hex_slice)
         spill_i = ren.find("func _nearest_player_land_formation_at_world")
         self.assertGreaterEqual(spill_i, 0)
         spill_slice = ren[spill_i : spill_i + 2800]
@@ -132,6 +144,11 @@ class TestUnitCentricPickProduct(unittest.TestCase):
         self.assertIn("DemoUnitIcon_", spill_slice)
         self.assertIn("counter.global_position", spill_slice)
         self.assertIn("maxf(hit_r, CHROME_SPILL_WORLD)", spill_slice)
+        spill_m = re.search(
+            r"const CHROME_SPILL_WORLD:\s*float\s*=\s*([0-9.]+)", spill_slice
+        )
+        self.assertIsNotNone(spill_m)
+        self.assertGreaterEqual(float(spill_m.group(1)), 320.0)
         # Hang-class: pin open path must not open inspector.
         # Still-click fallthrough never opens land (foreign PER leak).
         pin_i = ren.find("func _try_open_unit_at_world")

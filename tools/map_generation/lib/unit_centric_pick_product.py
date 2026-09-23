@@ -327,30 +327,41 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     else:
         fails.append("land_still_click_player_tag_only")
     # Play MIXED on 09cfc51: disk miss fell through to CZE/GER tooltip; open-unit
-    # fallthrough opened incidental PER land. Province-stack player land on miss;
-    # still-click _try_open_unit_at_world is air/fleet/space only.
+    # fallthrough opened incidental PER land. Hex-only province-stack player land
+    # on miss (not capital-star prefer); still-click open-unit is air/fleet/space.
+    hex_fn = _gd_func_slice(ren, "_resolve_hex_pick_pid")
     land_province_fallback = (
         bool(land_fn)
-        and "_resolve_map_pick_pid" in land_fn
-        and land_fn.find("_resolve_map_pick_pid") > land_fn.find("_pick_land_unit_formation_at_world")
+        and "_resolve_hex_pick_pid" in land_fn
+        and "_resolve_map_pick_pid" not in land_fn
+        and "_capital_star_pid_at" not in land_fn
+        and land_fn.find("_resolve_hex_pick_pid") > land_fn.find("_pick_land_unit_formation_at_world")
         and land_fn.count("_player_land_formation_at_province") >= 2
+        and bool(hex_fn)
+        and "get_province_at_world_pos" in hex_fn
+        and "resolve_pick_province_id" in hex_fn
+        and "_capital_star_pid_at" not in hex_fn
+        and "prefer_capital" not in hex_fn
     )
     wiring["land_still_click_province_player_land"] = land_province_fallback
     if land_province_fallback:
         passes.append("land_still_click_province_player_land")
     else:
         fails.append("land_still_click_province_player_land")
-    # Play MIXED on 4fb65b4: miss_pid hex (Neustadt/Schwäbisch Hall/FRA) has no
-    # GER land; Home chrome spills while stations stay on 710173 (+ nbr).
+    # Play MIXED on 4fb65b4 / 60e7f59: miss_pid hex has no GER land; Home / Berlin
+    # chrome spills while stations stay on 710173 (~278u). Spill must cover that.
+    _spill_m = re.search(r"const CHROME_SPILL_WORLD:\s*float\s*=\s*([0-9.]+)", spill_fn)
+    _spill_r = float(_spill_m.group(1)) if _spill_m else 0.0
     land_chrome_spill = (
         bool(land_fn)
         and "_nearest_player_land_formation_at_world" in land_fn
         and land_fn.find("_nearest_player_land_formation_at_world")
-        > land_fn.find("_resolve_map_pick_pid")
+        > land_fn.find("_resolve_hex_pick_pid")
         and land_fn.find("_nearest_player_land_formation_at_world")
         > land_fn.rfind("_player_land_formation_at_province")
         and bool(spill_fn)
         and "CHROME_SPILL_WORLD" in spill_fn
+        and _spill_r >= 320.0
         and "land_only" in spill_fn
         and "player_only" in spill_fn
         and "_unit_counter_hit_radius_world" in spill_fn

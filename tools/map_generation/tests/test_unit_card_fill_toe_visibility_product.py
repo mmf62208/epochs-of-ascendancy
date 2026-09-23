@@ -132,18 +132,20 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         self.assertIn("_collect_formations_at_province", src)
         self.assertIn("player_only", src)
         self.assertIn("CHROME_SPILL_WORLD", src)
+        self.assertIn("func _resolve_hex_pick_pid", src)
         land_i = src.find("func _try_open_land_unit_at_world")
         self.assertGreaterEqual(land_i, 0)
         land_slice = src[land_i : land_i + 2400]
         next_land = land_slice.find("\nfunc ", 1)
         if next_land > 0:
             land_slice = land_slice[:next_land]
-        self.assertIn("_resolve_map_pick_pid", land_slice)
+        self.assertIn("_resolve_hex_pick_pid", land_slice)
+        self.assertNotIn("_resolve_map_pick_pid", land_slice)
         self.assertGreaterEqual(land_slice.count("_player_land_formation_at_province"), 2)
         self.assertIn("_nearest_player_land_formation_at_world", land_slice)
         self.assertGreater(
             land_slice.find("_nearest_player_land_formation_at_world"),
-            land_slice.find("_resolve_map_pick_pid"),
+            land_slice.find("_resolve_hex_pick_pid"),
         )
         pin_i = src.find("func _try_open_unit_at_world")
         self.assertGreaterEqual(pin_i, 0)

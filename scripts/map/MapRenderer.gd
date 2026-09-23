@@ -17939,6 +17939,17 @@ func _resolve_map_pick_pid(world_pos: Vector2) -> int:
 	return pid
 
 
+## Hex/land under cursor only — no capital-star prefer.
+## Land still-click miss_pid uses this so Berlin star cannot steal land-open.
+func _resolve_hex_pick_pid(world_pos: Vector2) -> int:
+	var pid := -1
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_at_world_pos"):
+		pid = MapManager.get_province_at_world_pos(world_pos, true)
+		if MapManager.has_method("resolve_pick_province_id"):
+			pid = MapManager.resolve_pick_province_id(pid)
+	return pid
+
+
 ## Click navy/armor/infantry map counters → select unit for move/assault + detail card.
 func _toast_living_diplomacy_pick(pid: int) -> void:
 	var dip: Dictionary = PlayNextHook.living_diplomacy_from_province(pid, _player_tag())
@@ -18030,10 +18041,10 @@ func _pick_land_unit_formation_at_world(world_pos: Vector2) -> Object:
 
 
 func _nearest_player_land_formation_at_world(world_pos: Vector2) -> Object:
-	# Home chrome spills onto nearby hexes while GER land stays on 710173 (+ nbr).
-	# After disk + miss_pid province miss, bind closest visible player-land
-	# DemoUnitIcon (chrome → station). Not hex-under-cursor membership.
-	const CHROME_SPILL_WORLD: float = 180.0
+	# Home chrome spills onto nearby hexes / Berlin-Home while GER land stays
+	# on 710173 (+ nbr). After disk + hex miss_pid miss, bind closest visible
+	# player-land DemoUnitIcon (chrome → station). Not hex membership.
+	const CHROME_SPILL_WORLD: float = 340.0
 	var land_only: bool = true
 	var player_only: bool = true
 	if _demo_unit_icon_pids.is_empty():
@@ -18115,14 +18126,14 @@ func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) 
 		if stacked != null:
 			fo = stacked
 	if fo == null:
-		# Disk miss (empty / non-player): player land stationed on the province
+		# Disk miss (empty / non-player): player land stationed on the hex
 		# under the click — even when first pick is not air/fleet/space.
-		# Before capital star / _try_open_unit_at_world / province tooltip.
-		var miss_pid: int = _resolve_map_pick_pid(world_pos)
+		# Hex-only: capital star stays the next still-click step after land-open.
+		var miss_pid: int = _resolve_hex_pick_pid(world_pos)
 		fo = _player_land_formation_at_province(miss_pid)
 	if fo == null:
-		# Home chrome over Neustadt / Schwäbisch Hall / FRA edge: nearest
-		# painted player-land icon (station 710173 / ger_nbr), not hex membership.
+		# Home chrome over Neustadt / Schwäbisch Hall / FRA / Berlin-Home:
+		# nearest painted player-land icon (station 710173 / ger_nbr).
 		fo = _nearest_player_land_formation_at_world(world_pos)
 	if fo == null:
 		return false
