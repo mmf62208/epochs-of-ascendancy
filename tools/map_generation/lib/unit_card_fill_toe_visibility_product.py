@@ -323,6 +323,7 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     (passes if home_hit else fails).append("home_hit_disk_tracks_counter_scale")
     land_pick_fn = _gd_func_slice(ren, "_pick_land_unit_formation_at_world")
     block_type_fn = _gd_func_slice(ren, "_formation_type_blocks_land_open")
+    stack_fn = _gd_func_slice(ren, "_player_land_formation_at_province")
     land_skips_air = (
         bool(land_fn)
         and "_pick_land_unit_formation_at_world" in land_fn
@@ -339,6 +340,22 @@ def build_unit_card_fill_toe_visibility_product(*, check_wiring: bool = True) ->
     )
     wiring["land_still_click_skips_air_fleet"] = land_skips_air
     (passes if land_skips_air else fails).append("land_still_click_skips_air_fleet")
+    land_player_only = (
+        bool(land_fn)
+        and "_formation_is_player_tag" in land_fn
+        and "_player_land_formation_at_province" in land_fn
+        and bool(land_pick_fn)
+        and "player_only" in land_pick_fn
+        and "player_only" in pick_fn
+        and "if player_only:" in pick_fn
+        and "return null" in pick_fn
+        and bool(stack_fn)
+        and "_collect_formations_at_province" in stack_fn
+        and "_formation_type_blocks_land_open" in stack_fn
+        and "_formation_is_player_tag" in stack_fn
+    )
+    wiring["land_still_click_player_tag_only"] = land_player_only
+    (passes if land_player_only else fails).append("land_still_click_player_tag_only")
 
     # DIG-FIRST (d998fcd): still-click opened title+Close only — strip fault before body.
     always_fill = (

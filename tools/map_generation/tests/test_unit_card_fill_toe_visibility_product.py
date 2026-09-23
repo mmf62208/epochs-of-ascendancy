@@ -57,6 +57,7 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
             "tooltip_not_map_pick_blocker",
             "chip_open_in_input",
             "land_still_click_skips_air_fleet",
+            "land_still_click_player_tag_only",
             "europe_home_counters_want_visible",
             "home_syncs_counter_visibility",
             "counter_scale_floor_readable",
@@ -122,6 +123,10 @@ class TestUnitCardFillToeVisibilityProduct(unittest.TestCase):
         self.assertIn("_try_open_land_chip_from_input", src)
         self.assertIn("func _pick_land_unit_formation_at_world", src)
         self.assertIn("func _formation_type_blocks_land_open", src)
+        self.assertIn("func _player_land_formation_at_province", src)
+        self.assertIn("func _formation_is_player_tag", src)
+        self.assertIn("_collect_formations_at_province", src)
+        self.assertIn("player_only", src)
         self.assertNotIn("DIG_CHIP_MISS", src)
         self.assertNotIn("DIG_CHIP_SKIP", src)
         self.assertIn("func _unit_counter_hit_radius_world", src)

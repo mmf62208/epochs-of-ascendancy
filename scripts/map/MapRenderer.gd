@@ -17990,20 +17990,60 @@ func _formation_type_blocks_land_open(fo: Object) -> bool:
 	return ft == Formation.TYPE_AIR_WING or ft == Formation.TYPE_FLEET or ft == Formation.TYPE_SPACE_WING
 
 
+func _formation_is_player_tag(fo: Object) -> bool:
+	if fo == null:
+		return false
+	var p_tag: String = _player_tag()
+	if p_tag.is_empty() or not ("country_tag" in fo):
+		return false
+	return str(fo.country_tag).strip_edges().to_upper() == p_tag
+
+
+func _player_land_formation_at_province(province_id: int) -> Object:
+	# Stack under chrome: one DemoUnitIcon per pid can be air while GER land is stationed.
+	if province_id < 0:
+		return null
+	var forms: Array = _collect_formations_at_province(province_id)
+	var best: Object = null
+	for f_v in forms:
+		if f_v == null or not (f_v is Object):
+			continue
+		var cand: Object = f_v as Object
+		if _formation_type_blocks_land_open(cand):
+			continue
+		if not _formation_is_player_tag(cand):
+			continue
+		var ft: String = str(cand.formation_type) if "formation_type" in cand else ""
+		if ft == Formation.TYPE_DIVISION:
+			return cand
+		if best == null:
+			best = cand
+	return best
+
+
 func _pick_land_unit_formation_at_world(world_pos: Vector2) -> Object:
-	# Same hit-disk / visible-icon / player-tag walk as `_pick_unit_formation_at_world`,
-	# but skip air_wing / fleet / space_wing so a player air pin cannot steal land.
+	# Same hit-disk / visible-icon walk as `_pick_unit_formation_at_world`,
+	# but player-tag land only (skip air/fleet/space + foreign best_any).
 	var land_only: bool = true
-	return _pick_unit_formation_at_world(world_pos, land_only)
+	var player_only: bool = true
+	return _pick_unit_formation_at_world(world_pos, land_only, player_only)
 
 
 func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
-	var fo: Object = _pick_unit_formation_at_world(world_pos)
-	if fo != null and _formation_type_blocks_land_open(fo):
-		fo = _pick_land_unit_formation_at_world(world_pos)
+	var fo_any: Object = _pick_unit_formation_at_world(world_pos)
+	var fo: Object = _pick_land_unit_formation_at_world(world_pos)
+	if fo_any != null and _formation_type_blocks_land_open(fo_any):
+		# Air/fleet/space chrome: resolve player land at that province before
+		# neighbor foreign land icons can win an overlapping disk.
+		var chrome_pid: int = int(fo_any.stationed_province_id) if "stationed_province_id" in fo_any else -1
+		var stacked: Object = _player_land_formation_at_province(chrome_pid)
+		if stacked != null:
+			fo = stacked
 	if fo == null:
 		return false
 	if _formation_type_blocks_land_open(fo):
+		return false
+	if not _formation_is_player_tag(fo):
 		return false
 	_select_map_unit(fo)
 	# Pin click must not _select_province (3520 supply outlines hung input after chip).
@@ -18232,7 +18272,7 @@ func _on_march_hop_ui(to_pid: int, arrived: bool, dest_id: int = -1, hop: Dictio
 		_show_inspector_toast("Marching · now at %s" % pname, 2.8)
 
 
-func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false) -> Object:
+func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false, player_only: bool = false) -> Object:
 	if _demo_unit_icon_pids.is_empty():
 		return null
 	# Strategic cull / master off: terrain, capitals, ocean beat chips.
@@ -18290,6 +18330,11 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false) 
 			continue
 		if land_only and _formation_type_blocks_land_open(fo):
 			continue
+		if player_only:
+			if p_tag.is_empty() or not ("country_tag" in fo):
+				continue
+			if str(fo.country_tag).strip_edges().to_upper() != p_tag:
+				continue
 		# Inclusive disk: accept boundary (d == hit_r2) as a valid best.
 		if d <= best_any_d:
 			best_any_d = d
@@ -18301,6 +18346,8 @@ func _pick_unit_formation_at_world(world_pos: Vector2, land_only: bool = false) 
 				best_player = fo
 	if best_player != null:
 		return best_player
+	if player_only:
+		return null
 	return best_any
 
 

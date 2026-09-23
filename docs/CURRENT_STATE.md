@@ -9,6 +9,8 @@
 > Do not prioritize from this file alone; append session notes only.
 
 ---
+> **2026-09-23 FEED land still-click player-tag only (PR 50):** Play MIXED on `24ac5d0` — air-skip FEED works (Fill%/TOE body opens; DIG clean). Soft wall: still-click under Europe Home opened **SOV** Division 0 / DNK instead of **GER**. `_pick_unit_formation_at_world` fell through to foreign `best_any` when no player land pin was in the disk; land_only re-pick also promoted a neighbor foreign land icon when chrome meta was air. Land still-click is now **player-tag land only** (closest player land; no foreign `best_any`). Air/fleet/space chrome resolves player land via `_collect_formations_at_province` before neighbor icons. Fill%/TOE body / AABB / DIG-off / has_method **untouched**. HOLD merge.
+>
 > **2026-09-23 FEED land still-click skips air/fleet (PR 50):** Play DIG on `61ebe7a` — `inside=1` + `DIG_CHIP_SKIP reason=air_wing`. Soft wall is **open**, not AABB: `_pick_unit_formation_at_world` prefers a player air_wing over nearby land; `_try_open_land_unit_at_world` then rejected and glance tooltip won. Land still-click now re-picks best land Formation in hit disks (`_pick_land_unit_formation_at_world`, same walk + player-tag, skip air/fleet/space). DIG instrument stripped. Hit-AABB / Fill%/TOE body / tooltip-suppress / has_method **untouched**. HOLD merge.
 >
 > **2026-09-23 SOFT Fill%/TOE body after fallback (PR 50):** Prior always-paint still called strip before Stationed/Leader and skipped LandCombatPower when GER Division had only `design_id` — fold became `Fill —%` with no TOE bits / no body if strip threw. Parent body first; infer TOE from design_id (tiger/panzer); keep `Fill —% · TOE —` if strip omits TOE. Hit-AABB / LOD untouched. HOLD merge.

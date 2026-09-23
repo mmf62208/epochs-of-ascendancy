@@ -284,6 +284,7 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
     land_fn = _gd_func_slice(ren, "_try_open_land_unit_at_world")
     land_pick_fn = _gd_func_slice(ren, "_pick_land_unit_formation_at_world")
     block_type_fn = _gd_func_slice(ren, "_formation_type_blocks_land_open")
+    stack_fn = _gd_func_slice(ren, "_player_land_formation_at_province")
     land_skips_air = (
         bool(land_fn)
         and "_pick_land_unit_formation_at_world" in land_fn
@@ -303,6 +304,27 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         passes.append("land_still_click_skips_air_fleet")
     else:
         fails.append("land_still_click_skips_air_fleet")
+    # Play MIXED: foreign best_any opened SOV/DNK. Land still-click is player-tag
+    # land only; air chrome resolves stack via _collect_formations_at_province.
+    land_player_only = (
+        bool(land_fn)
+        and "_formation_is_player_tag" in land_fn
+        and "_player_land_formation_at_province" in land_fn
+        and bool(land_pick_fn)
+        and "player_only" in land_pick_fn
+        and "player_only" in pick_fn
+        and "if player_only:" in pick_fn
+        and "return null" in pick_fn
+        and bool(stack_fn)
+        and "_collect_formations_at_province" in stack_fn
+        and "_formation_type_blocks_land_open" in stack_fn
+        and "_formation_is_player_tag" in stack_fn
+    )
+    wiring["land_still_click_player_tag_only"] = land_player_only
+    if land_player_only:
+        passes.append("land_still_click_player_tag_only")
+    else:
+        fails.append("land_still_click_player_tag_only")
     tooltip_not_blocker = bool(block_fn) and '"ProvinceHoverTooltip"' not in block_fn
     wiring["tooltip_not_pick_blocker"] = tooltip_not_blocker
     if tooltip_not_blocker:
@@ -369,7 +391,8 @@ def build_unit_centric_pick_product(*, check_wiring: bool = True) -> Dict[str, A
         "; home_hit_disk_tracks_counter_scale"
         "; home_hit_covers_full_plate_label_aabb"
         "; capital_star_before_chip; chip_match_station_province_one_pin_per_hex"
-        "; land_still_click_skips_air_fleet",
+        "; land_still_click_skips_air_fleet"
+        "; land_still_click_player_tag_only",
     }
 
 
