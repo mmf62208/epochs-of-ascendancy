@@ -25891,7 +25891,7 @@
       "domain": "land",
       "theater": "europe_core",
       "strategic_region_hint": "British Isles",
-      "population_base": 250000,
+      "population_base": 62991,
       "nuts_id": "UKJ14",
       "cntr_code": "UK",
       "core_for_tags": [
@@ -68387,6 +68387,42 @@
       "cntr_code": "FR",
       "core_for_tags": [
         "FRA"
+      ],
+      "natural_resources": {},
+      "special_features": [],
+      "island_class": "mainland",
+      "facility_tier": 1
+    },
+    {
+      "id": 711523,
+      "name": "Oxfordshire North",
+      "terrain": "plains",
+      "domain": "land",
+      "theater": "europe_core",
+      "strategic_region_hint": "British Isles",
+      "population_base": 123048,
+      "nuts_id": "UKJ14",
+      "cntr_code": "UK",
+      "core_for_tags": [
+        "ENG"
+      ],
+      "natural_resources": {},
+      "special_features": [],
+      "island_class": "mainland",
+      "facility_tier": 1
+    },
+    {
+      "id": 711524,
+      "name": "Oxfordshire East",
+      "terrain": "plains",
+      "domain": "land",
+      "theater": "europe_core",
+      "strategic_region_hint": "British Isles",
+      "population_base": 63961,
+      "nuts_id": "UKJ14",
+      "cntr_code": "UK",
+      "core_for_tags": [
+        "ENG"
       ],
       "natural_resources": {},
       "special_features": [],
