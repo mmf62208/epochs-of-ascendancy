@@ -1582,6 +1582,10 @@ func _mouse_over_close_control() -> bool:
 
 
 func _mouse_over_search_control() -> bool:
+	# Rect first: after +6d / living title, gui_get_hovered_control can miss the
+	# Go button (overlay, leftover pick-block) while the cursor is still on it.
+	if _search_ui_owns_click():
+		return true
 	var vp_s: Viewport = get_viewport()
 	if vp_s == null:
 		return false
@@ -1590,10 +1594,34 @@ func _mouse_over_search_control() -> bool:
 		return false
 	var n_s: Node = hov_s
 	while n_s != null:
-		if str(n_s.name) == "MapProvinceSearch":
+		var nn_s: String = str(n_s.name)
+		if nn_s == "MapProvinceSearch" or nn_s == "SearchGoButton" or nn_s == "SearchLineEdit":
 			return true
 		n_s = n_s.get_parent()
 	return false
+
+
+func _search_ui_owns_click() -> bool:
+	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
+		return false
+	var vp_r: Viewport = get_viewport()
+	if vp_r == null:
+		return false
+	var sr: Control = _map_search as Control
+	return sr.get_global_rect().grow(6.0).has_point(vp_r.get_mouse_position())
+
+
+func rebind_map_search() -> void:
+	# Living title Begin can leave Search bound to a stale renderer / empty index.
+	if _map_search == null or not is_instance_valid(_map_search):
+		_map_search = null
+		_setup_player_map_ux()
+		return
+	var cam_rb := get_node_or_null("MapCamera") as Camera2D
+	if _map_search.has_method("bind"):
+		_map_search.call("bind", self, cam_rb)
+	if _map_search.has_method("rebuild_index"):
+		_map_search.call("rebuild_index")
 
 
 func _release_search_focus() -> void:
@@ -1650,6 +1678,9 @@ func _handle_escape_key() -> void:
 	if _esc_stack_frame == frame_now:
 		return
 	_esc_stack_frame = frame_now
+	# Search LineEdit must not steal idle Esc→CC (Play MIXED e36825b after +6d).
+	# Release focus and keep walking the stack — do not treat unfocus as a dismiss.
+	_release_search_focus()
 	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
 	# without GIS lock or a second search.
 	if _unit_detail_popup_is_visible():
@@ -1823,7 +1854,7 @@ func _input(event: InputEvent) -> void:
 			else:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
-			if event.pressed and _mouse_over_search_control():
+			if event.pressed and (_mouse_over_search_control() or _search_ui_owns_click()):
 				return
 			if event.pressed:
 				# New map press unlocks Close/Esc camera lock *before* leftover
@@ -1852,6 +1883,8 @@ func _input(event: InputEvent) -> void:
 					# Pan latch stays. Do not swallow Open fight / unit-card buttons
 					# (2d47d06: fold click was tooltip-only no-op after pan PASS).
 					# Search LineEdit/Go already returned above — do not touch that path.
+					if _search_ui_owns_click():
+						return
 					if not _is_mouse_over_blocking_ui():
 						_arm_left_map_press()
 						_mark_left_pan_blocked_pick()
@@ -1868,7 +1901,7 @@ func _input(event: InputEvent) -> void:
 					_dismiss_inspector_and_restore_input()
 					get_viewport().set_input_as_handled()
 					return
-				if _mouse_over_search_control():
+				if _mouse_over_search_control() or _search_ui_owns_click():
 					return
 				_finish_close_click_guard_on_new_press()
 				# Arm pan on the map even if a HUD Control is hovered (search/toolbar).
@@ -2180,7 +2213,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dismiss_inspector_and_restore_input()
 			get_viewport().set_input_as_handled()
 			return
-		if _mouse_over_search_control():
+		if _mouse_over_search_control() or _search_ui_owns_click():
 			return
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
@@ -2745,6 +2778,11 @@ func _setup_player_map_ux() -> void:
 		_map_search.set_script(SearchScript)
 		_map_search.name = "MapProvinceSearch"
 		ui.add_child(_map_search)
+		if _map_search is Control:
+			var sr_boot: Control = _map_search as Control
+			sr_boot.mouse_filter = Control.MOUSE_FILTER_STOP
+			sr_boot.z_index = 90
+			sr_boot.process_mode = Node.PROCESS_MODE_ALWAYS
 		var cam := get_node_or_null("MapCamera") as Camera2D
 		if _map_search.has_method("bind"):
 			_map_search.call("bind", self, cam)
@@ -2813,6 +2851,9 @@ func _layout_map_ui() -> void:
 		sr.offset_top = chrome_top
 		sr.offset_right = -12.0
 		sr.offset_bottom = chrome_top + 32.0
+		sr.z_index = 90
+		sr.mouse_filter = Control.MOUSE_FILTER_STOP
+		sr.process_mode = Node.PROCESS_MODE_ALWAYS
 
 	if info_panel is Control and not info_panel.has_meta("user_moved"):
 		var ip := info_panel as Control
@@ -18119,7 +18160,7 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
 	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
 	# Esc helpers + Dig2 / Drag2+3 pan helpers untouched.
-	if _mouse_over_search_control() or _mouse_over_close_control():
+	if _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control():
 		return false
 	if _is_mouse_over_blocking_ui():
 		return false

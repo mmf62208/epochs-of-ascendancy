@@ -89,6 +89,12 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (SEARCH_GD, "fold_search_key"),
     (SEARCH_GD, "city_name"),
     (SEARCH_GD, "cologne"),
+    (SEARCH_GD, "SearchGoButton"),
+    (SEARCH_GD, "text_submitted.connect"),
+    (SEARCH_GD, "button_down.connect"),
+    (SEARCH_GD, "submit_from_live_ui"),
+    (RENDERER_GD, "_search_ui_owns_click"),
+    (RENDERER_GD, "rebind_map_search"),
     (FORMATTERS_GD, "Road Spine"),
     (FORMATTERS_PY, "Road Spine"),
 )
@@ -610,6 +616,51 @@ def ix1_search_go_live_path() -> Dict[str, Any]:
     }
 
 
+def ix1_search_go_live_signals() -> Dict[str, Any]:
+    """Prove live LineEdit+Go/Enter signals are wired — not resolve-only.
+
+    Play MIXED e36825b: headless resolve PASS, live Go click was a dead control.
+    """
+    search = _read(SEARCH_GD)
+    ren = _read(RENDERER_GD)
+    missing: List[str] = []
+    if "SearchGoButton" not in search:
+        missing.append("go_button_name")
+    if "SearchLineEdit" not in search:
+        missing.append("line_edit_name")
+    if "text_submitted.connect(_on_submit)" not in search:
+        missing.append("text_submitted_wired")
+    if "button_down.connect(_on_go_pressed)" not in search:
+        missing.append("button_down_wired")
+    if "pressed.connect(_on_go_pressed)" not in search:
+        missing.append("pressed_wired")
+    if "ACTION_MODE_BUTTON_PRESS" not in search:
+        missing.append("press_on_down")
+    if "submit_from_live_ui" not in search:
+        missing.append("submit_from_live_ui")
+    if "press_go_button" not in search:
+        missing.append("press_go_button")
+    if "KEY_ENTER" not in search or "KEY_KP_ENTER" not in search:
+        missing.append("enter_key_backup")
+    if "_search_ui_owns_click" not in ren:
+        missing.append("search_rect_owns_click")
+    if "rebind_map_search" not in ren:
+        missing.append("rebind_after_title")
+    if "get_global_rect" not in _slice_func(ren, "_search_ui_owns_click"):
+        missing.append("search_global_rect")
+    if "_release_search_focus" not in _slice_func(ren, "_handle_escape_key"):
+        missing.append("esc_releases_search_focus")
+    live = ix1_search_go_live_path()
+    if not live.get("ok"):
+        missing.append("search_go_live_resolve")
+    return {
+        "ok": not missing,
+        "missing": missing,
+        "hub_id": HUB_ID,
+        "search_go_live_path": live,
+    }
+
+
 def ix1_province_select_under_garrison() -> Dict[str, Any]:
     """Search/Go + Alt/infra empty-terrain must open province inspector under garrison."""
     ren = _read(RENDERER_GD)
@@ -753,6 +804,12 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
     else:
         fails.append("search_go_live_resolve")
 
+    search_signals = ix1_search_go_live_signals()
+    if search_signals.get("ok"):
+        passes.append("search_go_live_signals")
+    else:
+        fails.append("search_go_live_signals")
+
     return {
         "ok": not fails,
         "slice": SLICE_NAME,
@@ -772,6 +829,7 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
         "day_tick_unblocked": day_tick,
         "province_select_under_garrison": select_gate,
         "search_go_live_resolve": search_live,
+        "search_go_live_signals": search_signals,
         "parked": [
             "Dig2 pan",
             "old G polyline dig",

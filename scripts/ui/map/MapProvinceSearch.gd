@@ -5,6 +5,9 @@ extends HBoxContainer
 const IX1_HUB_ID := 710417
 const IX1_BONN_ID := 710416
 const IX1_LEVERKUSEN_ID := 710418
+const LINE_NAME := "SearchLineEdit"
+const GO_NAME := "SearchGoButton"
+const SUBMIT_GUARD_MS := 180
 ## Live Search must resolve Köln / Cologne / Koln / Koeln to the Rhineland hub.
 const SEARCH_ALIASES := {
 	"cologne": IX1_HUB_ID,
@@ -23,26 +26,43 @@ const SEARCH_ALIASES := {
 
 var _map_renderer: Node = null
 var _line: LineEdit = null
+var _go: Button = null
 var _names: Dictionary = {}  # lower / folded name -> pid
 var _folded_names: Dictionary = {}  # ascii-folded key -> pid
+var _submit_guard_msec: int = 0
+var _last_live_submit_pid: int = -1
 
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	z_index = 90
 	add_theme_constant_override("separation", 6)
-	_line = LineEdit.new()
-	_line.placeholder_text = "Search province..."
-	_line.custom_minimum_size = Vector2(180, 0)
-	_line.text_submitted.connect(_on_submit)
-	add_child(_line)
+	_ensure_live_controls()
 
-	var btn := Button.new()
-	btn.text = "Go"
-	btn.pressed.connect(_on_go_pressed)
-	add_child(btn)
+
+func _input(event: InputEvent) -> void:
+	# Enter after living title / +6d: LineEdit text_submitted can no-op if focus is stale.
+	if not (event is InputEventKey):
+		return
+	var key: InputEventKey = event
+	if not key.pressed or key.echo:
+		return
+	if key.keycode != KEY_ENTER and key.keycode != KEY_KP_ENTER:
+		return
+	if _line == null or not is_instance_valid(_line):
+		return
+	if not _line.has_focus() and not _search_owns_focus():
+		return
+	_on_submit(_line.text)
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		vp.set_input_as_handled()
 
 
 func bind(map_renderer: Node, _camera: Camera2D) -> void:
 	_map_renderer = map_renderer
+	_ensure_live_controls()
 	rebuild_index()
 
 
@@ -62,6 +82,74 @@ static func fold_search_key(s: String) -> String:
 	t = t.replace("ç", "c").replace("ñ", "n").replace("ø", "o")
 	t = t.replace("\u0308", "").replace("\u0301", "").replace("\u0300", "").replace("\u0302", "")
 	return t
+
+
+func _ensure_live_controls() -> void:
+	if _line == null or not is_instance_valid(_line):
+		_line = get_node_or_null(LINE_NAME) as LineEdit
+	if _line == null:
+		_line = LineEdit.new()
+		_line.name = LINE_NAME
+		add_child(_line)
+	_line.placeholder_text = "Search province..."
+	_line.custom_minimum_size = Vector2(180, 0)
+	_line.mouse_filter = Control.MOUSE_FILTER_STOP
+	_line.focus_mode = Control.FOCUS_ALL
+	_line.editable = true
+	if not _line.text_submitted.is_connected(_on_submit):
+		_line.text_submitted.connect(_on_submit)
+	if not _line.gui_input.is_connected(_on_line_gui_input):
+		_line.gui_input.connect(_on_line_gui_input)
+
+	if _go == null or not is_instance_valid(_go):
+		_go = get_node_or_null(GO_NAME) as Button
+	if _go == null:
+		_go = Button.new()
+		_go.name = GO_NAME
+		add_child(_go)
+	_go.text = "Go"
+	_go.mouse_filter = Control.MOUSE_FILTER_STOP
+	_go.focus_mode = Control.FOCUS_ALL
+	# Press-on-down so leftover map-pan / pick-block cannot eat button-up.
+	_go.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	if not _go.pressed.is_connected(_on_go_pressed):
+		_go.pressed.connect(_on_go_pressed)
+	if not _go.button_down.is_connected(_on_go_pressed):
+		_go.button_down.connect(_on_go_pressed)
+	if not _go.gui_input.is_connected(_on_go_gui_input):
+		_go.gui_input.connect(_on_go_gui_input)
+
+
+func _search_owns_focus() -> bool:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return false
+	var fo: Control = vp.gui_get_focus_owner()
+	if fo == null:
+		return false
+	return fo == _line or fo == _go or is_ancestor_of(fo)
+
+
+func _on_line_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventKey):
+		return
+	var key: InputEventKey = event
+	if not key.pressed or key.echo:
+		return
+	if key.keycode != KEY_ENTER and key.keycode != KEY_KP_ENTER:
+		return
+	_on_submit(_line.text if _line != null else "")
+	accept_event()
+
+
+func _on_go_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb: InputEventMouseButton = event
+	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	_on_go_pressed()
+	accept_event()
 
 
 func _rebuild_index() -> void:
@@ -132,20 +220,58 @@ func _index_name(raw: String, pid: int) -> void:
 
 
 func _on_go_pressed() -> void:
+	_ensure_live_controls()
 	_on_submit(_line.text if _line != null else "")
 
 
 func _on_submit(text: String) -> void:
+	var now: int = Time.get_ticks_msec()
+	if now - _submit_guard_msec < SUBMIT_GUARD_MS:
+		return
+	_submit_guard_msec = now
+	_ensure_live_controls()
 	if _names.is_empty():
 		_rebuild_index()
 	var pid: int = resolve_search_query(text)
 	if pid < 0:
 		_rebuild_index()
 		pid = resolve_search_query(text)
+	_last_live_submit_pid = pid
 	if pid < 0:
 		_toast_search_miss(text)
 		return
 	_go_to_province(pid)
+
+
+func submit_from_live_ui(text: String) -> int:
+	## Same path the live LineEdit Enter / Go button use (not resolve-only).
+	_ensure_live_controls()
+	if _line != null:
+		_line.text = text
+	_submit_guard_msec = 0
+	_on_submit(text)
+	return _last_live_submit_pid
+
+
+func press_go_button() -> int:
+	_ensure_live_controls()
+	_submit_guard_msec = 0
+	_on_go_pressed()
+	return _last_live_submit_pid
+
+
+func get_search_line() -> LineEdit:
+	_ensure_live_controls()
+	return _line
+
+
+func get_go_button() -> Button:
+	_ensure_live_controls()
+	return _go
+
+
+func last_live_submit_pid() -> int:
+	return _last_live_submit_pid
 
 
 func resolve_search_query(text: String) -> int:
@@ -195,11 +321,32 @@ func _resolve_search_pid(q: String) -> int:
 	return -1
 
 
+func _resolve_map_renderer() -> Node:
+	if _map_renderer != null and is_instance_valid(_map_renderer):
+		return _map_renderer
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return null
+	var mr: Node = tree.get_first_node_in_group("map_renderer")
+	if mr == null and tree.current_scene != null:
+		mr = tree.current_scene.find_child("MapRenderer", true, false)
+	if mr != null:
+		_map_renderer = mr
+	return _map_renderer
+
+
 func _go_to_province(pid: int) -> void:
-	if _map_renderer != null and _map_renderer.has_method("open_province_inspector_from_search"):
-		_map_renderer.call("open_province_inspector_from_search", pid)
-	elif _map_renderer != null and _map_renderer.has_method("focus_province_by_id"):
-		_map_renderer.call("focus_province_by_id", pid, "soft")
+	var mr: Node = _resolve_map_renderer()
+	var opened: bool = false
+	if mr != null and mr.has_method("open_province_inspector_from_search"):
+		opened = bool(mr.call("open_province_inspector_from_search", pid))
+	elif mr != null and mr.has_method("focus_province_by_id"):
+		opened = bool(mr.call("focus_province_by_id", pid, "soft"))
+	if not opened:
+		if mr == null:
+			_toast_search_unbound(pid)
+		else:
+			_toast_inspector_failed(pid)
 	var vp := get_viewport()
 	if vp != null:
 		vp.gui_release_focus()
@@ -207,13 +354,27 @@ func _go_to_province(pid: int) -> void:
 
 func _toast_search_miss(text: String) -> void:
 	var q: String = text.strip_edges()
-	if q == "":
-		return
-	if _map_renderer != null and _map_renderer.has_method("_show_inspector_toast"):
-		_map_renderer.call("_show_inspector_toast", "No province match for '%s'" % q, 2.2)
+	var msg: String = "No province match — type a name, then Go" if q == "" else "No province match for '%s'" % q
+	_emit_search_toast(msg, true)
 	var vp := get_viewport()
 	if vp != null:
 		vp.gui_release_focus()
+
+
+func _toast_inspector_failed(pid: int) -> void:
+	_emit_search_toast("Search found %d but province inspector did not open" % pid, true)
+
+
+func _toast_search_unbound(pid: int) -> void:
+	_emit_search_toast("Search is not bound to the map (pid %d)" % pid, true)
+
+
+func _emit_search_toast(msg: String, is_error: bool) -> void:
+	var mr: Node = _resolve_map_renderer()
+	if mr != null and mr.has_method("_show_inspector_toast"):
+		mr.call("_show_inspector_toast", msg, 2.4, is_error)
+	elif typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+		LeaderEventUI.show_toast(msg, 2.4, is_error)
 
 
 func select_province_by_id(pid: int) -> void:

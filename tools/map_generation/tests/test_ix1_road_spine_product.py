@@ -27,6 +27,7 @@ from ix1_road_spine_product import (  # noqa: E402
     ix1_province_select_under_garrison,
     ix1_road_spine_mandate_cost,
     ix1_search_go_live_path,
+    ix1_search_go_live_signals,
     ix1_search_go_resolve,
     load_ix1_spec,
     movement_cost,
@@ -120,6 +121,13 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertTrue(live.get("ok"), msg=live)
         p = build_ix1_road_spine_product()
         self.assertIn("search_go_live_resolve", p.get("passes") or [])
+
+    def test_search_go_live_signals_wired(self) -> None:
+        # Play MIXED e36825b: resolve PASS, live LineEdit+Go was a dead control.
+        gate = ix1_search_go_live_signals()
+        self.assertTrue(gate.get("ok"), msg=gate)
+        p = build_ix1_road_spine_product()
+        self.assertIn("search_go_live_signals", p.get("passes") or [])
 
     def test_live_f5_equiv_gate_not_playtest_clock(self) -> None:
         tick = ix1_day_tick_unblocked()

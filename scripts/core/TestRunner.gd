@@ -681,6 +681,9 @@ func _on_living_title_boot_closed(result: Dictionary) -> void:
 	if tag.is_empty():
 		tag = "GER"
 	player_tag = tag
+	# Live Search LineEdit+Go can be unbound / empty-index after title Begin.
+	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("rebind_map_search"):
+		map_renderer.call("rebind_map_search")
 	if not has_meta("eoa_first_session_toast"):
 		set_meta("eoa_first_session_toast", true)
 		_toast_first_session_onboarding()
