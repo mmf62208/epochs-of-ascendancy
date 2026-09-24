@@ -60,6 +60,8 @@ func _run() -> void:
 	_test_source_live_inspector_path()
 	_test_resolve_aliases()
 	_test_go_enter_signal_wiring()
+	_test_source_spine_visible_after_search()
+	_test_idm_should_show_spine_on_koln()
 
 
 func _test_source_live_inspector_path() -> void:
@@ -104,7 +106,77 @@ func _test_source_live_inspector_path() -> void:
 	if "show_info_panel(province, true, true)" not in hex:
 		_fail("Alt/infra hex backup does not force-open inspector")
 		return
+	if "_reveal_ix1_road_spine_on_inspector" not in live:
+		_fail("Search live path does not reveal Build Road Spine")
+		return
 	_pass("Search/Go + Alt/infra source path force-opens inspector (soft pan, no queue_free)")
+
+
+func _test_source_spine_visible_after_search() -> void:
+	var ren := _read(SRC_REN)
+	if ren.is_empty():
+		_fail("MapRenderer source missing for spine-visible gate")
+		return
+	var live := _slice_func(ren, "open_province_inspector_from_search")
+	if "_reveal_ix1_road_spine_on_inspector" not in live:
+		_fail("open_province_inspector_from_search does not reveal Build Road Spine")
+		return
+	var hex := _slice_func(ren, "_open_hex_province_inspector")
+	if "_reveal_ix1_road_spine_on_inspector" not in hex:
+		_fail("Alt/infra hex backup does not reveal Build Road Spine")
+		return
+	var show := _slice_func(ren, "show_info_panel")
+	if "_reveal_ix1_road_spine_on_inspector" not in show:
+		_fail("show_info_panel does not keep Build Road Spine on the live inspector")
+		return
+	var pin := _slice_func(ren, "_pin_road_spine_button_to_inspector_chrome")
+	if pin.is_empty() or "add_child" not in pin:
+		_fail("Build Road Spine is not pinned to InfoPanel chrome")
+		return
+	var reveal := _slice_func(ren, "_reveal_ix1_road_spine_on_inspector")
+	if "scroll_vertical" not in reveal:
+		_fail("Search reveal does not reset inspector scroll")
+		return
+	if "Ix1SpineBuildRow" not in ren or "BtnBuildRoadSpineInList" not in ren:
+		_fail("Build Road Spine is not pinned into the live facility Build list")
+		return
+	if "_prepend_ix1_spine_build_row" not in _slice_func(ren, "_update_special_sites_ui"):
+		_fail("special-sites Build list does not prepend Build Road Spine")
+		return
+	var layout := _slice_func(ren, "_layout_road_spine_chrome_button")
+	if "230" not in layout:
+		_fail("Build Road Spine chrome is not next to Settle")
+		return
+	_pass("Search+Go live path pins Build Road Spine on chrome + facility Build list")
+
+
+func _test_idm_should_show_spine_on_koln() -> void:
+	var idm: Node = root.get_node_or_null("InfrastructureDevelopmentManager")
+	if idm == null:
+		_fail("InfrastructureDevelopmentManager autoload missing")
+		return
+	if not idm.has_method("should_show_road_spine_button"):
+		_fail("should_show_road_spine_button missing")
+		return
+	if not idm.has_method("is_ix1_road_spine_province"):
+		_fail("is_ix1_road_spine_province missing")
+		return
+	if not bool(idm.call("is_ix1_road_spine_province", HUB_ID)):
+		_fail("710417 is not an IX-1 corridor province")
+		return
+	if not bool(idm.call("should_show_road_spine_button", HUB_ID, "GER")):
+		_fail("should_show_road_spine_button(710417, GER) is false on day-0 Köln")
+		return
+	if bool(idm.call("should_show_road_spine_button", 710403, "GER")):
+		_fail("should_show_road_spine_button showed on off-spine Essen")
+		return
+	if not idm.has_method("get_ix1_road_spine_mandate_cost"):
+		_fail("get_ix1_road_spine_mandate_cost missing")
+		return
+	if int(idm.call("get_ix1_road_spine_mandate_cost")) != 0:
+		_fail("IX-1 Mandate cost is not 0")
+		return
+	_pass("IDM shows startable Build Road Spine on GER 1936 day-0 Köln (Mandate 0)")
 
 
 func _test_resolve_aliases() -> void:

@@ -29,6 +29,7 @@ from ix1_road_spine_product import (  # noqa: E402
     ix1_search_go_live_path,
     ix1_search_go_live_signals,
     ix1_search_go_resolve,
+    ix1_search_go_spine_visible,
     load_ix1_spec,
     movement_cost,
     shipped_api_integrity,
@@ -128,6 +129,14 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertTrue(gate.get("ok"), msg=gate)
         p = build_ix1_road_spine_product()
         self.assertIn("search_go_live_signals", p.get("passes") or [])
+
+    def test_search_go_spine_visible_on_koln_inspector(self) -> None:
+        # Play MIXED 5732d34: Köln panel opened, Build Road Spine absent among facility rows.
+        gate = ix1_search_go_spine_visible()
+        self.assertTrue(gate.get("ok"), msg=gate)
+        self.assertEqual(int(gate.get("hub_id")), HUB_ID)
+        p = build_ix1_road_spine_product()
+        self.assertIn("search_go_spine_visible", p.get("passes") or [])
 
     def test_live_f5_equiv_gate_not_playtest_clock(self) -> None:
         tick = ix1_day_tick_unblocked()

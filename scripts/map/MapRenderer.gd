@@ -2903,11 +2903,15 @@ func _layout_info_panel_inner() -> void:
 
 	const PAD_L := 18.0
 	const PAD_R := 16.0
-	const HEADER_H := 40.0
 	const FOOTER_PAD := 12.0
 	const INNER_L := 12.0
 	const INNER_R := 12.0
 	const SCROLLBAR_W := 14.0
+	# Settle + IX-1 Build Road Spine share the chrome row under National Spirits / Close.
+	# Keep scroll under that row so Search+Go Köln does not bury the spine CTA in InfoContent.
+	var header_h := 40.0
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
+		header_h = 68.0
 
 	if btn_national_spirits != null:
 		btn_national_spirits.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -2934,9 +2938,10 @@ func _layout_info_panel_inner() -> void:
 
 	# Explicit pixel box for scroll — do NOT use full-rect anchors (content growth was expanding it).
 	var scroll_x := PAD_L
-	var scroll_y := HEADER_H
+	var scroll_y := header_h
 	var scroll_w := maxf(panel_w - PAD_L - PAD_R, 120.0)
-	var scroll_h := maxf(panel_h - HEADER_H - FOOTER_PAD, 80.0)
+	var scroll_h := maxf(panel_h - header_h - FOOTER_PAD, 80.0)
+	_layout_road_spine_chrome_button()
 	var text_w := maxf(scroll_w - INNER_L - INNER_R - SCROLLBAR_W, 100.0)
 
 	var scroll := ip.get_node_or_null("InfoScroll") as ScrollContainer
@@ -17387,6 +17392,7 @@ func open_province_inspector_from_search(province_id: int) -> bool:
 	_raise_province_inspector_over_unit_card()
 	show_info_panel(province, true, true)
 	_raise_province_inspector_over_unit_card()
+	_reveal_ix1_road_spine_on_inspector(province, true)
 	_show_inspector_toast("%s · province inspector" % str(province.name), 2.2)
 	if typeof(MapManager) != TYPE_NIL:
 		MapManager.province_selected.emit(province_id)
@@ -17429,6 +17435,7 @@ func _open_hex_province_inspector(province: Province) -> void:
 	_raise_province_inspector_over_unit_card()
 	show_info_panel(province, true, true)
 	_raise_province_inspector_over_unit_card()
+	_reveal_ix1_road_spine_on_inspector(province, true)
 
 
 func _select_province(province: Province, node: Node2D) -> void:
@@ -17972,6 +17979,8 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 	_update_settle_button(province)
 	_update_assign_agent_button(province)
 	_refresh_oob_strip_for_province(province)
+	# Köln Search+Go must keep Build Road Spine on the live chrome, not only in buried scroll.
+	_reveal_ix1_road_spine_on_inspector(province, false)
 
 
 func _ensure_oob_strip() -> void:
@@ -19239,6 +19248,8 @@ func _info_content_vbox() -> VBoxContainer:
 
 
 func _ensure_infrastructure_investment_ui() -> void:
+	# Spine CTA is chrome (InfoPanel), not InfoContent — create even if the scroll vbox is missing.
+	_ensure_road_spine_button()
 	var content := _info_content_vbox()
 	if content == null:
 		return
@@ -19286,17 +19297,6 @@ func _ensure_infrastructure_investment_ui() -> void:
 		if not _btn_invest_infra.pressed.is_connected(_on_invest_infrastructure_pressed):
 			_btn_invest_infra.pressed.connect(_on_invest_infrastructure_pressed)
 		content.add_child(_btn_invest_infra)
-
-	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
-		_btn_build_road_spine = Button.new()
-		_btn_build_road_spine.name = "BtnBuildRoadSpine"
-		_btn_build_road_spine.text = "Build Road Spine"
-		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). First-session starter grant — GER 1936 day-0 Mandate is enough (generic Invest stays gated). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
-		_btn_build_road_spine.custom_minimum_size = Vector2(200, 28)
-		_btn_build_road_spine.visible = false
-		if not _btn_build_road_spine.pressed.is_connected(_on_build_road_spine_pressed):
-			_btn_build_road_spine.pressed.connect(_on_build_road_spine_pressed)
-		content.add_child(_btn_build_road_spine)
 
 	if _btn_develop_resource == null or not is_instance_valid(_btn_develop_resource):
 		_btn_develop_resource = Button.new()
@@ -19530,21 +19530,157 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 	_update_road_spine_button(province)
 
 
+func _ensure_road_spine_button() -> void:
+	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
+		_btn_build_road_spine = Button.new()
+		_btn_build_road_spine.name = "BtnBuildRoadSpine"
+		_btn_build_road_spine.text = "Build Road Spine"
+		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). First-session starter grant — GER 1936 day-0 Mandate is enough (generic Invest stays gated). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
+		_btn_build_road_spine.custom_minimum_size = Vector2(220, 24)
+		_btn_build_road_spine.visible = false
+		_btn_build_road_spine.focus_mode = Control.FOCUS_NONE
+		if not _btn_build_road_spine.pressed.is_connected(_on_build_road_spine_pressed):
+			_btn_build_road_spine.pressed.connect(_on_build_road_spine_pressed)
+	_pin_road_spine_button_to_inspector_chrome()
+
+
+func _pin_road_spine_button_to_inspector_chrome() -> void:
+	# Live Search+Go Köln shows facility Build rows in the scroll. Pin IX-1 next to Settle.
+	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	var parent: Node = _btn_build_road_spine.get_parent()
+	if parent != ip:
+		if parent != null:
+			parent.remove_child(_btn_build_road_spine)
+		ip.add_child(_btn_build_road_spine)
+	_btn_build_road_spine.focus_mode = Control.FOCUS_NONE
+	_btn_build_road_spine.mouse_filter = Control.MOUSE_FILTER_STOP
+	_btn_build_road_spine.z_index = 2
+	_layout_road_spine_chrome_button()
+
+
+func _layout_road_spine_chrome_button() -> void:
+	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	var panel_w := absf(ip.offset_right - ip.offset_left)
+	if panel_w < 80.0:
+		panel_w = maxf(ip.size.x, 520.0)
+	# Same chrome row as Settle (8,38,225,62) so Search+Go does not require scrolling.
+	var left := 230.0
+	var top := 38.0
+	var height := 24.0
+	var width := minf(280.0, maxf(200.0, panel_w - left - 16.0))
+	_btn_build_road_spine.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_btn_build_road_spine.position = Vector2(left, top)
+	_btn_build_road_spine.custom_minimum_size = Vector2(200, height)
+	_btn_build_road_spine.size = Vector2(width, height)
+
+
+func _ix1_should_show_spine_button(province: Province) -> bool:
+	if province == null:
+		return false
+	var mgr = _get_infra_manager()
+	if mgr != null and mgr.has_method("should_show_road_spine_button"):
+		if bool(mgr.should_show_road_spine_button(province.id, _player_tag())):
+			return true
+	# Search/Go fallback: MapManager cache can miss while the live Province is already in hand.
+	if mgr != null and mgr.has_method("is_ix1_road_spine_province"):
+		if not bool(mgr.is_ix1_road_spine_province(province.id)):
+			return false
+	elif province.id != 710416 and province.id != 710417 and province.id != 710418:
+		return false
+	if province.is_sea:
+		return false
+	var tag := _player_tag().strip_edges().to_upper()
+	if tag.is_empty():
+		return false
+	var owner := str(province.owner_tag).strip_edges().to_upper()
+	var ctrl := str(province.controller_tag).strip_edges().to_upper()
+	return owner == tag or ctrl == tag or owner.is_empty()
+
+
+func _reveal_ix1_road_spine_on_inspector(province: Province, reset_scroll: bool = true) -> void:
+	# Live-facing: Build Road Spine must be visible+startable after Search Köln/Cologne+Go.
+	if province == null:
+		return
+	_ensure_road_spine_button()
+	_update_road_spine_button(province)
+	_prepend_ix1_spine_build_row(province)
+	if reset_scroll and info_panel is Control:
+		var scroll := (info_panel as Control).get_node_or_null("InfoScroll") as ScrollContainer
+		if scroll != null:
+			scroll.scroll_vertical = 0
+			scroll.scroll_horizontal = 0
+	_layout_road_spine_chrome_button()
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
+		_layout_info_panel_inner()
+	_raise_province_inspector_over_unit_card()
+
+
+func _prepend_ix1_spine_build_row(province: Province) -> void:
+	# Pin a startable row into the facility Build list Play actually sees after Search+Go.
+	_ensure_special_sites_ui()
+	if _special_sites_container == null or not is_instance_valid(_special_sites_container):
+		return
+	if not _ix1_should_show_spine_button(province):
+		var stale: Node = _special_sites_container.get_node_or_null("Ix1SpineBuildRow")
+		if stale != null:
+			stale.queue_free()
+		return
+	var existing: Node = _special_sites_container.get_node_or_null("Ix1SpineBuildRow")
+	if existing != null and is_instance_valid(existing) and not existing.is_queued_for_deletion():
+		existing.visible = true
+		_special_sites_container.move_child(existing, 0)
+		_special_sites_container.visible = true
+		if _label_special_sites_header != null and is_instance_valid(_label_special_sites_header):
+			_label_special_sites_header.visible = true
+		return
+	var row := HBoxContainer.new()
+	row.name = "Ix1SpineBuildRow"
+	row.add_theme_constant_override("separation", 8)
+	var info_label := Label.new()
+	info_label.text = "Build Road Spine (Mandate 0, Bonn–Köln–Leverkusen)"
+	info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.add_child(info_label)
+	var btn := Button.new()
+	btn.name = "BtnBuildRoadSpineInList"
+	btn.text = "Build Road Spine"
+	btn.custom_minimum_size = Vector2(140, 24)
+	btn.tooltip_text = "IX-1 first-session starter — GER 1936 day-0 Mandate 0 is enough."
+	if not btn.pressed.is_connected(_on_build_road_spine_pressed):
+		btn.pressed.connect(_on_build_road_spine_pressed)
+	row.add_child(btn)
+	_special_sites_container.add_child(row)
+	_special_sites_container.move_child(row, 0)
+	_special_sites_container.visible = true
+	if _label_special_sites_header != null and is_instance_valid(_label_special_sites_header):
+		_label_special_sites_header.visible = true
+
+
 func _update_road_spine_button(province: Province) -> void:
-	_ensure_infrastructure_investment_ui()
+	_ensure_road_spine_button()
 	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
 		return
 	var mgr = _get_infra_manager()
-	if province == null or mgr == null:
+	if province == null:
 		_btn_build_road_spine.visible = false
 		return
-	var show_btn := false
-	if mgr.has_method("should_show_road_spine_button"):
-		show_btn = bool(mgr.should_show_road_spine_button(province.id, _player_tag()))
+	var show_btn := _ix1_should_show_spine_button(province)
 	_btn_build_road_spine.visible = show_btn
+	_pin_road_spine_button_to_inspector_chrome()
 	if not show_btn:
 		return
-	var status: Dictionary = mgr.get_project_status(province.id) if mgr.has_method("get_project_status") else {}
+	_btn_build_road_spine.visible = true
+	var status: Dictionary = {}
+	if mgr != null and mgr.has_method("get_project_status"):
+		status = mgr.get_project_status(province.id)
 	var active := bool(status.get("active", false))
 	var spine_proj := bool(status.get("build_road_spine", false))
 	if active:
@@ -19557,6 +19693,7 @@ func _update_road_spine_button(province: Province) -> void:
 		_btn_build_road_spine.disabled = false
 		_btn_build_road_spine.text = "Build Road Spine"
 		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). First-session starter grant — GER 1936 day-0 Mandate is enough (generic Invest stays gated). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
+	_layout_road_spine_chrome_button()
 
 
 func _on_build_road_spine_pressed() -> void:
@@ -20392,8 +20529,10 @@ func _update_special_sites_ui(province: Province) -> void:
 		_label_special_sites_header.text = "Special Sites (None)"
 		_special_sites_container.visible = true
 
-		# Clear previous
+		# Clear previous (keep IX-1 row — Search+Go live surface)
 		for child in _special_sites_container.get_children():
+			if str(child.name) == "Ix1SpineBuildRow":
+				continue
 			child.queue_free()
 
 		# === Real Site Construction Picker ===
@@ -20457,13 +20596,16 @@ func _update_special_sites_ui(province: Province) -> void:
 			build_btn.text = "Construct New Special Site (Port)"
 			build_btn.pressed.connect(_on_start_special_site_construction_pressed.bind(province.id))
 			_special_sites_container.add_child(build_btn)
+		_prepend_ix1_spine_build_row(province)
 		return
 
 	_label_special_sites_header.visible = true
 	_special_sites_container.visible = true
 
-	# Clear previous
+	# Clear previous (keep IX-1 row — Search+Go live surface)
 	for child in _special_sites_container.get_children():
+		if str(child.name) == "Ix1SpineBuildRow":
+			continue
 		child.queue_free()
 
 	_label_special_sites_header.text = "Special Sites (%d)" % sites.size()
@@ -20596,6 +20738,7 @@ func _update_special_sites_ui(province: Province) -> void:
 		effects_label.add_theme_font_size_override("font_size", 10)
 		effects_label.modulate = Color(0.7, 0.92, 0.8)
 		row.add_child(effects_label)
+	_prepend_ix1_spine_build_row(province)
 
 
 func _ensure_special_sites_ui() -> void:

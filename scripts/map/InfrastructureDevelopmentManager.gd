@@ -1027,10 +1027,13 @@ func should_show_road_spine_button(province_id: int, player_tag: String) -> bool
 	var p: Province = null
 	if typeof(MapManager) != TYPE_NIL:
 		p = MapManager.get_province(province_id)
-	if p == null or p.is_sea:
-		return false
 	var tag := player_tag.strip_edges().to_upper()
 	if tag.is_empty():
+		return false
+	if p == null:
+		# Search/Go may resolve Köln before MapManager cache; corridor + player tag is enough.
+		return true
+	if p.is_sea:
 		return false
 	if p.owner_tag.to_upper() != tag and p.controller_tag.to_upper() != tag:
 		return false

@@ -83,6 +83,9 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (RENDERER_GD, "_map_prefers_province_over_unit"),
     (RENDERER_GD, "chip_disk_only"),
     (RENDERER_GD, "open_province_inspector_from_search"),
+    (RENDERER_GD, "_reveal_ix1_road_spine_on_inspector"),
+    (RENDERER_GD, "_pin_road_spine_button_to_inspector_chrome"),
+    (RENDERER_GD, "Ix1SpineBuildRow"),
     (RENDERER_GD, "force_over_unit_card"),
     (RENDERER_GD, "_soft_pan_camera_to_province"),
     (SEARCH_GD, "open_province_inspector_from_search"),
@@ -616,6 +619,63 @@ def ix1_search_go_live_path() -> Dict[str, Any]:
     }
 
 
+def ix1_search_go_spine_visible() -> Dict[str, Any]:
+    """Live-facing: Build Road Spine must be visible+startable after Search+Go.
+
+    Play MIXED 5732d34: Cologne+Go opened Köln 710417, but the left chrome showed
+    facility Build rows only (Settle / Heavy Water / Kiel Canal…). Spine CTA was
+    buried in InfoContent under modifiers / construction list.
+    """
+    ren = _read(RENDERER_GD)
+    search = _read(SEARCH_GD)
+    idm = _read(IDM_GD)
+    missing: List[str] = []
+    live = _slice_func(ren, "open_province_inspector_from_search")
+    if "_reveal_ix1_road_spine_on_inspector" not in live:
+        missing.append("search_reveals_spine")
+    hex_open = _slice_func(ren, "_open_hex_province_inspector")
+    if "_reveal_ix1_road_spine_on_inspector" not in hex_open:
+        missing.append("hex_reveals_spine")
+    show = _slice_func(ren, "show_info_panel")
+    if "_reveal_ix1_road_spine_on_inspector" not in show:
+        missing.append("inspector_reveals_spine")
+    if "open_province_inspector_from_search" not in search:
+        missing.append("search_calls_live_inspector")
+    pin = _slice_func(ren, "_pin_road_spine_button_to_inspector_chrome")
+    if "info_panel" not in pin or "add_child" not in pin:
+        missing.append("spine_pinned_to_chrome")
+    reveal = _slice_func(ren, "_reveal_ix1_road_spine_on_inspector")
+    if "scroll_vertical" not in reveal:
+        missing.append("search_resets_scroll")
+    if "_pin_road_spine_button_to_inspector_chrome" not in _slice_func(ren, "_ensure_road_spine_button"):
+        missing.append("ensure_pins_chrome")
+    if "Ix1SpineBuildRow" not in ren or "BtnBuildRoadSpineInList" not in ren:
+        missing.append("spine_row_in_build_list")
+    if "_prepend_ix1_spine_build_row" not in _slice_func(ren, "_update_special_sites_ui"):
+        missing.append("special_sites_prepend_spine")
+    layout = _slice_func(ren, "_layout_road_spine_chrome_button")
+    if "230" not in layout or "38" not in layout:
+        missing.append("spine_chrome_next_to_settle")
+    show_btn = _slice_func(idm, "should_show_road_spine_button")
+    if "p == null" not in show_btn:
+        missing.append("idm_null_province_fallback")
+    if "Build Road Spine" not in ren:
+        missing.append("build_road_spine_label")
+    live_path = ix1_search_go_live_path()
+    if not live_path.get("ok"):
+        missing.append("search_go_live_resolve")
+    signals = ix1_search_go_live_signals()
+    if not signals.get("ok"):
+        missing.append("search_go_live_signals")
+    return {
+        "ok": not missing,
+        "missing": missing,
+        "hub_id": HUB_ID,
+        "search_go_live_path": live_path,
+        "search_go_live_signals": signals,
+    }
+
+
 def ix1_search_go_live_signals() -> Dict[str, Any]:
     """Prove live LineEdit+Go/Enter signals are wired — not resolve-only.
 
@@ -810,6 +870,12 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
     else:
         fails.append("search_go_live_signals")
 
+    spine_visible = ix1_search_go_spine_visible()
+    if spine_visible.get("ok"):
+        passes.append("search_go_spine_visible")
+    else:
+        fails.append("search_go_spine_visible")
+
     return {
         "ok": not fails,
         "slice": SLICE_NAME,
@@ -830,6 +896,7 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
         "province_select_under_garrison": select_gate,
         "search_go_live_resolve": search_live,
         "search_go_live_signals": search_signals,
+        "search_go_spine_visible": spine_visible,
         "parked": [
             "Dig2 pan",
             "old G polyline dig",
