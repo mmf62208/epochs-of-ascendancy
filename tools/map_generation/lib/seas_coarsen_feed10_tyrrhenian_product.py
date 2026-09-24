@@ -1,21 +1,22 @@
-"""FEED-8 seas coarsen — Mike province-sizing bar #3 (Ligurian basin only).
+"""FEED-10 seas coarsen — Mike province-sizing bar #3 (Tyrrhenian basin only).
 
-The accurate board already allocated "Ligurian Sea" 950119, but its ring was a
-leftover expand_grand_theater seed hex sitting at ~5.08°E / 37.28°N (south of
-Spain, canvas area ~705). The real Genoa-gulf / Ligurian basin
-(7.5–10.5°E / 43.0–44.6°N) was void.
+The accurate board already allocated "Tyrrhenian Sea" 950120, but its ring was a
+leftover expand_grand_theater seed hex sitting at ~5.48°E / 37.00°N (south of
+Spain, canvas area ~344). The real west-Italy / Corsica–Sardinia basin
+(9.5–15.0°E / 38.2–42.5°N) was void.
 
-This product is a **one-theater proof** (not Tyrrhenian / Adriatic / Alboran
-redo, not NAtl, not lakes, not Maginot / Flanders land):
+This product is a **one-theater proof** (not Ligurian / Adriatic / Alboran
+redo, not NAtl, not lakes, not Maginot / Flanders / SE England land):
 
-* Reuse sea ID **950119** (not a renumber) and place a basin-sized ring on the
-  real Ligurian water, south of Liguria–Provence–N Italy coasts, north of
-  Cap Corse.
-* Do not write land mesh (Maginot, Flanders/Nord, Gibraltar, HK, Windward).
-* Do not rewrite Alboran 950128 / strait 950019 / Tyrrhenian 950120 /
+* Reuse sea ID **950120** (not a renumber) and place a basin-sized ring on the
+  real Tyrrhenian water, west of the Italian peninsula, east of Corsica /
+  Sardinia, south of Cap Corse / Ligurian 950119.
+* Do not write land mesh (Maginot, Flanders/Nord, SE England, Gibraltar, HK,
+  Windward).
+* Do not rewrite Ligurian 950119 / Alboran 950128 / strait 950019 /
   Adriatic 950121 / Channel / Great Lakes meshes. Do not write world_full.
 
-Write: tools/map_generation/scripts/apply_seas_coarsen_feed8_ligurian.py
+Write: tools/map_generation/scripts/apply_seas_coarsen_feed10_tyrrhenian.py
 """
 from __future__ import annotations
 
@@ -31,8 +32,8 @@ DEFAULT_DIR = ROOT / "data" / "provinces_world_accurate"
 WORLD_BBOX = (-180.0, -56.0, 180.0, 83.0)
 WORLD_CANVAS = (8192.0, 4096.0)
 
-LIGURIAN_ID = 950119
 TYRRHENIAN_ID = 950120
+LIGURIAN_ID = 950119
 ADRIATIC_ID = 950121
 ALBORAN_ID = 950128
 STRAIT_ID = 950019
@@ -46,83 +47,102 @@ MAGINOT_FRA_ID = 710739
 NORD_ID = 710734
 NORD_EAST_ID = 711521
 NORD_SOUTH_ID = 711522
+OXFORDSHIRE_ID = 711438
+HAMPSHIRE_ID = 711449
+OXFORDSHIRE_NORTH_ID = 711523
+OXFORDSHIRE_EAST_ID = 711524
 
-# Core Liguria / Provence coasts that must touch the new ring.
-ALPES_MARITIMES_ID = 710797
-IMPERIA_ID = 710868
-SAVONA_ID = 710869
-GENOVA_ID = 710870
-SPEZIA_ID = 710871
-
-HAUTE_CORSE_ID = 710802
+# Core west-Italy / Corsica / Sardinia coasts that must touch the new ring.
 CORSE_DU_SUD_ID = 710801
+HAUTE_CORSE_ID = 710802
+NAPOLI_ID = 710892
+SASSARI_ID = 710917
+NUORO_ID = 710918
+SUD_SARDEGNA_ID = 710921
+GROSSETO_ID = 710953
+VITERBO_ID = 710961
+ROMA_ID = 710963
+LATINA_ID = 710964
 
 WATER_D = frozenset({"sea", "strait", "lake", "ocean", "naval"})
 WATER_T = frozenset({"sea", "ocean", "water", "lake"})
 
-# Leftover seed (pre-FEED) — 950119 sat at ~5.08°E / 37.28°N, area ~705.
-PRE_LIGURIAN_AREA = 705.08
-PRE_LIGURIAN_LONLAT = (5.0842, 37.2799)
+# Leftover seed (pre-FEED) — 950120 sat at ~5.48°E / 37.00°N, area ~344.
+PRE_TYRRHENIAN_AREA = 344.35
+PRE_TYRRHENIAN_LONLAT = (5.4762, 36.9966)
 PRE_THEATER_SEA_N = 1
-PRE_THEATER_MEDIAN = 705.08
-PRE_LIGURIA_PROVENCE_COASTAL_MEDIAN = 130.0
+PRE_THEATER_MEDIAN = 344.35
+PRE_WEST_ITALY_COASTAL_MEDIAN = 202.0
 
-# Basin-sized proof: Alboran-class if the gulf void allows (>=1000), always >400
-# and clearly larger than Liguria–Provence coastal land median (~130).
-LIGURIAN_AREA_MIN = 1000.0
-LIGURIAN_AREA_FLOOR = 400.0
-THEATER_MEDIAN_MIN = 400.0
-# Packed NUTS: 8px (~0.35°) is "actually touches"; 18px reaches inland Po/Corsica.
+# Basin-sized proof: Alboran/Ligurian-class if the void allows (>=1000),
+# always >=600 and clearly larger than west-Italy coastal land median (~202).
+TYRRHENIAN_AREA_MIN = 1000.0
+TYRRHENIAN_AREA_FLOOR = 600.0
+THEATER_MEDIAN_MIN = 600.0
+# Packed NUTS: 8px (~0.35°) is "actually touches".
 COAST_TOUCH_PX = 8.0
-COAST_WINDOW = (6.6, 43.15, 10.9, 44.75)
-LIGURIA_PROVENCE_LAND_WINDOW = (7.5, 43.0, 10.5, 44.6)
+COAST_WINDOW = (8.4, 37.8, 16.0, 43.0)
+WEST_ITALY_LAND_WINDOW = (9.5, 38.0, 15.5, 42.8)
 
-# Clockwise from NW. Void corridor: south of Liguria/Provence hulls,
-# north of Cap Corse (~42.96°N), west of Livorno/Pisa interiors, east of Var.
-LIGURIAN_LONLAT_RING: Tuple[Tuple[float, float], ...] = (
-    (7.52, 43.68),
-    (7.72, 43.73),
-    (7.95, 43.78),
-    (8.20, 43.86),
-    (8.45, 43.98),
-    (8.70, 44.10),
-    (8.95, 44.16),
-    (9.25, 44.16),
-    (9.48, 44.10),
-    (9.72, 43.98),
-    (9.98, 43.88),
-    (10.18, 43.80),
-    (10.26, 43.55),
-    (10.20, 43.32),
-    (9.75, 43.18),
-    (9.10, 43.16),
-    (8.45, 43.18),
-    (7.80, 43.28),
-    (7.55, 43.45),
-    (7.50, 43.58),
+# Clockwise from NW. Void corridor: east of Corsica/Sardinia hulls,
+# west of Italian peninsula hulls, south of Cap Corse / Ligurian (~43.16°N),
+# north of Sicily (~38.2°N).
+TYRRHENIAN_LONLAT_RING: Tuple[Tuple[float, float], ...] = (
+    (9.68, 42.30),
+    (10.15, 42.34),
+    (10.75, 42.32),
+    (11.20, 42.20),
+    (11.50, 41.98),
+    (11.85, 41.58),
+    (12.25, 41.28),
+    (12.70, 41.12),
+    (13.15, 41.02),
+    (13.65, 40.85),
+    (14.08, 40.62),
+    (14.28, 40.35),
+    (14.22, 39.90),
+    (13.95, 39.40),
+    (13.45, 38.88),
+    (12.75, 38.55),
+    (12.05, 38.48),
+    (11.35, 38.55),
+    (10.70, 38.82),
+    (10.20, 39.20),
+    (10.00, 39.55),
+    (9.95, 40.00),
+    (9.95, 40.55),
+    (9.98, 41.05),
+    (9.85, 41.50),
+    (9.68, 41.85),
+    (9.62, 42.10),
 )
-LIGURIAN_CENTROID_LONLAT = (8.84, 43.70)
-LIGURIAN_LON_WINDOW = (7.5, 10.5)
-LIGURIAN_LAT_WINDOW = (43.0, 44.6)
+TYRRHENIAN_CENTROID_LONLAT = (11.59, 40.61)
+TYRRHENIAN_LON_WINDOW = (9.5, 15.0)
+TYRRHENIAN_LAT_WINDOW = (38.2, 42.5)
 
-# Basin sample points that were VOID on the FEED-7 tip.
-LIGURIAN_SAMPLE_LONLAT: Tuple[Tuple[float, float], ...] = (
-    (8.9, 43.9),
-    (8.5, 43.7),
-    (9.3, 44.0),
-    (7.8, 43.4),
-    (10.0, 43.6),
+# Basin sample points that were VOID on the FEED-9 tip.
+TYRRHENIAN_SAMPLE_LONLAT: Tuple[Tuple[float, float], ...] = (
+    (12.0, 40.5),
+    (11.5, 41.5),
+    (13.0, 41.0),
+    (10.5, 40.0),
+    (14.0, 40.5),
 )
 
 CORE_COAST_IDS: Tuple[int, ...] = (
-    ALPES_MARITIMES_ID,
-    IMPERIA_ID,
-    SAVONA_ID,
-    GENOVA_ID,
-    SPEZIA_ID,
+    CORSE_DU_SUD_ID,
+    HAUTE_CORSE_ID,
+    NAPOLI_ID,
+    SASSARI_ID,
+    NUORO_ID,
+    SUD_SARDEGNA_ID,
+    GROSSETO_ID,
+    VITERBO_ID,
+    ROMA_ID,
+    LATINA_ID,
 )
-STALE_CLUSTER_SEAS: Tuple[int, ...] = (WESTERN_MED_ID, CENTRAL_MED_ID, TYRRHENIAN_ID)
-SKIP_COAST_IDS: Tuple[int, ...] = (HAUTE_CORSE_ID, CORSE_DU_SUD_ID, LIGURIAN_ID)
+STALE_CLUSTER_SEAS: Tuple[int, ...] = (WESTERN_MED_ID, CENTRAL_MED_ID, ADRIATIC_ID)
+SKIP_COAST_IDS: Tuple[int, ...] = (TYRRHENIAN_ID, LIGURIAN_ID, 710908, 710909, 710910)
 
 BANNED_LAND_IDS: Tuple[int, ...] = (
     GIBRALTAR_ID,
@@ -137,20 +157,34 @@ BANNED_LAND_IDS: Tuple[int, ...] = (
     NORD_ID,
     NORD_EAST_ID,
     NORD_SOUTH_ID,
+    OXFORDSHIRE_ID,
+    HAMPSHIRE_ID,
+    OXFORDSHIRE_NORTH_ID,
+    OXFORDSHIRE_EAST_ID,
 )
 BANNED_SEA_MESH_IDS: Tuple[int, ...] = (
+    LIGURIAN_ID,
     ALBORAN_ID,
     STRAIT_ID,
-    TYRRHENIAN_ID,
     ADRIATIC_ID,
     CHANNEL_ID,
 )
 GREAT_LAKE_IDS: Tuple[int, ...] = (950333, 950334, 950335, 950336, 950337)
 
-FEED_META = "v1_ligurian_basin_coarsen"
+# Tip-frozen meshes this FEED must not rewrite (FEED-8 / FEED-4 / FEED-9).
+FROZEN_MESH_AREA: Dict[int, float] = {
+    LIGURIAN_ID: 1340.58,
+    ALBORAN_ID: 1881.05,
+    OXFORDSHIRE_ID: 58.22,
+    HAMPSHIRE_ID: 215.21,
+    OXFORDSHIRE_NORTH_ID: 113.73,
+    OXFORDSHIRE_EAST_ID: 59.12,
+}
+
+FEED_META = "v1_tyrrhenian_basin_coarsen"
 PRESERVED_IDS: Tuple[int, ...] = (
-    LIGURIAN_ID,
     TYRRHENIAN_ID,
+    LIGURIAN_ID,
     ADRIATIC_ID,
     ALBORAN_ID,
     STRAIT_ID,
@@ -158,6 +192,10 @@ PRESERVED_IDS: Tuple[int, ...] = (
     MAGINOT_FRA_ID,
     NORD_ID,
     GIBRALTAR_ID,
+    OXFORDSHIRE_ID,
+    HAMPSHIRE_ID,
+    OXFORDSHIRE_NORTH_ID,
+    OXFORDSHIRE_EAST_ID,
 )
 
 Ring = List[List[float]]
@@ -269,8 +307,8 @@ def rings_touch(a: Sequence[Sequence[float]], b: Sequence[Sequence[float]], dist
     return False
 
 
-def ligurian_design_ring() -> Ring:
-    return [list(lonlat_to_canvas(lon, lat)) for lon, lat in LIGURIAN_LONLAT_RING]
+def tyrrhenian_design_ring() -> Ring:
+    return [list(lonlat_to_canvas(lon, lat)) for lon, lat in TYRRHENIAN_LONLAT_RING]
 
 
 def _is_water(p: Mapping[str, Any]) -> bool:
@@ -290,10 +328,10 @@ def load_board(board_dir: Path) -> Dict[str, Any]:
     return {"base": base, "geo": geo, "adj": adj, "adj_doc": adj_doc}
 
 
-def liguria_provence_coastal_land_areas(
+def west_italy_coastal_land_areas(
     base: Mapping[int, Mapping[str, Any]], geo: Mapping[int, Mapping[str, Any]]
 ) -> List[float]:
-    lon0, lat0, lon1, lat1 = LIGURIA_PROVENCE_LAND_WINDOW
+    lon0, lat0, lon1, lat1 = WEST_ITALY_LAND_WINDOW
     out: List[float] = []
     for pid, p in base.items():
         if _is_water(p):
@@ -321,7 +359,7 @@ def _median(vals: Sequence[float]) -> float:
 
 
 def theater_sea_ids() -> Tuple[int, ...]:
-    return (LIGURIAN_ID,)
+    return (TYRRHENIAN_ID,)
 
 
 def theater_metrics(geo: Mapping[int, Mapping[str, Any]]) -> Dict[str, float]:
@@ -331,7 +369,7 @@ def theater_metrics(geo: Mapping[int, Mapping[str, Any]]) -> Dict[str, float]:
         "min": min(areas) if areas else 0.0,
         "median": _median(areas),
         "max": max(areas) if areas else 0.0,
-        "ligurian": polygon_area((geo.get(LIGURIAN_ID) or {}).get("points") or []),
+        "tyrrhenian": polygon_area((geo.get(TYRRHENIAN_ID) or {}).get("points") or []),
     }
 
 
@@ -447,7 +485,7 @@ def _coastal_neighbors(
     base: Mapping[int, Mapping[str, Any]],
     geo: Mapping[int, Mapping[str, Any]],
 ) -> List[int]:
-    """Land that actually touches the Ligurian ring (Liguria / Provence / N Italy)."""
+    """Land that actually touches the Tyrrhenian ring (west-Italy / Corsica / Sardinia)."""
     skip = set(SKIP_COAST_IDS)
     lon0, lat0, lon1, lat1 = COAST_WINDOW
     out: List[int] = []
@@ -466,27 +504,27 @@ def _coastal_neighbors(
     return sorted(out)
 
 
-def apply_seas_coarsen_feed8(board_dir: str = "") -> Dict[str, Any]:
-    """Write Ligurian basin ring + theater adj. Existing IDs stay. No land writes."""
+def apply_seas_coarsen_feed10(board_dir: str = "") -> Dict[str, Any]:
+    """Write Tyrrhenian basin ring + theater adj. Existing IDs stay. No land writes."""
     d = Path(board_dir) if board_dir else DEFAULT_DIR
     board = load_board(d)
     base: Dict[int, dict] = board["base"]
     geo: Dict[int, dict] = board["geo"]
     adj: Dict[int, List[int]] = board["adj"]
-    if LIGURIAN_ID not in geo or LIGURIAN_ID not in base:
-        raise KeyError("missing allocated Ligurian sea id 950119")
+    if TYRRHENIAN_ID not in geo or TYRRHENIAN_ID not in base:
+        raise KeyError("missing allocated Tyrrhenian sea id 950120")
 
     before = theater_metrics(geo)
-    ring = ligurian_design_ring()
-    old = dict(geo[LIGURIAN_ID])
+    ring = tyrrhenian_design_ring()
+    old = dict(geo[TYRRHENIAN_ID])
     geo_obj = _geo_object(
         old,
-        LIGURIAN_ID,
-        "Ligurian Sea",
+        TYRRHENIAN_ID,
+        "Tyrrhenian Sea",
         ring,
-        {"role": "med_basin", "theater": "ligurian"},
+        {"role": "med_basin", "theater": "tyrrhenian"},
     )
-    geo_updates: Dict[int, Dict[str, Any]] = {LIGURIAN_ID: geo_obj}
+    geo_updates: Dict[int, Dict[str, Any]] = {TYRRHENIAN_ID: geo_obj}
     banned_written = [
         pid
         for pid in geo_updates
@@ -499,19 +537,19 @@ def apply_seas_coarsen_feed8(board_dir: str = "") -> Dict[str, Any]:
     wanted: Set[int] = set(coastal)
 
     adj_updates: Dict[int, List[int]] = {}
-    old_nbrs = set(adj.get(LIGURIAN_ID) or [])
+    old_nbrs = set(adj.get(TYRRHENIAN_ID) or [])
     for nb in old_nbrs:
         if nb in wanted:
             continue
         if nb in adj:
-            adj[nb] = [x for x in adj[nb] if int(x) != LIGURIAN_ID]
+            adj[nb] = [x for x in adj[nb] if int(x) != TYRRHENIAN_ID]
             adj_updates[int(nb)] = list(adj[nb])
-    adj[LIGURIAN_ID] = sorted(wanted)
-    adj_updates[LIGURIAN_ID] = adj[LIGURIAN_ID]
+    adj[TYRRHENIAN_ID] = sorted(wanted)
+    adj_updates[TYRRHENIAN_ID] = adj[TYRRHENIAN_ID]
     for nb in wanted:
         cur = set(int(x) for x in (adj.get(nb) or []))
-        if LIGURIAN_ID not in cur:
-            cur.add(LIGURIAN_ID)
+        if TYRRHENIAN_ID not in cur:
+            cur.add(TYRRHENIAN_ID)
             adj[int(nb)] = sorted(cur)
             adj_updates[int(nb)] = adj[int(nb)]
 
@@ -524,11 +562,11 @@ def apply_seas_coarsen_feed8(board_dir: str = "") -> Dict[str, Any]:
     }
     after = theater_metrics(after_geo)
     return {
-        "ok": n_geo == 1 and after["ligurian"] >= LIGURIAN_AREA_MIN,
+        "ok": n_geo == 1 and after["tyrrhenian"] >= TYRRHENIAN_AREA_MIN,
         "board_dir": str(d),
         "geo_objects_rewritten": n_geo,
         "adj_keys_rewritten": n_adj,
-        "reused_ids": [LIGURIAN_ID],
+        "reused_ids": [TYRRHENIAN_ID],
         "new_ids": [],
         "preserved_ids": list(PRESERVED_IDS),
         "renumbered": False,
@@ -540,8 +578,8 @@ def apply_seas_coarsen_feed8(board_dir: str = "") -> Dict[str, Any]:
     }
 
 
-def build_seas_coarsen_feed8_ligurian_product(board_dir: str = "") -> Dict[str, Any]:
-    """QC shipped accurate board: Ligurian Sea is the Genoa-gulf basin, not a leftover seed."""
+def build_seas_coarsen_feed10_tyrrhenian_product(board_dir: str = "") -> Dict[str, Any]:
+    """QC shipped accurate board: Tyrrhenian Sea is the real basin, not a leftover seed."""
     d = Path(board_dir) if board_dir else DEFAULT_DIR
     fails: List[str] = []
     passes: List[str] = []
@@ -553,14 +591,16 @@ def build_seas_coarsen_feed8_ligurian_product(board_dir: str = "") -> Dict[str, 
     adj = board["adj"]
 
     for pid, want_name, want_domain in (
-        (LIGURIAN_ID, "Ligurian Sea", "sea"),
         (TYRRHENIAN_ID, "Tyrrhenian Sea", "sea"),
+        (LIGURIAN_ID, "Ligurian Sea", "sea"),
         (ADRIATIC_ID, "Adriatic Sea", "sea"),
         (ALBORAN_ID, "Alboran Sea", "sea"),
         (STRAIT_ID, "Gibraltar Strait Zone", "strait"),
-        (GENOVA_ID, "Genova", "land"),
-        (IMPERIA_ID, "Imperia", "land"),
-        (ALPES_MARITIMES_ID, "Alpes-Maritimes", "land"),
+        (ROMA_ID, "Roma", "land"),
+        (GROSSETO_ID, "Grosseto", "land"),
+        (HAUTE_CORSE_ID, "Haute-Corse", "land"),
+        (NUORO_ID, "Nuoro", "land"),
+        (OXFORDSHIRE_ID, "Oxfordshire", "land"),
     ):
         row = base.get(int(pid)) or {}
         if int(pid) not in base or int(pid) not in geo:
@@ -573,15 +613,15 @@ def build_seas_coarsen_feed8_ligurian_product(board_dir: str = "") -> Dict[str, 
             passes.append(f"kept_{pid}_{want_name}")
 
     metrics = theater_metrics(geo)
-    ligurian_area = float(metrics["ligurian"])
-    if ligurian_area < LIGURIAN_AREA_MIN:
-        fails.append(f"ligurian_not_basin_scale area={ligurian_area:.1f}")
+    tyrrhenian_area = float(metrics["tyrrhenian"])
+    if tyrrhenian_area < TYRRHENIAN_AREA_MIN:
+        fails.append(f"tyrrhenian_not_basin_scale area={tyrrhenian_area:.1f}")
     else:
-        passes.append(f"ligurian_area={ligurian_area:.1f}")
-    if ligurian_area < LIGURIAN_AREA_FLOOR:
-        fails.append(f"ligurian_below_floor {ligurian_area:.1f}<{LIGURIAN_AREA_FLOOR}")
-    if ligurian_area <= PRE_LIGURIAN_AREA:
-        fails.append(f"ligurian_not_coarser_than_leftover {ligurian_area:.1f}<={PRE_LIGURIAN_AREA}")
+        passes.append(f"tyrrhenian_area={tyrrhenian_area:.1f}")
+    if tyrrhenian_area < TYRRHENIAN_AREA_FLOOR:
+        fails.append(f"tyrrhenian_below_floor {tyrrhenian_area:.1f}<{TYRRHENIAN_AREA_FLOOR}")
+    if tyrrhenian_area <= PRE_TYRRHENIAN_AREA:
+        fails.append(f"tyrrhenian_not_coarser_than_leftover {tyrrhenian_area:.1f}<={PRE_TYRRHENIAN_AREA}")
     if float(metrics["median"]) <= PRE_THEATER_MEDIAN:
         fails.append(f"theater_median_not_larger {metrics['median']:.1f}<={PRE_THEATER_MEDIAN}")
     else:
@@ -591,43 +631,43 @@ def build_seas_coarsen_feed8_ligurian_product(board_dir: str = "") -> Dict[str, 
     else:
         passes.append(f"theater_sea_n={int(metrics['sea_n'])}")
 
-    coastal_land = liguria_provence_coastal_land_areas(base, geo)
-    land_med = _median(coastal_land) if coastal_land else PRE_LIGURIA_PROVENCE_COASTAL_MEDIAN
-    if ligurian_area <= land_med:
-        fails.append(f"ligurian_not_larger_than_coastal_land {ligurian_area:.1f}<={land_med:.1f}")
+    coastal_land = west_italy_coastal_land_areas(base, geo)
+    land_med = _median(coastal_land) if coastal_land else PRE_WEST_ITALY_COASTAL_MEDIAN
+    if tyrrhenian_area <= land_med * 3.0:
+        fails.append(f"tyrrhenian_not_3x_coastal_land {tyrrhenian_area:.1f}<={land_med * 3.0:.1f}")
     else:
-        passes.append(f"ligurian_over_coastal_median={ligurian_area / max(land_med, 1.0):.2f}")
+        passes.append(f"tyrrhenian_over_coastal_median={tyrrhenian_area / max(land_med, 1.0):.2f}")
 
-    ligurian_ring = (geo.get(LIGURIAN_ID) or {}).get("points") or []
-    cx, cy = polygon_centroid(ligurian_ring)
+    tyrrhenian_ring = (geo.get(TYRRHENIAN_ID) or {}).get("points") or []
+    cx, cy = polygon_centroid(tyrrhenian_ring)
     lon, lat = canvas_to_lonlat(cx, cy)
     if not (
-        LIGURIAN_LON_WINDOW[0] <= lon <= LIGURIAN_LON_WINDOW[1]
-        and LIGURIAN_LAT_WINDOW[0] <= lat <= LIGURIAN_LAT_WINDOW[1]
+        TYRRHENIAN_LON_WINDOW[0] <= lon <= TYRRHENIAN_LON_WINDOW[1]
+        and TYRRHENIAN_LAT_WINDOW[0] <= lat <= TYRRHENIAN_LAT_WINDOW[1]
     ):
-        fails.append(f"ligurian_centroid_off_basin lonlat=({lon:.3f},{lat:.3f})")
+        fails.append(f"tyrrhenian_centroid_off_basin lonlat=({lon:.3f},{lat:.3f})")
     else:
         passes.append(f"centroid=({lon:.3f},{lat:.3f})")
 
-    la = (geo.get(LIGURIAN_ID) or {}).get("label_anchor") or [cx, cy]
+    la = (geo.get(TYRRHENIAN_ID) or {}).get("label_anchor") or [cx, cy]
     la_lon, la_lat = canvas_to_lonlat(float(la[0]), float(la[1]))
     if not (
-        LIGURIAN_LON_WINDOW[0] <= la_lon <= LIGURIAN_LON_WINDOW[1]
-        and LIGURIAN_LAT_WINDOW[0] <= la_lat <= LIGURIAN_LAT_WINDOW[1]
+        TYRRHENIAN_LON_WINDOW[0] <= la_lon <= TYRRHENIAN_LON_WINDOW[1]
+        and TYRRHENIAN_LAT_WINDOW[0] <= la_lat <= TYRRHENIAN_LAT_WINDOW[1]
     ):
-        fails.append(f"ligurian_label_anchor_off_basin lonlat=({la_lon:.3f},{la_lat:.3f})")
+        fails.append(f"tyrrhenian_label_anchor_off_basin lonlat=({la_lon:.3f},{la_lat:.3f})")
     else:
         passes.append(f"label_anchor=({la_lon:.3f},{la_lat:.3f})")
 
-    leftover_x, leftover_y = lonlat_to_canvas(PRE_LIGURIAN_LONLAT[0], PRE_LIGURIAN_LONLAT[1])
-    if point_in_ring(leftover_x, leftover_y, ligurian_ring):
+    leftover_x, leftover_y = lonlat_to_canvas(PRE_TYRRHENIAN_LONLAT[0], PRE_TYRRHENIAN_LONLAT[1])
+    if point_in_ring(leftover_x, leftover_y, tyrrhenian_ring):
         fails.append("leftover_south_of_spain_still_owned")
     else:
         passes.append("leftover_seed_vacated")
 
-    for slon, slat in LIGURIAN_SAMPLE_LONLAT:
+    for slon, slat in TYRRHENIAN_SAMPLE_LONLAT:
         sx, sy = lonlat_to_canvas(slon, slat)
-        if not point_in_ring(sx, sy, ligurian_ring):
+        if not point_in_ring(sx, sy, tyrrhenian_ring):
             fails.append(f"basin_sample_miss ({slon},{slat})")
         land_hits = [
             pid
@@ -637,40 +677,35 @@ def build_seas_coarsen_feed8_ligurian_product(board_dir: str = "") -> Dict[str, 
         if land_hits:
             fails.append(f"basin_sample_in_land ({slon},{slat}) {land_hits[:4]}")
     if not any(f.startswith("basin_sample") for f in fails):
-        passes.append("basin_samples_in_ligurian")
+        passes.append("basin_samples_in_tyrrhenian")
 
-    nbrs = set(int(x) for x in (adj.get(LIGURIAN_ID) or []))
+    nbrs = set(int(x) for x in (adj.get(TYRRHENIAN_ID) or []))
     for pid in CORE_COAST_IDS:
         if pid not in nbrs:
             fails.append(f"missing_core_coast {pid}")
-        elif LIGURIAN_ID not in set(int(x) for x in (adj.get(pid) or [])):
-            fails.append(f"coast_{pid}_missing_ligurian_neighbor")
+        elif TYRRHENIAN_ID not in set(int(x) for x in (adj.get(pid) or [])):
+            fails.append(f"coast_{pid}_missing_tyrrhenian_neighbor")
         else:
             passes.append(f"adj_coast_{pid}")
     for pid in STALE_CLUSTER_SEAS:
         if pid in nbrs:
             fails.append(f"stale_cluster_neighbor {pid}")
-        elif LIGURIAN_ID in set(int(x) for x in (adj.get(pid) or [])):
-            fails.append(f"stale_sea_{pid}_still_lists_ligurian")
+        elif TYRRHENIAN_ID in set(int(x) for x in (adj.get(pid) or [])):
+            fails.append(f"stale_sea_{pid}_still_lists_tyrrhenian")
     if not any(f.startswith("stale_") for f in fails):
         passes.append("stale_leftover_neighbors_dropped")
-    if ALBORAN_ID in nbrs or STRAIT_ID in nbrs or ADRIATIC_ID in nbrs or CHANNEL_ID in nbrs:
+    if LIGURIAN_ID in nbrs or ALBORAN_ID in nbrs or STRAIT_ID in nbrs or CHANNEL_ID in nbrs:
         fails.append("out_of_theater_sea_neighbor")
     else:
-        passes.append("no_alboran_adriatic_channel_edge")
+        passes.append("no_ligurian_alboran_channel_edge")
 
     # Banned land / other-sea geometry must stay (spot areas).
-    alb_area = polygon_area((geo.get(ALBORAN_ID) or {}).get("points") or [])
-    if alb_area < 1500.0:
-        fails.append(f"alboran_remeshed area={alb_area:.1f}")
-    else:
-        passes.append("alboran_untouched")
-    # FEED-10 owns the Tyrrhenian mesh (reuse 950120). FEED-8 only requires
-    # ID / name / domain, already checked above.
-    if str((base.get(TYRRHENIAN_ID) or {}).get("name") or "") != "Tyrrhenian Sea":
-        fails.append("tyrrhenian_renamed")
-    else:
-        passes.append("tyrrhenian_id_kept")
+    for pid, expected in FROZEN_MESH_AREA.items():
+        got = polygon_area((geo.get(int(pid)) or {}).get("points") or [])
+        if abs(got - expected) > 2.0:
+            fails.append(f"frozen_mesh_rewritten {pid} area={got:.2f}")
+    if not any(str(f).startswith("frozen_mesh") for f in fails):
+        passes.append("ligurian_alboran_se_england_meshes")
     adr_area = polygon_area((geo.get(ADRIATIC_ID) or {}).get("points") or [])
     if abs(adr_area - 393.06) > 2.0:
         fails.append(f"adriatic_mesh_rewritten area={adr_area:.2f}")
@@ -708,6 +743,10 @@ def build_seas_coarsen_feed8_ligurian_product(board_dir: str = "") -> Dict[str, 
         fails.append(f"board_scale_left_3520_band n={n_board}")
     else:
         passes.append(f"board_n={n_board}")
+    if n_board != 3536:
+        fails.append(f"board_count_changed n={n_board}")
+    else:
+        passes.append("board_3536_reshape_only")
 
     world_full = ROOT / "data" / "provinces_world_full"
     if world_full.is_dir():
@@ -715,10 +754,10 @@ def build_seas_coarsen_feed8_ligurian_product(board_dir: str = "") -> Dict[str, 
     else:
         passes.append("world_full_dir_absent_ok")
 
-    doc = ROOT / "docs" / "MAP_SEAS_COARSEN_FEED8_LIGURIAN.md"
+    doc = ROOT / "docs" / "MAP_SEAS_COARSEN_FEED10_TYRRHENIAN.md"
     if doc.is_file():
         body = doc.read_text(encoding="utf-8")
-        if "FEED-8" in body and "Never renumber" in body and "950119" in body and "Ligurian" in body:
+        if "FEED-10" in body and "Never renumber" in body and "950120" in body and "Tyrrhenian" in body:
             passes.append("design_note")
         else:
             fails.append("design_note_thin")
@@ -728,10 +767,10 @@ def build_seas_coarsen_feed8_ligurian_product(board_dir: str = "") -> Dict[str, 
     ok = not fails
     return {
         "ok": ok,
-        "summary": "PASS Ligurian seas coarsen" if ok else "FAIL " + "; ".join(fails[:6]),
+        "summary": "PASS Tyrrhenian seas coarsen" if ok else "FAIL " + "; ".join(fails[:6]),
         "passes": passes,
         "fails": fails,
-        "reused_ids": [LIGURIAN_ID],
+        "reused_ids": [TYRRHENIAN_ID],
         "new_ids": [],
         "preserved_ids": list(PRESERVED_IDS),
         "renumbered": False,
@@ -739,15 +778,15 @@ def build_seas_coarsen_feed8_ligurian_product(board_dir: str = "") -> Dict[str, 
         "before_metrics": {
             "sea_n": PRE_THEATER_SEA_N,
             "median": PRE_THEATER_MEDIAN,
-            "ligurian": PRE_LIGURIAN_AREA,
+            "tyrrhenian": PRE_TYRRHENIAN_AREA,
         },
-        "liguria_provence_coastal_median": land_med,
-        "ligurian_area": round(ligurian_area, 2),
+        "west_italy_coastal_median": land_med,
+        "tyrrhenian_area": round(tyrrhenian_area, 2),
         "coastal_land_ids": sorted(nbrs),
         "board_n": n_board,
         "sea_block": sea_block,
     }
 
 
-def seas_coarsen_feed8_ligurian_integrity(board_dir: str = "") -> Dict[str, Any]:
-    return build_seas_coarsen_feed8_ligurian_product(board_dir)
+def seas_coarsen_feed10_tyrrhenian_integrity(board_dir: str = "") -> Dict[str, Any]:
+    return build_seas_coarsen_feed10_tyrrhenian_product(board_dir)
