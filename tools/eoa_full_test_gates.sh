@@ -101,6 +101,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_caribbean_island_sizing_feed6_product \
     tools.map_generation.tests.test_flanders_nord_land_uniformity_product \
     tools.map_generation.tests.test_seas_coarsen_feed8_ligurian_product \
+    tools.map_generation.tests.test_se_england_shire_land_uniformity_product \
     tools.map_generation.tests.test_world_accurate_capital_pick_product \
     tools.map_generation.tests.test_world_accurate_strategic_and_assault \
     tools.map_generation.tests.test_world_accurate_multi_front_and_deploy \
