@@ -4,7 +4,8 @@
 
 - Branch: `cursor/ix1-road-spine-9d9b`
 - Start SHA: `5732d3400c364b20694d0618787b6250ca537d3d`
-- New head: *(filled after push)*
+- New head: `67731cfc4acde7123481e54a60d5fda2d731b503`
+- PR: https://github.com/mmf62208/epochs-of-ascendancy/pull/55
 
 ## Cause (Play MIXED `5732d34`)
 
@@ -22,6 +23,10 @@ Residual: Köln chrome after Cologne+Go showed **facility Build rows only** (Set
 
 Corridor unchanged: Köln `710417` → Bonn `710416` + Leverkusen `710418`; Essen `710403` off-spine. Dig2/G PARKED.
 
-## Gates
+## Gates (this SHA)
 
-Pending this revision — run after push.
+- `test_ix1_road_spine_product` **13/13** including `search_go_spine_visible`
+- `HeadlessIx1SearchGoInspectorTest` **RESULT=PASS** (Go+Enter inspector + spine chrome/list + IDM should_show Köln / not Essen / Mandate 0)
+- `HeadlessIx1RoadSpineMandateGateTest` **PASS (failures=0)** cost=0
+- `HeadlessIx1RoadSpineDayTickTest` **RESULT=PASS** (+12d 17.0%→50.6%; complete; live-F5-equiv +8d past+6 consider=0 pick=0 autosave=0)
+- Official `--quick` `living_unit_order_loop` wiring FAIL + Pillow `map_qc` are **pre-existing** (not this FIX)
