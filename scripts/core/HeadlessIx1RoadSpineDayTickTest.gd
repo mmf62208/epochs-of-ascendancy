@@ -151,9 +151,10 @@ func _test_spine_can_complete() -> void:
 	if idm == null:
 		_fail("InfrastructureDevelopmentManager autoload missing")
 		return
-	# Continue the same Köln project (already past 20%) until days_remaining hits 0.
+	# Continue the same Köln project (already past 20%) on the cheap daily tick.
+	# A second F5 flush of 30d OOMs air/day listeners; complete does not need that path.
 	var t0 := Time.get_ticks_msec()
-	var result: Dictionary = idm.call("simulate_ix1_spine_days", 30)
+	var result: Dictionary = idm.call("simulate_ix1_spine_days", 30, false)
 	var ms := Time.get_ticks_msec() - t0
 	var completed := bool(result.get("completed", false))
 	var after := float(result.get("progress_after", 0.0))

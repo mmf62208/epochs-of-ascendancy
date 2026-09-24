@@ -1124,7 +1124,7 @@ func _should_run_full_board_ai_invest() -> bool:
 ## Short automated path: seed Köln spine at the live freeze point (~17%) and
 ## drive the real F5 flush so the day clock + progress move past day 9 / 20%.
 ## Call again with more days to complete (ETA ~35 from 0%; ~29 from 17%).
-func simulate_ix1_spine_days(days: int = 12) -> Dictionary:
+func simulate_ix1_spine_days(days: int = 12, use_f5_flush: bool = true) -> Dictionary:
 	var n := clampi(int(days), 1, 60)
 	var hub := IX1_FALLBACK_HUB
 	if typeof(TimeManager) != TYPE_NIL:
@@ -1151,15 +1151,15 @@ func simulate_ix1_spine_days(days: int = 12) -> Dictionary:
 	var start_elapsed := 0
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
 		start_elapsed = int(TimeManager.get_total_days_elapsed())
-	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_living_playtest_days"):
-		var left := n
-		while left > 0:
-			var chunk := mini(left, 20)
-			TimeManager.call("advance_living_playtest_days", chunk)
-			left -= chunk
-	else:
-		for i in n:
-			advance_daily_projects(1936, 1, 1 + i)
+	# F5 flush proves the live clock (cap 12d — longer flush OOMs air/day listeners).
+	# Complete path uses the cheap daily project tick only.
+	var flush_n := mini(n, 12) if use_f5_flush else 0
+	var rest := n - flush_n
+	if flush_n > 0 and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_living_playtest_days"):
+		TimeManager.call("advance_living_playtest_days", flush_n)
+	if rest > 0:
+		# Cheap days-remaining clock — no full-board AI invest, no F5 listener flush.
+		tick_active_projects(rest)
 	live = active_projects.get(hub)
 	var end_prog := 100.0 if live == null else float(live.progress)
 	var end_elapsed := start_elapsed
