@@ -1,6 +1,6 @@
 # IX-1 Road Spine — Layer 2 first interconnect vertical
 
-**Status:** theater proof on tip `eb4371d` (draft; **HOLD merge** for Scott/Play).  
+**Status:** theater proof + Mandate front-door FIX (draft; **HOLD merge** for Scott/Play).  
 **Slice name:** **IX-1 Road Spine** (not Dig2, not G polyline, not Maginot combat).  
 **Layer:** Mike Layer 2 — player actions must **show** on the map and **change play**.
 
@@ -26,10 +26,14 @@ Home Europe, GER-owned at 1918 / 1936 start. **Rhineland / west-German city spin
 
 Edges: `710417–710416`, `710417–710418`. Three adjacent owned plains cells. Spec: `data/infrastructure/ix1_road_spine.json`.
 
+## Mandate front door (FIX)
+
+Fresh **Begin · Germany · 1936** has Mandate **0** (`peace_state.mandate` map empty). Generic Köln Invest is still **73** and stays gated. The IX-1 order uses a **first-session starter grant** (`first_session_mandate_cost` **0** in `data/infrastructure/ix1_road_spine.json` / `get_ix1_road_spine_mandate_cost`). No F10 / debug cheat. Headless: `ix1_day0_mandate_can_start("GER")` and `HeadlessIx1RoadSpineMandateGateTest.gd`.
+
 ## Player path (smoke)
 
 1. Default F5 GER, Home Europe. Pick **Köln** `710417` (or Bonn / Leverkusen).
-2. Inspector **Build Road Spine** (not F10). Construction ring + ETA bar while the project ticks.
+2. Inspector **Build Road Spine** (not F10). Day-0 Mandate **0** is enough. Construction ring + ETA bar while the project ticks.
 3. On complete: toast / news **Road spine complete**; RoadLayer paints the brown spine at Home zoom; inspector refresh.
 4. Move / supply on the corridor is cheaper than the same province pre-build and cheaper than Essen control.
 
@@ -48,7 +52,7 @@ New front door: `InfrastructureDevelopmentManager.try_start_road_spine` / `link_
 1. SCRIPT_ERROR **0**. Esc → Command Center **HARD PASS** unchanged.
 2. **Look:** readable road line on Bonn–Köln–Leverkusen at playable zoom (not F10-only).
 3. **Impact:** spine `get_movement_cost` **strictly less** than pre-build; cheaper than off-spine Essen control.
-4. Thin unittest `test_ix1_road_spine_product` green (edges present + cost delta).
+4. Thin unittest `test_ix1_road_spine_product` green (edges present + cost delta + GER 1936 day-0 Mandate gate).
 5. Tyrrhenian / Ligurian / Flanders / SE England / pale-map / Fill%·TOE **untouched**.
 
 ## PARKED (do not open from this PR)

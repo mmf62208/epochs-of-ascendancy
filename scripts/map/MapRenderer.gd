@@ -19070,7 +19070,7 @@ func _ensure_infrastructure_investment_ui() -> void:
 		_btn_build_road_spine = Button.new()
 		_btn_build_road_spine.name = "BtnBuildRoadSpine"
 		_btn_build_road_spine.text = "Build Road Spine"
-		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
+		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). First-session starter grant — GER 1936 day-0 Mandate is enough (generic Invest stays gated). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
 		_btn_build_road_spine.custom_minimum_size = Vector2(200, 28)
 		_btn_build_road_spine.visible = false
 		if not _btn_build_road_spine.pressed.is_connected(_on_build_road_spine_pressed):
@@ -19335,7 +19335,7 @@ func _update_road_spine_button(province: Province) -> void:
 	else:
 		_btn_build_road_spine.disabled = false
 		_btn_build_road_spine.text = "Build Road Spine"
-		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
+		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). First-session starter grant — GER 1936 day-0 Mandate is enough (generic Invest stays gated). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
 
 
 func _on_build_road_spine_pressed() -> void:

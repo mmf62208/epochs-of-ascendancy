@@ -38,6 +38,10 @@ HUB_ID = 710417
 BONN_ID = 710416
 LEVERKUSEN_ID = 710418
 ESSEN_CONTROL_ID = 710403
+# Fresh Begin · Germany · 1936: peace_state mandate map is empty → 0.
+# Generic Köln Invest is 73; IX-1 uses this first-session starter cost only.
+IX1_FIRST_SESSION_MANDATE_COST = 0
+GER_1936_DAY0_MANDATE = 0
 CORRIDOR_IDS: Tuple[int, ...] = (BONN_ID, HUB_ID, LEVERKUSEN_ID)
 SPINE_EDGES: Tuple[Tuple[int, int], ...] = (
     (HUB_ID, BONN_ID),
@@ -50,6 +54,10 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (IDM_GD, "try_start_road_spine"),
     (IDM_GD, "link_ix1_road_spine_edges"),
     (IDM_GD, "should_show_road_spine_button"),
+    (IDM_GD, "get_ix1_road_spine_mandate_cost"),
+    (IDM_GD, "ix1_day0_mandate_can_start"),
+    (IDM_GD, "IX1_FIRST_SESSION_MANDATE_COST"),
+    (SPEC_PATH, "first_session_mandate_cost"),
     (IDM_GD, "710417"),
     (MAP_MANAGER_GD, "func build_road_connection"),
     (PROVINCE_GD, "built_road_neighbors"),
@@ -105,6 +113,32 @@ def off_spine_control_id(spec: Optional[Mapping[str, Any]] = None) -> int:
     if isinstance(data, Mapping) and data.get("off_spine_control_id") is not None:
         return int(data["off_spine_control_id"])
     return ESSEN_CONTROL_ID
+
+
+def ix1_road_spine_mandate_cost(spec: Optional[Mapping[str, Any]] = None) -> int:
+    """IX-1 first-session starter cost. Generic Invest stays on the Köln 73 curve."""
+    data = spec if spec is not None else load_ix1_spec()
+    if isinstance(data, Mapping) and data.get("first_session_mandate_cost") is not None:
+        return max(0, int(data["first_session_mandate_cost"]))
+    return IX1_FIRST_SESSION_MANDATE_COST
+
+
+def ix1_day0_mandate_gate(
+    mandate: int = GER_1936_DAY0_MANDATE,
+    spec: Optional[Mapping[str, Any]] = None,
+    tag: str = OWNER_TAG,
+) -> Dict[str, Any]:
+    """Headless-assertable GER 1936 day-0 Mandate gate for the IX-1 order."""
+    cost = ix1_road_spine_mandate_cost(spec)
+    current = int(mandate)
+    return {
+        "ok": current >= cost,
+        "mandate": current,
+        "cost": cost,
+        "tag": str(tag or OWNER_TAG).upper(),
+        "start": "1936-01-01",
+        "generic_koeln_invest_cost": 73,
+    }
 
 
 def _edge_key(a: int, b: int) -> Tuple[int, int]:
@@ -374,6 +408,12 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
     else:
         fails.append("shipped_apis")
 
+    gate = ix1_day0_mandate_gate(GER_1936_DAY0_MANDATE, spec)
+    if gate.get("ok") and int(gate.get("cost", -1)) == IX1_FIRST_SESSION_MANDATE_COST:
+        passes.append("day0_mandate_gate")
+    else:
+        fails.append("day0_mandate_gate")
+
     return {
         "ok": not fails,
         "slice": SLICE_NAME,
@@ -389,6 +429,7 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
         "fails": fails,
         "adjacency": adj,
         "shipped": api,
+        "day0_mandate_gate": gate,
         "parked": [
             "Dig2 pan",
             "old G polyline dig",

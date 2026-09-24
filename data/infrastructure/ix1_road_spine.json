@@ -7,11 +7,12 @@
   "corridor_ids": [710416, 710417, 710418],
   "edges": [[710417, 710416], [710417, 710418]],
   "off_spine_control_id": 710403,
+  "first_session_mandate_cost": 0,
   "names": {
     "710416": "Bonn, Kreisfreie Stadt",
     "710417": "Köln, Kreisfreie Stadt",
     "710418": "Leverkusen, Kreisfreie Stadt",
     "710403": "Essen, Kreisfreie Stadt"
   },
-  "notes": "Home Europe 3-province GER-owned Rhineland spine. Not Maginot combat. Not a continent mesh."
+  "notes": "Home Europe 3-province GER-owned Rhineland spine. Not Maginot combat. Not a continent mesh. IX-1 first-session order is a starter interconnect grant: Mandate cost 0 so Begin · Germany · 1936 (day-0 Mandate 0) can start Build Road Spine without F10. Generic Invest stays on the Köln 73 curve."
 }

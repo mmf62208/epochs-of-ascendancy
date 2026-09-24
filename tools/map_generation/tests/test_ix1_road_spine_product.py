@@ -12,7 +12,9 @@ sys.path.insert(0, str(ROOT / "tools" / "map_generation" / "lib"))
 from ix1_road_spine_product import (  # noqa: E402
     BONN_ID,
     ESSEN_CONTROL_ID,
+    GER_1936_DAY0_MANDATE,
     HUB_ID,
+    IX1_FIRST_SESSION_MANDATE_COST,
     LEVERKUSEN_ID,
     SLICE_NAME,
     apply_road_spine_order,
@@ -20,6 +22,8 @@ from ix1_road_spine_product import (  # noqa: E402
     build_ix1_road_spine_product,
     corridor_is_owned_adjacent,
     empty_board,
+    ix1_day0_mandate_gate,
+    ix1_road_spine_mandate_cost,
     load_ix1_spec,
     movement_cost,
     shipped_api_integrity,
@@ -75,6 +79,19 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
     def test_shipped_apis(self) -> None:
         g = shipped_api_integrity()
         self.assertTrue(g.get("ok"), msg=g)
+
+    def test_ger_1936_day0_mandate_gate(self) -> None:
+        spec = load_ix1_spec()
+        self.assertEqual(int(spec.get("first_session_mandate_cost", -1)), IX1_FIRST_SESSION_MANDATE_COST)
+        self.assertEqual(ix1_road_spine_mandate_cost(spec), 0)
+        self.assertEqual(GER_1936_DAY0_MANDATE, 0)
+        gate = ix1_day0_mandate_gate(GER_1936_DAY0_MANDATE, spec)
+        self.assertTrue(gate.get("ok"), msg=gate)
+        self.assertEqual(int(gate.get("mandate")), 0)
+        self.assertLessEqual(int(gate.get("cost")), int(gate.get("mandate")))
+        self.assertLess(int(gate.get("cost")), int(gate.get("generic_koeln_invest_cost")))
+        p = build_ix1_road_spine_product()
+        self.assertIn("day0_mandate_gate", p.get("passes") or [])
 
 
 if __name__ == "__main__":

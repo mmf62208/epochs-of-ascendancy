@@ -118,6 +118,9 @@ var _ai_infra_starts_today: int = 0
 const IX1_SPEC_PATH := "res://data/infrastructure/ix1_road_spine.json"
 const IX1_FALLBACK_HUB := 710417
 const IX1_FALLBACK_CORRIDOR: Array[int] = [710416, 710417, 710418]
+## First-session interconnect grant. Fresh Begin · Germany · 1936 has Mandate 0;
+## generic Köln Invest is 73 and stays gated. IX-1 uses this starter cost only.
+const IX1_FIRST_SESSION_MANDATE_COST := 0
 var _ix1_spec: Dictionary = {}
 
 
@@ -1031,6 +1034,37 @@ func should_show_road_spine_button(province_id: int, player_tag: String) -> bool
 	return true
 
 
+func get_ix1_road_spine_mandate_cost() -> int:
+	var spec := _ix1_spec_dict()
+	if spec.has("first_session_mandate_cost"):
+		return maxi(0, int(spec.get("first_session_mandate_cost", IX1_FIRST_SESSION_MANDATE_COST)))
+	return IX1_FIRST_SESSION_MANDATE_COST
+
+
+func get_ix1_displayed_mandate(tag: String = "GER") -> int:
+	## Live HUD / Invest gate read the raw peace_state map (empty → 0), not get_pillar's 50 baseline.
+	var t := tag.strip_edges().to_upper()
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
+		var ps: Dictionary = GameData.get_peace_state()
+		return int(ps.get("mandate", {}).get(t, 0))
+	return 0
+
+
+func ix1_day0_mandate_can_start(tag: String = "GER") -> Dictionary:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		t = "GER"
+	var cost := get_ix1_road_spine_mandate_cost()
+	var current := get_ix1_displayed_mandate(t)
+	return {
+		"ok": current >= cost,
+		"mandate": current,
+		"cost": cost,
+		"tag": t,
+		"start": "1936-01-01",
+	}
+
+
 func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
 	if not is_ix1_road_spine_province(province_id):
 		return {"success": false, "reason": "Not on the IX-1 Rhineland road spine."}
@@ -1041,12 +1075,13 @@ func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
 			"reason": preview.get("reason", "Cannot start road spine"),
 			"preview": preview
 		}
-	var pp_cost := int(preview.get("cost_pp", 0))
-	if typeof(GameData) != TYPE_NIL:
-		var ps: Dictionary = GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
-		var current_mand := int(ps.get("mandate", {}).get(investor_tag, 0))
-		if current_mand < pp_cost:
-			return {"success": false, "reason": "Insufficient Mandate (%d < %d)" % [current_mand, pp_cost], "preview": preview}
+	var pp_cost := get_ix1_road_spine_mandate_cost()
+	var gate: Dictionary = ix1_day0_mandate_can_start(investor_tag)
+	if not bool(gate.get("ok", false)):
+		var current_mand := int(gate.get("mandate", 0))
+		return {"success": false, "reason": "Insufficient Mandate (%d < %d)" % [current_mand, pp_cost], "preview": preview}
+	if pp_cost > 0 and typeof(GameData) != TYPE_NIL:
+		# Skip 0-cost apply_pillar_shift — that helper seeds missing tags at 50.
 		GameData.apply_pillar_shift(investor_tag, "mandate", -pp_cost, "road_spine_" + str(province_id))
 		GameData.apply_pillar_shift(investor_tag, "ascendancy", -int(pp_cost * 0.3), "road_spine_prestige")
 	var p_for_target: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
@@ -1057,6 +1092,7 @@ func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
 		return {"success": false, "reason": "Failed to create road spine project"}
 	proj.build_road_spine = true
 	proj.spine_neighbor_ids = get_ix1_spine_neighbors(province_id)
+	proj.political_power_cost = pp_cost
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
 		MapManager.notify_province_changed(province_id, "infrastructure_project")
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
@@ -1071,7 +1107,7 @@ func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
 		"reason": "Road spine project started",
 		"project": proj,
 		"eta_days": proj.get_eta_days(),
-		"cost_pp": preview.get("cost_pp", 0),
+		"cost_pp": pp_cost,
 		"spine_neighbor_ids": proj.spine_neighbor_ids.duplicate(),
 		"build_road_spine": true
 	}
