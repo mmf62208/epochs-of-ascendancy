@@ -146,6 +146,7 @@ const SAVE_GAME_VERSION := "0.2-dev"   # Bumped for richer metadata support
 const DEFAULT_SLOT := "quicksave"
 
 var _last_save_path: String = ""
+var _calendar_autosave_pending: bool = false
 
 func _ready() -> void:
 	_ensure_save_dir()
@@ -159,6 +160,7 @@ func _ready() -> void:
 				and not TimeManager.game_day_advanced.is_connected(_on_day_advanced_for_autosave):
 			TimeManager.game_day_advanced.connect(_on_day_advanced_for_autosave)
 
+
 func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 0) -> void:
 	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
 		return
@@ -170,6 +172,16 @@ func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 
 		elapsed = int(TimeManager.get_total_days_elapsed())
 	if elapsed <= 0 or (elapsed % 7) != 0:
 		return
+	# Isolate the gather from day_emit so the F5 hour clock can keep moving
+	# (day-7 save_game_detailed used to freeze the spine session at 20:00).
+	if _calendar_autosave_pending:
+		return
+	_calendar_autosave_pending = true
+	call_deferred("_deferred_calendar_autosave", elapsed)
+
+
+func _deferred_calendar_autosave(elapsed: int) -> void:
+	_calendar_autosave_pending = false
 	var res := save_game_detailed("autosave")
 	if res.get("ok", false):
 		print("SaveLoadManager: Calendar autosave day=%d -> autosave.json" % elapsed)

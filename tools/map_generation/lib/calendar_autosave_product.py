@@ -74,11 +74,14 @@ def build_calendar_autosave_product() -> Dict[str, Any]:
     else:
         fails.append("sl_connects_day")
     day_fn = extract_gd_func_body(sl, "_on_day_advanced_for_autosave")
-    if day_fn and "save_game_detailed" in day_fn and "autosave" in day_fn:
+    deferred_fn = extract_gd_func_body(sl, "_deferred_calendar_autosave")
+    # Write may be deferred off day_emit so an IX-1 spine day tick cannot freeze at 20:00.
+    write_fn = deferred_fn if deferred_fn and "save_game_detailed" in deferred_fn else day_fn
+    if day_fn and "autosave" in day_fn and "save_game_detailed" in write_fn:
         passes.append("sl_writes_autosave")
     else:
         fails.append("sl_writes_autosave")
-    if day_fn and "show_toast" in day_fn and "Autosaved" in day_fn:
+    if write_fn and "show_toast" in write_fn and "Autosaved" in write_fn:
         passes.append("sl_toast")
     else:
         fails.append("sl_toast")

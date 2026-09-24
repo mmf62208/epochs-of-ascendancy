@@ -698,8 +698,14 @@ func _on_map_province_data_changed(province_id: int, what: String) -> void:
 	if provinces.has(province_id):
 		_refresh_single_province_fill(province_id)
 		# Inspector rebuild is heavy; skip on capture/resolve owner flips.
-		if _is_info_panel_visible() and not owner_flip:
-			show_info_panel(provinces[province_id])
+		# Only refresh the open sheet for the selected hex — a foreign/AI
+		# infrastructure_project notify used to retarget + rebuild the inspector
+		# and stall the F5 clock while an IX-1 spine was in progress.
+		if _is_info_panel_visible() and not owner_flip and province_id == selected_province_id:
+			if what == "infrastructure_project":
+				_update_infrastructure_investment_ui(provinces[province_id])
+			else:
+				show_info_panel(provinces[province_id])
 	if _hover_fill_province_id == province_id:
 		_apply_hover_fill(province_id, true)
 	if owner_flip:
@@ -19431,7 +19437,8 @@ func _on_cancel_infra_project_pressed() -> void:
 ## Keeps "active project %/ETA" and derived effects (supply/org) up to date without manual re-click.
 func _on_infra_progress_for_inspector(pid: int, _proj: Variant, _delta: float) -> void:
 	if pid == selected_province_id and info_panel != null and info_panel.visible and provinces.has(pid):
-		# Refresh just the invest UI + combat derived (settlement etc already live via other)
+		# Refresh just the invest UI. Do not notify_province_changed here — that
+		# re-entered show_info_panel + overlay rebuild on every spine day tick.
 		_update_infrastructure_investment_ui(provinces[pid])
 		if info_combat != null:
 			# Re-append derived if needed; full show_info_panel would re-do everything
@@ -19441,9 +19448,7 @@ func _on_infra_progress_for_inspector(pid: int, _proj: Variant, _delta: float) -
 				if w > 5.0:
 					# Already appended in main, but trigger visual nudge via re-show if wanted
 					pass
-	# Force map overlay redraw so active project pulse/% ring in InfrastructureOverlayLayer updates live (progress polled + animation)
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
-		MapManager.notify_province_changed(pid, "infrastructure_project")
+	# Overlay construction rings poll project status in _draw — queue_redraw is enough.
 	var ol := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol and ol.has_method("queue_redraw"):
 		ol.queue_redraw()

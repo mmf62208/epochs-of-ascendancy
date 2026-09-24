@@ -23,6 +23,7 @@ from ix1_road_spine_product import (  # noqa: E402
     corridor_is_owned_adjacent,
     empty_board,
     ix1_day0_mandate_gate,
+    ix1_day_tick_unblocked,
     ix1_road_spine_mandate_cost,
     load_ix1_spec,
     movement_cost,
@@ -91,6 +92,13 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertLessEqual(int(gate.get("cost")), int(gate.get("mandate")))
         self.assertLess(int(gate.get("cost")), int(gate.get("generic_koeln_invest_cost")))
         p = build_ix1_road_spine_product()
+        self.assertIn("day0_mandate_gate", p.get("passes") or [])
+
+    def test_day_tick_unblocked_with_spine_in_progress(self) -> None:
+        tick = ix1_day_tick_unblocked()
+        self.assertTrue(tick.get("ok"), msg=tick)
+        p = build_ix1_road_spine_product()
+        self.assertIn("day_tick_unblocked", p.get("passes") or [])
         self.assertIn("day0_mandate_gate", p.get("passes") or [])
 
 

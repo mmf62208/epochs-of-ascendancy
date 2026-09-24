@@ -1,6 +1,6 @@
 # IX-1 Road Spine — Layer 2 first interconnect vertical
 
-**Status:** theater proof + Mandate front-door FIX (draft; **HOLD merge** for Scott/Play).  
+**Status:** theater proof + Mandate front-door PASS + day-tick FIX (draft; **HOLD merge** for Scott/Play).  
 **Slice name:** **IX-1 Road Spine** (not Dig2, not G polyline, not Maginot combat).  
 **Layer:** Mike Layer 2 — player actions must **show** on the map and **change play**.
 
@@ -29,6 +29,10 @@ Edges: `710417–710416`, `710417–710418`. Three adjacent owned plains cells. 
 ## Mandate front door (FIX)
 
 Fresh **Begin · Germany · 1936** has Mandate **0** (`peace_state.mandate` map empty). Generic Köln Invest is still **73** and stays gated. The IX-1 order uses a **first-session starter grant** (`first_session_mandate_cost` **0** in `data/infrastructure/ix1_road_spine.json` / `get_ix1_road_spine_mandate_cost`). No F10 / debug cheat. Headless: `ix1_day0_mandate_can_start("GER")` and `HeadlessIx1RoadSpineMandateGateTest.gd`.
+
+## Day-tick FIX (clock + spine progress)
+
+An active spine used to stall the F5 clock (~7 Jan 20:00 @ 4× / ~9 Jan 20:00 @ 1×, spine ~17–20%) while Godot stayed hot. Cause: `advance_daily_projects` only runs the full-board `ai_consider_daily_invests` (3520×N) when **any** project is live, and each progress notify rebuilt the inspector. F5 already budgets 1 AI infra start/day — the continent consider is skipped under `is_interactive_light_sim`. Progress updates no longer `notify_province_changed`. Calendar autosave is deferred off `day_emit`. Headless: `simulate_ix1_spine_days` + `HeadlessIx1RoadSpineDayTickTest.gd` (clock +12d past 20%, then complete). Mandate front door unchanged.
 
 ## Player path (smoke)
 

@@ -327,11 +327,10 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 			continue
 
 		var p: Province = MapManager.get_province(pid) if typeof(MapManager) != TYPE_NIL else null
-		if p == null:
-			continue
-
-		# Re-evaluate modifiers every day (engineers can arrive/leave, new tech, new sabotage)
-		_refresh_project_modifiers(proj, p)
+		# Tick progress even if the hex is not on this tree (headless -s / mid-load).
+		# Missing province only skips modifier refresh + map complete.
+		if p != null:
+			_refresh_project_modifiers(proj, p)
 
 		var work := proj.get_current_work_per_day()
 		var before := proj.progress
@@ -346,8 +345,7 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 			project_progress_updated.emit(pid, proj, delta)
 			# Light event feedback for playability (avoid spam; only on significant chunks or high %).
 			if (int(proj.progress) % 25 == 0 or proj.progress > 90) and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				var prov: Province = MapManager.get_province(pid) if typeof(MapManager) != TYPE_NIL else null
-				var pname := prov.name if prov else str(pid)
+				var pname := p.name if p else str(pid)
 				LeaderEventUI.show_toast("%s infra project ~%d%% complete (ETA %d days)" % [pname, int(proj.progress), proj.get_eta_days()], 2.0)
 
 		if proj.progress >= 100.0 or proj.days_remaining <= 0:
@@ -357,9 +355,10 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 	for item in to_complete:
 		_complete_project(int(item.pid), item.proj)
 
-	# Auto AI investment consideration (low rate for natural 50+ turn playtest evolution; non-player countries develop cores).
-	# Uses same validation/Mandate path. Throttled to prevent spam.
-	if randi() % 5 == 0:  # roughly every 5 days across sim
+	# Full-board AI invest scan is 3520×N and only runs because a project is active.
+	# F5 already budgets 1 AI infra start/day via try_ai_start_infra_project — do not
+	# turn an IX-1 spine into a continent mesh consider. Headless/harness keep the scan.
+	if _should_run_full_board_ai_invest() and randi() % 5 == 0:
 		ai_consider_daily_invests([], 0.08)
 
 
@@ -1110,6 +1109,75 @@ func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
 		"cost_pp": pp_cost,
 		"spine_neighbor_ids": proj.spine_neighbor_ids.duplicate(),
 		"build_road_spine": true
+	}
+
+
+## F5 light sim already budgets 1 AI infra start/day. The full-board consider
+## (get_all_provinces × every tag) is what wedged the clock once a spine existed.
+func _should_run_full_board_ai_invest() -> bool:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim"):
+		if bool(TimeManager.is_interactive_light_sim()):
+			return false
+	return true
+
+
+## Short automated path: seed Köln spine at the live freeze point (~17%) and
+## drive the real F5 flush so the day clock + progress move past day 9 / 20%.
+## Call again with more days to complete (ETA ~35 from 0%; ~29 from 17%).
+func simulate_ix1_spine_days(days: int = 12) -> Dictionary:
+	var n := clampi(int(days), 1, 60)
+	var hub := IX1_FALLBACK_HUB
+	if typeof(TimeManager) != TYPE_NIL:
+		if not _is_initialized:
+			initialize_with_time()
+	if not active_projects.has(hub):
+		restore_project(hub, {
+			"province_id": hub,
+			"axis": "infrastructure",
+			"owner_tag": "GER",
+			"starting_level": 4,
+			"target_level": 5,
+			"progress": 17.0,
+			"work_per_day_base": 2.8,
+			"days_remaining": 29,
+			"status": "active",
+			"build_road_spine": true,
+			"spine_neighbor_ids": [710416, 710418],
+		})
+	var start_prog := 0.0
+	var live: ProvincialProject = active_projects.get(hub)
+	if live != null:
+		start_prog = float(live.progress)
+	var start_elapsed := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		start_elapsed = int(TimeManager.get_total_days_elapsed())
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_living_playtest_days"):
+		var left := n
+		while left > 0:
+			var chunk := mini(left, 20)
+			TimeManager.call("advance_living_playtest_days", chunk)
+			left -= chunk
+	else:
+		for i in n:
+			advance_daily_projects(1936, 1, 1 + i)
+	live = active_projects.get(hub)
+	var end_prog := 100.0 if live == null else float(live.progress)
+	var end_elapsed := start_elapsed
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		end_elapsed = int(TimeManager.get_total_days_elapsed())
+	var completed := live == null or (live != null and str(live.status) == "complete")
+	var elapsed_delta := end_elapsed - start_elapsed
+	return {
+		"ok": elapsed_delta >= n and (end_prog > start_prog or completed),
+		"days": n,
+		"elapsed_delta": elapsed_delta,
+		"progress_before": start_prog,
+		"progress_after": end_prog,
+		"past_freeze": end_prog > 20.0 or completed,
+		"completed": completed,
+		"build_road_spine": true,
+		"hub_id": hub,
+		"full_board_ai_invest": _should_run_full_board_ai_invest(),
 	}
 
 

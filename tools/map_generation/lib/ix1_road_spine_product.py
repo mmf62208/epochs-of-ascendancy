@@ -29,6 +29,9 @@ OVERLAY_GD = ROOT / "scripts" / "map" / "InfrastructureOverlayLayer.gd"
 RENDERER_GD = ROOT / "scripts" / "map" / "MapRenderer.gd"
 FORMATTERS_GD = ROOT / "scripts" / "map" / "MapPolishFormatters.gd"
 FORMATTERS_PY = ROOT / "tools" / "map_generation" / "lib" / "map_polish_formatters.py"
+SAVE_LOAD_GD = ROOT / "scripts" / "autoload" / "SaveLoadManager.gd"
+DAY_TICK_HARNESS = ROOT / "scripts" / "core" / "HeadlessIx1RoadSpineDayTickTest.gd"
+GATES_SH = ROOT / "tools" / "eoa_full_test_gates.sh"
 ADJ_PATH = ROOT / "data" / "provinces_world_accurate" / "province_adjacency.json"
 BASE_PATH = ROOT / "data" / "provinces_world_accurate" / "provinces_base.json"
 
@@ -57,6 +60,11 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (IDM_GD, "get_ix1_road_spine_mandate_cost"),
     (IDM_GD, "ix1_day0_mandate_can_start"),
     (IDM_GD, "IX1_FIRST_SESSION_MANDATE_COST"),
+    (IDM_GD, "_should_run_full_board_ai_invest"),
+    (IDM_GD, "simulate_ix1_spine_days"),
+    (SAVE_LOAD_GD, "_deferred_calendar_autosave"),
+    (DAY_TICK_HARNESS, "past_freeze"),
+    (GATES_SH, "HeadlessIx1RoadSpineDayTickTest"),
     (SPEC_PATH, "first_session_mandate_cost"),
     (IDM_GD, "710417"),
     (MAP_MANAGER_GD, "func build_road_connection"),
@@ -356,6 +364,52 @@ def shipped_api_integrity() -> Dict[str, Any]:
     }
 
 
+def _slice_func(src: str, func_name: str) -> str:
+    needle = "func %s" % func_name
+    i = src.find(needle)
+    if i < 0:
+        return ""
+    nxt = src.find("\nfunc ", i + len(needle))
+    if nxt < 0:
+        return src[i:]
+    return src[i:nxt]
+
+
+def ix1_day_tick_unblocked() -> Dict[str, Any]:
+    """Active spine must not enable the 3520×N AI invest scan or inspector notify loop."""
+    idm = _read(IDM_GD)
+    ren = _read(RENDERER_GD)
+    save = _read(SAVE_LOAD_GD)
+    harness = _read(DAY_TICK_HARNESS)
+    gates = _read(GATES_SH)
+    gate = _slice_func(idm, "_should_run_full_board_ai_invest")
+    adv = _slice_func(idm, "advance_daily_projects")
+    prog = _slice_func(ren, "_on_infra_progress_for_inspector")
+    changed = _slice_func(ren, "_on_map_province_data_changed")
+    sim = _slice_func(idm, "simulate_ix1_spine_days")
+    missing: List[str] = []
+    if "is_interactive_light_sim" not in gate:
+        missing.append("light_sim_gate")
+    if "_should_run_full_board_ai_invest" not in adv:
+        missing.append("advance_uses_gate")
+    if "notify_province_changed(" in prog:
+        missing.append("progress_renotify")
+    if "selected_province_id" not in changed or "infrastructure_project" not in changed:
+        missing.append("selected_only_inspector")
+    if "_deferred_calendar_autosave" not in save:
+        missing.append("deferred_autosave")
+    if "past_freeze" not in sim or "advance_living_playtest_days" not in sim:
+        missing.append("simulate_ix1_spine_days")
+    if "past_freeze" not in harness or "RESULT=" not in harness:
+        missing.append("day_tick_harness")
+    if "HeadlessIx1RoadSpineDayTickTest" not in gates:
+        missing.append("day_tick_on_gates")
+    return {
+        "ok": not missing,
+        "missing": missing,
+    }
+
+
 def build_ix1_road_spine_product() -> Dict[str, Any]:
     passes: List[str] = []
     fails: List[str] = []
@@ -414,6 +468,12 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
     else:
         fails.append("day0_mandate_gate")
 
+    day_tick = ix1_day_tick_unblocked()
+    if day_tick.get("ok"):
+        passes.append("day_tick_unblocked")
+    else:
+        fails.append("day_tick_unblocked")
+
     return {
         "ok": not fails,
         "slice": SLICE_NAME,
@@ -430,6 +490,7 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
         "adjacency": adj,
         "shipped": api,
         "day0_mandate_gate": gate,
+        "day_tick_unblocked": day_tick,
         "parked": [
             "Dig2 pan",
             "old G polyline dig",
