@@ -96,7 +96,9 @@ python3 -m unittest tools.map_generation.tests.test_seas_coarsen_feed4_product \
   tools.map_generation.tests.test_caribbean_island_sizing_feed6_product -v
 ```
 
-`--quick` living-unit wiring fails (if any) are **tip-pre-existing** on `665970c`. This FEED does not touch those GD files. Out of scope (not a seas-board issue).
+`map_accuracy_qc` on the written board: hard_ok, matched **3534**, orphans 0, NE land hit **0.9853**. FEED-4 Alboran + FEED-7 Flanders + FEED-2 Maginot + FEED-1 Great Lakes + Gibraltar / HK / Windward product tests PASS.
+
+`--quick` still fails `test_living_unit_order_loop_product` (wiring: `air_region_cas`, `peace_occupation`, `nation_era_next`, `map_country_select`, `playtest_clock`). **Same fails on tip** `665970c` — this FEED does not touch those GD files. Out of scope (not a seas-board issue). `map_qc` + HOI matrix steps **OK**.
 
 ## Play smoke (human)
 
