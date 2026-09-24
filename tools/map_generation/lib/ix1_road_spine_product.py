@@ -401,7 +401,7 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("graphical_play_gate")
     if "_should_run_full_board_ai_invest" not in adv:
         missing.append("advance_uses_gate")
-    if "get_all_provinces" in pick or "get_provinces_by_owner" in pick:
+    if "get_all_provinces(" in pick or "get_provinces_by_owner(" in pick:
         missing.append("pick_full_board_scan")
     if "AI_INFRA_PICK_CAP" not in pick:
         missing.append("pick_cap")

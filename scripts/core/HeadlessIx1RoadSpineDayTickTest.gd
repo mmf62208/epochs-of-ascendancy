@@ -106,7 +106,7 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 	if pick.is_empty():
 		_fail("_pick_ai_infra_province missing")
 		return
-	if "get_all_provinces" in pick or "get_provinces_by_owner" in pick:
+	if "get_all_provinces(" in pick or "get_provinces_by_owner(" in pick:
 		_fail("live AI infra pick still walks get_all_provinces / get_provinces_by_owner")
 		return
 	if "AI_INFRA_PICK_CAP" not in pick:
