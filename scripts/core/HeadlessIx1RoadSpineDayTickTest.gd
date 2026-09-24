@@ -9,8 +9,10 @@ extends SceneTree
 const SRC_IDM := "res://scripts/map/InfrastructureDevelopmentManager.gd"
 const SRC_REN := "res://scripts/map/MapRenderer.gd"
 const SRC_SAVE := "res://scripts/autoload/SaveLoadManager.gd"
+const SRC_TM := "res://scripts/autoload/TimeManager.gd"
 const HUB_ID := 710417
 const FREEZE_PROGRESS := 20.0
+const LIVE_DAY_BUDGET_MS := 8000
 
 var _failures := 0
 
@@ -42,9 +44,11 @@ func _run_and_quit() -> void:
 
 func _run() -> void:
 	_test_source_gates_full_board_ai_invest()
+	_test_source_live_f5_path_cannot_full_board_scan()
 	_test_source_progress_does_not_renotify()
 	_test_clock_advances_past_freeze()
 	_test_spine_can_complete()
+	_test_live_f5_equivalent_day_advance()
 	_test_mandate_cost_still_zero()
 
 
@@ -90,7 +94,48 @@ func _test_source_gates_full_board_ai_invest() -> void:
 	if "_deferred_calendar_autosave" not in save:
 		_fail("calendar autosave must be deferred off day_emit")
 		return
+	if "is_live_f5_play_path" not in gate and "DisplayServer.get_name()" not in gate:
+		_fail("full-board AI gate must also skip graphical editor/export Play, not only light_sim")
+		return
 	_pass("F5 light sim skips full-board AI invest; autosave deferred")
+
+
+func _test_source_live_f5_path_cannot_full_board_scan() -> void:
+	var idm := _read(SRC_IDM)
+	var pick := _slice_func(idm, "_pick_ai_infra_province")
+	if pick.is_empty():
+		_fail("_pick_ai_infra_province missing")
+		return
+	if "get_all_provinces" in pick or "get_provinces_by_owner" in pick:
+		_fail("live AI infra pick still walks get_all_provinces / get_provinces_by_owner")
+		return
+	if "AI_INFRA_PICK_CAP" not in pick:
+		_fail("live AI infra pick must cap candidates")
+		return
+	var start := _slice_func(idm, "start_infrastructure_project")
+	if "_should_quiet_ai_infra_start" not in start:
+		_fail("AI infra start must quiet toast/notify on live F5")
+		return
+	var sim := _slice_func(idm, "simulate_live_f5_day_advance")
+	if sim.is_empty() or "advance_live_f5_equivalent_days" not in sim:
+		_fail("simulate_live_f5_day_advance must drive live-equiv days (not playtest clock)")
+		return
+	if "living_playtest_clock" in sim and "advance_living_playtest_days" in sim:
+		_fail("live-equiv sim must not use advance_living_playtest_days")
+		return
+	var tm := _read(SRC_TM)
+	var live := _slice_func(tm, "advance_live_f5_equivalent_days")
+	if live.is_empty() or "_living_playtest_clock = true" in live:
+		_fail("advance_live_f5_equivalent_days must not set _living_playtest_clock")
+		return
+	if "_live_f5_equiv_clock = true" not in live:
+		_fail("advance_live_f5_equivalent_days must set _live_f5_equiv_clock")
+		return
+	var rings := _slice_func(_read(SRC_REN), "_refresh_feature_progress_rings")
+	if "is_interactive_light_sim" not in rings:
+		_fail("feature-ring day walk must early-out on F5 light sim")
+		return
+	_pass("live F5 path cannot full-board AI scan; toast quiet; ring walk gated")
 
 
 func _test_source_progress_does_not_renotify() -> void:
@@ -167,6 +212,57 @@ func _test_spine_can_complete() -> void:
 	_pass("spine complete=%s progress=%.1f elapsed_delta=%s (%dms)" % [
 		str(completed or after >= 99.0), after, str(result.get("elapsed_delta")), ms
 	])
+
+
+func _test_live_f5_equivalent_day_advance() -> void:
+	var idm: Node = _autoload("InfrastructureDevelopmentManager")
+	if idm == null:
+		_fail("InfrastructureDevelopmentManager autoload missing")
+		return
+	if not idm.has_method("simulate_live_f5_day_advance"):
+		_fail("simulate_live_f5_day_advance missing")
+		return
+	if idm.has_method("initialize_with_time"):
+		idm.call("initialize_with_time")
+	var tm: Node = _autoload("TimeManager")
+	if tm != null and tm.has_method("is_live_f5_play_path"):
+		# Before the run, headless without the equiv flag is not Play.
+		pass
+	var t0 := Time.get_ticks_msec()
+	var result: Dictionary = idm.call("simulate_live_f5_day_advance", 5)
+	var ms := Time.get_ticks_msec() - t0
+	var elapsed := int(result.get("elapsed_delta", 0))
+	var consider := int(result.get("full_board_ai_invest_calls", -1))
+	var gate_on := bool(result.get("full_board_ai_invest", true))
+	var considered := int(result.get("provinces_considered", 9999))
+	if not bool(result.get("ok", false)):
+		_fail("live-F5-equiv day advance not ok: %s" % str(result))
+		return
+	if elapsed < 5:
+		_fail("live-F5-equiv clock did not advance 5 days (elapsed_delta=%d) %s" % [elapsed, str(result)])
+		return
+	if not bool(result.get("past_plus2", false)):
+		_fail("live-F5-equiv did not prove past day +2: %s" % str(result))
+		return
+	if consider != 0:
+		_fail("full-board ai_consider_daily_invests ran %d times on live-equiv path" % consider)
+		return
+	if gate_on:
+		_fail("live-equiv still enables _should_run_full_board_ai_invest")
+		return
+	if considered > 16:
+		_fail("live AI infra pick considered %d provinces (cap 16)" % considered)
+		return
+	if ms > LIVE_DAY_BUDGET_MS:
+		_fail("live-F5-equiv 5d took %dms (wedged)" % ms)
+		return
+	if bool(result.get("living_playtest_clock", true)):
+		_fail("live-equiv result must not claim living_playtest_clock")
+		return
+	_pass(
+		"live-F5-equiv +%dd past+2 consider=%d pick=%d (%dms)"
+		% [elapsed, consider, considered, ms]
+	)
 
 
 func _test_mandate_cost_still_zero() -> void:

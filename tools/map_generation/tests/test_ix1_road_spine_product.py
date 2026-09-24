@@ -101,6 +101,14 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertIn("day_tick_unblocked", p.get("passes") or [])
         self.assertIn("day0_mandate_gate", p.get("passes") or [])
 
+    def test_live_f5_equiv_gate_not_playtest_clock(self) -> None:
+        tick = ix1_day_tick_unblocked()
+        self.assertTrue(tick.get("ok"), msg=tick)
+        self.assertNotIn("live_equiv_uses_playtest_clock", tick.get("missing") or [])
+        self.assertNotIn("simulate_live_f5_day_advance", tick.get("missing") or [])
+        self.assertNotIn("pick_full_board_scan", tick.get("missing") or [])
+        self.assertNotIn("graphical_play_gate", tick.get("missing") or [])
+
 
 if __name__ == "__main__":
     unittest.main()

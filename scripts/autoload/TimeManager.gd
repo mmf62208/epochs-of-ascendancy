@@ -79,6 +79,8 @@ var _pending_sim_events: Array = []
 var _sim_flush_scheduled: bool = false
 ## Compact 5–20d playtest clock: light capture (no execute BFS-retreat), F5 flush.
 var _living_playtest_clock: bool = false
+## Headless stand-in for editor/export Play: light sim + day_ai/invest, no playtest skips.
+var _live_f5_equiv_clock: bool = false
 var _draining_f5_flush: bool = false
 ## Soft budget (ms) for deferred sim work per frame — keeps pan/hover live past month ends.
 const INTERACTIVE_SIM_FLUSH_BUDGET_MS := 10
@@ -336,6 +338,43 @@ func advance_days(days: float) -> void:
 
 	if light and not _pending_sim_events.is_empty():
 		_schedule_sim_flush()
+
+
+## Live editor/export Play stand-in: same split flush as F5, but does NOT set
+## `_living_playtest_clock` (that skip is why headless day-tick could pass
+## while softpipe Play still wedged at day +2). day_ai / budgeted AI invest run.
+func advance_live_f5_equivalent_days(days: int = 5) -> Dictionary:
+	var n := clampi(int(days), 1, 20)
+	var start := total_days_elapsed
+	var from_day := current_day
+	var from_month := current_month
+	var was_paused := paused
+	paused = false
+	_live_f5_equiv_clock = true
+	advance_days(float(n))
+	var flushed := _drain_living_f5_flush(n)
+	_live_f5_equiv_clock = false
+	paused = was_paused
+	var advanced := total_days_elapsed - start
+	print(
+		"TimeManager: live-F5-equiv +%d days flushed=%d → %04d-%02d-%02d (elapsed=%d)"
+		% [advanced, flushed, current_year, current_month, current_day, total_days_elapsed]
+	)
+	return {
+		"ok": advanced >= n,
+		"days": advanced,
+		"elapsed": total_days_elapsed,
+		"from_day": from_day,
+		"from_month": from_month,
+		"year": current_year,
+		"month": current_month,
+		"day": current_day,
+		"live": true,
+		"live_f5_equiv": true,
+		"living_playtest_clock": false,
+		"f5_flush": true,
+		"flushed": flushed,
+	}
 
 
 ## Maginot / PLAYTEST item 14: drive the real F5 1x path (advance_days + split
@@ -641,7 +680,9 @@ func _tick_out_of_combat_recovery() -> void:
 
 ## True for normal graphical F5 play — keep day ticks light so HUD/map stay responsive.
 func is_interactive_light_sim() -> bool:
-	if _living_playtest_clock:
+	if _living_playtest_clock or _live_f5_equiv_clock:
+		return true
+	if OS.get_environment("EOA_LIVE_F5_EQUIV").strip_edges() == "1":
 		return true
 	if OS.get_environment("EOA_UI_SMOKE").strip_edges() == "1":
 		return true
@@ -656,6 +697,20 @@ func is_interactive_light_sim() -> bool:
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return false
 	return true
+
+
+## Editor / export Play (X11, softpipe, Vulkan) — not the compact Maginot playtest clock.
+## Headless tests opt in with `_live_f5_equiv_clock` / EOA_LIVE_F5_EQUIV=1.
+func is_live_f5_play_path() -> bool:
+	if _live_f5_equiv_clock:
+		return true
+	if OS.get_environment("EOA_LIVE_F5_EQUIV").strip_edges() == "1":
+		return true
+	if _living_playtest_clock:
+		return false
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	return is_interactive_light_sim()
 
 
 ## Called by real-time timers (e.g. TopInfoBar) to advance simulation based on wall time.

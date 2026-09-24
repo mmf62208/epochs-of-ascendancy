@@ -113,6 +113,10 @@ var _dev_level_defs: Dictionary = {}
 var _is_initialized: bool = false
 var _ai_infra_budget_day: int = -1
 var _ai_infra_starts_today: int = 0
+## Test / gate counters — live F5 must keep these at 0 / tiny.
+var _full_board_ai_invest_calls: int = 0
+var _ai_infra_provinces_considered: int = 0
+const AI_INFRA_PICK_CAP := 8
 
 # IX-1 Road Spine (Rhineland Bonn–Köln–Leverkusen). Spec is the source of IDs.
 const IX1_SPEC_PATH := "res://data/infrastructure/ix1_road_spine.json"
@@ -285,15 +289,15 @@ func start_infrastructure_project(province_id: int, target_level: int, investor_
 	active_projects[province_id] = proj
 	project_started.emit(proj)
 
-	# Optional: immediately notify MapManager / visuals that this province is now "under construction"
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
-		MapManager.notify_province_changed(province_id, "infrastructure_project")
-
-	# Event hook: player feedback on starting investment (makes the action feel consequential immediately).
-	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
-		var prov: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
-		var pname := prov.name if prov else str(province_id)
-		LeaderEventUI.post_news("Investment Started", "%s begins infrastructure project in %s (target level %d)." % [proj.owner_tag, pname, target_level], "infrastructure")
+	# Live F5 / softpipe: remote AI invest must not toast or notify (toast panels +
+	# province_data_changed → riot/fill dirty a 3520-poly canvas and wedge the clock).
+	if not _should_quiet_ai_infra_start(proj.owner_tag):
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
+			MapManager.notify_province_changed(province_id, "infrastructure_project")
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+			var prov: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+			var pname := prov.name if prov else str(province_id)
+			LeaderEventUI.post_news("Investment Started", "%s begins infrastructure project in %s (target level %d)." % [proj.owner_tag, pname, target_level], "infrastructure")
 
 	print("InfrastructureDevelopmentManager: started infra project on province %d (target %d) for %s" % [province_id, target_level, proj.owner_tag])
 	return proj
@@ -1114,11 +1118,34 @@ func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
 
 ## F5 light sim already budgets 1 AI infra start/day. The full-board consider
 ## (get_all_provinces × every tag) is what wedged the clock once a spine existed.
+## Graphical editor/export Play must skip even if light-sim is somehow false
+## (softpipe smoke is DisplayServer X11/OpenGL, not headless).
 func _should_run_full_board_ai_invest() -> bool:
+	if typeof(TimeManager) != TYPE_NIL:
+		if TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
+			return false
+		if TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+			return false
+	if DisplayServer.get_name() != "headless" and not OS.has_feature("dedicated_server"):
+		return false
+	if OS.get_environment("EOA_LIVE_F5_EQUIV").strip_edges() == "1":
+		return false
+	return true
+
+
+func _should_quiet_ai_infra_start(investor_tag: String) -> bool:
+	var tag := investor_tag.strip_edges().to_upper()
+	if tag.is_empty() or tag == _player_tag_for_ai():
+		return false
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_live_f5_play_path"):
+		if bool(TimeManager.is_live_f5_play_path()):
+			return true
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim"):
 		if bool(TimeManager.is_interactive_light_sim()):
-			return false
-	return true
+			return true
+	if DisplayServer.get_name() != "headless" and not OS.has_feature("dedicated_server"):
+		return true
+	return false
 
 
 ## Short automated path: seed Köln spine at the live freeze point (~17%) and
@@ -1181,11 +1208,86 @@ func simulate_ix1_spine_days(days: int = 12, use_f5_flush: bool = true) -> Dicti
 	}
 
 
+## Live editor/export Play stand-in: day_ai + budgeted AI invest run, playtest
+## skips do not. Fails closed if full-board consider would fire or the clock
+## does not move past day +2 in a short budget (headless-only green is not KEEP).
+func simulate_live_f5_day_advance(days: int = 5) -> Dictionary:
+	var n := clampi(int(days), 1, 20)
+	_full_board_ai_invest_calls = 0
+	_ai_infra_provinces_considered = 0
+	if typeof(TimeManager) != TYPE_NIL:
+		if not _is_initialized:
+			initialize_with_time()
+	var hub := IX1_FALLBACK_HUB
+	if not active_projects.has(hub):
+		restore_project(hub, {
+			"province_id": hub,
+			"axis": "infrastructure",
+			"owner_tag": "GER",
+			"starting_level": 4,
+			"target_level": 5,
+			"progress": 2.0,
+			"work_per_day_base": 2.8,
+			"days_remaining": 35,
+			"status": "active",
+			"build_road_spine": false,
+			"spine_neighbor_ids": [],
+		})
+	var start_elapsed := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		start_elapsed = int(TimeManager.get_total_days_elapsed())
+	var gate_on := true
+	if typeof(TimeManager) != TYPE_NIL:
+		var was_equiv := bool(TimeManager.get("_live_f5_equiv_clock"))
+		TimeManager.set("_live_f5_equiv_clock", true)
+		gate_on = _should_run_full_board_ai_invest()
+		TimeManager.set("_live_f5_equiv_clock", was_equiv)
+	var t0 := Time.get_ticks_msec()
+	var clock: Dictionary = {}
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_live_f5_equivalent_days"):
+		clock = TimeManager.call("advance_live_f5_equivalent_days", n)
+	elif typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_days"):
+		var was_paused := bool(TimeManager.paused)
+		TimeManager.paused = false
+		TimeManager.advance_days(float(n))
+		if TimeManager.has_method("_drain_living_f5_flush"):
+			TimeManager.call("_drain_living_f5_flush", n)
+		TimeManager.paused = was_paused
+	var ms := Time.get_ticks_msec() - t0
+	var end_elapsed := start_elapsed
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		end_elapsed = int(TimeManager.get_total_days_elapsed())
+	var elapsed_delta := end_elapsed - start_elapsed
+	var consider_calls := _full_board_ai_invest_calls
+	var past_plus2 := elapsed_delta >= mini(n, 3)
+	var ok := (
+		elapsed_delta >= n
+		and consider_calls == 0
+		and not gate_on
+		and past_plus2
+		and ms <= 8000
+	)
+	return {
+		"ok": ok,
+		"days": n,
+		"elapsed_delta": elapsed_delta,
+		"past_plus2": past_plus2,
+		"full_board_ai_invest": gate_on,
+		"full_board_ai_invest_calls": consider_calls,
+		"provinces_considered": _ai_infra_provinces_considered,
+		"elapsed_ms": ms,
+		"live_f5_equiv": true,
+		"living_playtest_clock": false,
+		"clock": clock,
+	}
+
+
 ## AI helper (called from DebugOverlay AI sim turns, TestRunner headless demos, or daily if extended).
 ## AI countries aggressively develop core / high-value low-infra provinces (per DESIGN Phase D).
 ## Uses same try_start so Mandate spend + full validation (engineer, tech, stab) applies.
 ## Probabilistic to avoid spam; prefers provinces with factories or high pop or in core.
 func ai_consider_daily_invests(ai_country_tags: Array = [], chance_per_country: float = 0.35) -> int:
+	_full_board_ai_invest_calls += 1
 	var started := 0
 	if ai_country_tags.is_empty():
 		# Fallback: discover some non-player tags from MapManager
@@ -1266,9 +1368,10 @@ func try_ai_start_infra_project(tag: String, day_index: int = 0) -> Dictionary:
 		return {"ok": true, "skipped": true, "started": false, "started_n": 0, "reason": "player", "tag": chosen}
 	if _ai_infra_budget_day == day_index and _ai_infra_starts_today >= 1:
 		return {"ok": true, "skipped": true, "started": false, "started_n": 0, "reason": "day_budget", "tag": chosen}
+	_ai_infra_provinces_considered = 0
 	var pid := _pick_ai_infra_province(chosen)
 	if pid <= 0:
-		return {"ok": true, "started": false, "started_n": 0, "reason": "no_candidate", "tag": chosen}
+		return {"ok": true, "started": false, "started_n": 0, "reason": "no_candidate", "tag": chosen, "provinces_considered": _ai_infra_provinces_considered}
 	var started := false
 	if has_method("try_start_infrastructure_investment"):
 		var res: Dictionary = try_start_infrastructure_investment(pid, chosen)
@@ -1298,6 +1401,7 @@ func try_ai_start_infra_project(tag: String, day_index: int = 0) -> Dictionary:
 		"pid": pid,
 		"kind": "infrastructure",
 		"days_remaining": live.days_remaining if live else 0,
+		"provinces_considered": _ai_infra_provinces_considered,
 	}
 
 
@@ -1350,19 +1454,17 @@ func _player_tag_for_ai() -> String:
 
 
 func _pick_ai_infra_tag(player: String, day_index: int) -> String:
-	var majors: Array = ["GER", "SOV", "JAP", "FRA", "ITA", "USA", "ENG", "POL"]
-	var n := majors.size()
-	if n <= 0:
-		return ""
-	var rot := posmod(int(day_index), n)
-	var ordered: Array = majors.slice(rot) + majors.slice(0, rot)
-	for raw in ordered:
+	# One rotated major — do not walk every tag calling a province scan.
+	var majors: Array = ["SOV", "JAP", "FRA", "ITA", "USA", "ENG", "POL"]
+	var filtered: Array = []
+	for raw in majors:
 		var t := str(raw).to_upper()
 		if t.is_empty() or t == player:
 			continue
-		if _pick_ai_infra_province(t) > 0:
-			return t
-	return ""
+		filtered.append(t)
+	if filtered.is_empty():
+		return ""
+	return str(filtered[posmod(int(day_index), filtered.size())])
 
 
 func _capital_pid_for_tag(tag: String) -> int:
@@ -1377,49 +1479,56 @@ func _capital_pid_for_tag(tag: String) -> int:
 
 
 func _pick_ai_infra_province(tag: String) -> int:
-	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
+	# Live F5: never walk get_provinces_by_owner / get_all_provinces (3520).
+	# Capital → a few capital neighbors → at most two cached border from_ids.
+	if typeof(MapManager) == TYPE_NIL:
 		return 0
 	var t := tag.strip_edges().to_upper()
-	var owned: Array = MapManager.get_provinces_by_owner(t)
-	if owned.is_empty():
+	if t.is_empty():
 		return 0
 	var cap_pid := _capital_pid_for_tag(t)
-	var border: Dictionary = {}
+	if _ai_infra_pid_ok(cap_pid, t):
+		_ai_infra_provinces_considered += 1
+		return cap_pid
+	if cap_pid > 0 and MapManager.has_method("get_adjacent_provinces"):
+		var nbr: Array = MapManager.get_adjacent_provinces(cap_pid, true)
+		for pid_var in nbr:
+			if _ai_infra_provinces_considered >= AI_INFRA_PICK_CAP:
+				break
+			var pid := int(pid_var)
+			_ai_infra_provinces_considered += 1
+			if _ai_infra_pid_ok(pid, t):
+				return pid
 	if MapManager.has_method("collect_live_border_assault_targets"):
-		var fronts: Array = MapManager.collect_live_border_assault_targets(t, 8)
+		var fronts: Array = MapManager.collect_live_border_assault_targets(t, 2)
 		for raw in fronts:
+			if _ai_infra_provinces_considered >= AI_INFRA_PICK_CAP:
+				break
 			if typeof(raw) != TYPE_DICTIONARY:
 				continue
 			var from_id := int((raw as Dictionary).get("from_province_id", 0))
-			if from_id > 0:
-				border[from_id] = true
-	var era_max := _get_era_max(t, "infrastructure")
-	var best_pid := 0
-	var best_score := -9999.0
-	for pid_var in owned:
-		var pid := int(pid_var)
-		if pid <= 0 or has_active_project(pid):
-			continue
-		var p: Province = MapManager.get_province(pid)
-		if p == null or bool(p.is_sea):
-			continue
-		var infra := int(p.infrastructure)
-		if infra >= era_max:
-			continue
-		var near_cap := pid == cap_pid
-		if not near_cap and cap_pid > 0 and MapManager.has_method("get_adjacent_provinces"):
-			var nbr: Array = MapManager.get_adjacent_provinces(cap_pid, true)
-			near_cap = nbr.has(pid)
-		var on_border := border.has(pid)
-		var score := float(12 - infra) * 2.0
-		if near_cap:
-			score += 8.0
-		if on_border:
-			score += 7.0
-		if score > best_score:
-			best_score = score
-			best_pid = pid
-	return best_pid
+			_ai_infra_provinces_considered += 1
+			if _ai_infra_pid_ok(from_id, t):
+				return from_id
+	return 0
+
+
+func _ai_infra_pid_ok(pid: int, tag: String) -> bool:
+	if pid <= 0 or has_active_project(pid):
+		return false
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province"):
+		return false
+	var p: Province = MapManager.get_province(pid)
+	if p == null or bool(p.is_sea):
+		return false
+	var owner := str(p.owner_tag).strip_edges().to_upper()
+	var ctrl := str(p.controller_tag).strip_edges().to_upper() if "controller_tag" in p else ""
+	if owner != tag and ctrl != tag:
+		return false
+	var era_max := _get_era_max(tag, "infrastructure")
+	if int(p.infrastructure) >= era_max:
+		return false
+	return true
 
 
 func _count_active_projects_for(country_tag: String) -> int:
@@ -1444,6 +1553,13 @@ func _available_political_power(country_tag: String) -> int:
 	var tag := country_tag.strip_edges().to_upper()
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_political_power"):
 		return int(GameData.get_political_power(tag))
+	# Live F5: never scan every owned hex for a PP proxy (that is a 3520 walk).
+	if _should_quiet_ai_infra_start(tag) or (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_interactive_light_sim")
+		and bool(TimeManager.is_interactive_light_sim())
+	):
+		return maxi(80 - _count_active_projects_for(tag) * 12, 0)
 	# Proxy: factories + dev on owned provinces minus active project load
 	var pp := 50
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):

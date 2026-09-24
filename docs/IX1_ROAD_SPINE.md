@@ -32,7 +32,7 @@ Fresh **Begin · Germany · 1936** has Mandate **0** (`peace_state.mandate` map 
 
 ## Day-tick FIX (clock + spine progress)
 
-An active spine used to stall the F5 clock (~7 Jan 20:00 @ 4× / ~9 Jan 20:00 @ 1×, spine ~17–20%) while Godot stayed hot. Cause: `advance_daily_projects` only runs the full-board `ai_consider_daily_invests` (3520×N) when **any** project is live, and each progress notify rebuilt the inspector. F5 already budgets 1 AI infra start/day — the continent consider is skipped under `is_interactive_light_sim`. Progress updates no longer `notify_province_changed`. Calendar autosave is deferred off `day_emit`. Headless: `simulate_ix1_spine_days` + `HeadlessIx1RoadSpineDayTickTest.gd` (clock +12d past 20%, then complete). Mandate front door unchanged.
+An active spine used to stall the F5 clock (~7 Jan 20:00 @ 4× / ~9 Jan 20:00 @ 1×, spine ~17–20%) while Godot stayed hot. Cause: `advance_daily_projects` only runs the full-board `ai_consider_daily_invests` (3520×N) when **any** project is live, and each progress notify rebuilt the inspector. F5 already budgets 1 AI infra start/day — the continent consider is skipped under `is_interactive_light_sim` **and** any graphical DisplayServer (editor/export Play / softpipe). Budgeted AI pick is capital/neighbors only (never `get_provinces_by_owner`). Remote AI starts do not toast/notify. Day-emit no longer walks 3520 feature rings. Headless: `simulate_ix1_spine_days` + `simulate_live_f5_day_advance` (live-equiv flush, not the playtest-clock skip) in `HeadlessIx1RoadSpineDayTickTest.gd`. Mandate front door unchanged.
 
 ## Player path (smoke)
 

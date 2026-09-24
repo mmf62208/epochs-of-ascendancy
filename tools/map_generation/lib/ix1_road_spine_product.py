@@ -30,6 +30,7 @@ RENDERER_GD = ROOT / "scripts" / "map" / "MapRenderer.gd"
 FORMATTERS_GD = ROOT / "scripts" / "map" / "MapPolishFormatters.gd"
 FORMATTERS_PY = ROOT / "tools" / "map_generation" / "lib" / "map_polish_formatters.py"
 SAVE_LOAD_GD = ROOT / "scripts" / "autoload" / "SaveLoadManager.gd"
+TIME_MANAGER_GD = ROOT / "scripts" / "autoload" / "TimeManager.gd"
 DAY_TICK_HARNESS = ROOT / "scripts" / "core" / "HeadlessIx1RoadSpineDayTickTest.gd"
 GATES_SH = ROOT / "tools" / "eoa_full_test_gates.sh"
 ADJ_PATH = ROOT / "data" / "provinces_world_accurate" / "province_adjacency.json"
@@ -380,26 +381,50 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
     idm = _read(IDM_GD)
     ren = _read(RENDERER_GD)
     save = _read(SAVE_LOAD_GD)
+    tm = _read(TIME_MANAGER_GD)
     harness = _read(DAY_TICK_HARNESS)
     gates = _read(GATES_SH)
     gate = _slice_func(idm, "_should_run_full_board_ai_invest")
     adv = _slice_func(idm, "advance_daily_projects")
+    pick = _slice_func(idm, "_pick_ai_infra_province")
+    start = _slice_func(idm, "start_infrastructure_project")
     prog = _slice_func(ren, "_on_infra_progress_for_inspector")
     changed = _slice_func(ren, "_on_map_province_data_changed")
+    rings = _slice_func(ren, "_refresh_feature_progress_rings")
     sim = _slice_func(idm, "simulate_ix1_spine_days")
+    live_sim = _slice_func(idm, "simulate_live_f5_day_advance")
+    live_clock = _slice_func(tm, "advance_live_f5_equivalent_days")
     missing: List[str] = []
     if "is_interactive_light_sim" not in gate:
         missing.append("light_sim_gate")
+    if "is_live_f5_play_path" not in gate and "DisplayServer.get_name()" not in gate:
+        missing.append("graphical_play_gate")
     if "_should_run_full_board_ai_invest" not in adv:
         missing.append("advance_uses_gate")
+    if "get_all_provinces" in pick or "get_provinces_by_owner" in pick:
+        missing.append("pick_full_board_scan")
+    if "AI_INFRA_PICK_CAP" not in pick:
+        missing.append("pick_cap")
+    if "_should_quiet_ai_infra_start" not in start:
+        missing.append("quiet_ai_toast")
     if "notify_province_changed(" in prog:
         missing.append("progress_renotify")
     if "selected_province_id" not in changed or "infrastructure_project" not in changed:
         missing.append("selected_only_inspector")
+    if "is_interactive_light_sim" not in rings:
+        missing.append("ring_walk_gated")
     if "_deferred_calendar_autosave" not in save:
         missing.append("deferred_autosave")
     if "past_freeze" not in sim or "advance_living_playtest_days" not in sim:
         missing.append("simulate_ix1_spine_days")
+    if "advance_live_f5_equivalent_days" not in live_sim or "past_plus2" not in live_sim:
+        missing.append("simulate_live_f5_day_advance")
+    if "_living_playtest_clock = true" in live_clock:
+        missing.append("live_equiv_uses_playtest_clock")
+    if "_live_f5_equiv_clock = true" not in live_clock:
+        missing.append("live_equiv_clock")
+    if "past_plus2" not in harness or "simulate_live_f5_day_advance" not in harness:
+        missing.append("live_equiv_harness")
     if "past_freeze" not in harness or "RESULT=" not in harness:
         missing.append("day_tick_harness")
     if "HeadlessIx1RoadSpineDayTickTest" not in gates:

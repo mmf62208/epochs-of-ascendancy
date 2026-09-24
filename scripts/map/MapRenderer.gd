@@ -719,6 +719,9 @@ func _on_map_province_data_changed(province_id: int, what: String) -> void:
 		# "open land battles resolved". Pid fill is enough; LOD/mode still
 		# redraws frontiers.
 		return
+	# Remote AI infrastructure_project must not walk riot markers on F5.
+	if what == "infrastructure_project" and province_id != selected_province_id:
+		return
 	_update_riot_markers()  # monthly riot ignition/spread, not capture
 
 
@@ -868,7 +871,9 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 				_show_inspector_toast(aar_line, 5.5)
 				_play_map_sfx("achievement" if str(aar.get("winner", "")) == "attacker" else "map")
 	# Pass 17: live-update airfield repair rings without full province rebuild.
-	call_deferred("_refresh_feature_progress_rings")
+	# Live F5 / softpipe: walking 3520 province_nodes on every day_emit wedges the clock.
+	if not light:
+		call_deferred("_refresh_feature_progress_rings")
 	# Pass 22: refresh repair queue chip list on day advance.
 	if _repair_queue_chip != null and is_instance_valid(_repair_queue_chip) and _repair_queue_chip.visible:
 		if _repair_queue_chip.has_method("refresh"):
@@ -24373,6 +24378,13 @@ func _on_feature_ring_clicked(province_id: int) -> void:
 ## Pass 17: update existing FeatureProgressRing nodes from live damage/construction state.
 func _refresh_feature_progress_rings() -> void:
 	if province_nodes.is_empty():
+		return
+	var light := (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_interactive_light_sim")
+		and bool(TimeManager.is_interactive_light_sim())
+	)
+	if light:
 		return
 	for pid_v in province_nodes.keys():
 		var node: Node2D = province_nodes[pid_v] as Node2D
