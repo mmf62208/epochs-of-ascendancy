@@ -27,6 +27,7 @@ PROVINCE_GD = ROOT / "scripts" / "data" / "Province.gd"
 MAP_MANAGER_GD = ROOT / "scripts" / "map" / "MapManager.gd"
 OVERLAY_GD = ROOT / "scripts" / "map" / "InfrastructureOverlayLayer.gd"
 RENDERER_GD = ROOT / "scripts" / "map" / "MapRenderer.gd"
+SEARCH_GD = ROOT / "scripts" / "ui" / "map" / "MapProvinceSearch.gd"
 FORMATTERS_GD = ROOT / "scripts" / "map" / "MapPolishFormatters.gd"
 FORMATTERS_PY = ROOT / "tools" / "map_generation" / "lib" / "map_polish_formatters.py"
 SAVE_LOAD_GD = ROOT / "scripts" / "autoload" / "SaveLoadManager.gd"
@@ -75,6 +76,11 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (OVERLAY_GD, "_road_layer_has_explicit_lines"),
     (RENDERER_GD, "BtnBuildRoadSpine"),
     (RENDERER_GD, "_on_build_road_spine_pressed"),
+    (RENDERER_GD, "_hide_unit_card_keep_map_focus"),
+    (RENDERER_GD, "_dismiss_unit_card_restore_province"),
+    (RENDERER_GD, "_map_prefers_province_over_unit"),
+    (RENDERER_GD, "chip_disk_only"),
+    (SEARCH_GD, "focus_province_by_id"),
     (FORMATTERS_GD, "Road Spine"),
     (FORMATTERS_PY, "Road Spine"),
 )
@@ -442,6 +448,62 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
     }
 
 
+def ix1_province_select_under_garrison() -> Dict[str, Any]:
+    """Search/Go + Alt/infra empty-terrain must open province inspector under garrison."""
+    ren = _read(RENDERER_GD)
+    search = _read(SEARCH_GD)
+    focus = _slice_func(ren, "focus_province_by_id")
+    show = _slice_func(ren, "show_info_panel")
+    land = _slice_func(ren, "_try_open_land_unit_at_world")
+    chip = _slice_func(ren, "_try_open_land_chip_from_input")
+    esc = _slice_func(ren, "_handle_escape_key")
+    prefer = _slice_func(ren, "_map_prefers_province_over_unit")
+    hide = _slice_func(ren, "_hide_unit_card_keep_map_focus")
+    restore = _slice_func(ren, "_dismiss_unit_card_restore_province")
+    popup = _slice_func(ren, "_show_unit_detail_popup")
+    missing: List[str] = []
+    if "focus_province_by_id" not in search:
+        missing.append("search_calls_focus")
+    if "_hide_unit_card_keep_map_focus" not in focus:
+        missing.append("search_hides_garrison")
+    if "show_info_panel(province, true)" not in focus:
+        missing.append("search_force_inspector")
+    if "_camera_is_held" not in focus:
+        missing.append("focus_keeps_camera_is_held")
+    if "force_open" not in show or "keep_camera" not in show:
+        missing.append("show_force_keep_camera")
+    if "chip_disk_only" not in land:
+        missing.append("chip_disk_only")
+    if "_resolve_hex_pick_pid" not in land or "_nearest_player_land_formation_at_world" not in land:
+        missing.append("land_fallbacks_kept")
+    if land.count("_player_land_formation_at_province") < 2:
+        missing.append("land_province_stack_kept")
+    if "_map_prefers_province_over_unit" not in chip:
+        missing.append("chip_uses_prefer")
+    if "show_info_panel" in chip or "show_info_panel" in land:
+        missing.append("land_open_no_inspector")
+    if "_dismiss_unit_card_restore_province" not in esc:
+        missing.append("esc_restores_province")
+    if "KEY_ALT" not in prefer or '"infra"' not in prefer:
+        missing.append("prefer_alt_or_infra")
+    if "event.alt_pressed" not in _slice_func(ren, "_input"):
+        missing.append("alt_skips_land_chip")
+    if "chip_disk_only" not in hide and "UnitDetailPopup" not in hide:
+        missing.append("hide_unit_card")
+    if "show_info_panel(p, true, true)" not in restore:
+        missing.append("restore_keep_camera")
+    if "_dismiss_unit_card_restore_province" not in popup:
+        missing.append("garrison_close_restores")
+    if "710417" not in _read(SPEC_PATH) or "710416" not in _read(SPEC_PATH):
+        missing.append("corridor_ids")
+    return {
+        "ok": not missing,
+        "missing": missing,
+        "hub_id": HUB_ID,
+        "corridor_ids": list(CORRIDOR_IDS),
+    }
+
+
 def build_ix1_road_spine_product() -> Dict[str, Any]:
     passes: List[str] = []
     fails: List[str] = []
@@ -506,6 +568,12 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
     else:
         fails.append("day_tick_unblocked")
 
+    select_gate = ix1_province_select_under_garrison()
+    if select_gate.get("ok"):
+        passes.append("province_select_under_garrison")
+    else:
+        fails.append("province_select_under_garrison")
+
     return {
         "ok": not fails,
         "slice": SLICE_NAME,
@@ -523,6 +591,7 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
         "shipped": api,
         "day0_mandate_gate": gate,
         "day_tick_unblocked": day_tick,
+        "province_select_under_garrison": select_gate,
         "parked": [
             "Dig2 pan",
             "old G polyline dig",

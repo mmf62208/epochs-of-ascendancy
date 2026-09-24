@@ -1650,6 +1650,12 @@ func _handle_escape_key() -> void:
 	if _esc_stack_frame == frame_now:
 		return
 	_esc_stack_frame = frame_now
+	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
+	# without GIS lock or a second search.
+	if _unit_detail_popup_is_visible():
+		_dismiss_unit_card_restore_province()
+		_close_release_seen = true
+		return
 	if _inspector_stack_blocking_input():
 		_dismiss_inspector_and_restore_input()
 		# Esc is not a held Close button — next empty-area left-drag may unlock.
@@ -1882,9 +1888,14 @@ func _input(event: InputEvent) -> void:
 				if did_left_pan:
 					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
-				elif not event.shift_pressed and _try_open_land_chip_from_input(event.ctrl_pressed):
+				elif (
+					not event.shift_pressed
+					and not event.alt_pressed
+					and _try_open_land_chip_from_input(event.ctrl_pressed)
+				):
 					# Still-click land chip in `_input` so ProvinceHoverTooltip
 					# cannot steal GER Division Fill%/TOE (Play DIG FAIL).
+					# Alt-click prefers province inspector (IX-1 Köln under garrison).
 					return
 	if event is InputEventMouseMotion:
 		_note_mouse_up_arms_still_click()
@@ -2255,9 +2266,12 @@ func _unhandled_input(event: InputEvent) -> void:
 		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
 		# Land division chips beat capital stars (Play: chips opened Praha inspector).
 		# Air/fleet still lose to stars (Berlin star vs Air Wing PASS).
-		if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed):
-			get_viewport().set_input_as_handled()
-			return
+		# Alt-click / infra empty-terrain prefers province (IX-1 Köln under garrison).
+		if not event.alt_pressed:
+			var disk_only: bool = _map_prefers_province_over_unit()
+			if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed, disk_only):
+				get_viewport().set_input_as_handled()
+				return
 		# Capital gold star wins over a colocated air/fleet chip.
 		# Star click inspects the capital and does not arm MARCH.
 		# THIS drag already exceeded 8px: do not snap-select any capital
@@ -17244,6 +17258,15 @@ func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> b
 	var node := _province_node(province_id)
 	if node == null:
 		return false
+	# Search/Go is explicit province intent: hide Garrison overlay and drop Close hold
+	# so show_info_panel is not skipped by _camera_is_held() (Play MIXED Köln 710417).
+	_hide_unit_card_keep_map_focus()
+	_inspector_held_closed = false
+	_unlock_close_camera()
+	_close_click_guard = false
+	_close_suppress_edge = false
+	_hold_camera_until_msec = 0
+	_map_pick_block_until_msec = 0
 	_select_province(province, node)
 	var pos: Vector2 = province_centroids.get(province_id, Vector2.ZERO)
 	if pos == Vector2.ZERO:
@@ -17263,7 +17286,7 @@ func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> b
 			cam.zoom = Vector2(soft_z, soft_z)
 		else:
 			cam.zoom = Vector2(tactical_z, tactical_z)
-	show_info_panel(province)
+	show_info_panel(province, true)
 	MapManager.province_selected.emit(province_id)
 	return true
 
@@ -17631,7 +17654,7 @@ func _update_spatial_hover() -> void:
 
 # ====================== INFO PANEL ======================
 
-func show_info_panel(province: Province) -> void:
+func show_info_panel(province: Province, force_open: bool = false, keep_camera: bool = false) -> void:
 	# Real province always wins — never redirect back to coarse (that re-teleported camera every
 	# data_changed/air tick after clicking Africa and hard-crashed while panning).
 	if province != null:
@@ -17645,7 +17668,7 @@ func show_info_panel(province: Province) -> void:
 		push_warning("MapRenderer: info_panel is not a CanvasItem (type=" + str(info_panel.get_class()) + ", script=" + str(info_panel.get_script()) + ") — cannot show inspector. Check scene NodePath exports for the MapRenderer or wiring in _wire_info_panel_refs.")
 		return
 
-	if _camera_is_held():
+	if _camera_is_held() and not force_open:
 		return
 	_inspector_held_closed = false
 	_layout_map_ui()
@@ -17655,7 +17678,12 @@ func show_info_panel(province: Province) -> void:
 	_layout_info_panel_inner()
 	# After panel is visible, nudge once so selection sits in the free map band.
 	# Dismiss bumps _camera_nudge_gen so a Close cannot leave this as a teleport.
-	if not info_panel.has_meta("user_moved") and selected_province_id == province.id:
+	# keep_camera: garrison Close restores inspector without flying the GIS pose.
+	if (
+		not keep_camera
+		and not info_panel.has_meta("user_moved")
+		and selected_province_id == province.id
+	):
 		call_deferred("_nudge_camera_after_panel", province.id, _camera_nudge_gen)
 	# Second + third pass after size settles so wrap width matches real scroll viewport.
 	call_deferred("_layout_info_panel_inner")
@@ -17999,7 +18027,8 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 	if MapViewInput.modal_blocks_map_nav(get_viewport()):
 		return false
 	var world_pos: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
-	if _try_open_land_unit_at_world(world_pos, ctrl_click):
+	var disk_only: bool = _map_prefers_province_over_unit()
+	if _try_open_land_unit_at_world(world_pos, ctrl_click, disk_only):
 		get_viewport().set_input_as_handled()
 		return true
 	return false
@@ -18127,7 +18156,11 @@ func _nearest_player_land_formation_at_world(world_pos: Vector2) -> Object:
 	return best
 
 
-func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
+func _try_open_land_unit_at_world(
+	world_pos: Vector2,
+	ctrl_click: bool = false,
+	chip_disk_only: bool = false
+) -> bool:
 	var fo_any: Object = _pick_unit_formation_at_world(world_pos)
 	var fo: Object = _pick_land_unit_formation_at_world(world_pos)
 	if fo_any != null and _formation_type_blocks_land_open(fo_any):
@@ -18137,13 +18170,14 @@ func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) 
 		var stacked: Object = _player_land_formation_at_province(chrome_pid)
 		if stacked != null:
 			fo = stacked
-	if fo == null:
+	if fo == null and not chip_disk_only:
 		# Disk miss (empty / non-player): player land stationed on the hex
 		# under the click — even when first pick is not air/fleet/space.
 		# Hex-only: capital star stays the next still-click step after land-open.
+		# chip_disk_only: infra / empty-terrain prefers province inspector.
 		var miss_pid: int = _resolve_hex_pick_pid(world_pos)
 		fo = _player_land_formation_at_province(miss_pid)
-	if fo == null:
+	if fo == null and not chip_disk_only:
 		# Home chrome over Neustadt / Schwäbisch Hall / FRA / Berlin-Home:
 		# nearest painted player-land icon (station 710173 / ger_nbr).
 		fo = _nearest_player_land_formation_at_world(world_pos)
@@ -18560,7 +18594,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	RetrowaveTheme.style_secondary_button(close_btn)
 	close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
-	close_btn.pressed.connect(_dismiss_inspector_and_restore_input)
+	close_btn.pressed.connect(_dismiss_unit_card_restore_province)
 	title_row.add_child(close_btn)
 
 	# Always paint Fill%/TOE on open (never title-row-only). Parent fallback first so
@@ -18921,6 +18955,42 @@ func _unit_detail_popup_is_visible() -> bool:
 	if ui == null:
 		return false
 	return _overlay_node_is_up(ui.get_node_or_null("UnitDetailPopup"))
+
+
+func _map_prefers_province_over_unit() -> bool:
+	# Infra Build / F7 and Alt-click prefer hex inspector over garrison stack.
+	if Input.is_key_pressed(KEY_ALT):
+		return true
+	if current_map_mode == "infra":
+		return true
+	return false
+
+
+func _hide_unit_card_keep_map_focus() -> void:
+	# Drop Garrison overlay without Close GIS lock / pick-block (search + restore).
+	var ui: CanvasLayer = get_node_or_null("UI") as CanvasLayer
+	if ui != null:
+		var unit_pop: Node = ui.get_node_or_null("UnitDetailPopup")
+		if unit_pop != null:
+			if unit_pop is CanvasItem:
+				(unit_pop as CanvasItem).visible = false
+			if unit_pop is Control:
+				(unit_pop as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+			unit_pop.queue_free()
+	if not selected_formation_id.is_empty():
+		selected_formation_id = ""
+		_refresh_selected_unit_chip()
+
+
+func _dismiss_unit_card_restore_province() -> void:
+	_hide_unit_card_keep_map_focus()
+	if selected_province_id < 0 or not provinces.has(selected_province_id):
+		return
+	var p: Province = provinces[selected_province_id] as Province
+	if p == null:
+		return
+	_inspector_held_closed = false
+	show_info_panel(p, true, true)
 
 
 func _ensure_station_engineers_button() -> void:

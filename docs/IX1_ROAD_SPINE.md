@@ -38,7 +38,7 @@ After that +2 fix held, live F5 still froze ~6–7 Jan (+5/+6d) at ~10GB RSS: ca
 
 ## Player path (smoke)
 
-1. Default F5 GER, Home Europe. Pick **Köln** `710417` (or Bonn / Leverkusen).
+1. Default F5 GER, Home Europe. Search **Köln** + **Go** (or Bonn / Leverkusen) — this opens the **province inspector** (infra/build), not Garrison / unit overlay. Alt-click or empty-terrain on **Infra / Build** also prefers the hex. Esc / Close on Garrison restores the province inspector without flying the camera.
 2. Inspector **Build Road Spine** (not F10). Day-0 Mandate **0** is enough. Construction ring + ETA bar while the project ticks.
 3. On complete: toast / news **Road spine complete**; RoadLayer paints the brown spine at Home zoom; inspector refresh.
 4. Move / supply on the corridor is cheaper than the same province pre-build and cheaper than Essen control.

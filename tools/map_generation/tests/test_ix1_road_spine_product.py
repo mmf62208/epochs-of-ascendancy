@@ -24,6 +24,7 @@ from ix1_road_spine_product import (  # noqa: E402
     empty_board,
     ix1_day0_mandate_gate,
     ix1_day_tick_unblocked,
+    ix1_province_select_under_garrison,
     ix1_road_spine_mandate_cost,
     load_ix1_spec,
     movement_cost,
@@ -100,6 +101,14 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         p = build_ix1_road_spine_product()
         self.assertIn("day_tick_unblocked", p.get("passes") or [])
         self.assertIn("day0_mandate_gate", p.get("passes") or [])
+
+    def test_province_select_under_garrison(self) -> None:
+        gate = ix1_province_select_under_garrison()
+        self.assertTrue(gate.get("ok"), msg=gate)
+        self.assertEqual(int(gate.get("hub_id")), HUB_ID)
+        self.assertEqual(sorted(gate.get("corridor_ids") or []), [BONN_ID, HUB_ID, LEVERKUSEN_ID])
+        p = build_ix1_road_spine_product()
+        self.assertIn("province_select_under_garrison", p.get("passes") or [])
 
     def test_live_f5_equiv_gate_not_playtest_clock(self) -> None:
         tick = ix1_day_tick_unblocked()
