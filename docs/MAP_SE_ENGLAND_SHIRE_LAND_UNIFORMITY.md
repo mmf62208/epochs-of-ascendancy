@@ -102,7 +102,7 @@ Maginot-class target met: max/median **4.48 ≤ ~5** and max **215.2 ≤ 290**. 
 python3 -m unittest tools.map_generation.tests.test_se_england_shire_land_uniformity_product -v
 ```
 
-`map_accuracy_qc` on the written board if that is the repo gate. Maginot / Flanders / Ligurian / Gibraltar / Alboran / HK / Windward / Great Lakes product tests still PASS. Fill%·TOE + pale-map residual marker in `MapRenderer.gd` stay untouched. `world_full` git-clean (no 711523/711524 IDs written).
+`map_accuracy_qc` on the written board: hard_ok, matched **3536**, orphans 0, NE land hit **0.9853**. Maginot / Flanders / Ligurian / Gibraltar / Alboran / HK / Windward / Great Lakes product tests still PASS. Fill%·TOE + pale-map residual marker in `MapRenderer.gd` stay untouched. `world_full` git-clean (no 711523/711524 IDs written).
 
 `--quick` living-unit wiring fails that already exist on tip `1388a3e` are OK — this FEED does not touch those GD files.
 
