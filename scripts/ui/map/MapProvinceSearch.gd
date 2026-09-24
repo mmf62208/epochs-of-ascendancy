@@ -67,14 +67,20 @@ static func fold_search_key(s: String) -> String:
 func _rebuild_index() -> void:
 	_names.clear()
 	_folded_names.clear()
-	var sl := get_node_or_null("/root/ScenarioLoader") as ScenarioLoader
+	var sl: Node = get_node_or_null("/root/ScenarioLoader")
 	var city_layer: Dictionary = {}
 	if sl != null:
-		city_layer = sl.province_city_layer
+		if "province_city_layer" in sl:
+			var raw_city: Variant = sl.get("province_city_layer")
+			if raw_city is Dictionary:
+				city_layer = raw_city
 		if city_layer.has("provinces") and city_layer["provinces"] is Dictionary:
 			city_layer = city_layer["provinces"]
-		for pid_var in sl.provinces.keys():
-			_index_province(int(pid_var), sl.provinces[pid_var], city_layer)
+		if "provinces" in sl:
+			var sl_provs: Variant = sl.get("provinces")
+			if sl_provs is Dictionary:
+				for pid_var in (sl_provs as Dictionary).keys():
+					_index_province(int(pid_var), (sl_provs as Dictionary)[pid_var], city_layer)
 	# MapRenderer.provinces may exist after ScenarioLoader was still empty at bind.
 	if _map_renderer != null and "provinces" in _map_renderer:
 		var mr_provs: Variant = _map_renderer.get("provinces")
@@ -89,10 +95,11 @@ func _rebuild_index() -> void:
 
 
 func _index_province(pid: int, p: Variant, city_layer: Dictionary) -> void:
-	if p == null or not (p is Province):
+	if p == null or not (p is Object):
 		return
-	var prov: Province = p as Province
-	_index_name(prov.name, pid)
+	var obj: Object = p as Object
+	if "name" in obj:
+		_index_name(str(obj.get("name")), pid)
 	_index_name(str(pid), pid)
 	var entry: Variant = city_layer.get(str(pid), {})
 	_index_city_entry(pid, entry)
