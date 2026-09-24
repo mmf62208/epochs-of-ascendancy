@@ -1,3 +1,5 @@
+> **2026-09-24 IX-1 live +5/+6d freeze / OOM:** After +2 softpipe FIX held, Play MIXED on `1d9cb6a` — clock reached 7 Jan then froze / OOM ~10GB RSS. Cause: calendar `save_game_detailed` on elapsed%7 (pretty JSON + 3520 map + hierarchy) plus day-+5 harvest walk of all provinces. Live F5 skips automatic 7d + quit autosave; harvest is player-owned only; live-equiv soak +8d past +6 consider=0 gathers=0. Mandate 0 / corridor IDs / Dig2/G **untouched**. HOLD merge.
+>
 > **Status (2026-08-16):** Live truth → [`GAME_STATUS_SNAPSHOT.md`](GAME_STATUS_SNAPSHOT.md) (**~3520** board, L1 land loop + AI start + land_war save, M6 human-only). Director → [`GAME_DIRECTOR_PLAN.md`](GAME_DIRECTOR_PLAN.md). Dual markers → root `TODO.md`. Play → [`PLAYTEST_AND_DECISION_GUIDE.md`](PLAYTEST_AND_DECISION_GUIDE.md) §0b. This file remains append-only session log.
 
 # Current State of Epochs of Ascendancy

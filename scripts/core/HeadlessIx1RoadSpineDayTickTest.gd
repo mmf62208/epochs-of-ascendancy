@@ -12,7 +12,8 @@ const SRC_SAVE := "res://scripts/autoload/SaveLoadManager.gd"
 const SRC_TM := "res://scripts/autoload/TimeManager.gd"
 const HUB_ID := 710417
 const FREEZE_PROGRESS := 20.0
-const LIVE_DAY_BUDGET_MS := 8000
+const LIVE_DAY_BUDGET_MS := 12000
+const LIVE_SOAK_DAYS := 8
 
 var _failures := 0
 
@@ -94,6 +95,10 @@ func _test_source_gates_full_board_ai_invest() -> void:
 	if "_deferred_calendar_autosave" not in save:
 		_fail("calendar autosave must be deferred off day_emit")
 		return
+	var autosave_hook := _slice_func(save, "_on_day_advanced_for_autosave")
+	if "is_live_f5_play_path" not in autosave_hook and "_should_skip_live_f5_calendar_autosave" not in autosave_hook:
+		_fail("calendar autosave must skip live F5 / softpipe (day +5/+6 OOM)")
+		return
 	if "is_live_f5_play_path" not in gate and "DisplayServer.get_name()" not in gate:
 		_fail("full-board AI gate must also skip graphical editor/export Play, not only light_sim")
 		return
@@ -119,6 +124,9 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 	var sim := _slice_func(idm, "simulate_live_f5_day_advance")
 	if sim.is_empty() or "advance_live_f5_equivalent_days" not in sim:
 		_fail("simulate_live_f5_day_advance must drive live-equiv days (not playtest clock)")
+		return
+	if "past_plus6" not in sim or "calendar_autosave_gathers" not in sim:
+		_fail("simulate_live_f5_day_advance must prove past +6 and skip calendar autosave")
 		return
 	if "living_playtest_clock" in sim and "advance_living_playtest_days" in sim:
 		_fail("live-equiv sim must not use advance_living_playtest_days")
@@ -229,20 +237,25 @@ func _test_live_f5_equivalent_day_advance() -> void:
 		# Before the run, headless without the equiv flag is not Play.
 		pass
 	var t0 := Time.get_ticks_msec()
-	var result: Dictionary = idm.call("simulate_live_f5_day_advance", 5)
+	var result: Dictionary = idm.call("simulate_live_f5_day_advance", LIVE_SOAK_DAYS)
 	var ms := Time.get_ticks_msec() - t0
 	var elapsed := int(result.get("elapsed_delta", 0))
 	var consider := int(result.get("full_board_ai_invest_calls", -1))
 	var gate_on := bool(result.get("full_board_ai_invest", true))
 	var considered := int(result.get("provinces_considered", 9999))
+	var gathers := int(result.get("calendar_autosave_gathers", -1))
+	var mem_delta := int(result.get("memory_delta_bytes", -1))
 	if not bool(result.get("ok", false)):
 		_fail("live-F5-equiv day advance not ok: %s" % str(result))
 		return
-	if elapsed < 5:
-		_fail("live-F5-equiv clock did not advance 5 days (elapsed_delta=%d) %s" % [elapsed, str(result)])
+	if elapsed < LIVE_SOAK_DAYS:
+		_fail("live-F5-equiv clock did not advance %d days (elapsed_delta=%d) %s" % [LIVE_SOAK_DAYS, elapsed, str(result)])
 		return
 	if not bool(result.get("past_plus2", false)):
 		_fail("live-F5-equiv did not prove past day +2: %s" % str(result))
+		return
+	if not bool(result.get("past_plus6", false)):
+		_fail("live-F5-equiv did not prove past day +6: %s" % str(result))
 		return
 	if consider != 0:
 		_fail("full-board ai_consider_daily_invests ran %d times on live-equiv path" % consider)
@@ -253,15 +266,21 @@ func _test_live_f5_equivalent_day_advance() -> void:
 	if considered > 16:
 		_fail("live AI infra pick considered %d provinces (cap 16)" % considered)
 		return
+	if gathers != 0:
+		_fail("calendar autosave gathered %d times on live-equiv path (must skip)" % gathers)
+		return
+	if mem_delta > 48 * 1024 * 1024:
+		_fail("live-F5-equiv memory grew %d bytes (unbounded)" % mem_delta)
+		return
 	if ms > LIVE_DAY_BUDGET_MS:
-		_fail("live-F5-equiv 5d took %dms (wedged)" % ms)
+		_fail("live-F5-equiv %dd took %dms (wedged)" % [LIVE_SOAK_DAYS, ms])
 		return
 	if bool(result.get("living_playtest_clock", true)):
 		_fail("live-equiv result must not claim living_playtest_clock")
 		return
 	_pass(
-		"live-F5-equiv +%dd past+2 consider=%d pick=%d (%dms)"
-		% [elapsed, consider, considered, ms]
+		"live-F5-equiv +%dd past+6 consider=%d pick=%d autosave=0 mem=%d (%dms)"
+		% [elapsed, consider, considered, mem_delta, ms]
 	)
 
 

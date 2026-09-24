@@ -1209,15 +1209,22 @@ func simulate_ix1_spine_days(days: int = 12, use_f5_flush: bool = true) -> Dicti
 
 
 ## Live editor/export Play stand-in: day_ai + budgeted AI invest run, playtest
-## skips do not. Fails closed if full-board consider would fire or the clock
-## does not move past day +2 in a short budget (headless-only green is not KEEP).
-func simulate_live_f5_day_advance(days: int = 5) -> Dictionary:
+## skips do not. Fails closed if full-board consider would fire, calendar
+## autosave gathers, or the clock does not move past day +6 in a short budget
+## (headless-only green is not KEEP). Default 8d crosses the live +5/+6 wall.
+func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
 	var n := clampi(int(days), 1, 20)
 	_full_board_ai_invest_calls = 0
 	_ai_infra_provinces_considered = 0
 	if typeof(TimeManager) != TYPE_NIL:
 		if not _is_initialized:
 			initialize_with_time()
+	var sl: Node = null
+	if typeof(SaveLoadManager) != TYPE_NIL:
+		sl = SaveLoadManager
+	if sl != null:
+		sl.set("_calendar_autosave_gathers", 0)
+		sl.set("_calendar_autosave_live_f5_skips", 0)
 	var hub := IX1_FALLBACK_HUB
 	if not active_projects.has(hub):
 		restore_project(hub, {
@@ -1242,6 +1249,7 @@ func simulate_live_f5_day_advance(days: int = 5) -> Dictionary:
 		TimeManager.set("_live_f5_equiv_clock", true)
 		gate_on = _should_run_full_board_ai_invest()
 		TimeManager.set("_live_f5_equiv_clock", was_equiv)
+	var mem0 := int(OS.get_static_memory_usage())
 	var t0 := Time.get_ticks_msec()
 	var clock: Dictionary = {}
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_live_f5_equivalent_days"):
@@ -1254,27 +1262,44 @@ func simulate_live_f5_day_advance(days: int = 5) -> Dictionary:
 			TimeManager.call("_drain_living_f5_flush", n)
 		TimeManager.paused = was_paused
 	var ms := Time.get_ticks_msec() - t0
+	var mem1 := int(OS.get_static_memory_usage())
+	var mem_delta := maxi(0, mem1 - mem0)
 	var end_elapsed := start_elapsed
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
 		end_elapsed = int(TimeManager.get_total_days_elapsed())
 	var elapsed_delta := end_elapsed - start_elapsed
 	var consider_calls := _full_board_ai_invest_calls
 	var past_plus2 := elapsed_delta >= mini(n, 3)
+	var past_plus6 := elapsed_delta >= mini(n, 7)
+	var autosave_gathers := 0
+	var autosave_skips := 0
+	if sl != null:
+		autosave_gathers = int(sl.get("_calendar_autosave_gathers"))
+		autosave_skips = int(sl.get("_calendar_autosave_live_f5_skips"))
+	var ms_budget := 12000 if n >= 7 else 8000
+	var mem_budget := 48 * 1024 * 1024
 	var ok := (
 		elapsed_delta >= n
 		and consider_calls == 0
 		and not gate_on
 		and past_plus2
-		and ms <= 8000
+		and past_plus6
+		and autosave_gathers == 0
+		and mem_delta <= mem_budget
+		and ms <= ms_budget
 	)
 	return {
 		"ok": ok,
 		"days": n,
 		"elapsed_delta": elapsed_delta,
 		"past_plus2": past_plus2,
+		"past_plus6": past_plus6,
 		"full_board_ai_invest": gate_on,
 		"full_board_ai_invest_calls": consider_calls,
 		"provinces_considered": _ai_infra_provinces_considered,
+		"calendar_autosave_gathers": autosave_gathers,
+		"calendar_autosave_live_f5_skips": autosave_skips,
+		"memory_delta_bytes": mem_delta,
 		"elapsed_ms": ms,
 		"live_f5_equiv": true,
 		"living_playtest_clock": false,

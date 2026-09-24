@@ -419,12 +419,19 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("simulate_ix1_spine_days")
     if "advance_live_f5_equivalent_days" not in live_sim or "past_plus2" not in live_sim:
         missing.append("simulate_live_f5_day_advance")
+    if "past_plus6" not in live_sim or "calendar_autosave_gathers" not in live_sim:
+        missing.append("live_equiv_past_plus6")
     if "_living_playtest_clock = true" in live_clock:
         missing.append("live_equiv_uses_playtest_clock")
     if "_live_f5_equiv_clock = true" not in live_clock:
         missing.append("live_equiv_clock")
     if "past_plus2" not in harness or "simulate_live_f5_day_advance" not in harness:
         missing.append("live_equiv_harness")
+    if "past_plus6" not in harness or "calendar_autosave_gathers" not in harness:
+        missing.append("live_equiv_plus6_harness")
+    save_hook = _slice_func(save, "_on_day_advanced_for_autosave")
+    if "is_live_f5_play_path" not in save_hook and "_should_skip_live_f5_calendar_autosave" not in save_hook:
+        missing.append("live_f5_autosave_skip")
     if "past_freeze" not in harness or "RESULT=" not in harness:
         missing.append("day_tick_harness")
     if "HeadlessIx1RoadSpineDayTickTest" not in gates:

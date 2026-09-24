@@ -89,7 +89,10 @@ func _on_province_data_changed(_pid: int, what: String) -> void:
 
 
 func _on_daily_tick(_year: int, _month: int, _day: int) -> void:
-	# Interactive: pulse every 5th day only — daily redraw storms helped freeze 1x at month ends.
+	# Live F5 / softpipe: skip the pulse process entirely (llvmpipe redraw + day +5
+	# harvest used to stack). Interactive: pulse every 5th day only.
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
+		return
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
 		var day_n := int(TimeManager.total_days_elapsed) if "total_days_elapsed" in TimeManager else _day
 		if day_n % 5 != 0:
