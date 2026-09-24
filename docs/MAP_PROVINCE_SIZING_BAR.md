@@ -57,6 +57,8 @@ Board scale stays **~3520**. No new IDs. Caspian / Victoria leftover seed cells 
 - **FEED-6:** Caribbean ordinary-island sizing (bar #2 islands) — see [`MAP_CARIBBEAN_ISLAND_SIZING_FEED6.md`](MAP_CARIBBEAN_ISLAND_SIZING_FEED6.md) (Windward strip; HOLD merge).
 - **FEED-7:** Flanders / Nord land-area uniformity (bar #1, outside Maginot) — see [`MAP_FLANDERS_NORD_LAND_UNIFORMITY.md`](MAP_FLANDERS_NORD_LAND_UNIFORMITY.md) (Nord `710734` split; HOLD merge).
 - **FEED-8:** Ligurian Sea basin reshape (bar #3, second Med basin) — see [`MAP_SEAS_COARSEN_FEED8_LIGURIAN.md`](MAP_SEAS_COARSEN_FEED8_LIGURIAN.md) (reuse `950119`; HOLD merge).
+- **FEED-9:** SE England shire land uniformity (bar #1) — see [`MAP_SE_ENGLAND_SHIRE_LAND_UNIFORMITY.md`](MAP_SE_ENGLAND_SHIRE_LAND_UNIFORMITY.md) (Oxfordshire `711438` split; HOLD merge).
+- **FEED-10:** Tyrrhenian Sea basin reshape (bar #3, third Med basin) — see [`MAP_SEAS_COARSEN_FEED10_TYRRHENIAN.md`](MAP_SEAS_COARSEN_FEED10_TYRRHENIAN.md) (reuse `950120`; HOLD merge).
 - **Later:** other keys only if still missing.
 
 ## Play smoke (human)

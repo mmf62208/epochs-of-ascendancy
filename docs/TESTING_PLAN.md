@@ -318,4 +318,16 @@ python3 -m unittest tools.map_generation.tests.test_se_england_shire_land_unifor
 
 On `--quick` via `tools/eoa_full_test_gates.sh`. Maginot / Flanders / Ligurian remesh / Greater London grow / Central Hampshire split / Dig2 / G / combat / Fill%·TOE / pale-map / Esc are out of scope for this theater proof.
 
-Honest: `--quick` living-unit wiring fails are **tip-pre-existing** on `1388a3ecae54635e57ea0e9a10b801ca895ddca2` (same files). This FEED does not touch those GD files. 
+Honest: `--quick` living-unit wiring fails are **tip-pre-existing** on `1388a3ecae54635e57ea0e9a10b801ca895ddca2` (same files). This FEED does not touch those GD files.
+
+### Tyrrhenian Sea basin reshape (FEED-10)
+
+Pure product + board QC (no Godot):
+
+```bash
+python3 -m unittest tools.map_generation.tests.test_seas_coarsen_feed10_tyrrhenian_product -v
+```
+
+On `--quick` via `tools/eoa_full_test_gates.sh`. Ligurian / Alboran / Adriatic meshes / Maginot land / Flanders land / SE England land / Great Lakes / Esc / G / Dig2 / combat are out of scope for this theater proof.
+
+Honest: `--quick` living-unit wiring fails (if any) are **tip-pre-existing** on `b335344c4c9d0cba1aa6c1ae7f51733e9e249731` (same files). This FEED does not touch those GD files. 
