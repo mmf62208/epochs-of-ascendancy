@@ -2,9 +2,29 @@
 ## Type-ahead province / city search with camera fly-to.
 extends HBoxContainer
 
+const IX1_HUB_ID := 710417
+const IX1_BONN_ID := 710416
+const IX1_LEVERKUSEN_ID := 710418
+## Live Search must resolve Köln / Cologne / Koln / Koeln to the Rhineland hub.
+const SEARCH_ALIASES := {
+	"cologne": IX1_HUB_ID,
+	"koln": IX1_HUB_ID,
+	"koeln": IX1_HUB_ID,
+	"köln": IX1_HUB_ID,
+	"bonn": IX1_BONN_ID,
+	"leverkusen": IX1_LEVERKUSEN_ID,
+	"berlin": 710300,
+	"paris": 710707,
+	"roma": 710963,
+	"rome": 710963,
+	"tokyo": 903995,
+	"london": 711414,
+}
+
 var _map_renderer: Node = null
 var _line: LineEdit = null
-var _names: Dictionary = {}  # lower name -> pid
+var _names: Dictionary = {}  # lower / folded name -> pid
+var _folded_names: Dictionary = {}  # ascii-folded key -> pid
 
 
 func _ready() -> void:
@@ -30,8 +50,23 @@ func rebuild_index() -> void:
 	_rebuild_index()
 
 
+static func fold_search_key(s: String) -> String:
+	## NFC/NFD + ASCII fallback so live "Koln" / "Köln" / "Cologne" all hit 710417.
+	var t: String = s.strip_edges().to_lower()
+	t = t.replace("ö", "o").replace("ä", "a").replace("ü", "u").replace("ß", "ss")
+	t = t.replace("é", "e").replace("è", "e").replace("ê", "e").replace("ë", "e")
+	t = t.replace("á", "a").replace("à", "a").replace("â", "a")
+	t = t.replace("í", "i").replace("ì", "i").replace("î", "i")
+	t = t.replace("ó", "o").replace("ò", "o").replace("ô", "o")
+	t = t.replace("ú", "u").replace("ù", "u").replace("û", "u")
+	t = t.replace("ç", "c").replace("ñ", "n").replace("ø", "o")
+	t = t.replace("\u0308", "").replace("\u0301", "").replace("\u0300", "").replace("\u0302", "")
+	return t
+
+
 func _rebuild_index() -> void:
 	_names.clear()
+	_folded_names.clear()
 	var sl := get_node_or_null("/root/ScenarioLoader") as ScenarioLoader
 	var city_layer: Dictionary = {}
 	if sl != null:
@@ -46,20 +81,47 @@ func _rebuild_index() -> void:
 		if mr_provs is Dictionary:
 			for pid_var2 in (mr_provs as Dictionary).keys():
 				_index_province(int(pid_var2), (mr_provs as Dictionary)[pid_var2], city_layer)
+	# City-layer rows can exist even when a Province object is late.
+	for city_key in city_layer.keys():
+		_index_city_entry(int(str(city_key)), city_layer.get(city_key))
+	for alias_key in SEARCH_ALIASES.keys():
+		_index_name(str(alias_key), int(SEARCH_ALIASES[alias_key]))
 
 
 func _index_province(pid: int, p: Variant, city_layer: Dictionary) -> void:
 	if p == null or not (p is Province):
 		return
 	var prov: Province = p as Province
-	var key := prov.name.strip_edges().to_lower()
-	if key != "":
-		_names[key] = pid
-	var cities = city_layer.get(str(pid), {}).get("cities", [])
-	for c in cities:
-		var cn := str(c.get("name", "")).strip_edges().to_lower()
-		if cn != "":
-			_names[cn] = pid
+	_index_name(prov.name, pid)
+	_index_name(str(pid), pid)
+	var entry: Variant = city_layer.get(str(pid), {})
+	_index_city_entry(pid, entry)
+
+
+func _index_city_entry(pid: int, entry: Variant) -> void:
+	if pid < 0 or not (entry is Dictionary):
+		return
+	var ed: Dictionary = entry
+	_index_name(str(ed.get("city_name", "")), pid)
+	var cities: Variant = ed.get("cities", [])
+	if cities is Array:
+		for c in cities:
+			if c is Dictionary:
+				_index_name(str((c as Dictionary).get("name", "")), pid)
+			else:
+				_index_name(str(c), pid)
+
+
+func _index_name(raw: String, pid: int) -> void:
+	var key: String = raw.strip_edges().to_lower()
+	if key == "":
+		return
+	_names[key] = pid
+	var folded: String = fold_search_key(key)
+	if folded != "":
+		_folded_names[folded] = pid
+		if folded != key:
+			_names[folded] = pid
 
 
 func _on_go_pressed() -> void:
@@ -69,51 +131,83 @@ func _on_go_pressed() -> void:
 func _on_submit(text: String) -> void:
 	if _names.is_empty():
 		_rebuild_index()
-	var q := text.strip_edges().to_lower()
-	if q == "":
-		return
-	var pid := _resolve_search_pid(q)
+	var pid: int = resolve_search_query(text)
 	if pid < 0:
 		_rebuild_index()
-		pid = _resolve_search_pid(q)
+		pid = resolve_search_query(text)
 	if pid < 0:
+		_toast_search_miss(text)
 		return
-	if _map_renderer != null and _map_renderer.has_method("focus_province_by_id"):
-		_map_renderer.call("focus_province_by_id", pid)
+	_go_to_province(pid)
+
+
+func resolve_search_query(text: String) -> int:
+	return _resolve_search_pid(fold_search_key(text) if text.strip_edges() != "" else "")
+
+
+func _resolve_search_pid(q: String) -> int:
+	var raw: String = q.strip_edges().to_lower()
+	if raw.is_empty():
+		return -1
+	var folded: String = fold_search_key(raw)
+	if raw.is_valid_int():
+		var as_pid: int = int(raw)
+		if as_pid == IX1_HUB_ID or as_pid == IX1_BONN_ID or as_pid == IX1_LEVERKUSEN_ID:
+			return as_pid
+		if _names.values().has(as_pid) or _folded_names.values().has(as_pid):
+			return as_pid
+	if SEARCH_ALIASES.has(raw):
+		return int(SEARCH_ALIASES[raw])
+	if SEARCH_ALIASES.has(folded):
+		return int(SEARCH_ALIASES[folded])
+	if _names.has(raw):
+		return int(_names[raw])
+	if _names.has(folded):
+		return int(_names[folded])
+	if _folded_names.has(folded):
+		return int(_folded_names[folded])
+	# Prefer exact capital / IX-1 aliases (Berlin / Paris / Köln / Cologne).
+	for alias_key in SEARCH_ALIASES.keys():
+		var ak: String = str(alias_key)
+		if (ak.begins_with(raw) or fold_search_key(ak).begins_with(folded)) and folded.length() >= 3:
+			return int(SEARCH_ALIASES[alias_key])
+	var prefix_pid: int = -1
+	for name_key in _names.keys():
+		var nk: String = str(name_key)
+		var fk: String = fold_search_key(nk)
+		if nk.begins_with(raw) or fk.begins_with(folded):
+			return int(_names[name_key])
+		if prefix_pid < 0 and (raw in nk or folded in fk):
+			prefix_pid = int(_names[name_key])
+	if prefix_pid >= 0:
+		return prefix_pid
+	for fold_key in _folded_names.keys():
+		var fk2: String = str(fold_key)
+		if fk2.begins_with(folded) or folded in fk2:
+			return int(_folded_names[fold_key])
+	return -1
+
+
+func _go_to_province(pid: int) -> void:
+	if _map_renderer != null and _map_renderer.has_method("open_province_inspector_from_search"):
+		_map_renderer.call("open_province_inspector_from_search", pid)
+	elif _map_renderer != null and _map_renderer.has_method("focus_province_by_id"):
+		_map_renderer.call("focus_province_by_id", pid, "soft")
 	var vp := get_viewport()
 	if vp != null:
 		vp.gui_release_focus()
 
 
-func _resolve_search_pid(q: String) -> int:
-	if q.is_empty():
-		return -1
-	if _names.has(q):
-		return int(_names[q])
-	# Prefer exact capital aliases (Berlin / Paris / Roma / Tokyo / London).
-	const CAPITALS := {
-		"berlin": 710300,
-		"paris": 710707,
-		"roma": 710963,
-		"rome": 710963,
-		"tokyo": 903995,
-		"london": 711414,
-	}
-	if CAPITALS.has(q):
-		return int(CAPITALS[q])
-	for cap_key in CAPITALS.keys():
-		if str(cap_key).begins_with(q) and q.length() >= 3:
-			return int(CAPITALS[cap_key])
-	var prefix_pid := -1
-	for name_key in _names.keys():
-		var nk := str(name_key)
-		if nk.begins_with(q):
-			return int(_names[name_key])
-		if prefix_pid < 0 and q in nk:
-			prefix_pid = int(_names[name_key])
-	return prefix_pid
+func _toast_search_miss(text: String) -> void:
+	var q: String = text.strip_edges()
+	if q == "":
+		return
+	if _map_renderer != null and _map_renderer.has_method("_show_inspector_toast"):
+		_map_renderer.call("_show_inspector_toast", "No province match for '%s'" % q, 2.2)
+	var vp := get_viewport()
+	if vp != null:
+		vp.gui_release_focus()
 
 
 func select_province_by_id(pid: int) -> void:
-	if _map_renderer != null and _map_renderer.has_method("focus_province_by_id"):
-		_map_renderer.call("focus_province_by_id", pid)
+	_go_to_province(pid)

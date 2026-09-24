@@ -2309,7 +2309,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toast_living_diplomacy_pick(star_pid)
 				_select_province(star_province, star_node)
 				_center_camera_on_province(star_pid, "soft")
-				show_info_panel(star_province)
+				if event.alt_pressed or _map_prefers_province_over_unit():
+					_open_hex_province_inspector(star_province)
+				else:
+					show_info_panel(star_province)
 				get_viewport().set_input_as_handled()
 				return
 		# Remaining chips (air/fleet) after star.
@@ -2405,7 +2408,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			_select_province(resolved_province, resolved_node)
 			_center_camera_on_province(resolved_province.id, "soft")
-			show_info_panel(resolved_province)
+			if event.alt_pressed or _map_prefers_province_over_unit():
+				_open_hex_province_inspector(resolved_province)
+			else:
+				show_info_panel(resolved_province)
 			get_viewport().set_input_as_handled()
 			return
 
@@ -2822,7 +2828,11 @@ func _layout_map_ui() -> void:
 		ip.offset_right = cx + pw
 		ip.offset_bottom = cy + ph
 		ip.custom_minimum_size = Vector2(pw, ph)
-		ip.z_index = 40
+		# Search/Go force-open must stay above Garrison z70; default dock stays 40.
+		if ip.has_meta("force_over_unit_card") and bool(ip.get_meta("force_over_unit_card")):
+			ip.z_index = 80
+		else:
+			ip.z_index = 40
 	_layout_info_panel_inner()
 
 
@@ -3015,7 +3025,24 @@ func _bring_info_panel_to_front() -> void:
 	if info_panel == null or not (info_panel is Control):
 		return
 	var ip := info_panel as Control
-	ip.z_index = 60
+	if ip.has_meta("force_over_unit_card") and bool(ip.get_meta("force_over_unit_card")):
+		ip.z_index = 80
+	else:
+		ip.z_index = 60
+	var p := ip.get_parent()
+	if p != null:
+		p.move_child(ip, p.get_child_count() - 1)
+
+
+func _raise_province_inspector_over_unit_card() -> void:
+	# Garrison unit card is z70; Search/Go + Alt/infra must paint Build Road Spine on top.
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	ip.set_meta("force_over_unit_card", true)
+	ip.z_index = 80
+	ip.visible = true
+	ip.mouse_filter = Control.MOUSE_FILTER_STOP
 	var p := ip.get_parent()
 	if p != null:
 		p.move_child(ip, p.get_child_count() - 1)
@@ -13469,6 +13496,8 @@ func hide_info_panel() -> void:
 		if info_panel is Control:
 			(info_panel as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 			(info_panel as Control).release_focus()
+			if (info_panel as Control).has_meta("force_over_unit_card"):
+				(info_panel as Control).remove_meta("force_over_unit_card")
 	elif info_panel != null:
 		push_warning("MapRenderer: hide_info_panel called on non-CanvasItem (got " + str(info_panel.get_script() if info_panel.get_script() else info_panel.get_class()) + ")")
 	if _province_id_badge != null:
@@ -17250,16 +17279,19 @@ func _clear_selection() -> void:
 ## Now also drives the modern CameraController (ProvinceContainers) so auto-center works reliably for map tools / changes.
 ## Pass 51: zoom_mode = tactical | soft | keep (pan only).
 func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> bool:
-	if province_id < 0 or typeof(MapManager) == TYPE_NIL:
+	if province_id < 0:
 		return false
-	var province: Province = MapManager.get_province(province_id)
+	var province: Province = null
+	if typeof(MapManager) != TYPE_NIL:
+		province = MapManager.get_province(province_id)
+	if province == null and provinces.has(province_id):
+		province = provinces[province_id] as Province
 	if province == null:
 		return false
 	var node := _province_node(province_id)
-	if node == null:
-		return false
 	# Search/Go is explicit province intent: hide Garrison overlay and drop Close hold
 	# so show_info_panel is not skipped by _camera_is_held() (Play MIXED Köln 710417).
+	# Node may be late/null — still open the inspector (do not silent-return).
 	_hide_unit_card_keep_map_focus()
 	_inspector_held_closed = false
 	_unlock_close_camera()
@@ -17268,27 +17300,94 @@ func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> b
 	_hold_camera_until_msec = 0
 	_map_pick_block_until_msec = 0
 	_select_province(province, node)
-	var pos: Vector2 = province_centroids.get(province_id, Vector2.ZERO)
-	if pos == Vector2.ZERO:
-		pos = MapManager.get_province_centroid(province_id)
-	var cam := get_node_or_null("MapCamera") as Camera2D
-	if cam == null:
-		cam = get_viewport().get_camera_2d() if get_viewport() else null
-	if cam != null and pos != Vector2.ZERO and not _camera_is_held():
-		var tactical_z := clampf(2.4 * MapCanvasConfig.THEATER_SCALE, min_zoom, max_zoom)
-		cam.global_position = _apply_camera_bounds(pos)
-		var zm := zoom_mode.strip_edges().to_lower()
-		if zm == "keep":
-			pass  # pan only
-		elif zm == "soft":
-			var cur_z := absf(cam.zoom.x)
-			var soft_z := clampf(lerpf(cur_z, tactical_z, 0.5), min_zoom, max_zoom)
-			cam.zoom = Vector2(soft_z, soft_z)
-		else:
+	var zm := zoom_mode.strip_edges().to_lower()
+	if zm == "soft" or zm == "keep":
+		_soft_pan_camera_to_province(province_id, zm == "keep")
+	else:
+		var pos: Vector2 = province_centroids.get(province_id, Vector2.ZERO)
+		if pos == Vector2.ZERO and typeof(MapManager) != TYPE_NIL:
+			pos = MapManager.get_province_centroid(province_id)
+		var cam := get_node_or_null("MapCamera") as Camera2D
+		if cam == null:
+			cam = get_viewport().get_camera_2d() if get_viewport() else null
+		if cam != null and pos != Vector2.ZERO and not _camera_is_held():
+			var tactical_z := clampf(2.4 * MapCanvasConfig.THEATER_SCALE, min_zoom, max_zoom)
+			cam.global_position = _apply_camera_bounds(pos)
 			cam.zoom = Vector2(tactical_z, tactical_z)
+	_raise_province_inspector_over_unit_card()
 	show_info_panel(province, true)
-	MapManager.province_selected.emit(province_id)
+	if typeof(MapManager) != TYPE_NIL:
+		MapManager.province_selected.emit(province_id)
 	return true
+
+
+## Live Search/Go: force-open province inspector (Build Road Spine) without tactical zoom crash.
+func open_province_inspector_from_search(province_id: int) -> bool:
+	if province_id < 0:
+		return false
+	var province: Province = null
+	if typeof(MapManager) != TYPE_NIL:
+		province = MapManager.get_province(province_id)
+	if province == null and provinces.has(province_id):
+		province = provinces[province_id] as Province
+	if province == null:
+		return false
+	_hide_unit_card_keep_map_focus()
+	_inspector_held_closed = false
+	_unlock_close_camera()
+	_close_click_guard = false
+	_close_suppress_edge = false
+	_hold_camera_until_msec = 0
+	_map_pick_block_until_msec = 0
+	var node := _province_node(province_id)
+	_select_province(province, node)
+	# Softpipe Play MIXED: tactical zoom after +6d exited Godot mid Search retries.
+	_soft_pan_camera_to_province(province_id, false)
+	_raise_province_inspector_over_unit_card()
+	show_info_panel(province, true, true)
+	_raise_province_inspector_over_unit_card()
+	_show_inspector_toast("%s · province inspector" % str(province.name), 2.2)
+	if typeof(MapManager) != TYPE_NIL:
+		MapManager.province_selected.emit(province_id)
+	return true
+
+
+func _soft_pan_camera_to_province(province_id: int, keep_zoom: bool) -> void:
+	# Search/Go + Alt/infra must not snap to tactical zoom (softpipe process death).
+	if _camera_is_held():
+		return
+	var pos: Vector2 = province_centroids.get(province_id, Vector2.ZERO) as Vector2
+	if pos == Vector2.ZERO and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
+		pos = MapManager.get_province_centroid(province_id)
+	if pos == Vector2.ZERO:
+		return
+	var cam := get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport():
+		cam = get_viewport().get_camera_2d()
+	if cam == null:
+		return
+	if not keep_zoom:
+		var cur_z: float = maxf(absf(cam.zoom.x), 0.01)
+		if cur_z < 0.22:
+			var soft_z: float = clampf(0.42, min_zoom, max_zoom)
+			cam.zoom = Vector2(soft_z, soft_z)
+	cam.global_position = _apply_camera_bounds(pos)
+
+
+func _open_hex_province_inspector(province: Province) -> void:
+	# Alt-click / Infra empty-terrain backup: same inspector as Search/Go.
+	if province == null:
+		return
+	_hide_unit_card_keep_map_focus()
+	_inspector_held_closed = false
+	_unlock_close_camera()
+	_close_click_guard = false
+	_close_suppress_edge = false
+	_hold_camera_until_msec = 0
+	_map_pick_block_until_msec = 0
+	_raise_province_inspector_over_unit_card()
+	show_info_panel(province, true, true)
+	_raise_province_inspector_over_unit_card()
 
 
 func _select_province(province: Province, node: Node2D) -> void:
@@ -18968,15 +19067,15 @@ func _map_prefers_province_over_unit() -> bool:
 
 func _hide_unit_card_keep_map_focus() -> void:
 	# Drop Garrison overlay without Close GIS lock / pick-block (search + restore).
+	# Hide only — queue_free mid Search retry was a softpipe exit suspect.
 	var ui: CanvasLayer = get_node_or_null("UI") as CanvasLayer
 	if ui != null:
 		var unit_pop: Node = ui.get_node_or_null("UnitDetailPopup")
-		if unit_pop != null:
+		if unit_pop != null and is_instance_valid(unit_pop) and not unit_pop.is_queued_for_deletion():
 			if unit_pop is CanvasItem:
 				(unit_pop as CanvasItem).visible = false
 			if unit_pop is Control:
 				(unit_pop as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
-			unit_pop.queue_free()
 	if not selected_formation_id.is_empty():
 		selected_formation_id = ""
 		_refresh_selected_unit_chip()

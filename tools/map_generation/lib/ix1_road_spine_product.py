@@ -28,6 +28,7 @@ MAP_MANAGER_GD = ROOT / "scripts" / "map" / "MapManager.gd"
 OVERLAY_GD = ROOT / "scripts" / "map" / "InfrastructureOverlayLayer.gd"
 RENDERER_GD = ROOT / "scripts" / "map" / "MapRenderer.gd"
 SEARCH_GD = ROOT / "scripts" / "ui" / "map" / "MapProvinceSearch.gd"
+CITY_PATH = ROOT / "data" / "provinces_world_accurate" / "province_city_layer.json"
 FORMATTERS_GD = ROOT / "scripts" / "map" / "MapPolishFormatters.gd"
 FORMATTERS_PY = ROOT / "tools" / "map_generation" / "lib" / "map_polish_formatters.py"
 SAVE_LOAD_GD = ROOT / "scripts" / "autoload" / "SaveLoadManager.gd"
@@ -67,6 +68,7 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (SAVE_LOAD_GD, "_deferred_calendar_autosave"),
     (DAY_TICK_HARNESS, "past_freeze"),
     (GATES_SH, "HeadlessIx1RoadSpineDayTickTest"),
+    (GATES_SH, "HeadlessIx1SearchGoInspectorTest"),
     (SPEC_PATH, "first_session_mandate_cost"),
     (IDM_GD, "710417"),
     (MAP_MANAGER_GD, "func build_road_connection"),
@@ -80,7 +82,13 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (RENDERER_GD, "_dismiss_unit_card_restore_province"),
     (RENDERER_GD, "_map_prefers_province_over_unit"),
     (RENDERER_GD, "chip_disk_only"),
-    (SEARCH_GD, "focus_province_by_id"),
+    (RENDERER_GD, "open_province_inspector_from_search"),
+    (RENDERER_GD, "force_over_unit_card"),
+    (RENDERER_GD, "_soft_pan_camera_to_province"),
+    (SEARCH_GD, "open_province_inspector_from_search"),
+    (SEARCH_GD, "fold_search_key"),
+    (SEARCH_GD, "city_name"),
+    (SEARCH_GD, "cologne"),
     (FORMATTERS_GD, "Road Spine"),
     (FORMATTERS_PY, "Road Spine"),
 )
@@ -448,11 +456,166 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
     }
 
 
+def fold_search_key(s: str) -> str:
+    """Mirror MapProvinceSearch.fold_search_key (Köln / Cologne / Koln live path)."""
+    t = str(s or "").strip().lower()
+    repl = {
+        "ö": "o",
+        "ä": "a",
+        "ü": "u",
+        "ß": "ss",
+        "é": "e",
+        "è": "e",
+        "ê": "e",
+        "ë": "e",
+        "á": "a",
+        "à": "a",
+        "â": "a",
+        "í": "i",
+        "ì": "i",
+        "î": "i",
+        "ó": "o",
+        "ò": "o",
+        "ô": "o",
+        "ú": "u",
+        "ù": "u",
+        "û": "u",
+        "ç": "c",
+        "ñ": "n",
+        "ø": "o",
+    }
+    for src, dst in repl.items():
+        t = t.replace(src, dst)
+    for mark in ("\u0308", "\u0301", "\u0300", "\u0302"):
+        t = t.replace(mark, "")
+    return t
+
+
+IX1_SEARCH_ALIASES: Dict[str, int] = {
+    "cologne": HUB_ID,
+    "koln": HUB_ID,
+    "koeln": HUB_ID,
+    "köln": HUB_ID,
+    "bonn": BONN_ID,
+    "leverkusen": LEVERKUSEN_ID,
+}
+
+
+def ix1_search_index(spec: Optional[Mapping[str, Any]] = None) -> Dict[str, int]:
+    names: Dict[str, int] = {}
+    data = spec if spec is not None else load_ix1_spec()
+    raw_names = data.get("names") if isinstance(data, Mapping) else None
+    if isinstance(raw_names, dict):
+        for pid_s, name in raw_names.items():
+            pid = int(pid_s)
+            key = str(name).strip().lower()
+            if key:
+                names[key] = pid
+                names[fold_search_key(key)] = pid
+    if CITY_PATH.is_file():
+        city_raw = json.loads(CITY_PATH.read_text(encoding="utf-8"))
+        rows = city_raw.get("provinces") if isinstance(city_raw, dict) and "provinces" in city_raw else city_raw
+        if isinstance(rows, dict):
+            for pid_s, entry in rows.items():
+                if not isinstance(entry, dict):
+                    continue
+                try:
+                    pid = int(pid_s)
+                except (TypeError, ValueError):
+                    continue
+                cn = str(entry.get("city_name", "")).strip().lower()
+                if cn:
+                    names[cn] = pid
+                    names[fold_search_key(cn)] = pid
+    for alias, pid in IX1_SEARCH_ALIASES.items():
+        names[alias.lower()] = int(pid)
+        names[fold_search_key(alias)] = int(pid)
+    return names
+
+
+def ix1_search_go_resolve(query: str, names: Optional[Mapping[str, int]] = None) -> int:
+    """Live Search/Go resolver. Cologne / Koln / Köln / 710417 must hit the hub."""
+    idx: Mapping[str, int] = names if names is not None else ix1_search_index()
+    raw = str(query or "").strip().lower()
+    if not raw:
+        return -1
+    folded = fold_search_key(raw)
+    if raw.isdigit():
+        pid = int(raw)
+        if pid in CORRIDOR_IDS or pid == HUB_ID:
+            return pid
+        if pid in set(int(v) for v in idx.values()):
+            return pid
+    aliases = {fold_search_key(k): int(v) for k, v in IX1_SEARCH_ALIASES.items()}
+    aliases.update({k.lower(): int(v) for k, v in IX1_SEARCH_ALIASES.items()})
+    if raw in aliases:
+        return int(aliases[raw])
+    if folded in aliases:
+        return int(aliases[folded])
+    if raw in idx:
+        return int(idx[raw])
+    if folded in idx:
+        return int(idx[folded])
+    prefix_pid = -1
+    for key, pid in idx.items():
+        fk = fold_search_key(str(key))
+        if str(key).startswith(raw) or fk.startswith(folded):
+            return int(pid)
+        if prefix_pid < 0 and (raw in str(key) or folded in fk):
+            prefix_pid = int(pid)
+    return prefix_pid
+
+
+def ix1_search_go_live_path() -> Dict[str, Any]:
+    """Would have caught Play MIXED: Search Cologne/Koln silent no-op."""
+    queries = ("Köln", "koln", "koeln", "Cologne", "cologne", "710417")
+    misses: List[str] = []
+    hits: Dict[str, int] = {}
+    for q in queries:
+        pid = ix1_search_go_resolve(q)
+        hits[q] = pid
+        if pid != HUB_ID:
+            misses.append(q)
+    search = _read(SEARCH_GD)
+    ren = _read(RENDERER_GD)
+    src_miss: List[str] = []
+    if "fold_search_key" not in search:
+        src_miss.append("search_fold")
+    if "city_name" not in search:
+        src_miss.append("search_city_name")
+    if "cologne" not in search.lower():
+        src_miss.append("search_cologne_alias")
+    if "open_province_inspector_from_search" not in search:
+        src_miss.append("search_calls_live_inspector")
+    live = _slice_func(ren, "open_province_inspector_from_search")
+    if "show_info_panel(province, true, true)" not in live:
+        src_miss.append("live_force_keep_camera")
+    if "_soft_pan_camera_to_province" not in live:
+        src_miss.append("live_soft_pan")
+    if "2.4" in live:
+        src_miss.append("live_no_tactical_24")
+    if "force_over_unit_card" not in _slice_func(ren, "_raise_province_inspector_over_unit_card"):
+        src_miss.append("raise_over_garrison")
+    if "queue_free()" in _slice_func(ren, "_hide_unit_card_keep_map_focus"):
+        src_miss.append("hide_no_queue_free")
+    hex_open = _slice_func(ren, "_open_hex_province_inspector")
+    if "show_info_panel(province, true, true)" not in hex_open:
+        src_miss.append("hex_force_inspector")
+    return {
+        "ok": not misses and not src_miss,
+        "hub_id": HUB_ID,
+        "hits": hits,
+        "misses": misses,
+        "src_miss": src_miss,
+    }
+
+
 def ix1_province_select_under_garrison() -> Dict[str, Any]:
     """Search/Go + Alt/infra empty-terrain must open province inspector under garrison."""
     ren = _read(RENDERER_GD)
     search = _read(SEARCH_GD)
     focus = _slice_func(ren, "focus_province_by_id")
+    live = _slice_func(ren, "open_province_inspector_from_search")
     show = _slice_func(ren, "show_info_panel")
     land = _slice_func(ren, "_try_open_land_unit_at_world")
     chip = _slice_func(ren, "_try_open_land_chip_from_input")
@@ -462,14 +625,16 @@ def ix1_province_select_under_garrison() -> Dict[str, Any]:
     restore = _slice_func(ren, "_dismiss_unit_card_restore_province")
     popup = _slice_func(ren, "_show_unit_detail_popup")
     missing: List[str] = []
-    if "focus_province_by_id" not in search:
-        missing.append("search_calls_focus")
-    if "_hide_unit_card_keep_map_focus" not in focus:
+    if "open_province_inspector_from_search" not in search:
+        missing.append("search_calls_live_inspector")
+    if "_hide_unit_card_keep_map_focus" not in live:
         missing.append("search_hides_garrison")
-    if "show_info_panel(province, true)" not in focus:
+    if "show_info_panel(province, true, true)" not in live:
         missing.append("search_force_inspector")
-    if "_camera_is_held" not in focus:
-        missing.append("focus_keeps_camera_is_held")
+    if "_soft_pan_camera_to_province" not in live:
+        missing.append("search_soft_pan")
+    if "node == null" in focus and "return false" in focus[focus.find("node == null"):focus.find("node == null") + 80]:
+        missing.append("focus_allows_null_node")
     if "force_open" not in show or "keep_camera" not in show:
         missing.append("show_force_keep_camera")
     if "chip_disk_only" not in land:
@@ -488,19 +653,27 @@ def ix1_province_select_under_garrison() -> Dict[str, Any]:
         missing.append("prefer_alt_or_infra")
     if "event.alt_pressed" not in _slice_func(ren, "_input"):
         missing.append("alt_skips_land_chip")
-    if "chip_disk_only" not in hide and "UnitDetailPopup" not in hide:
+    if "_open_hex_province_inspector" not in ren:
+        missing.append("hex_backup_inspector")
+    if "UnitDetailPopup" not in hide:
         missing.append("hide_unit_card")
+    if "queue_free()" in hide:
+        missing.append("hide_no_queue_free")
     if "show_info_panel(p, true, true)" not in restore:
         missing.append("restore_keep_camera")
     if "_dismiss_unit_card_restore_province" not in popup:
         missing.append("garrison_close_restores")
     if "710417" not in _read(SPEC_PATH) or "710416" not in _read(SPEC_PATH):
         missing.append("corridor_ids")
+    live_resolve = ix1_search_go_live_path()
+    if not live_resolve.get("ok"):
+        missing.append("search_go_live_resolve")
     return {
         "ok": not missing,
         "missing": missing,
         "hub_id": HUB_ID,
         "corridor_ids": list(CORRIDOR_IDS),
+        "search_go_live_path": live_resolve,
     }
 
 
@@ -574,6 +747,12 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
     else:
         fails.append("province_select_under_garrison")
 
+    search_live = ix1_search_go_live_path()
+    if search_live.get("ok"):
+        passes.append("search_go_live_resolve")
+    else:
+        fails.append("search_go_live_resolve")
+
     return {
         "ok": not fails,
         "slice": SLICE_NAME,
@@ -592,6 +771,7 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
         "day0_mandate_gate": gate,
         "day_tick_unblocked": day_tick,
         "province_select_under_garrison": select_gate,
+        "search_go_live_resolve": search_live,
         "parked": [
             "Dig2 pan",
             "old G polyline dig",

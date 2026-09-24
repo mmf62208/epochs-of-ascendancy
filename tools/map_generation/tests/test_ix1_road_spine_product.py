@@ -26,6 +26,8 @@ from ix1_road_spine_product import (  # noqa: E402
     ix1_day_tick_unblocked,
     ix1_province_select_under_garrison,
     ix1_road_spine_mandate_cost,
+    ix1_search_go_live_path,
+    ix1_search_go_resolve,
     load_ix1_spec,
     movement_cost,
     shipped_api_integrity,
@@ -109,6 +111,15 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertEqual(sorted(gate.get("corridor_ids") or []), [BONN_ID, HUB_ID, LEVERKUSEN_ID])
         p = build_ix1_road_spine_product()
         self.assertIn("province_select_under_garrison", p.get("passes") or [])
+
+    def test_search_go_live_resolve_koln_aliases(self) -> None:
+        # Play MIXED fc6c7ca: Cologne/Koln Search+Go was a silent no-op.
+        for q in ("Köln", "koln", "koeln", "Cologne", "cologne", "710417"):
+            self.assertEqual(ix1_search_go_resolve(q), HUB_ID, msg=q)
+        live = ix1_search_go_live_path()
+        self.assertTrue(live.get("ok"), msg=live)
+        p = build_ix1_road_spine_product()
+        self.assertIn("search_go_live_resolve", p.get("passes") or [])
 
     def test_live_f5_equiv_gate_not_playtest_clock(self) -> None:
         tick = ix1_day_tick_unblocked()
