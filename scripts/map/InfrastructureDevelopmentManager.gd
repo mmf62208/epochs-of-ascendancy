@@ -33,6 +33,8 @@ class ProvincialProject:
 	var start_day: int = 0
 	var days_remaining: int = 0                  # daily tick clock (save + AI/player progress)
 	var status: String = "active"                # active | paused | sabotaged | complete | cancelled
+	var build_road_spine: bool = false           # IX-1: complete also writes built_road_neighbors
+	var spine_neighbor_ids: Array[int] = []
 
 	func get_id() -> String:
 		if id.is_empty():
@@ -76,7 +78,9 @@ class ProvincialProject:
 			"political_power_cost": political_power_cost,
 			"start_day": start_day,
 			"days_remaining": days_remaining,
-			"status": status
+			"status": status,
+			"build_road_spine": build_road_spine,
+			"spine_neighbor_ids": spine_neighbor_ids.duplicate()
 		}
 
 	static func from_save_dict(d: Dictionary) -> ProvincialProject:
@@ -94,6 +98,10 @@ class ProvincialProject:
 		p.start_day = int(d.get("start_day", 0))
 		p.days_remaining = int(d.get("days_remaining", d.get("days_left", 0)))
 		p.status = d.get("status", "active")
+		p.build_road_spine = bool(d.get("build_road_spine", false))
+		var raw_n: Variant = d.get("spine_neighbor_ids", [])
+		if raw_n is Array:
+			p.spine_neighbor_ids = Array(raw_n, TYPE_INT, "", null)
 		return p
 
 
@@ -105,6 +113,12 @@ var _dev_level_defs: Dictionary = {}
 var _is_initialized: bool = false
 var _ai_infra_budget_day: int = -1
 var _ai_infra_starts_today: int = 0
+
+# IX-1 Road Spine (Rhineland Bonn–Köln–Leverkusen). Spec is the source of IDs.
+const IX1_SPEC_PATH := "res://data/infrastructure/ix1_road_spine.json"
+const IX1_FALLBACK_HUB := 710417
+const IX1_FALLBACK_CORRIDOR: Array[int] = [710416, 710417, 710418]
+var _ix1_spec: Dictionary = {}
 
 
 func _ready() -> void:
@@ -448,6 +462,9 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 		# Fallback for unknown axes
 		pass
 
+	if proj.build_road_spine:
+		link_ix1_road_spine_edges(province_id, proj.spine_neighbor_ids)
+
 	# Wire to pop/econ (per goals + DESIGN): infra upgrade attracts population (industrialization pull) + labor for future production.
 	# Uses direct mutate + notify (pop is runtime in Province; settlement also boosted for org/attrit/supply combat payoff).
 	if p.population > 0:
@@ -470,9 +487,18 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
 		var prov: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
 		var pname := prov.name if prov else str(province_id)
-		LeaderEventUI.post_news("Infrastructure Complete", "%s project finished in %s (now level %d). Local supply, org recovery, and combat width improved for %s." % [axis.capitalize(), pname, new_level, proj.owner_tag], "infrastructure")
-		if LeaderEventUI.has_method("show_toast"):
-			LeaderEventUI.show_toast("Investment complete in %s: %s now level %d" % [pname, axis, new_level], 4.0)
+		if proj.build_road_spine:
+			LeaderEventUI.post_news(
+				"IX-1 Road Spine Complete",
+				"Road spine finished in %s (infra %d). Corridor edges painted; move/supply on the spine is cheaper." % [pname, new_level],
+				"infrastructure",
+			)
+			if LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Road spine complete in %s · infra %d · edges live" % [pname, new_level], 4.0)
+		else:
+			LeaderEventUI.post_news("Infrastructure Complete", "%s project finished in %s (now level %d). Local supply, org recovery, and combat width improved for %s." % [axis.capitalize(), pname, new_level, proj.owner_tag], "infrastructure")
+			if LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Investment complete in %s: %s now level %d" % [pname, axis, new_level], 4.0)
 
 	print("InfrastructureDevelopmentManager: COMPLETED %s project on province %d → level %d for %s" % [axis, province_id, new_level, proj.owner_tag])
 
@@ -839,6 +865,8 @@ func get_project_status(province_id: int) -> Dictionary:
 		"modifiers": proj.modifiers.duplicate(),
 		"current_infra": p.infrastructure if p else 0,
 		"current_dev": p.development_level if p else 0,
+		"build_road_spine": proj.build_road_spine,
+		"spine_neighbor_ids": proj.spine_neighbor_ids.duplicate(),
 	}
 
 
@@ -905,6 +933,148 @@ func should_show_investment_button(province_id: int, player_tag: String) -> bool
 		return false
 
 	return true
+
+
+## === IX-1 Road Spine (Rhineland Bonn 710416 — Köln 710417 — Leverkusen 710418) ===
+
+func _ix1_spec_dict() -> Dictionary:
+	if not _ix1_spec.is_empty():
+		return _ix1_spec
+	if ResourceLoader.exists(IX1_SPEC_PATH):
+		var f := FileAccess.open(IX1_SPEC_PATH, FileAccess.READ)
+		if f:
+			var parser := JSON.new()
+			if parser.parse(f.get_as_text()) == OK and parser.data is Dictionary:
+				_ix1_spec = parser.data
+			f.close()
+	if _ix1_spec.is_empty():
+		_ix1_spec = {
+			"hub_id": IX1_FALLBACK_HUB,
+			"corridor_ids": IX1_FALLBACK_CORRIDOR.duplicate(),
+			"edges": [[710417, 710416], [710417, 710418]],
+			"owner_tag": "GER",
+		}
+	return _ix1_spec
+
+
+func get_ix1_corridor_ids() -> Array[int]:
+	var spec := _ix1_spec_dict()
+	var out: Array[int] = []
+	var raw: Variant = spec.get("corridor_ids", IX1_FALLBACK_CORRIDOR)
+	if raw is Array:
+		for v in raw:
+			var pid := int(v)
+			if pid > 0 and pid not in out:
+				out.append(pid)
+	if out.is_empty():
+		return IX1_FALLBACK_CORRIDOR.duplicate()
+	return out
+
+
+func is_ix1_road_spine_province(province_id: int) -> bool:
+	return province_id in get_ix1_corridor_ids()
+
+
+func get_ix1_spine_neighbors(province_id: int) -> Array[int]:
+	var spec := _ix1_spec_dict()
+	var out: Array[int] = []
+	var raw: Variant = spec.get("edges", [])
+	if raw is Array:
+		for pair in raw:
+			if pair is Array and pair.size() >= 2:
+				var a := int(pair[0])
+				var b := int(pair[1])
+				if a == province_id and b > 0 and b not in out:
+					out.append(b)
+				elif b == province_id and a > 0 and a not in out:
+					out.append(a)
+	return out
+
+
+func link_ix1_road_spine_edges(province_id: int, neighbor_ids: Array = []) -> Dictionary:
+	var nbrs: Array[int] = []
+	if neighbor_ids is Array and not neighbor_ids.is_empty():
+		for v in neighbor_ids:
+			var nid := int(v)
+			if nid > 0 and nid != province_id and nid not in nbrs:
+				nbrs.append(nid)
+	else:
+		nbrs = get_ix1_spine_neighbors(province_id)
+	var linked: Array[Dictionary] = []
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("build_road_connection"):
+		for nid in nbrs:
+			MapManager.build_road_connection(province_id, nid)
+			linked.append({"a": province_id, "b": nid})
+	return {
+		"ok": not linked.is_empty() or nbrs.is_empty(),
+		"province_id": province_id,
+		"neighbors": nbrs,
+		"linked": linked,
+	}
+
+
+func should_show_road_spine_button(province_id: int, player_tag: String) -> bool:
+	if not is_ix1_road_spine_province(province_id):
+		return false
+	if has_active_project(province_id):
+		return true
+	var p: Province = null
+	if typeof(MapManager) != TYPE_NIL:
+		p = MapManager.get_province(province_id)
+	if p == null or p.is_sea:
+		return false
+	var tag := player_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		return false
+	if p.owner_tag.to_upper() != tag and p.controller_tag.to_upper() != tag:
+		return false
+	return true
+
+
+func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
+	if not is_ix1_road_spine_province(province_id):
+		return {"success": false, "reason": "Not on the IX-1 Rhineland road spine."}
+	var preview: Dictionary = can_start_project(province_id, "infrastructure", investor_tag)
+	if not preview.get("ok", false):
+		return {
+			"success": false,
+			"reason": preview.get("reason", "Cannot start road spine"),
+			"preview": preview
+		}
+	var pp_cost := int(preview.get("cost_pp", 0))
+	if typeof(GameData) != TYPE_NIL:
+		var ps: Dictionary = GameData.get_peace_state() if GameData.has_method("get_peace_state") else {}
+		var current_mand := int(ps.get("mandate", {}).get(investor_tag, 0))
+		if current_mand < pp_cost:
+			return {"success": false, "reason": "Insufficient Mandate (%d < %d)" % [current_mand, pp_cost], "preview": preview}
+		GameData.apply_pillar_shift(investor_tag, "mandate", -pp_cost, "road_spine_" + str(province_id))
+		GameData.apply_pillar_shift(investor_tag, "ascendancy", -int(pp_cost * 0.3), "road_spine_prestige")
+	var p_for_target: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	var cur := p_for_target.infrastructure if p_for_target else 1
+	var tgt := cur + 1
+	var proj := start_infrastructure_project(province_id, tgt, investor_tag)
+	if proj == null:
+		return {"success": false, "reason": "Failed to create road spine project"}
+	proj.build_road_spine = true
+	proj.spine_neighbor_ids = get_ix1_spine_neighbors(province_id)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
+		MapManager.notify_province_changed(province_id, "infrastructure_project")
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+		var pname := p_for_target.name if p_for_target else str(province_id)
+		LeaderEventUI.post_news(
+			"IX-1 Road Spine Started",
+			"%s begins a road-spine project in %s (ETA %d days)." % [proj.owner_tag, pname, proj.get_eta_days()],
+			"infrastructure",
+		)
+	return {
+		"success": true,
+		"reason": "Road spine project started",
+		"project": proj,
+		"eta_days": proj.get_eta_days(),
+		"cost_pp": preview.get("cost_pp", 0),
+		"spine_neighbor_ids": proj.spine_neighbor_ids.duplicate(),
+		"build_road_spine": true
+	}
 
 
 ## AI helper (called from DebugOverlay AI sim turns, TestRunner headless demos, or daily if extended).

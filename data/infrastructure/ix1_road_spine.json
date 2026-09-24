@@ -1,0 +1,17 @@
+{
+  "slice": "IX-1 Road Spine",
+  "theater": "rhineland_west_german",
+  "owner_tag": "GER",
+  "start_years": [1918, 1936],
+  "hub_id": 710417,
+  "corridor_ids": [710416, 710417, 710418],
+  "edges": [[710417, 710416], [710417, 710418]],
+  "off_spine_control_id": 710403,
+  "names": {
+    "710416": "Bonn, Kreisfreie Stadt",
+    "710417": "Köln, Kreisfreie Stadt",
+    "710418": "Leverkusen, Kreisfreie Stadt",
+    "710403": "Essen, Kreisfreie Stadt"
+  },
+  "notes": "Home Europe 3-province GER-owned Rhineland spine. Not Maginot combat. Not a continent mesh."
+}

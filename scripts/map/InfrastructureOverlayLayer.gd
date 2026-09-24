@@ -161,7 +161,8 @@ func _update_sub_layer_visibilities() -> void:
     # Operational zoom: roads appear earlier so arteries are readable without deep zoom.
     # World-class pass: slightly earlier road/rail visibility for theater-scale reading.
     if road_layer:
-        road_layer.visible = show_roads and z > 0.10
+        # IX-1: player-built explicit spines stay visible at playable mid-zoom (not F10-only).
+        road_layer.visible = (show_roads or _road_layer_has_explicit_lines()) and z > 0.10
     if rail_layer:
         rail_layer.visible = show_rails and z > 0.14
     if city_layer or sites_layer:
@@ -426,9 +427,6 @@ func rebuild_road_layer():
         road_layer.remove_child(k)
         k.queue_free()
 
-    if not show_roads:
-        return  # don't populate nodes for hidden layer (saves resources when toggled off)
-
     if map_manager == null:
         return
 
@@ -460,8 +458,9 @@ func rebuild_road_layer():
             # Check explicit built_roads or fallback to high infra
             var has_explicit = (nid in p.built_road_neighbors) or (pid in (n.built_road_neighbors if n else []))
             var avg_infra = (p.infrastructure + n.infrastructure) / 2.0
-            if not has_explicit and avg_infra < road_min:
-                continue
+            if not has_explicit:
+                if not show_roads or avg_infra < road_min:
+                    continue
             var c2 = map_manager.get_province_centroid(nid)
             # Art-team road palette (F5/G spiderweb fix):
             # Supply mode draws ONLY corridor edges (bright). No adjacency mesh, no spines.
@@ -506,8 +505,13 @@ func rebuild_road_layer():
                 line.begin_cap_mode = Line2D.LINE_CAP_ROUND
                 line.end_cap_mode = Line2D.LINE_CAP_ROUND
             else:
-                # Infra mapmode only (political never rebuilds roads): dust roads, never neon.
-                if tier >= 2:
+                # Explicit IX-1 spines stay readable on political at Home zoom.
+                # Inferred high-infra dust only when Infra mapmode (show_roads) is on.
+                if has_explicit:
+                    line.default_color = Color(0.50, 0.36, 0.14, 0.82)
+                    line.width = 2.8
+                    line.z_index = 3
+                elif tier >= 2:
                     line.default_color = Color(0.40, 0.34, 0.22, 0.38)
                     line.width = 2.0
                     line.z_index = 2
@@ -525,6 +529,8 @@ func rebuild_road_layer():
             line.set_meta("tier", tier)
             line.set_meta("corridor", on_corridor)
             road_layer.add_child(line)
+    if road_layer.get_child_count() > 0 and _get_current_zoom() > 0.10:
+        road_layer.visible = true
 
 ## Similar for rails - higher threshold, distinct style (e.g. dashed via multiple segments or color)
 func rebuild_rail_layer():
@@ -929,16 +935,20 @@ func set_show_proposed_splits(enabled: bool):
 ## Toggle infrastructure sub-layers. Called from DebugOverlay, options, or hotkeys.
 ## Now properly controls the Node2D sub-layer visibility (RoadLayer etc) for true toggle + node editing.
 func set_show_roads(enabled: bool):
-    var was_on = show_roads
     show_roads = enabled
-    if road_layer:
-        road_layer.visible = show_roads
-    if show_roads and not was_on:
-        rebuild_road_layer()
-    elif not show_roads:
-        # Political F1 / hide: wipe Line2D children so faint roads cannot linger.
-        _clear_road_layer_children()
+    # Always rebuild: inferred mesh only when enabled; explicit IX-1 spines stay.
+    rebuild_road_layer()
+    _update_sub_layer_visibilities()
     queue_redraw()
+
+
+func _road_layer_has_explicit_lines() -> bool:
+    if road_layer == null:
+        return false
+    for c in road_layer.get_children():
+        if bool(c.get_meta("explicit", false)):
+            return true
+    return false
 
 
 func _clear_road_layer_children() -> void:

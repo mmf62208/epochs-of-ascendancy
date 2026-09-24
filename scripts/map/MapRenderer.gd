@@ -52,6 +52,7 @@ const _TerrainTiles = preload("res://scripts/map/TerrainTileLibrary.gd")
 
 # Dynamically created infrastructure investment UI (MVP — matches engineers button pattern)
 var _btn_invest_infra: Button = null
+var _btn_build_road_spine: Button = null
 var _btn_develop_resource: Button = null
 var _label_invest_status: Label = null
 var _progress_invest: ProgressBar = null
@@ -19065,6 +19066,17 @@ func _ensure_infrastructure_investment_ui() -> void:
 			_btn_invest_infra.pressed.connect(_on_invest_infrastructure_pressed)
 		content.add_child(_btn_invest_infra)
 
+	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
+		_btn_build_road_spine = Button.new()
+		_btn_build_road_spine.name = "BtnBuildRoadSpine"
+		_btn_build_road_spine.text = "Build Road Spine"
+		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
+		_btn_build_road_spine.custom_minimum_size = Vector2(200, 28)
+		_btn_build_road_spine.visible = false
+		if not _btn_build_road_spine.pressed.is_connected(_on_build_road_spine_pressed):
+			_btn_build_road_spine.pressed.connect(_on_build_road_spine_pressed)
+		content.add_child(_btn_build_road_spine)
+
 	if _btn_develop_resource == null or not is_instance_valid(_btn_develop_resource):
 		_btn_develop_resource = Button.new()
 		_btn_develop_resource.name = "BtnDevelopResource"
@@ -19210,6 +19222,7 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 		if _progress_invest: _progress_invest.visible = false
 		if _btn_cancel_invest: _btn_cancel_invest.visible = false
 		if _label_invest_modifiers: _label_invest_modifiers.visible = false
+		_update_road_spine_button(null)
 		return
 
 	var mgr = _get_infra_manager()
@@ -19219,6 +19232,7 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 		if _progress_invest: _progress_invest.visible = false
 		if _btn_cancel_invest: _btn_cancel_invest.visible = false
 		if _label_invest_modifiers: _label_invest_modifiers.visible = false
+		_update_road_spine_button(null)
 		return
 
 	var player_tag := _player_tag()
@@ -19233,6 +19247,7 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 		if _progress_invest: _progress_invest.visible = false
 		if _btn_cancel_invest: _btn_cancel_invest.visible = false
 		if _label_invest_modifiers: _label_invest_modifiers.visible = false
+		_update_road_spine_button(province)
 		return
 
 	_label_invest_status.visible = true
@@ -19291,6 +19306,59 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 			else:
 				_btn_invest_infra.tooltip_text = str(preview.get("reason", "Cannot invest here."))
 				_btn_invest_infra.disabled = true
+	_update_road_spine_button(province)
+
+
+func _update_road_spine_button(province: Province) -> void:
+	_ensure_infrastructure_investment_ui()
+	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
+		return
+	var mgr = _get_infra_manager()
+	if province == null or mgr == null:
+		_btn_build_road_spine.visible = false
+		return
+	var show_btn := false
+	if mgr.has_method("should_show_road_spine_button"):
+		show_btn = bool(mgr.should_show_road_spine_button(province.id, _player_tag()))
+	_btn_build_road_spine.visible = show_btn
+	if not show_btn:
+		return
+	var status: Dictionary = mgr.get_project_status(province.id) if mgr.has_method("get_project_status") else {}
+	var active := bool(status.get("active", false))
+	var spine_proj := bool(status.get("build_road_spine", false))
+	if active:
+		_btn_build_road_spine.disabled = true
+		_btn_build_road_spine.text = "Building Road Spine" if spine_proj else "Project Active"
+		var eta := int(status.get("eta_days", 0))
+		var pct := int(round(float(status.get("progress", 0.0))))
+		_btn_build_road_spine.tooltip_text = "Road spine %d%% · ETA %d days" % [pct, eta]
+	else:
+		_btn_build_road_spine.disabled = false
+		_btn_build_road_spine.text = "Build Road Spine"
+		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
+
+
+func _on_build_road_spine_pressed() -> void:
+	if selected_province_id < 0:
+		return
+	var mgr = _get_infra_manager()
+	if mgr == null or not mgr.has_method("try_start_road_spine"):
+		_show_inspector_toast("Road spine unavailable", 2.5, true)
+		return
+	var result: Dictionary = mgr.try_start_road_spine(selected_province_id, _player_tag())
+	if result.get("success", false):
+		var eta := int(result.get("eta_days", 18))
+		var pname := ""
+		if provinces.has(selected_province_id):
+			pname = provinces[selected_province_id].name
+		focus_province_by_id(selected_province_id)
+		_show_inspector_toast("Road spine started in %s · ETA %d days" % [pname, eta], 3.0)
+		_play_map_sfx("confirm")
+		if provinces.has(selected_province_id):
+			show_info_panel(provinces[selected_province_id])
+	else:
+		_show_inspector_toast(str(result.get("reason", "Cannot start road spine")), 3.5, true)
+		_play_map_sfx("error")
 
 
 func _on_invest_infrastructure_pressed() -> void:
@@ -19384,11 +19452,18 @@ func _on_infra_completed_for_inspector(pid: int, new_level: int, _axis: String, 
 	var pname := ""
 	if provinces.has(pid):
 		pname = provinces[pid].name
+	var spine := false
+	if _proj != null:
+		spine = bool(_proj.build_road_spine)
 	var flair: Dictionary = _MapNextListHelpers.format_infra_project_flair(pname, "complete", new_level)
-	_show_inspector_toast(str(flair.get("toast", "Infrastructure complete")), float(flair.get("duration", 3.0)))
-	_play_map_sfx(str(flair.get("sfx", "achievement")))
-	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
-		LeaderEventUI.post_news(str(flair.get("news_headline", "Infrastructure complete")), str(flair.get("news_body", "")), "infrastructure")
+	if spine:
+		_show_inspector_toast("Road spine complete in %s · infra %d" % [pname, new_level], 3.5)
+		_play_map_sfx("achievement")
+	else:
+		_show_inspector_toast(str(flair.get("toast", "Infrastructure complete")), float(flair.get("duration", 3.0)))
+		_play_map_sfx(str(flair.get("sfx", "achievement")))
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+			LeaderEventUI.post_news(str(flair.get("news_headline", "Infrastructure complete")), str(flair.get("news_body", "")), "infrastructure")
 	if pid == selected_province_id and info_panel != null and info_panel.visible and provinces.has(pid):
 		show_info_panel(provinces[pid])  # full refresh for new infra level effects on combat/supply
 		force_refresh_tints_for_owner(provinces[pid].owner_tag)

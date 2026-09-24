@@ -133,6 +133,24 @@ class TestInvestmentStatusFromProjectDict(unittest.TestCase):
         self.assertIn("Invest to raise", idle["label"])
         self.assertEqual(idle["button_text"], "Invest in Infrastructure")
 
+    def test_panel_state_road_spine_label(self) -> None:
+        panel = format_invest_panel_state(
+            {
+                "active": True,
+                "progress": 40.0,
+                "eta_days": 12,
+                "target_level": 5,
+                "is_sabotaged": False,
+                "build_road_spine": True,
+            },
+            cur_infra=4,
+            cur_dev=2,
+        )
+        self.assertIn("Road Spine", panel["label"])
+        self.assertEqual(panel["button_text"], "Building Road Spine")
+        self.assertTrue(panel["button_disabled"])
+        self.assertTrue(panel["show_progress"])
+
 
 class TestSpecialSiteEffectsFromDefs(unittest.TestCase):
     """§2 — site effect bits from shipped JSON defs + construction/damage state."""

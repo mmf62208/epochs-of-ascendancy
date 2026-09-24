@@ -87,7 +87,12 @@ static func format_invest_panel_state(status: Dictionary, cur_infra: int, cur_de
 	var target := int(status.get("target_level", cur_infra + 1))
 	var sabotaged := bool(status.get("is_sabotaged", false))
 	var sab_note := " ⚠ Sabotage slowing progress" if sabotaged else ""
-	var label := "Infra Project: %d%% → Lv.%d (ETA %d days)%s" % [pct, target, eta, sab_note]
+	var spine := bool(status.get("build_road_spine", false))
+	var label := (
+		"Road Spine: %d%% → Lv.%d (ETA %d days)%s" % [pct, target, eta, sab_note]
+		if spine
+		else "Infra Project: %d%% → Lv.%d (ETA %d days)%s" % [pct, target, eta, sab_note]
+	)
 	var mods: Dictionary = status.get("modifiers", {}) if status.get("modifiers") is Dictionary else {}
 	var panel_bits: PackedStringArray = []
 	if mods.has("engineer"):
@@ -112,7 +117,7 @@ static func format_invest_panel_state(status: Dictionary, cur_infra: int, cur_de
 		"show_cancel": true,
 		"show_progress": true,
 		"modifiers_label": modifiers_label,
-		"button_text": "Project Active",
+		"button_text": "Building Road Spine" if spine else "Project Active",
 		"button_disabled": true,
 	}
 
