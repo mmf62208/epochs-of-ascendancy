@@ -118,6 +118,13 @@ func _test_source_live_press_and_guard() -> void:
 	if "_drain_living_f5_flush" in pump:
 		_fail("live-progress guard must not drain the F5 flush shortcut")
 		return
+	var quit_fn := _slice_func(tr, "_quit_logged")
+	if "ix1_live_progress" not in quit_fn:
+		_fail("stay-alive must not swallow ix1_live_progress quit")
+		return
+	if "_exec_cat_text" not in tr:
+		_fail("live-progress RSS must cat /proc of the Godot pid (not FileAccess-only / not /proc/self)")
+		return
 	_pass("live press + guard stay on MapRenderer.button / advance_real_time")
 
 

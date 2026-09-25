@@ -725,7 +725,7 @@ func _quit_logged(code: int, reason: String) -> void:
 	var stay := false
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("smoke_advance_should_stay_alive"):
 		stay = bool(TimeManager.call("smoke_advance_should_stay_alive"))
-	if stay and not reason.begins_with("ui_smoke") and reason != "unit_order_qa" and not reason.begins_with("feb_clock") and not reason.begins_with("ix1_frame_guard"):
+	if stay and not reason.begins_with("ui_smoke") and reason != "unit_order_qa" and not reason.begins_with("feb_clock") and not reason.begins_with("ix1_frame_guard") and not reason.begins_with("ix1_live_progress"):
 		print("EOA_HARNESS_QUIT who=TestRunner suppressed stay_alive=1 reason=%s (Search/spine window; NOT product clock PASS)" % reason)
 		if OS.has_method("flush_stdout"):
 			OS.call("flush_stdout")
@@ -1195,23 +1195,49 @@ func _log_ix1_guard_visible_feedback() -> Dictionary:
 
 func _read_godot_rss_mb() -> int:
 	# Measure THIS Godot pid. Never /proc/self via OS.execute (that is awk).
+	# FileAccess often cannot read /proc; prefer /usr/bin/cat then ps.
 	var pid := OS.get_process_id()
-	var from_statm := _parse_statm_rss_mb("/proc/%d/statm" % pid)
+	var cat_statm := _exec_cat_text("/proc/%d/statm" % pid)
+	var from_statm := _parse_statm_rss_from_text(cat_statm)
 	if from_statm > 0:
 		return from_statm
-	var from_status := _parse_vmrss_mb_text(_read_abs_text("/proc/%d/status" % pid))
+	from_statm = _parse_statm_rss_mb("/proc/%d/statm" % pid)
+	if from_statm > 0:
+		return from_statm
+	var cat_status := _exec_cat_text("/proc/%d/status" % pid)
+	var from_status := _parse_vmrss_mb_text(cat_status)
 	if from_status > 0:
 		return from_status
-	var awk_bins: Array[String] = ["/usr/bin/awk", "awk"]
-	var awk_path := "/proc/%d/status" % pid
-	for bin in awk_bins:
-		var out: Array = []
-		OS.execute(bin, PackedStringArray(["/VmRSS/{printf \"%d\", $2/1024}", awk_path]), out, true, false)
-		if out.size() > 0:
-			var s: String = str(out[0]).strip_edges()
-			if s.is_valid_int() and int(s) > 0:
-				return int(s)
+	from_status = _parse_vmrss_mb_text(_read_abs_text("/proc/%d/status" % pid))
+	if from_status > 0:
+		return from_status
+	var ps_out: Array = []
+	OS.execute("/usr/bin/ps", PackedStringArray(["-o", "rss=", "-p", str(pid)]), ps_out, true, false)
+	if ps_out.size() > 0:
+		var kb_s: String = str(ps_out[0]).strip_edges()
+		if kb_s.is_valid_int() and int(kb_s) > 0:
+			return int(round(float(int(kb_s)) / 1024.0))
 	return 0
+
+
+func _exec_cat_text(path: String) -> String:
+	var out: Array = []
+	OS.execute("/usr/bin/cat", PackedStringArray([path]), out, true, false)
+	if out.size() > 0:
+		return str(out[0])
+	return ""
+
+
+func _parse_statm_rss_from_text(txt: String) -> int:
+	if txt.is_empty():
+		return 0
+	var parts: PackedStringArray = txt.strip_edges().split(" ", false)
+	if parts.size() < 2:
+		return 0
+	var pages := int(parts[1])
+	if pages <= 0:
+		return 0
+	return int(round(float(pages) * 4096.0 / 1024.0 / 1024.0))
 
 
 func _read_abs_text(path: String) -> String:
@@ -1273,6 +1299,8 @@ func _arm_smoke_ix1_live_progress() -> void:
 
 
 func _tick_smoke_ix1_live_progress() -> void:
+	if bool(get_meta("eoa_smoke_live_progress_done", false)):
+		return
 	if not bool(get_meta("eoa_smoke_live_progress_armed", false)):
 		return
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_paused"):
@@ -1298,11 +1326,13 @@ func _tick_smoke_ix1_live_progress() -> void:
 			% [elapsed_days, pct, eta, rss, 1 if done else 0]
 		)
 	if rss >= 3072:
+		set_meta("eoa_smoke_live_progress_done", true)
 		_eoa_flush("EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=FAIL rss_mb=%d" % rss)
 		_quit_logged(1, "ix1_live_progress_rss")
 		return
 	var saw := int(get_meta("eoa_smoke_live_progress_saw_pct", 0))
 	if elapsed_days >= 5 and saw <= 0 and not done:
+		set_meta("eoa_smoke_live_progress_done", true)
 		_eoa_flush(
 			"EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=FAIL days=%d pct=0 (stay-alive day_emit drop; live calendar did not tick IDM)"
 			% elapsed_days
@@ -1310,6 +1340,7 @@ func _tick_smoke_ix1_live_progress() -> void:
 		_quit_logged(1, "ix1_live_progress_stuck_zero")
 		return
 	if done or pct >= 100:
+		set_meta("eoa_smoke_live_progress_done", true)
 		_eoa_flush(
 			"EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=PASS days=%d pct=%d rss_mb=%d (live path COMPLETE)"
 			% [elapsed_days, pct, rss]
@@ -1317,6 +1348,7 @@ func _tick_smoke_ix1_live_progress() -> void:
 		_quit_logged(0, "ix1_live_progress_pass")
 		return
 	if elapsed_days >= 45:
+		set_meta("eoa_smoke_live_progress_done", true)
 		_eoa_flush(
 			"EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=FAIL days=%d pct=%d never COMPLETE"
 			% [elapsed_days, pct]

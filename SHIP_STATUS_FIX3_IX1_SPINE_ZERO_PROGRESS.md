@@ -18,8 +18,8 @@ Also: toast timer WeakRef (no `Object → Object`); spine chrome **below** Settl
 
 ## Guard
 
-- `HeadlessIx1RoadSpineLiveStayAliveTickTest` — stay-alive + `advance_real_time` (FAIL on 2bc8f19).
-- `tools/eoa_ix1_spine_live_progress_guard.sh` — Play wrapper + viewport mouse + `/proc` RSS.
+- `HeadlessIx1RoadSpineLiveStayAliveTickTest` — stay-alive + `advance_real_time` (**FAIL** on `2bc8f19`: calendar +6d, spine 0.0%; **PASS** on tip: 0%→100% `built`).
+- `tools/eoa_ix1_spine_live_progress_guard.sh` — Play wrapper + viewport mouse + `/proc` RSS. First new-tip run: press `viewport_mouse` → construction 3% day 1 → COMPLETE day 35; sidecar RSS **2052–2053 MB**. Stay-alive used to swallow `ix1_live_progress` quit (rss_mb=0 from FileAccess `/proc`); now quit is allowed and RSS uses `/usr/bin/cat` of the Godot pid.
 
 ## Honest labels
 

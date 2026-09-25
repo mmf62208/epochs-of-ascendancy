@@ -629,6 +629,10 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("testrunner_live_progress_uses_advance_real_time")
     if "advance_daily_projects" in _slice_func(_read(TEST_RUNNER_GD), "_tick_smoke_ix1_live_progress"):
         missing.append("testrunner_live_progress_idm_shortcut")
+    if "ix1_live_progress" not in _slice_func(_read(TEST_RUNNER_GD), "_quit_logged"):
+        missing.append("testrunner_live_progress_quit")
+    if "_exec_cat_text" not in _read(TEST_RUNNER_GD):
+        missing.append("testrunner_rss_cat_proc")
     live_prog_sh = _read(ROOT / "tools" / "eoa_ix1_spine_live_progress_guard.sh")
     if "EOA_SMOKE_SPINE_LIVE_PROGRESS" not in live_prog_sh:
         missing.append("live_progress_guard_sh")

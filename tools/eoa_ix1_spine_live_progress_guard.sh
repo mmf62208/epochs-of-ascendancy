@@ -109,6 +109,16 @@ GODOT_PID=""
 				kill -9 "$GPID" 2>/dev/null || true
 				break
 			fi
+			if grep -qE "EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=" "$LOG" 2>/dev/null; then
+				echo "$(date +%H:%M:%S) RESULT_SEEN rss_mb=$rss" >>"$RSSLOG"
+				# Stay-alive used to swallow get_tree().quit; reap after RESULT.
+				sleep 2
+				if kill -0 "$GODOT_PID" 2>/dev/null; then
+					kill -9 "$GODOT_PID" 2>/dev/null || true
+					kill -9 "$GPID" 2>/dev/null || true
+				fi
+				break
+			fi
 		fi
 		if ! kill -0 "$GPID" 2>/dev/null; then
 			break

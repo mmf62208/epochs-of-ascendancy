@@ -217,6 +217,8 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertNotIn("testrunner_live_progress_guard", tick.get("missing") or [])
         self.assertNotIn("testrunner_live_progress_uses_advance_real_time", tick.get("missing") or [])
         self.assertNotIn("testrunner_live_progress_idm_shortcut", tick.get("missing") or [])
+        self.assertNotIn("testrunner_live_progress_quit", tick.get("missing") or [])
+        self.assertNotIn("testrunner_rss_cat_proc", tick.get("missing") or [])
         self.assertNotIn("live_progress_guard_sh", tick.get("missing") or [])
         self.assertNotIn("live_progress_guard_play_launch", tick.get("missing") or [])
         self.assertNotIn("live_progress_guard_proc_rss", tick.get("missing") or [])
