@@ -54,6 +54,10 @@ const _TerrainTiles = preload("res://scripts/map/TerrainTileLibrary.gd")
 var _btn_invest_infra: Button = null
 var _btn_build_road_spine: Button = null
 var _ix1_reveal_busy: bool = false
+var _ix1_spine_inspector_pid: int = -1
+var _ix1_spine_press_guard_msec: int = 0
+var _ix1_last_spine_press: Dictionary = {}
+const IX1_SPINE_PRESS_GUARD_MS := 180
 var _btn_develop_resource: Button = null
 var _label_invest_status: Label = null
 var _progress_invest: ProgressBar = null
@@ -1619,6 +1623,29 @@ func _search_ui_owns_click() -> bool:
 	return sr.get_global_rect().grow(6.0).has_point(vp_r.get_mouse_position())
 
 
+func _road_spine_btn_owns_click() -> bool:
+	# Play MIXED d0b1587d: leftover map pan / pick-block swallowed inspector
+	# button-up (same class as Search Go). Rect first — hover can miss.
+	var vp_sp: Viewport = get_viewport()
+	if vp_sp == null:
+		return false
+	var mouse_sp: Vector2 = vp_sp.get_mouse_position()
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
+		if _btn_build_road_spine.get_global_rect().grow(6.0).has_point(mouse_sp):
+			return true
+	if info_panel == null or not (info_panel is Control) or not (info_panel as Control).visible:
+		return false
+	var list_btn: Button = (info_panel as Node).find_child("BtnBuildRoadSpineInList", true, false) as Button
+	if list_btn != null and is_instance_valid(list_btn) and list_btn.visible:
+		if list_btn.get_global_rect().grow(6.0).has_point(mouse_sp):
+			return true
+	var row: Control = (info_panel as Node).find_child("Ix1SpineBuildRow", true, false) as Control
+	if row != null and is_instance_valid(row) and row.visible:
+		if row.get_global_rect().grow(4.0).has_point(mouse_sp):
+			return true
+	return false
+
+
 func _living_title_owns_click() -> bool:
 	return _living_title_owns_event(null)
 
@@ -2413,6 +2440,7 @@ func _input(event: InputEvent) -> void:
 				or _mouse_over_search_control()
 				or _search_ui_owns_click()
 				or _living_title_owns_click()
+				or _road_spine_btn_owns_click()
 			):
 				return
 			if event.pressed:
@@ -2442,7 +2470,7 @@ func _input(event: InputEvent) -> void:
 					# Pan latch stays. Do not swallow Open fight / unit-card buttons
 					# (2d47d06: fold click was tooltip-only no-op after pan PASS).
 					# Search LineEdit/Go already returned above — do not touch that path.
-					if _top_bar_owns_click() or _search_ui_owns_click():
+					if _top_bar_owns_click() or _search_ui_owns_click() or _road_spine_btn_owns_click():
 						return
 					if not _is_mouse_over_blocking_ui():
 						_arm_left_map_press()
@@ -2460,7 +2488,7 @@ func _input(event: InputEvent) -> void:
 					_dismiss_inspector_and_restore_input()
 					get_viewport().set_input_as_handled()
 					return
-				if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click():
+				if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _road_spine_btn_owns_click():
 					return
 				_finish_close_click_guard_on_new_press()
 				# Arm pan on the map even if a HUD Control is hovered (search/toolbar).
@@ -2810,7 +2838,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dismiss_inspector_and_restore_input()
 			get_viewport().set_input_as_handled()
 			return
-		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click():
+		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click() or _road_spine_btn_owns_click():
 			return
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
@@ -18155,6 +18183,8 @@ func _on_mouse_exited(node: Node2D) -> void:
 
 func _is_mouse_over_blocking_ui() -> bool:
 	## True when cursor is over a screen/popup so map hover text must not bleed through.
+	if _road_spine_btn_owns_click() or _search_ui_owns_click() or _top_bar_owns_click():
+		return true
 	var vp := get_viewport()
 	if vp == null:
 		return false
@@ -18186,6 +18216,9 @@ func _is_mouse_over_blocking_ui() -> bool:
 			"BtnOpenFight",
 			"OpenFightFoldBtn",
 			"BtnClose",
+			"BtnBuildRoadSpine",
+			"BtnBuildRoadSpineInList",
+			"Ix1SpineBuildRow",
 			"LivingTitleBoot",
 			"LivingTitlePanel",
 			"LivingTitleBegin",
@@ -18787,7 +18820,7 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
 	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
 	# Esc helpers + Dig2 / Drag2+3 pan helpers untouched.
-	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control():
+	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false
 	if _is_mouse_over_blocking_ui():
 		return false
@@ -20156,10 +20189,26 @@ func _ensure_road_spine_button() -> void:
 		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). First-session starter grant — GER 1936 day-0 Mandate is enough (generic Invest stays gated). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
 		_btn_build_road_spine.custom_minimum_size = Vector2(220, 24)
 		_btn_build_road_spine.visible = false
-		_btn_build_road_spine.focus_mode = Control.FOCUS_NONE
-		if not _btn_build_road_spine.pressed.is_connected(_on_build_road_spine_pressed):
-			_btn_build_road_spine.pressed.connect(_on_build_road_spine_pressed)
+	_wire_road_spine_live_button(_btn_build_road_spine)
 	_pin_road_spine_button_to_inspector_chrome()
+
+
+func _wire_road_spine_live_button(btn: Button) -> void:
+	# Press-on-down so leftover map-pan / pick-block cannot eat button-up
+	# (same class as Search Go). Visible chrome with a dead pressed-on-up is FAIL.
+	if btn == null or not is_instance_valid(btn):
+		return
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	btn.z_index = 20
+	if not btn.pressed.is_connected(_on_build_road_spine_pressed):
+		btn.pressed.connect(_on_build_road_spine_pressed)
+	if not btn.button_down.is_connected(_on_build_road_spine_pressed):
+		btn.button_down.connect(_on_build_road_spine_pressed)
+	if not btn.gui_input.is_connected(_on_build_road_spine_gui_input):
+		btn.gui_input.connect(_on_build_road_spine_gui_input)
 
 
 func _pin_road_spine_button_to_inspector_chrome() -> void:
@@ -20174,9 +20223,9 @@ func _pin_road_spine_button_to_inspector_chrome() -> void:
 		if parent != null:
 			parent.remove_child(_btn_build_road_spine)
 		ip.add_child(_btn_build_road_spine)
-	_btn_build_road_spine.focus_mode = Control.FOCUS_NONE
-	_btn_build_road_spine.mouse_filter = Control.MOUSE_FILTER_STOP
-	_btn_build_road_spine.z_index = 2
+	elif ip.get_child_count() > 0:
+		ip.move_child(_btn_build_road_spine, ip.get_child_count() - 1)
+	_wire_road_spine_live_button(_btn_build_road_spine)
 	_layout_road_spine_chrome_button()
 
 
@@ -20230,6 +20279,7 @@ func _reveal_ix1_road_spine_on_inspector(province: Province, reset_scroll: bool 
 	if province == null or _ix1_reveal_busy:
 		return
 	_ix1_reveal_busy = true
+	_ix1_spine_inspector_pid = province.id
 	_ensure_road_spine_button()
 	_update_road_spine_button(province)
 	if _ix1_should_show_spine_button(province):
@@ -20259,6 +20309,9 @@ func _prepend_ix1_spine_build_row(province: Province) -> void:
 		existing.visible = true
 		_special_sites_container.move_child(existing, 0)
 		_special_sites_container.visible = true
+		var existing_btn: Button = existing.find_child("BtnBuildRoadSpineInList", true, false) as Button
+		if existing_btn != null:
+			_wire_road_spine_live_button(existing_btn)
 		if _label_special_sites_header != null and is_instance_valid(_label_special_sites_header):
 			_label_special_sites_header.visible = true
 		return
@@ -20275,8 +20328,7 @@ func _prepend_ix1_spine_build_row(province: Province) -> void:
 	btn.text = "Build Road Spine"
 	btn.custom_minimum_size = Vector2(140, 24)
 	btn.tooltip_text = "IX-1 first-session starter — GER 1936 day-0 Mandate 0 is enough."
-	if not btn.pressed.is_connected(_on_build_road_spine_pressed):
-		btn.pressed.connect(_on_build_road_spine_pressed)
+	_wire_road_spine_live_button(btn)
 	row.add_child(btn)
 	_special_sites_container.add_child(row)
 	_special_sites_container.move_child(row, 0)
@@ -20317,27 +20369,93 @@ func _update_road_spine_button(province: Province) -> void:
 	_layout_road_spine_chrome_button()
 
 
+func _ix1_spine_target_province_id() -> int:
+	if selected_province_id >= 0:
+		return selected_province_id
+	if _ix1_spine_inspector_pid >= 0:
+		return _ix1_spine_inspector_pid
+	return -1
+
+
+func _on_build_road_spine_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb: InputEventMouseButton = event
+	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	_on_build_road_spine_pressed()
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
+		_btn_build_road_spine.accept_event()
+	var vp_sp: Viewport = get_viewport()
+	if vp_sp != null:
+		vp_sp.set_input_as_handled()
+
+
 func _on_build_road_spine_pressed() -> void:
-	if selected_province_id < 0:
+	var now_ms: int = Time.get_ticks_msec()
+	if now_ms - _ix1_spine_press_guard_msec < IX1_SPINE_PRESS_GUARD_MS:
+		return
+	_ix1_spine_press_guard_msec = now_ms
+	var pid: int = _ix1_spine_target_province_id()
+	var chrome_vis := _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible
+	if pid < 0:
+		_ix1_last_spine_press = {"ok": false, "armed": false, "visible": chrome_vis, "pid": pid, "reason": "no_province"}
+		_log_smoke_spine_start(_ix1_last_spine_press)
+		_show_inspector_toast("Road spine: open Köln first", 2.5, true)
 		return
 	var mgr = _get_infra_manager()
 	if mgr == null or not mgr.has_method("try_start_road_spine"):
+		_ix1_last_spine_press = {"ok": false, "armed": false, "visible": chrome_vis, "pid": pid, "reason": "manager_missing"}
+		_log_smoke_spine_start(_ix1_last_spine_press)
 		_show_inspector_toast("Road spine unavailable", 2.5, true)
 		return
-	var result: Dictionary = mgr.try_start_road_spine(selected_province_id, _player_tag())
-	if result.get("success", false):
+	var result: Dictionary = mgr.try_start_road_spine(pid, _player_tag())
+	var armed := bool(result.get("success", false))
+	_ix1_last_spine_press = {
+		"ok": armed,
+		"armed": armed,
+		"visible": chrome_vis,
+		"pid": pid,
+		"reason": str(result.get("reason", "")),
+		"eta_days": int(result.get("eta_days", 0)),
+	}
+	_log_smoke_spine_start(_ix1_last_spine_press)
+	if armed:
 		var eta := int(result.get("eta_days", 18))
 		var pname := ""
-		if provinces.has(selected_province_id):
-			pname = provinces[selected_province_id].name
-		focus_province_by_id(selected_province_id)
+		if provinces.has(pid):
+			pname = provinces[pid].name
+		focus_province_by_id(pid)
 		_show_inspector_toast("Road spine started in %s · ETA %d days" % [pname, eta], 3.0)
 		_play_map_sfx("confirm")
-		if provinces.has(selected_province_id):
-			show_info_panel(provinces[selected_province_id])
+		if provinces.has(pid):
+			show_info_panel(provinces[pid])
 	else:
 		_show_inspector_toast(str(result.get("reason", "Cannot start road spine")), 3.5, true)
 		_play_map_sfx("error")
+
+
+func press_build_road_spine_from_live_ui() -> Dictionary:
+	# Live-facing helper: same press path Play uses. Visible chrome that never
+	# arms after this call is a soft-wall FAIL (do not treat as headless-only).
+	_ix1_spine_press_guard_msec = 0
+	_on_build_road_spine_pressed()
+	return _ix1_last_spine_press.duplicate()
+
+
+func _log_smoke_spine_start(report: Dictionary) -> void:
+	var vis := bool(report.get("visible", false))
+	var armed := bool(report.get("armed", false))
+	# Visible button + start never arms after press = FAIL for the live softpipe.
+	print(
+		"EOA_SMOKE_SPINE_START who=MapRenderer.press visible=%s armed=%s pid=%s reason=%s (live press; NOT product Begin/Esc/clock PASS)"
+		% [
+			"1" if vis else "0",
+			"1" if armed else "0",
+			str(int(report.get("pid", -1))),
+			str(report.get("reason", "")),
+		]
+	)
 
 
 func _on_invest_infrastructure_pressed() -> void:

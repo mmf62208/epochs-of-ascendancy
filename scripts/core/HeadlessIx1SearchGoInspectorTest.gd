@@ -63,6 +63,7 @@ func _run() -> void:
 	_test_go_enter_signal_wiring()
 	_test_source_spine_visible_after_search()
 	_test_idm_should_show_spine_on_koln()
+	_test_spine_start_after_press_wiring()
 
 
 func _test_source_live_inspector_path() -> void:
@@ -237,6 +238,49 @@ func _test_idm_should_show_spine_on_koln() -> void:
 		_fail("IX-1 Mandate cost is not 0")
 		return
 	_pass("IDM shows startable Build Road Spine on GER 1936 day-0 Köln (Mandate 0)")
+
+
+func _test_spine_start_after_press_wiring() -> void:
+	# Play MIXED d0b1587d: chrome visible, live press never armed.
+	var ren := _read(SRC_REN)
+	var idm := _read("res://scripts/map/InfrastructureDevelopmentManager.gd")
+	if ren.is_empty() or idm.is_empty():
+		_fail("renderer/IDM source missing for spine start-after-press")
+		return
+	if "_road_spine_btn_owns_click" not in ren:
+		_fail("Build Road Spine click is not owned (leftover map pan can swallow press)")
+		return
+	if "_road_spine_btn_owns_click" not in _slice_func(ren, "_input"):
+		_fail("MapRenderer._input does not yield to Build Road Spine")
+		return
+	var wire := _slice_func(ren, "_wire_road_spine_live_button")
+	if wire.is_empty() or "ACTION_MODE_BUTTON_PRESS" not in wire:
+		_fail("Build Road Spine is not press-on-down")
+		return
+	if "button_down.connect(_on_build_road_spine_pressed)" not in ren:
+		_fail("Build Road Spine button_down is not wired")
+		return
+	if "press_build_road_spine_from_live_ui" not in ren:
+		_fail("press_build_road_spine_from_live_ui missing")
+		return
+	if "EOA_SMOKE_SPINE_START" not in ren:
+		_fail("EOA_SMOKE_SPINE_START live start gate missing")
+		return
+	var press := _slice_func(ren, "_on_build_road_spine_pressed")
+	if "_ix1_spine_target_province_id" not in press:
+		_fail("spine press does not resolve inspector pid")
+		return
+	if "open Köln first" not in press:
+		_fail("spine press can silent-return with no toast")
+		return
+	var start := _slice_func(idm, "try_start_road_spine")
+	if "can_start_project(" in start:
+		_fail("try_start_road_spine still uses generic Invest can_start_project")
+		return
+	if "start_road_spine_project" not in start:
+		_fail("try_start_road_spine does not create via start_road_spine_project")
+		return
+	_pass("Build Road Spine live press arms start (owns-click + press-on-down + no Invest gate)")
 
 
 func _test_resolve_aliases() -> void:

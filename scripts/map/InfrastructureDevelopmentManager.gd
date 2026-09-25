@@ -1071,43 +1071,82 @@ func ix1_day0_mandate_can_start(tag: String = "GER") -> Dictionary:
 	}
 
 
-func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
-	if not is_ix1_road_spine_province(province_id):
-		return {"success": false, "reason": "Not on the IX-1 Rhineland road spine."}
-	var preview: Dictionary = can_start_project(province_id, "infrastructure", investor_tag)
-	if not preview.get("ok", false):
-		return {
-			"success": false,
-			"reason": preview.get("reason", "Cannot start road spine"),
-			"preview": preview
-		}
-	var pp_cost := get_ix1_road_spine_mandate_cost()
-	var gate: Dictionary = ix1_day0_mandate_can_start(investor_tag)
-	if not bool(gate.get("ok", false)):
-		var current_mand := int(gate.get("mandate", 0))
-		return {"success": false, "reason": "Insufficient Mandate (%d < %d)" % [current_mand, pp_cost], "preview": preview}
-	if pp_cost > 0 and typeof(GameData) != TYPE_NIL:
-		# Skip 0-cost apply_pillar_shift — that helper seeds missing tags at 50.
-		GameData.apply_pillar_shift(investor_tag, "mandate", -pp_cost, "road_spine_" + str(province_id))
-		GameData.apply_pillar_shift(investor_tag, "ascendancy", -int(pp_cost * 0.3), "road_spine_prestige")
-	var p_for_target: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
-	var cur := p_for_target.infrastructure if p_for_target else 1
-	var tgt := cur + 1
-	var proj := start_infrastructure_project(province_id, tgt, investor_tag)
-	if proj == null:
-		return {"success": false, "reason": "Failed to create road spine project"}
+func start_road_spine_project(province_id: int, investor_tag: String) -> ProvincialProject:
+	# IX-1 first-session grant: create the project without generic Invest
+	# can_start_project (Köln 73 Mandate / capacity / era). Mandate 0 is enough.
+	if has_active_project(province_id):
+		return null
+	var tag := investor_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "GER"
+	var p: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	if p == null:
+		return null
+	var proj := ProvincialProject.new()
+	proj.province_id = province_id
+	proj.axis = "infrastructure"
+	proj.owner_tag = tag
+	proj.starting_level = p.infrastructure
+	proj.target_level = p.infrastructure + 1
+	proj.work_per_day_base = _calculate_base_work_rate(p, "infrastructure", tag)
+	proj.political_power_cost = get_ix1_road_spine_mandate_cost()
+	proj.start_day = _current_game_day_index()
+	proj.status = "active"
 	proj.build_road_spine = true
 	proj.spine_neighbor_ids = get_ix1_spine_neighbors(province_id)
-	proj.political_power_cost = pp_cost
+	_refresh_project_modifiers(proj, p)
+	proj.days_remaining = maxi(1, proj.get_eta_days())
+	active_projects[province_id] = proj
+	project_started.emit(proj)
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
 		MapManager.notify_province_changed(province_id, "infrastructure_project")
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
-		var pname := p_for_target.name if p_for_target else str(province_id)
 		LeaderEventUI.post_news(
 			"IX-1 Road Spine Started",
-			"%s begins a road-spine project in %s (ETA %d days)." % [proj.owner_tag, pname, proj.get_eta_days()],
+			"%s begins a road-spine project in %s (ETA %d days)." % [proj.owner_tag, p.name, proj.get_eta_days()],
 			"infrastructure",
 		)
+	print("InfrastructureDevelopmentManager: started IX-1 road spine on province %d for %s" % [province_id, tag])
+	return proj
+
+
+func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
+	if not is_ix1_road_spine_province(province_id):
+		return {"success": false, "reason": "Not on the IX-1 Rhineland road spine."}
+	if has_active_project(province_id):
+		var existing: ProvincialProject = get_active_project(province_id)
+		var already_spine := existing != null and bool(existing.build_road_spine)
+		return {
+			"success": false,
+			"reason": "Road spine already in progress." if already_spine else "A project is already active in this province.",
+			"already_active": true,
+			"build_road_spine": already_spine,
+		}
+	var tag := investor_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "GER"
+	var p_for_target: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	if p_for_target != null:
+		if p_for_target.is_sea:
+			return {"success": false, "reason": "Road spine is land-only."}
+		var owner := str(p_for_target.owner_tag).strip_edges().to_upper()
+		var ctrl := str(p_for_target.controller_tag).strip_edges().to_upper()
+		if owner != tag and ctrl != tag and not owner.is_empty():
+			return {"success": false, "reason": "You must control the province to start the road spine."}
+	var pp_cost := get_ix1_road_spine_mandate_cost()
+	var gate: Dictionary = ix1_day0_mandate_can_start(tag)
+	if not bool(gate.get("ok", false)):
+		var current_mand := int(gate.get("mandate", 0))
+		return {"success": false, "reason": "Insufficient Mandate (%d < %d)" % [current_mand, pp_cost]}
+	if pp_cost > 0 and typeof(GameData) != TYPE_NIL:
+		# Skip 0-cost apply_pillar_shift — that helper seeds missing tags at 50.
+		GameData.apply_pillar_shift(tag, "mandate", -pp_cost, "road_spine_" + str(province_id))
+		GameData.apply_pillar_shift(tag, "ascendancy", -int(pp_cost * 0.3), "road_spine_prestige")
+	# Do not call can_start_project / start_infrastructure_project — those spend
+	# generic Invest cost_pp (Köln 73) and can no-op a visible Mandate-0 CTA.
+	var proj: ProvincialProject = start_road_spine_project(province_id, tag)
+	if proj == null:
+		return {"success": false, "reason": "Failed to create road spine project"}
 	return {
 		"success": true,
 		"reason": "Road spine project started",

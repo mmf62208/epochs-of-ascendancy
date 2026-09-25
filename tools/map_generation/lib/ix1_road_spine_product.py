@@ -73,6 +73,7 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (IDM_GD, "IX1_FIRST_SESSION_MANDATE_COST"),
     (IDM_GD, "_should_run_full_board_ai_invest"),
     (IDM_GD, "simulate_ix1_spine_days"),
+    (IDM_GD, "start_road_spine_project"),
     (SAVE_LOAD_GD, "_deferred_calendar_autosave"),
     (DAY_TICK_HARNESS, "past_freeze"),
     (GATES_SH, "HeadlessIx1RoadSpineDayTickTest"),
@@ -87,6 +88,10 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (OVERLAY_GD, "_road_layer_has_explicit_lines"),
     (RENDERER_GD, "BtnBuildRoadSpine"),
     (RENDERER_GD, "_on_build_road_spine_pressed"),
+    (RENDERER_GD, "press_build_road_spine_from_live_ui"),
+    (RENDERER_GD, "_road_spine_btn_owns_click"),
+    (RENDERER_GD, "EOA_SMOKE_SPINE_START"),
+    (RENDERER_GD, "ACTION_MODE_BUTTON_PRESS"),
     (RENDERER_GD, "_hide_unit_card_keep_map_focus"),
     (RENDERER_GD, "_dismiss_unit_card_restore_province"),
     (RENDERER_GD, "_map_prefers_province_over_unit"),
@@ -837,6 +842,58 @@ def ix1_search_go_spine_visible() -> Dict[str, Any]:
     }
 
 
+def ix1_spine_start_after_press() -> Dict[str, Any]:
+    """Live-facing: visible Build Road Spine must arm a project after press.
+
+    Play MIXED d0b1587d: chrome visible at Mandate 0, repeated clicks produced
+    no toast / progress / state. Visible-only is FAIL if start never arms.
+    """
+    ren = _read(RENDERER_GD)
+    idm = _read(IDM_GD)
+    missing: List[str] = []
+    press = _slice_func(ren, "_on_build_road_spine_pressed")
+    if "_ix1_spine_target_province_id" not in press:
+        missing.append("press_resolves_pid")
+    if "open Köln first" not in press:
+        missing.append("press_toasts_no_province")
+    if "_show_inspector_toast" not in press:
+        missing.append("press_always_toasts")
+    if "if selected_province_id < 0:\n\t\treturn" in press.replace("    ", "\t"):
+        missing.append("press_silent_no_province")
+    if "EOA_SMOKE_SPINE_START" not in ren:
+        missing.append("smoke_start_gate")
+    if "press_build_road_spine_from_live_ui" not in ren:
+        missing.append("live_press_helper")
+    if "_road_spine_btn_owns_click" not in ren:
+        missing.append("spine_owns_click")
+    if "ACTION_MODE_BUTTON_PRESS" not in _slice_func(ren, "_wire_road_spine_live_button"):
+        missing.append("press_on_down")
+    if "button_down.connect(_on_build_road_spine_pressed)" not in ren:
+        missing.append("button_down_wired")
+    if "_on_build_road_spine_gui_input" not in ren:
+        missing.append("gui_input_backup")
+    if "_road_spine_btn_owns_click" not in _slice_func(ren, "_input"):
+        missing.append("input_does_not_steal_spine")
+    start = _slice_func(idm, "try_start_road_spine")
+    if "can_start_project(" in start:
+        missing.append("try_start_uses_invest_gate")
+    if "start_road_spine_project" not in start:
+        missing.append("try_start_uses_spine_project")
+    if "start_road_spine_project" not in idm:
+        missing.append("start_road_spine_project")
+    if "can_start_project(" in _slice_func(idm, "start_road_spine_project"):
+        missing.append("spine_project_uses_invest_gate")
+    visible = ix1_search_go_spine_visible()
+    if not visible.get("ok"):
+        missing.append("spine_visible")
+    return {
+        "ok": not missing,
+        "missing": missing,
+        "hub_id": HUB_ID,
+        "spine_visible": visible,
+    }
+
+
 def ix1_search_go_live_signals() -> Dict[str, Any]:
     """Prove live LineEdit+Go/Enter signals are wired — not resolve-only.
 
@@ -1054,6 +1111,12 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
     else:
         fails.append("search_go_spine_visible")
 
+    spine_start = ix1_spine_start_after_press()
+    if spine_start.get("ok"):
+        passes.append("spine_start_after_press")
+    else:
+        fails.append("spine_start_after_press")
+
     return {
         "ok": not fails,
         "slice": SLICE_NAME,
@@ -1075,6 +1138,7 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
         "search_go_live_resolve": search_live,
         "search_go_live_signals": search_signals,
         "search_go_spine_visible": spine_visible,
+        "spine_start_after_press": spine_start,
         "parked": [
             "Dig2 pan",
             "old G polyline dig",

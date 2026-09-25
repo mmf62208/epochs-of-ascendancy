@@ -30,6 +30,7 @@ from ix1_road_spine_product import (  # noqa: E402
     ix1_search_go_live_signals,
     ix1_search_go_resolve,
     ix1_search_go_spine_visible,
+    ix1_spine_start_after_press,
     load_ix1_spec,
     movement_cost,
     shipped_api_integrity,
@@ -137,6 +138,14 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertEqual(int(gate.get("hub_id")), HUB_ID)
         p = build_ix1_road_spine_product()
         self.assertIn("search_go_spine_visible", p.get("passes") or [])
+
+    def test_spine_start_arms_after_press(self) -> None:
+        # Play MIXED d0b1587d: Build Road Spine visible at Mandate 0; clicks no-op.
+        gate = ix1_spine_start_after_press()
+        self.assertTrue(gate.get("ok"), msg=gate)
+        self.assertEqual(int(gate.get("hub_id")), HUB_ID)
+        p = build_ix1_road_spine_product()
+        self.assertIn("spine_start_after_press", p.get("passes") or [])
 
     def test_live_f5_equiv_gate_not_playtest_clock(self) -> None:
         tick = ix1_day_tick_unblocked()

@@ -60,13 +60,24 @@ func _test_source_uses_starter_cost() -> void:
 	if "IX1_FIRST_SESSION_MANDATE_COST" not in text:
 		_fail("IDM missing IX1_FIRST_SESSION_MANDATE_COST")
 		return
-	if "var pp_cost := int(preview.get(\"cost_pp\", 0))" in text and text.find("func try_start_road_spine") >= 0:
-		var spine_fn := text.find("func try_start_road_spine")
-		var next_fn := text.find("\nfunc ", spine_fn + 10)
-		var body := text.substr(spine_fn, next_fn - spine_fn if next_fn > spine_fn else text.length() - spine_fn)
-		if "preview.get(\"cost_pp\"" in body:
-			_fail("try_start_road_spine still spends generic Invest cost_pp")
-			return
+	if "start_road_spine_project" not in text:
+		_fail("IDM missing start_road_spine_project (Invest-gated start is a live no-op)")
+		return
+	var spine_fn := text.find("func try_start_road_spine")
+	if spine_fn < 0:
+		_fail("try_start_road_spine missing")
+		return
+	var next_fn := text.find("\nfunc ", spine_fn + 10)
+	var body := text.substr(spine_fn, next_fn - spine_fn if next_fn > spine_fn else text.length() - spine_fn)
+	if "can_start_project(" in body:
+		_fail("try_start_road_spine still uses generic Invest can_start_project")
+		return
+	if "preview.get(\"cost_pp\"" in body:
+		_fail("try_start_road_spine still spends generic Invest cost_pp")
+		return
+	if "start_road_spine_project" not in body:
+		_fail("try_start_road_spine does not call start_road_spine_project")
+		return
 	_pass("IDM IX-1 Mandate cost uses first-session starter API")
 
 
