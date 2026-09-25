@@ -90,18 +90,37 @@ func _ready() -> void:
 	set_process_unhandled_input(true)
 
 
-func _living_title_is_up() -> bool:
-	# Play Esc ×2 on the living title must leave Command Center visible.
-	# find_child — do not reference LivingTitleBoot class_name (-s harness parse).
-	var tree: SceneTree = get_tree()
-	if tree == null or tree.root == null:
+func _node_is_open_living_title(n: Node) -> bool:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
 		return false
-	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
-	if boot == null or not is_instance_valid(boot) or boot.is_queued_for_deletion():
+	if not str(n.name).begins_with("LivingTitleBoot"):
 		return false
-	if bool(boot.get("_closed")):
+	if bool(n.get("_closed")):
 		return false
 	return true
+
+
+func _any_open_living_title(n: Node) -> bool:
+	if _node_is_open_living_title(n):
+		return true
+	for child in n.get_children():
+		if _any_open_living_title(child):
+			return true
+	return false
+
+
+func _living_title_is_up() -> bool:
+	# Play Esc ×2 on the living title must leave Command Center visible.
+	# Walk the tree (do not use find_child — queued leftovers lie title_up=false).
+	# Do not reference LivingTitleBoot class_name (-s harness parse).
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return false
+	if tree.root != null and _any_open_living_title(tree.root):
+		return true
+	if tree.current_scene != null and _any_open_living_title(tree.current_scene):
+		return true
+	return false
 
 
 func _is_live_escape_event(event: InputEvent) -> bool:
@@ -128,13 +147,16 @@ func _input(event: InputEvent) -> void:
 		return
 	if not _is_live_escape_event(event):
 		return
+	var title_up_now: bool = _living_title_is_up()
 	print(
-		"EOA_LIVE_ESC who=MainMenu._input process_mode=%s title_up=%s closing=%s handled=before"
-		% [str(process_mode), str(_living_title_is_up()), str(_closing)]
+		"EOA_LIVE_ESC who=MainMenu._input process_mode=%s title_up=%s closing=%s tree=%s"
+		% [str(process_mode), str(title_up_now), str(_closing), str(get_tree() != null)]
 	)
-	if _living_title_is_up():
+	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
 		# Open-only while the title overlay is up (Play 3d00182 Esc ×2 toggle-close).
-		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=1 (do not _force_close)")
+		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=%s from_title_meta=%s (do not _force_close)" % [
+			str(_living_title_is_up()), str(has_meta("eoa_opened_from_living_title"))
+		])
 		get_viewport().set_input_as_handled()
 		return
 	_force_close()
@@ -150,8 +172,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		"EOA_LIVE_ESC who=MainMenu._unhandled_input process_mode=%s title_up=%s"
 		% [str(process_mode), str(_living_title_is_up())]
 	)
-	if _living_title_is_up():
-		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=1 (do not _force_close)")
+	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
+		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=%s from_title_meta=%s (do not _force_close)" % [
+			str(_living_title_is_up()), str(has_meta("eoa_opened_from_living_title"))
+		])
 		get_viewport().set_input_as_handled()
 		return
 	_force_close()

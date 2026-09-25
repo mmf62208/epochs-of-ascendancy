@@ -1623,12 +1623,7 @@ func _living_title_owns_click() -> bool:
 	# Same class as Search Go / TopInfoBar: gui_get_hovered_control can miss
 	# the living-title panel while the cursor is on Begin (Play d18cbae).
 	# Rect-first so MapRenderer._input cannot swallow the click as a map pick.
-	if not _living_title_boot_is_up():
-		return false
-	var tree_t: SceneTree = get_tree()
-	if tree_t == null or tree_t.root == null:
-		return false
-	var boot: Node = tree_t.root.find_child("LivingTitleBoot", true, false)
+	var boot: Node = _living_title_boot_node()
 	if boot == null or not is_instance_valid(boot):
 		return false
 	var vp_lt: Viewport = get_viewport()
@@ -1667,12 +1662,10 @@ func _is_live_escape_event(event: InputEvent) -> bool:
 
 
 func _route_living_title_escape() -> void:
-	var tree_e: SceneTree = get_tree()
-	if tree_e != null and tree_e.root != null:
-		var boot_e: Node = tree_e.root.find_child("LivingTitleBoot", true, false)
-		if boot_e != null and boot_e.has_method("handle_live_escape"):
-			boot_e.call("handle_live_escape")
-			return
+	var boot_e: Node = _living_title_boot_node()
+	if boot_e != null and boot_e.has_method("handle_live_escape"):
+		boot_e.call("handle_live_escape")
+		return
 	_esc_open_command_center()
 
 
@@ -18319,14 +18312,33 @@ func _toast_living_diplomacy_pick(pid: int) -> void:
 		_show_inspector_toast(str(dip.get("sentence", "Influence")), 3.5)
 
 
-func _living_title_boot_is_up() -> bool:
+func _living_title_boot_node() -> Node:
 	var tree := get_tree()
-	if tree == null or tree.root == null:
-		return false
-	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
-	if boot == null or not is_instance_valid(boot) or boot.is_queued_for_deletion():
-		return false
-	return _overlay_node_is_up(boot)
+	if tree == null:
+		return null
+	if tree.root != null:
+		var from_root: Node = _walk_open_living_title(tree.root)
+		if from_root != null:
+			return from_root
+	if tree.current_scene != null:
+		return _walk_open_living_title(tree.current_scene)
+	return null
+
+
+func _walk_open_living_title(n: Node) -> Node:
+	if n != null and is_instance_valid(n) and not n.is_queued_for_deletion():
+		if str(n.name).begins_with("LivingTitleBoot") and not bool(n.get("_closed")):
+			if _overlay_node_is_up(n):
+				return n
+		for child in n.get_children():
+			var found: Node = _walk_open_living_title(child)
+			if found != null:
+				return found
+	return null
+
+
+func _living_title_boot_is_up() -> bool:
+	return _living_title_boot_node() != null
 
 
 ## Title boot: click playable land/capital on the political map (panel stays a list too).
@@ -18337,10 +18349,7 @@ func _try_living_title_map_pick(pid: int) -> bool:
 		return false
 	if not _living_title_boot_is_up():
 		return false
-	var tree := get_tree()
-	if tree == null or tree.root == null:
-		return false
-	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
+	var boot: Node = _living_title_boot_node()
 	if boot != null and boot.has_method("select_from_province"):
 		boot.call("select_from_province", pid)
 	return true

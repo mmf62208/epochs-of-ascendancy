@@ -141,8 +141,8 @@ func _test_source_live_input_routing() -> void:
 	if mm.is_empty():
 		_fail("MainMenu source missing")
 		return
-	if "_living_title_is_up" not in mm:
-		_fail("MainMenu must see living title so Esc ×2 cannot _force_close CC")
+	if "_living_title_is_up" not in mm or "eoa_opened_from_living_title" not in mm:
+		_fail("MainMenu must keep CC while living title is up / opened-from-title meta")
 		return
 	var mm_input := _slice_func(mm, "_input")
 	if mm_input.is_empty() or "_living_title_is_up" not in mm_input:
@@ -393,6 +393,9 @@ func _test_runtime_esc_opens_cc() -> void:
 func _test_runtime_two_esc_keeps_cc() -> void:
 	# Play softpipe always presses Esc ×2. Headless single-Esc was green while
 	# live CC opened then toggle-closed (Play 3d00182 overlay unchanged).
+	var leftover_mm: Node = root.get_node_or_null("MainMenu")
+	if leftover_mm != null:
+		leftover_mm.free()
 	var title_scr: GDScript = load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
 	var title: CanvasLayer = title_scr.new() as CanvasLayer
 	title.name = "LivingTitleBoot"

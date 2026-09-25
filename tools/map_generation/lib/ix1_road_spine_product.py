@@ -540,7 +540,7 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("living_title_esc_open_only")
     if "open_command_center_stay" not in top or "_living_title_boot_is_up" not in top:
         missing.append("top_bar_cc_open_only_on_title")
-    if "_living_title_is_up" not in cc:
+    if "_living_title_is_up" not in cc or "eoa_opened_from_living_title" not in cc:
         missing.append("mainmenu_keep_cc_while_title")
     if "arm_play_clock_after_begin" not in top or "ACTION_MODE_BUTTON_PRESS" not in top:
         missing.append("top_bar_begin_arm")

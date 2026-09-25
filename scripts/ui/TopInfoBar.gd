@@ -1545,16 +1545,31 @@ func _on_load_pressed() -> void:
 
 
 func _living_title_boot_is_up() -> bool:
-	# find_child — do not reference LivingTitleBoot class_name (-s harness parse).
+	# Walk the tree (queued leftovers must not lie title_up=false).
+	# Do not reference LivingTitleBoot class_name (-s harness parse).
 	var tree: SceneTree = get_tree()
 	if tree == null or tree.root == null:
 		return false
-	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
-	if boot == null or not is_instance_valid(boot) or boot.is_queued_for_deletion():
+	return _any_open_living_title(tree.root)
+
+
+func _node_is_open_living_title(n: Node) -> bool:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
 		return false
-	if bool(boot.get("_closed")):
+	if not str(n.name).begins_with("LivingTitleBoot"):
+		return false
+	if bool(n.get("_closed")):
 		return false
 	return true
+
+
+func _any_open_living_title(n: Node) -> bool:
+	if _node_is_open_living_title(n):
+		return true
+	for child in n.get_children():
+		if _any_open_living_title(child):
+			return true
+	return false
 
 
 func _on_menu_pressed() -> void:
@@ -1590,6 +1605,8 @@ func _instance_command_center_now(refresh_list: bool = true) -> void:
 			_sync_pause_from_time_manager()
 			_update_speed_buttons()
 		)
+	if _living_title_boot_is_up():
+		menu.set_meta("eoa_opened_from_living_title", true)
 	get_tree().root.add_child(menu)
 	if refresh_list and menu.has_method("_refresh_save_list"):
 		menu.call_deferred("_refresh_save_list")

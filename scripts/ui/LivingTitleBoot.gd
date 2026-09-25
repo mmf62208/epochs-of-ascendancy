@@ -375,16 +375,27 @@ static func is_live_escape_event(event: InputEvent) -> bool:
 	return false
 
 
-## True while the living-title overlay is in the tree (Play Esc ×2 must not close CC).
-static func is_up_in_tree(tree: SceneTree) -> bool:
+## True while any living-title overlay is still open (Play Esc ×2 must not close CC).
+## Skips queued-for-deletion leftovers so find_child cannot lie title_up=false.
+static func _walk_first_open_title(n: Node) -> Node:
+	if n != null and is_instance_valid(n) and not n.is_queued_for_deletion():
+		if str(n.name).begins_with("LivingTitleBoot") and not bool(n.get("_closed")):
+			return n
+		for child in n.get_children():
+			var found: Node = _walk_first_open_title(child)
+			if found != null:
+				return found
+	return null
+
+
+static func first_open_in_tree(tree: SceneTree) -> Node:
 	if tree == null or tree.root == null:
-		return false
-	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
-	if boot == null or not is_instance_valid(boot) or boot.is_queued_for_deletion():
-		return false
-	if bool(boot.get("_closed")):
-		return false
-	return true
+		return null
+	return _walk_first_open_title(tree.root)
+
+
+static func is_up_in_tree(tree: SceneTree) -> bool:
+	return first_open_in_tree(tree) != null
 
 
 func live_routing_facts() -> Dictionary:
@@ -513,6 +524,11 @@ func _command_center_is_up() -> bool:
 
 func _ensure_command_center_stays_open() -> bool:
 	if _command_center_is_up():
+		var tree_s: SceneTree = get_tree()
+		if tree_s != null and tree_s.root != null:
+			var mm_s: Node = tree_s.root.get_node_or_null("MainMenu")
+			if mm_s != null:
+				mm_s.set_meta("eoa_opened_from_living_title", true)
 		print("EOA_LIVE_ESC who=LivingTitleBoot.stay cc already up (Play Esc ×2 open-only)")
 		return true
 	return _open_command_center_from_title()
@@ -578,6 +594,7 @@ func _instance_command_center_now() -> void:
 		return
 	menu.name = "MainMenu"
 	menu.process_mode = Node.PROCESS_MODE_ALWAYS
+	menu.set_meta("eoa_opened_from_living_title", true)
 	tree.root.add_child(menu)
 
 
@@ -663,9 +680,19 @@ func _finish(out: Dictionary) -> void:
 	if _closed:
 		return
 	_closed = true
+	_clear_opened_from_title_meta()
 	_center_on_player(str(out.get("player_tag", _tag)))
 	boot_closed.emit(out)
 	queue_free()
+
+
+func _clear_opened_from_title_meta() -> void:
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.root == null:
+		return
+	var mm: Node = tree.root.get_node_or_null("MainMenu")
+	if mm != null and mm.has_meta("eoa_opened_from_living_title"):
+		mm.remove_meta("eoa_opened_from_living_title")
 
 
 func _center_on_player(tag: String) -> void:
