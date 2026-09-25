@@ -6,6 +6,8 @@ extends CanvasLayer
 
 const MENU_WIDTH := 960.0
 const MENU_HEIGHT := 680.0
+## Above living title (120) and UILayer HUD (110) so Esc→CC is not buried under the bar.
+const COMMAND_CENTER_LAYER := 130
 const LIVING_CC_NATIONS := ["GER", "ENG", "FRA", "JAP", "USA", "SOV", "ITA", "POL"]
 const LIVING_CC_ERAS := [1918, 1936, 2026]
 
@@ -78,7 +80,7 @@ var _era_btns: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	layer = 100
+	layer = COMMAND_CENTER_LAYER
 	_build_ui()
 	_ensure_dialogs()
 	_pause_game(true)
@@ -88,20 +90,96 @@ func _ready() -> void:
 	set_process_unhandled_input(true)
 
 
+func _node_is_open_living_title(n: Node) -> bool:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+		return false
+	if not str(n.name).begins_with("LivingTitleBoot"):
+		return false
+	if bool(n.get("_closed")):
+		return false
+	return true
+
+
+func _any_open_living_title(n: Node) -> bool:
+	if _node_is_open_living_title(n):
+		return true
+	for child in n.get_children():
+		if _any_open_living_title(child):
+			return true
+	return false
+
+
+func _living_title_is_up() -> bool:
+	# Play Esc ×2 on the living title must leave Command Center visible.
+	# Walk the tree (do not use find_child — queued leftovers lie title_up=false).
+	# Do not reference LivingTitleBoot class_name (-s harness parse).
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return false
+	if tree.root != null and _any_open_living_title(tree.root):
+		return true
+	if tree.current_scene != null and _any_open_living_title(tree.current_scene):
+		return true
+	return false
+
+
+func _is_live_escape_event(event: InputEvent) -> bool:
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
+	if event != null and event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
 func _input(event: InputEvent) -> void:
 	if _closing:
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
-		_force_close()
+	if not _is_live_escape_event(event):
+		return
+	var title_up_now: bool = _living_title_is_up()
+	print(
+		"EOA_LIVE_ESC who=MainMenu._input process_mode=%s title_up=%s closing=%s tree=%s"
+		% [str(process_mode), str(title_up_now), str(_closing), str(get_tree() != null)]
+	)
+	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
+		# Open-only while the title overlay is up (Play 3d00182 Esc ×2 toggle-close).
+		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=%s from_title_meta=%s (do not _force_close)" % [
+			str(_living_title_is_up()), str(has_meta("eoa_opened_from_living_title"))
+		])
 		get_viewport().set_input_as_handled()
+		return
+	_force_close()
+	get_viewport().set_input_as_handled()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _closing:
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
-		_force_close()
+	if not _is_live_escape_event(event):
+		return
+	print(
+		"EOA_LIVE_ESC who=MainMenu._unhandled_input process_mode=%s title_up=%s"
+		% [str(process_mode), str(_living_title_is_up())]
+	)
+	if _living_title_is_up() or has_meta("eoa_opened_from_living_title"):
+		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=%s from_title_meta=%s (do not _force_close)" % [
+			str(_living_title_is_up()), str(has_meta("eoa_opened_from_living_title"))
+		])
 		get_viewport().set_input_as_handled()
+		return
+	_force_close()
+	get_viewport().set_input_as_handled()
 
 
 func _build_ui() -> void:

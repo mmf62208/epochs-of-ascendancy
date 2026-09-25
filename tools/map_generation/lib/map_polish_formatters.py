@@ -116,7 +116,11 @@ def format_invest_panel_state(
     target = int(status.get("target_level", cur_infra + 1))
     sabotaged = bool(status.get("is_sabotaged", False))
     sab_note = " ⚠ Sabotage slowing progress" if sabotaged else ""
-    label = "Infra Project: %d%% → Lv.%d (ETA %d days)%s" % (pct, target, eta, sab_note)
+    spine = bool(status.get("build_road_spine", False))
+    if spine:
+        label = "Road Spine: %d%% → Lv.%d (ETA %d days)%s" % (pct, target, eta, sab_note)
+    else:
+        label = "Infra Project: %d%% → Lv.%d (ETA %d days)%s" % (pct, target, eta, sab_note)
     mods = status.get("modifiers") if isinstance(status.get("modifiers"), dict) else {}
     mod_bits = format_investment_modifier_bits(mods)
     # Panel uses slightly different eng format historically ("Eng +x" without sign on positive)
@@ -144,7 +148,7 @@ def format_invest_panel_state(
         "show_cancel": True,
         "show_progress": True,
         "modifiers_label": modifiers_label,
-        "button_text": "Project Active",
+        "button_text": "Building Road Spine" if spine else "Project Active",
         "button_disabled": True,
         "mod_bits": mod_bits,
     }

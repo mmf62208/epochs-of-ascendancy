@@ -146,6 +146,9 @@ const SAVE_GAME_VERSION := "0.2-dev"   # Bumped for richer metadata support
 const DEFAULT_SLOT := "quicksave"
 
 var _last_save_path: String = ""
+var _calendar_autosave_pending: bool = false
+var _calendar_autosave_gathers: int = 0
+var _calendar_autosave_live_f5_skips: int = 0
 
 func _ready() -> void:
 	_ensure_save_dir()
@@ -159,17 +162,47 @@ func _ready() -> void:
 				and not TimeManager.game_day_advanced.is_connected(_on_day_advanced_for_autosave):
 			TimeManager.game_day_advanced.connect(_on_day_advanced_for_autosave)
 
+
 func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 0) -> void:
 	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
 		return
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		# Compact 20d Maginot clock: save_game_detailed every 7d hung the -s harness.
 		return
+	# Live editor/export Play (X11 / llvmpipe): full gather + pretty JSON of the
+	# 3520 board + hierarchy OOMs (~10GB RSS) at day +5/+6. Distinct from the
+	# already-fixed +2 AI softpipe. Player Ctrl+S is unchanged.
+	if _should_skip_live_f5_calendar_autosave():
+		_calendar_autosave_live_f5_skips += 1
+		return
 	var elapsed := 0
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
 		elapsed = int(TimeManager.get_total_days_elapsed())
 	if elapsed <= 0 or (elapsed % 7) != 0:
 		return
+	# Isolate the gather from day_emit so the F5 hour clock can keep moving
+	# (day-7 save_game_detailed used to freeze the spine session at 20:00).
+	if _calendar_autosave_pending:
+		return
+	_calendar_autosave_pending = true
+	call_deferred("_deferred_calendar_autosave", elapsed)
+
+
+func _should_skip_live_f5_calendar_autosave() -> bool:
+	if typeof(TimeManager) == TYPE_NIL:
+		return false
+	if TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
+		return true
+	return false
+
+
+func _deferred_calendar_autosave(elapsed: int) -> void:
+	_calendar_autosave_pending = false
+	# Re-check: the deferred frame may still be live F5 / softpipe.
+	if _should_skip_live_f5_calendar_autosave():
+		_calendar_autosave_live_f5_skips += 1
+		return
+	_calendar_autosave_gathers += 1
 	var res := save_game_detailed("autosave")
 	if res.get("ok", false):
 		print("SaveLoadManager: Calendar autosave day=%d -> autosave.json" % elapsed)
@@ -181,6 +214,9 @@ func _on_day_advanced_for_autosave(_year: int = 0, _month: int = 0, _day: int = 
 func _on_year_advanced_for_autosave(_year: int) -> void:
 	# Autosave to a fixed slot; keeps only the latest autosave for simplicity.
 	# Silent on success (print only), non-spammy toast on failure.
+	if _should_skip_live_f5_calendar_autosave():
+		_calendar_autosave_live_f5_skips += 1
+		return
 	var res := save_game_detailed("autosave")
 	if res.get("ok", false):
 		print("SaveLoadManager: Autosaved on year change -> autosave.json")
@@ -208,10 +244,13 @@ func _notification(what: int) -> void:
 
 func _skip_quit_autosave() -> bool:
 	# Maginot -s / year multi-AI: save_game_detailed on EXIT_TREE hung after RESULT=PASS.
-	# Graphical F5 quit still autosaves. Calendar 7d autosave is a separate path.
+	# Live F5 / softpipe: same gather OOMs after a +6d soak — skip automatic quit write.
+	# Explicit Ctrl+S still uses save_game_detailed.
 	if OS.get_environment("EOA_CALENDAR_AUTOSAVE").strip_edges() == "0":
 		return true
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return true
+	if _should_skip_live_f5_calendar_autosave():
 		return true
 	return false
 
@@ -599,6 +638,12 @@ func _gather_save_data() -> Dictionary:
 	# --- GameData (demographic/policy state for Ascendancy Initiatives, Policy/Law screen, Trust Erosion, manpower, relocation/settlement) ---
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_save_data"):
 		data["game_data"] = GameData.get_save_data()
+		# Live F5 / softpipe: hierarchy dump is 3×3520 string-key maps and is
+		# era-reseedable. Drop it so Ctrl+S cannot spike RSS after a soak.
+		if _should_skip_live_f5_calendar_autosave() and data["game_data"] is Dictionary:
+			var gd_blob: Dictionary = data["game_data"]
+			gd_blob["hierarchy_membership_live"] = {}
+			data["game_data"] = gd_blob
 
 	# --- Leaders ---
 	if typeof(LeaderManager) != TYPE_NIL:
@@ -633,9 +678,11 @@ func _gather_save_data() -> Dictionary:
 		data["province_editor"] = pe.get_save_data()
 
 	# --- Pass 22: MapRenderer UI (compare slots, tint intensities, last mapmode) ---
-	var mr_save := get_tree().get_first_node_in_group("map_renderer") if get_tree() != null else null
-	if mr_save and mr_save.has_method("get_save_data"):
-		data["map_ui"] = mr_save.get_save_data()
+	# Live F5: skip route-history / minimap blob (grows every day_emit).
+	if not _should_skip_live_f5_calendar_autosave():
+		var mr_save := get_tree().get_first_node_in_group("map_renderer") if get_tree() != null else null
+		if mr_save and mr_save.has_method("get_save_data"):
+			data["map_ui"] = mr_save.get_save_data()
 
 	# --- Pass 24: RelationsManager (formal alliances / guarantees / CRS pairs) ---
 	if typeof(RelationsManager) != TYPE_NIL and RelationsManager.has_method("get_save_data"):
@@ -1364,7 +1411,10 @@ func save_game_detailed(slot_name: String = DEFAULT_SLOT) -> Dictionary:
 		lw_out["last_aar"] = {}
 	data["land_war"] = lw_out
 
-	var json_text := JSON.stringify(data, "\t")
+	# Autosave / live F5: compact JSON (no tab indent). Pretty-print of the
+	# 3520-province blob doubled peak RSS on llvmpipe Play soaks.
+	var indent := "" if (safe_slot == "autosave" or _should_skip_live_f5_calendar_autosave()) else "\t"
+	var json_text := JSON.stringify(data, indent)
 	if json_text.is_empty() or json_text == "null":
 		var jmsg := "JSON stringify failed"
 		push_error("SaveLoadManager: %s" % jmsg)

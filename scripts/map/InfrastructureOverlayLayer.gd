@@ -62,11 +62,14 @@ var city_layer: Node2D
 var sites_layer: Node2D  # For airfields, ports, shipyards etc. as toggleable/editable vector elements (runways, docks) in addition to the icon drawing in _draw.
 ## Quiet player factory/port/airfield marks. Visible at operational zoom even when show_sites is off.
 var industry_layer: Node2D
+## IX-1 queued/construction preview. Persistent _draw child — never Line2D churn on zoom.
+var spine_preview_layer: Node2D
 
 ## Era band for sparse 1918 vs default 1936 vs dense 2026+ infra visualization.
 var _last_era_band: int = -1
 var _infra_rebuild_scheduled: bool = false
 var _infra_light_rebuild_scheduled: bool = false
+var _road_rebuild_busy: bool = false
 var _last_infra_rebuild_msec: int = 0
 const INFRA_REBUILD_MIN_INTERVAL_MS := 1200
 ## ColorRect city nodes (4500+) freeze pan/zoom; _draw fallback is cheaper for playtest.
@@ -74,7 +77,18 @@ const BUILD_CITY_NODES := false
 const DRAW_CITY_FALLBACK := false  # When BUILD_CITY_NODES off, skip per-province grey rect fallback (was 472×N rects per redraw).
 const MAX_LAYER_PROVINCES := 120
 const MAX_CITY_BUILDINGS_PER_PROVINCE := 4
+const MAX_RAIL_TIES_PER_EDGE := 8
+## Ix1SpinePreviewDraw hard caps — a 0/NaN dash step on world GIS cents
+## (Köln ~4254,944) froze the windowed canvas and climbed RSS to OOM.
+const IX1_PREVIEW_MAX_SEGS := 12
+const IX1_PREVIEW_MAX_HATCHES := 8
+const IX1_PREVIEW_MIN_STEP := 1.0
+const IX1_PREVIEW_DASH := 6.0
+const IX1_PREVIEW_GAP := 4.0
 var _player_industry_marks: Array = []
+var _layer_provs_cache: Dictionary = {}
+var _layer_provs_cache_msec: int = 0
+const LAYER_PROV_CACHE_MS := 400
 
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
@@ -143,6 +157,13 @@ func _ensure_sub_layers():
             industry_layer.name = "PlayerIndustryMarks"
             industry_layer.z_index = 5
             add_child(industry_layer)
+    if spine_preview_layer == null:
+        spine_preview_layer = get_node_or_null("Ix1SpinePreview")
+        if spine_preview_layer == null:
+            spine_preview_layer = Ix1SpinePreviewDraw.new()
+            spine_preview_layer.name = "Ix1SpinePreview"
+            spine_preview_layer.z_index = 6
+            add_child(spine_preview_layer)
 
 func _apply_layer_visibilities():
     _update_sub_layer_visibilities()
@@ -161,7 +182,12 @@ func _update_sub_layer_visibilities() -> void:
     # Operational zoom: roads appear earlier so arteries are readable without deep zoom.
     # World-class pass: slightly earlier road/rail visibility for theater-scale reading.
     if road_layer:
-        road_layer.visible = show_roads and z > 0.10
+        # IX-1: player-built explicit spines stay visible at playable mid-zoom (not F10-only).
+        road_layer.visible = (show_roads or _road_layer_has_explicit_lines()) and z > 0.10
+    if spine_preview_layer:
+        # Visibility only — never rebuild/create nodes on zoom (silent-exit class).
+        var prev_state := str(spine_preview_layer.get("state"))
+        spine_preview_layer.visible = prev_state in ["queued", "construction"] and z > 0.10
     if rail_layer:
         rail_layer.visible = show_rails and z > 0.14
     if city_layer or sites_layer:
@@ -382,12 +408,24 @@ func _get_visible_provinces() -> Dictionary:
 func _get_provinces_for_layers() -> Dictionary:
     if map_manager == null:
         return {}
+    var now_ms := Time.get_ticks_msec()
+    if not _layer_provs_cache.is_empty() and now_ms - _layer_provs_cache_msec < LAYER_PROV_CACHE_MS:
+        return _layer_provs_cache
     var all: Dictionary = map_manager.get_all_provinces()
     var out: Dictionary = {}
+    # Always keep the IX-1 corridor so Bonn–Köln–Leverkusen explicit edges paint
+    # even if major-owner culling drops them. Essen 710403 stays off-spine.
+    for spine_pid in [710416, 710417, 710418]:
+        if all.has(spine_pid):
+            out[spine_pid] = all[spine_pid]
     var major_tags: Array[String] = ["GER", "FRA", "ENG", "SOV", "USA", "ITA", "POL", "JAP"]
     for tag in major_tags:
+        if out.size() >= MAX_LAYER_PROVINCES:
+            break
         if map_manager.has_method("get_provinces_by_owner"):
             for pid in map_manager.get_provinces_by_owner(tag):
+                if out.size() >= MAX_LAYER_PROVINCES:
+                    break
                 if all.has(pid) and not out.has(pid):
                     out[pid] = all[pid]
     if game_data and game_data.has_method("get_provinces_with_active_riots"):
@@ -413,21 +451,30 @@ func _get_provinces_for_layers() -> Dictionary:
             var pick_pid: int = int(entry.get("pid", -1))
             if all.has(pick_pid):
                 out[pick_pid] = all[pick_pid]
+    _layer_provs_cache = out
+    _layer_provs_cache_msec = now_ms
     return out
 
 ## Rebuild the road layer using explicit built roads from provinces (or fallback to infra level).
 ## Call this after any "build road" decision or project complete.
 func rebuild_road_layer():
+    if _road_rebuild_busy:
+        return
+    _road_rebuild_busy = true
+    _rebuild_road_layer_inner()
+    _road_rebuild_busy = false
+
+
+func _rebuild_road_layer_inner() -> void:
     if road_layer == null:
         _ensure_sub_layers()
+    if road_layer == null:
+        return
     # Robust clear: remove immediately then queue_free to prevent accumulation on rapid successive rebuilds (e.g. many data updates in test harness)
     var kids = road_layer.get_children()
     for k in kids:
         road_layer.remove_child(k)
         k.queue_free()
-
-    if not show_roads:
-        return  # don't populate nodes for hidden layer (saves resources when toggled off)
 
     if map_manager == null:
         return
@@ -460,8 +507,9 @@ func rebuild_road_layer():
             # Check explicit built_roads or fallback to high infra
             var has_explicit = (nid in p.built_road_neighbors) or (pid in (n.built_road_neighbors if n else []))
             var avg_infra = (p.infrastructure + n.infrastructure) / 2.0
-            if not has_explicit and avg_infra < road_min:
-                continue
+            if not has_explicit:
+                if not show_roads or avg_infra < road_min:
+                    continue
             var c2 = map_manager.get_province_centroid(nid)
             # Art-team road palette (F5/G spiderweb fix):
             # Supply mode draws ONLY corridor edges (bright). No adjacency mesh, no spines.
@@ -506,8 +554,13 @@ func rebuild_road_layer():
                 line.begin_cap_mode = Line2D.LINE_CAP_ROUND
                 line.end_cap_mode = Line2D.LINE_CAP_ROUND
             else:
-                # Infra mapmode only (political never rebuilds roads): dust roads, never neon.
-                if tier >= 2:
+                # Explicit IX-1 spines stay readable on political at Home zoom.
+                # Inferred high-infra dust only when Infra mapmode (show_roads) is on.
+                if has_explicit:
+                    line.default_color = Color(0.50, 0.36, 0.14, 0.82)
+                    line.width = 2.8
+                    line.z_index = 3
+                elif tier >= 2:
                     line.default_color = Color(0.40, 0.34, 0.22, 0.38)
                     line.width = 2.0
                     line.z_index = 2
@@ -524,6 +577,49 @@ func rebuild_road_layer():
             line.set_meta("explicit", has_explicit)
             line.set_meta("tier", tier)
             line.set_meta("corridor", on_corridor)
+            road_layer.add_child(line)
+    # Explicit IX-1 edges even if adjacency cache missed the corridor.
+    _paint_explicit_ix1_spine_if_missing(provinces, drawn)
+    if road_layer.get_child_count() > 0 and _get_current_zoom() > 0.10:
+        road_layer.visible = true
+
+
+func _paint_explicit_ix1_spine_if_missing(provinces: Dictionary, drawn: Dictionary) -> void:
+    if road_layer == null or map_manager == null:
+        return
+    for pid in [710416, 710417, 710418]:
+        var p: Province = provinces.get(pid) as Province
+        if p == null:
+            p = map_manager.get_province(pid) if map_manager.has_method("get_province") else null
+        if p == null:
+            continue
+        var c1: Vector2 = map_manager.get_province_centroid(pid)
+        if c1 == Vector2.ZERO:
+            c1 = p.coordinates
+        for nid in p.built_road_neighbors:
+            var key := "%d_%d" % [mini(pid, nid), maxi(pid, nid)]
+            if drawn.has(key):
+                continue
+            drawn[key] = true
+            var n: Province = provinces.get(nid) as Province
+            if n == null and map_manager.has_method("get_province"):
+                n = map_manager.get_province(nid)
+            if n == null:
+                continue
+            var c2: Vector2 = map_manager.get_province_centroid(nid)
+            if c2 == Vector2.ZERO:
+                c2 = n.coordinates
+            var line := Line2D.new()
+            line.points = [c1, c2]
+            line.antialiased = true
+            line.default_color = Color(0.50, 0.36, 0.14, 0.82)
+            line.width = 2.8
+            line.z_index = 3
+            line.set_meta("p1", pid)
+            line.set_meta("p2", nid)
+            line.set_meta("explicit", true)
+            line.set_meta("tier", 2)
+            line.set_meta("corridor", false)
             road_layer.add_child(line)
 
 ## Similar for rails - higher threshold, distinct style (e.g. dashed via multiple segments or color)
@@ -581,9 +677,13 @@ func rebuild_rail_layer():
             line.set_meta("p2", nid)
             line.set_meta("explicit", has_explicit)
             rail_layer.add_child(line)
-            # Simple ties for rail look
+            # Simple ties for rail look. Cap hard — a 0/NaN tie_step used to
+            # allocate unbounded Line2D children (windowed OOM class).
             var dist = c1.distance_to(c2)
-            var steps = max(2, int(dist / tie_step))
+            if not is_finite(dist) or dist < 1.0:
+                continue
+            var safe_step := maxf(float(tie_step), 8.0)
+            var steps = clampi(maxi(2, int(dist / safe_step)), 2, MAX_RAIL_TIES_PER_EDGE)
             for s in range(1, steps):
                 var t = float(s) / steps
                 var mid = c1.lerp(c2, t)
@@ -843,6 +943,131 @@ func find_road_node(p1: int, p2: int) -> Line2D:
             return child
     return null
 
+
+func collect_explicit_road_edges() -> Array[Dictionary]:
+    var out: Array[Dictionary] = []
+    if road_layer == null:
+        return out
+    var seen: Dictionary = {}
+    for child in road_layer.get_children():
+        if not (child is Line2D):
+            continue
+        if not bool(child.get_meta("explicit", false)):
+            continue
+        var a := int(child.get_meta("p1", -1))
+        var b := int(child.get_meta("p2", -1))
+        if a <= 0 or b <= 0:
+            continue
+        var key := "%d_%d" % [mini(a, b), maxi(a, b)]
+        if seen.has(key):
+            continue
+        seen[key] = true
+        out.append({"a": mini(a, b), "b": maxi(a, b)})
+    return out
+
+
+func ix1_spine_roadlayer_report() -> Dictionary:
+    if road_layer == null:
+        _ensure_sub_layers()
+    var bonn_koln := find_road_node(710417, 710416) != null
+    var koln_lev := find_road_node(710417, 710418) != null
+    var essen_hit := find_road_node(710417, 710403) != null
+    return {
+        "ok": bonn_koln and koln_lev and not essen_hit,
+        "bonn_koln": bonn_koln,
+        "koln_leverkusen": koln_lev,
+        "essen_edge": essen_hit,
+        "child_count": road_layer.get_child_count() if road_layer else 0,
+        "explicit_edges": collect_explicit_road_edges(),
+    }
+
+
+func set_ix1_spine_preview(state: String, pid: int, pct: float) -> void:
+    # Incremental: update 2-edge _draw only. Never rebuild RoadLayer / never Line2D.
+    _ensure_sub_layers()
+    if spine_preview_layer == null:
+        return
+    var cents: Dictionary = {}
+    if map_manager != null and map_manager.has_method("get_province_centroid"):
+        for spine_pid in [710416, 710417, 710418]:
+            var c: Vector2 = map_manager.get_province_centroid(spine_pid)
+            if c == Vector2.ZERO and map_manager.has_method("get_province"):
+                var p: Province = map_manager.get_province(spine_pid)
+                if p != null:
+                    c = p.coordinates
+            if typeof(c) != TYPE_VECTOR2 or not (is_finite(c.x) and is_finite(c.y)):
+                c = Vector2.ZERO
+            cents[spine_pid] = c
+    if spine_preview_layer.has_method("setup_spine"):
+        spine_preview_layer.call("setup_spine", state, clampf(pct, 0.0, 100.0), pid, cents)
+    var z := _get_current_zoom()
+    if not is_finite(z):
+        z = 1.0
+    var st := state.strip_edges().to_lower()
+    spine_preview_layer.visible = st in ["queued", "construction"] and z > 0.10
+
+
+func ix1_preview_loop_caps() -> Dictionary:
+    return {
+        "max_segs": IX1_PREVIEW_MAX_SEGS,
+        "max_hatches": IX1_PREVIEW_MAX_HATCHES,
+        "min_step": IX1_PREVIEW_MIN_STEP,
+        "dash": IX1_PREVIEW_DASH,
+        "gap": IX1_PREVIEW_GAP,
+        "antialiased": false,
+        "relative_hub": true,
+    }
+
+
+func refresh_ix1_spine_preview() -> void:
+    # Zoom-safe: queue_redraw only. No child create/free.
+    if spine_preview_layer != null and spine_preview_layer.has_method("redraw_spine"):
+        spine_preview_layer.call("redraw_spine")
+
+
+func ix1_spine_preview_report() -> Dictionary:
+    _ensure_sub_layers()
+    var st := ""
+    var pct := 0.0
+    var line2d_n := 0
+    var edges: Array = []
+    if spine_preview_layer != null:
+        st = str(spine_preview_layer.get("state"))
+        pct = float(spine_preview_layer.get("pct"))
+        for ch in spine_preview_layer.get_children():
+            if ch is Line2D:
+                line2d_n += 1
+        if spine_preview_layer.has_method("preview_edges"):
+            edges = spine_preview_layer.call("preview_edges")
+    var bonn_koln := false
+    var koln_lev := false
+    var essen_hit := false
+    for e in edges:
+        if typeof(e) != TYPE_DICTIONARY:
+            continue
+        var a := int(e.get("a", -1))
+        var b := int(e.get("b", -1))
+        var lo := mini(a, b)
+        var hi := maxi(a, b)
+        if lo == 710416 and hi == 710417:
+            bonn_koln = true
+        if lo == 710417 and hi == 710418:
+            koln_lev = true
+        if lo == 710403 or hi == 710403:
+            essen_hit = true
+    var in_progress := st in ["queued", "construction"]
+    return {
+        "ok": (in_progress and bonn_koln and koln_lev and not essen_hit and line2d_n == 0) or st == "built" or st == "",
+        "state": st,
+        "pct": pct,
+        "bonn_koln": bonn_koln,
+        "koln_leverkusen": koln_lev,
+        "essen_edge": essen_hit,
+        "line2d_children": line2d_n,
+        "uses_draw": true,
+        "visible": spine_preview_layer.visible if spine_preview_layer != null else false,
+    }
+
 func find_rail_node(p1: int, p2: int) -> Line2D:
     if not rail_layer: return null
     for child in rail_layer.get_children():
@@ -861,6 +1086,22 @@ func find_site_nodes(province_id: int) -> Array:
 
 func _on_province_data_changed(_pid: int, what: String):
     if what in ["infrastructure", "development", "special_site", "infrastructure_project", "effects", "all"]:
+        if what == "infrastructure_project":
+            # Spine start/progress is preview _draw only. A light RoadLayer /
+            # sites rebuild here flushed the windowed canvas into the hang/OOM.
+            var spine_live := false
+            if infrastructure_manager != null:
+                if infrastructure_manager.has_method("get_active_project"):
+                    var live_proj: Variant = infrastructure_manager.call("get_active_project", _pid)
+                    if live_proj != null and live_proj is Object and "build_road_spine" in live_proj:
+                        spine_live = bool(live_proj.build_road_spine)
+                if not spine_live and infrastructure_manager.has_method("get_ix1_spine_visual_state"):
+                    var st := str(infrastructure_manager.call("get_ix1_spine_visual_state"))
+                    spine_live = st in ["queued", "construction"]
+            if spine_live:
+                if spine_preview_layer != null and spine_preview_layer.has_method("redraw_spine"):
+                    spine_preview_layer.call("redraw_spine")
+                return
         if what in ["development", "special_site", "all"]:
             _schedule_rebuild_all_infra_layers()
         elif what in ["infrastructure", "infrastructure_project"]:
@@ -929,16 +1170,20 @@ func set_show_proposed_splits(enabled: bool):
 ## Toggle infrastructure sub-layers. Called from DebugOverlay, options, or hotkeys.
 ## Now properly controls the Node2D sub-layer visibility (RoadLayer etc) for true toggle + node editing.
 func set_show_roads(enabled: bool):
-    var was_on = show_roads
     show_roads = enabled
-    if road_layer:
-        road_layer.visible = show_roads
-    if show_roads and not was_on:
-        rebuild_road_layer()
-    elif not show_roads:
-        # Political F1 / hide: wipe Line2D children so faint roads cannot linger.
-        _clear_road_layer_children()
+    # Always rebuild: inferred mesh only when enabled; explicit IX-1 spines stay.
+    rebuild_road_layer()
+    _update_sub_layer_visibilities()
     queue_redraw()
+
+
+func _road_layer_has_explicit_lines() -> bool:
+    if road_layer == null:
+        return false
+    for c in road_layer.get_children():
+        if bool(c.get_meta("explicit", false)):
+            return true
+    return false
 
 
 func _clear_road_layer_children() -> void:
@@ -1694,3 +1939,125 @@ class IndustryMarksDraw extends Node2D:
                 draw_line(center + Vector2(-12, 8), center + Vector2(12, 8), Color(0.3, 0.28, 0.25, 0.85), 2.2)
             if bool(row.get("air", false)):
                 draw_line(center + Vector2(-10, 0), center + Vector2(10, 0), Color(0.25, 0.25, 0.35, 0.9), 2.0)
+
+
+## IX-1 queued / construction preview. Two corridor edges only. `_draw` only —
+## never Line2D children, never rebuilt by rebuild_road_layer (zoom silent-exit).
+## Draws in hub-local space so the CanvasItem AABB stays tiny (world GIS cents
+## are ~4254,944 — absolute AA lines froze the windowed main thread + OOM).
+class Ix1SpinePreviewDraw extends Node2D:
+    var state: String = ""
+    var pct: float = 0.0
+    var hub_pid: int = 710417
+    var cents: Dictionary = {}
+    var last_draw_segs: int = 0
+    var _in_draw: bool = false
+
+    func setup_spine(new_state: String, new_pct: float, pid: int, new_cents: Dictionary) -> void:
+        state = new_state.strip_edges().to_lower()
+        pct = clampf(new_pct, 0.0, 100.0)
+        hub_pid = pid if pid > 0 else 710417
+        cents = new_cents.duplicate()
+        var hub_c: Vector2 = _as_finite_vec(cents.get(hub_pid, Vector2.ZERO))
+        # Hub-local draw: child AABB is ~8u, not a 4k×1k world box.
+        if hub_c != Vector2.ZERO:
+            position = hub_c
+        if not _in_draw:
+            queue_redraw()
+
+    func redraw_spine() -> void:
+        if not _in_draw:
+            queue_redraw()
+
+    func preview_edges() -> Array:
+        if state not in ["queued", "construction"]:
+            return []
+        return [
+            {"a": 710416, "b": 710417, "kind": state},
+            {"a": 710417, "b": 710418, "kind": state},
+        ]
+
+    func _as_finite_vec(v: Variant) -> Vector2:
+        if typeof(v) != TYPE_VECTOR2:
+            return Vector2.ZERO
+        var vec: Vector2 = v
+        if not is_finite(vec.x) or not is_finite(vec.y):
+            return Vector2.ZERO
+        return vec
+
+    func _draw() -> void:
+        if _in_draw:
+            return
+        _in_draw = true
+        last_draw_segs = 0
+        if state == "built" or state.is_empty():
+            _in_draw = false
+            return
+        var origin: Vector2 = position
+        var pairs: Array = [[710417, 710416], [710417, 710418]]
+        for pair in pairs:
+            var a_abs: Vector2 = _as_finite_vec(cents.get(int(pair[0]), Vector2.ZERO))
+            var b_abs: Vector2 = _as_finite_vec(cents.get(int(pair[1]), Vector2.ZERO))
+            if a_abs == Vector2.ZERO and b_abs == Vector2.ZERO:
+                continue
+            var a: Vector2 = a_abs - origin
+            var b: Vector2 = b_abs - origin
+            if not is_finite(a.x) or not is_finite(b.x):
+                continue
+            if state == "queued":
+                _draw_spine_dashed(a, b, Color(0.55, 0.48, 0.28, 0.45), 2.0)
+            else:
+                var t := clampf(pct / 100.0, 0.06, 1.0)
+                var mid: Vector2 = a.lerp(b, t)
+                draw_line(a, mid, Color(0.82, 0.58, 0.18, 0.90), 3.0, false)
+                last_draw_segs += 1
+                _draw_spine_hatches(a, mid)
+                if t < 0.999:
+                    _draw_spine_dashed(mid, b, Color(0.55, 0.42, 0.18, 0.50), 2.1)
+        _in_draw = false
+
+    func _draw_spine_dashed(from: Vector2, to: Vector2, col: Color, width: float) -> void:
+        var delta: Vector2 = to - from
+        var length := delta.length()
+        if not is_finite(length) or length < 0.75:
+            return
+        var dir: Vector2 = delta / length
+        if not is_finite(dir.x) or not is_finite(dir.y):
+            return
+        var dash := IX1_PREVIEW_DASH
+        var gap := IX1_PREVIEW_GAP
+        var step := maxf(dash + gap, IX1_PREVIEW_MIN_STEP)
+        if not is_finite(step) or step < IX1_PREVIEW_MIN_STEP:
+            step = IX1_PREVIEW_MIN_STEP
+        var walked := 0.0
+        var n := 0
+        while walked < length and n < IX1_PREVIEW_MAX_SEGS:
+            var a: Vector2 = from + dir * walked
+            var b: Vector2 = from + dir * minf(walked + dash, length)
+            if is_finite(a.x) and is_finite(b.x):
+                draw_line(a, b, col, width, false)
+                last_draw_segs += 1
+            walked += step
+            n += 1
+
+    func _draw_spine_hatches(from: Vector2, to: Vector2) -> void:
+        var delta: Vector2 = to - from
+        var length := delta.length()
+        if not is_finite(length) or length < 2.0:
+            return
+        var dir: Vector2 = delta / length
+        if not is_finite(dir.x) or not is_finite(dir.y):
+            return
+        var perp := Vector2(-dir.y, dir.x) * 4.5
+        var step := maxf(length / 8.0, IX1_PREVIEW_MIN_STEP)
+        if not is_finite(step) or step < IX1_PREVIEW_MIN_STEP:
+            step = IX1_PREVIEW_MIN_STEP
+        var walked := step
+        var n := 0
+        while walked < length and n < IX1_PREVIEW_MAX_HATCHES:
+            var p: Vector2 = from + dir * walked
+            if is_finite(p.x):
+                draw_line(p - perp, p + perp, Color(0.90, 0.70, 0.22, 0.70), 1.4, false)
+                last_draw_segs += 1
+            walked += step
+            n += 1

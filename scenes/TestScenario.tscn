@@ -14,6 +14,6 @@ script = ExtResource("2_wna7v")
 [node name="WorldMap" parent="." unique_id=504288333 instance=ExtResource("3_45mq6")]
 
 [node name="UILayer" type="CanvasLayer" parent="." unique_id=1002338707]
-layer = 10
+layer = 110
 
 [node name="TopInfoBar" parent="UILayer" unique_id=204131638 instance=ExtResource("4_topbar")]

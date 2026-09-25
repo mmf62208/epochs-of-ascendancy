@@ -102,6 +102,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_flanders_nord_land_uniformity_product \
     tools.map_generation.tests.test_seas_coarsen_feed8_ligurian_product \
     tools.map_generation.tests.test_se_england_shire_land_uniformity_product \
+    tools.map_generation.tests.test_ix1_road_spine_product \
     tools.map_generation.tests.test_world_accurate_capital_pick_product \
     tools.map_generation.tests.test_world_accurate_strategic_and_assault \
     tools.map_generation.tests.test_world_accurate_multi_front_and_deploy \
@@ -195,7 +196,7 @@ if [[ ! -x tools/run_godot.sh ]]; then
   log "WARN: tools/run_godot.sh missing; skipping Godot steps"
 else
   run_step launch_pick \
-    tools/run_godot.sh --headless --path . -s res://tools/map_manager_pick_harness_accurate.gd || fail
+    tools/run_godot.sh --headless -s res://tools/map_manager_pick_harness_accurate.gd || fail
 
   if [[ -n "$LOG_DIR" ]] && [[ -f "$LOG_DIR/launch_pick.log" ]]; then
     if grep -q 'SCRIPT ERROR' "$LOG_DIR/launch_pick.log"; then
@@ -209,10 +210,28 @@ else
   fi
 
   run_step launch_assault \
-    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessWorldAccurateMultiFrontAssaultTest.gd || fail
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessWorldAccurateMultiFrontAssaultTest.gd || fail
 
   run_step launch_unit_order \
-    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessWorldAccurateUnitOrderLoopTest.gd || fail
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessWorldAccurateUnitOrderLoopTest.gd || fail
+
+  run_step launch_ix1_mandate_gate \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineMandateGateTest.gd || fail
+
+  run_step launch_ix1_day_tick \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineDayTickTest.gd || fail
+
+  run_step launch_ix1_live_stay_alive_tick \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineLiveStayAliveTickTest.gd || fail
+
+  run_step launch_ix1_search_go \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1SearchGoInspectorTest.gd || fail
+
+  run_step launch_ix1_title_esc_begin \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1LivingTitleEscBeginTest.gd || fail
+
+  run_step launch_ix1_spine_complete \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd || fail
 
   if [[ -n "$LOG_DIR" ]] && [[ -f "$LOG_DIR/launch_assault.log" ]]; then
     if grep -q 'SCRIPT ERROR' "$LOG_DIR/launch_assault.log"; then
@@ -239,7 +258,7 @@ else
   if [[ "$WITH_PERF" -eq 1 ]]; then
     # Perf sample is evidence only — soft 30fps FAIL is OK
     run_step map_perf \
-      tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessWorldAccurateMapPerfTest.gd || log "WARN map_perf non-zero (not a hard gate)"
+      tools/run_godot.sh --headless -s res://scripts/core/HeadlessWorldAccurateMapPerfTest.gd || log "WARN map_perf non-zero (not a hard gate)"
   fi
 fi
 

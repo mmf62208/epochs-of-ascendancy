@@ -104,8 +104,16 @@ var _collapsed: bool = false
 
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	# IGNORE empty chrome + clip overflow. An unclipped preset HBox used to
+	# paint/click across the full width (layer 20, above TopInfoBar layer 10)
+	# and swallow 4x/pause after the panel expanded on Play softpipe.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clip_contents = true
 	_build_ui()
+
+
+func live_f5_cannot_steal_top_bar() -> bool:
+	return mouse_filter == Control.MOUSE_FILTER_IGNORE and clip_contents
 
 
 func bind_map_renderer(renderer: Node) -> void:
@@ -124,11 +132,14 @@ func get_panel_height() -> float:
 func _build_ui() -> void:
 	var outer := HBoxContainer.new()
 	outer.add_theme_constant_override("separation", 6)
+	outer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	outer.clip_contents = true
 	add_child(outer)
 
 	_collapse_btn = Button.new()
 	_collapse_btn.text = "▾"
 	_collapse_btn.focus_mode = Control.FOCUS_NONE
+	_collapse_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_collapse_btn.custom_minimum_size = Vector2(28, 24)
 	_collapse_btn.pressed.connect(_toggle_collapsed)
 	outer.add_child(_collapse_btn)
@@ -136,10 +147,13 @@ func _build_ui() -> void:
 	_body = VBoxContainer.new()
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_body.add_theme_constant_override("separation", 2)
+	_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_body.clip_contents = true
 	outer.add_child(_body)
 
 	var title_row := HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 8)
+	title_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_body.add_child(title_row)
 
 	var title := Label.new()
@@ -149,6 +163,8 @@ func _build_ui() -> void:
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 3)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.clip_contents = true
 	_body.add_child(row)
 
 	_mode_group = ButtonGroup.new()
@@ -162,6 +178,7 @@ func _build_ui() -> void:
 		btn.add_theme_font_size_override("font_size", 11)
 		btn.custom_minimum_size = Vector2(0, 28)
 		btn.tooltip_text = str(MODE_HINTS.get(mode, mode))
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
 		# Retrowave map-mode icons (HudIconLibrary)
 		var mode_tex: Texture2D = _HudIcons.map_mode_icon(mode, 32)
 		if mode_tex != null:
@@ -178,6 +195,8 @@ func _build_ui() -> void:
 	# Pass 14: quick mapmode presets.
 	_preset_row = HBoxContainer.new()
 	_preset_row.add_theme_constant_override("separation", 4)
+	_preset_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_preset_row.clip_contents = true
 	_body.add_child(_preset_row)
 	_build_preset_row()
 
@@ -229,6 +248,7 @@ func _build_preset_row() -> void:
 				parts.append(str(sx))
 			stack_s = " + " + "+".join(parts)
 		btn.tooltip_text = "%s → %s%s" % [label, hint, stack_s]
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
 		var m: String = mode
 		var lbl: String = label
 		var st: Array = stack.duplicate()

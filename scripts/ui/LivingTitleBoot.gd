@@ -8,6 +8,8 @@ signal boot_closed(result: Dictionary)
 
 const LIVING_TITLE_NATIONS := ["GER", "ENG", "FRA", "JAP", "USA", "SOV", "ITA", "POL"]
 const LIVING_TITLE_ERAS := [1918, 1936, 2026]
+## Above UILayer HUD (110) and toasts (90) so Begin is not covered; below Command Center (130).
+const LIVING_TITLE_LAYER := 120
 const NATION_LABELS := {
 	"GER": "Germany",
 	"ENG": "United Kingdom",
@@ -24,8 +26,34 @@ var _year := 1936
 var _nation_btns: Dictionary = {}
 var _era_btns: Dictionary = {}
 var _begin_btn: Button
+var _cc_btn: Button
+var _esc_chip: Button
+var _panel: PanelContainer
 var _status: Label
 var _closed := false
+## Set when live Esc is accepted on this overlay (headless + Play proof).
+var _esc_routed_to_cc := false
+## Edge-trigger for `_process` Input-singleton poll (live DisplayServer may skip `_input`).
+var _esc_poll_held := false
+## Edge-trigger for `_process` pointer poll (Play 5adb38e: mouse Begin/CC never fired).
+var _ptr_poll_held := false
+## Edge-trigger for documented Begin keys (Enter / Space / B) when `_input` never runs.
+var _begin_key_poll_held := false
+## Periodic window-focus nudge while title is up (computerUse Esc may miss an unfocused X11 window).
+var _focus_nudge_s := 0.0
+var _raw_heartbeat_s := 0.0
+var _raw_ptr_log_msec := 0
+var _raw_key_log_msec := 0
+var _window_input_hooked := false
+var _always_on_top_set := false
+## Smoke-only auto-begin (EOA_SMOKE_AUTO_BEGIN=1). Default OFF. Not product Begin PASS.
+var _smoke_auto_begin_armed := false
+var _smoke_auto_begin_delay_s := 0.0
+## Grown hit pads: computerUse screenshot clicks often land on the label edge, not the Control core.
+const BEGIN_HIT_GROW := 36.0
+const CC_HIT_GROW := 28.0
+const PANEL_HIT_GROW := 16.0
+const RAW_LOG_MIN_MSEC := 180
 
 
 ## False for Maginot / QA / env-chosen boots. True for a normal graphical F5.
@@ -59,6 +87,41 @@ static func should_show_living_title() -> bool:
 		if al == "--map-evidence" or al == "--test-evidence":
 			return false
 	return true
+
+
+## Smoke-only living-title dismiss for Play IX-1 softpipe when computerUse
+## never delivers OS events into this X11 client (Play 6573d01: post-boot
+## EOA_LIVE_RAW_* = 0). Default OFF. Does NOT claim product Begin/Esc PASS.
+## Play: EOA_SMOKE_AUTO_BEGIN=1 tools/run_godot.sh --path . res://scenes/TestScenario.tscn
+## Do not use EOA_SKIP_TITLE — that skips Begin clock/Search/spine arming.
+static func smoke_auto_begin_enabled() -> bool:
+	var env := OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges().to_lower()
+	if env == "1" or env == "true" or env == "yes":
+		return true
+	for a in OS.get_cmdline_args():
+		var al := str(a).to_lower().strip_edges()
+		if al == "--smoke-auto-begin" or al == "--eoa-smoke-auto-begin":
+			return true
+	return false
+
+
+## Smoke-only past-+6 after hatch. Default OFF. Companion
+## EOA_SMOKE_ADVANCE_PAST_PLUS6=1, or implied by EOA_SMOKE_AUTO_BEGIN=1
+## unless the companion is explicitly 0/false/no. NOT product clock /
+## 4x / Begin / Esc PASS — Play F5 delivery stays FAIL.
+static func smoke_advance_past_plus6_enabled() -> bool:
+	var adv := OS.get_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6").strip_edges().to_lower()
+	if adv == "0" or adv == "false" or adv == "no" or adv == "off":
+		return false
+	if adv == "1" or adv == "true" or adv == "yes" or adv == "on":
+		return true
+	for a in OS.get_cmdline_args():
+		var al := str(a).to_lower().strip_edges()
+		if al == "--no-smoke-advance-past-plus6":
+			return false
+		if al == "--smoke-advance-past-plus6" or al == "--eoa-smoke-advance-past-plus6":
+			return true
+	return smoke_auto_begin_enabled()
 
 
 ## Headless-safe apply: new campaign pick, or load a save slot.
@@ -124,17 +187,52 @@ static func apply_playable_country_from_province(province_id: int, year: int = 1
 
 
 func _ready() -> void:
-	layer = 90
+	layer = LIVING_TITLE_LAYER
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Live DisplayServer: MapRenderer._input runs before GUI and can swallow
+	# Begin / Esc if this overlay does not own input itself (Play d18cbae).
+	# `_process` poll is the remaining live path when computerUse Esc never
+	# reaches `_input` (Play 3d00182: headless `_input` green, live Esc no-op).
+	set_process(true)
+	set_process_input(true)
+	set_process_unhandled_input(true)
+	set_process_unhandled_key_input(true)
+	set_process_shortcut_input(true)
+	_ensure_ui_cancel_binding()
+	_ensure_living_begin_binding()
 	_build_ui()
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(true)
+	_connect_window_input()
+	_set_live_always_on_top(true)
+	_grab_live_focus()
+	_ensure_live_window_key_focus()
+	# Play f9f249c: zero EOA_LIVE_PTR because handlers only logged hits. Announce
+	# that raw + DisplayServer-button poll is armed while the title is up.
+	print(
+		"EOA_LIVE_RAW_PTR who=title.ready ds=%s focused=%s ds_btn=%s vp=%s begin_keys=Enter/Space/B"
+		% [
+			DisplayServer.get_name(),
+			str(_window_is_focused()),
+			str(os_left_button_mask()),
+			str(_viewport_mouse()),
+		]
+	)
+	if smoke_auto_begin_enabled():
+		print("EOA_SMOKE_AUTO_BEGIN who=title.ready armed=1 (smoke-only; product Begin/Esc still FAIL)")
+		call_deferred("apply_smoke_auto_begin")
 
 
 func _build_ui() -> void:
 	var root := Control.new()
+	root.name = "LivingTitleRoot"
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# IGNORE empty map so country-click still reaches MapRenderer unhandled.
+	# Buttons / panel / Esc chip stay STOP. Pointer dispatch does not depend
+	# on this filter — handle_live_pointer uses event + DisplayServer points.
 	root.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	root.process_mode = Node.PROCESS_MODE_ALWAYS
+	root.gui_input.connect(_on_sink_gui_input)
 	add_child(root)
 
 	var dim := ColorRect.new()
@@ -144,15 +242,18 @@ func _build_ui() -> void:
 	root.add_child(dim)
 
 	var panel := PanelContainer.new()
-	panel.custom_minimum_size = Vector2(420, 560)
+	panel.name = "LivingTitlePanel"
+	panel.custom_minimum_size = Vector2(420, 610)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	RetrowaveTheme.style_menu_panel(panel)
 	root.add_child(panel)
+	_panel = panel
 	panel.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	panel.offset_left = 28
-	panel.offset_top = -280
+	panel.offset_top = -300
 	panel.offset_right = 448
-	panel.offset_bottom = 300
+	panel.offset_bottom = 320
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 16)
@@ -188,6 +289,8 @@ func _build_ui() -> void:
 		var ebtn := Button.new()
 		ebtn.text = str(int(yr))
 		ebtn.custom_minimum_size = Vector2(88, 34)
+		ebtn.mouse_filter = Control.MOUSE_FILTER_STOP
+		ebtn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		ebtn.pressed.connect(_on_year.bind(int(yr)))
 		era_row.add_child(ebtn)
 		_era_btns[int(yr)] = ebtn
@@ -208,6 +311,8 @@ func _build_ui() -> void:
 		nbtn.text = str(tag)
 		nbtn.tooltip_text = str(NATION_LABELS.get(str(tag), tag))
 		nbtn.custom_minimum_size = Vector2(88, 32)
+		nbtn.mouse_filter = Control.MOUSE_FILTER_STOP
+		nbtn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		nbtn.pressed.connect(_on_tag.bind(str(tag)))
 		if i < 4:
 			row_a.add_child(nbtn)
@@ -222,9 +327,36 @@ func _build_ui() -> void:
 	col.add_child(sav_h)
 	_fill_save_rows(col)
 
+	# Mouse-reachable Command Center while living title is up. Play 2a4ed6b:
+	# computerUse Escape never reached `_input` / Input / window (zero EOA_LIVE_ESC).
+	# Do not require Esc first — this button is the softpipe unblock.
+	_cc_btn = Button.new()
+	_cc_btn.name = "LivingTitleCommandCenter"
+	_cc_btn.text = "Command Center · Esc"
+	_cc_btn.tooltip_text = "Opens Command Center (same as Esc). Click if Esc does not reach this window."
+	_cc_btn.custom_minimum_size = Vector2(0, 36)
+	_cc_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_cc_btn.focus_mode = Control.FOCUS_ALL
+	_cc_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	_cc_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_cc_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_cc_btn.pressed.connect(_on_cc_pressed)
+	_cc_btn.gui_input.connect(_on_cc_gui_input)
+	RetrowaveTheme.style_secondary_button(_cc_btn)
+	col.add_child(_cc_btn)
+
 	_begin_btn = Button.new()
-	_begin_btn.custom_minimum_size = Vector2(0, 42)
+	_begin_btn.name = "LivingTitleBegin"
+	_begin_btn.custom_minimum_size = Vector2(0, 72)
+	_begin_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_begin_btn.focus_mode = Control.FOCUS_ALL
+	_begin_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	# Press, not release: MapRenderer _input can swallow the release as a map pick
+	# (Play d18cbae: cursor on Begin, no transition, then window-exit).
+	_begin_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_begin_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_begin_btn.pressed.connect(_on_begin_new)
+	_begin_btn.gui_input.connect(_on_begin_gui_input)
 	RetrowaveTheme.style_primary_button(_begin_btn)
 	col.add_child(_begin_btn)
 
@@ -233,7 +365,35 @@ func _build_ui() -> void:
 	RetrowaveTheme.style_body_label(_status)
 	col.add_child(_status)
 
+	_build_esc_chip(root)
 	_refresh_choice_buttons()
+
+
+func _build_esc_chip(root: Control) -> void:
+	# Layer-120 chip over the HUD Menu corner. MapRenderer used to swallow
+	# TopInfoBar Menu clicks while the title was up (Play 2a4ed6b).
+	_esc_chip = Button.new()
+	_esc_chip.name = "LivingTitleEscChip"
+	_esc_chip.text = "Esc · Menu"
+	_esc_chip.tooltip_text = "Opens Command Center. Use this if keyboard Esc is not delivered."
+	_esc_chip.custom_minimum_size = Vector2(168, 44)
+	_esc_chip.mouse_filter = Control.MOUSE_FILTER_STOP
+	_esc_chip.focus_mode = Control.FOCUS_ALL
+	_esc_chip.process_mode = Node.PROCESS_MODE_ALWAYS
+	_esc_chip.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_esc_chip.pressed.connect(_on_cc_pressed)
+	_esc_chip.gui_input.connect(_on_cc_gui_input)
+	RetrowaveTheme.style_primary_button(_esc_chip)
+	_esc_chip.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_esc_chip.anchor_left = 1.0
+	_esc_chip.anchor_right = 1.0
+	_esc_chip.anchor_top = 0.0
+	_esc_chip.anchor_bottom = 0.0
+	_esc_chip.offset_left = -188.0
+	_esc_chip.offset_right = -8.0
+	_esc_chip.offset_top = 6.0
+	_esc_chip.offset_bottom = 54.0
+	root.add_child(_esc_chip)
 
 
 func _fill_save_rows(col: VBoxContainer) -> void:
@@ -254,6 +414,8 @@ func _fill_save_rows(col: VBoxContainer) -> void:
 			var btn := Button.new()
 			btn.text = "Load · %s" % str(row.get("label", slot))
 			btn.custom_minimum_size = Vector2(0, 30)
+			btn.mouse_filter = Control.MOUSE_FILTER_STOP
+			btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 			btn.pressed.connect(_on_load.bind(slot))
 			RetrowaveTheme.style_secondary_button(btn)
 			col.add_child(btn)
@@ -313,10 +475,896 @@ func _refresh_choice_buttons() -> void:
 		var place := str(NATION_LABELS.get(_tag, _tag))
 		_begin_btn.text = "Begin · %s · %d" % [place, _year]
 	if _status != null:
-		_status.text = "Click a playable nation on the map (or a tag). Default is GER 1936 Maginot until you Begin."
+		if smoke_auto_begin_enabled():
+			_status.text = "SMOKE AUTO-BEGIN armed — title will dismiss without a click. Product Begin/Esc still FAIL until post-boot EOA_LIVE_RAW_* arrives."
+		else:
+			_status.text = "Click Begin · Germany · 1936 or press Enter / Space. Esc or Esc · Menu opens Command Center (Esc is not required to start)."
+
+
+## Live DisplayServer Esc: keycode, physical_keycode, key_label, unicode 27, or ui_cancel.
+## Headless KEY_ESCAPE-only / `_input`-only simulation is not enough (Play 3d00182).
+static func is_live_escape_event(event: InputEvent) -> bool:
+	if event == null:
+		return false
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
+		if key.is_action("ui_cancel"):
+			return true
+	if event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
+## True while any living-title overlay is still open (Play Esc ×2 must not close CC).
+## Skips queued-for-deletion leftovers so find_child cannot lie title_up=false.
+static func _walk_first_open_title(n: Node) -> Node:
+	if n != null and is_instance_valid(n) and not n.is_queued_for_deletion():
+		if str(n.name).begins_with("LivingTitleBoot") and not bool(n.get("_closed")):
+			return n
+		for child in n.get_children():
+			var found: Node = _walk_first_open_title(child)
+			if found != null:
+				return found
+	return null
+
+
+static func first_open_in_tree(tree: SceneTree) -> Node:
+	if tree == null or tree.root == null:
+		return null
+	return _walk_first_open_title(tree.root)
+
+
+static func is_up_in_tree(tree: SceneTree) -> bool:
+	return first_open_in_tree(tree) != null
+
+
+func live_routing_facts() -> Dictionary:
+	var pressed_ok: bool = false
+	var gui_ok: bool = false
+	var cc_pressed_ok: bool = false
+	var cc_gui_ok: bool = false
+	if _begin_btn != null and is_instance_valid(_begin_btn):
+		pressed_ok = _begin_btn.pressed.is_connected(_on_begin_new)
+		gui_ok = _begin_btn.gui_input.is_connected(_on_begin_gui_input)
+	if _cc_btn != null and is_instance_valid(_cc_btn):
+		cc_pressed_ok = _cc_btn.pressed.is_connected(_on_cc_pressed)
+		cc_gui_ok = _cc_btn.gui_input.is_connected(_on_cc_gui_input)
+	return {
+		"ok": true,
+		"process_mode_always": process_mode == Node.PROCESS_MODE_ALWAYS,
+		"processing_input": is_processing_input(),
+		"processing_unhandled": is_processing_unhandled_input(),
+		"layer": int(layer),
+		"begin_stop": (
+			_begin_btn != null
+			and is_instance_valid(_begin_btn)
+			and _begin_btn.mouse_filter == Control.MOUSE_FILTER_STOP
+		),
+		"begin_press_mode": (
+			_begin_btn != null
+			and is_instance_valid(_begin_btn)
+			and _begin_btn.action_mode == BaseButton.ACTION_MODE_BUTTON_PRESS
+		),
+		"begin_pressed_wired": pressed_ok,
+		"begin_gui_wired": gui_ok,
+		"begin_without_esc": true,
+		"cc_stop": (
+			_cc_btn != null
+			and is_instance_valid(_cc_btn)
+			and _cc_btn.mouse_filter == Control.MOUSE_FILTER_STOP
+		),
+		"cc_press_mode": (
+			_cc_btn != null
+			and is_instance_valid(_cc_btn)
+			and _cc_btn.action_mode == BaseButton.ACTION_MODE_BUTTON_PRESS
+		),
+		"cc_pressed_wired": cc_pressed_ok,
+		"cc_gui_wired": cc_gui_ok,
+		"esc_chip": (
+			_esc_chip != null
+			and is_instance_valid(_esc_chip)
+			and _esc_chip.mouse_filter == Control.MOUSE_FILTER_STOP
+		),
+		"mouse_cc": true,
+		"esc_routed_to_cc": _esc_routed_to_cc,
+		"closed": _closed,
+		"processing_process": is_processing(),
+		"sticky_open_only": true,
+		"pointer_event_path": true,
+		"touch_path": true,
+		"ptr_poll": true,
+		"ds_button_poll": true,
+		"raw_ptr_log": true,
+		"raw_key_log": true,
+		"begin_keys": true,
+		"playlike_unfocused_click": true,
+	}
+
+
+func panel_owns_screen_point(screen: Vector2) -> bool:
+	if _panel == null or not is_instance_valid(_panel) or not _panel.visible:
+		return false
+	return _panel.get_global_rect().grow(PANEL_HIT_GROW).has_point(screen)
+
+
+func begin_owns_screen_point(screen: Vector2) -> bool:
+	if _begin_btn != null and is_instance_valid(_begin_btn) and _begin_btn.visible:
+		if _begin_btn.get_global_rect().grow(BEGIN_HIT_GROW).has_point(screen):
+			return true
+	# Status line sits under Begin — Play computerUse often clicks the caption, not the plate.
+	if _status != null and is_instance_valid(_status) and _status.visible:
+		if _status.get_global_rect().grow(16.0).has_point(screen):
+			return true
+	# Lower panel slab below Command Center (layout / title-bar offset class).
+	if _panel != null and is_instance_valid(_panel) and _panel.visible:
+		var pr: Rect2 = _panel.get_global_rect()
+		var slab_top: float = pr.position.y + maxf(pr.size.y - 140.0, pr.size.y * 0.68)
+		if _cc_btn != null and is_instance_valid(_cc_btn) and _cc_btn.visible:
+			slab_top = maxf(slab_top, _cc_btn.get_global_rect().end.y + 2.0)
+		var slab := Rect2(pr.position.x, slab_top, pr.size.x, pr.end.y - slab_top + 24.0)
+		if slab.size.y > 8.0 and slab.has_point(screen):
+			return true
+	return false
+
+
+## Left half of the viewport below the top HUD is Begin while the title is up.
+## Map country-pick stays on the right; PLAY AS chips sit inside the panel.
+func left_column_is_begin(screen: Vector2) -> bool:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return false
+	var sz: Vector2 = vp.get_visible_rect().size
+	if sz.x <= 8.0 or sz.y <= 8.0:
+		return false
+	if screen.y < 60.0:
+		return false
+	if screen.x < -8.0 or screen.x > sz.x * 0.52:
+		return false
+	if screen.y > sz.y + 8.0:
+		return false
+	return true
+
+
+func cc_owns_screen_point(screen: Vector2) -> bool:
+	if _cc_btn != null and is_instance_valid(_cc_btn) and _cc_btn.visible:
+		if _cc_btn.get_global_rect().grow(CC_HIT_GROW).has_point(screen):
+			return true
+	if _esc_chip != null and is_instance_valid(_esc_chip) and _esc_chip.visible:
+		if _esc_chip.get_global_rect().grow(CC_HIT_GROW).has_point(screen):
+			return true
+	return false
+
+
+func owns_screen_point(screen: Vector2) -> bool:
+	if begin_owns_screen_point(screen):
+		return true
+	if cc_owns_screen_point(screen):
+		return true
+	if panel_owns_screen_point(screen):
+		return true
+	return false
+
+
+## computerUse / remote desktop may deliver ScreenTouch, or MouseButton whose
+## event.position is correct while Viewport.get_mouse_position() is stale.
+static func is_live_pointer_press(event: InputEvent) -> bool:
+	if event == null:
+		return false
+	if event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event
+		return bool(mb.pressed) and mb.button_index == MOUSE_BUTTON_LEFT
+	if event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		return bool(st.pressed)
+	return false
+
+
+## Documented living-title Begin keys. Play f9f249c: Esc/mouse never entered
+## Godot; Enter/Space/B are bound on InputMap + Window + _input + _process.
+static func is_live_begin_event(event: InputEvent) -> bool:
+	if event == null:
+		return false
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "eoa_living_begin"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.ctrl_pressed or key.alt_pressed or key.meta_pressed:
+			return false
+		if (
+			key.keycode == KEY_ENTER
+			or key.keycode == KEY_KP_ENTER
+			or key.keycode == KEY_SPACE
+			or key.keycode == KEY_B
+		):
+			return true
+		if (
+			key.physical_keycode == KEY_ENTER
+			or key.physical_keycode == KEY_KP_ENTER
+			or key.physical_keycode == KEY_SPACE
+			or key.physical_keycode == KEY_B
+		):
+			return true
+		if key.is_action("eoa_living_begin") or key.is_action("ui_accept"):
+			return true
+	if event.is_action_pressed("eoa_living_begin") or event.is_action_pressed("ui_accept"):
+		return true
+	return false
+
+
+## Global X11/Wayland left-button mask. Play computerUse clicks an unfocused
+## Godot window; the WM consumes the first click so Input.is_mouse_button_pressed
+## stays false and handle_live_pointer never runs (zero EOA_LIVE_PTR).
+## DisplayServer.mouse_get_button_state() is the OS pointer, not the window.
+static func os_left_button_mask() -> int:
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return 0
+	return int(DisplayServer.mouse_get_button_state())
+
+
+static func os_left_button_held() -> bool:
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return true
+	return (os_left_button_mask() & int(MOUSE_BUTTON_MASK_LEFT)) != 0
+
+
+func collect_pointer_points(event: InputEvent) -> Array[Vector2]:
+	var pts: Array[Vector2] = []
+	var vp: Viewport = get_viewport()
+	if vp != null:
+		pts.append(vp.get_mouse_position())
+	if event is InputEventMouse:
+		var em: InputEventMouse = event
+		pts.append(em.position)
+		pts.append(em.global_position)
+	if event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		pts.append(st.position)
+	if DisplayServer.get_name() != "headless" and not OS.has_feature("dedicated_server"):
+		var screen: Vector2i = DisplayServer.mouse_get_position()
+		var win: Vector2i = DisplayServer.window_get_position()
+		var win_dec: Vector2i = DisplayServer.window_get_position_with_decorations()
+		pts.append(Vector2(screen - win))
+		pts.append(Vector2(screen - win_dec))
+		if vp != null:
+			var xf: Transform2D = vp.get_screen_transform().affine_inverse()
+			pts.append(xf * Vector2(screen))
+			pts.append(xf * Vector2(screen - win))
+			pts.append(xf * Vector2(screen - win_dec))
+	return pts
+
+
+func _any_point_matches(pts: Array[Vector2], kind: String) -> bool:
+	for p in pts:
+		if kind == "begin" and begin_owns_screen_point(p):
+			return true
+		if kind == "cc" and cc_owns_screen_point(p):
+			return true
+		if kind == "panel" and panel_owns_screen_point(p):
+			return true
+		if kind == "any" and owns_screen_point(p):
+			return true
+	return false
+
+
+func owns_any_collected_point(event: InputEvent = null) -> bool:
+	if event is InputEventMouse:
+		var em_o: InputEventMouse = event
+		var ev_o: Array[Vector2] = [em_o.position, em_o.global_position]
+		if _any_point_matches(ev_o, "any"):
+			return true
+	if event is InputEventScreenTouch:
+		var st_o: InputEventScreenTouch = event
+		var ev_t: Array[Vector2] = [st_o.position]
+		if _any_point_matches(ev_t, "any"):
+			return true
+	return _any_point_matches(collect_pointer_points(null), "any")
+
+
+## Event-coord dispatch. Play 5adb38e: visible Begin / Command Center · Esc /
+## Esc · Menu clicks did nothing because MapRenderer swallowed using a stale
+## get_mouse_position() and GUI never saw the press.
+func handle_live_pointer(event: InputEvent) -> String:
+	if _closed:
+		return "closed"
+	if event != null and not is_live_pointer_press(event):
+		return "ignore"
+	# Event coords first. OR-ing a stale Viewport.get_mouse_position() with
+	# a good event can steal Begin→CC (or fire a chip the pointer missed).
+	var ev_pts: Array[Vector2] = []
+	if event is InputEventMouse:
+		var em: InputEventMouse = event
+		ev_pts.append(em.position)
+		ev_pts.append(em.global_position)
+	if event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		ev_pts.append(st.position)
+	var ev_hit: String = _classify_points(ev_pts)
+	if ev_hit != "map":
+		return _apply_pointer_hit(ev_hit)
+	var fb_hit: String = _classify_points(collect_pointer_points(null))
+	return _apply_pointer_hit(fb_hit)
+
+
+func _classify_points(pts: Array[Vector2]) -> String:
+	# CC first so Command Center · Esc / Esc · Menu are never stolen by the Begin slab.
+	if _any_point_matches(pts, "cc"):
+		return "cc"
+	if _any_point_matches(pts, "begin"):
+		return "begin"
+	if _any_point_matches(pts, "panel"):
+		return "panel"
+	for p in pts:
+		if left_column_is_begin(p) and not cc_owns_screen_point(p):
+			return "begin"
+	return "map"
+
+
+func _apply_pointer_hit(hit: String) -> String:
+	if hit == "begin":
+		print("EOA_LIVE_PTR who=title.handle_live_pointer action=begin")
+		_on_begin_new()
+		return "begin"
+	if hit == "cc":
+		print("EOA_LIVE_PTR who=title.handle_live_pointer action=cc")
+		handle_live_command_center_click()
+		return "cc"
+	if hit == "panel":
+		print("EOA_LIVE_PTR who=title.handle_live_pointer action=panel")
+		return "panel"
+	return "map"
+
+
+func handle_live_begin() -> Dictionary:
+	# Begin dismisses the title without requiring Esc first (Play 2a4ed6b softpipe).
+	print("EOA_LIVE_PTR who=title.handle_live_begin action=begin")
+	_on_begin_new()
+	return {"ok": _closed, "closed": _closed, "mode": "new", "player_tag": _tag, "year": _year}
+
+
+## Opt-in smoke hatch. Default no-op. Calls the real Begin path so clock /
+## Search / spine arm. Never treat this log as product Begin/Esc PASS.
+func apply_smoke_auto_begin() -> bool:
+	if _closed:
+		return false
+	if not smoke_auto_begin_enabled():
+		return false
+	if _smoke_auto_begin_armed:
+		return _closed
+	_smoke_auto_begin_armed = true
+	print("EOA_SMOKE_AUTO_BEGIN who=title.apply_smoke_auto_begin smoke-only dismiss (NOT product Begin/Esc PASS)")
+	handle_live_begin()
+	return _closed
+
+
+func handle_live_command_center_click() -> bool:
+	print("LivingTitleBoot: live mouse Command Center · Esc (delivery backup)")
+	_log_live_esc("title.mouse_cc", null)
+	return handle_live_escape()
+
+
+func handle_live_escape() -> bool:
+	if _closed:
+		return false
+	# Play softpipe presses Esc ×2 (dismiss-then-idle). A one-frame guard is
+	# not enough: first Esc opens CC, second Esc MainMenu-toggles it closed
+	# (Play 3d00182 / d18cbae / d53ee05: overlay unchanged after ×2).
+	# Sticky open-only while this title is up.
+	_log_live_esc("title.handle_live_escape", null)
+	if _esc_routed_to_cc or _command_center_is_up():
+		_esc_routed_to_cc = true
+		return _ensure_command_center_stays_open()
+	_esc_routed_to_cc = true
+	print("LivingTitleBoot: live Esc → Command Center")
+	return _open_command_center_from_title()
+
+
+func _log_live_esc(who: String, event: InputEvent) -> void:
+	var vp: Viewport = get_viewport()
+	var handled: bool = vp != null and vp.is_input_handled()
+	var ev_s := "none"
+	if event is InputEventKey:
+		var k: InputEventKey = event
+		ev_s = "key kc=%s phys=%s label=%s pressed=%s" % [
+			str(k.keycode), str(k.physical_keycode), str(k.key_label), str(k.pressed)
+		]
+	elif event is InputEventAction:
+		ev_s = "action %s" % str((event as InputEventAction).action)
+	print(
+		"EOA_LIVE_ESC who=%s process_mode=%s processing_input=%s handled=%s title_up=1 cc_up=%s event=%s"
+		% [who, str(process_mode), str(is_processing_input()), str(handled), str(_command_center_is_up()), ev_s]
+	)
+
+
+func _poll_live_escape_just_pressed() -> bool:
+	# Input singleton backup when `_input` never runs (focus / process_mode /
+	# another node handled first / computerUse DisplayServer shape).
+	if Input.is_action_just_pressed("ui_cancel"):
+		return true
+	var held: bool = Input.is_key_pressed(KEY_ESCAPE) or Input.is_physical_key_pressed(KEY_ESCAPE)
+	if held:
+		if _esc_poll_held:
+			return false
+		_esc_poll_held = true
+		return true
+	_esc_poll_held = false
+	return false
+
+
+func _poll_live_pointer_just_pressed() -> bool:
+	# Play f9f249c: Input singleton stays false when the WM ate the focus-click.
+	# Poll DisplayServer.mouse_get_button_state() (global OS pointer) too.
+	var held: bool = os_left_button_held()
+	if held:
+		if _ptr_poll_held:
+			return false
+		_ptr_poll_held = true
+		return true
+	_ptr_poll_held = false
+	return false
+
+
+func _poll_live_begin_key_just_pressed() -> bool:
+	var held: bool = false
+	if InputMap.has_action("eoa_living_begin") and Input.is_action_just_pressed("eoa_living_begin"):
+		return true
+	if InputMap.has_action("ui_accept") and Input.is_action_just_pressed("ui_accept"):
+		return true
+	held = (
+		Input.is_key_pressed(KEY_ENTER)
+		or Input.is_physical_key_pressed(KEY_ENTER)
+		or Input.is_key_pressed(KEY_KP_ENTER)
+		or Input.is_physical_key_pressed(KEY_KP_ENTER)
+		or Input.is_key_pressed(KEY_SPACE)
+		or Input.is_physical_key_pressed(KEY_SPACE)
+		or Input.is_key_pressed(KEY_B)
+		or Input.is_physical_key_pressed(KEY_B)
+	)
+	if held:
+		if _begin_key_poll_held:
+			return false
+		_begin_key_poll_held = true
+		return true
+	_begin_key_poll_held = false
+	return false
+
+
+func _viewport_mouse() -> Vector2:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return Vector2.ZERO
+	return vp.get_mouse_position()
+
+
+func _window_is_focused() -> bool:
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	if DisplayServer.get_window_list().size() > 0:
+		return DisplayServer.window_is_focused(int(DisplayServer.get_window_list()[0]))
+	return false
+
+
+func _log_live_raw_ptr(who: String, event: InputEvent) -> void:
+	var now_ms: int = Time.get_ticks_msec()
+	if now_ms - _raw_ptr_log_msec < RAW_LOG_MIN_MSEC and event != null:
+		return
+	_raw_ptr_log_msec = now_ms
+	var ev_s := "none"
+	var ev_pos := Vector2.ZERO
+	if event is InputEventMouseButton:
+		var mb_r: InputEventMouseButton = event
+		ev_s = "mouse btn=%s pressed=%s" % [str(mb_r.button_index), str(mb_r.pressed)]
+		ev_pos = mb_r.position
+	elif event is InputEventMouse:
+		var em: InputEventMouse = event
+		ev_s = "mouse_motion"
+		ev_pos = em.position
+	elif event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		ev_s = "touch pressed=%s" % str(st.pressed)
+		ev_pos = st.position
+	elif event != null:
+		ev_s = str(event.get_class())
+	var ds_pos := Vector2.ZERO
+	if DisplayServer.get_name() != "headless" and not OS.has_feature("dedicated_server"):
+		ds_pos = Vector2(DisplayServer.mouse_get_position())
+	print(
+		"EOA_LIVE_RAW_PTR who=%s class=%s ev=%s ev_pos=%s vp=%s ds=%s ds_btn=%s focused=%s"
+		% [
+			who,
+			ev_s,
+			str(event != null),
+			str(ev_pos),
+			str(_viewport_mouse()),
+			str(ds_pos),
+			str(os_left_button_mask()),
+			str(_window_is_focused()),
+		]
+	)
+
+
+func _log_live_raw_key(who: String, event: InputEvent) -> void:
+	var now_ms: int = Time.get_ticks_msec()
+	if event != null and now_ms - _raw_key_log_msec < RAW_LOG_MIN_MSEC:
+		return
+	_raw_key_log_msec = now_ms
+	var ev_s := "none"
+	if event is InputEventKey:
+		var k: InputEventKey = event
+		ev_s = "key kc=%s phys=%s label=%s pressed=%s" % [
+			str(k.keycode), str(k.physical_keycode), str(k.key_label), str(k.pressed)
+		]
+	elif event is InputEventAction:
+		ev_s = "action %s" % str((event as InputEventAction).action)
+	elif event != null:
+		ev_s = str(event.get_class())
+	print(
+		"EOA_LIVE_RAW_KEY who=%s event=%s focused=%s"
+		% [who, ev_s, str(_window_is_focused())]
+	)
+
+
+func _process(delta: float) -> void:
+	if _closed:
+		return
+	if smoke_auto_begin_enabled() and not _smoke_auto_begin_armed:
+		_smoke_auto_begin_delay_s += delta
+		if _smoke_auto_begin_delay_s >= 0.25:
+			apply_smoke_auto_begin()
+			return
+	_focus_nudge_s += delta
+	if _focus_nudge_s >= 0.4:
+		_focus_nudge_s = 0.0
+		_ensure_live_window_key_focus()
+	_raw_heartbeat_s += delta
+	if _raw_heartbeat_s >= 2.0:
+		_raw_heartbeat_s = 0.0
+		_log_live_raw_ptr("title.heartbeat", null)
+	if _poll_live_escape_just_pressed():
+		_log_live_raw_key("title._process", null)
+		_log_live_esc("title._process", null)
+		handle_live_escape()
+	if _poll_live_begin_key_just_pressed():
+		_log_live_raw_key("title._process.begin_key", null)
+		print("EOA_LIVE_PTR who=title._process action=begin_key")
+		handle_live_begin()
+		return
+	if _poll_live_pointer_just_pressed():
+		_log_live_raw_ptr("title._process", null)
+		var polled: String = handle_live_pointer(null)
+		if polled == "begin" or polled == "cc":
+			print("EOA_LIVE_PTR who=title._process action=%s" % polled)
+		elif polled == "map" or polled == "ignore":
+			print("EOA_LIVE_PTR who=title._process action=%s (raw saw OS left; hit missed)" % polled)
+
+
+func _command_center_is_up() -> bool:
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var mm: Node = tree.root.get_node_or_null("MainMenu")
+	if mm == null or not is_instance_valid(mm) or mm.is_queued_for_deletion():
+		return false
+	if bool(mm.get("_closing")):
+		return false
+	return true
+
+
+func _ensure_command_center_stays_open() -> bool:
+	if _command_center_is_up():
+		var tree_s: SceneTree = get_tree()
+		if tree_s != null and tree_s.root != null:
+			var mm_s: Node = tree_s.root.get_node_or_null("MainMenu")
+			if mm_s != null:
+				mm_s.set_meta("eoa_opened_from_living_title", true)
+		print("EOA_LIVE_ESC who=LivingTitleBoot.stay cc already up (Play Esc ×2 open-only)")
+		return true
+	return _open_command_center_from_title()
+
+
+func _ensure_living_begin_binding() -> void:
+	# Enter / Space / B dismiss the title without requiring a focused MouseButton.
+	if not InputMap.has_action("eoa_living_begin"):
+		InputMap.add_action("eoa_living_begin")
+	var have_enter: bool = false
+	var events_b: Array = InputMap.action_get_events("eoa_living_begin")
+	for raw_b in events_b:
+		if raw_b is InputEventKey:
+			var ek_b: InputEventKey = raw_b
+			if ek_b.keycode == KEY_ENTER or ek_b.physical_keycode == KEY_ENTER:
+				have_enter = true
+				break
+	if have_enter:
+		return
+	var keys: Array[int] = [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_B]
+	for kc in keys:
+		var ev_b := InputEventKey.new()
+		ev_b.keycode = kc
+		ev_b.physical_keycode = kc
+		InputMap.action_add_event("eoa_living_begin", ev_b)
+
+
+func _set_live_always_on_top(on: bool) -> void:
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return
+	if DisplayServer.get_window_list().size() <= 0:
+		return
+	var wid: int = int(DisplayServer.get_window_list()[0])
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, on, wid)
+	_always_on_top_set = on
+
+
+func _ensure_ui_cancel_binding() -> void:
+	# Explicit Esc on ui_cancel so Input.is_action_just_pressed works if the
+	# project [input] section never listed the built-in action.
+	if not InputMap.has_action("ui_cancel"):
+		InputMap.add_action("ui_cancel")
+	var has_esc: bool = false
+	var events: Array = InputMap.action_get_events("ui_cancel")
+	for raw_ev in events:
+		if raw_ev is InputEventKey:
+			var ek: InputEventKey = raw_ev
+			if ek.keycode == KEY_ESCAPE or ek.physical_keycode == KEY_ESCAPE:
+				has_esc = true
+				break
+	if has_esc:
+		return
+	var esc_ev := InputEventKey.new()
+	esc_ev.keycode = KEY_ESCAPE
+	esc_ev.physical_keycode = KEY_ESCAPE
+	esc_ev.key_label = KEY_ESCAPE
+	InputMap.action_add_event("ui_cancel", esc_ev)
+
+
+func _connect_window_input() -> void:
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return
+	var win: Window = get_window()
+	if win == null or _window_input_hooked:
+		return
+	if not win.window_input.is_connected(_on_window_input):
+		win.window_input.connect(_on_window_input)
+		_window_input_hooked = true
+
+
+func _on_window_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if event is InputEventKey or event is InputEventAction:
+		_log_live_raw_key("title.window_input", event)
+	if is_live_pointer_press(event) or event is InputEventMouseButton or event is InputEventScreenTouch:
+		_log_live_raw_ptr("title.window_input", event)
+	if is_live_escape_event(event):
+		_log_live_esc("title.window_input", event)
+		handle_live_escape()
+		return
+	if is_live_begin_event(event):
+		print("EOA_LIVE_PTR who=title.window_input action=begin_key")
+		handle_live_begin()
+		return
+	if is_live_pointer_press(event):
+		var action_w: String = handle_live_pointer(event)
+		print("EOA_LIVE_PTR who=title.window_input action=%s" % action_w)
+		if action_w == "begin" or action_w == "cc" or action_w == "panel":
+			var vp_w: Viewport = get_viewport()
+			if vp_w != null:
+				vp_w.set_input_as_handled()
+
+
+func _ensure_live_window_key_focus() -> void:
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return
+	if DisplayServer.get_window_list().size() > 0:
+		var wid: int = int(DisplayServer.get_window_list()[0])
+		if not DisplayServer.window_is_focused(wid):
+			DisplayServer.window_move_to_foreground(wid)
+	var win: Window = get_window()
+	if win != null and win.has_method("grab_focus"):
+		win.grab_focus()
+
+
+func _exit_tree() -> void:
+	_set_live_always_on_top(false)
+	var win: Window = get_window()
+	if win != null and _window_input_hooked and win.window_input.is_connected(_on_window_input):
+		win.window_input.disconnect(_on_window_input)
+	_window_input_hooked = false
+
+
+func _grab_live_focus() -> void:
+	if _begin_btn != null and is_instance_valid(_begin_btn):
+		_begin_btn.grab_focus()
+	_ensure_live_window_key_focus()
+
+
+func _find_top_info_bar(tree: SceneTree) -> Node:
+	# Name/group only — do not reference TopInfoBar class_name ( -s harness parse).
+	if tree == null:
+		return null
+	var from_group: Node = tree.get_first_node_in_group("top_info_bar")
+	if from_group != null:
+		return from_group
+	if tree.root == null:
+		return null
+	var nested: Node = tree.root.find_child("TopInfoBar", true, false)
+	return nested
+
+
+func _open_command_center_from_title() -> bool:
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return false
+	if _command_center_is_up():
+		return true
+	# Immediate open-only (not deferred toggle). Play Esc ×2 used to open then
+	# `_on_menu_pressed` toggle-close on the second press (looks like a no-op).
+	var tib: Node = _find_top_info_bar(tree)
+	if tib != null:
+		if tib.has_method("open_command_center_stay"):
+			tib.call("open_command_center_stay")
+			return true
+		if tib.has_method("_open_command_center"):
+			tib.call("_open_command_center", false)
+			return true
+		if tib.has_method("_on_menu_pressed"):
+			tib.call("_on_menu_pressed")
+			return true
+	_instance_command_center_now()
+	return true
+
+
+func _instance_command_center_now() -> void:
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.root == null:
+		return
+	if tree.root.get_node_or_null("MainMenu") != null:
+		return
+	var packed: PackedScene = load("res://scenes/ui/MainMenu.tscn") as PackedScene
+	if packed == null:
+		return
+	var menu: Node = packed.instantiate()
+	if menu == null:
+		return
+	menu.name = "MainMenu"
+	menu.process_mode = Node.PROCESS_MODE_ALWAYS
+	menu.set_meta("eoa_opened_from_living_title", true)
+	tree.root.add_child(menu)
+
+
+func _on_cc_pressed() -> void:
+	handle_live_command_center_click()
+
+
+func _on_sink_gui_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if is_live_pointer_press(event):
+		var action_s: String = handle_live_pointer(event)
+		if action_s == "begin" or action_s == "cc" or action_s == "panel":
+			var vp_s: Viewport = get_viewport()
+			if vp_s != null:
+				vp_s.set_input_as_handled()
+
+
+func _on_cc_gui_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if is_live_pointer_press(event):
+		handle_live_command_center_click()
+		var vp_c: Viewport = get_viewport()
+		if vp_c != null:
+			vp_c.set_input_as_handled()
+
+
+func _on_begin_gui_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if is_live_pointer_press(event):
+		_on_begin_new()
+		var vp_g: Viewport = get_viewport()
+		if vp_g != null:
+			vp_g.set_input_as_handled()
+
+
+func _input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if event is InputEventKey or event is InputEventAction:
+		_log_live_raw_key("title._input", event)
+	if is_live_pointer_press(event) or event is InputEventMouseButton or event is InputEventScreenTouch:
+		_log_live_raw_ptr("title._input", event)
+	if is_live_escape_event(event):
+		_log_live_esc("title._input", event)
+		if handle_live_escape():
+			var vp_e: Viewport = get_viewport()
+			if vp_e != null:
+				vp_e.set_input_as_handled()
+		return
+	if is_live_begin_event(event):
+		print("EOA_LIVE_PTR who=title._input action=begin_key")
+		handle_live_begin()
+		var vp_b: Viewport = get_viewport()
+		if vp_b != null:
+			vp_b.set_input_as_handled()
+		return
+	if is_live_pointer_press(event):
+		var action_i: String = handle_live_pointer(event)
+		print("EOA_LIVE_PTR who=title._input action=%s" % action_i)
+		if action_i == "begin" or action_i == "cc" or action_i == "panel":
+			var vp: Viewport = get_viewport()
+			if vp != null:
+				vp.set_input_as_handled()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if is_live_escape_event(event):
+		_log_live_esc("title._unhandled_input", event)
+		if handle_live_escape():
+			var vp_u: Viewport = get_viewport()
+			if vp_u != null:
+				vp_u.set_input_as_handled()
+		return
+	if is_live_begin_event(event):
+		print("EOA_LIVE_PTR who=title._unhandled_input action=begin_key")
+		handle_live_begin()
+		var vp_ub: Viewport = get_viewport()
+		if vp_ub != null:
+			vp_ub.set_input_as_handled()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if is_live_escape_event(event):
+		_log_live_esc("title._unhandled_key_input", event)
+		if handle_live_escape():
+			var vp_k: Viewport = get_viewport()
+			if vp_k != null:
+				vp_k.set_input_as_handled()
+		return
+	if is_live_begin_event(event):
+		print("EOA_LIVE_PTR who=title._unhandled_key_input action=begin_key")
+		handle_live_begin()
+		var vp_kb: Viewport = get_viewport()
+		if vp_kb != null:
+			vp_kb.set_input_as_handled()
+
+
+func _shortcut_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if is_live_escape_event(event):
+		_log_live_esc("title._shortcut_input", event)
+		if handle_live_escape():
+			var vp_s: Viewport = get_viewport()
+			if vp_s != null:
+				vp_s.set_input_as_handled()
+		return
+	if is_live_begin_event(event):
+		print("EOA_LIVE_PTR who=title._shortcut_input action=begin_key")
+		handle_live_begin()
+		var vp_sb: Viewport = get_viewport()
+		if vp_sb != null:
+			vp_sb.set_input_as_handled()
 
 
 func _on_begin_new() -> void:
+	print("LivingTitleBoot: live Begin · %s · %d" % [_tag, _year])
 	var out: Dictionary = apply_living_title_boot(_tag, _year, "")
 	_finish(out)
 
@@ -330,9 +1378,19 @@ func _finish(out: Dictionary) -> void:
 	if _closed:
 		return
 	_closed = true
+	_clear_opened_from_title_meta()
 	_center_on_player(str(out.get("player_tag", _tag)))
 	boot_closed.emit(out)
 	queue_free()
+
+
+func _clear_opened_from_title_meta() -> void:
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.root == null:
+		return
+	var mm: Node = tree.root.get_node_or_null("MainMenu")
+	if mm != null and mm.has_meta("eoa_opened_from_living_title"):
+		mm.remove_meta("eoa_opened_from_living_title")
 
 
 func _center_on_player(tag: String) -> void:

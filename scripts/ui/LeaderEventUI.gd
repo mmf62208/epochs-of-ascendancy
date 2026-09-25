@@ -7,6 +7,7 @@ signal news_posted(entry: Dictionary)
 
 const MAX_NEWS_ITEMS := 40
 const TOAST_DURATION_SEC := 6.0
+const TOAST_DISMISSING_META := "eoa_toast_dismissing"
 
 var news_history: Array[Dictionary] = []
 var _retirement_queue: Array[String] = []
@@ -15,6 +16,8 @@ var _replacement_queue: Array[String] = []
 var _active_replacement_popup: LeaderReplacementPickerPopup = null
 var _toast_layer: CanvasLayer
 var _toast_container: VBoxContainer
+var _spine_bisect_logs: bool = false
+var _spine_bisect_logs_resolved: bool = false
 
 # Preloaded custom icons for event toasts (beyond unicode); riot for crisis/riot cats per graphics wiring.
 var _riot_crowd_icon: Texture2D = null
@@ -70,9 +73,13 @@ func _ensure_toast_layer() -> void:
 
 	_toast_container = VBoxContainer.new()
 	_toast_container.name = "ToastContainer"
+	# IGNORE empty chrome so a mis-sized stack cannot steal TopInfoBar 4x/pause
+	# (CanvasLayer 90 sits above the default HUD layer).
+	_toast_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_container.clip_contents = true
 	_toast_container.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_toast_container.offset_left = -420.0
-	_toast_container.offset_top = -280.0
+	_toast_container.offset_top = -220.0
 	_toast_container.offset_right = -16.0
 	_toast_container.offset_bottom = -16.0
 	_toast_container.add_theme_constant_override("separation", 8)
@@ -82,8 +89,35 @@ func _ensure_toast_layer() -> void:
 ## Simple toast for save/menu/system feedback (non-news).
 # Enhanced for important messages (toasts first): Always has close/dismiss X. For is_important, adds "Respond" button (e.g. opens PolicyLawScreen or launches dialogue for welfare/crisis choices).
 # Clean, interactive, fun: Player informed immediately, can dismiss or act on cultural war / policy decisions.
+func _eoa_spine_bisect_enabled() -> bool:
+	if _spine_bisect_logs_resolved:
+		return _spine_bisect_logs
+	_spine_bisect_logs = (
+		OS.get_environment("EOA_SMOKE_FRAME_GUARD") == "1"
+		or OS.get_environment("EOA_SMOKE_SPINE_BISECT") == "1"
+	)
+	_spine_bisect_logs_resolved = true
+	return _spine_bisect_logs
+
+
+func _eoa_flush(msg: String) -> void:
+	# Cheap: silent unless the Play-launch frame guard / bisect flag is on.
+	if not _eoa_spine_bisect_enabled():
+		return
+	print(msg)
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+
+
 func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = false, is_important: bool = false, on_respond: Callable = Callable()) -> void:
+	# Same skip as post_news: headless -s toast timers + CanvasLayer hung
+	# CompleteTest after spine 91% (and Maginot after RESULT=PASS).
+	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.enter")
+	if _should_skip_toast_ui():
+		_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.skip")
+		return
 	_ensure_toast_layer()
+	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.after_ensure")
 	var entry := {
 		"title": "Notice" if not is_error else "Error",
 		"body": message,
@@ -175,11 +209,7 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 	var close_btn := Button.new()
 	close_btn.text = "×"
 	close_btn.custom_minimum_size = Vector2(20, 20)
-	close_btn.pressed.connect(func(): 
-		if panel.get_parent():
-			panel.get_parent().remove_child(panel)
-			panel.queue_free()
-	)
+	close_btn.pressed.connect(_dismiss_toast.bind(panel))
 	title_row.add_child(close_btn)
 	vbox.add_child(title_row)
 
@@ -206,18 +236,33 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 				# Fallback: toast reminder.
 				show_toast("Open Policy / Law screen to adjust welfare/social services and respond to the cultural decision.", 4.0)
 			# Dismiss after respond.
-			if panel.get_parent():
-				panel.get_parent().remove_child(panel)
-				panel.queue_free()
+			_dismiss_toast(panel)
 		)
 		vbox.add_child(respond_btn)
 
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	if "Road spine started" in message or "Road spine ~" in message:
+		panel.set_meta("eoa_spine_start_toast", true)
 	_toast_container.add_child(panel)
-	while _toast_container.get_child_count() > 4:
-		_dismiss_toast(_toast_container.get_child(0) as PanelContainer)
+	_eoa_flush(
+		"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.before_trim n=%d"
+		% _toast_container.get_child_count()
+	)
+	_trim_live_f5_toast_stack()
+	_eoa_flush(
+		"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.after_trim n=%d"
+		% _toast_container.get_child_count()
+	)
+	var n_cap: int = _toast_container.get_child_count()
+	if n_cap > 4:
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.cap4_iter0 n=%d"
+			% n_cap
+		)
+	_trim_toast_stack_to(4)
 
-	var timer := get_tree().create_timer(maxf(1.0, duration_sec))
-	timer.timeout.connect(_on_toast_timer_expired.bind(panel), CONNECT_ONE_SHOT)
+	_arm_toast_timeout(panel, duration_sec)
+	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.exit")
 
 
 func post_news(title: String, body: String, category: String = "general") -> void:
@@ -237,6 +282,8 @@ func post_news(title: String, body: String, category: String = "general") -> voi
 	news_posted.emit(entry)
 	if _should_skip_toast_ui():
 		return
+	if _should_coalesce_live_f5_combat_toast(category):
+		return
 	_show_toast(entry)
 
 
@@ -248,6 +295,77 @@ func _should_skip_toast_ui() -> bool:
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		return true
 	return false
+
+
+func _live_f5_toast_path() -> bool:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_live_f5_play_path"):
+		return bool(TimeManager.is_live_f5_play_path())
+	return DisplayServer.get_name() != "headless" and not OS.has_feature("dedicated_server")
+
+
+func _should_coalesce_live_f5_combat_toast(category: String) -> bool:
+	# Stacked Province-captured cards on layer 90 stole 4x/pause after ~6 Jan.
+	# Keep one combat toast; news_history still records every capture.
+	if not _live_f5_toast_path():
+		return false
+	var cat := category.strip_edges().to_lower()
+	if cat not in ["combat", "war", "military"]:
+		return false
+	if _toast_container == null:
+		return false
+	return _toast_container.get_child_count() >= 1
+
+
+func _trim_toast_stack_to(max_keep: int) -> int:
+	# Snapshot + immediate remove. queue_free alone never drops get_child_count()
+	# this frame — a while-count loop spun forever (~140 MB/s) on live F5.
+	if _toast_container == null or max_keep < 0:
+		return 0
+	var kids: Array[Node] = _toast_container.get_children()
+	var n: int = kids.size()
+	if n <= max_keep:
+		return 0
+	var evict: Array[Node] = []
+	var ki := 0
+	while ki < kids.size():
+		var kid: Node = kids[ki]
+		if kid != null and kid.has_meta("eoa_spine_start_toast") and bool(kid.get_meta("eoa_spine_start_toast")):
+			ki += 1
+			continue
+		evict.append(kid)
+		ki += 1
+	var excess: int = n - max_keep
+	var cap: int = mini(excess, evict.size())
+	var i := 0
+	while i < cap:
+		_dismiss_toast(evict[i])
+		i += 1
+	return cap
+
+
+func _trim_live_f5_toast_stack() -> void:
+	if _toast_container == null or not _live_f5_toast_path():
+		_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.skip")
+		return
+	var n0: int = _toast_container.get_child_count()
+	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.enter n=%d" % n0)
+	if n0 > 2:
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.iter0 n=%d"
+			% n0
+		)
+	var iter: int = _trim_toast_stack_to(2)
+	_eoa_flush(
+		"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.exit n=%d iters=%d"
+		% [_toast_container.get_child_count(), iter]
+	)
+
+
+func live_f5_toast_stack_cannot_steal_top_bar() -> bool:
+	_ensure_toast_layer()
+	if _toast_container == null:
+		return false
+	return _toast_container.mouse_filter == Control.MOUSE_FILTER_IGNORE
 
 
 func get_recent_news(limit: int = 10) -> Array[Dictionary]:
@@ -372,22 +490,71 @@ func _show_toast(entry: Dictionary) -> void:
 	RetrowaveTheme.style_body_label(body_label)
 	vbox.add_child(body_label)
 
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var body_l := str(entry.get("body", "")).to_lower()
+	var title_l := str(entry.get("title", "")).to_lower()
+	if "road spine" in body_l or "road spine" in title_l or "ix-1" in title_l:
+		panel.set_meta("eoa_spine_start_toast", true)
 	_toast_container.add_child(panel)
-	while _toast_container.get_child_count() > 4:
-		_dismiss_toast(_toast_container.get_child(0) as PanelContainer)
+	_trim_live_f5_toast_stack()
+	_trim_toast_stack_to(4)
 
-	var timer := get_tree().create_timer(TOAST_DURATION_SEC)
-	timer.timeout.connect(_on_toast_timer_expired.bind(panel), CONNECT_ONE_SHOT)
-	dismiss_button.pressed.connect(_dismiss_toast.bind(panel))
-
-
-func _dismiss_toast(panel: PanelContainer) -> void:
-	if panel != null and is_instance_valid(panel):
-		panel.queue_free()
+	_arm_toast_timeout(panel, TOAST_DURATION_SEC)
+	dismiss_button.pressed.connect(_dismiss_toast.bind(weakref(panel)))
 
 
-func _on_toast_timer_expired(panel: PanelContainer) -> void:
-	_dismiss_toast(panel)
+func _arm_toast_timeout(panel: PanelContainer, duration_sec: float) -> void:
+	# Bind WeakRef, never the Control itself. A typed PanelContainer callback
+	# on a freed toast is Godot "Cannot convert argument 1 from Object to Object".
+	if panel == null or not is_instance_valid(panel):
+		return
+	var wr: WeakRef = weakref(panel)
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return
+	var timer: SceneTreeTimer = tree.create_timer(maxf(1.0, duration_sec))
+	if timer == null:
+		return
+	timer.timeout.connect(_on_toast_timer_expired.bind(wr), CONNECT_ONE_SHOT)
+
+
+func _dismiss_toast(panel: Variant = null) -> void:
+	var toast: Object = _toast_object_from_ref(panel)
+	if toast == null or not is_instance_valid(toast):
+		return
+	if toast.has_meta(TOAST_DISMISSING_META) and bool(toast.get_meta(TOAST_DISMISSING_META)):
+		return
+	toast.set_meta(TOAST_DISMISSING_META, true)
+	if toast is Node:
+		var node: Node = toast as Node
+		var parent: Node = node.get_parent()
+		if parent != null:
+			parent.remove_child(node)
+		# One-shot free. Never start a second tween/timer on a dismissing panel.
+		node.queue_free()
+
+
+func _toast_object_from_ref(panel: Variant) -> Object:
+	if panel == null:
+		return null
+	if panel is WeakRef:
+		var got: Variant = (panel as WeakRef).get_ref()
+		if got is Object:
+			return got as Object
+		return null
+	if panel is Object:
+		return panel as Object
+	return null
+
+
+func _on_toast_timer_expired(panel: Variant = null) -> void:
+	# Variant / WeakRef: a freed Control cannot convert into typed PanelContainer.
+	if panel == null:
+		return
+	var toast: Object = _toast_object_from_ref(panel)
+	if toast == null or not is_instance_valid(toast):
+		return
+	_dismiss_toast(toast)
 
 
 func _on_retirement_offered(leader_id: String) -> void:

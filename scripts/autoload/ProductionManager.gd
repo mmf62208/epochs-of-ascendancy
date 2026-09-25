@@ -2384,11 +2384,26 @@ func daily_formation_reinforce_from_stockpile() -> Dictionary:
 	}
 	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
 		return report
+	var live_f5 := (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_live_f5_play_path")
+		and bool(TimeManager.is_live_f5_play_path())
+	)
+	var player_tag := ""
+	if live_f5 and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		player_tag = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
 	var formations: Array = []
+	var reinforce_cap := 32 if live_f5 else 100000
 	for fid in LeaderManager.formations:
 		var ff = LeaderManager.formations[fid]
 		if ff != null:
+			if live_f5 and not player_tag.is_empty():
+				var ftag := str(ff.country_tag).strip_edges().to_upper() if "country_tag" in ff else ""
+				if ftag != player_tag:
+					continue
 			formations.append(ff)
+		if formations.size() >= reinforce_cap:
+			break
 	for f in formations:
 		if f == null:
 			continue
@@ -3489,69 +3504,79 @@ func daily_resource_harvest_tick(days: float = 1.0) -> Dictionary:
 		and TimeManager.has_method("is_interactive_light_sim")
 		and bool(TimeManager.is_interactive_light_sim())
 	)
+	var live_f5 := (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_live_f5_play_path")
+		and bool(TimeManager.is_live_f5_play_path())
+	)
 	var player_tag_pref := ""
-	if light and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+	if (light or live_f5) and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
 		player_tag_pref = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
-	# Collect owned land provinces with resources (MapManager.get_all_provinces → id→Province).
-	# Interactive: prefer player-owned deposits and cap scan so world_full cannot stall the clock.
-	var harvest_cap := 220 if light else 100000
+	# Collect owned land provinces with resources.
+	# Live F5 / light: player-owned hexes only — never walk 3520 looking for GER
+	# deposits (that hitch landed on day +5 and stacked with day-7 autosave).
+	var harvest_cap := 96 if live_f5 else (220 if light else 100000)
 	var harvested := 0
-	if MapManager.has_method("get_all_provinces"):
+	var harvest_pids: Array = []
+	if (light or live_f5) and not player_tag_pref.is_empty() and MapManager.has_method("get_provinces_by_owner"):
+		harvest_pids = MapManager.get_provinces_by_owner(player_tag_pref)
+	elif MapManager.has_method("get_all_provinces"):
 		var all_p: Variant = MapManager.get_all_provinces()
 		if all_p is Dictionary:
-			for pid_key in (all_p as Dictionary):
-				if harvested >= harvest_cap:
-					break
-				var p: Province = (all_p as Dictionary)[pid_key] as Province
-				if p == null:
-					continue
-				var owner := str(p.owner_tag).strip_edges().to_upper()
-				var ctrl := str(p.controller_tag).strip_edges().to_upper() if "controller_tag" in p else ""
-				var tag := owner
-				if rhc.has_method("harvest_holder_tag"):
-					tag = str(rhc.harvest_holder_tag(owner, ctrl))
-				var res: Dictionary = p.resources if p.resources is Dictionary else {}
-				var pid := int(p.id) if "id" in p else int(pid_key)
-				if tag.is_empty() or res.is_empty():
-					continue
-				if light and not player_tag_pref.is_empty() and tag != player_tag_pref:
-					continue
-				var year := 1936
-				if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year"):
-					year = int(TimeManager.get_current_year())
-				var scaled: Dictionary = res
-				if rhc.has_method("scale_deposits_for_year"):
-					scaled = rhc.scale_deposits_for_year(res, year)
-				if scaled.is_empty():
-					continue
-				var occ := 1.0
-				if rhc.has_method("occupation_harvest_mult"):
-					occ = float(rhc.occupation_harvest_mult(owner, ctrl))
-				if occ < 0.999:
-					var taxed: Dictionary = {}
-					for rk in scaled:
-						taxed[rk] = float(scaled[rk]) * occ
-					scaled = taxed
-				owners[tag] = true
-				var plants: Array = []
-				if typeof(FactoryManager) != TYPE_NIL and FactoryManager.has_method("get_resource_plants_in_province") and pid > 0:
-					plants = FactoryManager.get_resource_plants_in_province(pid)
-				var development: Dictionary = {}
-				if "resource_development" in p and p.resource_development is Dictionary:
-					development = (p.resource_development as Dictionary).duplicate()
-				var pid_s := str(pid)
-				if province_resource_dev.has(pid_s) and province_resource_dev[pid_s] is Dictionary:
-					var extra: Dictionary = province_resource_dev[pid_s] as Dictionary
-					for dk in extra:
-						development[str(dk)] = maxi(int(development.get(dk, 0)), int(extra[dk]))
-				provinces_payload.append({
-					"owner_tag": tag,
-					"resources": scaled,
-					"plants": plants,
-					"development": development,
-					"province_id": pid,
-				})
-				harvested += 1
+			harvest_pids = (all_p as Dictionary).keys()
+	for pid_key in harvest_pids:
+		if harvested >= harvest_cap:
+			break
+		var p: Province = MapManager.get_province(int(pid_key)) if MapManager.has_method("get_province") else null
+		if p == null:
+			continue
+		var owner := str(p.owner_tag).strip_edges().to_upper()
+		var ctrl := str(p.controller_tag).strip_edges().to_upper() if "controller_tag" in p else ""
+		var tag := owner
+		if rhc.has_method("harvest_holder_tag"):
+			tag = str(rhc.harvest_holder_tag(owner, ctrl))
+		var res: Dictionary = p.resources if p.resources is Dictionary else {}
+		var pid := int(p.id) if "id" in p else int(pid_key)
+		if tag.is_empty() or res.is_empty():
+			continue
+		if (light or live_f5) and not player_tag_pref.is_empty() and tag != player_tag_pref:
+			continue
+		var year := 1936
+		if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_current_year"):
+			year = int(TimeManager.get_current_year())
+		var scaled: Dictionary = res
+		if rhc.has_method("scale_deposits_for_year"):
+			scaled = rhc.scale_deposits_for_year(res, year)
+		if scaled.is_empty():
+			continue
+		var occ := 1.0
+		if rhc.has_method("occupation_harvest_mult"):
+			occ = float(rhc.occupation_harvest_mult(owner, ctrl))
+		if occ < 0.999:
+			var taxed: Dictionary = {}
+			for rk in scaled:
+				taxed[rk] = float(scaled[rk]) * occ
+			scaled = taxed
+		owners[tag] = true
+		var plants: Array = []
+		if typeof(FactoryManager) != TYPE_NIL and FactoryManager.has_method("get_resource_plants_in_province") and pid > 0:
+			plants = FactoryManager.get_resource_plants_in_province(pid)
+		var development: Dictionary = {}
+		if "resource_development" in p and p.resource_development is Dictionary:
+			development = (p.resource_development as Dictionary).duplicate()
+		var pid_s := str(pid)
+		if province_resource_dev.has(pid_s) and province_resource_dev[pid_s] is Dictionary:
+			var extra: Dictionary = province_resource_dev[pid_s] as Dictionary
+			for dk in extra:
+				development[str(dk)] = maxi(int(development.get(dk, 0)), int(extra[dk]))
+		provinces_payload.append({
+			"owner_tag": tag,
+			"resources": scaled,
+			"plants": plants,
+			"development": development,
+			"province_id": pid,
+		})
+		harvested += 1
 	for tag in owners:
 		unlocks_by_tag[tag] = _harvest_unlocks_for_tag(str(tag))
 	var by_tag: Dictionary = rhc.compute_national_daily_income(provinces_payload, unlocks_by_tag) as Dictionary
@@ -3731,6 +3756,7 @@ func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
 			day_n = int(TimeManager.total_days_elapsed)
 	# Interactive: keep production line ticks cheap; harvest/reinforce only every 5th day.
 	# (Daily harvest + reinforce scans were still heavy enough to stall 1x near Feb→Mar.)
+	# Live F5: same cadence, but reinforce stays player-capped (day +5 hitch).
 	if light:
 		advance_days(1.0)
 		if day_n % 5 == 0:

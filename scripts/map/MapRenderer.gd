@@ -52,6 +52,15 @@ const _TerrainTiles = preload("res://scripts/map/TerrainTileLibrary.gd")
 
 # Dynamically created infrastructure investment UI (MVP — matches engineers button pattern)
 var _btn_invest_infra: Button = null
+var _btn_build_road_spine: Button = null
+var _label_spine_progress: Label = null
+var _label_spine_start_notice: Label = null
+var _ix1_reveal_busy: bool = false
+var _ix1_spine_inspector_pid: int = -1
+var _ix1_spine_press_guard_msec: int = 0
+var _ix1_last_spine_press: Dictionary = {}
+var _ix1_last_progress_band: int = -1
+const IX1_SPINE_PRESS_GUARD_MS := 180
 var _btn_develop_resource: Button = null
 var _label_invest_status: Label = null
 var _progress_invest: ProgressBar = null
@@ -697,8 +706,14 @@ func _on_map_province_data_changed(province_id: int, what: String) -> void:
 	if provinces.has(province_id):
 		_refresh_single_province_fill(province_id)
 		# Inspector rebuild is heavy; skip on capture/resolve owner flips.
-		if _is_info_panel_visible() and not owner_flip:
-			show_info_panel(provinces[province_id])
+		# Only refresh the open sheet for the selected hex — a foreign/AI
+		# infrastructure_project notify used to retarget + rebuild the inspector
+		# and stall the F5 clock while an IX-1 spine was in progress.
+		if _is_info_panel_visible() and not owner_flip and province_id == selected_province_id:
+			if what == "infrastructure_project":
+				_update_infrastructure_investment_ui(provinces[province_id])
+			else:
+				show_info_panel(provinces[province_id])
 	if _hover_fill_province_id == province_id:
 		_apply_hover_fill(province_id, true)
 	if owner_flip:
@@ -711,6 +726,9 @@ func _on_map_province_data_changed(province_id: int, what: String) -> void:
 		# (borders + mesh + labels) on this signal and freeze F5 after
 		# "open land battles resolved". Pid fill is enough; LOD/mode still
 		# redraws frontiers.
+		return
+	# Remote AI infrastructure_project must not walk riot markers on F5.
+	if what == "infrastructure_project" and province_id != selected_province_id:
 		return
 	_update_riot_markers()  # monthly riot ignition/spread, not capture
 
@@ -834,13 +852,16 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 	_legend_tracked_day = day
 	_legend_tracked_month = month
 	_legend_tracked_year = year
-	# Interactive 1x: never repaint fills on the day tick (even deferred queue) — month only.
-	var light := (
+	# Interactive 1x / live F5 softpipe: never repaint fills on the day tick — month only.
+	# is_live_f5_play_path covers windowed DisplayServer even if light_sim is somehow false.
+	var live_or_light := (
 		typeof(TimeManager) != TYPE_NIL
-		and TimeManager.has_method("is_interactive_light_sim")
-		and bool(TimeManager.is_interactive_light_sim())
+		and (
+			(TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()))
+			or (TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()))
+		)
 	)
-	if not light:
+	if not live_or_light:
 		_refresh_province_fill_colors()
 	_refresh_map_time_ui()
 	var open_n := _sync_land_battle_bubbles()
@@ -861,7 +882,9 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 				_show_inspector_toast(aar_line, 5.5)
 				_play_map_sfx("achievement" if str(aar.get("winner", "")) == "attacker" else "map")
 	# Pass 17: live-update airfield repair rings without full province rebuild.
-	call_deferred("_refresh_feature_progress_rings")
+	# Live F5 / softpipe: walking 3520 province_nodes on every day_emit wedges the clock.
+	if not live_or_light:
+		call_deferred("_refresh_feature_progress_rings")
 	# Pass 22: refresh repair queue chip list on day advance.
 	if _repair_queue_chip != null and is_instance_valid(_repair_queue_chip) and _repair_queue_chip.visible:
 		if _repair_queue_chip.has_method("refresh"):
@@ -877,19 +900,23 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 		if _map_minimap.has_method("invalidate_munitions_cache"):
 			_map_minimap.call_deferred("invalidate_munitions_cache")
 	# Pass 25: sample multi-day risk history for active compare paths.
-	_sample_route_risk_day_history()
+	# Live F5 / softpipe: skip path-risk walks on the hour/day emit (clock at 00:00).
+	if not live_or_light:
+		_sample_route_risk_day_history()
 
 
 func _on_time_advanced_refresh_legend(_a: Variant = null, _b: Variant = null) -> void:
 	_note_time_boundary_for_legend(_b != null)
 	_refresh_map_time_ui()
-	var light := (
+	var live_or_light := (
 		typeof(TimeManager) != TYPE_NIL
-		and TimeManager.has_method("is_interactive_light_sim")
-		and bool(TimeManager.is_interactive_light_sim())
+		and (
+			(TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()))
+			or (TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()))
+		)
 	)
 	# Month boundary: one deferred fill is enough; never sync-paint inside the tick.
-	if light:
+	if live_or_light:
 		call_deferred("_refresh_province_fill_colors")
 	else:
 		_refresh_province_fill_colors()
@@ -1570,6 +1597,10 @@ func _mouse_over_close_control() -> bool:
 
 
 func _mouse_over_search_control() -> bool:
+	# Rect first: after +6d / living title, gui_get_hovered_control can miss the
+	# Go button (overlay, leftover pick-block) while the cursor is still on it.
+	if _search_ui_owns_click():
+		return true
 	var vp_s: Viewport = get_viewport()
 	if vp_s == null:
 		return false
@@ -1578,10 +1609,549 @@ func _mouse_over_search_control() -> bool:
 		return false
 	var n_s: Node = hov_s
 	while n_s != null:
-		if str(n_s.name) == "MapProvinceSearch":
+		var nn_s: String = str(n_s.name)
+		if nn_s == "MapProvinceSearch" or nn_s == "SearchGoButton" or nn_s == "SearchLineEdit":
 			return true
 		n_s = n_s.get_parent()
 	return false
+
+
+func _search_ui_owns_click() -> bool:
+	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
+		return false
+	var vp_r: Viewport = get_viewport()
+	if vp_r == null:
+		return false
+	var sr: Control = _map_search as Control
+	return sr.get_global_rect().grow(6.0).has_point(vp_r.get_mouse_position())
+
+
+func _road_spine_btn_owns_click() -> bool:
+	# Play MIXED d0b1587d: leftover map pan / pick-block swallowed inspector
+	# button-up (same class as Search Go). Rect first — hover can miss.
+	var vp_sp: Viewport = get_viewport()
+	if vp_sp == null:
+		return false
+	var mouse_sp: Vector2 = vp_sp.get_mouse_position()
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
+		if _btn_build_road_spine.get_global_rect().grow(6.0).has_point(mouse_sp):
+			return true
+	if info_panel == null or not (info_panel is Control) or not (info_panel as Control).visible:
+		return false
+	var list_btn: Button = (info_panel as Node).find_child("BtnBuildRoadSpineInList", true, false) as Button
+	if list_btn != null and is_instance_valid(list_btn) and list_btn.visible:
+		if list_btn.get_global_rect().grow(6.0).has_point(mouse_sp):
+			return true
+	var row: Control = (info_panel as Node).find_child("Ix1SpineBuildRow", true, false) as Control
+	if row != null and is_instance_valid(row) and row.visible:
+		if row.get_global_rect().grow(4.0).has_point(mouse_sp):
+			return true
+	return false
+
+
+func _living_title_owns_click() -> bool:
+	return _living_title_owns_event(null)
+
+
+func _living_title_owns_event(event: InputEvent) -> bool:
+	# Play 5adb38e: computerUse clicks land on visible Begin / CC chips but
+	# Viewport.get_mouse_position() is stale (or the event is ScreenTouch).
+	# Collect event + DisplayServer + viewport points — do not rely on hover.
+	var boot: Node = _living_title_boot_node()
+	if boot == null or not is_instance_valid(boot):
+		return false
+	if boot.has_method("owns_any_collected_point") and bool(boot.call("owns_any_collected_point", event)):
+		return true
+	if boot.has_method("collect_pointer_points") and boot.has_method("owns_screen_point"):
+		var pts_v: Variant = boot.call("collect_pointer_points", event)
+		if pts_v is Array:
+			for raw_p in (pts_v as Array):
+				if raw_p is Vector2 and bool(boot.call("owns_screen_point", raw_p)):
+					return true
+	var vp_lt: Viewport = get_viewport()
+	if vp_lt == null:
+		return false
+	var mouse_lt: Vector2 = vp_lt.get_mouse_position()
+	if boot.has_method("owns_screen_point") and bool(boot.call("owns_screen_point", mouse_lt)):
+		return true
+	var panel_lt: Control = boot.find_child("LivingTitlePanel", true, false) as Control
+	if panel_lt != null and panel_lt.visible and panel_lt.get_global_rect().grow(12.0).has_point(mouse_lt):
+		return true
+	var begin_lt: Control = boot.find_child("LivingTitleBegin", true, false) as Control
+	if begin_lt != null and begin_lt.visible and begin_lt.get_global_rect().grow(28.0).has_point(mouse_lt):
+		return true
+	var cc_lt: Control = boot.find_child("LivingTitleCommandCenter", true, false) as Control
+	if cc_lt != null and cc_lt.visible and cc_lt.get_global_rect().grow(24.0).has_point(mouse_lt):
+		return true
+	var chip_lt: Control = boot.find_child("LivingTitleEscChip", true, false) as Control
+	if chip_lt != null and chip_lt.visible and chip_lt.get_global_rect().grow(24.0).has_point(mouse_lt):
+		return true
+	return false
+
+
+func _is_live_pointer_press(event: InputEvent) -> bool:
+	if event is InputEventMouseButton:
+		var mb_p: InputEventMouseButton = event
+		return bool(mb_p.pressed) and mb_p.button_index == MOUSE_BUTTON_LEFT
+	if event is InputEventScreenTouch:
+		var st_p: InputEventScreenTouch = event
+		return bool(st_p.pressed)
+	return false
+
+
+func _route_living_title_pointer(event: InputEvent) -> String:
+	var boot_p: Node = _living_title_boot_node()
+	if boot_p != null and boot_p.has_method("handle_live_pointer"):
+		return str(boot_p.call("handle_live_pointer", event))
+	return ""
+
+
+func _is_live_begin_key(event: InputEvent) -> bool:
+	# Enter / Space / B start the campaign while the living title is up
+	# (Play f9f249c: computerUse mouse never reached handle_live_pointer).
+	var boot_k: Node = _living_title_boot_node()
+	if boot_k != null and boot_k.has_method("is_live_begin_event"):
+		return bool(boot_k.call("is_live_begin_event", event))
+	if event is InputEventKey:
+		var key_b: InputEventKey = event
+		if not key_b.pressed or key_b.echo:
+			return false
+		if key_b.ctrl_pressed or key_b.alt_pressed or key_b.meta_pressed:
+			return false
+		if (
+			key_b.keycode == KEY_ENTER
+			or key_b.keycode == KEY_KP_ENTER
+			or key_b.keycode == KEY_SPACE
+			or key_b.keycode == KEY_B
+		):
+			return true
+	return false
+
+
+func _is_live_escape_event(event: InputEvent) -> bool:
+	# Live DisplayServer: keycode, physical_keycode, or ui_cancel (Play d18cbae).
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
+	if event != null and event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
+func _route_living_title_escape() -> void:
+	var boot_e: Node = _living_title_boot_node()
+	if boot_e != null and boot_e.has_method("handle_live_escape"):
+		boot_e.call("handle_live_escape")
+		return
+	_esc_open_command_center()
+
+
+func _top_bar_owns_click() -> bool:
+	# Softpipe / living-title: gui_get_hovered_control() can miss TopInfoBar
+	# 4x / pause (same class as Search Go). Rect first so leftover pick-block
+	# cannot set_input_as_handled over the live clock chrome.
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return false
+	var tib: Control = TopInfoBar.find_in_tree(tree) as Control
+	if tib == null or not is_instance_valid(tib) or not tib.visible:
+		return false
+	var vp_t: Viewport = get_viewport()
+	if vp_t == null:
+		return false
+	var mouse_t: Vector2 = vp_t.get_mouse_position()
+	if tib.get_global_rect().grow(4.0).has_point(mouse_t):
+		return true
+	var speed_row: Control = tib.get_node_or_null("ContentRow/LeftContainer/TimeSpeedContainer") as Control
+	if speed_row != null and speed_row.visible and speed_row.get_global_rect().grow(8.0).has_point(mouse_t):
+		return true
+	return false
+
+
+func release_play_clock_input_blockers() -> void:
+	# After living title Begin: leftover pan/pick from title map-clicks / soft
+	# camera center must not swallow the first 4x / pause / Space press.
+	_arm_still_click_after_pan()
+	_left_btn_down = false
+	_left_pan_armed = false
+	_left_pan_active = false
+	_left_button_was_up = true
+	_release_search_focus()
+	var vp_clk: Viewport = get_viewport()
+	if vp_clk != null:
+		vp_clk.gui_release_focus()
+
+
+func rebind_map_search() -> void:
+	# Living title Begin can leave Search bound to a stale renderer / empty index.
+	# Play 8f89145: also re-host onto UILayer 110 so stay-alive chrome is live.
+	ensure_live_search_chrome()
+	if _map_search != null and _map_search.has_method("rebuild_index"):
+		_map_search.call("rebuild_index")
+
+
+func ensure_live_search_chrome() -> Control:
+	## Host Search on UILayer 110 TopInfoBar (a Control with real size), not
+	## as a CanvasLayer child. Play c82233c8: flags were live=1 but LineEdit/Go
+	## painted 0px — CanvasLayer parent size 0 collapsed height, and the field
+	## sat under the expanded Map Mode wall. TOP_RIGHT of the 52px bar strip
+	## cannot sit under Map Mode (layer 20) or the NEXT banner.
+	var layer: CanvasLayer = _search_hud_layer()
+	if layer != null:
+		layer.visible = true
+		layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	var host: Control = _search_hud_control_host()
+	if host == null:
+		return null
+	host.visible = true
+	host.process_mode = Node.PROCESS_MODE_ALWAYS
+	if _map_search == null or not is_instance_valid(_map_search):
+		_map_search = host.get_node_or_null("MapProvinceSearch") as HBoxContainer
+	if _map_search == null or not is_instance_valid(_map_search):
+		if layer != null:
+			_map_search = layer.get_node_or_null("MapProvinceSearch") as HBoxContainer
+	if _map_search == null or not is_instance_valid(_map_search):
+		var world_ui := get_node_or_null("UI") as CanvasLayer
+		if world_ui != null:
+			_map_search = world_ui.get_node_or_null("MapProvinceSearch") as HBoxContainer
+	if _map_search == null or not is_instance_valid(_map_search):
+		var SearchScript := preload("res://scripts/ui/map/MapProvinceSearch.gd")
+		_map_search = HBoxContainer.new()
+		_map_search.set_script(SearchScript)
+		_map_search.name = "MapProvinceSearch"
+		host.add_child(_map_search)
+	elif _map_search.get_parent() != host and not host.is_ancestor_of(_map_search):
+		var old_p: Node = _map_search.get_parent()
+		if old_p != null:
+			old_p.remove_child(_map_search)
+		host.add_child(_map_search)
+	if _map_search is Control:
+		var sr_boot: Control = _map_search as Control
+		sr_boot.visible = true
+		sr_boot.modulate = Color(1, 1, 1, 1)
+		sr_boot.mouse_filter = Control.MOUSE_FILTER_STOP
+		sr_boot.z_index = 80
+		sr_boot.z_as_relative = false
+		sr_boot.process_mode = Node.PROCESS_MODE_ALWAYS
+	if host.has_method("host_map_search_chrome"):
+		host.call("host_map_search_chrome", _map_search)
+	_layout_map_search_chrome()
+	if _map_search.has_method("ensure_chrome_visible"):
+		_map_search.call("ensure_chrome_visible")
+	var cam_es := get_node_or_null("MapCamera") as Camera2D
+	if _map_search.has_method("bind"):
+		_map_search.call("bind", self, cam_es)
+	return _map_search as Control
+
+
+func search_chrome_is_live() -> bool:
+	return bool(search_chrome_pixel_report().get("live", false))
+
+
+func search_chrome_pixel_report() -> Dictionary:
+	## Pixel gate: flags alone are not live. Fail when drawn rect has zero
+	## area, is off-screen, or is fully covered by Map Mode / NEXT.
+	var report: Dictionary = {
+		"visible": false,
+		"focusable": false,
+		"on_screen": false,
+		"overlap": 1.0,
+		"area": 0.0,
+		"live": false,
+		"line_w": 0.0,
+		"line_h": 0.0,
+		"go_w": 0.0,
+		"go_h": 0.0,
+		"x": 0.0,
+		"y": 0.0,
+		"host": "",
+		"layer": -1,
+		"in_bar": false,
+		"sticky": false,
+		"reflow": false,
+	}
+	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
+		return report
+	var sr_live: Control = _map_search as Control
+	var parent_n: Node = sr_live.get_parent()
+	var host_name: String = str(parent_n.name) if parent_n != null else ""
+	var walk_h: Node = parent_n
+	while walk_h != null:
+		if walk_h is TopInfoBar or str(walk_h.name) == "TopInfoBar":
+			host_name = "TopInfoBar"
+			break
+		walk_h = walk_h.get_parent()
+	report["host"] = host_name
+	report["layer"] = _canvas_layer_index_of(sr_live)
+	report["in_bar"] = false
+	report["sticky"] = false
+	report["reflow"] = false
+	var line_live: LineEdit = sr_live.get_node_or_null("SearchLineEdit") as LineEdit
+	var go_live: Button = sr_live.get_node_or_null("SearchGoButton") as Button
+	if line_live == null or go_live == null:
+		return report
+	report["visible"] = sr_live.is_visible_in_tree() and line_live.is_visible_in_tree() and go_live.is_visible_in_tree()
+	report["focusable"] = (
+		line_live.focus_mode != Control.FOCUS_NONE
+		and line_live.editable
+		and go_live.focus_mode != Control.FOCUS_NONE
+	)
+	var line_r: Rect2 = line_live.get_global_rect()
+	var go_r: Rect2 = go_live.get_global_rect()
+	report["line_w"] = line_r.size.x
+	report["line_h"] = line_r.size.y
+	report["go_w"] = go_r.size.x
+	report["go_h"] = go_r.size.y
+	report["x"] = line_r.position.x
+	report["y"] = line_r.position.y
+	var area: float = maxf(0.0, line_r.size.x) * maxf(0.0, line_r.size.y)
+	area += maxf(0.0, go_r.size.x) * maxf(0.0, go_r.size.y)
+	report["area"] = area
+	var vp_r: Rect2 = Rect2(Vector2.ZERO, Vector2(1280, 720))
+	if get_viewport() != null:
+		vp_r = get_viewport().get_visible_rect()
+	var line_on: bool = line_r.size.x >= 80.0 and line_r.size.y >= 16.0 and vp_r.intersects(line_r)
+	var go_on: bool = go_r.size.x >= 24.0 and go_r.size.y >= 16.0 and vp_r.intersects(go_r)
+	report["on_screen"] = line_on and go_on
+	var covered: float = _search_chrome_cover_fraction(line_r.merge(go_r))
+	report["overlap"] = covered
+	var host_ok: bool = parent_n is Control and not (parent_n is CanvasLayer)
+	var layer_ok: bool = int(report["layer"]) >= 110
+	var in_bar: bool = _search_chrome_is_in_top_bar(line_r.merge(go_r), parent_n)
+	report["in_bar"] = in_bar
+	report["reflow"] = _search_bar_reflow_settled(parent_n)
+	var sticky_ok: bool = in_bar and bool(report["on_screen"]) and area >= 1600.0 and covered < 0.45
+	report["sticky"] = sticky_ok
+	report["live"] = (
+		bool(report["visible"])
+		and bool(report["focusable"])
+		and bool(report["on_screen"])
+		and in_bar
+		and area >= 1600.0
+		and covered < 0.45
+		and host_ok
+		and layer_ok
+	)
+	return report
+
+
+func _search_chrome_is_in_top_bar(r: Rect2, from_n: Node) -> bool:
+	var walk_b: Node = from_n
+	while walk_b != null:
+		if walk_b is TopInfoBar or str(walk_b.name) == "TopInfoBar":
+			if not (walk_b is Control):
+				return false
+			var tib_c: Control = walk_b as Control
+			var bar_r: Rect2 = tib_c.get_global_rect()
+			if bar_r.size.x < 8.0 or bar_r.size.y < 8.0:
+				bar_r = Rect2(tib_c.global_position, Vector2(maxf(tib_c.size.x, 64.0), maxf(tib_c.size.y, 44.0)))
+			var inter: Rect2 = bar_r.grow(6.0).intersection(r)
+			if inter.size.x < 80.0 or inter.size.y < 16.0:
+				return false
+			return r.position.y < bar_r.end.y + 10.0
+		walk_b = walk_b.get_parent()
+	return false
+
+
+func _search_bar_reflow_settled(from_n: Node) -> bool:
+	var walk_r: Node = from_n
+	var tib_n: Node = null
+	while walk_r != null:
+		if walk_r is TopInfoBar or str(walk_r.name) == "TopInfoBar":
+			tib_n = walk_r
+			break
+		walk_r = walk_r.get_parent()
+	if tib_n == null:
+		return false
+	var more: Control = tib_n.get_node_or_null("ContentRow/CenterContainer/NavOverflowMenu") as Control
+	var steel: Control = tib_n.get_node_or_null("ContentRow/RightContainer/ResourcesContainer/SteelLabel") as Control
+	var more_on: bool = more != null and more.is_visible_in_tree()
+	var steel_on: bool = steel != null and steel.is_visible_in_tree()
+	return more_on or steel_on
+
+
+func _search_chrome_cover_fraction(r: Rect2) -> float:
+	if r.size.x < 1.0 or r.size.y < 1.0:
+		return 1.0
+	var cover: float = 0.0
+	var search_layer: int = _canvas_layer_index_of(_map_search)
+	var blockers: Array[Control] = []
+	if _map_mode_toolbar is Control:
+		blockers.append(_map_mode_toolbar as Control)
+	if _next_hook_chip is Control:
+		blockers.append(_next_hook_chip as Control)
+	var tib_host: Control = _search_hud_control_host()
+	if tib_host != null:
+		var extra_paths: PackedStringArray = PackedStringArray([
+			"ContentRow/RightContainer/ResourcesContainer",
+			"ContentRow/RightContainer/ResourcesContainer/SteelLabel",
+			"ContentRow/RightContainer/ResourcesContainer/AluminumLabel",
+			"ContentRow/RightContainer/ResourcesContainer/OilLabel",
+			"ContentRow/RightContainer/ResourcesContainer/RubberLabel",
+			"ContentRow/CenterContainer/NavOverflowMenu",
+		])
+		for pth in extra_paths:
+			var extra: Control = tib_host.get_node_or_null(pth) as Control
+			if extra != null:
+				blockers.append(extra)
+	for b in blockers:
+		if b == null or not is_instance_valid(b) or not b.is_visible_in_tree():
+			continue
+		if _map_search != null and is_instance_valid(_map_search):
+			if b == _map_search or b.is_ancestor_of(_map_search) or _map_search.is_ancestor_of(b):
+				continue
+		var b_layer: int = _canvas_layer_index_of(b)
+		if b_layer < search_layer:
+			continue
+		var inter: Rect2 = r.intersection(b.get_global_rect())
+		if inter.size.x > 0.0 and inter.size.y > 0.0:
+			cover += (inter.size.x * inter.size.y) / (r.size.x * r.size.y)
+	return minf(1.0, cover)
+
+
+func _canvas_layer_index_of(n: Node) -> int:
+	var walk: Node = n
+	while walk != null:
+		if walk is CanvasLayer:
+			return (walk as CanvasLayer).layer
+		walk = walk.get_parent()
+	return 0
+
+
+func _search_hud_layer() -> CanvasLayer:
+	# Prefer UILayer 110 so Search paints with TopInfoBar, above Map Mode 20.
+	var tree_h: SceneTree = get_tree()
+	if tree_h != null:
+		var scene_h: Node = tree_h.current_scene
+		if scene_h != null:
+			var hud: CanvasLayer = scene_h.get_node_or_null("UILayer") as CanvasLayer
+			if hud != null:
+				return hud
+		var root_hud: CanvasLayer = tree_h.root.get_node_or_null("UILayer") as CanvasLayer
+		if root_hud != null:
+			return root_hud
+	return get_node_or_null("UI") as CanvasLayer
+
+
+func _search_hud_control_host() -> Control:
+	## Search must parent to a Control with a real size (TopInfoBar), never a
+	## 0-size CanvasLayer. PRESET_TOP_RIGHT on CanvasLayer → x=-320 off-screen.
+	var layer: CanvasLayer = _search_hud_layer()
+	if layer != null:
+		var tib: Control = layer.get_node_or_null("TopInfoBar") as Control
+		if tib != null:
+			return tib
+	if get_tree() != null:
+		var found: TopInfoBar = TopInfoBar.find_in_tree(get_tree())
+		if found != null:
+			return found
+	if layer != null:
+		var row: Control = layer.get_node_or_null("SearchChromeRow") as Control
+		if row == null:
+			row = Control.new()
+			row.name = "SearchChromeRow"
+			layer.add_child(row)
+			row.set_anchors_preset(Control.PRESET_TOP_WIDE)
+			row.offset_top = 0.0
+			row.offset_bottom = 52.0
+			row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.z_index = 80
+			row.clip_contents = false
+		return row
+	return null
+
+
+func _layout_map_search_chrome() -> void:
+	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
+		return
+	var sr: Control = _map_search as Control
+	var host: Control = _search_hud_control_host()
+	if host != null and sr.get_parent() != host and not host.is_ancestor_of(sr):
+		var old_p: Node = sr.get_parent()
+		if old_p != null:
+			old_p.remove_child(sr)
+		host.add_child(sr)
+	if host != null and host.has_method("host_map_search_chrome"):
+		host.call("host_map_search_chrome", sr)
+	var box_w := 308.0
+	var box_h := 32.0
+	# In-flow on TopInfoBar RightContainer survives More+/Steel/Al reflow.
+	# Overlay PRESET_TOP_RIGHT is fallback only (parent Control with real width —
+	# never PRESET_TOP_RIGHT on a CanvasLayer; parent size 0 → x=-320).
+	if sr.get_parent() is BoxContainer:
+		sr.custom_minimum_size = Vector2(box_w, box_h)
+		sr.size_flags_horizontal = Control.SIZE_SHRINK_END
+		sr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		sr.visible = true
+		sr.modulate = Color(1, 1, 1, 1)
+		sr.z_index = 80
+		sr.z_as_relative = false
+		sr.mouse_filter = Control.MOUSE_FILTER_STOP
+		sr.process_mode = Node.PROCESS_MODE_ALWAYS
+		sr.clip_contents = false
+		if sr.has_method("ensure_chrome_visible"):
+			sr.call("ensure_chrome_visible")
+		sr.reset_size()
+		sr.force_update_transform()
+		return
+	var bar_h := 52.0
+	if host != null:
+		if host.has_method("get_bar_height"):
+			bar_h = maxf(44.0, float(host.call("get_bar_height")))
+		elif host.size.y > 8.0:
+			bar_h = host.size.y
+	var top_pad := maxf(8.0, (bar_h - box_h) * 0.5)
+	var host_w := 0.0
+	if host != null:
+		host_w = host.size.x
+	if host_w >= 64.0:
+		# TOP_RIGHT fallback: parent Control has a real width (TopInfoBar strip).
+		sr.set_anchors_preset(Control.PRESET_TOP_RIGHT, false)
+		sr.anchor_left = 1.0
+		sr.anchor_top = 0.0
+		sr.anchor_right = 1.0
+		sr.anchor_bottom = 0.0
+		sr.offset_left = -box_w - 8.0
+		sr.offset_right = -8.0
+		sr.offset_top = top_pad
+		sr.offset_bottom = top_pad + box_h
+	else:
+		# Parent not laid out yet — explicit viewport pixels, still in the strip.
+		var vp_sz: Vector2 = Vector2(1280, 720)
+		if get_viewport() != null:
+			var vis: Vector2 = get_viewport().get_visible_rect().size
+			if vis.x >= 64.0:
+				vp_sz = vis
+		sr.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
+		sr.anchor_left = 0.0
+		sr.anchor_top = 0.0
+		sr.anchor_right = 0.0
+		sr.anchor_bottom = 0.0
+		sr.position = Vector2(maxf(8.0, vp_sz.x - box_w - 8.0), top_pad)
+	sr.custom_minimum_size = Vector2(box_w, box_h)
+	sr.size = Vector2(box_w, box_h)
+	sr.visible = true
+	sr.modulate = Color(1, 1, 1, 1)
+	sr.z_index = 80
+	sr.z_as_relative = false
+	sr.mouse_filter = Control.MOUSE_FILTER_STOP
+	sr.process_mode = Node.PROCESS_MODE_ALWAYS
+	sr.clip_contents = false
+	if host != null:
+		host.clip_contents = false
+		host.visible = true
+	sr.reset_size()
+	sr.force_update_transform()
 
 
 func _release_search_focus() -> void:
@@ -1638,6 +2208,21 @@ func _handle_escape_key() -> void:
 	if _esc_stack_frame == frame_now:
 		return
 	_esc_stack_frame = frame_now
+	# Search LineEdit must not steal idle Esc→CC (Play MIXED e36825b after +6d).
+	# Release focus and keep walking the stack — do not treat unfocus as a dismiss.
+	_release_search_focus()
+	# Living title owns the boot screen: do not dismiss a hidden inspector first.
+	# Play d18cbae: layer 120/130 was not enough — title must accept live Esc
+	# (keycode / physical / ui_cancel) and MapRenderer must not also toggle-close.
+	if _living_title_boot_is_up():
+		_route_living_title_escape()
+		return
+	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
+	# without GIS lock or a second search.
+	if _unit_detail_popup_is_visible():
+		_dismiss_unit_card_restore_province()
+		_close_release_seen = true
+		return
 	if _inspector_stack_blocking_input():
 		_dismiss_inspector_and_restore_input()
 		# Esc is not a held Close button — next empty-area left-drag may unlock.
@@ -1690,7 +2275,7 @@ func _input(event: InputEvent) -> void:
 	# Esc / I / Home must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
 	if event is InputEventKey and event.pressed and not event.echo:
 		# Search / any LineEdit: do not steal letters (Play: typing "i" fired I-glyphs).
-		if _gui_text_field_has_focus() and event.keycode != KEY_ESCAPE:
+		if _gui_text_field_has_focus() and not _is_live_escape_event(event) and event.keycode != KEY_ESCAPE:
 			return
 		if event.keycode == KEY_HOME:
 			_apply_home_key(event.shift_pressed)
@@ -1751,11 +2336,24 @@ func _input(event: InputEvent) -> void:
 				set_map_mode("resources")
 			get_viewport().set_input_as_handled()
 			return
-		if event.keycode == KEY_ESCAPE:
+		if _is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 			# Full Esc chain in `_input` (Home-key pattern) so search/GUI cannot
 			# swallow idle Esc after inspector close (play: Esc closed inspector,
 			# next idle Esc never opened Command Center).
+			# Live DisplayServer may deliver physical_keycode / ui_cancel, not keycode.
+			print(
+				"EOA_LIVE_ESC who=MapRenderer._input title_up=%s process_mode=%s handled=before"
+				% [str(_living_title_boot_is_up()), str(process_mode)]
+			)
 			_handle_escape_key()
+			get_viewport().set_input_as_handled()
+			return
+		if _living_title_boot_is_up() and _is_live_begin_key(event):
+			print("EOA_LIVE_RAW_KEY who=MapRenderer._input event=begin_key")
+			var boot_bk: Node = _living_title_boot_node()
+			if boot_bk != null and boot_bk.has_method("handle_live_begin"):
+				boot_bk.call("handle_live_begin")
+				print("EOA_LIVE_PTR who=MapRenderer._input action=begin_key")
 			get_viewport().set_input_as_handled()
 			return
 		if (
@@ -1776,6 +2374,13 @@ func _input(event: InputEvent) -> void:
 			)
 			get_viewport().set_input_as_handled()
 			return
+	if _living_title_boot_is_up() and event is InputEventScreenTouch:
+		# computerUse / remote desktop often delivers touch, not MouseButton.
+		if _is_live_pointer_press(event):
+			var touch_act: String = _route_living_title_pointer(event)
+			if touch_act == "begin" or touch_act == "cc" or touch_act == "panel":
+				get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseButton:
 		# Wheel zoom even when GUI has focus on non-scroll chrome (legend can steal wheel —
 		# if mouse is over map / empty space, always zoom). ScrollContainers still get wheel
@@ -1805,7 +2410,41 @@ func _input(event: InputEvent) -> void:
 			else:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
-			if event.pressed and _mouse_over_search_control():
+			if _living_title_boot_is_up():
+				# Play 5adb38e: never swallow title-up presses. Route by event
+				# coords (computerUse may not update get_mouse_position first).
+				# Blind set_input_as_handled() here made Begin / mouse-CC dead.
+				if event.pressed:
+					print(
+						"EOA_LIVE_RAW_PTR who=MapRenderer._input class=mouse btn=%s pos=%s"
+						% [str(event.button_index), str(event.position)]
+					)
+					var title_act: String = _route_living_title_pointer(event)
+					print("EOA_LIVE_PTR who=MapRenderer._input action=%s" % title_act)
+					if title_act == "begin" or title_act == "cc" or title_act == "panel":
+						get_viewport().set_input_as_handled()
+						return
+					if _living_title_owns_event(event) or _top_bar_owns_click():
+						return
+					# Map-area press: do not mark handled — GUI / window_input
+					# / title _input must still see the event.
+					return
+				if _living_title_owns_event(event) or _top_bar_owns_click():
+					return
+				var title_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+				var title_pid: int = _resolve_map_pick_pid(title_world)
+				if title_pid <= 0:
+					title_pid = _resolve_hex_pick_pid(title_world)
+				_try_living_title_map_pick(title_pid)
+				get_viewport().set_input_as_handled()
+				return
+			if event.pressed and (
+				_top_bar_owns_click()
+				or _mouse_over_search_control()
+				or _search_ui_owns_click()
+				or _living_title_owns_click()
+				or _road_spine_btn_owns_click()
+			):
 				return
 			if event.pressed:
 				# New map press unlocks Close/Esc camera lock *before* leftover
@@ -1834,6 +2473,8 @@ func _input(event: InputEvent) -> void:
 					# Pan latch stays. Do not swallow Open fight / unit-card buttons
 					# (2d47d06: fold click was tooltip-only no-op after pan PASS).
 					# Search LineEdit/Go already returned above — do not touch that path.
+					if _top_bar_owns_click() or _search_ui_owns_click() or _road_spine_btn_owns_click():
+						return
 					if not _is_mouse_over_blocking_ui():
 						_arm_left_map_press()
 						_mark_left_pan_blocked_pick()
@@ -1850,7 +2491,7 @@ func _input(event: InputEvent) -> void:
 					_dismiss_inspector_and_restore_input()
 					get_viewport().set_input_as_handled()
 					return
-				if _mouse_over_search_control():
+				if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _road_spine_btn_owns_click():
 					return
 				_finish_close_click_guard_on_new_press()
 				# Arm pan on the map even if a HUD Control is hovered (search/toolbar).
@@ -1870,9 +2511,23 @@ func _input(event: InputEvent) -> void:
 				if did_left_pan:
 					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
-				elif not event.shift_pressed and _try_open_land_chip_from_input(event.ctrl_pressed):
+				elif _living_title_boot_is_up():
+					# Never open chips / inspector / assault under the title (window-exit).
+					var rel_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+					var rel_pid: int = _resolve_map_pick_pid(rel_world)
+					if rel_pid <= 0:
+						rel_pid = _resolve_hex_pick_pid(rel_world)
+					_try_living_title_map_pick(rel_pid)
+					get_viewport().set_input_as_handled()
+					return
+				elif (
+					not event.shift_pressed
+					and not event.alt_pressed
+					and _try_open_land_chip_from_input(event.ctrl_pressed)
+				):
 					# Still-click land chip in `_input` so ProvinceHoverTooltip
 					# cannot steal GER Division Fill%/TOE (Play DIG FAIL).
+					# Alt-click prefers province inspector (IX-1 Köln under garrison).
 					return
 	if event is InputEventMouseMotion:
 		_note_mouse_up_arms_still_click()
@@ -1931,7 +2586,7 @@ func _wheel_should_zoom_map() -> bool:
 			return false
 		if nn.ends_with("Screen") or nn.ends_with("Popup"):
 			return false
-		if nn == "TopInfoBar":
+		if nn == "TopInfoBar" or nn == "LivingTitleBoot" or nn == "LivingTitlePanel" or nn == "LivingTitleBegin" or nn == "LivingTitleCommandCenter" or nn == "LivingTitleEscChip":
 			return false
 		n = n.get_parent()
 	return true
@@ -1939,11 +2594,15 @@ func _wheel_should_zoom_map() -> bool:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if _gui_text_field_has_focus() and event.keycode != KEY_ESCAPE:
+		if _gui_text_field_has_focus() and not _is_live_escape_event(event) and event.keycode != KEY_ESCAPE:
 			return
 		# Esc: dismiss stuck overlays (legend / tech / info) so playtest is never trapped.
-		if event.keycode == KEY_ESCAPE:
+		if _is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 			# Backup if `_input` did not run. Same chain: dismiss then idle `_on_menu_pressed`.
+			print(
+				"EOA_LIVE_ESC who=MapRenderer._unhandled_input title_up=%s process_mode=%s"
+				% [str(_living_title_boot_is_up()), str(process_mode)]
+			)
 			_handle_escape_key()
 			get_viewport().set_input_as_handled()
 			return
@@ -2101,6 +2760,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		# Phase C: B — live fronts. Toast + cycle + camera ONLY (never outline/scan on key frame).
 		if event.keycode == KEY_B and not event.ctrl_pressed and not event.alt_pressed and not event.shift_pressed:
+			if _living_title_boot_is_up():
+				var boot_b: Node = _living_title_boot_node()
+				if boot_b != null and boot_b.has_method("handle_live_begin"):
+					boot_b.call("handle_live_begin")
+					print("EOA_LIVE_PTR who=MapRenderer._unhandled_input action=begin_key")
+				get_viewport().set_input_as_handled()
+				return
 			_run_live_border_fronts_instant()
 			get_viewport().set_input_as_handled()
 			return
@@ -2152,12 +2818,30 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if _living_title_boot_is_up():
+			if event.pressed:
+				var un_act: String = _route_living_title_pointer(event)
+				if un_act == "begin" or un_act == "cc" or un_act == "panel":
+					get_viewport().set_input_as_handled()
+					return
+				if _living_title_owns_event(event) or _top_bar_owns_click():
+					return
+				return
+			if _living_title_owns_event(event) or _top_bar_owns_click():
+				return
+			var un_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+			var un_pid: int = _resolve_map_pick_pid(un_world)
+			if un_pid <= 0:
+				un_pid = _resolve_hex_pick_pid(un_world)
+			_try_living_title_map_pick(un_pid)
+			get_viewport().set_input_as_handled()
+			return
 		if _mouse_over_close_control():
 			if _inspector_stack_blocking_input():
 				_dismiss_inspector_and_restore_input()
 			get_viewport().set_input_as_handled()
 			return
-		if _mouse_over_search_control():
+		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click() or _road_spine_btn_owns_click():
 			return
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
@@ -2241,11 +2925,22 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 		_release_search_focus()
 		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
+		# Living title owns map clicks: never open inspector / chips / assault (window-exit class).
+		if _living_title_boot_is_up():
+			var title_pid := _resolve_map_pick_pid(world_pos)
+			if title_pid <= 0:
+				title_pid = _resolve_hex_pick_pid(world_pos)
+			if _try_living_title_map_pick(title_pid):
+				get_viewport().set_input_as_handled()
+				return
 		# Land division chips beat capital stars (Play: chips opened Praha inspector).
 		# Air/fleet still lose to stars (Berlin star vs Air Wing PASS).
-		if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed):
-			get_viewport().set_input_as_handled()
-			return
+		# Alt-click / infra empty-terrain prefers province (IX-1 Köln under garrison).
+		if not event.alt_pressed:
+			var disk_only: bool = _map_prefers_province_over_unit()
+			if _try_open_land_unit_at_world(world_pos, event.ctrl_pressed, disk_only):
+				get_viewport().set_input_as_handled()
+				return
 		# Capital gold star wins over a colocated air/fleet chip.
 		# Star click inspects the capital and does not arm MARCH.
 		# THIS drag already exceeded 8px: do not snap-select any capital
@@ -2283,7 +2978,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				_toast_living_diplomacy_pick(star_pid)
 				_select_province(star_province, star_node)
 				_center_camera_on_province(star_pid, "soft")
-				show_info_panel(star_province)
+				if event.alt_pressed or _map_prefers_province_over_unit():
+					_open_hex_province_inspector(star_province)
+				else:
+					show_info_panel(star_province)
 				get_viewport().set_input_as_handled()
 				return
 		# Remaining chips (air/fleet) after star.
@@ -2379,7 +3077,10 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 			_select_province(resolved_province, resolved_node)
 			_center_camera_on_province(resolved_province.id, "soft")
-			show_info_panel(resolved_province)
+			if event.alt_pressed or _map_prefers_province_over_unit():
+				_open_hex_province_inspector(resolved_province)
+			else:
+				show_info_panel(resolved_province)
 			get_viewport().set_input_as_handled()
 			return
 
@@ -2671,11 +3372,21 @@ func _zoom_toward_mouse(zoom_change: float) -> void:
 	if new_zoom == old_zoom:
 		return
 
+	eoa_log_flush(
+		"EOA_ZOOM_BEGIN who=MapRenderer._zoom_toward_mouse from=%.3f to=%.3f factor=%.3f"
+		% [old_zoom.x, new_zoom.x, zoom_change]
+	)
 	var world_before := cam.get_canvas_transform().affine_inverse() * mouse_screen
 	cam.zoom = new_zoom
 	var world_after := cam.get_canvas_transform().affine_inverse() * mouse_screen
 	cam.global_position += world_before - world_after
 	_clamp_camera_to_theater()
+	# Light LOD only — never full 3520 fill / RoadLayer rebuild on a wheel notch.
+	_refresh_terrain_zoom_light()
+	eoa_log_flush(
+		"EOA_ZOOM_END who=MapRenderer._zoom_toward_mouse z=%.3f ok=1"
+		% new_zoom.x
+	)
 
 ## Converts screen (pixel) mouse position to world/map space using the active Camera2D.
 ## This is the key bridge for using MapPickGrid / MapManager picking.
@@ -2701,21 +3412,17 @@ func _setup_player_map_ux() -> void:
 		_map_mode_toolbar = PanelContainer.new()
 		_map_mode_toolbar.set_script(ToolbarScript)
 		_map_mode_toolbar.name = "MapModeToolbar"
+		_map_mode_toolbar.clip_contents = true
+		_map_mode_toolbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ui.add_child(_map_mode_toolbar)
 		if _map_mode_toolbar.has_method("bind_map_renderer"):
 			_map_mode_toolbar.call("bind_map_renderer", self)
 		if _map_mode_toolbar.has_signal("layout_changed"):
 			_map_mode_toolbar.layout_changed.connect(_layout_map_ui)
 
-	if _map_search == null:
-		var SearchScript := preload("res://scripts/ui/map/MapProvinceSearch.gd")
-		_map_search = HBoxContainer.new()
-		_map_search.set_script(SearchScript)
-		_map_search.name = "MapProvinceSearch"
-		ui.add_child(_map_search)
-		var cam := get_node_or_null("MapCamera") as Camera2D
-		if _map_search.has_method("bind"):
-			_map_search.call("bind", self, cam)
+	# Host on UILayer 110 (not WorldMap UI 20). TOP_RIGHT on layer 20 left
+	# Search off-screen under the expanded Map Mode wall (Play 8f89145).
+	ensure_live_search_chrome()
 
 	if _map_minimap == null:
 		var MinimapScript := preload("res://scripts/ui/map/MapMinimap.gd")
@@ -2768,19 +3475,15 @@ func _layout_map_ui() -> void:
 
 	if _map_mode_toolbar is Control:
 		var tb := _map_mode_toolbar as Control
+		tb.clip_contents = true
+		tb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tb.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		tb.offset_left = 8.0
 		tb.offset_top = top_clearance
 		tb.offset_right = minf(620.0, get_viewport().get_visible_rect().size.x - 16.0)
 		tb.offset_bottom = top_clearance + toolbar_h
 
-	if _map_search is Control:
-		var sr := _map_search as Control
-		sr.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-		sr.offset_left = -320.0
-		sr.offset_top = chrome_top
-		sr.offset_right = -12.0
-		sr.offset_bottom = chrome_top + 32.0
+	_layout_map_search_chrome()
 
 	if info_panel is Control and not info_panel.has_meta("user_moved"):
 		var ip := info_panel as Control
@@ -2796,7 +3499,11 @@ func _layout_map_ui() -> void:
 		ip.offset_right = cx + pw
 		ip.offset_bottom = cy + ph
 		ip.custom_minimum_size = Vector2(pw, ph)
-		ip.z_index = 40
+		# Search/Go force-open must stay above Garrison z70; default dock stays 40.
+		if ip.has_meta("force_over_unit_card") and bool(ip.get_meta("force_over_unit_card")):
+			ip.z_index = 80
+		else:
+			ip.z_index = 40
 	_layout_info_panel_inner()
 
 
@@ -2826,11 +3533,15 @@ func _layout_info_panel_inner() -> void:
 
 	const PAD_L := 18.0
 	const PAD_R := 16.0
-	const HEADER_H := 40.0
 	const FOOTER_PAD := 12.0
 	const INNER_L := 12.0
 	const INNER_R := 12.0
 	const SCROLLBAR_W := 14.0
+	# Settle + IX-1 Build Road Spine share the chrome row under National Spirits / Close.
+	# Keep scroll under that row so Search+Go Köln does not bury the spine CTA in InfoContent.
+	var header_h := 40.0
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
+		header_h = 68.0
 
 	if btn_national_spirits != null:
 		btn_national_spirits.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -2857,9 +3568,10 @@ func _layout_info_panel_inner() -> void:
 
 	# Explicit pixel box for scroll — do NOT use full-rect anchors (content growth was expanding it).
 	var scroll_x := PAD_L
-	var scroll_y := HEADER_H
+	var scroll_y := header_h
 	var scroll_w := maxf(panel_w - PAD_L - PAD_R, 120.0)
-	var scroll_h := maxf(panel_h - HEADER_H - FOOTER_PAD, 80.0)
+	var scroll_h := maxf(panel_h - header_h - FOOTER_PAD, 80.0)
+	_layout_road_spine_chrome_button()
 	var text_w := maxf(scroll_w - INNER_L - INNER_R - SCROLLBAR_W, 100.0)
 
 	var scroll := ip.get_node_or_null("InfoScroll") as ScrollContainer
@@ -2989,7 +3701,24 @@ func _bring_info_panel_to_front() -> void:
 	if info_panel == null or not (info_panel is Control):
 		return
 	var ip := info_panel as Control
-	ip.z_index = 60
+	if ip.has_meta("force_over_unit_card") and bool(ip.get_meta("force_over_unit_card")):
+		ip.z_index = 80
+	else:
+		ip.z_index = 60
+	var p := ip.get_parent()
+	if p != null:
+		p.move_child(ip, p.get_child_count() - 1)
+
+
+func _raise_province_inspector_over_unit_card() -> void:
+	# Garrison unit card is z70; Search/Go + Alt/infra must paint Build Road Spine on top.
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	ip.set_meta("force_over_unit_card", true)
+	ip.z_index = 80
+	ip.visible = true
+	ip.mouse_filter = Control.MOUSE_FILTER_STOP
 	var p := ip.get_parent()
 	if p != null:
 		p.move_child(ip, p.get_child_count() - 1)
@@ -13443,6 +14172,8 @@ func hide_info_panel() -> void:
 		if info_panel is Control:
 			(info_panel as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 			(info_panel as Control).release_focus()
+			if (info_panel as Control).has_meta("force_over_unit_card"):
+				(info_panel as Control).remove_meta("force_over_unit_card")
 	elif info_panel != null:
 		push_warning("MapRenderer: hide_info_panel called on non-CanvasItem (got " + str(info_panel.get_script() if info_panel.get_script() else info_panel.get_class()) + ")")
 	if _province_id_badge != null:
@@ -17220,40 +17951,139 @@ func _clear_selection() -> void:
 	_update_compare_hint_label()
 
 
+func eoa_log_flush(msg: String) -> void:
+	# Bisect prints stay, but stay cheap unless the Play-launch guard is on.
+	if msg.begins_with("EOA_SMOKE_SPINE_BISECT"):
+		if (
+			OS.get_environment("EOA_SMOKE_FRAME_GUARD") != "1"
+			and OS.get_environment("EOA_SMOKE_SPINE_BISECT") != "1"
+		):
+			return
+	print(msg)
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+
+
 ## Select a province and pan the map camera to it (used by production / relocate UI).
 ## Now also drives the modern CameraController (ProvinceContainers) so auto-center works reliably for map tools / changes.
 ## Pass 51: zoom_mode = tactical | soft | keep (pan only).
-func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> bool:
-	if province_id < 0 or typeof(MapManager) == TYPE_NIL:
+## Live F5: "tactical" is redirected to soft-pan (2.4 zoom after +6d / spine start
+## killed the process with no SCRIPT ERROR).
+func focus_province_by_id(province_id: int, zoom_mode: String = "soft") -> bool:
+	if province_id < 0:
 		return false
-	var province: Province = MapManager.get_province(province_id)
+	var province: Province = null
+	if typeof(MapManager) != TYPE_NIL:
+		province = MapManager.get_province(province_id)
+	if province == null and provinces.has(province_id):
+		province = provinces[province_id] as Province
 	if province == null:
 		return false
 	var node := _province_node(province_id)
-	if node == null:
-		return false
+	# Search/Go is explicit province intent: hide Garrison overlay and drop Close hold
+	# so show_info_panel is not skipped by _camera_is_held() (Play MIXED Köln 710417).
+	# Node may be late/null — still open the inspector (do not silent-return).
+	_hide_unit_card_keep_map_focus()
+	_inspector_held_closed = false
+	_unlock_close_camera()
+	_close_click_guard = false
+	_close_suppress_edge = false
+	_hold_camera_until_msec = 0
+	_map_pick_block_until_msec = 0
 	_select_province(province, node)
-	var pos: Vector2 = province_centroids.get(province_id, Vector2.ZERO)
-	if pos == Vector2.ZERO:
-		pos = MapManager.get_province_centroid(province_id)
-	var cam := get_node_or_null("MapCamera") as Camera2D
-	if cam == null:
-		cam = get_viewport().get_camera_2d() if get_viewport() else null
-	if cam != null and pos != Vector2.ZERO and not _camera_is_held():
-		var tactical_z := clampf(2.4 * MapCanvasConfig.THEATER_SCALE, min_zoom, max_zoom)
-		cam.global_position = _apply_camera_bounds(pos)
-		var zm := zoom_mode.strip_edges().to_lower()
-		if zm == "keep":
-			pass  # pan only
-		elif zm == "soft":
-			var cur_z := absf(cam.zoom.x)
-			var soft_z := clampf(lerpf(cur_z, tactical_z, 0.5), min_zoom, max_zoom)
-			cam.zoom = Vector2(soft_z, soft_z)
-		else:
-			cam.zoom = Vector2(tactical_z, tactical_z)
-	show_info_panel(province)
-	MapManager.province_selected.emit(province_id)
+	var zm := zoom_mode.strip_edges().to_lower()
+	if zm == "soft" or zm == "keep":
+		eoa_log_flush("EOA_ZOOM_BEGIN who=MapRenderer.focus_province_by_id mode=%s pid=%d" % [zm, province_id])
+		_soft_pan_camera_to_province(province_id, zm == "keep")
+		eoa_log_flush("EOA_ZOOM_END who=MapRenderer.focus_province_by_id mode=%s pid=%d ok=1" % [zm, province_id])
+	else:
+		# Live F5 / smoke: tactical 2.4 after +6d (or after IX-1 spine start)
+		# exited Godot with no SCRIPT ERROR. Soft-pan is the shipped path.
+		eoa_log_flush(
+			"EOA_ZOOM_BEGIN who=MapRenderer.focus_province_by_id mode=tactical_redirected_soft pid=%d"
+			% province_id
+		)
+		_soft_pan_camera_to_province(province_id, false)
+		eoa_log_flush(
+			"EOA_ZOOM_END who=MapRenderer.focus_province_by_id mode=tactical_redirected_soft pid=%d ok=1"
+			% province_id
+		)
+	_raise_province_inspector_over_unit_card()
+	show_info_panel(province, true)
+	if typeof(MapManager) != TYPE_NIL:
+		MapManager.province_selected.emit(province_id)
 	return true
+
+
+## Live Search/Go: force-open province inspector (Build Road Spine) without tactical zoom crash.
+func open_province_inspector_from_search(province_id: int) -> bool:
+	if province_id < 0:
+		return false
+	var province: Province = null
+	if typeof(MapManager) != TYPE_NIL:
+		province = MapManager.get_province(province_id)
+	if province == null and provinces.has(province_id):
+		province = provinces[province_id] as Province
+	if province == null:
+		return false
+	_hide_unit_card_keep_map_focus()
+	_inspector_held_closed = false
+	_unlock_close_camera()
+	_close_click_guard = false
+	_close_suppress_edge = false
+	_hold_camera_until_msec = 0
+	_map_pick_block_until_msec = 0
+	var node := _province_node(province_id)
+	_select_province(province, node)
+	# Softpipe Play MIXED: tactical zoom after +6d exited Godot mid Search retries.
+	_soft_pan_camera_to_province(province_id, false)
+	_raise_province_inspector_over_unit_card()
+	show_info_panel(province, true, true)
+	_raise_province_inspector_over_unit_card()
+	_reveal_ix1_road_spine_on_inspector(province, true)
+	_show_inspector_toast("%s · province inspector" % str(province.name), 2.2)
+	if typeof(MapManager) != TYPE_NIL:
+		MapManager.province_selected.emit(province_id)
+	return true
+
+
+func _soft_pan_camera_to_province(province_id: int, keep_zoom: bool) -> void:
+	# Search/Go + Alt/infra must not snap to tactical zoom (softpipe process death).
+	if _camera_is_held():
+		return
+	var pos: Vector2 = province_centroids.get(province_id, Vector2.ZERO) as Vector2
+	if pos == Vector2.ZERO and typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
+		pos = MapManager.get_province_centroid(province_id)
+	if pos == Vector2.ZERO:
+		return
+	var cam := get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport():
+		cam = get_viewport().get_camera_2d()
+	if cam == null:
+		return
+	if not keep_zoom:
+		var cur_z: float = maxf(absf(cam.zoom.x), 0.01)
+		if cur_z < 0.22:
+			var soft_z: float = clampf(0.42, min_zoom, max_zoom)
+			cam.zoom = Vector2(soft_z, soft_z)
+	cam.global_position = _apply_camera_bounds(pos)
+
+
+func _open_hex_province_inspector(province: Province) -> void:
+	# Alt-click / Infra empty-terrain backup: same inspector as Search/Go.
+	if province == null:
+		return
+	_hide_unit_card_keep_map_focus()
+	_inspector_held_closed = false
+	_unlock_close_camera()
+	_close_click_guard = false
+	_close_suppress_edge = false
+	_hold_camera_until_msec = 0
+	_map_pick_block_until_msec = 0
+	_raise_province_inspector_over_unit_card()
+	show_info_panel(province, true, true)
+	_raise_province_inspector_over_unit_card()
+	_reveal_ix1_road_spine_on_inspector(province, true)
 
 
 func _select_province(province: Province, node: Node2D) -> void:
@@ -17314,8 +18144,11 @@ func _center_camera_on_province(province_id: int, zoom_mode: String = "soft") ->
 	var zm := zoom_mode.strip_edges().to_lower()
 	var cur_z := maxf(absf(cam.zoom.x), 0.01)
 	if zm == "tactical":
-		cur_z = clampf(2.2 * MapCanvasConfig.THEATER_SCALE, min_zoom, max_zoom)
-		cam.zoom = Vector2(cur_z, cur_z)
+		# Same class as Search/spine start: snap-to-2.2+ killed the softpipe.
+		eoa_log_flush("EOA_ZOOM_BEGIN who=MapRenderer._center_camera_on_province mode=tactical_redirected_soft pid=%d" % province_id)
+		_soft_pan_camera_to_province(province_id, false)
+		eoa_log_flush("EOA_ZOOM_END who=MapRenderer._center_camera_on_province mode=tactical_redirected_soft pid=%d ok=1" % province_id)
+		return
 	elif zm == "soft":
 		var soft_target := clampf(maxf(cur_z, 0.9), min_zoom, max_zoom)
 		if cur_z < 0.75:
@@ -17384,6 +18217,8 @@ func _on_mouse_exited(node: Node2D) -> void:
 
 func _is_mouse_over_blocking_ui() -> bool:
 	## True when cursor is over a screen/popup so map hover text must not bleed through.
+	if _road_spine_btn_owns_click() or _search_ui_owns_click() or _top_bar_owns_click():
+		return true
 	var vp := get_viewport()
 	if vp == null:
 		return false
@@ -17415,6 +18250,14 @@ func _is_mouse_over_blocking_ui() -> bool:
 			"BtnOpenFight",
 			"OpenFightFoldBtn",
 			"BtnClose",
+			"BtnBuildRoadSpine",
+			"BtnBuildRoadSpineInList",
+			"Ix1SpineBuildRow",
+			"LivingTitleBoot",
+			"LivingTitlePanel",
+			"LivingTitleBegin",
+			"LivingTitleCommandCenter",
+			"LivingTitleEscChip",
 		]:
 			return true
 		if nn.ends_with("Screen") or nn.ends_with("Popup") or nn.ends_with("View"):
@@ -17619,7 +18462,7 @@ func _update_spatial_hover() -> void:
 
 # ====================== INFO PANEL ======================
 
-func show_info_panel(province: Province) -> void:
+func show_info_panel(province: Province, force_open: bool = false, keep_camera: bool = false) -> void:
 	# Real province always wins — never redirect back to coarse (that re-teleported camera every
 	# data_changed/air tick after clicking Africa and hard-crashed while panning).
 	if province != null:
@@ -17633,7 +18476,7 @@ func show_info_panel(province: Province) -> void:
 		push_warning("MapRenderer: info_panel is not a CanvasItem (type=" + str(info_panel.get_class()) + ", script=" + str(info_panel.get_script()) + ") — cannot show inspector. Check scene NodePath exports for the MapRenderer or wiring in _wire_info_panel_refs.")
 		return
 
-	if _camera_is_held():
+	if _camera_is_held() and not force_open:
 		return
 	_inspector_held_closed = false
 	_layout_map_ui()
@@ -17643,7 +18486,12 @@ func show_info_panel(province: Province) -> void:
 	_layout_info_panel_inner()
 	# After panel is visible, nudge once so selection sits in the free map band.
 	# Dismiss bumps _camera_nudge_gen so a Close cannot leave this as a teleport.
-	if not info_panel.has_meta("user_moved") and selected_province_id == province.id:
+	# keep_camera: garrison Close restores inspector without flying the GIS pose.
+	if (
+		not keep_camera
+		and not info_panel.has_meta("user_moved")
+		and selected_province_id == province.id
+	):
 		call_deferred("_nudge_camera_after_panel", province.id, _camera_nudge_gen)
 	# Second + third pass after size settles so wrap width matches real scroll viewport.
 	call_deferred("_layout_info_panel_inner")
@@ -17792,6 +18640,8 @@ func show_info_panel(province: Province) -> void:
 	_update_settle_button(province)
 	_update_assign_agent_button(province)
 	_refresh_oob_strip_for_province(province)
+	# Köln Search+Go must keep Build Road Spine on the live chrome, not only in buried scroll.
+	_reveal_ix1_road_spine_on_inspector(province, false)
 
 
 func _ensure_oob_strip() -> void:
@@ -17957,37 +18807,62 @@ func _toast_living_diplomacy_pick(pid: int) -> void:
 		_show_inspector_toast(str(dip.get("sentence", "Influence")), 3.5)
 
 
+func _living_title_boot_node() -> Node:
+	var tree := get_tree()
+	if tree == null:
+		return null
+	if tree.root != null:
+		var from_root: Node = _walk_open_living_title(tree.root)
+		if from_root != null:
+			return from_root
+	if tree.current_scene != null:
+		return _walk_open_living_title(tree.current_scene)
+	return null
+
+
+func _walk_open_living_title(n: Node) -> Node:
+	if n != null and is_instance_valid(n) and not n.is_queued_for_deletion():
+		if str(n.name).begins_with("LivingTitleBoot") and not bool(n.get("_closed")):
+			if _overlay_node_is_up(n):
+				return n
+		for child in n.get_children():
+			var found: Node = _walk_open_living_title(child)
+			if found != null:
+				return found
+	return null
+
+
+func _living_title_boot_is_up() -> bool:
+	return _living_title_boot_node() != null
+
+
 ## Title boot: click playable land/capital on the political map (panel stays a list too).
+## While the overlay is up, consume the click even on a miss so inspector/assault
+## cannot run (Play d53ee05: map click after dead Begin exited the DEBUG window).
 func _try_living_title_map_pick(pid: int) -> bool:
 	if _left_release_must_skip_pick() or _left_live_slop_is_drag():
 		return false
-	var tree := get_tree()
-	if tree == null or tree.root == null:
+	if not _living_title_boot_is_up():
 		return false
-	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
-	if boot == null or not is_instance_valid(boot) or boot.is_queued_for_deletion():
-		return false
-	if not _overlay_node_is_up(boot):
-		return false
-	if boot.has_method("select_from_province"):
-		var picked: Variant = boot.call("select_from_province", pid)
-		if picked is Dictionary and bool((picked as Dictionary).get("ok", false)):
-			return true
-	return false
+	var boot: Node = _living_title_boot_node()
+	if boot != null and boot.has_method("select_from_province"):
+		boot.call("select_from_province", pid)
+	return true
 
 
 func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
 	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
 	# Esc helpers + Dig2 / Drag2+3 pan helpers untouched.
-	if _mouse_over_search_control() or _mouse_over_close_control():
+	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control() or _road_spine_btn_owns_click():
 		return false
 	if _is_mouse_over_blocking_ui():
 		return false
 	if MapViewInput.modal_blocks_map_nav(get_viewport()):
 		return false
 	var world_pos: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
-	if _try_open_land_unit_at_world(world_pos, ctrl_click):
+	var disk_only: bool = _map_prefers_province_over_unit()
+	if _try_open_land_unit_at_world(world_pos, ctrl_click, disk_only):
 		get_viewport().set_input_as_handled()
 		return true
 	return false
@@ -18115,7 +18990,11 @@ func _nearest_player_land_formation_at_world(world_pos: Vector2) -> Object:
 	return best
 
 
-func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) -> bool:
+func _try_open_land_unit_at_world(
+	world_pos: Vector2,
+	ctrl_click: bool = false,
+	chip_disk_only: bool = false
+) -> bool:
 	var fo_any: Object = _pick_unit_formation_at_world(world_pos)
 	var fo: Object = _pick_land_unit_formation_at_world(world_pos)
 	if fo_any != null and _formation_type_blocks_land_open(fo_any):
@@ -18125,13 +19004,14 @@ func _try_open_land_unit_at_world(world_pos: Vector2, ctrl_click: bool = false) 
 		var stacked: Object = _player_land_formation_at_province(chrome_pid)
 		if stacked != null:
 			fo = stacked
-	if fo == null:
+	if fo == null and not chip_disk_only:
 		# Disk miss (empty / non-player): player land stationed on the hex
 		# under the click — even when first pick is not air/fleet/space.
 		# Hex-only: capital star stays the next still-click step after land-open.
+		# chip_disk_only: infra / empty-terrain prefers province inspector.
 		var miss_pid: int = _resolve_hex_pick_pid(world_pos)
 		fo = _player_land_formation_at_province(miss_pid)
-	if fo == null:
+	if fo == null and not chip_disk_only:
 		# Home chrome over Neustadt / Schwäbisch Hall / FRA / Berlin-Home:
 		# nearest painted player-land icon (station 710173 / ger_nbr).
 		fo = _nearest_player_land_formation_at_world(world_pos)
@@ -18548,7 +19428,7 @@ func _show_unit_detail_popup(formation: Object) -> void:
 	close_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	RetrowaveTheme.style_secondary_button(close_btn)
 	close_btn.process_mode = Node.PROCESS_MODE_ALWAYS
-	close_btn.pressed.connect(_dismiss_inspector_and_restore_input)
+	close_btn.pressed.connect(_dismiss_unit_card_restore_province)
 	title_row.add_child(close_btn)
 
 	# Always paint Fill%/TOE on open (never title-row-only). Parent fallback first so
@@ -18911,6 +19791,42 @@ func _unit_detail_popup_is_visible() -> bool:
 	return _overlay_node_is_up(ui.get_node_or_null("UnitDetailPopup"))
 
 
+func _map_prefers_province_over_unit() -> bool:
+	# Infra Build / F7 and Alt-click prefer hex inspector over garrison stack.
+	if Input.is_key_pressed(KEY_ALT):
+		return true
+	if current_map_mode == "infra":
+		return true
+	return false
+
+
+func _hide_unit_card_keep_map_focus() -> void:
+	# Drop Garrison overlay without Close GIS lock / pick-block (search + restore).
+	# Hide only — queue_free mid Search retry was a softpipe exit suspect.
+	var ui: CanvasLayer = get_node_or_null("UI") as CanvasLayer
+	if ui != null:
+		var unit_pop: Node = ui.get_node_or_null("UnitDetailPopup")
+		if unit_pop != null and is_instance_valid(unit_pop) and not unit_pop.is_queued_for_deletion():
+			if unit_pop is CanvasItem:
+				(unit_pop as CanvasItem).visible = false
+			if unit_pop is Control:
+				(unit_pop as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if not selected_formation_id.is_empty():
+		selected_formation_id = ""
+		_refresh_selected_unit_chip()
+
+
+func _dismiss_unit_card_restore_province() -> void:
+	_hide_unit_card_keep_map_focus()
+	if selected_province_id < 0 or not provinces.has(selected_province_id):
+		return
+	var p: Province = provinces[selected_province_id] as Province
+	if p == null:
+		return
+	_inspector_held_closed = false
+	show_info_panel(p, true, true)
+
+
 func _ensure_station_engineers_button() -> void:
 	if info_panel == null:
 		return
@@ -19017,6 +19933,8 @@ func _info_content_vbox() -> VBoxContainer:
 
 
 func _ensure_infrastructure_investment_ui() -> void:
+	# Spine CTA is chrome (InfoPanel), not InfoContent — create even if the scroll vbox is missing.
+	_ensure_road_spine_button()
 	var content := _info_content_vbox()
 	if content == null:
 		return
@@ -19210,6 +20128,7 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 		if _progress_invest: _progress_invest.visible = false
 		if _btn_cancel_invest: _btn_cancel_invest.visible = false
 		if _label_invest_modifiers: _label_invest_modifiers.visible = false
+		_update_road_spine_button(null)
 		return
 
 	var mgr = _get_infra_manager()
@@ -19219,6 +20138,7 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 		if _progress_invest: _progress_invest.visible = false
 		if _btn_cancel_invest: _btn_cancel_invest.visible = false
 		if _label_invest_modifiers: _label_invest_modifiers.visible = false
+		_update_road_spine_button(null)
 		return
 
 	var player_tag := _player_tag()
@@ -19227,12 +20147,17 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 		if mgr.has_method("should_show_investment_button")
 		else true
 	)
-	if not show_ui:
+	var spine_status: Dictionary = (
+		mgr.get_project_status(province.id) if mgr.has_method("get_project_status") else {}
+	)
+	var spine_active := bool(spine_status.get("active", false)) and bool(spine_status.get("build_road_spine", false))
+	if not show_ui and not spine_active:
 		_btn_invest_infra.visible = false
 		_label_invest_status.visible = false
 		if _progress_invest: _progress_invest.visible = false
 		if _btn_cancel_invest: _btn_cancel_invest.visible = false
 		if _label_invest_modifiers: _label_invest_modifiers.visible = false
+		_update_road_spine_button(province)
 		return
 
 	_label_invest_status.visible = true
@@ -19291,6 +20216,507 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 			else:
 				_btn_invest_infra.tooltip_text = str(preview.get("reason", "Cannot invest here."))
 				_btn_invest_infra.disabled = true
+	_update_road_spine_button(province)
+
+
+func _ensure_road_spine_button() -> void:
+	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
+		_btn_build_road_spine = Button.new()
+		_btn_build_road_spine.name = "BtnBuildRoadSpine"
+		_btn_build_road_spine.text = "Build Road Spine"
+		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). First-session starter grant — GER 1936 day-0 Mandate is enough (generic Invest stays gated). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
+		_btn_build_road_spine.custom_minimum_size = Vector2(220, 24)
+		_btn_build_road_spine.visible = false
+	_wire_road_spine_live_button(_btn_build_road_spine)
+	_pin_road_spine_button_to_inspector_chrome()
+
+
+func _wire_road_spine_live_button(btn: Button) -> void:
+	# Press-on-down so leftover map-pan / pick-block cannot eat button-up
+	# (same class as Search Go). Visible chrome with a dead pressed-on-up is FAIL.
+	if btn == null or not is_instance_valid(btn):
+		return
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	btn.z_index = 20
+	if not btn.pressed.is_connected(_on_build_road_spine_pressed):
+		btn.pressed.connect(_on_build_road_spine_pressed)
+	if not btn.button_down.is_connected(_on_build_road_spine_pressed):
+		btn.button_down.connect(_on_build_road_spine_pressed)
+	if not btn.gui_input.is_connected(_on_build_road_spine_gui_input):
+		btn.gui_input.connect(_on_build_road_spine_gui_input)
+
+
+func _pin_road_spine_button_to_inspector_chrome() -> void:
+	# Live Search+Go Köln shows facility Build rows in the scroll. Pin IX-1 next to Settle.
+	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	var parent: Node = _btn_build_road_spine.get_parent()
+	if parent != ip:
+		if parent != null:
+			parent.remove_child(_btn_build_road_spine)
+		ip.add_child(_btn_build_road_spine)
+	elif ip.get_child_count() > 0:
+		ip.move_child(_btn_build_road_spine, ip.get_child_count() - 1)
+	_wire_road_spine_live_button(_btn_build_road_spine)
+	_layout_road_spine_chrome_button()
+
+
+func _layout_road_spine_chrome_button() -> void:
+	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	var panel_w := absf(ip.offset_right - ip.offset_left)
+	if panel_w < 80.0:
+		panel_w = maxf(ip.size.x, 520.0)
+	# Own row BELOW Settle (8,38,225,62). Same-row x=230 overlapped the
+	# overflowing "Settle Köln…" label ("Now building…" drawn on top).
+	var left := 8.0
+	var top := 66.0
+	var height := 26.0
+	var width := minf(480.0, maxf(220.0, panel_w - left - 16.0))
+	_btn_build_road_spine.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_btn_build_road_spine.position = Vector2(left, top)
+	_btn_build_road_spine.custom_minimum_size = Vector2(220, height)
+	_btn_build_road_spine.size = Vector2(width, height)
+
+
+func _ix1_should_show_spine_button(province: Province) -> bool:
+	if province == null:
+		return false
+	var mgr = _get_infra_manager()
+	if mgr != null and mgr.has_method("should_show_road_spine_button"):
+		if bool(mgr.should_show_road_spine_button(province.id, _player_tag())):
+			return true
+	# Search/Go fallback: MapManager cache can miss while the live Province is already in hand.
+	if mgr != null and mgr.has_method("is_ix1_road_spine_province"):
+		if not bool(mgr.is_ix1_road_spine_province(province.id)):
+			return false
+	elif province.id != 710416 and province.id != 710417 and province.id != 710418:
+		return false
+	if province.is_sea:
+		return false
+	var tag := _player_tag().strip_edges().to_upper()
+	if tag.is_empty():
+		return false
+	var owner := str(province.owner_tag).strip_edges().to_upper()
+	var ctrl := str(province.controller_tag).strip_edges().to_upper()
+	return owner == tag or ctrl == tag or owner.is_empty()
+
+
+func _reveal_ix1_road_spine_on_inspector(province: Province, reset_scroll: bool = true) -> void:
+	# Live-facing: Build Road Spine must be visible+startable after Search Köln/Cologne+Go.
+	# Re-entrancy: show_info_panel already laid out; a second inner layout + header_h
+	# change was a softpipe resize-storm suspect after the spine-pin CA.
+	if province == null or _ix1_reveal_busy:
+		return
+	_ix1_reveal_busy = true
+	_ix1_spine_inspector_pid = province.id
+	_ensure_road_spine_button()
+	_update_road_spine_button(province)
+	if _ix1_should_show_spine_button(province):
+		_prepend_ix1_spine_build_row(province)
+	if reset_scroll and info_panel is Control:
+		var scroll := (info_panel as Control).get_node_or_null("InfoScroll") as ScrollContainer
+		if scroll != null:
+			scroll.scroll_vertical = 0
+			scroll.scroll_horizontal = 0
+	_layout_road_spine_chrome_button()
+	_raise_province_inspector_over_unit_card()
+	_ix1_reveal_busy = false
+
+
+func _prepend_ix1_spine_build_row(province: Province) -> void:
+	# Pin a startable row into the facility Build list Play actually sees after Search+Go.
+	_ensure_special_sites_ui()
+	if _special_sites_container == null or not is_instance_valid(_special_sites_container):
+		return
+	if not _ix1_should_show_spine_button(province):
+		var stale: Node = _special_sites_container.get_node_or_null("Ix1SpineBuildRow")
+		if stale != null:
+			stale.queue_free()
+		return
+	var existing: Node = _special_sites_container.get_node_or_null("Ix1SpineBuildRow")
+	if existing != null and is_instance_valid(existing) and not existing.is_queued_for_deletion():
+		existing.visible = true
+		_special_sites_container.move_child(existing, 0)
+		_special_sites_container.visible = true
+		var existing_btn: Button = existing.find_child("BtnBuildRoadSpineInList", true, false) as Button
+		if existing_btn != null:
+			_wire_road_spine_live_button(existing_btn)
+		if _label_special_sites_header != null and is_instance_valid(_label_special_sites_header):
+			_label_special_sites_header.visible = true
+		return
+	var row := HBoxContainer.new()
+	row.name = "Ix1SpineBuildRow"
+	row.add_theme_constant_override("separation", 8)
+	var info_label := Label.new()
+	info_label.name = "Ix1SpineBuildInfo"
+	info_label.text = "Build Road Spine (Mandate 0, Bonn–Köln–Leverkusen)"
+	info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.add_child(info_label)
+	var btn := Button.new()
+	btn.name = "BtnBuildRoadSpineInList"
+	btn.text = "Build Road Spine"
+	btn.custom_minimum_size = Vector2(140, 24)
+	btn.tooltip_text = "IX-1 first-session starter — GER 1936 day-0 Mandate 0 is enough."
+	_wire_road_spine_live_button(btn)
+	row.add_child(btn)
+	_special_sites_container.add_child(row)
+	_special_sites_container.move_child(row, 0)
+	_special_sites_container.visible = true
+	if _label_special_sites_header != null and is_instance_valid(_label_special_sites_header):
+		_label_special_sites_header.visible = true
+
+
+func _update_road_spine_button(province: Province) -> void:
+	_ensure_road_spine_button()
+	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
+		return
+	var mgr = _get_infra_manager()
+	if province == null:
+		_btn_build_road_spine.visible = false
+		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+			_label_spine_progress.visible = false
+		if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
+			_label_spine_start_notice.visible = false
+		return
+	var show_btn := _ix1_should_show_spine_button(province)
+	_btn_build_road_spine.visible = show_btn
+	_pin_road_spine_button_to_inspector_chrome()
+	if not show_btn:
+		return
+	_btn_build_road_spine.visible = true
+	var status: Dictionary = {}
+	if mgr != null and mgr.has_method("get_project_status"):
+		status = mgr.get_project_status(province.id)
+	var active := bool(status.get("active", false))
+	var spine_proj := bool(status.get("build_road_spine", false))
+	if active:
+		var eta := int(status.get("eta_days", 0))
+		var pct := int(round(float(status.get("progress", 0.0))))
+		_btn_build_road_spine.disabled = true
+		_btn_build_road_spine.text = "Building…" if spine_proj else "Project Active"
+		_btn_build_road_spine.tooltip_text = "Road spine %d%% · ETA %d days" % [pct, eta]
+		_ensure_spine_progress_label()
+		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+			_label_spine_progress.visible = true
+			_label_spine_progress.text = "Road spine %d%% · ETA %d days" % [pct, eta]
+	else:
+		_btn_build_road_spine.disabled = false
+		_btn_build_road_spine.text = "Build Road Spine"
+		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). First-session starter grant — GER 1936 day-0 Mandate is enough (generic Invest stays gated). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
+		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+			_label_spine_progress.visible = false
+		if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
+			_label_spine_start_notice.visible = false
+	_layout_road_spine_chrome_button()
+	_layout_spine_progress_label()
+
+
+func _ix1_spine_target_province_id() -> int:
+	if selected_province_id >= 0:
+		return selected_province_id
+	if _ix1_spine_inspector_pid >= 0:
+		return _ix1_spine_inspector_pid
+	return -1
+
+
+func _on_build_road_spine_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb: InputEventMouseButton = event
+	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	_on_build_road_spine_pressed()
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
+		_btn_build_road_spine.accept_event()
+	var vp_sp: Viewport = get_viewport()
+	if vp_sp != null:
+		vp_sp.set_input_as_handled()
+
+
+func _on_build_road_spine_pressed() -> void:
+	var now_ms: int = Time.get_ticks_msec()
+	if now_ms - _ix1_spine_press_guard_msec < IX1_SPINE_PRESS_GUARD_MS:
+		return
+	_ix1_spine_press_guard_msec = now_ms
+	var pid: int = _ix1_spine_target_province_id()
+	var chrome_vis := _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible
+	if pid < 0:
+		_ix1_last_spine_press = {"ok": false, "armed": false, "visible": chrome_vis, "pid": pid, "reason": "no_province"}
+		_log_smoke_spine_start(_ix1_last_spine_press)
+		_show_inspector_toast("Road spine: open Köln first", 2.5, true)
+		return
+	var mgr = _get_infra_manager()
+	if mgr == null or not mgr.has_method("try_start_road_spine"):
+		_ix1_last_spine_press = {"ok": false, "armed": false, "visible": chrome_vis, "pid": pid, "reason": "manager_missing"}
+		_log_smoke_spine_start(_ix1_last_spine_press)
+		_show_inspector_toast("Road spine unavailable", 2.5, true)
+		return
+	var result: Dictionary = mgr.try_start_road_spine(pid, _player_tag())
+	var armed := bool(result.get("success", false))
+	_ix1_last_spine_press = {
+		"ok": armed,
+		"armed": armed,
+		"visible": chrome_vis,
+		"pid": pid,
+		"reason": str(result.get("reason", "")),
+		"eta_days": int(result.get("eta_days", 0)),
+	}
+	_log_smoke_spine_start(_ix1_last_spine_press)
+	if armed:
+		var eta := int(result.get("eta_days", 18))
+		var pname := ""
+		if provinces.has(pid):
+			pname = provinces[pid].name
+		# Toast + Building… BEFORE any camera work. Play MIXED 002df244:
+		# focus_province_by_id defaulted to tactical 2.4 and the process died
+		# before the player saw start feedback.
+		_apply_spine_building_button_state(pid, 0, eta)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.button.after_apply pid=%d" % pid)
+		_show_inspector_toast("Road spine started in %s · ETA %d days" % [pname, eta], 3.0)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.button.after_inspector_toast pid=%d" % pid)
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast("Road spine started in %s · ETA %d days" % [pname, eta], 3.5)
+			eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.button.after_leader_toast pid=%d" % pid)
+		_play_map_sfx("confirm")
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.button.after_sfx pid=%d" % pid)
+		# Windowed 9ebd17f: show_info_panel + preview _draw flushed the canvas
+		# on this frame (toast/Building… never painted; RSS climbed to OOM).
+		# Paint UI first; soft-pan after the next idle frame.
+		call_deferred("_ix1_spine_start_after_first_frame", pid)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.button.after_deferred pid=%d" % pid)
+	else:
+		_show_inspector_toast(str(result.get("reason", "Cannot start road spine")), 3.5, true)
+		_play_map_sfx("error")
+
+
+func _ix1_spine_start_after_first_frame(pid: int) -> void:
+	# Runs after toast + Building… have had one frame. Soft pan only.
+	eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.after_frame.enter pid=%d" % pid)
+	if provinces.has(pid):
+		show_info_panel(provinces[pid])
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.after_frame.after_show_info_panel pid=%d" % pid)
+		var eta_defer := int(_ix1_last_spine_press.get("eta_days", 35))
+		_apply_spine_building_button_state(pid, 0, eta_defer)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.after_frame.after_apply pid=%d" % pid)
+	focus_province_by_id(pid, "soft")
+	eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.after_frame.after_soft_pan pid=%d" % pid)
+
+
+func deliver_ix1_spine_button_mouse_press() -> Dictionary:
+	# Smoke / frame-guard only. Synthesize a left-click and deliver it to the
+	# live Build Road Spine button through the viewport — same MapRenderer.button
+	# handler Play hits. Never call try_start_road_spine or
+	# press_build_road_spine_from_live_ui from here.
+	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.deliver_mouse reason=no_button")
+		return {"ok": false, "reason": "no_button"}
+	var btn: Button = _btn_build_road_spine
+	btn.visible = true
+	_layout_road_spine_chrome_button()
+	var rect: Rect2 = btn.get_global_rect()
+	var pos: Vector2 = rect.get_center()
+	var vp: Viewport = btn.get_viewport()
+	if vp == null:
+		vp = get_viewport()
+	if vp == null:
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.deliver_mouse reason=no_viewport")
+		return {"ok": false, "reason": "no_viewport"}
+	eoa_log_flush(
+		"EOA_SMOKE_SPINE_BISECT who=MapRenderer.deliver_mouse pos=%.1f,%.1f w=%.0f h=%.0f"
+		% [pos.x, pos.y, rect.size.x, rect.size.y]
+	)
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.warp_mouse(Vector2i(int(round(pos.x)), int(round(pos.y))))
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.position = pos
+	ev.global_position = pos
+	vp.push_input(ev, true)
+	# Also deliver the same mouse event onto the button's gui_input so a
+	# missed viewport hit still runs MapRenderer.button — not the spine API.
+	btn.gui_input.emit(ev)
+	eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.deliver_mouse pushed=1")
+	return {"ok": true, "reason": "viewport_mouse", "pos": pos}
+
+
+func press_build_road_spine_from_live_ui() -> Dictionary:
+	# Live-facing helper: same press path Play uses. Visible chrome that never
+	# arms after this call is a soft-wall FAIL (do not treat as headless-only).
+	_ix1_spine_press_guard_msec = 0
+	_on_build_road_spine_pressed()
+	return _ix1_last_spine_press.duplicate()
+
+
+func _log_smoke_spine_start(report: Dictionary) -> void:
+	var vis := bool(report.get("visible", false))
+	var armed := bool(report.get("armed", false))
+	# Visible button + start never arms after press = FAIL for the live softpipe.
+	eoa_log_flush(
+		"EOA_SMOKE_SPINE_START who=MapRenderer.press visible=%s armed=%s pid=%s reason=%s (live press; NOT product Begin/Esc/clock PASS)"
+		% [
+			"1" if vis else "0",
+			"1" if armed else "0",
+			str(int(report.get("pid", -1))),
+			str(report.get("reason", "")),
+		]
+	)
+
+
+func _log_smoke_spine_progress(pid: int, pct: int, eta: int, who: String = "MapRenderer") -> void:
+	var band := int(pct / 10)
+	if band == _ix1_last_progress_band and pct < 100:
+		return
+	_ix1_last_progress_band = band
+	eoa_log_flush(
+		"EOA_SMOKE_SPINE_PROGRESS who=%s pid=%d pct=%d eta=%d (NOT product Begin/Esc/clock PASS)"
+		% [who, pid, pct, eta]
+	)
+
+
+func _log_smoke_spine_complete(pid: int, who: String = "MapRenderer") -> void:
+	eoa_log_flush(
+		"EOA_SMOKE_SPINE_COMPLETE who=%s pid=%d (NOT product Begin/Esc/clock PASS)"
+		% [who, pid]
+	)
+
+
+func _apply_spine_building_button_state(pid: int, pct: int, eta: int) -> void:
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
+		_btn_build_road_spine.visible = true
+		_btn_build_road_spine.disabled = true
+		_btn_build_road_spine.text = "Building…"
+		_btn_build_road_spine.tooltip_text = "Road spine %d%% · ETA %d days" % [pct, eta]
+	_ensure_spine_progress_label()
+	if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+		_label_spine_progress.visible = true
+		_label_spine_progress.text = "Road spine %d%% · ETA %d days" % [pct, eta]
+	_ensure_spine_start_notice()
+	if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
+		_label_spine_start_notice.visible = true
+		if pct <= 0:
+			_label_spine_start_notice.text = "Road spine started · ETA %d days" % eta
+		else:
+			_label_spine_start_notice.text = "Road spine underway · %d%%" % pct
+	var list_row: Node = null
+	if _special_sites_container != null and is_instance_valid(_special_sites_container):
+		list_row = _special_sites_container.get_node_or_null("Ix1SpineBuildRow")
+	if list_row != null:
+		var list_btn: Button = list_row.find_child("BtnBuildRoadSpineInList", true, false) as Button
+		if list_btn != null:
+			list_btn.disabled = true
+			list_btn.text = "Building…"
+		var list_lab: Label = list_row.find_child("Ix1SpineBuildInfo", true, false) as Label
+		if list_lab == null:
+			for ch in list_row.get_children():
+				if ch is Label:
+					list_lab = ch
+					break
+		if list_lab != null:
+			list_lab.text = "Road spine %d%% · ETA %d days (Bonn–Köln–Leverkusen)" % [pct, eta]
+	_log_smoke_spine_progress(pid, pct, eta, "MapRenderer.button")
+
+
+func _ensure_spine_progress_label() -> void:
+	if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+		_layout_spine_progress_label()
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	_label_spine_progress = Label.new()
+	_label_spine_progress.name = "LabelSpineProgress"
+	_label_spine_progress.text = ""
+	_label_spine_progress.visible = false
+	_label_spine_progress.add_theme_font_size_override("font_size", 12)
+	_label_spine_progress.modulate = Color(0.75, 0.95, 0.82, 1.0)
+	_label_spine_progress.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	(info_panel as Control).add_child(_label_spine_progress)
+	_layout_spine_progress_label()
+
+
+func _layout_spine_progress_label() -> void:
+	if _label_spine_progress == null or not is_instance_valid(_label_spine_progress):
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	var panel_w := absf(ip.offset_right - ip.offset_left)
+	if panel_w < 80.0:
+		panel_w = maxf(ip.size.x, 520.0)
+	_label_spine_progress.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_label_spine_progress.position = Vector2(8.0, 96.0)
+	_label_spine_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 22.0)
+	_label_spine_progress.size = _label_spine_progress.custom_minimum_size
+	_layout_spine_start_notice()
+
+
+func _ensure_spine_start_notice() -> void:
+	if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
+		_layout_spine_start_notice()
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	_label_spine_start_notice = Label.new()
+	_label_spine_start_notice.name = "LabelSpineStartNotice"
+	_label_spine_start_notice.text = ""
+	_label_spine_start_notice.visible = false
+	_label_spine_start_notice.add_theme_font_size_override("font_size", 13)
+	_label_spine_start_notice.add_theme_color_override("font_color", Color(0.95, 0.92, 0.45, 1.0))
+	_label_spine_start_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	(info_panel as Control).add_child(_label_spine_start_notice)
+	_layout_spine_start_notice()
+
+
+func _layout_spine_start_notice() -> void:
+	if _label_spine_start_notice == null or not is_instance_valid(_label_spine_start_notice):
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	var panel_w := absf(ip.offset_right - ip.offset_left)
+	if panel_w < 80.0:
+		panel_w = maxf(ip.size.x, 520.0)
+	_label_spine_start_notice.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_label_spine_start_notice.position = Vector2(8.0, 120.0)
+	_label_spine_start_notice.custom_minimum_size = Vector2(minf(500.0, maxf(280.0, panel_w - 24.0)), 22.0)
+	_label_spine_start_notice.size = _label_spine_start_notice.custom_minimum_size
+
+
+func drive_ix1_zoom_and_roadlayer_redraw(zoom_mode: String = "soft") -> Dictionary:
+	# Headless / smoke: start spine → clock → this path. Never snaps to 2.4.
+	var mode := zoom_mode.strip_edges().to_lower()
+	if mode == "tactical":
+		mode = "soft"
+	eoa_log_flush("EOA_ZOOM_BEGIN who=MapRenderer.drive_ix1 mode=%s pid=710417" % mode)
+	_soft_pan_camera_to_province(710417, mode == "keep")
+	_refresh_terrain_zoom_light()
+	var ol: Node = get_overlay_layer("InfrastructureOverlayLayer")
+	if ol != null and ol.has_method("rebuild_road_layer"):
+		ol.call("rebuild_road_layer")
+	if ol != null and ol.has_method("refresh_ix1_spine_preview"):
+		ol.call("refresh_ix1_spine_preview")
+	var report: Dictionary = {}
+	if ol != null and ol.has_method("ix1_spine_roadlayer_report"):
+		report = ol.call("ix1_spine_roadlayer_report")
+	if ol != null and ol.has_method("ix1_spine_preview_report"):
+		report["preview"] = ol.call("ix1_spine_preview_report")
+	eoa_log_flush("EOA_ZOOM_END who=MapRenderer.drive_ix1 mode=%s ok=1" % mode)
+	return {
+		"ok": true,
+		"mode": mode,
+		"roadlayer": report,
+	}
 
 
 func _on_invest_infrastructure_pressed() -> void:
@@ -19362,8 +20788,19 @@ func _on_cancel_infra_project_pressed() -> void:
 ## Live refresh for inspector when infra project on selected province makes progress or completes.
 ## Keeps "active project %/ETA" and derived effects (supply/org) up to date without manual re-click.
 func _on_infra_progress_for_inspector(pid: int, _proj: Variant, _delta: float) -> void:
+	var spine := false
+	var pct := 0
+	var eta := 0
+	if _proj != null:
+		spine = bool(_proj.build_road_spine)
+		pct = int(round(float(_proj.progress)))
+		if _proj.has_method("get_eta_days"):
+			eta = int(_proj.get_eta_days())
+	if spine:
+		_apply_spine_building_button_state(pid, pct, eta)
 	if pid == selected_province_id and info_panel != null and info_panel.visible and provinces.has(pid):
-		# Refresh just the invest UI + combat derived (settlement etc already live via other)
+		# Refresh just the invest UI. Do not notify_province_changed here — that
+		# re-entered show_info_panel + overlay rebuild on every spine day tick.
 		_update_infrastructure_investment_ui(provinces[pid])
 		if info_combat != null:
 			# Re-append derived if needed; full show_info_panel would re-do everything
@@ -19373,9 +20810,7 @@ func _on_infra_progress_for_inspector(pid: int, _proj: Variant, _delta: float) -
 				if w > 5.0:
 					# Already appended in main, but trigger visual nudge via re-show if wanted
 					pass
-	# Force map overlay redraw so active project pulse/% ring in InfrastructureOverlayLayer updates live (progress polled + animation)
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
-		MapManager.notify_province_changed(pid, "infrastructure_project")
+	# Overlay construction rings poll project status in _draw — queue_redraw is enough.
 	var ol := get_overlay_layer("InfrastructureOverlayLayer")
 	if ol and ol.has_method("queue_redraw"):
 		ol.queue_redraw()
@@ -19384,11 +20819,25 @@ func _on_infra_completed_for_inspector(pid: int, new_level: int, _axis: String, 
 	var pname := ""
 	if provinces.has(pid):
 		pname = provinces[pid].name
+	var spine := false
+	if _proj != null:
+		spine = bool(_proj.build_road_spine)
 	var flair: Dictionary = _MapNextListHelpers.format_infra_project_flair(pname, "complete", new_level)
-	_show_inspector_toast(str(flair.get("toast", "Infrastructure complete")), float(flair.get("duration", 3.0)))
-	_play_map_sfx(str(flair.get("sfx", "achievement")))
-	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
-		LeaderEventUI.post_news(str(flair.get("news_headline", "Infrastructure complete")), str(flair.get("news_body", "")), "infrastructure")
+	if spine:
+		_log_smoke_spine_complete(pid, "MapRenderer.complete")
+		if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
+			_btn_build_road_spine.disabled = true
+			_btn_build_road_spine.text = "Spine complete"
+		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+			_label_spine_progress.visible = true
+			_label_spine_progress.text = "Road spine complete · infra %d" % new_level
+		_show_inspector_toast("Road spine complete in %s · infra %d" % [pname, new_level], 3.5)
+		_play_map_sfx("achievement")
+	else:
+		_show_inspector_toast(str(flair.get("toast", "Infrastructure complete")), float(flair.get("duration", 3.0)))
+		_play_map_sfx(str(flair.get("sfx", "achievement")))
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+			LeaderEventUI.post_news(str(flair.get("news_headline", "Infrastructure complete")), str(flair.get("news_body", "")), "infrastructure")
 	if pid == selected_province_id and info_panel != null and info_panel.visible and provinces.has(pid):
 		show_info_panel(provinces[pid])  # full refresh for new infra level effects on combat/supply
 		force_refresh_tints_for_owner(provinces[pid].owner_tag)
@@ -19434,10 +20883,13 @@ func _on_infra_cancelled_for_inspector(pid: int, reason: String) -> void:
 
 
 func _show_inspector_toast(message: String, duration: float = 2.5, is_error: bool = false) -> void:
+	eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer._show_inspector_toast.enter")
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast(message, duration, is_error)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer._show_inspector_toast.after_show_toast")
 	else:
 		print(message)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer._show_inspector_toast.print_only")
 
 
 ## Select flair: short toast + sfx from pure formatter (damage/HH context when present).
@@ -20055,6 +21507,8 @@ func _ensure_settle_button() -> void:
 	_btn_settle.offset_top = 38.0   # below close/spirits row
 	_btn_settle.offset_right = 225.0
 	_btn_settle.offset_bottom = 62.0
+	_btn_settle.clip_contents = true
+	_btn_settle.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	if not _btn_settle.pressed.is_connected(_on_settle_province_pressed):
 		_btn_settle.pressed.connect(_on_settle_province_pressed)
 	info_panel.add_child(_btn_settle)
@@ -20097,8 +21551,10 @@ func _update_special_sites_ui(province: Province) -> void:
 		_label_special_sites_header.text = "Special Sites (None)"
 		_special_sites_container.visible = true
 
-		# Clear previous
+		# Clear previous (keep IX-1 row — Search+Go live surface)
 		for child in _special_sites_container.get_children():
+			if str(child.name) == "Ix1SpineBuildRow":
+				continue
 			child.queue_free()
 
 		# === Real Site Construction Picker ===
@@ -20162,13 +21618,16 @@ func _update_special_sites_ui(province: Province) -> void:
 			build_btn.text = "Construct New Special Site (Port)"
 			build_btn.pressed.connect(_on_start_special_site_construction_pressed.bind(province.id))
 			_special_sites_container.add_child(build_btn)
+		_prepend_ix1_spine_build_row(province)
 		return
 
 	_label_special_sites_header.visible = true
 	_special_sites_container.visible = true
 
-	# Clear previous
+	# Clear previous (keep IX-1 row — Search+Go live surface)
 	for child in _special_sites_container.get_children():
+		if str(child.name) == "Ix1SpineBuildRow":
+			continue
 		child.queue_free()
 
 	_label_special_sites_header.text = "Special Sites (%d)" % sites.size()
@@ -20301,6 +21760,7 @@ func _update_special_sites_ui(province: Province) -> void:
 		effects_label.add_theme_font_size_override("font_size", 10)
 		effects_label.modulate = Color(0.7, 0.92, 0.8)
 		row.add_child(effects_label)
+	_prepend_ix1_spine_build_row(province)
 
 
 func _ensure_special_sites_ui() -> void:
@@ -24294,6 +25754,11 @@ func _on_feature_ring_clicked(province_id: int) -> void:
 func _refresh_feature_progress_rings() -> void:
 	if province_nodes.is_empty():
 		return
+	if typeof(TimeManager) != TYPE_NIL:
+		if TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
+			return
+		if TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+			return
 	for pid_v in province_nodes.keys():
 		var node: Node2D = province_nodes[pid_v] as Node2D
 		if node == null or not is_instance_valid(node):

@@ -53,6 +53,9 @@ var _sim_tick_busy: bool = false
 var _sim_tick_busy_since_msec: int = 0
 const SIM_TICK_INTERVAL_MS := 1000
 const SIM_TICK_BUSY_WATCHDOG_MS := 8000
+## After 1x/Space, softpipe must leave 1 Jan 00:00. Force one hour if the first tick was lost.
+const LIVE_CLOCK_00_WATCHDOG_MS := 2000
+var _clock_unpause_msec: int = 0
 
 ## Layout breakpoints (viewport width). Secondary screens always live in More ▾ for usability.
 const WIDTH_COMPACT := 1400
@@ -79,7 +82,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	clip_contents = false
-	z_index = 20
+	# Stay above Map Mode (WorldMap UI layer 20) and toast stack (layer 90)
+	# once UILayer is 110 — z_index is local to that layer.
+	z_index = 40
 	_apply_theme()
 	_connect_buttons()
 	_sync_pause_from_time_manager()
@@ -123,6 +128,7 @@ func _ready() -> void:
 	# double-scales day advance when both Engine and TimeManager scale are applied.
 	_last_sim_tick_msec = Time.get_ticks_msec()
 	set_process(true)
+	set_process_input(true)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 	if get_viewport():
@@ -138,6 +144,154 @@ func get_bar_height() -> float:
 	return custom_minimum_size.y
 
 
+func host_map_search_chrome(search: Control) -> void:
+	## Durable Search slot on the 52px strip (UILayer 110): in-flow on
+	## RightContainer, immediately before Menu. Overlay TOP_RIGHT was first-
+	## paint only — Play 48e4fe20: More+/Steel/Al reflow ate that space and
+	## Search vanished while PIXEL still logged live=1.
+	if search == null or not is_instance_valid(search):
+		return
+	clip_contents = false
+	visible = true
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	if _right_container != null:
+		_right_container.clip_contents = false
+		_right_container.visible = true
+		_right_container.mouse_filter = Control.MOUSE_FILTER_PASS
+	var slot: Control = _right_container if _right_container != null else self
+	if search.get_parent() != slot:
+		var old_p: Node = search.get_parent()
+		if old_p != null:
+			old_p.remove_child(search)
+		slot.add_child(search)
+	search.z_index = 80
+	search.z_as_relative = false
+	search.mouse_filter = Control.MOUSE_FILTER_STOP
+	search.visible = true
+	search.modulate = Color(1, 1, 1, 1)
+	search.process_mode = Node.PROCESS_MODE_ALWAYS
+	search.clip_contents = false
+	search.custom_minimum_size = Vector2(308, 32)
+	if slot == _right_container:
+		search.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
+		search.anchor_left = 0.0
+		search.anchor_top = 0.0
+		search.anchor_right = 0.0
+		search.anchor_bottom = 0.0
+		search.offset_left = 0.0
+		search.offset_top = 0.0
+		search.offset_right = 0.0
+		search.offset_bottom = 0.0
+		search.size_flags_horizontal = Control.SIZE_SHRINK_END
+		search.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		# [Resources] [Search+Go] [Menu] — Search stays on the right through reflow.
+		if _resources_container != null and _resources_container.get_parent() == _right_container:
+			_right_container.move_child(_resources_container, 0)
+			_right_container.move_child(search, 1)
+		else:
+			_right_container.move_child(search, 0)
+		if _menu_container != null and _menu_container.get_parent() == _right_container:
+			_right_container.move_child(_menu_container, _right_container.get_child_count() - 1)
+	else:
+		move_child(search, get_child_count() - 1)
+	if search.has_method("ensure_chrome_visible"):
+		search.call("ensure_chrome_visible")
+
+
+func _find_hosted_map_search() -> Control:
+	var n: Node = get_node_or_null("ContentRow/RightContainer/MapProvinceSearch")
+	if n is Control:
+		return n as Control
+	n = get_node_or_null("MapProvinceSearch")
+	if n is Control:
+		return n as Control
+	if _right_container != null:
+		n = _right_container.get_node_or_null("MapProvinceSearch")
+		if n is Control:
+			return n as Control
+	for child in get_children():
+		if str(child.name) == "MapProvinceSearch" and child is Control:
+			return child as Control
+	return null
+
+
+func _keep_search_chrome_sticky() -> void:
+	## Re-apply after More+/Steel/Al settle so Search is not first-paint only.
+	var search: Control = _find_hosted_map_search()
+	if search == null or not is_instance_valid(search):
+		return
+	host_map_search_chrome(search)
+
+
+func _protect_search_from_resource_overflow() -> void:
+	## Hide extra resource chips before Search can be pushed off the strip.
+	var vp_w := 1280.0
+	if get_viewport() != null:
+		vp_w = get_viewport().get_visible_rect().size.x
+	var reserved := 308.0 + 72.0 + 24.0
+	var left_min := 240.0
+	var center_min := 360.0
+	var room: float = vp_w - left_min - center_min - reserved
+	if rubber_label != null and room < 220.0:
+		rubber_label.visible = false
+	if oil_label != null and room < 160.0:
+		oil_label.visible = false
+	# Play MIXED 002df244: at 1280px Steel/Al painted under Search. Hide them
+	# before they can clip the sticky Search slot.
+	if aluminum_label != null and (room < 280.0 or vp_w < 1680.0):
+		aluminum_label.visible = false
+	if steel_label != null and (room < 200.0 or vp_w < 1560.0):
+		steel_label.visible = false
+	if _resources_container != null:
+		_resources_container.clip_contents = true
+
+
+func arm_play_clock_after_begin() -> void:
+	## Living title Begin: keep start-paused until 4x / Space / pause-play, but
+	## re-wire chrome so those clicks reach TimeManager on the softpipe path.
+	_sim_tick_busy = false
+	_sim_tick_busy_since_msec = 0
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	set_process(true)
+	set_process_input(true)
+	visible = true
+	mouse_filter = Control.MOUSE_FILTER_PASS
+	_connect_buttons()
+	_update_speed_buttons()
+	_update_date_time()
+
+
+## Smoke-only past-+6 after hatch. Uses the real 4x owner (`_set_game_speed`)
+## then TimeManager `advance_real_time` (same class as headless DayTick).
+## Default OFF. Does NOT claim product 4x / clock / Begin / Esc PASS.
+func apply_smoke_advance_past_plus6() -> Dictionary:
+	var enabled := false
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("smoke_advance_past_plus6_enabled"):
+		enabled = bool(TimeManager.smoke_advance_past_plus6_enabled())
+	if not enabled:
+		print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=topbar.apply_smoke_advance_past_plus6 skipped flag_off (NOT product clock PASS)")
+		return {"ok": false, "reason": "flag_off", "smoke_only": true, "product_clock_pass": false}
+	var already_armed := has_meta("eoa_smoke_advance_armed") and bool(get_meta("eoa_smoke_advance_armed"))
+	if already_armed:
+		var cached: Dictionary = {}
+		if has_meta("eoa_smoke_advance_result") and get_meta("eoa_smoke_advance_result") is Dictionary:
+			cached = get_meta("eoa_smoke_advance_result") as Dictionary
+		if not cached.is_empty() and str(cached.get("reason", "")) != "chunked_pending":
+			return cached
+	else:
+		set_meta("eoa_smoke_advance_armed", true)
+		print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=topbar.apply_smoke_advance_past_plus6 smoke 4x owner (NOT product clock/Begin/Esc PASS)")
+		arm_play_clock_after_begin()
+		_set_game_speed(4)
+	var out: Dictionary = {}
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("apply_smoke_advance_past_plus6"):
+		out = TimeManager.call("apply_smoke_advance_past_plus6") as Dictionary
+	_update_date_time()
+	if str(out.get("reason", "")) != "chunked_pending":
+		set_meta("eoa_smoke_advance_result", out)
+	return out
+
+
 func _ensure_start_paused_for_playtest() -> void:
 	## Graphical F5: start paused so map/UI stay responsive while player looks around.
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
@@ -147,6 +301,9 @@ func _ensure_start_paused_for_playtest() -> void:
 	# Don't re-pause if the player already hit 1x/▶ (deferred interactive can race this).
 	if has_meta("player_owns_clock") and bool(get_meta("player_owns_clock")):
 		return
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("living_title_has_closed"):
+		if bool(TimeManager.living_title_has_closed()):
+			return
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(true)
 		is_paused = true
@@ -184,6 +341,7 @@ func _apply_responsive_layout() -> void:
 	if _right_container:
 		_right_container.add_theme_constant_override("separation", 6)
 		_right_container.size_flags_horizontal = Control.SIZE_SHRINK_END
+		_right_container.clip_contents = false
 		if _menu_container:
 			_right_container.move_child(_menu_container, _right_container.get_child_count() - 1)
 
@@ -200,9 +358,9 @@ func _apply_responsive_layout() -> void:
 		_resources_container.add_theme_constant_override("separation", 8)
 
 	if steel_label:
-		steel_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 40
+		steel_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 80
 	if aluminum_label:
-		aluminum_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 160
+		aluminum_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 220
 	if oil_label:
 		oil_label.visible = show_resources
 	if rubber_label:
@@ -227,6 +385,8 @@ func _apply_responsive_layout() -> void:
 	custom_minimum_size.y = 48.0 if compact else 52.0
 	offset_bottom = custom_minimum_size.y
 	_refresh_hotseat_visibility()
+	_protect_search_from_resource_overflow()
+	_keep_search_chrome_sticky()
 
 
 func _ensure_speed_overflow_menu() -> void:
@@ -694,6 +854,8 @@ func _wire_speed_button(btn: Button, speed_or_pause: int) -> void:
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn.disabled = false
 	btn.focus_mode = Control.FOCUS_ALL
+	# Press-on-down: leftover map-pan / pick-block cannot eat button-up (Search Go).
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	btn.set_meta("eoa_speed", speed_or_pause)
 	# Disconnect stale connections then attach one clean handler.
 	for c in btn.pressed.get_connections():
@@ -734,6 +896,25 @@ func _process(_delta: float) -> void:
 	):
 		TimeManager.set_paused(false)
 		TimeManager.set_time_scale(float(current_speed))
+	if (
+		not is_paused
+		and has_meta("player_owns_clock")
+		and bool(get_meta("player_owns_clock"))
+		and _clock_unpause_msec > 0
+		and now - _clock_unpause_msec >= LIVE_CLOCK_00_WATCHDOG_MS
+		and typeof(TimeManager) != TYPE_NIL
+		and int(TimeManager.current_hour) == 0
+		and int(TimeManager.total_days_elapsed) == 0
+	):
+		# Live softpipe: first hour never left 00:00 (busy latch / lost deferred tick).
+		_sim_tick_busy = false
+		_sim_tick_busy_since_msec = 0
+		if TimeManager.has_method("set_paused"):
+			TimeManager.set_paused(false)
+		_on_tick()
+		_clock_unpause_msec = 0
+		_last_sim_tick_msec = Time.get_ticks_msec()
+		return
 	if is_paused or _sim_tick_busy:
 		return
 	if _last_sim_tick_msec <= 0:
@@ -781,11 +962,56 @@ func _update_direction() -> void:
 	pass
 
 
+func _is_live_escape_event(event: InputEvent) -> bool:
+	# Live DisplayServer: keycode, physical_keycode, or ui_cancel (Play d18cbae).
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
+	if event != null and event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
+func _search_line_owns_typed_keys() -> bool:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return false
+	var fo: Control = vp.gui_get_focus_owner()
+	if not (fo is LineEdit):
+		return false
+	# Empty Search leftover after Begin must not swallow Space.
+	return not str((fo as LineEdit).text).is_empty()
+
+
+func _input(event: InputEvent) -> void:
+	# Live F5: Search LineEdit focus makes Space/_unhandled_input a no-op.
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	var key: InputEventKey = event
+	if key.keycode == KEY_SPACE or key.keycode == KEY_PERIOD:
+		if _search_line_owns_typed_keys():
+			return
+		_on_pause_pressed()
+		get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	# Space / > : toggle pause (fallback if 1x click is blocked by an overlay)
 	if event.keycode == KEY_SPACE or event.keycode == KEY_PERIOD:
+		if _search_line_owns_typed_keys():
+			return
 		_on_pause_pressed()
 		get_viewport().set_input_as_handled()
 		return
@@ -858,9 +1084,14 @@ func _unhandled_input(event: InputEvent) -> void:
 			print("Ctrl+L QuickLoad triggered")
 		get_viewport().set_input_as_handled()
 		return
-	if event.keycode == KEY_ESCAPE:
+	if _is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 		# Backup: MapRenderer `_input` owns the Esc stack (dismiss then idle CC).
 		# Do not queue_free MainMenu here — `_on_menu_pressed` toggles Command Center.
+		# Live DisplayServer may deliver physical_keycode / ui_cancel instead of keycode.
+		print(
+			"EOA_LIVE_ESC who=TopInfoBar._unhandled_input title_up=%s process_mode=%s"
+			% [str(_living_title_boot_is_up()), str(process_mode)]
+		)
 		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
 		if mr == null and get_tree() and get_tree().current_scene:
 			mr = get_tree().current_scene.find_child("MapRenderer", true, false)
@@ -891,6 +1122,7 @@ func _set_game_speed(speed: int) -> void:
 	# Defer first day so this click returns immediately (hover/scroll stay live).
 	# Immediate advance_days() was freezing the main thread for multiple seconds.
 	_last_sim_tick_msec = 0  # force next _process to fire soon
+	_clock_unpause_msec = Time.get_ticks_msec()
 	call_deferred("_deferred_first_day_step")
 	print("TopInfoBar: SPEED %dx (unpaused) — clock running" % current_speed)
 
@@ -930,6 +1162,7 @@ func _on_pause_pressed() -> void:
 	_update_date_time()
 	if not is_paused:
 		_last_sim_tick_msec = 0
+		_clock_unpause_msec = Time.get_ticks_msec()
 		call_deferred("_deferred_first_day_step")
 	print("TopInfoBar: %s (speed %dx)" % ["PAUSED" if is_paused else "RESUMED", current_speed])
 
@@ -1024,6 +1257,8 @@ func _update_resources() -> void:
 	else:
 		oil_label.text = "Fuel: %.0f" % fuel_amt
 	rubber_label.text = "Rubber: %.0f" % float(stockpile.get("rubber", 0.0))
+	# Steel/Al text widen is the Play 48e4fe20 reflow that dropped overlay Search.
+	_keep_search_chrome_sticky()
 
 
 func _close_overlay_screens() -> void:
@@ -1447,14 +1682,84 @@ func _on_load_pressed() -> void:
 	_open_command_center(true)
 
 
+func _living_title_boot_is_up() -> bool:
+	# Walk the tree (queued leftovers must not lie title_up=false).
+	# Do not reference LivingTitleBoot class_name (-s harness parse).
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.root == null:
+		return false
+	return _any_open_living_title(tree.root)
+
+
+func _node_is_open_living_title(n: Node) -> bool:
+	if n == null or not is_instance_valid(n) or n.is_queued_for_deletion():
+		return false
+	if not str(n.name).begins_with("LivingTitleBoot"):
+		return false
+	if bool(n.get("_closed")):
+		return false
+	return true
+
+
+func _any_open_living_title(n: Node) -> bool:
+	if _node_is_open_living_title(n):
+		return true
+	for child in n.get_children():
+		if _any_open_living_title(child):
+			return true
+	return false
+
+
 func _on_menu_pressed() -> void:
 	_open_command_center(false)
 
 
+## Open Command Center and keep it up. Never toggle-close (living-title Esc ×2).
+func open_command_center_stay() -> void:
+	_open_command_center_stay()
+
+
+func _open_command_center_stay() -> void:
+	var existing := get_tree().root.get_node_or_null("MainMenu") if get_tree() != null else null
+	if existing != null and is_instance_valid(existing) and not existing.is_queued_for_deletion():
+		if bool(existing.get("_closing")):
+			existing.name = "MainMenuLeftover"
+		else:
+			print("EOA_LIVE_ESC who=TopInfoBar.open_command_center_stay already_up")
+			return
+	_instance_command_center_now(true)
+
+
+func _instance_command_center_now(refresh_list: bool = true) -> void:
+	var packed := load("res://scenes/ui/MainMenu.tscn")
+	if packed == null:
+		_show_main_menu_popup_fallback()
+		return
+	var menu: Node = packed.instantiate()
+	menu.name = "MainMenu"
+	menu.process_mode = Node.PROCESS_MODE_ALWAYS
+	if menu.has_signal("menu_closed"):
+		menu.menu_closed.connect(func() -> void:
+			_sync_pause_from_time_manager()
+			_update_speed_buttons()
+		)
+	if _living_title_boot_is_up():
+		menu.set_meta("eoa_opened_from_living_title", true)
+	get_tree().root.add_child(menu)
+	if refresh_list and menu.has_method("_refresh_save_list"):
+		menu.call_deferred("_refresh_save_list")
+
+
 func _open_command_center(refresh_list: bool = true) -> void:
-	# Instance the Command Center overlay (CanvasLayer). Toggle closed if already open.
+	# Instance the Command Center overlay (CanvasLayer). Toggle closed if already open
+	# — except while the living title is up (Play Esc ×2 must not toggle-close).
 	var existing := get_tree().root.get_node_or_null("MainMenu")
 	if existing != null:
+		if _living_title_boot_is_up():
+			print("EOA_LIVE_ESC who=TopInfoBar.open_only title_up=1 (do not toggle-close)")
+			if refresh_list and existing.has_method("_refresh_save_list"):
+				existing.call("_refresh_save_list")
+			return
 		if refresh_list and existing.has_method("_refresh_save_list"):
 			existing.call("_refresh_save_list")
 			if existing.has_method("_set_status"):
@@ -1468,23 +1773,7 @@ func _open_command_center(refresh_list: bool = true) -> void:
 			existing.queue_free()
 			_pause_for_menu(false)
 		return
-
-	var packed := load("res://scenes/ui/MainMenu.tscn")
-	if packed == null:
-		_show_main_menu_popup_fallback()
-		return
-
-	var menu: Node = packed.instantiate()
-	menu.name = "MainMenu"
-	menu.process_mode = Node.PROCESS_MODE_ALWAYS
-	if menu.has_signal("menu_closed"):
-		menu.menu_closed.connect(func() -> void:
-			_sync_pause_from_time_manager()
-			_update_speed_buttons()
-		)
-	get_tree().root.add_child(menu)
-	if refresh_list and menu.has_method("_refresh_save_list"):
-		menu.call_deferred("_refresh_save_list")
+	_instance_command_center_now(refresh_list)
 
 
 func _on_settings_pressed() -> void:

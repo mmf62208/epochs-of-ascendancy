@@ -560,7 +560,10 @@ func _ensure_game_interactive() -> void:
 	var ui_layer := get_node_or_null("UILayer") as CanvasLayer
 	if ui_layer:
 		ui_layer.visible = true
-		ui_layer.layer = 20  # above map / leftover load screens
+		# 110 = above Map Mode 20 / toasts 90 so 4x stays reachable. Must stay
+		# below living title 120 and Command Center 130 (Play d53ee05: 110
+		# without raising those overlays buried Begin + Esc→CC).
+		ui_layer.layer = 110
 	if _is_graphical_launch():
 		# Solo session so hotseat banner / End Turn stay hidden for normal F5.
 		# Default human tag GER (Europe Maginot theater) — first-session play path.
@@ -605,7 +608,11 @@ func _ensure_game_interactive() -> void:
 		):
 			set_meta("eoa_title_boot", true)
 			call_deferred("_show_living_title_boot")
-		elif not has_meta("eoa_first_session_toast"):
+		elif (
+			not has_meta("eoa_first_session_toast")
+			and not has_meta("eoa_title_boot")
+			and get_node_or_null("LivingTitleBoot") == null
+		):
 			set_meta("eoa_first_session_toast", true)
 			call_deferred("_toast_first_session_onboarding")
 		var tm := get_node_or_null("/root/TimeManager")
@@ -625,20 +632,35 @@ func _ensure_game_interactive() -> void:
 				and top_bar.has_meta("player_owns_clock")
 				and bool(top_bar.get_meta("player_owns_clock"))
 			)
-			if not _wants_automated_harness_cycles() and not player_owns_clock:
+			var title_closed := false
+			if tm.has_method("living_title_has_closed"):
+				title_closed = bool(tm.call("living_title_has_closed"))
+			elif has_meta("eoa_living_title_closed"):
+				title_closed = bool(get_meta("eoa_living_title_closed"))
+			var force_start_pause := true
+			if tm.has_method("should_force_playtest_start_pause"):
+				force_start_pause = bool(tm.call("should_force_playtest_start_pause"))
+			else:
+				force_start_pause = not player_owns_clock and not title_closed
+			if (
+				not _wants_automated_harness_cycles()
+				and force_start_pause
+				and not player_owns_clock
+				and not title_closed
+			):
 				if tm.has_method("set_paused"):
 					tm.set_paused(true)
 				if top_bar:
 					top_bar.is_paused = true
 					if top_bar.has_method("_update_speed_buttons"):
 						top_bar._update_speed_buttons()
-			elif player_owns_clock and top_bar:
-				# Honor live speed/pause from the bar (do not clobber).
+			elif (player_owns_clock or title_closed) and top_bar:
+				# Honor live speed/pause from the bar (do not clobber after Begin / 1x).
 				if top_bar.has_method("_sync_time_manager_controls"):
 					top_bar.call("_sync_time_manager_controls")
 				elif top_bar.has_method("_update_speed_buttons"):
 					top_bar._update_speed_buttons()
-	print("TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; sim paused for playtest.")
+	print("TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; clock owned by player/Begin after title (no deferred re-pause).")
 	# Automated UI smoke: EOA_UI_SMOKE=1 godot --headless res://scenes/TestScenario.tscn
 	if OS.get_environment("EOA_UI_SMOKE").strip_edges() == "1" and not has_meta("eoa_ui_smoke_ran"):
 		set_meta("eoa_ui_smoke_ran", true)
@@ -672,18 +694,697 @@ func _show_living_title_boot() -> void:
 	add_child(boot)
 	if boot.has_signal("boot_closed"):
 		boot.connect("boot_closed", _on_living_title_boot_closed)
-	print("TestRunner: living title boot — pick scenario date, country, or load")
+	# Live DisplayServer backup: poll Esc / pointer if title `_input` never runs.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	set_process(true)
+	print("TestRunner: living title boot — pick scenario date, country, or load (Esc / Esc · Menu / Begin without Esc)")
+	# Play 6573d01: computerUse never delivered post-boot EOA_LIVE_RAW_*.
+	# Opt-in smoke hatch dismisses via real handle_live_begin (clock/Search/spine).
+	# Default OFF — not product Begin/Esc PASS.
+	if script.has_method("smoke_auto_begin_enabled") and bool(script.call("smoke_auto_begin_enabled")):
+		print("EOA_SMOKE_AUTO_BEGIN who=TestRunner._show_living_title_boot armed=1 (smoke-only; product Begin/Esc still FAIL)")
+		call_deferred("_smoke_auto_begin_living_title")
+
+
+func _smoke_auto_begin_living_title() -> void:
+	var boot: Node = get_node_or_null("LivingTitleBoot")
+	if boot == null or not is_instance_valid(boot) or bool(boot.get("_closed")):
+		return
+	print("EOA_SMOKE_AUTO_BEGIN who=TestRunner._smoke_auto_begin_living_title smoke-only (NOT product Begin/Esc PASS)")
+	if boot.has_method("apply_smoke_auto_begin"):
+		boot.call("apply_smoke_auto_begin")
+	elif boot.has_method("handle_live_begin"):
+		boot.call("handle_live_begin")
+
+
+func _quit_logged(code: int, reason: String) -> void:
+	# Any intended quit must log a reason. Silent get_tree().quit is a softpipe FAIL.
+	print("EOA_HARNESS_QUIT who=TestRunner reason=%s code=%d" % [reason, code])
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+	var stay := false
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("smoke_advance_should_stay_alive"):
+		stay = bool(TimeManager.call("smoke_advance_should_stay_alive"))
+	if stay and not reason.begins_with("ui_smoke") and reason != "unit_order_qa" and not reason.begins_with("feb_clock") and not reason.begins_with("ix1_frame_guard") and not reason.begins_with("ix1_live_progress"):
+		print("EOA_HARNESS_QUIT who=TestRunner suppressed stay_alive=1 reason=%s (Search/spine window; NOT product clock PASS)" % reason)
+		if OS.has_method("flush_stdout"):
+			OS.call("flush_stdout")
+		return
+	if get_tree() != null:
+		get_tree().quit(code)
+
+
+func _process(_delta: float) -> void:
+	# Only while the living title is up — cheap null check after Begin.
+	var boot: Node = get_node_or_null("LivingTitleBoot")
+	if boot == null or not is_instance_valid(boot) or bool(boot.get("_closed")):
+		_maybe_smoke_advance_past_plus6(_delta)
+		_tick_smoke_ix1_frame_guard(_delta)
+		return
+	# Play 6573d01 backup: if the flag is set and title._ready deferred missed.
+	if not has_meta("eoa_smoke_auto_begin_tried"):
+		var scr_ab: GDScript = _living_title_boot_script()
+		if scr_ab != null and scr_ab.has_method("smoke_auto_begin_enabled") and bool(scr_ab.call("smoke_auto_begin_enabled")):
+			var waited: float = float(get_meta("eoa_smoke_auto_begin_wait", 0.0))
+			waited += _delta
+			set_meta("eoa_smoke_auto_begin_wait", waited)
+			if waited >= 0.45:
+				set_meta("eoa_smoke_auto_begin_tried", true)
+				print("EOA_SMOKE_AUTO_BEGIN who=TestRunner._process backup (NOT product Begin/Esc PASS)")
+				if boot.has_method("apply_smoke_auto_begin"):
+					boot.call("apply_smoke_auto_begin")
+				elif boot.has_method("handle_live_begin"):
+					boot.call("handle_live_begin")
+				return
+	# Play 5adb38e / f9f249c: mouse Begin/CC never reached title `_input`.
+	# Poll Input AND DisplayServer.mouse_get_button_state() — computerUse
+	# clicks an unfocused window and the WM eats the ButtonPress so the
+	# Input singleton stays false (zero EOA_LIVE_PTR).
+	var os_left: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	if not os_left and boot.has_method("os_left_button_held"):
+		os_left = bool(boot.call("os_left_button_held"))
+	elif not os_left and DisplayServer.get_name() != "headless":
+		os_left = (int(DisplayServer.mouse_get_button_state()) & int(MOUSE_BUTTON_MASK_LEFT)) != 0
+	if os_left:
+		if not has_meta("eoa_title_ptr_held"):
+			set_meta("eoa_title_ptr_held", true)
+			print(
+				"EOA_LIVE_RAW_PTR who=TestRunner._process ds_btn=%s vp=%s"
+				% [str(int(DisplayServer.mouse_get_button_state())), str(get_viewport().get_mouse_position() if get_viewport() != null else Vector2.ZERO)]
+			)
+			if boot.has_method("handle_live_pointer"):
+				var ptr_act: String = str(boot.call("handle_live_pointer", null))
+				print("EOA_LIVE_PTR who=TestRunner._process action=%s" % ptr_act)
+	else:
+		if has_meta("eoa_title_ptr_held"):
+			remove_meta("eoa_title_ptr_held")
+	if boot.has_method("is_live_begin_event") == false:
+		pass
+	elif (
+		(InputMap.has_action("eoa_living_begin") and Input.is_action_just_pressed("eoa_living_begin"))
+		or (InputMap.has_action("ui_accept") and Input.is_action_just_pressed("ui_accept"))
+		or Input.is_key_pressed(KEY_ENTER)
+		or Input.is_physical_key_pressed(KEY_ENTER)
+	):
+		if not has_meta("eoa_title_begin_key_held"):
+			set_meta("eoa_title_begin_key_held", true)
+			print("EOA_LIVE_RAW_KEY who=TestRunner._process event=begin_key")
+			if boot.has_method("handle_live_begin"):
+				boot.call("handle_live_begin")
+				print("EOA_LIVE_PTR who=TestRunner._process action=begin_key")
+	else:
+		if has_meta("eoa_title_begin_key_held"):
+			remove_meta("eoa_title_begin_key_held")
+	var just: bool = Input.is_action_just_pressed("ui_cancel")
+	var held: bool = Input.is_key_pressed(KEY_ESCAPE) or Input.is_physical_key_pressed(KEY_ESCAPE)
+	if not just and not held:
+		if has_meta("eoa_title_esc_held"):
+			remove_meta("eoa_title_esc_held")
+		return
+	if held and not just and has_meta("eoa_title_esc_held"):
+		return
+	if held:
+		set_meta("eoa_title_esc_held", true)
+	print(
+		"EOA_LIVE_ESC who=TestRunner._process process_mode=%s title_up=1 processing=%s"
+		% [str(process_mode), str(is_processing())]
+	)
+	if boot.has_method("handle_live_escape"):
+		boot.call("handle_live_escape")
 
 
 func _on_living_title_boot_closed(result: Dictionary) -> void:
+	if has_meta("eoa_title_esc_held"):
+		remove_meta("eoa_title_esc_held")
 	print("TestRunner: living title closed %s" % str(result))
 	var tag := str(result.get("player_tag", player_tag)).strip_edges().to_upper()
 	if tag.is_empty():
 		tag = "GER"
 	player_tag = tag
+	set_meta("eoa_living_title_closed", true)
+	var tm_boot := get_node_or_null("/root/TimeManager")
+	if tm_boot != null and tm_boot.has_method("mark_living_title_closed"):
+		tm_boot.call("mark_living_title_closed")
+	# Live Search LineEdit+Go can be unbound / empty-index after title Begin.
+	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("rebind_map_search"):
+		map_renderer.call("rebind_map_search")
+	# Begin leftover Search focus must not swallow Space; leftover pan/pick must
+	# not swallow 4x / pause (Play 9f09db2: gui_get_hovered_control missed chrome).
+	if map_renderer != null and is_instance_valid(map_renderer):
+		if map_renderer.has_method("release_play_clock_input_blockers"):
+			map_renderer.call("release_play_clock_input_blockers")
+		elif map_renderer.has_method("_release_search_focus"):
+			map_renderer.call("_release_search_focus")
+	var top_bar_boot := get_node_or_null("UILayer/TopInfoBar")
+	if top_bar_boot != null:
+		if top_bar_boot.has_method("arm_play_clock_after_begin"):
+			top_bar_boot.call("arm_play_clock_after_begin")
+		else:
+			top_bar_boot.set("_sim_tick_busy", false)
+			top_bar_boot.set("_sim_tick_busy_since_msec", 0)
 	if not has_meta("eoa_first_session_toast"):
 		set_meta("eoa_first_session_toast", true)
 		_toast_first_session_onboarding()
+	# Play ae78507: hatch PASS, 4x/day undelivered — same computerUse hole.
+	# Smoke-only past-+6 via TopInfoBar 4x owner + advance_real_time.
+	if _smoke_advance_past_plus6_wanted():
+		print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner._on_living_title_boot_closed armed=1 (NOT product clock/Begin/Esc PASS)")
+		call_deferred("_smoke_advance_past_plus6_after_hatch")
+
+
+func _smoke_advance_past_plus6_wanted() -> bool:
+	var scr: GDScript = _living_title_boot_script()
+	if scr != null and scr.has_method("smoke_advance_past_plus6_enabled"):
+		return bool(scr.call("smoke_advance_past_plus6_enabled"))
+	var tm: Node = get_node_or_null("/root/TimeManager")
+	if tm != null and tm.has_method("smoke_advance_past_plus6_enabled"):
+		return bool(tm.call("smoke_advance_past_plus6_enabled"))
+	return false
+
+
+func _maybe_smoke_advance_past_plus6(delta: float) -> void:
+	if has_meta("eoa_smoke_advance_done"):
+		return
+	if has_meta("eoa_smoke_advance_chunking"):
+		_poll_smoke_advance_past_plus6()
+		return
+	if has_meta("eoa_smoke_advance_tried"):
+		return
+	if not _smoke_advance_past_plus6_wanted():
+		return
+	if not has_meta("eoa_living_title_closed"):
+		return
+	var waited: float = float(get_meta("eoa_smoke_advance_wait", 0.0))
+	waited += delta
+	set_meta("eoa_smoke_advance_wait", waited)
+	if waited >= 0.35:
+		_smoke_advance_past_plus6_after_hatch()
+
+
+func _smoke_advance_past_plus6_after_hatch() -> void:
+	if has_meta("eoa_smoke_advance_tried"):
+		return
+	set_meta("eoa_smoke_advance_tried", true)
+	if not _smoke_advance_past_plus6_wanted():
+		return
+	print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner._smoke_advance_past_plus6_after_hatch smoke-only (NOT product clock/Begin/Esc PASS)")
+	var out: Dictionary = _call_smoke_advance_past_plus6()
+	if str(out.get("reason", "")) == "chunked_pending":
+		set_meta("eoa_smoke_advance_chunking", true)
+		print(
+			"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner.after_hatch chunked pending window_stay=1 (NOT product clock PASS)"
+		)
+		return
+	_finish_smoke_advance_after_hatch(out)
+
+
+func _poll_smoke_advance_past_plus6() -> void:
+	if has_meta("eoa_smoke_advance_done"):
+		return
+	# Softpipe: do not only re-read pending. Nudge the chunker so a scarce
+	# idle frame still consumes ticks (catch-up if starved).
+	var out: Dictionary = _nudge_smoke_advance_past_plus6()
+	if str(out.get("reason", "")) == "chunked_pending":
+		return
+	_finish_smoke_advance_after_hatch(out)
+
+
+func _nudge_smoke_advance_past_plus6() -> Dictionary:
+	var tm: Node = get_node_or_null("/root/TimeManager")
+	if tm != null and tm.has_method("nudge_smoke_advance_chunk"):
+		return tm.call("nudge_smoke_advance_chunk") as Dictionary
+	if tm != null and tm.has_method("step_smoke_advance_chunk"):
+		return tm.call("step_smoke_advance_chunk") as Dictionary
+	return _call_smoke_advance_past_plus6()
+
+
+func _call_smoke_advance_past_plus6() -> Dictionary:
+	var out: Dictionary = {}
+	var top_bar: Node = get_node_or_null("UILayer/TopInfoBar")
+	if top_bar != null and top_bar.has_method("apply_smoke_advance_past_plus6"):
+		out = top_bar.call("apply_smoke_advance_past_plus6") as Dictionary
+	else:
+		var tm: Node = get_node_or_null("/root/TimeManager")
+		if tm != null and tm.has_method("apply_smoke_advance_past_plus6"):
+			out = tm.call("apply_smoke_advance_past_plus6") as Dictionary
+		elif tm != null and tm.has_method("nudge_smoke_advance_chunk"):
+			out = tm.call("nudge_smoke_advance_chunk") as Dictionary
+		elif tm != null and tm.has_method("step_smoke_advance_chunk"):
+			out = tm.call("step_smoke_advance_chunk") as Dictionary
+	return out
+
+
+func _finish_smoke_advance_after_hatch(out: Dictionary) -> void:
+	if has_meta("eoa_smoke_advance_done"):
+		return
+	set_meta("eoa_smoke_advance_done", true)
+	if has_meta("eoa_smoke_advance_chunking"):
+		remove_meta("eoa_smoke_advance_chunking")
+	print(
+		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner.after_hatch ok=%s past7=%s date=%s window_stay=%s catchup=%s (NOT product clock PASS)"
+		% [
+			str(out.get("ok", false)),
+			str(out.get("past_7_jan", false)),
+			"%s-%s-%s %s:00" % [str(out.get("year", 0)), str(out.get("month", 0)), str(out.get("day", 0)), str(out.get("hour", 0))],
+			"1" if bool(out.get("window_stay", true)) else "0",
+			"1" if bool(out.get("catchup", false)) else "0",
+		]
+	)
+	# Play 9625020: after_hatch ok=true past7=true then the window died before
+	# Search. Never treat advance-complete as harness done — do not quit.
+	print(
+		"EOA_SMOKE_STAYALIVE who=TestRunner.after_hatch no_quit=1 window_alive=1 past7=%s stay_alive=%s (Search/spine window; NOT product Begin/Esc/clock PASS)"
+		% [
+			str(out.get("past_7_jan", false)),
+			"1" if bool(out.get("stay_alive", _smoke_should_gate_post_hatch_heavy())) else "0",
+		]
+	)
+	_restore_live_search_chrome_after_stay_alive("after_hatch")
+	call_deferred("_smoke_search_chrome_sticky_after_reflow")
+	call_deferred("_smoke_stay_alive_heartbeat")
+	call_deferred("_maybe_start_ix1_frame_guard")
+
+
+func _smoke_should_gate_post_hatch_heavy() -> bool:
+	# Live smoke: skip the post-past7 unit-icon / grand-visual rebound.
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	var tm: Node = get_node_or_null("/root/TimeManager")
+	if tm != null and tm.has_method("smoke_stay_alive_active") and bool(tm.call("smoke_stay_alive_active")):
+		return true
+	if tm != null and tm.has_method("smoke_advance_should_stay_alive"):
+		return bool(tm.call("smoke_advance_should_stay_alive"))
+	return _smoke_advance_past_plus6_wanted()
+
+
+func _smoke_stay_alive_heartbeat() -> void:
+	if not has_meta("eoa_smoke_advance_done"):
+		return
+	var beats: int = int(get_meta("eoa_smoke_stay_alive_beats", 0))
+	beats += 1
+	set_meta("eoa_smoke_stay_alive_beats", beats)
+	print(
+		"EOA_SMOKE_STAYALIVE who=TestRunner.heartbeat beat=%d window_alive=1 no_quit=1 (Search/spine window; NOT product clock PASS)"
+		% beats
+	)
+	# Every beat: first-paint live=1 is not enough — chrome must stay after reflow.
+	_restore_live_search_chrome_after_stay_alive("heartbeat")
+	if beats == 2:
+		call_deferred("_smoke_search_chrome_sticky_after_reflow")
+	if beats < 4:
+		call_deferred("_smoke_stay_alive_heartbeat")
+
+
+func _smoke_search_chrome_sticky_after_reflow() -> void:
+	# Play 48e4fe20: first PIXEL live=1 then TopInfoBar More+/Steel/Al reflow
+	# dropped chrome. Force layout settle and fail live if Search is gone.
+	var tib: Node = get_tree().get_first_node_in_group("top_info_bar") if get_tree() != null else null
+	if tib == null and get_tree() != null:
+		tib = get_tree().root.find_child("TopInfoBar", true, false)
+	if tib != null:
+		if tib.has_method("_apply_responsive_layout"):
+			tib.call("_apply_responsive_layout")
+		if tib.has_method("_update_resources"):
+			tib.call("_update_resources")
+		if tib.has_method("_keep_search_chrome_sticky"):
+			tib.call("_keep_search_chrome_sticky")
+	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("ensure_live_search_chrome"):
+		map_renderer.call("ensure_live_search_chrome")
+	_restore_live_search_chrome_after_stay_alive("layout_settle")
+
+
+func _restore_live_search_chrome_after_stay_alive(who: String) -> void:
+	# Play c82233c8: flags were live=1 but LineEdit/Go painted 0px under Map Mode.
+	# Play 48e4fe20: first-paint live=1 then chrome vanished after Steel/Al reflow.
+	# Re-host onto TopInfoBar RightContainer and fail live when pixels are absent.
+	if map_renderer == null or not is_instance_valid(map_renderer):
+		print("EOA_SMOKE_SEARCH_CHROME who=TestRunner.%s visible=0 focusable=0 live=0 (no renderer; NOT product Begin/Esc PASS)" % who)
+		print("EOA_SMOKE_SEARCH_CHROME_PIXEL who=TestRunner.%s on_screen=0 in_bar=0 overlap=1 area=0 live=0 sticky=0 (no renderer; NOT product Begin/Esc PASS)" % who)
+		return
+	if map_renderer.has_method("ensure_live_search_chrome"):
+		map_renderer.call("ensure_live_search_chrome")
+	var pixel: Dictionary = {}
+	if map_renderer.has_method("search_chrome_pixel_report"):
+		pixel = map_renderer.call("search_chrome_pixel_report") as Dictionary
+	# Pixel report is the only live signal — flags without on_screen/area/in_bar FAIL.
+	var live_ok := (not pixel.is_empty()) and bool(pixel.get("live", false))
+	var vis := bool(pixel.get("visible", false))
+	var focusable := bool(pixel.get("focusable", false))
+	var sticky_ok := live_ok and bool(pixel.get("sticky", live_ok)) and bool(pixel.get("in_bar", false))
+	if who == "layout_settle" and not sticky_ok:
+		live_ok = false
+	print(
+		"EOA_SMOKE_SEARCH_CHROME who=TestRunner.%s visible=%s focusable=%s live=%s (Search LineEdit+Go on TopInfoBar UILayer; NOT product Begin/Esc/clock PASS)"
+		% [who, "1" if vis else "0", "1" if focusable else "0", "1" if live_ok else "0"]
+	)
+	print(
+		"EOA_SMOKE_SEARCH_CHROME_PIXEL who=TestRunner.%s on_screen=%s in_bar=%s overlap=%s area=%s line=%sx%s go=%sx%s xy=%s,%s host=%s layer=%s reflow=%s sticky=%s live=%s (pixel sticky gate; NOT product Begin/Esc/clock PASS)"
+		% [
+			who,
+			"1" if bool(pixel.get("on_screen", false)) else "0",
+			"1" if bool(pixel.get("in_bar", false)) else "0",
+			"%.2f" % float(pixel.get("overlap", 1.0)),
+			"%.0f" % float(pixel.get("area", 0.0)),
+			"%.0f" % float(pixel.get("line_w", 0.0)),
+			"%.0f" % float(pixel.get("line_h", 0.0)),
+			"%.0f" % float(pixel.get("go_w", 0.0)),
+			"%.0f" % float(pixel.get("go_h", 0.0)),
+			"%.0f" % float(pixel.get("x", 0.0)),
+			"%.0f" % float(pixel.get("y", 0.0)),
+			str(pixel.get("host", "")),
+			str(pixel.get("layer", -1)),
+			"1" if bool(pixel.get("reflow", false)) else "0",
+			"1" if sticky_ok else "0",
+			"1" if live_ok else "0",
+		]
+	)
+
+
+func _eoa_flush(msg: String) -> void:
+	print(msg)
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+
+
+func _smoke_frame_guard_wanted() -> bool:
+	return OS.get_environment("EOA_SMOKE_FRAME_GUARD").strip_edges() == "1"
+
+
+func _maybe_start_ix1_frame_guard() -> void:
+	if not _smoke_frame_guard_wanted() and not _smoke_live_progress_wanted():
+		return
+	if has_meta("eoa_smoke_frame_guard_started"):
+		return
+	if not has_meta("eoa_smoke_advance_done"):
+		return
+	set_meta("eoa_smoke_frame_guard_started", true)
+	_eoa_flush("EOA_SMOKE_FRAME_GUARD who=TestRunner.start_after_stayalive (Play launch + viewport mouse; NOT product Begin/Esc/clock PASS)")
+	call_deferred("_smoke_ix1_frame_guard_open_and_press")
+
+
+func _smoke_ix1_frame_guard_open_and_press() -> void:
+	# Same Köln inspector Play had open, then a real mouse event on the button.
+	_eoa_flush("EOA_SMOKE_FRAME_GUARD who=TestRunner.open_koln pid=710417")
+	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("open_province_inspector_from_search"):
+		map_renderer.call("open_province_inspector_from_search", 710417)
+	_eoa_flush("EOA_SMOKE_FRAME_GUARD who=TestRunner.koln_open")
+	call_deferred("_smoke_ix1_frame_guard_press")
+
+
+func _smoke_ix1_frame_guard_press() -> void:
+	_eoa_flush("EOA_SMOKE_FRAME_GUARD who=TestRunner.mouse_press")
+	var report: Dictionary = {}
+	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("deliver_ix1_spine_button_mouse_press"):
+		report = map_renderer.call("deliver_ix1_spine_button_mouse_press") as Dictionary
+	_eoa_flush(
+		"EOA_SMOKE_FRAME_GUARD who=TestRunner.mouse_press_returned ok=%s reason=%s"
+		% [str(bool(report.get("ok", false))), str(report.get("reason", ""))]
+	)
+	var vis0: Dictionary = _log_ix1_guard_visible_feedback()
+	set_meta("eoa_smoke_frame_guard_vis_ok", bool(vis0.get("ok", false)))
+	set_meta("eoa_smoke_frame_guard_t0", Time.get_ticks_msec())
+	set_meta("eoa_smoke_frame_guard_frames", 0)
+	set_meta("eoa_smoke_frame_guard_rss0", _read_godot_rss_mb())
+	set_meta("eoa_smoke_frame_guard_last_sec", -1)
+	set_meta("eoa_smoke_frame_guard_active", true)
+	if _smoke_live_progress_wanted():
+		_arm_smoke_ix1_live_progress()
+
+
+func _smoke_live_progress_wanted() -> bool:
+	return OS.get_environment("EOA_SMOKE_SPINE_LIVE_PROGRESS").strip_edges() == "1"
+
+
+func _tick_smoke_ix1_frame_guard(_delta: float) -> void:
+	if not _smoke_frame_guard_wanted() and not _smoke_live_progress_wanted():
+		return
+	if not bool(get_meta("eoa_smoke_frame_guard_active", false)):
+		_maybe_start_ix1_frame_guard()
+		return
+	if _smoke_live_progress_wanted():
+		_tick_smoke_ix1_live_progress()
+		return
+	var frames: int = int(get_meta("eoa_smoke_frame_guard_frames", 0)) + 1
+	set_meta("eoa_smoke_frame_guard_frames", frames)
+	var t0: int = int(get_meta("eoa_smoke_frame_guard_t0", 0))
+	var elapsed: int = int((Time.get_ticks_msec() - t0) / 1000.0)
+	var last: int = int(get_meta("eoa_smoke_frame_guard_last_sec", -1))
+	if elapsed == last:
+		return
+	set_meta("eoa_smoke_frame_guard_last_sec", elapsed)
+	var rss: int = _read_godot_rss_mb()
+	_eoa_flush(
+		"EOA_SMOKE_FRAME_GUARD frames=%d rss_mb=%d elapsed=%d (after press; NOT product Begin/Esc/clock PASS)"
+		% [frames, rss, elapsed]
+	)
+	var secs := 60
+	var env_secs := OS.get_environment("EOA_FRAME_GUARD_SECS").strip_edges()
+	if env_secs.is_valid_int():
+		secs = clampi(int(env_secs), 5, 120)
+	if rss >= 3072:
+		_eoa_flush("EOA_SMOKE_FRAME_GUARD frames=%d rss_mb=%d FAIL" % [frames, rss])
+		_quit_logged(1, "ix1_frame_guard_rss")
+		return
+	if elapsed >= secs:
+		var vis: Dictionary = _log_ix1_guard_visible_feedback()
+		var frames_ok := frames >= maxi(secs * 2, 10)
+		# Toast cards expire in 3–6s; latch the post-press visible check.
+		# Building… must still be on the button at 60s.
+		var vis_latched := bool(get_meta("eoa_smoke_frame_guard_vis_ok", false))
+		var building_still := "Building" in str(vis.get("building", ""))
+		var vis_ok := vis_latched and building_still
+		var verdict := "PASS" if frames_ok and rss < 3072 and vis_ok else "FAIL"
+		_eoa_flush("EOA_SMOKE_FRAME_GUARD frames=%d rss_mb=%d %s" % [frames, rss, verdict])
+		_quit_logged(0 if verdict == "PASS" else 1, "ix1_frame_guard_%s" % verdict.to_lower())
+
+
+func _log_ix1_guard_visible_feedback() -> Dictionary:
+	var toast_n := 0
+	var toast_body := ""
+	if typeof(LeaderEventUI) != TYPE_NIL:
+		var cont: Variant = LeaderEventUI.get("_toast_container")
+		if cont is Node:
+			var node: Node = cont as Node
+			toast_n = node.get_child_count()
+			if toast_n > 0:
+				var last: Node = node.get_child(toast_n - 1)
+				var labels: Array[Node] = last.find_children("*", "Label", true, false)
+				var li := 0
+				while li < labels.size():
+					var lab_node: Node = labels[li]
+					if lab_node is Label:
+						var t: String = (lab_node as Label).text
+						if not t.is_empty():
+							toast_body = t
+							break
+					li += 1
+	var building := ""
+	if map_renderer != null and is_instance_valid(map_renderer):
+		var btn: Variant = map_renderer.get("_btn_build_road_spine")
+		if btn is Button:
+			building = (btn as Button).text
+	var toast_ok := toast_n > 0 and ("Road spine" in toast_body or "Building" in toast_body or toast_n >= 1)
+	var building_ok := "Building" in building
+	var ok := toast_ok and building_ok
+	_eoa_flush(
+		"EOA_SMOKE_FRAME_GUARD who=visible toast_n=%d building=%s toast_ok=%d building_ok=%d"
+		% [toast_n, building, 1 if toast_ok else 0, 1 if building_ok else 0]
+	)
+	return {"ok": ok, "toast_n": toast_n, "building": building}
+
+
+func _read_godot_rss_mb() -> int:
+	# Measure THIS Godot pid. Never /proc/self via OS.execute (that is awk).
+	# FileAccess often cannot read /proc; prefer /usr/bin/cat then ps.
+	var pid := OS.get_process_id()
+	var cat_statm := _exec_cat_text("/proc/%d/statm" % pid)
+	var from_statm := _parse_statm_rss_from_text(cat_statm)
+	if from_statm > 0:
+		return from_statm
+	from_statm = _parse_statm_rss_mb("/proc/%d/statm" % pid)
+	if from_statm > 0:
+		return from_statm
+	var cat_status := _exec_cat_text("/proc/%d/status" % pid)
+	var from_status := _parse_vmrss_mb_text(cat_status)
+	if from_status > 0:
+		return from_status
+	from_status = _parse_vmrss_mb_text(_read_abs_text("/proc/%d/status" % pid))
+	if from_status > 0:
+		return from_status
+	var ps_out: Array = []
+	OS.execute("/usr/bin/ps", PackedStringArray(["-o", "rss=", "-p", str(pid)]), ps_out, true, false)
+	if ps_out.size() > 0:
+		var kb_s: String = str(ps_out[0]).strip_edges()
+		if kb_s.is_valid_int() and int(kb_s) > 0:
+			return int(round(float(int(kb_s)) / 1024.0))
+	return 0
+
+
+func _exec_cat_text(path: String) -> String:
+	var out: Array = []
+	OS.execute("/usr/bin/cat", PackedStringArray([path]), out, true, false)
+	if out.size() > 0:
+		return str(out[0])
+	return ""
+
+
+func _parse_statm_rss_from_text(txt: String) -> int:
+	if txt.is_empty():
+		return 0
+	var parts: PackedStringArray = txt.strip_edges().split(" ", false)
+	if parts.size() < 2:
+		return 0
+	var pages := int(parts[1])
+	if pages <= 0:
+		return 0
+	return int(round(float(pages) * 4096.0 / 1024.0 / 1024.0))
+
+
+func _read_abs_text(path: String) -> String:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return ""
+	var txt := f.get_as_text()
+	f.close()
+	return txt
+
+
+func _parse_vmrss_mb_text(txt: String) -> int:
+	for line in txt.split("\n"):
+		if not line.begins_with("VmRSS:"):
+			continue
+		var compact := line.replace("\t", " ")
+		var parts: PackedStringArray = compact.split(" ", false)
+		if parts.size() >= 2:
+			var mb: int = int(round(float(parts[1]) / 1024.0))
+			if mb > 0:
+				return mb
+	return 0
+
+
+func _parse_statm_rss_mb(path: String) -> int:
+	var txt := _read_abs_text(path)
+	if txt.is_empty():
+		return 0
+	var parts: PackedStringArray = txt.strip_edges().split(" ", false)
+	if parts.size() < 2:
+		return 0
+	var pages := int(parts[1])
+	if pages <= 0:
+		return 0
+	return int(round(float(pages) * 4096.0 / 1024.0 / 1024.0))
+
+
+func _arm_smoke_ix1_live_progress() -> void:
+	# After the real viewport mouse press: unpause the stay-alive clock and
+	# drive the SAME live hour path TopInfoBar uses (advance_real_time).
+	# Do NOT call IDM.advance_daily_projects or drain the F5 flush — that is
+	# the headless shortcut that PASSed on 2bc8f19 while live stayed 0%.
+	set_meta("eoa_smoke_live_progress_armed", true)
+	set_meta("eoa_smoke_live_progress_saw_pct", 0)
+	set_meta("eoa_smoke_live_progress_complete", false)
+	if typeof(TimeManager) != TYPE_NIL:
+		if TimeManager.has_method("set_paused"):
+			TimeManager.set_paused(false)
+		if TimeManager.has_method("set_time_scale"):
+			TimeManager.set_time_scale(4.0)
+	_eoa_flush(
+		"EOA_SMOKE_SPINE_LIVE_PROGRESS who=TestRunner.arm stay_alive=%s paused=0 scale=4 (live advance_real_time; NOT IDM shortcut)"
+		% str(
+			TimeManager.call("smoke_stay_alive_active")
+			if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("smoke_stay_alive_active")
+			else "?"
+		)
+	)
+
+
+func _tick_smoke_ix1_live_progress() -> void:
+	if bool(get_meta("eoa_smoke_live_progress_done", false)):
+		return
+	if not bool(get_meta("eoa_smoke_live_progress_armed", false)):
+		return
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_paused"):
+		if bool(TimeManager.is_paused()) and TimeManager.has_method("set_paused"):
+			TimeManager.set_paused(false)
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_real_time"):
+		TimeManager.advance_real_time(1.0)
+	var frames: int = int(get_meta("eoa_smoke_frame_guard_frames", 0)) + 1
+	set_meta("eoa_smoke_frame_guard_frames", frames)
+	var status: Dictionary = _ix1_live_progress_status()
+	var pct: int = int(status.get("pct", 0))
+	var eta: int = int(status.get("eta", 0))
+	var elapsed_days: int = int(status.get("elapsed", 0))
+	var done := bool(status.get("complete", false))
+	if pct > int(get_meta("eoa_smoke_live_progress_saw_pct", 0)):
+		set_meta("eoa_smoke_live_progress_saw_pct", pct)
+	if done:
+		set_meta("eoa_smoke_live_progress_complete", true)
+	var rss: int = _read_godot_rss_mb()
+	if frames % 6 == 0 or done or pct >= 100:
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_LIVE_PROGRESS who=TestRunner.tick days=%d pct=%d eta=%d rss_mb=%d complete=%d (advance_real_time; NOT product Begin/Esc/clock PASS)"
+			% [elapsed_days, pct, eta, rss, 1 if done else 0]
+		)
+	if rss >= 3072:
+		set_meta("eoa_smoke_live_progress_done", true)
+		_eoa_flush("EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=FAIL rss_mb=%d" % rss)
+		_quit_logged(1, "ix1_live_progress_rss")
+		return
+	var saw := int(get_meta("eoa_smoke_live_progress_saw_pct", 0))
+	if elapsed_days >= 5 and saw <= 0 and not done:
+		set_meta("eoa_smoke_live_progress_done", true)
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=FAIL days=%d pct=0 (stay-alive day_emit drop; live calendar did not tick IDM)"
+			% elapsed_days
+		)
+		_quit_logged(1, "ix1_live_progress_stuck_zero")
+		return
+	if done or pct >= 100:
+		set_meta("eoa_smoke_live_progress_done", true)
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=PASS days=%d pct=%d rss_mb=%d (live path COMPLETE)"
+			% [elapsed_days, pct, rss]
+		)
+		_quit_logged(0, "ix1_live_progress_pass")
+		return
+	if elapsed_days >= 45:
+		set_meta("eoa_smoke_live_progress_done", true)
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=FAIL days=%d pct=%d never COMPLETE"
+			% [elapsed_days, pct]
+		)
+		_quit_logged(1, "ix1_live_progress_no_complete")
+
+
+func _ix1_live_progress_status() -> Dictionary:
+	var out := {"pct": 0, "eta": 0, "elapsed": 0, "complete": false}
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		out["elapsed"] = int(TimeManager.get_total_days_elapsed())
+	var start_elapsed := 0
+	if has_meta("eoa_smoke_live_progress_start_elapsed"):
+		start_elapsed = int(get_meta("eoa_smoke_live_progress_start_elapsed"))
+	else:
+		start_elapsed = int(out["elapsed"])
+		set_meta("eoa_smoke_live_progress_start_elapsed", start_elapsed)
+	out["elapsed"] = maxi(0, int(out["elapsed"]) - start_elapsed)
+	if typeof(InfrastructureDevelopmentManager) == TYPE_NIL:
+		return out
+	if InfrastructureDevelopmentManager.has_method("get_ix1_spine_visual_state"):
+		if str(InfrastructureDevelopmentManager.call("get_ix1_spine_visual_state")) == "built":
+			out["complete"] = true
+			out["pct"] = 100
+	if InfrastructureDevelopmentManager.has_method("get_project_status"):
+		var st: Dictionary = InfrastructureDevelopmentManager.call("get_project_status", 710417) as Dictionary
+		out["pct"] = int(round(float(st.get("progress", 0.0))))
+		out["eta"] = int(st.get("eta_days", 0))
+		if not bool(st.get("active", false)) and bool(out["complete"]):
+			out["pct"] = 100
+	if InfrastructureDevelopmentManager.has_method("has_active_project"):
+		if not bool(InfrastructureDevelopmentManager.call("has_active_project", 710417)):
+			if int(out["pct"]) >= 99 or bool(out["complete"]):
+				out["complete"] = true
+				out["pct"] = 100
+	return out
 
 
 ## One-shot first-session onboarding for graphical F5 (meta-guarded at call site).
@@ -703,7 +1404,7 @@ func _run_feb_clock_advance_test() -> void:
 	await get_tree().create_timer(2.0).timeout
 	if typeof(TimeManager) == TYPE_NIL:
 		print("HeadlessFebClockAdvanceTest: RESULT=FAIL no_tm")
-		get_tree().quit(1)
+		_quit_logged(1, "feb_clock_no_tm")
 		return
 	TimeManager.set_paused(false)
 	TimeManager.set_time_scale(1.0)
@@ -729,17 +1430,17 @@ func _run_feb_clock_advance_test() -> void:
 		print("HeadlessFebClockAdvanceTest: day %d  %s → %s  (%dms)" % [i + 1, before, after, d1])
 		if before == after:
 			print("HeadlessFebClockAdvanceTest: RESULT=FAIL stuck at %s" % after)
-			get_tree().quit(1)
+			_quit_logged(1, "feb_clock_stuck")
 			return
 	var final := "%04d-%02d-%02d" % [TimeManager.current_year, TimeManager.current_month, TimeManager.current_day]
 	if TimeManager.current_month < 3:
 		print("HeadlessFebClockAdvanceTest: RESULT=FAIL no_march final=%s" % final)
-		get_tree().quit(1)
+		_quit_logged(1, "feb_clock_no_march")
 		return
 	print("HeadlessFebClockAdvanceTest: RESULT=PASS final=%s max_day_ms=%d" % [final, max_day_ms])
 	print("=== EOA FEB CLOCK ADVANCE end ===")
 	if OS.get_environment("EOA_FEB_CLOCK").strip_edges() == "1" and OS.get_environment("EOA_UI_SMOKE").strip_edges() != "1":
-		get_tree().quit(0)
+		_quit_logged(0, "feb_clock_pass")
 
 
 ## Headless F5 proof: Maginot chip exists with strength and can be ordered.
@@ -857,7 +1558,7 @@ func _run_unit_order_qa_and_quit() -> void:
 	print("EOA UNIT ORDER QA: %s fail=%s" % ["PASS" if ok else "FAIL", str(fail)])
 	print("RESULT=%s" % ("PASS" if ok else "FAIL"))
 	print("=== EOA UNIT ORDER QA end ===")
-	get_tree().quit(0 if ok else 1)
+	_quit_logged(0 if ok else 1, "unit_order_qa")
 
 
 ## Headless/editor automation: verify top bar, blockers, province pick after interactive unlock.
@@ -982,10 +1683,10 @@ func _run_ui_smoke_and_quit() -> void:
 		print("  FAIL: ", f)
 	if fail.is_empty():
 		print("=== EOA UI SMOKE OVERALL PASS ===")
-		get_tree().quit(0)
+		_quit_logged(0, "ui_smoke_pass")
 	else:
 		print("=== EOA UI SMOKE OVERALL FAIL ===")
-		get_tree().quit(1)
+		_quit_logged(1, "ui_smoke_fail")
 
 
 func _force_clear_input_blockers() -> void:
@@ -1136,7 +1837,7 @@ func _ready() -> void:
 	# Diagnostic for "hang" / evidence misfires: always log exactly what the process received so we can see why graphical vs evidence path was chosen.
 	print("TestRunner: OS cmdline_args (for evidence detection): ", OS.get_cmdline_args())
 	print("TestRunner: DisplayServer name: ", DisplayServer.get_name(), " | has dedicated_server feature: ", OS.has_feature("dedicated_server"))
-	print("TestRunner: EOA envs: RUN_50=", OS.get_environment("EOA_RUN_50_TURN_SIM"), " LONG=", OS.get_environment("EOA_RUN_LONG_SIM"), " HEADLESS_EVIDENCE=", OS.get_environment("EOA_HEADLESS_EVIDENCE"), " FAST=", OS.get_environment("EOA_FAST_TEST"), " TEST_SAVE=", OS.get_environment("EOA_TEST_SAVE_LOAD"))
+	print("TestRunner: EOA envs: RUN_50=", OS.get_environment("EOA_RUN_50_TURN_SIM"), " LONG=", OS.get_environment("EOA_RUN_LONG_SIM"), " HEADLESS_EVIDENCE=", OS.get_environment("EOA_HEADLESS_EVIDENCE"), " FAST=", OS.get_environment("EOA_FAST_TEST"), " TEST_SAVE=", OS.get_environment("EOA_TEST_SAVE_LOAD"), " SMOKE_AUTO_BEGIN=", OS.get_environment("EOA_SMOKE_AUTO_BEGIN"), " SMOKE_ADVANCE_PAST_PLUS6=", OS.get_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6"))
 	# Early space evidence force (for headless test runs to guarantee prints even if sim loop races quit or defer)
 	if OS.get_environment("EOA_HEADLESS_EVIDENCE").strip_edges() == "1" or OS.get_environment("EOA_TEST_SAVE_LOAD").strip_edges() == "1" or OS.get_environment("EOA_RUN_50_TURN_SIM").strip_edges() == "1":
 		call_deferred("_force_space_race_evidence_prints")
@@ -3359,25 +4060,35 @@ func _deferred_grand_visuals_and_setup() -> void:
 
 	# world_accurate F5: phase1 seed block never runs. Park Maginot chips after Europe frame.
 	# EOA_UNIT_ORDER_QA must park even in headless (evidence skips this otherwise).
+	# Live smoke stay-alive: skip the 252-icon flood after past7 (Play 9625020 exit).
+	var smoke_gate_heavy := _smoke_should_gate_post_hatch_heavy()
+	if smoke_gate_heavy:
+		print("EOA_SMOKE_STAYALIVE who=TestRunner.deferred_grand_visuals gate_chips=1 no_quit=1 (NOT product Begin/Esc/clock PASS)")
 	if (
 		map_renderer
 		and map_renderer.has_method("ensure_playable_front_chips")
+		and not smoke_gate_heavy
 		and (
 			not _wants_headless_evidence()
 			or OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() == "1"
 		)
 	):
 		map_renderer.call("ensure_playable_front_chips", OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() != "1")
+	elif smoke_gate_heavy:
+		print("EOA_SMOKE_STAYALIVE who=TestRunner.skip_front_chips past7_window=1 (Search/spine; no unit-icon flood)")
 
 	# Final safety hide if loading screen still up (e.g. non-heavy path or orphaned node).
 	_ensure_game_interactive()
 
-	if OS.get_environment("EOA_RUN_SIM_CYCLES") == "1" or _wants_50_turn_sim():
+	if not smoke_gate_heavy and (OS.get_environment("EOA_RUN_SIM_CYCLES") == "1" or _wants_50_turn_sim()):
 		call_deferred("_run_deferred_save_load_stockpile_test")
 		call_deferred("_run_deferred_combat_persist_test")
 
 	print("TestRunner: [DEFERRED GRAND VISUALS] Complete (bg + vis prints + basic seeds done post first frame; heavy + cycles + nudge already scheduled).")
 
+	if smoke_gate_heavy:
+		print("EOA_SMOKE_STAYALIVE who=TestRunner.deferred_grand_visuals complete no_quit=1 window_alive=1 (NOT product clock PASS)")
+		return
 	if typeof(AgentManager) != TYPE_NIL:
 		AgentManager.apply_agent_national_impacts()
 

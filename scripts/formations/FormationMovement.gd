@@ -135,7 +135,11 @@ static func _norm_terrain(raw: String) -> String:
 static func _infra_unit(province: Province) -> float:
 	if province == null:
 		return 0.5
-	return _clamp(float(province.infrastructure) / 10.0, 0.0, 1.0)
+	var infra := float(province.infrastructure)
+	# IX-1: spine edges make hops cheaper than same-infra off-spine land.
+	if province.built_road_neighbors.size() > 0:
+		infra += 2.0
+	return _clamp(infra / 10.0, 0.0, 1.0)
 
 
 static func _ctrl_tag(province: Province) -> String:

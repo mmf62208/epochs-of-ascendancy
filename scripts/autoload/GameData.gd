@@ -12268,6 +12268,9 @@ func simulate_failed_state_pressure(low_cohesion_tag: String, high_ascendancy_ne
 
 func get_save_data() -> Dictionary:
 	_init_peace_state_if_needed()
+	var skip_hier := false
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_live_f5_play_path"):
+		skip_hier = bool(TimeManager.is_live_f5_play_path())
 	return {
 		"demographic_policies": peace_state.get("demographic_policies", {}).duplicate(true),
 		"non_citizen_ratio": peace_state.get("non_citizen_ratio", {}).duplicate(true),
@@ -12319,8 +12322,9 @@ func get_save_data() -> Dictionary:
 		"biotech_intel": peace_state.get("biotech_intel", {}).duplicate(true),
 		"biotech_sabotage_log": peace_state.get("biotech_sabotage_log", {}).duplicate(true),
 		"scanner_intel_flags": peace_state.get("scanner_intel_flags", {}).duplicate(true),
-		# Live hierarchy membership (post-seed player/peace mutations) — not era re-seed
-		"hierarchy_membership_live": _export_hierarchy_membership_live(),
+		# Live hierarchy membership (post-seed player/peace mutations) — not era re-seed.
+		# Live F5 / softpipe: skip the 3×3520 string-key dump (era-reseedable).
+		"hierarchy_membership_live": {} if skip_hier else _export_hierarchy_membership_live(),
 		"membership_live_mutation_count": int(peace_state.get("membership_live_mutation_count", 0)),
 		"membership_live_log": peace_state.get("membership_live_log", []).duplicate(true) if peace_state.get("membership_live_log") is Array else [],
 		"version": 1

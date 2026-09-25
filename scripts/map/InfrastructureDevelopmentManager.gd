@@ -18,6 +18,13 @@ signal project_completed(province_id: int, new_level: int, axis: String, project
 signal project_cancelled(province_id: int, reason: String)
 signal project_sabotaged(province_id: int, work_lost: float, severity: String)
 
+var _ix1_smoke_progress_band: int = -1
+## Headless start→complete must not run the 3520×N AI invest scan (Play MIXED
+## hang class: spine active → consider → continent mesh). F5 already skips.
+var _ix1_skip_full_board_ai_invest: bool = false
+var _ix1_spine_visual_state: String = ""
+var _ix1_spine_states_seen: Array[String] = []
+
 # --- Inner data model (can be promoted to its own Resource later) ---
 class ProvincialProject:
 	var id: String = ""
@@ -33,6 +40,8 @@ class ProvincialProject:
 	var start_day: int = 0
 	var days_remaining: int = 0                  # daily tick clock (save + AI/player progress)
 	var status: String = "active"                # active | paused | sabotaged | complete | cancelled
+	var build_road_spine: bool = false           # IX-1: complete also writes built_road_neighbors
+	var spine_neighbor_ids: Array[int] = []
 
 	func get_id() -> String:
 		if id.is_empty():
@@ -76,7 +85,9 @@ class ProvincialProject:
 			"political_power_cost": political_power_cost,
 			"start_day": start_day,
 			"days_remaining": days_remaining,
-			"status": status
+			"status": status,
+			"build_road_spine": build_road_spine,
+			"spine_neighbor_ids": spine_neighbor_ids.duplicate()
 		}
 
 	static func from_save_dict(d: Dictionary) -> ProvincialProject:
@@ -94,6 +105,10 @@ class ProvincialProject:
 		p.start_day = int(d.get("start_day", 0))
 		p.days_remaining = int(d.get("days_remaining", d.get("days_left", 0)))
 		p.status = d.get("status", "active")
+		p.build_road_spine = bool(d.get("build_road_spine", false))
+		var raw_n: Variant = d.get("spine_neighbor_ids", [])
+		if raw_n is Array:
+			p.spine_neighbor_ids = Array(raw_n, TYPE_INT, "", null)
 		return p
 
 
@@ -105,6 +120,19 @@ var _dev_level_defs: Dictionary = {}
 var _is_initialized: bool = false
 var _ai_infra_budget_day: int = -1
 var _ai_infra_starts_today: int = 0
+## Test / gate counters — live F5 must keep these at 0 / tiny.
+var _full_board_ai_invest_calls: int = 0
+var _ai_infra_provinces_considered: int = 0
+const AI_INFRA_PICK_CAP := 8
+
+# IX-1 Road Spine (Rhineland Bonn–Köln–Leverkusen). Spec is the source of IDs.
+const IX1_SPEC_PATH := "res://data/infrastructure/ix1_road_spine.json"
+const IX1_FALLBACK_HUB := 710417
+const IX1_FALLBACK_CORRIDOR: Array[int] = [710416, 710417, 710418]
+## First-session interconnect grant. Fresh Begin · Germany · 1936 has Mandate 0;
+## generic Köln Invest is 73 and stays gated. IX-1 uses this starter cost only.
+const IX1_FIRST_SESSION_MANDATE_COST := 0
+var _ix1_spec: Dictionary = {}
 
 
 func _ready() -> void:
@@ -149,6 +177,11 @@ func initialize_with_time() -> void:
 
 
 func _on_game_day_advanced(year: int, month: int, day: int) -> void:
+	# Light-sim advance_days already ticked construction with the calendar
+	# (FIX3: stay-alive drops day_emit). Skip a second tick the same elapsed day.
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_meta("eoa_idm_calendar_tick_elapsed"):
+		if int(TimeManager.get_meta("eoa_idm_calendar_tick_elapsed")) == TimeManager.get_total_days_elapsed():
+			return
 	advance_daily_projects(year, month, day)
 
 
@@ -268,15 +301,15 @@ func start_infrastructure_project(province_id: int, target_level: int, investor_
 	active_projects[province_id] = proj
 	project_started.emit(proj)
 
-	# Optional: immediately notify MapManager / visuals that this province is now "under construction"
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
-		MapManager.notify_province_changed(province_id, "infrastructure_project")
-
-	# Event hook: player feedback on starting investment (makes the action feel consequential immediately).
-	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
-		var prov: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
-		var pname := prov.name if prov else str(province_id)
-		LeaderEventUI.post_news("Investment Started", "%s begins infrastructure project in %s (target level %d)." % [proj.owner_tag, pname, target_level], "infrastructure")
+	# Live F5 / softpipe: remote AI invest must not toast or notify (toast panels +
+	# province_data_changed → riot/fill dirty a 3520-poly canvas and wedge the clock).
+	if not _should_quiet_ai_infra_start(proj.owner_tag):
+		if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
+			MapManager.notify_province_changed(province_id, "infrastructure_project")
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+			var prov: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+			var pname := prov.name if prov else str(province_id)
+			LeaderEventUI.post_news("Investment Started", "%s begins infrastructure project in %s (target level %d)." % [proj.owner_tag, pname, target_level], "infrastructure")
 
 	print("InfrastructureDevelopmentManager: started infra project on province %d (target %d) for %s" % [province_id, target_level, proj.owner_tag])
 	return proj
@@ -310,11 +343,10 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 			continue
 
 		var p: Province = MapManager.get_province(pid) if typeof(MapManager) != TYPE_NIL else null
-		if p == null:
-			continue
-
-		# Re-evaluate modifiers every day (engineers can arrive/leave, new tech, new sabotage)
-		_refresh_project_modifiers(proj, p)
+		# Tick progress even if the hex is not on this tree (headless -s / mid-load).
+		# Missing province only skips modifier refresh + map complete.
+		if p != null:
+			_refresh_project_modifiers(proj, p)
 
 		var work := proj.get_current_work_per_day()
 		var before := proj.progress
@@ -327,11 +359,19 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 
 		if delta > 0.001:
 			project_progress_updated.emit(pid, proj, delta)
+			if proj.build_road_spine:
+				if proj.progress > 0.001:
+					_set_ix1_spine_visual_state("construction", pid, proj.progress)
+				_log_smoke_spine_progress(pid, int(round(proj.progress)), proj.get_eta_days(), "IDM.advance_daily")
 			# Light event feedback for playability (avoid spam; only on significant chunks or high %).
 			if (int(proj.progress) % 25 == 0 or proj.progress > 90) and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
-				var prov: Province = MapManager.get_province(pid) if typeof(MapManager) != TYPE_NIL else null
-				var pname := prov.name if prov else str(pid)
-				LeaderEventUI.show_toast("%s infra project ~%d%% complete (ETA %d days)" % [pname, int(proj.progress), proj.get_eta_days()], 2.0)
+				var pname := p.name if p else str(pid)
+				var toast_txt := (
+					"Road spine ~%d%% · ETA %d days" % [int(proj.progress), proj.get_eta_days()]
+					if proj.build_road_spine
+					else "%s infra project ~%d%% complete (ETA %d days)" % [pname, int(proj.progress), proj.get_eta_days()]
+				)
+				LeaderEventUI.show_toast(toast_txt, 2.0)
 
 		if proj.progress >= 100.0 or proj.days_remaining <= 0:
 			to_complete.append({"pid": pid, "proj": proj})
@@ -340,9 +380,10 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 	for item in to_complete:
 		_complete_project(int(item.pid), item.proj)
 
-	# Auto AI investment consideration (low rate for natural 50+ turn playtest evolution; non-player countries develop cores).
-	# Uses same validation/Mandate path. Throttled to prevent spam.
-	if randi() % 5 == 0:  # roughly every 5 days across sim
+	# Full-board AI invest scan is 3520×N and only runs because a project is active.
+	# F5 already budgets 1 AI infra start/day via try_ai_start_infra_project — do not
+	# turn an IX-1 spine into a continent mesh consider. Headless/harness keep the scan.
+	if not _ix1_skip_full_board_ai_invest and _should_run_full_board_ai_invest() and randi() % 5 == 0:
 		ai_consider_daily_invests([], 0.08)
 
 
@@ -432,7 +473,18 @@ func _refresh_project_modifiers(proj: ProvincialProject, province: Province) -> 
 func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 	var p: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
 	if p == null:
+		# Same store the live button writes. Headless / mid-load has no hex:
+		# still mark the spine COMPLETE so calendar ticks that reach 100%
+		# emit built (edges need the hex on-tree — RoadLayer is skipped).
 		active_projects.erase(province_id)
+		if proj != null and proj.build_road_spine:
+			proj.status = "complete"
+			_set_ix1_spine_visual_state("built", province_id, 100.0)
+			_log_smoke_spine_complete(province_id, "IDM.complete")
+			print(
+				"InfrastructureDevelopmentManager: COMPLETED %s project on province %d (hex off-tree)"
+				% [proj.axis, province_id]
+			)
 		return
 
 	var new_level := proj.target_level
@@ -447,6 +499,9 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 	else:
 		# Fallback for unknown axes
 		pass
+
+	if proj.build_road_spine:
+		link_ix1_road_spine_edges(province_id, proj.spine_neighbor_ids)
 
 	# Wire to pop/econ (per goals + DESIGN): infra upgrade attracts population (industrialization pull) + labor for future production.
 	# Uses direct mutate + notify (pop is runtime in Province; settlement also boosted for org/attrit/supply combat payoff).
@@ -470,11 +525,23 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
 		var prov: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
 		var pname := prov.name if prov else str(province_id)
-		LeaderEventUI.post_news("Infrastructure Complete", "%s project finished in %s (now level %d). Local supply, org recovery, and combat width improved for %s." % [axis.capitalize(), pname, new_level, proj.owner_tag], "infrastructure")
-		if LeaderEventUI.has_method("show_toast"):
-			LeaderEventUI.show_toast("Investment complete in %s: %s now level %d" % [pname, axis, new_level], 4.0)
+		if proj.build_road_spine:
+			LeaderEventUI.post_news(
+				"IX-1 Road Spine Complete",
+				"Road spine finished in %s (infra %d). Corridor edges painted; move/supply on the spine is cheaper." % [pname, new_level],
+				"infrastructure",
+			)
+			if LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Road spine complete in %s · infra %d · edges live" % [pname, new_level], 4.0)
+		else:
+			LeaderEventUI.post_news("Infrastructure Complete", "%s project finished in %s (now level %d). Local supply, org recovery, and combat width improved for %s." % [axis.capitalize(), pname, new_level, proj.owner_tag], "infrastructure")
+			if LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Investment complete in %s: %s now level %d" % [pname, axis, new_level], 4.0)
 
 	print("InfrastructureDevelopmentManager: COMPLETED %s project on province %d → level %d for %s" % [axis, province_id, new_level, proj.owner_tag])
+	if proj.build_road_spine:
+		_set_ix1_spine_visual_state("built", province_id, 100.0)
+		_log_smoke_spine_complete(province_id, "IDM.complete")
 
 
 func _get_era_max(country_tag: String, axis: String) -> int:
@@ -839,6 +906,8 @@ func get_project_status(province_id: int) -> Dictionary:
 		"modifiers": proj.modifiers.duplicate(),
 		"current_infra": p.infrastructure if p else 0,
 		"current_dev": p.development_level if p else 0,
+		"build_road_spine": proj.build_road_spine,
+		"spine_neighbor_ids": proj.spine_neighbor_ids.duplicate(),
 	}
 
 
@@ -907,11 +976,659 @@ func should_show_investment_button(province_id: int, player_tag: String) -> bool
 	return true
 
 
+## === IX-1 Road Spine (Rhineland Bonn 710416 — Köln 710417 — Leverkusen 710418) ===
+
+func _ix1_spec_dict() -> Dictionary:
+	if not _ix1_spec.is_empty():
+		return _ix1_spec
+	if ResourceLoader.exists(IX1_SPEC_PATH):
+		var f := FileAccess.open(IX1_SPEC_PATH, FileAccess.READ)
+		if f:
+			var parser := JSON.new()
+			if parser.parse(f.get_as_text()) == OK and parser.data is Dictionary:
+				_ix1_spec = parser.data
+			f.close()
+	if _ix1_spec.is_empty():
+		_ix1_spec = {
+			"hub_id": IX1_FALLBACK_HUB,
+			"corridor_ids": IX1_FALLBACK_CORRIDOR.duplicate(),
+			"edges": [[710417, 710416], [710417, 710418]],
+			"owner_tag": "GER",
+		}
+	return _ix1_spec
+
+
+func get_ix1_corridor_ids() -> Array[int]:
+	var spec := _ix1_spec_dict()
+	var out: Array[int] = []
+	var raw: Variant = spec.get("corridor_ids", IX1_FALLBACK_CORRIDOR)
+	if raw is Array:
+		for v in raw:
+			var pid := int(v)
+			if pid > 0 and pid not in out:
+				out.append(pid)
+	if out.is_empty():
+		return IX1_FALLBACK_CORRIDOR.duplicate()
+	return out
+
+
+func is_ix1_road_spine_province(province_id: int) -> bool:
+	return province_id in get_ix1_corridor_ids()
+
+
+func get_ix1_spine_neighbors(province_id: int) -> Array[int]:
+	var spec := _ix1_spec_dict()
+	var out: Array[int] = []
+	var raw: Variant = spec.get("edges", [])
+	if raw is Array:
+		for pair in raw:
+			if pair is Array and pair.size() >= 2:
+				var a := int(pair[0])
+				var b := int(pair[1])
+				if a == province_id and b > 0 and b not in out:
+					out.append(b)
+				elif b == province_id and a > 0 and a not in out:
+					out.append(a)
+	return out
+
+
+func link_ix1_road_spine_edges(province_id: int, neighbor_ids: Array = []) -> Dictionary:
+	var nbrs: Array[int] = []
+	if neighbor_ids is Array and not neighbor_ids.is_empty():
+		for v in neighbor_ids:
+			var nid := int(v)
+			if nid > 0 and nid != province_id and nid not in nbrs:
+				nbrs.append(nid)
+	else:
+		nbrs = get_ix1_spine_neighbors(province_id)
+	var linked: Array[Dictionary] = []
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("build_road_connection"):
+		for nid in nbrs:
+			MapManager.build_road_connection(province_id, nid)
+			linked.append({"a": province_id, "b": nid})
+	return {
+		"ok": not linked.is_empty() or nbrs.is_empty(),
+		"province_id": province_id,
+		"neighbors": nbrs,
+		"linked": linked,
+	}
+
+
+func should_show_road_spine_button(province_id: int, player_tag: String) -> bool:
+	if not is_ix1_road_spine_province(province_id):
+		return false
+	if has_active_project(province_id):
+		return true
+	var p: Province = null
+	if typeof(MapManager) != TYPE_NIL:
+		p = MapManager.get_province(province_id)
+	var tag := player_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		return false
+	if p == null:
+		# Search/Go may resolve Köln before MapManager cache; corridor + player tag is enough.
+		return true
+	if p.is_sea:
+		return false
+	if p.owner_tag.to_upper() != tag and p.controller_tag.to_upper() != tag:
+		return false
+	return true
+
+
+func get_ix1_road_spine_mandate_cost() -> int:
+	var spec := _ix1_spec_dict()
+	if spec.has("first_session_mandate_cost"):
+		return maxi(0, int(spec.get("first_session_mandate_cost", IX1_FIRST_SESSION_MANDATE_COST)))
+	return IX1_FIRST_SESSION_MANDATE_COST
+
+
+func get_ix1_displayed_mandate(tag: String = "GER") -> int:
+	## Live HUD / Invest gate read the raw peace_state map (empty → 0), not get_pillar's 50 baseline.
+	var t := tag.strip_edges().to_upper()
+	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_peace_state"):
+		var ps: Dictionary = GameData.get_peace_state()
+		return int(ps.get("mandate", {}).get(t, 0))
+	return 0
+
+
+func ix1_day0_mandate_can_start(tag: String = "GER") -> Dictionary:
+	var t := tag.strip_edges().to_upper()
+	if t.is_empty():
+		t = "GER"
+	var cost := get_ix1_road_spine_mandate_cost()
+	var current := get_ix1_displayed_mandate(t)
+	return {
+		"ok": current >= cost,
+		"mandate": current,
+		"cost": cost,
+		"tag": t,
+		"start": "1936-01-01",
+	}
+
+
+func start_road_spine_project(province_id: int, investor_tag: String) -> ProvincialProject:
+	# IX-1 first-session grant: create the project without generic Invest
+	# can_start_project (Köln 73 Mandate / capacity / era). Mandate 0 is enough.
+	if has_active_project(province_id):
+		return null
+	var tag := investor_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "GER"
+	var p: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	if p == null:
+		return null
+	var proj := ProvincialProject.new()
+	proj.province_id = province_id
+	proj.axis = "infrastructure"
+	proj.owner_tag = tag
+	proj.starting_level = p.infrastructure
+	proj.target_level = p.infrastructure + 1
+	proj.work_per_day_base = _calculate_base_work_rate(p, "infrastructure", tag)
+	proj.political_power_cost = get_ix1_road_spine_mandate_cost()
+	proj.start_day = _current_game_day_index()
+	proj.status = "active"
+	proj.build_road_spine = true
+	proj.spine_neighbor_ids = get_ix1_spine_neighbors(province_id)
+	_refresh_project_modifiers(proj, p)
+	proj.days_remaining = maxi(1, proj.get_eta_days())
+	active_projects[province_id] = proj
+	project_started.emit(proj)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
+		MapManager.notify_province_changed(province_id, "infrastructure_project")
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+		LeaderEventUI.post_news(
+			"IX-1 Road Spine Started",
+			"%s begins a road-spine project in %s (ETA %d days)." % [proj.owner_tag, p.name, proj.get_eta_days()],
+			"infrastructure",
+		)
+	print("InfrastructureDevelopmentManager: started IX-1 road spine on province %d for %s" % [province_id, tag])
+	_ix1_spine_states_seen.clear()
+	_ix1_spine_visual_state = ""
+	_set_ix1_spine_visual_state("queued", province_id, 0.0)
+	_log_smoke_spine_progress(province_id, int(round(proj.progress)), proj.get_eta_days(), "IDM.start")
+	return proj
+
+
+func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
+	if not is_ix1_road_spine_province(province_id):
+		return {"success": false, "reason": "Not on the IX-1 Rhineland road spine."}
+	if has_active_project(province_id):
+		var existing: ProvincialProject = get_active_project(province_id)
+		var already_spine := existing != null and bool(existing.build_road_spine)
+		return {
+			"success": false,
+			"reason": "Road spine already in progress." if already_spine else "A project is already active in this province.",
+			"already_active": true,
+			"build_road_spine": already_spine,
+		}
+	var tag := investor_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "GER"
+	var p_for_target: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	if p_for_target != null:
+		if p_for_target.is_sea:
+			return {"success": false, "reason": "Road spine is land-only."}
+		var owner := str(p_for_target.owner_tag).strip_edges().to_upper()
+		var ctrl := str(p_for_target.controller_tag).strip_edges().to_upper()
+		if owner != tag and ctrl != tag and not owner.is_empty():
+			return {"success": false, "reason": "You must control the province to start the road spine."}
+	var pp_cost := get_ix1_road_spine_mandate_cost()
+	var gate: Dictionary = ix1_day0_mandate_can_start(tag)
+	if not bool(gate.get("ok", false)):
+		var current_mand := int(gate.get("mandate", 0))
+		return {"success": false, "reason": "Insufficient Mandate (%d < %d)" % [current_mand, pp_cost]}
+	if pp_cost > 0 and typeof(GameData) != TYPE_NIL:
+		# Skip 0-cost apply_pillar_shift — that helper seeds missing tags at 50.
+		GameData.apply_pillar_shift(tag, "mandate", -pp_cost, "road_spine_" + str(province_id))
+		GameData.apply_pillar_shift(tag, "ascendancy", -int(pp_cost * 0.3), "road_spine_prestige")
+	# Do not call can_start_project / start_infrastructure_project — those spend
+	# generic Invest cost_pp (Köln 73) and can no-op a visible Mandate-0 CTA.
+	var proj: ProvincialProject = start_road_spine_project(province_id, tag)
+	if proj == null:
+		return {"success": false, "reason": "Failed to create road spine project"}
+	return {
+		"success": true,
+		"reason": "Road spine project started",
+		"project": proj,
+		"eta_days": proj.get_eta_days(),
+		"cost_pp": pp_cost,
+		"spine_neighbor_ids": proj.spine_neighbor_ids.duplicate(),
+		"build_road_spine": true
+	}
+
+
+## F5 light sim already budgets 1 AI infra start/day. The full-board consider
+## (get_all_provinces × every tag) is what wedged the clock once a spine existed.
+## Graphical editor/export Play must skip even if light-sim is somehow false
+## (softpipe smoke is DisplayServer X11/OpenGL, not headless).
+func _should_run_full_board_ai_invest() -> bool:
+	if _ix1_skip_full_board_ai_invest:
+		return false
+	if typeof(TimeManager) != TYPE_NIL:
+		if TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
+			return false
+		if TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+			return false
+	if DisplayServer.get_name() != "headless" and not OS.has_feature("dedicated_server"):
+		return false
+	if OS.get_environment("EOA_LIVE_F5_EQUIV").strip_edges() == "1":
+		return false
+	return true
+
+
+func _should_quiet_ai_infra_start(investor_tag: String) -> bool:
+	var tag := investor_tag.strip_edges().to_upper()
+	if tag.is_empty() or tag == _player_tag_for_ai():
+		return false
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_live_f5_play_path"):
+		if bool(TimeManager.is_live_f5_play_path()):
+			return true
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim"):
+		if bool(TimeManager.is_interactive_light_sim()):
+			return true
+	if DisplayServer.get_name() != "headless" and not OS.has_feature("dedicated_server"):
+		return true
+	return false
+
+
+## Short automated path: seed Köln spine at the live freeze point (~17%) and
+## drive the real F5 flush so the day clock + progress move past day 9 / 20%.
+## Call again with more days to complete (ETA ~35 from 0%; ~29 from 17%).
+func simulate_ix1_spine_days(days: int = 12, use_f5_flush: bool = true) -> Dictionary:
+	var n := clampi(int(days), 1, 60)
+	var hub := IX1_FALLBACK_HUB
+	if typeof(TimeManager) != TYPE_NIL:
+		if not _is_initialized:
+			initialize_with_time()
+	if not active_projects.has(hub):
+		restore_project(hub, {
+			"province_id": hub,
+			"axis": "infrastructure",
+			"owner_tag": "GER",
+			"starting_level": 4,
+			"target_level": 5,
+			"progress": 17.0,
+			"work_per_day_base": 2.8,
+			"days_remaining": 29,
+			"status": "active",
+			"build_road_spine": true,
+			"spine_neighbor_ids": [710416, 710418],
+		})
+	var start_prog := 0.0
+	var live: ProvincialProject = active_projects.get(hub)
+	if live != null:
+		start_prog = float(live.progress)
+	var start_elapsed := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		start_elapsed = int(TimeManager.get_total_days_elapsed())
+	# F5 flush proves the live clock (cap 12d — longer flush OOMs air/day listeners).
+	# Complete path uses the cheap daily project tick only.
+	var flush_n := mini(n, 12) if use_f5_flush else 0
+	var rest := n - flush_n
+	if flush_n > 0 and typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_living_playtest_days"):
+		TimeManager.call("advance_living_playtest_days", flush_n)
+	if rest > 0:
+		# Cheap days-remaining clock — no full-board AI invest, no F5 listener flush.
+		tick_active_projects(rest)
+	live = active_projects.get(hub)
+	var end_prog := 100.0 if live == null else float(live.progress)
+	var end_elapsed := start_elapsed
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		end_elapsed = int(TimeManager.get_total_days_elapsed())
+	var completed := live == null or (live != null and str(live.status) == "complete")
+	var elapsed_delta := end_elapsed - start_elapsed
+	return {
+		"ok": elapsed_delta >= n and (end_prog > start_prog or completed),
+		"days": n,
+		"elapsed_delta": elapsed_delta,
+		"progress_before": start_prog,
+		"progress_after": end_prog,
+		"past_freeze": end_prog > 20.0 or completed,
+		"completed": completed,
+		"build_road_spine": true,
+		"hub_id": hub,
+		"full_board_ai_invest": _should_run_full_board_ai_invest(),
+	}
+
+
+func _eoa_log_flush(msg: String) -> void:
+	print(msg)
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+
+
+func _log_smoke_spine_progress(pid: int, pct: int, eta: int, who: String) -> void:
+	var band := int(pct / 10)
+	if band == _ix1_smoke_progress_band and pct < 100 and who != "IDM.start":
+		return
+	_ix1_smoke_progress_band = band
+	_eoa_log_flush(
+		"EOA_SMOKE_SPINE_PROGRESS who=%s pid=%d pct=%d eta=%d (NOT product Begin/Esc/clock PASS)"
+		% [who, pid, pct, eta]
+	)
+
+
+func _log_smoke_spine_complete(pid: int, who: String) -> void:
+	_eoa_log_flush(
+		"EOA_SMOKE_SPINE_COMPLETE who=%s pid=%d (NOT product Begin/Esc/clock PASS)"
+		% [who, pid]
+	)
+
+
+func get_ix1_spine_visual_state() -> String:
+	return _ix1_spine_visual_state
+
+
+func get_ix1_spine_state_order() -> Array[String]:
+	return _ix1_spine_states_seen.duplicate()
+
+
+func _set_ix1_spine_visual_state(state: String, pid: int, pct: float) -> void:
+	var s := state.strip_edges().to_lower()
+	if s not in ["queued", "construction", "built"]:
+		return
+	if s == _ix1_spine_visual_state:
+		if s == "construction":
+			_notify_ix1_spine_preview(s, pid, pct)
+		return
+	_ix1_spine_visual_state = s
+	if s not in _ix1_spine_states_seen:
+		_ix1_spine_states_seen.append(s)
+	_eoa_log_flush(
+		"EOA_SMOKE_SPINE_STATE state=%s pid=%d pct=%d (NOT product Begin/Esc/clock PASS)"
+		% [s, pid, int(round(pct))]
+	)
+	_notify_ix1_spine_preview(s, pid, pct)
+
+
+func _notify_ix1_spine_preview(state: String, pid: int, pct: float) -> void:
+	# Preview only — never rebuild the RoadLayer here (zoom silent-exit class).
+	# Sync: hub-local + capped `_draw` is cheap. Toast/Building… still paint first
+	# because MapRenderer defers show_info_panel + soft-pan (windowed 9ebd17f OOM).
+	if get_tree() == null:
+		return
+	var overlay: Node = get_tree().get_first_node_in_group("infrastructure_overlay")
+	if overlay != null and overlay.has_method("set_ix1_spine_preview"):
+		overlay.call("set_ix1_spine_preview", state, pid, pct)
+
+
+func ensure_ix1_theater_provinces_for_headless() -> Dictionary:
+	# Seed Köln/Bonn/Leverkusen/Essen only when missing. Never renumber.
+	var seeded: Array[int] = []
+	if typeof(MapManager) == TYPE_NIL:
+		return {"ok": false, "reason": "no_map_manager", "seeded": seeded}
+	var specs: Array[Dictionary] = [
+		{"id": 710417, "name": "Köln, Kreisfreie Stadt", "pos": Vector2(0, 0)},
+		{"id": 710416, "name": "Bonn, Kreisfreie Stadt", "pos": Vector2(0, 80)},
+		{"id": 710418, "name": "Leverkusen, Kreisfreie Stadt", "pos": Vector2(0, -80)},
+		{"id": 710403, "name": "Essen, Kreisfreie Stadt", "pos": Vector2(90, 0)},
+	]
+	var cents: Dictionary = MapManager.get("_centroids") if MapManager.get("_centroids") is Dictionary else {}
+	var provs: Dictionary = MapManager.get("_provinces") if MapManager.get("_provinces") is Dictionary else {}
+	for row in specs:
+		var pid := int(row.get("id", -1))
+		if MapManager.get_province(pid) != null:
+			continue
+		var p := Province.new()
+		p.id = pid
+		p.name = str(row.get("name", str(pid)))
+		p.owner_tag = "GER"
+		p.controller_tag = "GER"
+		p.infrastructure = 4
+		p.development_level = 2
+		p.terrain = "plains"
+		p.is_sea = false
+		p.coordinates = row.get("pos", Vector2.ZERO)
+		provs[pid] = p
+		cents[pid] = p.coordinates
+		seeded.append(pid)
+	if not seeded.is_empty():
+		MapManager.set("_provinces", provs)
+		MapManager.set("_centroids", cents)
+	var adj: AdjacencySystem = MapManager.get_adjacency_system()
+	if adj == null:
+		adj = AdjacencySystem.new()
+		adj.load_from_dict({
+			"710416": [710417],
+			"710417": [710416, 710418],
+			"710418": [710417],
+			"710403": [],
+		})
+		MapManager.set("_adjacency", adj)
+	elif adj.get_land_neighbors(710417).is_empty() and adj.get_neighbors(710417).is_empty():
+		adj.load_from_dict({
+			"710416": [710417],
+			"710417": [710416, 710418],
+			"710418": [710417],
+			"710403": [],
+		})
+	for row2 in specs:
+		var p2: Province = MapManager.get_province(int(row2.get("id", -1)))
+		if p2 != null:
+			adj.register_province(p2)
+	return {
+		"ok": MapManager.get_province(710417) != null,
+		"seeded": seeded,
+		"hub": MapManager.get_province(710417) != null,
+	}
+
+
+func simulate_ix1_spine_start_to_complete(max_days: int = 60) -> Dictionary:
+	# Headless: start Köln spine, tick to complete, prove RoadLayer + Essen impact.
+	# Skip the full-board AI invest scan — that is what wedged CompleteTest after
+	# 91% (spine active → consider → continent mesh). Progress/complete logs stay.
+	_ix1_skip_full_board_ai_invest = true
+	var n := clampi(int(max_days), 8, 90)
+	var theater: Dictionary = ensure_ix1_theater_provinces_for_headless()
+	if not _is_initialized:
+		initialize_with_time()
+	var hub := IX1_FALLBACK_HUB
+	if has_active_project(hub):
+		var existing: ProvincialProject = get_active_project(hub)
+		if existing == null or not bool(existing.build_road_spine):
+			cancel_project(hub, "headless_spine_complete_reset")
+	var start_result: Dictionary = {}
+	if not has_active_project(hub):
+		start_result = try_start_road_spine(hub, "GER")
+		if not bool(start_result.get("success", false)):
+			start_road_spine_project(hub, "GER")
+			start_result = {"success": has_active_project(hub), "reason": "seeded_project"}
+	var overlay: Node = null
+	if get_tree() != null:
+		overlay = get_tree().get_first_node_in_group("infrastructure_overlay")
+	if overlay == null:
+		overlay = InfrastructureOverlayLayer.new()
+		overlay.name = "Ix1HeadlessRoadLayer"
+		if get_tree() != null:
+			get_tree().root.add_child(overlay)
+	if overlay.get("map_manager") == null and typeof(MapManager) != TYPE_NIL:
+		overlay.set("map_manager", MapManager)
+	if overlay.has_method("set_ix1_spine_preview"):
+		overlay.call("set_ix1_spine_preview", get_ix1_spine_visual_state(), hub, 0.0)
+	var preview_queued: Dictionary = {}
+	if overlay.has_method("ix1_spine_preview_report"):
+		preview_queued = overlay.call("ix1_spine_preview_report")
+	var koln: Province = MapManager.get_province(hub) if typeof(MapManager) != TYPE_NIL else null
+	var essen: Province = MapManager.get_province(710403) if typeof(MapManager) != TYPE_NIL else null
+	var cost_before := koln.get_movement_cost() if koln != null else -1.0
+	var essen_before := essen.get_movement_cost() if essen != null else -1.0
+	var days := 0
+	var last_pct := 0
+	var preview_construction: Dictionary = {}
+	while days < n and has_active_project(hub):
+		advance_daily_projects(1936, 1, 1 + days)
+		days += 1
+		var live: ProvincialProject = get_active_project(hub)
+		if live != null:
+			last_pct = int(round(live.progress))
+			if preview_construction.is_empty() and live.progress > 0.001 and overlay.has_method("ix1_spine_preview_report"):
+				preview_construction = overlay.call("ix1_spine_preview_report")
+	var completed := not has_active_project(hub)
+	var cost_after := koln.get_movement_cost() if koln != null else -1.0
+	var essen_after := essen.get_movement_cost() if essen != null else -1.0
+	var bonn: Province = MapManager.get_province(710416) if typeof(MapManager) != TYPE_NIL else null
+	var lev: Province = MapManager.get_province(710418) if typeof(MapManager) != TYPE_NIL else null
+	var edge_bonn := koln != null and bonn != null and (710416 in koln.built_road_neighbors) and (710417 in bonn.built_road_neighbors)
+	var edge_lev := koln != null and lev != null and (710418 in koln.built_road_neighbors) and (710417 in lev.built_road_neighbors)
+	var essen_edge := koln != null and essen != null and (710403 in koln.built_road_neighbors)
+	if overlay.has_method("rebuild_road_layer"):
+		overlay.call("rebuild_road_layer")
+	if overlay.has_method("refresh_ix1_spine_preview"):
+		overlay.call("refresh_ix1_spine_preview")
+	var road_report: Dictionary = {}
+	if overlay.has_method("ix1_spine_roadlayer_report"):
+		road_report = overlay.call("ix1_spine_roadlayer_report")
+	var preview_built: Dictionary = {}
+	if overlay.has_method("ix1_spine_preview_report"):
+		preview_built = overlay.call("ix1_spine_preview_report")
+	var states: Array[String] = get_ix1_spine_state_order()
+	var states_ok := states.size() >= 3 and str(states[0]) == "queued" and str(states[1]) == "construction" and str(states[states.size() - 1]) == "built"
+	var cheaper_than_before := cost_after > 0.0 and cost_before > 0.0 and cost_after < cost_before - 0.0001
+	var cheaper_than_essen := cost_after > 0.0 and essen_after > 0.0 and cost_after < essen_after - 0.0001
+	var essen_unchanged := essen != null and essen.built_road_neighbors.is_empty() and not essen_edge
+	_ix1_skip_full_board_ai_invest = false
+	return {
+		"ok": completed and edge_bonn and edge_lev and essen_unchanged and cheaper_than_before and cheaper_than_essen and bool(road_report.get("ok", false)) and states_ok,
+		"completed": completed,
+		"days": days,
+		"progress_last": last_pct,
+		"cost_before": cost_before,
+		"cost_after": cost_after,
+		"essen_before": essen_before,
+		"essen_after": essen_after,
+		"edge_bonn_koln": edge_bonn,
+		"edge_koln_leverkusen": edge_lev,
+		"essen_edge": essen_edge,
+		"cheaper_than_before": cheaper_than_before,
+		"cheaper_than_essen": cheaper_than_essen,
+		"essen_impact_none": essen_unchanged,
+		"roadlayer": road_report,
+		"visual_states": states,
+		"preview_queued": preview_queued,
+		"preview_construction": preview_construction,
+		"preview_built": preview_built,
+		"theater": theater,
+		"start": start_result,
+	}
+
+
+## Live editor/export Play stand-in: day_ai + budgeted AI invest run, playtest
+## skips do not. Fails closed if full-board consider would fire, calendar
+## autosave gathers, or the clock does not move past day +6 in a short budget
+## (headless-only green is not KEEP). Default 8d crosses the live +5/+6 wall.
+func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
+	var n := clampi(int(days), 1, 20)
+	_full_board_ai_invest_calls = 0
+	_ai_infra_provinces_considered = 0
+	if typeof(TimeManager) != TYPE_NIL:
+		if not _is_initialized:
+			initialize_with_time()
+	var sl: Node = null
+	if typeof(SaveLoadManager) != TYPE_NIL:
+		sl = SaveLoadManager
+	if sl != null:
+		sl.set("_calendar_autosave_gathers", 0)
+		sl.set("_calendar_autosave_live_f5_skips", 0)
+	var hub := IX1_FALLBACK_HUB
+	if not active_projects.has(hub):
+		restore_project(hub, {
+			"province_id": hub,
+			"axis": "infrastructure",
+			"owner_tag": "GER",
+			"starting_level": 4,
+			"target_level": 5,
+			"progress": 2.0,
+			"work_per_day_base": 2.8,
+			"days_remaining": 35,
+			"status": "active",
+			"build_road_spine": false,
+			"spine_neighbor_ids": [],
+		})
+	var start_elapsed := 0
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		start_elapsed = int(TimeManager.get_total_days_elapsed())
+	var gate_on := true
+	if typeof(TimeManager) != TYPE_NIL:
+		var was_equiv := bool(TimeManager.get("_live_f5_equiv_clock"))
+		TimeManager.set("_live_f5_equiv_clock", true)
+		gate_on = _should_run_full_board_ai_invest()
+		TimeManager.set("_live_f5_equiv_clock", was_equiv)
+	var mem0 := int(OS.get_static_memory_usage())
+	var t0 := Time.get_ticks_msec()
+	var hour_clock: Dictionary = {}
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_live_f5_equivalent_hours"):
+		# TopInfoBar path — headless advance_days alone cannot catch a 00:00 softpipe wedge.
+		hour_clock = TimeManager.call("advance_live_f5_equivalent_hours", 8)
+	var clock: Dictionary = {}
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_live_f5_equivalent_days"):
+		clock = TimeManager.call("advance_live_f5_equivalent_days", n)
+	elif typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_days"):
+		var was_paused := bool(TimeManager.paused)
+		TimeManager.paused = false
+		TimeManager.advance_days(float(n))
+		if TimeManager.has_method("_drain_living_f5_flush"):
+			TimeManager.call("_drain_living_f5_flush", n)
+		TimeManager.paused = was_paused
+	var ms := Time.get_ticks_msec() - t0
+	var mem1 := int(OS.get_static_memory_usage())
+	var mem_delta := maxi(0, mem1 - mem0)
+	var end_elapsed := start_elapsed
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		end_elapsed = int(TimeManager.get_total_days_elapsed())
+	var elapsed_delta := end_elapsed - start_elapsed
+	var consider_calls := _full_board_ai_invest_calls
+	var past_plus2 := elapsed_delta >= mini(n, 3)
+	var past_plus6 := elapsed_delta >= mini(n, 7)
+	var past_hour_plus6 := bool(hour_clock.get("past_hour_plus6", false))
+	var hour_delta := int(hour_clock.get("hour_delta", 0))
+	if hour_clock.is_empty():
+		past_hour_plus6 = false
+	var autosave_gathers := 0
+	var autosave_skips := 0
+	if sl != null:
+		autosave_gathers = int(sl.get("_calendar_autosave_gathers"))
+		autosave_skips = int(sl.get("_calendar_autosave_live_f5_skips"))
+	var ms_budget := 16000 if n >= 7 else 8000
+	var mem_budget := 48 * 1024 * 1024
+	var ok := (
+		elapsed_delta >= n
+		and consider_calls == 0
+		and not gate_on
+		and past_plus2
+		and past_plus6
+		and past_hour_plus6
+		and autosave_gathers == 0
+		and mem_delta <= mem_budget
+		and ms <= ms_budget
+	)
+	return {
+		"ok": ok,
+		"days": n,
+		"elapsed_delta": elapsed_delta,
+		"past_plus2": past_plus2,
+		"past_plus6": past_plus6,
+		"past_hour_plus6": past_hour_plus6,
+		"hour_delta": hour_delta,
+		"hour_clock": hour_clock,
+		"full_board_ai_invest": gate_on,
+		"full_board_ai_invest_calls": consider_calls,
+		"provinces_considered": _ai_infra_provinces_considered,
+		"calendar_autosave_gathers": autosave_gathers,
+		"calendar_autosave_live_f5_skips": autosave_skips,
+		"memory_delta_bytes": mem_delta,
+		"elapsed_ms": ms,
+		"live_f5_equiv": true,
+		"living_playtest_clock": false,
+		"clock": clock,
+	}
+
+
 ## AI helper (called from DebugOverlay AI sim turns, TestRunner headless demos, or daily if extended).
 ## AI countries aggressively develop core / high-value low-infra provinces (per DESIGN Phase D).
 ## Uses same try_start so Mandate spend + full validation (engineer, tech, stab) applies.
 ## Probabilistic to avoid spam; prefers provinces with factories or high pop or in core.
 func ai_consider_daily_invests(ai_country_tags: Array = [], chance_per_country: float = 0.35) -> int:
+	_full_board_ai_invest_calls += 1
 	var started := 0
 	if ai_country_tags.is_empty():
 		# Fallback: discover some non-player tags from MapManager
@@ -992,9 +1709,10 @@ func try_ai_start_infra_project(tag: String, day_index: int = 0) -> Dictionary:
 		return {"ok": true, "skipped": true, "started": false, "started_n": 0, "reason": "player", "tag": chosen}
 	if _ai_infra_budget_day == day_index and _ai_infra_starts_today >= 1:
 		return {"ok": true, "skipped": true, "started": false, "started_n": 0, "reason": "day_budget", "tag": chosen}
+	_ai_infra_provinces_considered = 0
 	var pid := _pick_ai_infra_province(chosen)
 	if pid <= 0:
-		return {"ok": true, "started": false, "started_n": 0, "reason": "no_candidate", "tag": chosen}
+		return {"ok": true, "started": false, "started_n": 0, "reason": "no_candidate", "tag": chosen, "provinces_considered": _ai_infra_provinces_considered}
 	var started := false
 	if has_method("try_start_infrastructure_investment"):
 		var res: Dictionary = try_start_infrastructure_investment(pid, chosen)
@@ -1024,6 +1742,7 @@ func try_ai_start_infra_project(tag: String, day_index: int = 0) -> Dictionary:
 		"pid": pid,
 		"kind": "infrastructure",
 		"days_remaining": live.days_remaining if live else 0,
+		"provinces_considered": _ai_infra_provinces_considered,
 	}
 
 
@@ -1076,19 +1795,17 @@ func _player_tag_for_ai() -> String:
 
 
 func _pick_ai_infra_tag(player: String, day_index: int) -> String:
-	var majors: Array = ["GER", "SOV", "JAP", "FRA", "ITA", "USA", "ENG", "POL"]
-	var n := majors.size()
-	if n <= 0:
-		return ""
-	var rot := posmod(int(day_index), n)
-	var ordered: Array = majors.slice(rot) + majors.slice(0, rot)
-	for raw in ordered:
+	# One rotated major — do not walk every tag calling a province scan.
+	var majors: Array = ["SOV", "JAP", "FRA", "ITA", "USA", "ENG", "POL"]
+	var filtered: Array = []
+	for raw in majors:
 		var t := str(raw).to_upper()
 		if t.is_empty() or t == player:
 			continue
-		if _pick_ai_infra_province(t) > 0:
-			return t
-	return ""
+		filtered.append(t)
+	if filtered.is_empty():
+		return ""
+	return str(filtered[posmod(int(day_index), filtered.size())])
 
 
 func _capital_pid_for_tag(tag: String) -> int:
@@ -1103,49 +1820,56 @@ func _capital_pid_for_tag(tag: String) -> int:
 
 
 func _pick_ai_infra_province(tag: String) -> int:
-	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_provinces_by_owner"):
+	# Live F5: never walk get_provinces_by_owner / get_all_provinces (3520).
+	# Capital → a few capital neighbors → at most two cached border from_ids.
+	if typeof(MapManager) == TYPE_NIL:
 		return 0
 	var t := tag.strip_edges().to_upper()
-	var owned: Array = MapManager.get_provinces_by_owner(t)
-	if owned.is_empty():
+	if t.is_empty():
 		return 0
 	var cap_pid := _capital_pid_for_tag(t)
-	var border: Dictionary = {}
+	if _ai_infra_pid_ok(cap_pid, t):
+		_ai_infra_provinces_considered += 1
+		return cap_pid
+	if cap_pid > 0 and MapManager.has_method("get_adjacent_provinces"):
+		var nbr: Array = MapManager.get_adjacent_provinces(cap_pid, true)
+		for pid_var in nbr:
+			if _ai_infra_provinces_considered >= AI_INFRA_PICK_CAP:
+				break
+			var pid := int(pid_var)
+			_ai_infra_provinces_considered += 1
+			if _ai_infra_pid_ok(pid, t):
+				return pid
 	if MapManager.has_method("collect_live_border_assault_targets"):
-		var fronts: Array = MapManager.collect_live_border_assault_targets(t, 8)
+		var fronts: Array = MapManager.collect_live_border_assault_targets(t, 2)
 		for raw in fronts:
+			if _ai_infra_provinces_considered >= AI_INFRA_PICK_CAP:
+				break
 			if typeof(raw) != TYPE_DICTIONARY:
 				continue
 			var from_id := int((raw as Dictionary).get("from_province_id", 0))
-			if from_id > 0:
-				border[from_id] = true
-	var era_max := _get_era_max(t, "infrastructure")
-	var best_pid := 0
-	var best_score := -9999.0
-	for pid_var in owned:
-		var pid := int(pid_var)
-		if pid <= 0 or has_active_project(pid):
-			continue
-		var p: Province = MapManager.get_province(pid)
-		if p == null or bool(p.is_sea):
-			continue
-		var infra := int(p.infrastructure)
-		if infra >= era_max:
-			continue
-		var near_cap := pid == cap_pid
-		if not near_cap and cap_pid > 0 and MapManager.has_method("get_adjacent_provinces"):
-			var nbr: Array = MapManager.get_adjacent_provinces(cap_pid, true)
-			near_cap = nbr.has(pid)
-		var on_border := border.has(pid)
-		var score := float(12 - infra) * 2.0
-		if near_cap:
-			score += 8.0
-		if on_border:
-			score += 7.0
-		if score > best_score:
-			best_score = score
-			best_pid = pid
-	return best_pid
+			_ai_infra_provinces_considered += 1
+			if _ai_infra_pid_ok(from_id, t):
+				return from_id
+	return 0
+
+
+func _ai_infra_pid_ok(pid: int, tag: String) -> bool:
+	if pid <= 0 or has_active_project(pid):
+		return false
+	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province"):
+		return false
+	var p: Province = MapManager.get_province(pid)
+	if p == null or bool(p.is_sea):
+		return false
+	var owner := str(p.owner_tag).strip_edges().to_upper()
+	var ctrl := str(p.controller_tag).strip_edges().to_upper() if "controller_tag" in p else ""
+	if owner != tag and ctrl != tag:
+		return false
+	var era_max := _get_era_max(tag, "infrastructure")
+	if int(p.infrastructure) >= era_max:
+		return false
+	return true
 
 
 func _count_active_projects_for(country_tag: String) -> int:
@@ -1170,6 +1894,13 @@ func _available_political_power(country_tag: String) -> int:
 	var tag := country_tag.strip_edges().to_upper()
 	if typeof(GameData) != TYPE_NIL and GameData.has_method("get_political_power"):
 		return int(GameData.get_political_power(tag))
+	# Live F5: never scan every owned hex for a PP proxy (that is a 3520 walk).
+	if _should_quiet_ai_infra_start(tag) or (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_interactive_light_sim")
+		and bool(TimeManager.is_interactive_light_sim())
+	):
+		return maxi(80 - _count_active_projects_for(tag) * 12, 0)
 	# Proxy: factories + dev on owned provinces minus active project load
 	var pp := 50
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_provinces_by_owner"):

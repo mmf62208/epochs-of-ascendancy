@@ -51,6 +51,9 @@ extends Resource
 ## Roads/rails can be added/removed/edited independently of base infrastructure level.
 @export var built_road_neighbors: Array[int] = []
 @export var built_rail_neighbors: Array[int] = []
+## IX-1 Road Spine: explicit edges lower move/supply cost vs same-infra off-spine.
+const ROAD_SPINE_INFRA_BONUS := 2.0
+const ROAD_SPINE_NEIGHBOR_BONUS := 0.5
 #endregion
 
 # Runtime settlement / repopulation level (0.0-1.0+). Set by GameData.apply_encourage_relocation and demographic policies.
@@ -89,9 +92,19 @@ func _get_map_manager() -> Node:
 	return tree.root.get_node_or_null("/root/MapManager")
 
 
+func get_effective_infrastructure_for_movement() -> float:
+	var infra := float(clampi(infrastructure, 0, 50))
+	var road_n := built_road_neighbors.size()
+	if road_n > 0:
+		infra += ROAD_SPINE_INFRA_BONUS + float(road_n) * ROAD_SPINE_NEIGHBOR_BONUS
+		if infra > 50.0:
+			infra = 50.0
+	return infra
+
+
 func get_movement_cost() -> float:
 	var terrain_mult := _base_terrain_movement_multiplier()
-	var infra := float(clampi(infrastructure, 0, 50))
+	var infra := get_effective_infrastructure_for_movement()
 	var dev := float(clampi(development_level, 0, 50))
 	var infra_factor := 1.0 / (1.0 + infra * 0.04)
 	var dev_factor := 1.0 / (1.0 + dev * 0.02)
