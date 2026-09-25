@@ -3,7 +3,7 @@
 **State:** DONE (machine). **HOLD merge.**  
 **Assign:** `/workspace/SHIP_ASSIGN_FIX_IX1_ESC_CC_REGRESS_D18CBAE.md`  
 **Start tip:** `d18cbae8dd96b0c53072810d1e482aa840785280` (`d18cbae`)  
-**New head:** `8fe682c1042613ee9449bafee79fa103e8b60104`  
+**New head:** `4ea83e8c430154070242837a333c85069a177db1`  
 **Functional fix:** `8cfb02e80db53e5f506e44b3db97afea849bbe9a`  
 **Follow-up:** parse-safe Esc helpers `49ac0770d6456b5913e76db268f9f50dbea44dd3`  
 **PR:** https://github.com/mmf62208/epochs-of-ascendancy/pull/55 (draft, HOLD merge)  
