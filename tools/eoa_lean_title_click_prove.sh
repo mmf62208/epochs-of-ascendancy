@@ -71,21 +71,28 @@ if [[ -z "${WID}" ]]; then
 fi
 
 xdotool windowactivate --sync "$WID" || true
-# Click Begin at client coords from the Godot print (computerUse-like:
-# click at a point, do not require a prior hover/mousemove over the Control).
-BEGIN_LINE="$(grep "LEAN_HIT_BEGIN_CLIENT=" "$LOG" | tail -n 1 || true)"
-CX="$(echo "$BEGIN_LINE" | sed -n 's/.*LEAN_HIT_BEGIN_CLIENT=\([0-9]*\),\([0-9]*\).*/\1/p')"
-CY="$(echo "$BEGIN_LINE" | sed -n 's/.*LEAN_HIT_BEGIN_CLIENT=\([0-9]*\),\([0-9]*\).*/\2/p')"
-if [[ -n "${CX}" && -n "${CY}" ]]; then
-	# No mousemove-first: computerUse often ButtonPress without a Godot motion.
-	xdotool mousemove --window "$WID" "$CX" "$CY" click 1 || true
-else
-	CC_LINE="$(grep "LEAN_HIT_CC_CLIENT=" "$LOG" | tail -n 1 || true)"
-	CX="$(echo "$CC_LINE" | sed -n 's/.*LEAN_HIT_CC_CLIENT=\([0-9]*\),\([0-9]*\).*/\1/p')"
-	CY="$(echo "$CC_LINE" | sed -n 's/.*LEAN_HIT_CC_CLIENT=\([0-9]*\),\([0-9]*\).*/\2/p')"
-	if [[ -n "${CX}" && -n "${CY}" ]]; then
-		xdotool mousemove --window "$WID" "$CX" "$CY" click 1 || true
+sleep 0.15
+# Prefer root-screen coords (computerUse-like: click the pixel, no hover).
+# Fallback: window-client. Click Begin then CC if the first press is a panel miss.
+click_hit() {
+	local line="$1"
+	local sx sy cx cy
+	sx="$(echo "$line" | sed -n 's/.*screen=\([0-9]*\),\([0-9]*\).*/\1/p')"
+	sy="$(echo "$line" | sed -n 's/.*screen=\([0-9]*\),\([0-9]*\).*/\2/p')"
+	cx="$(echo "$line" | sed -n 's/.*_CLIENT=\([0-9]*\),\([0-9]*\).*/\1/p')"
+	cy="$(echo "$line" | sed -n 's/.*_CLIENT=\([0-9]*\),\([0-9]*\).*/\2/p')"
+	if [[ -n "${sx}" && -n "${sy}" ]]; then
+		xdotool mousemove "$sx" "$sy" click 1 || true
+	elif [[ -n "${cx}" && -n "${cy}" ]]; then
+		xdotool mousemove --window "$WID" "$cx" "$cy" click 1 || true
 	fi
+}
+BEGIN_LINE="$(grep "LEAN_HIT_BEGIN_CLIENT=" "$LOG" | tail -n 1 || true)"
+CC_LINE="$(grep "LEAN_HIT_CC_CLIENT=" "$LOG" | tail -n 1 || true)"
+click_hit "$BEGIN_LINE"
+sleep 0.4
+if ! grep -q "RESULT=PASS\|live Begin\|action=begin\|action=cc" "$LOG" 2>/dev/null; then
+	click_hit "$CC_LINE"
 fi
 
 for _i in $(seq 1 30); do

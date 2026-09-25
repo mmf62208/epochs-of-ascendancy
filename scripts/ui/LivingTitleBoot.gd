@@ -278,6 +278,7 @@ func _build_ui() -> void:
 	_cc_btn.focus_mode = Control.FOCUS_ALL
 	_cc_btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	_cc_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_cc_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_cc_btn.pressed.connect(_on_cc_pressed)
 	_cc_btn.gui_input.connect(_on_cc_gui_input)
 	RetrowaveTheme.style_secondary_button(_cc_btn)
@@ -292,6 +293,7 @@ func _build_ui() -> void:
 	# Press, not release: MapRenderer _input can swallow the release as a map pick
 	# (Play d18cbae: cursor on Begin, no transition, then window-exit).
 	_begin_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_begin_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_begin_btn.pressed.connect(_on_begin_new)
 	_begin_btn.gui_input.connect(_on_begin_gui_input)
 	RetrowaveTheme.style_primary_button(_begin_btn)
@@ -528,13 +530,21 @@ func panel_owns_screen_point(screen: Vector2) -> bool:
 
 
 func begin_owns_screen_point(screen: Vector2) -> bool:
-	if _begin_btn == null or not is_instance_valid(_begin_btn) or not _begin_btn.visible:
-		return false
-	if _begin_btn.get_global_rect().grow(BEGIN_HIT_GROW).has_point(screen):
-		return true
+	if _begin_btn != null and is_instance_valid(_begin_btn) and _begin_btn.visible:
+		if _begin_btn.get_global_rect().grow(BEGIN_HIT_GROW).has_point(screen):
+			return true
 	# Status line sits under Begin — Play computerUse often clicks the caption, not the plate.
 	if _status != null and is_instance_valid(_status) and _status.visible:
 		if _status.get_global_rect().grow(12.0).has_point(screen):
+			return true
+	# Lower panel slab below Command Center (layout / title-bar offset class).
+	if _panel != null and is_instance_valid(_panel) and _panel.visible:
+		var pr: Rect2 = _panel.get_global_rect()
+		var slab_top: float = pr.position.y + maxf(pr.size.y - 110.0, pr.size.y * 0.72)
+		if _cc_btn != null and is_instance_valid(_cc_btn) and _cc_btn.visible:
+			slab_top = maxf(slab_top, _cc_btn.get_global_rect().end.y + 2.0)
+		var slab := Rect2(pr.position.x, slab_top, pr.size.x, pr.end.y - slab_top + 16.0)
+		if slab.size.y > 8.0 and slab.has_point(screen):
 			return true
 	return false
 
@@ -613,7 +623,17 @@ func _any_point_matches(pts: Array[Vector2], kind: String) -> bool:
 
 
 func owns_any_collected_point(event: InputEvent = null) -> bool:
-	return _any_point_matches(collect_pointer_points(event), "any")
+	if event is InputEventMouse:
+		var em_o: InputEventMouse = event
+		var ev_o: Array[Vector2] = [em_o.position, em_o.global_position]
+		if _any_point_matches(ev_o, "any"):
+			return true
+	if event is InputEventScreenTouch:
+		var st_o: InputEventScreenTouch = event
+		var ev_t: Array[Vector2] = [st_o.position]
+		if _any_point_matches(ev_t, "any"):
+			return true
+	return _any_point_matches(collect_pointer_points(null), "any")
 
 
 ## Event-coord dispatch. Play 5adb38e: visible Begin / Command Center · Esc /
@@ -624,16 +644,44 @@ func handle_live_pointer(event: InputEvent) -> String:
 		return "closed"
 	if event != null and not is_live_pointer_press(event):
 		return "ignore"
-	var pts: Array[Vector2] = collect_pointer_points(event)
+	# Event coords first. OR-ing a stale Viewport.get_mouse_position() with
+	# a good event can steal Begin→CC (or fire a chip the pointer missed).
+	var ev_pts: Array[Vector2] = []
+	if event is InputEventMouse:
+		var em: InputEventMouse = event
+		ev_pts.append(em.position)
+		ev_pts.append(em.global_position)
+	if event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		ev_pts.append(st.position)
+	var ev_hit: String = _classify_points(ev_pts)
+	if ev_hit != "map":
+		return _apply_pointer_hit(ev_hit)
+	var fb_hit: String = _classify_points(collect_pointer_points(null))
+	return _apply_pointer_hit(fb_hit)
+
+
+func _classify_points(pts: Array[Vector2]) -> String:
+	# CC first so Command Center · Esc / Esc · Menu are never stolen by the Begin slab.
+	if _any_point_matches(pts, "cc"):
+		return "cc"
 	if _any_point_matches(pts, "begin"):
+		return "begin"
+	if _any_point_matches(pts, "panel"):
+		return "panel"
+	return "map"
+
+
+func _apply_pointer_hit(hit: String) -> String:
+	if hit == "begin":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=begin")
 		_on_begin_new()
 		return "begin"
-	if _any_point_matches(pts, "cc"):
+	if hit == "cc":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=cc")
 		handle_live_command_center_click()
 		return "cc"
-	if _any_point_matches(pts, "panel"):
+	if hit == "panel":
 		print("EOA_LIVE_PTR who=title.handle_live_pointer action=panel")
 		return "panel"
 	return "map"

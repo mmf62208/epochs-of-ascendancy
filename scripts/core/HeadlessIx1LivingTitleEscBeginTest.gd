@@ -368,11 +368,11 @@ func _test_runtime_begin_wiring_and_input() -> void:
 	if title2.has_method("_input"):
 		title2.call("_input", mb)
 	if not bool(title2.get("_closed")):
-		# Rect may not map in headless; require the _input source path + handle_live_begin.
+		# Rect may not map in headless; require the _input pointer path + handle_live_begin.
 		var src := _read(SRC_TITLE)
 		var input_fn := _slice_func(src, "_input")
-		if "begin_owns_screen_point" not in input_fn or "_on_begin_new" not in input_fn:
-			_fail("LivingTitleBoot._input must activate Begin via begin_owns_screen_point")
+		if "handle_live_pointer" not in input_fn:
+			_fail("LivingTitleBoot._input must activate Begin via handle_live_pointer")
 			title2.queue_free()
 			return
 	_pass("Begin STOP+PRESS wired; handle_live_begin closes; _input owns Begin")

@@ -32,6 +32,17 @@ func _start() -> void:
 	root.add_child(_title)
 	if _title.has_signal("boot_closed"):
 		_title.connect("boot_closed", _on_boot_closed)
+	# Layout must run or Begin prints as ~28×52 and xdotool misses the plate.
+	var lay := Timer.new()
+	lay.wait_time = 0.4
+	lay.one_shot = true
+	lay.timeout.connect(_after_layout)
+	root.add_child(lay)
+	lay.start()
+
+
+func _after_layout() -> void:
+	var ds := DisplayServer.get_name()
 	_print_hits()
 	print(
 		"LEAN_CLICK_READY displayserver=%s pointer_event_path=1 touch_path=1 begin_without_esc=1"
