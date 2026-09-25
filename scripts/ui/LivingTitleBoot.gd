@@ -29,8 +29,11 @@ var _begin_btn: Button
 var _cc_btn: Button
 var _esc_chip: Button
 var _panel: PanelContainer
+var _root_ctl: Control
+var _host: Window
 var _status: Label
 var _closed := false
+var _cc_was_up := false
 ## Set when live Esc is accepted on this overlay (headless + Play proof).
 var _esc_routed_to_cc := false
 ## Edge-trigger for `_process` Input-singleton poll (live DisplayServer may skip `_input`).
@@ -204,7 +207,8 @@ func _ready() -> void:
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(true)
 	_connect_window_input()
-	_set_live_always_on_top(true)
+	# Do not FLAG_ALWAYS_ON_TOP the main game window (Play d18cbae Alt+Tab
+	# looked like a DEBUG exit). The title host Window owns focus instead.
 	_grab_live_focus()
 	_ensure_live_window_key_focus()
 	# Play f9f249c: zero EOA_LIVE_PTR because handlers only logged hits. Announce
@@ -226,6 +230,7 @@ func _ready() -> void:
 func _build_ui() -> void:
 	var root := Control.new()
 	root.name = "LivingTitleRoot"
+	_root_ctl = root
 	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	# IGNORE empty map so country-click still reaches MapRenderer unhandled.
 	# Buttons / panel / Esc chip stay STOP. Pointer dispatch does not depend
@@ -367,6 +372,7 @@ func _build_ui() -> void:
 
 	_build_esc_chip(root)
 	_refresh_choice_buttons()
+	_attach_host_window(root)
 
 
 func _build_esc_chip(root: Control) -> void:
@@ -394,6 +400,95 @@ func _build_esc_chip(root: Control) -> void:
 	_esc_chip.offset_top = 6.0
 	_esc_chip.offset_bottom = 54.0
 	root.add_child(_esc_chip)
+
+
+## Live DisplayServer: host the title UI in its own X11 Window.
+## Play computerUse clicks the visible panel but never activates the main
+## game client (zero post-boot EOA_LIVE_RAW_* on 6573d01). A transient
+## exclusive Window is a separate client at those pixels. Headless -s
+## keeps the CanvasLayer path so gates stay parse-safe.
+func _attach_host_window(root: Control) -> void:
+	if root == null or not is_instance_valid(root):
+		return
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return
+	if _host != null and is_instance_valid(_host):
+		return
+	var host := Window.new()
+	host.name = "LivingTitleHost"
+	host.title = "Epochs of Ascendancy — Begin"
+	host.transient = true
+	host.exclusive = true
+	host.unresizable = true
+	host.always_on_top = false
+	host.popup_window = true
+	host.min_size = Vector2i(420, 600)
+	host.size = Vector2i(460, 680)
+	host.close_requested.connect(_on_host_close_requested)
+	if host.has_signal("window_input"):
+		host.window_input.connect(_on_window_input)
+	add_child(host)
+	if root.get_parent() == self:
+		remove_child(root)
+	host.add_child(root)
+	root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	root.mouse_filter = Control.MOUSE_FILTER_STOP
+	if _panel != null and is_instance_valid(_panel):
+		_panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		_panel.offset_left = 10
+		_panel.offset_top = 10
+		_panel.offset_right = -10
+		_panel.offset_bottom = -10
+	_host = host
+	_place_host_over_main()
+	host.popup()
+	host.grab_focus()
+	_window_input_hooked = true
+	print(
+		"EOA_LIVE_HOST who=title.attach exclusive=1 size=%s pos=%s (native Window; not layer-only)"
+		% [str(host.size), str(host.position)]
+	)
+
+
+func live_host_window() -> Window:
+	if _host != null and is_instance_valid(_host):
+		return _host
+	return null
+
+
+func _place_host_over_main() -> void:
+	if _host == null or not is_instance_valid(_host):
+		return
+	if DisplayServer.get_window_list().size() <= 0:
+		return
+	var main_pos: Vector2i = DisplayServer.window_get_position()
+	_host.position = main_pos + Vector2i(28, 72)
+
+
+func _on_host_close_requested() -> void:
+	# WM close must not quit the game (Play game_exit.webp class).
+	if _closed:
+		return
+	print("EOA_LIVE_HOST who=title.host_close_requested action=begin (do not quit)")
+	handle_live_begin()
+
+
+func _hide_host_for_command_center() -> void:
+	if _host == null or not is_instance_valid(_host):
+		return
+	_host.exclusive = false
+	_host.hide()
+
+
+func _restore_host_after_command_center() -> void:
+	if _closed:
+		return
+	if _host == null or not is_instance_valid(_host):
+		return
+	_place_host_over_main()
+	_host.exclusive = true
+	_host.show()
+	_host.grab_focus()
 
 
 func _fill_save_rows(col: VBoxContainer) -> void:
@@ -589,6 +684,16 @@ func live_routing_facts() -> Dictionary:
 		"raw_key_log": true,
 		"begin_keys": true,
 		"playlike_unfocused_click": true,
+		"native_host": (
+			_host != null
+			and is_instance_valid(_host)
+			and _host is Window
+		),
+		"host_exclusive": (
+			_host != null
+			and is_instance_valid(_host)
+			and bool(_host.exclusive)
+		),
 	}
 
 
@@ -739,6 +844,11 @@ func collect_pointer_points(event: InputEvent) -> Array[Vector2]:
 		var win_dec: Vector2i = DisplayServer.window_get_position_with_decorations()
 		pts.append(Vector2(screen - win))
 		pts.append(Vector2(screen - win_dec))
+		if _host != null and is_instance_valid(_host):
+			pts.append(Vector2(screen - _host.position))
+			var host_vp: Viewport = _host
+			if host_vp != null:
+				pts.append(host_vp.get_mouse_position())
 		if vp != null:
 			var xf: Transform2D = vp.get_screen_transform().affine_inverse()
 			pts.append(xf * Vector2(screen))
@@ -864,6 +974,7 @@ func handle_live_escape() -> bool:
 	# (Play 3d00182 / d18cbae / d53ee05: overlay unchanged after ×2).
 	# Sticky open-only while this title is up.
 	_log_live_esc("title.handle_live_escape", null)
+	_hide_host_for_command_center()
 	if _esc_routed_to_cc or _command_center_is_up():
 		_esc_routed_to_cc = true
 		return _ensure_command_center_stays_open()
@@ -1026,9 +1137,21 @@ func _process(delta: float) -> void:
 			apply_smoke_auto_begin()
 			return
 	_focus_nudge_s += delta
-	if _focus_nudge_s >= 0.4:
+	if _focus_nudge_s >= 0.8:
 		_focus_nudge_s = 0.0
-		_ensure_live_window_key_focus()
+		# Nudge only the title host — never restack the main game window
+		# (Play Alt+Tab / screenshot-coord miss class).
+		if _host != null and is_instance_valid(_host) and _host.visible:
+			_host.grab_focus()
+		elif _host == null:
+			_ensure_live_window_key_focus()
+	if _command_center_is_up():
+		if not _cc_was_up:
+			_cc_was_up = true
+			_hide_host_for_command_center()
+	elif _cc_was_up:
+		_cc_was_up = false
+		_restore_host_after_command_center()
 	_raw_heartbeat_s += delta
 	if _raw_heartbeat_s >= 2.0:
 		_raw_heartbeat_s = 0.0
@@ -1097,14 +1220,10 @@ func _ensure_living_begin_binding() -> void:
 		InputMap.action_add_event("eoa_living_begin", ev_b)
 
 
-func _set_live_always_on_top(on: bool) -> void:
-	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
-		return
-	if DisplayServer.get_window_list().size() <= 0:
-		return
-	var wid: int = int(DisplayServer.get_window_list()[0])
-	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, on, wid)
-	_always_on_top_set = on
+func _set_live_always_on_top(_on: bool) -> void:
+	# Kept as a no-op. Main-window always-on-top made Alt+Tab look like a
+	# DEBUG exit (Play d18cbae game_exit.webp). Title host Window is enough.
+	_always_on_top_set = false
 
 
 func _ensure_ui_cancel_binding() -> void:
@@ -1133,11 +1252,11 @@ func _connect_window_input() -> void:
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return
 	var win: Window = get_window()
-	if win == null or _window_input_hooked:
-		return
-	if not win.window_input.is_connected(_on_window_input):
+	if win != null and not win.window_input.is_connected(_on_window_input):
 		win.window_input.connect(_on_window_input)
-		_window_input_hooked = true
+	if _host != null and is_instance_valid(_host) and not _host.window_input.is_connected(_on_window_input):
+		_host.window_input.connect(_on_window_input)
+	_window_input_hooked = true
 
 
 func _on_window_input(event: InputEvent) -> void:
@@ -1167,10 +1286,11 @@ func _on_window_input(event: InputEvent) -> void:
 func _ensure_live_window_key_focus() -> void:
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return
-	if DisplayServer.get_window_list().size() > 0:
-		var wid: int = int(DisplayServer.get_window_list()[0])
-		if not DisplayServer.window_is_focused(wid):
-			DisplayServer.window_move_to_foreground(wid)
+	# Prefer the title host. Do not move_to_foreground the main game window
+	# every tick — that restacks under computerUse and looks like an exit.
+	if _host != null and is_instance_valid(_host) and _host.visible:
+		_host.grab_focus()
+		return
 	var win: Window = get_window()
 	if win != null and win.has_method("grab_focus"):
 		win.grab_focus()
@@ -1179,8 +1299,10 @@ func _ensure_live_window_key_focus() -> void:
 func _exit_tree() -> void:
 	_set_live_always_on_top(false)
 	var win: Window = get_window()
-	if win != null and _window_input_hooked and win.window_input.is_connected(_on_window_input):
+	if win != null and win.window_input.is_connected(_on_window_input):
 		win.window_input.disconnect(_on_window_input)
+	if _host != null and is_instance_valid(_host) and _host.window_input.is_connected(_on_window_input):
+		_host.window_input.disconnect(_on_window_input)
 	_window_input_hooked = false
 
 
@@ -1378,6 +1500,9 @@ func _finish(out: Dictionary) -> void:
 	if _closed:
 		return
 	_closed = true
+	if _host != null and is_instance_valid(_host):
+		_host.exclusive = false
+		_host.hide()
 	_clear_opened_from_title_meta()
 	_center_on_player(str(out.get("player_tag", _tag)))
 	boot_closed.emit(out)
