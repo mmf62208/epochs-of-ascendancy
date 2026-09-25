@@ -30,7 +30,7 @@ Isolated xvfb repro of two short AA dashes at those cents **did** keep ticking (
 1. Preview draws **hub-local** (`position = hub centroid`) so the AABB is ~8u, not a 4k×1k world box.
 2. Dash/hatch loops: `is_finite` reject, `IX1_PREVIEW_MIN_STEP`, `IX1_PREVIEW_MAX_SEGS` / `MAX_HATCHES`, **no** antialiased `draw_line`. Re-entrant `queue_redraw` from `_draw` blocked.
 3. Toast + **Building…** on the press frame; `show_info_panel` + soft-pan `call_deferred` (`_ix1_spine_start_after_first_frame`).
-4. Preview notify is `call_deferred`. Spine start/progress does **not** light-rebuild RoadLayer/sites (preview only). Rail ties capped (`MAX_RAIL_TIES_PER_EDGE`).
+4. Preview notify is **sync** (hub-local `_draw` is cheap; CompleteTest construction same-tick). Spine start/progress does **not** light-rebuild RoadLayer/sites (preview only). Rail ties capped (`MAX_RAIL_TIES_PER_EDGE`).
 5. Windowed guard: `tools/eoa_ix1_spine_frame_guard.sh` (xvfb) · `EOA_SMOKE_FRAME_GUARD frames=… rss_mb=… PASS|FAIL` · frames keep advancing · RSS < 2 GB for 60 s after a simulated press.
 
 Three corridor states, progress/ETA, CompleteTest, sticky Search, stay-alive, catch-up, smoke auto-begin hatch, `EOA_SMOKE_SPINE_START` **kept**. Corridor IDs unchanged.
