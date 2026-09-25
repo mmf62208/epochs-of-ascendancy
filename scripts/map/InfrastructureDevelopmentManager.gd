@@ -473,7 +473,18 @@ func _refresh_project_modifiers(proj: ProvincialProject, province: Province) -> 
 func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 	var p: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
 	if p == null:
+		# Same store the live button writes. Headless / mid-load has no hex:
+		# still mark the spine COMPLETE so calendar ticks that reach 100%
+		# emit built (edges need the hex on-tree — RoadLayer is skipped).
 		active_projects.erase(province_id)
+		if proj != null and proj.build_road_spine:
+			proj.status = "complete"
+			_set_ix1_spine_visual_state("built", province_id, 100.0)
+			_log_smoke_spine_complete(province_id, "IDM.complete")
+			print(
+				"InfrastructureDevelopmentManager: COMPLETED %s project on province %d (hex off-tree)"
+				% [proj.axis, province_id]
+			)
 		return
 
 	var new_level := proj.target_level

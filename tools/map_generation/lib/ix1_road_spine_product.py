@@ -620,6 +620,9 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("timemanager_live_construction_calendar_tick")
     if "eoa_idm_calendar_tick_elapsed" not in _read(IDM_GD):
         missing.append("idm_skip_double_calendar_tick")
+    complete_fn = _slice_func(_read(IDM_GD), "_complete_project")
+    if "hex off-tree" not in complete_fn or "_log_smoke_spine_complete" not in complete_fn:
+        missing.append("idm_complete_off_tree_spine")
     if "EOA_SMOKE_SPINE_LIVE_PROGRESS" not in _read(TEST_RUNNER_GD):
         missing.append("testrunner_live_progress_guard")
     if "advance_real_time" not in _slice_func(_read(TEST_RUNNER_GD), "_tick_smoke_ix1_live_progress"):

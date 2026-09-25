@@ -213,6 +213,7 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertNotIn("day_tick_smoke_advance_harness", tick.get("missing") or [])
         self.assertNotIn("timemanager_live_construction_calendar_tick", tick.get("missing") or [])
         self.assertNotIn("idm_skip_double_calendar_tick", tick.get("missing") or [])
+        self.assertNotIn("idm_complete_off_tree_spine", tick.get("missing") or [])
         self.assertNotIn("testrunner_live_progress_guard", tick.get("missing") or [])
         self.assertNotIn("testrunner_live_progress_uses_advance_real_time", tick.get("missing") or [])
         self.assertNotIn("testrunner_live_progress_idm_shortcut", tick.get("missing") or [])

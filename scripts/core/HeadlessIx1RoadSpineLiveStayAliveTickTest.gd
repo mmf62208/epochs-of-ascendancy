@@ -179,19 +179,25 @@ func _test_stay_alive_advance_real_time_ticks_spine() -> void:
 		_cleanup_stay_alive(tm, idm)
 		return
 	# Continue to COMPLETE (~36d from 0% at ~2.8%/day).
+	var last_prog := mid_prog
 	while i < 260:
 		tm.call("advance_real_time", 1.0)
 		i += 1
+		last_prog = _spine_progress(idm)
+		if last_prog > 0.0:
+			mid_prog = last_prog
 		if not bool(idm.call("has_active_project", HUB_ID)):
 			break
-	var end_prog := _spine_progress(idm)
 	var still_active := bool(idm.call("has_active_project", HUB_ID))
 	var visual := ""
 	if idm.has_method("get_ix1_spine_visual_state"):
 		visual = str(idm.call("get_ix1_spine_visual_state"))
+	var end_prog := last_prog
+	if visual == "built" or not still_active:
+		end_prog = 100.0
 	_cleanup_stay_alive(tm, idm)
-	if still_active and end_prog < 99.0:
-		_fail("spine did not COMPLETE after live stay-alive clock (pct=%.1f state=%s)" % [end_prog, visual])
+	if visual != "built" or still_active:
+		_fail("spine did not COMPLETE after live stay-alive clock (pct=%.1f state=%s active=%s)" % [last_prog, visual, str(still_active)])
 		return
 	_pass(
 		"stay-alive advance_real_time +%dd %.1f%% → %.1f%% then COMPLETE state=%s (NOT product Begin/Esc/clock PASS)"

@@ -12,7 +12,7 @@ Windowed F5 (`is_interactive_light_sim`) `advance_days` only **queues** `day_emi
 
 ## Product fix
 
-`TimeManager.advance_days` light path calls `_tick_live_construction_on_calendar_day` (same IDM store). Signal skips a second tick via `eoa_idm_calendar_tick_elapsed`. Stay-alive still drops `day_ai` / `day_battles` / queued `day_emit` (hang class kept). Toast-trim snapshot + `remove_child` kept.
+`TimeManager.advance_days` light path calls `_tick_live_construction_on_calendar_day` (same IDM store). Signal skips a second tick via `eoa_idm_calendar_tick_elapsed`. Stay-alive still drops `day_ai` / `day_battles` / queued `day_emit` (hang class kept). Toast-trim snapshot + `remove_child` kept. Off-tree `_complete_project` still marks spine `built` + COMPLETE (edges need the hex on-tree).
 
 Also: toast timer WeakRef (no `Object → Object`); spine chrome **below** Settle; in-panel start notice.
 
