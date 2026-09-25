@@ -678,16 +678,13 @@ func _on_window_input(event: InputEvent) -> void:
 func _ensure_live_window_key_focus() -> void:
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return
-	var win: Window = get_window()
-	if win != null:
-		if win.has_method("grab_focus"):
-			win.grab_focus()
-		if win.has_method("move_to_foreground"):
-			win.move_to_foreground()
 	if DisplayServer.get_window_list().size() > 0:
-		var wid: int = DisplayServer.get_window_list()[0]
+		var wid: int = int(DisplayServer.get_window_list()[0])
 		if not DisplayServer.window_is_focused(wid):
 			DisplayServer.window_move_to_foreground(wid)
+	var win: Window = get_window()
+	if win != null and win.has_method("grab_focus"):
+		win.grab_focus()
 
 
 func _exit_tree() -> void:

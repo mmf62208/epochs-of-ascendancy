@@ -109,10 +109,14 @@ func _run() -> void:
 	if ds == "headless":
 		print("HeadlessIx1LiveEscWindowProbe: NOTE headless — not a live F5/computerUse proof")
 		print("HeadlessIx1LiveEscWindowProbe: Play path if zero EOA_LIVE_ESC: click Esc · Menu or Begin, then continue softpipe")
-	title_b.queue_free()
-	title_m.queue_free()
-	title.queue_free()
-	cc.queue_free()
+	if is_instance_valid(title_b):
+		title_b.queue_free()
+	if is_instance_valid(title_m):
+		title_m.queue_free()
+	if is_instance_valid(title):
+		title.queue_free()
+	if is_instance_valid(cc):
+		cc.queue_free()
 	var mm2: Node = root.get_node_or_null("MainMenu")
-	if mm2 != null:
+	if mm2 != null and is_instance_valid(mm2):
 		mm2.queue_free()
