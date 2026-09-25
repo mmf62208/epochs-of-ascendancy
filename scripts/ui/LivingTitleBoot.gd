@@ -26,6 +26,8 @@ var _year := 1936
 var _nation_btns: Dictionary = {}
 var _era_btns: Dictionary = {}
 var _begin_btn: Button
+var _cc_btn: Button
+var _esc_chip: Button
 var _panel: PanelContainer
 var _status: Label
 var _closed := false
@@ -33,6 +35,9 @@ var _closed := false
 var _esc_routed_to_cc := false
 ## Edge-trigger for `_process` Input-singleton poll (live DisplayServer may skip `_input`).
 var _esc_poll_held := false
+## Periodic window-focus nudge while title is up (computerUse Esc may miss an unfocused X11 window).
+var _focus_nudge_s := 0.0
+var _window_input_hooked := false
 
 
 ## False for Maginot / QA / env-chosen boots. True for a normal graphical F5.
@@ -142,10 +147,13 @@ func _ready() -> void:
 	set_process_unhandled_input(true)
 	set_process_unhandled_key_input(true)
 	set_process_shortcut_input(true)
+	_ensure_ui_cancel_binding()
 	_build_ui()
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(true)
+	_connect_window_input()
 	_grab_live_focus()
+	_ensure_live_window_key_focus()
 
 
 func _build_ui() -> void:
@@ -162,7 +170,7 @@ func _build_ui() -> void:
 
 	var panel := PanelContainer.new()
 	panel.name = "LivingTitlePanel"
-	panel.custom_minimum_size = Vector2(420, 560)
+	panel.custom_minimum_size = Vector2(420, 610)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	RetrowaveTheme.style_menu_panel(panel)
@@ -170,9 +178,9 @@ func _build_ui() -> void:
 	_panel = panel
 	panel.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	panel.offset_left = 28
-	panel.offset_top = -280
+	panel.offset_top = -300
 	panel.offset_right = 448
-	panel.offset_bottom = 300
+	panel.offset_bottom = 320
 
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 16)
@@ -246,6 +254,23 @@ func _build_ui() -> void:
 	col.add_child(sav_h)
 	_fill_save_rows(col)
 
+	# Mouse-reachable Command Center while living title is up. Play 2a4ed6b:
+	# computerUse Escape never reached `_input` / Input / window (zero EOA_LIVE_ESC).
+	# Do not require Esc first — this button is the softpipe unblock.
+	_cc_btn = Button.new()
+	_cc_btn.name = "LivingTitleCommandCenter"
+	_cc_btn.text = "Command Center · Esc"
+	_cc_btn.tooltip_text = "Opens Command Center (same as Esc). Click if Esc does not reach this window."
+	_cc_btn.custom_minimum_size = Vector2(0, 36)
+	_cc_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_cc_btn.focus_mode = Control.FOCUS_ALL
+	_cc_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	_cc_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_cc_btn.pressed.connect(_on_cc_pressed)
+	_cc_btn.gui_input.connect(_on_cc_gui_input)
+	RetrowaveTheme.style_secondary_button(_cc_btn)
+	col.add_child(_cc_btn)
+
 	_begin_btn = Button.new()
 	_begin_btn.name = "LivingTitleBegin"
 	_begin_btn.custom_minimum_size = Vector2(0, 42)
@@ -265,7 +290,35 @@ func _build_ui() -> void:
 	RetrowaveTheme.style_body_label(_status)
 	col.add_child(_status)
 
+	_build_esc_chip(root)
 	_refresh_choice_buttons()
+
+
+func _build_esc_chip(root: Control) -> void:
+	# Layer-120 chip over the HUD Menu corner. MapRenderer used to swallow
+	# TopInfoBar Menu clicks while the title was up (Play 2a4ed6b).
+	_esc_chip = Button.new()
+	_esc_chip.name = "LivingTitleEscChip"
+	_esc_chip.text = "Esc · Menu"
+	_esc_chip.tooltip_text = "Opens Command Center. Use this if keyboard Esc is not delivered."
+	_esc_chip.custom_minimum_size = Vector2(132, 36)
+	_esc_chip.mouse_filter = Control.MOUSE_FILTER_STOP
+	_esc_chip.focus_mode = Control.FOCUS_ALL
+	_esc_chip.process_mode = Node.PROCESS_MODE_ALWAYS
+	_esc_chip.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_esc_chip.pressed.connect(_on_cc_pressed)
+	_esc_chip.gui_input.connect(_on_cc_gui_input)
+	RetrowaveTheme.style_primary_button(_esc_chip)
+	_esc_chip.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_esc_chip.anchor_left = 1.0
+	_esc_chip.anchor_right = 1.0
+	_esc_chip.anchor_top = 0.0
+	_esc_chip.anchor_bottom = 0.0
+	_esc_chip.offset_left = -148.0
+	_esc_chip.offset_right = -12.0
+	_esc_chip.offset_top = 8.0
+	_esc_chip.offset_bottom = 44.0
+	root.add_child(_esc_chip)
 
 
 func _fill_save_rows(col: VBoxContainer) -> void:
@@ -347,7 +400,7 @@ func _refresh_choice_buttons() -> void:
 		var place := str(NATION_LABELS.get(_tag, _tag))
 		_begin_btn.text = "Begin · %s · %d" % [place, _year]
 	if _status != null:
-		_status.text = "Click a playable nation on the map (or a tag). Default is GER 1936 Maginot until you Begin."
+		_status.text = "Esc or Esc · Menu opens Command Center. Begin starts now (Esc is not required)."
 
 
 ## Live DisplayServer Esc: keycode, physical_keycode, key_label, unicode 27, or ui_cancel.
@@ -401,9 +454,14 @@ static func is_up_in_tree(tree: SceneTree) -> bool:
 func live_routing_facts() -> Dictionary:
 	var pressed_ok: bool = false
 	var gui_ok: bool = false
+	var cc_pressed_ok: bool = false
+	var cc_gui_ok: bool = false
 	if _begin_btn != null and is_instance_valid(_begin_btn):
 		pressed_ok = _begin_btn.pressed.is_connected(_on_begin_new)
 		gui_ok = _begin_btn.gui_input.is_connected(_on_begin_gui_input)
+	if _cc_btn != null and is_instance_valid(_cc_btn):
+		cc_pressed_ok = _cc_btn.pressed.is_connected(_on_cc_pressed)
+		cc_gui_ok = _cc_btn.gui_input.is_connected(_on_cc_gui_input)
 	return {
 		"ok": true,
 		"process_mode_always": process_mode == Node.PROCESS_MODE_ALWAYS,
@@ -422,6 +480,25 @@ func live_routing_facts() -> Dictionary:
 		),
 		"begin_pressed_wired": pressed_ok,
 		"begin_gui_wired": gui_ok,
+		"begin_without_esc": true,
+		"cc_stop": (
+			_cc_btn != null
+			and is_instance_valid(_cc_btn)
+			and _cc_btn.mouse_filter == Control.MOUSE_FILTER_STOP
+		),
+		"cc_press_mode": (
+			_cc_btn != null
+			and is_instance_valid(_cc_btn)
+			and _cc_btn.action_mode == BaseButton.ACTION_MODE_BUTTON_PRESS
+		),
+		"cc_pressed_wired": cc_pressed_ok,
+		"cc_gui_wired": cc_gui_ok,
+		"esc_chip": (
+			_esc_chip != null
+			and is_instance_valid(_esc_chip)
+			and _esc_chip.mouse_filter == Control.MOUSE_FILTER_STOP
+		),
+		"mouse_cc": true,
 		"esc_routed_to_cc": _esc_routed_to_cc,
 		"closed": _closed,
 		"processing_process": is_processing(),
@@ -441,8 +518,20 @@ func begin_owns_screen_point(screen: Vector2) -> bool:
 	return _begin_btn.get_global_rect().grow(10.0).has_point(screen)
 
 
+func cc_owns_screen_point(screen: Vector2) -> bool:
+	if _cc_btn != null and is_instance_valid(_cc_btn) and _cc_btn.visible:
+		if _cc_btn.get_global_rect().grow(8.0).has_point(screen):
+			return true
+	if _esc_chip != null and is_instance_valid(_esc_chip) and _esc_chip.visible:
+		if _esc_chip.get_global_rect().grow(8.0).has_point(screen):
+			return true
+	return false
+
+
 func owns_screen_point(screen: Vector2) -> bool:
 	if begin_owns_screen_point(screen):
+		return true
+	if cc_owns_screen_point(screen):
 		return true
 	if panel_owns_screen_point(screen):
 		return true
@@ -450,8 +539,15 @@ func owns_screen_point(screen: Vector2) -> bool:
 
 
 func handle_live_begin() -> Dictionary:
+	# Begin dismisses the title without requiring Esc first (Play 2a4ed6b softpipe).
 	_on_begin_new()
 	return {"ok": _closed, "closed": _closed, "mode": "new", "player_tag": _tag, "year": _year}
+
+
+func handle_live_command_center_click() -> bool:
+	print("LivingTitleBoot: live mouse Command Center · Esc (delivery backup)")
+	_log_live_esc("title.mouse_cc", null)
+	return handle_live_escape()
 
 
 func handle_live_escape() -> bool:
@@ -502,9 +598,13 @@ func _poll_live_escape_just_pressed() -> bool:
 	return false
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _closed:
 		return
+	_focus_nudge_s += delta
+	if _focus_nudge_s >= 1.5:
+		_focus_nudge_s = 0.0
+		_ensure_live_window_key_focus()
 	if _poll_live_escape_just_pressed():
 		_log_live_esc("title._process", null)
 		handle_live_escape()
@@ -534,14 +634,73 @@ func _ensure_command_center_stays_open() -> bool:
 	return _open_command_center_from_title()
 
 
-func _grab_live_focus() -> void:
-	if _begin_btn != null and is_instance_valid(_begin_btn):
-		_begin_btn.grab_focus()
+func _ensure_ui_cancel_binding() -> void:
+	# Explicit Esc on ui_cancel so Input.is_action_just_pressed works if the
+	# project [input] section never listed the built-in action.
+	if not InputMap.has_action("ui_cancel"):
+		InputMap.add_action("ui_cancel")
+	var has_esc: bool = false
+	var events: Array = InputMap.action_get_events("ui_cancel")
+	for raw_ev in events:
+		if raw_ev is InputEventKey:
+			var ek: InputEventKey = raw_ev
+			if ek.keycode == KEY_ESCAPE or ek.physical_keycode == KEY_ESCAPE:
+				has_esc = true
+				break
+	if has_esc:
+		return
+	var esc_ev := InputEventKey.new()
+	esc_ev.keycode = KEY_ESCAPE
+	esc_ev.physical_keycode = KEY_ESCAPE
+	esc_ev.key_label = KEY_ESCAPE
+	InputMap.action_add_event("ui_cancel", esc_ev)
+
+
+func _connect_window_input() -> void:
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return
 	var win: Window = get_window()
-	if win != null and win.has_method("grab_focus"):
-		win.grab_focus()
+	if win == null or _window_input_hooked:
+		return
+	if not win.window_input.is_connected(_on_window_input):
+		win.window_input.connect(_on_window_input)
+		_window_input_hooked = true
+
+
+func _on_window_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if is_live_escape_event(event):
+		_log_live_esc("title.window_input", event)
+		handle_live_escape()
+
+
+func _ensure_live_window_key_focus() -> void:
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return
+	var win: Window = get_window()
+	if win != null:
+		if win.has_method("grab_focus"):
+			win.grab_focus()
+		if win.has_method("move_to_foreground"):
+			win.move_to_foreground()
+	if DisplayServer.get_window_list().size() > 0:
+		var wid: int = DisplayServer.get_window_list()[0]
+		if not DisplayServer.window_is_focused(wid):
+			DisplayServer.window_move_to_foreground(wid)
+
+
+func _exit_tree() -> void:
+	var win: Window = get_window()
+	if win != null and _window_input_hooked and win.window_input.is_connected(_on_window_input):
+		win.window_input.disconnect(_on_window_input)
+	_window_input_hooked = false
+
+
+func _grab_live_focus() -> void:
+	if _begin_btn != null and is_instance_valid(_begin_btn):
+		_begin_btn.grab_focus()
+	_ensure_live_window_key_focus()
 
 
 func _find_top_info_bar(tree: SceneTree) -> Node:
@@ -598,6 +757,22 @@ func _instance_command_center_now() -> void:
 	tree.root.add_child(menu)
 
 
+func _on_cc_pressed() -> void:
+	handle_live_command_center_click()
+
+
+func _on_cc_gui_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			handle_live_command_center_click()
+			var vp_c: Viewport = get_viewport()
+			if vp_c != null:
+				vp_c.set_input_as_handled()
+
+
 func _on_begin_gui_input(event: InputEvent) -> void:
 	if _closed:
 		return
@@ -628,6 +803,11 @@ func _input(event: InputEvent) -> void:
 		var mouse: Vector2 = vp.get_mouse_position() if vp != null else mb.position
 		if begin_owns_screen_point(mouse) or begin_owns_screen_point(mb.position):
 			_on_begin_new()
+			if vp != null:
+				vp.set_input_as_handled()
+			return
+		if cc_owns_screen_point(mouse) or cc_owns_screen_point(mb.position):
+			handle_live_command_center_click()
 			if vp != null:
 				vp.set_input_as_handled()
 

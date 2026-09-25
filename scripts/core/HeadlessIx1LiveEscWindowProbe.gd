@@ -79,7 +79,40 @@ func _run() -> void:
 		_fail("process-poll Esc closed Command Center")
 		return
 	_pass("windowed DisplayServer=%s two Esc keep CC; poll stay" % ds)
+	# Mouse CC + Begin-without-Esc (Play 2a4ed6b: Esc never entered Godot).
+	var leftover2: Node = root.get_node_or_null("MainMenu")
+	if leftover2 != null:
+		leftover2.free()
+	var title_m: CanvasLayer = title_scr.new() as CanvasLayer
+	title_m.name = "LivingTitleBootMouse"
+	root.add_child(title_m)
+	var cc_btn: Button = title_m.find_child("LivingTitleCommandCenter", true, false) as Button
+	var chip: Button = title_m.find_child("LivingTitleEscChip", true, false) as Button
+	if cc_btn == null or chip == null:
+		_fail("mouse Command Center · Esc / Esc · Menu chip missing")
+		return
+	if not bool(title_m.call("handle_live_command_center_click")) and not bool(title_m.get("_esc_routed_to_cc")):
+		_fail("mouse Command Center click must open CC")
+		return
+	if title_m.has_method("_instance_command_center_now"):
+		title_m.call("_instance_command_center_now")
+	if root.get_node_or_null("MainMenu") == null:
+		_fail("mouse Command Center click must instance MainMenu")
+		return
+	var title_b: CanvasLayer = title_scr.new() as CanvasLayer
+	root.add_child(title_b)
+	var bout: Dictionary = title_b.call("handle_live_begin")
+	if not bool(bout.get("closed", false)) and not bool(title_b.get("_closed")):
+		_fail("Begin must dismiss title without Esc first")
+		return
+	_pass("mouse CC + Begin-without-Esc on DisplayServer=%s" % ds)
 	if ds == "headless":
 		print("HeadlessIx1LiveEscWindowProbe: NOTE headless — not a live F5/computerUse proof")
+		print("HeadlessIx1LiveEscWindowProbe: Play path if zero EOA_LIVE_ESC: click Esc · Menu or Begin, then continue softpipe")
+	title_b.queue_free()
+	title_m.queue_free()
 	title.queue_free()
 	cc.queue_free()
+	var mm2: Node = root.get_node_or_null("MainMenu")
+	if mm2 != null:
+		mm2.queue_free()

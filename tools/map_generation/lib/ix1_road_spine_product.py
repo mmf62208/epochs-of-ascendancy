@@ -538,6 +538,12 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("living_title_esc_process_poll")
     if "_ensure_command_center_stays_open" not in title:
         missing.append("living_title_esc_open_only")
+    if "LivingTitleCommandCenter" not in title or "handle_live_command_center_click" not in title:
+        missing.append("living_title_mouse_cc")
+    if "LivingTitleEscChip" not in title or "begin_without_esc" not in title:
+        missing.append("living_title_begin_without_esc")
+    if "_living_title_owns_click() or _top_bar_owns_click()" not in _read(RENDERER_GD):
+        missing.append("title_up_top_bar_clicks")
     if "open_command_center_stay" not in top or "_living_title_boot_is_up" not in top:
         missing.append("top_bar_cc_open_only_on_title")
     if "_living_title_is_up" not in cc or "eoa_opened_from_living_title" not in cc:

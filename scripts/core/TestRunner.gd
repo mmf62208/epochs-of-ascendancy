@@ -696,7 +696,7 @@ func _show_living_title_boot() -> void:
 		boot.connect("boot_closed", _on_living_title_boot_closed)
 	# Live DisplayServer backup: poll Esc if title `_input` never runs (Play 3d00182).
 	set_process(true)
-	print("TestRunner: living title boot — pick scenario date, country, or load")
+	print("TestRunner: living title boot — pick scenario date, country, or load (Esc / Esc · Menu / Begin without Esc)")
 
 
 func _process(_delta: float) -> void:

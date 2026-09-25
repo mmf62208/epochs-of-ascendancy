@@ -1638,6 +1638,12 @@ func _living_title_owns_click() -> bool:
 	var begin_lt: Control = boot.find_child("LivingTitleBegin", true, false) as Control
 	if begin_lt != null and begin_lt.visible and begin_lt.get_global_rect().grow(10.0).has_point(mouse_lt):
 		return true
+	var cc_lt: Control = boot.find_child("LivingTitleCommandCenter", true, false) as Control
+	if cc_lt != null and cc_lt.visible and cc_lt.get_global_rect().grow(8.0).has_point(mouse_lt):
+		return true
+	var chip_lt: Control = boot.find_child("LivingTitleEscChip", true, false) as Control
+	if chip_lt != null and chip_lt.visible and chip_lt.get_global_rect().grow(8.0).has_point(mouse_lt):
+		return true
 	return false
 
 
@@ -1960,9 +1966,10 @@ func _input(event: InputEvent) -> void:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if _living_title_boot_is_up():
-				# Title panel / Begin: do not arm map gesture or mark handled.
-				# Map click: consume so chip/assault cannot window-exit (Play d18cbae).
-				if _living_title_owns_click():
+				# Title panel / Begin / Esc·Menu chip / TopInfoBar: do not swallow.
+				# Play 2a4ed6b: computerUse Esc never arrived; HUD Menu clicks were
+				# also eaten here so the only remaining CC path was a dead key.
+				if _living_title_owns_click() or _top_bar_owns_click():
 					return
 				if event.pressed:
 					get_viewport().set_input_as_handled()
@@ -2121,7 +2128,7 @@ func _wheel_should_zoom_map() -> bool:
 			return false
 		if nn.ends_with("Screen") or nn.ends_with("Popup"):
 			return false
-		if nn == "TopInfoBar" or nn == "LivingTitleBoot" or nn == "LivingTitlePanel" or nn == "LivingTitleBegin":
+		if nn == "TopInfoBar" or nn == "LivingTitleBoot" or nn == "LivingTitlePanel" or nn == "LivingTitleBegin" or nn == "LivingTitleCommandCenter" or nn == "LivingTitleEscChip":
 			return false
 		n = n.get_parent()
 	return true
@@ -2347,7 +2354,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if _living_title_boot_is_up():
-			if _living_title_owns_click():
+			if _living_title_owns_click() or _top_bar_owns_click():
 				return
 			if event.pressed:
 				get_viewport().set_input_as_handled()
@@ -17763,6 +17770,8 @@ func _is_mouse_over_blocking_ui() -> bool:
 			"LivingTitleBoot",
 			"LivingTitlePanel",
 			"LivingTitleBegin",
+			"LivingTitleCommandCenter",
+			"LivingTitleEscChip",
 		]:
 			return true
 		if nn.ends_with("Screen") or nn.ends_with("Popup") or nn.ends_with("View"):

@@ -63,6 +63,7 @@ func _run() -> void:
 	_test_runtime_title_and_cc_layers()
 	_test_runtime_escape_shapes()
 	_test_runtime_begin_wiring_and_input()
+	_test_runtime_mouse_cc_and_begin_without_esc()
 	_test_runtime_esc_opens_cc()
 	_test_runtime_two_esc_keeps_cc()
 
@@ -96,6 +97,15 @@ func _test_source_live_input_routing() -> void:
 	if "func handle_live_escape" not in title_src or "func handle_live_begin" not in title_src:
 		_fail("LivingTitleBoot must expose handle_live_escape / handle_live_begin")
 		return
+	if "LivingTitleCommandCenter" not in title_src or "func handle_live_command_center_click" not in title_src:
+		_fail("LivingTitleBoot must ship a mouse Command Center · Esc affordance (Play 2a4ed6b zero EOA_LIVE_ESC)")
+		return
+	if "LivingTitleEscChip" not in title_src or "begin_without_esc" not in title_src:
+		_fail("LivingTitleBoot must ship Esc·Menu chip and Begin-without-Esc (softpipe unblock)")
+		return
+	if "_ensure_ui_cancel_binding" not in title_src or "window_input" not in title_src:
+		_fail("LivingTitleBoot must bind ui_cancel and hook Window.window_input for live Esc delivery")
+		return
 	if "func owns_screen_point" not in title_src or "func begin_owns_screen_point" not in title_src:
 		_fail("LivingTitleBoot must expose rect-first panel/Begin hit tests")
 		return
@@ -114,6 +124,9 @@ func _test_source_live_input_routing() -> void:
 	var input_fn := _slice_func(ren, "_input")
 	if input_fn.is_empty() or "_living_title_owns_click" not in input_fn:
 		_fail("MapRenderer._input must early-out when the living title owns the click")
+		return
+	if "_living_title_owns_click() or _top_bar_owns_click()" not in ren:
+		_fail("MapRenderer must not swallow TopInfoBar Menu clicks while the living title is up")
 		return
 	if "_living_title_boot_is_up" not in input_fn:
 		_fail("MapRenderer._input must not open chips/assault while the living title is up")
@@ -345,6 +358,83 @@ func _test_runtime_begin_wiring_and_input() -> void:
 			return
 	_pass("Begin STOP+PRESS wired; handle_live_begin closes; _input owns Begin")
 	title2.queue_free()
+
+
+func _test_runtime_mouse_cc_and_begin_without_esc() -> void:
+	# Play 2a4ed6b: Esc never reached Godot. Softpipe must proceed via mouse CC
+	# and/or Begin without waiting for a keyboard event.
+	var leftover_mm: Node = root.get_node_or_null("MainMenu")
+	if leftover_mm != null:
+		leftover_mm.free()
+	var title_scr: GDScript = load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
+	var title: CanvasLayer = title_scr.new() as CanvasLayer
+	title.name = "LivingTitleBoot"
+	root.add_child(title)
+	var cc_btn: Button = title.find_child("LivingTitleCommandCenter", true, false) as Button
+	var chip: Button = title.find_child("LivingTitleEscChip", true, false) as Button
+	if cc_btn == null or not is_instance_valid(cc_btn):
+		_fail("Command Center · Esc button missing on living title")
+		title.queue_free()
+		return
+	if chip == null or not is_instance_valid(chip):
+		_fail("Esc · Menu chip missing on living title")
+		title.queue_free()
+		return
+	if cc_btn.mouse_filter != Control.MOUSE_FILTER_STOP or cc_btn.action_mode != BaseButton.ACTION_MODE_BUTTON_PRESS:
+		_fail("Command Center · Esc must be STOP + BUTTON_PRESS")
+		title.queue_free()
+		return
+	if not title.has_method("handle_live_command_center_click"):
+		_fail("handle_live_command_center_click missing")
+		title.queue_free()
+		return
+	var routed: bool = bool(title.call("handle_live_command_center_click"))
+	if not routed and not bool(title.get("_esc_routed_to_cc")):
+		_fail("mouse Command Center click must open CC (sticky open-only)")
+		title.queue_free()
+		return
+	if title.has_method("_instance_command_center_now"):
+		title.call("_instance_command_center_now")
+	var cc: Node = root.get_node_or_null("MainMenu")
+	if cc == null or not is_instance_valid(cc):
+		_fail("mouse Command Center click must instance MainMenu")
+		title.queue_free()
+		return
+	var facts: Dictionary = {}
+	if title.has_method("live_routing_facts"):
+		facts = title.call("live_routing_facts")
+	if not bool(facts.get("mouse_cc", false)) or not bool(facts.get("begin_without_esc", false)):
+		_fail("live_routing_facts must advertise mouse_cc + begin_without_esc")
+		cc.queue_free()
+		title.queue_free()
+		return
+	# Begin without Esc first — title closes; Esc was never required.
+	var title_b: CanvasLayer = title_scr.new() as CanvasLayer
+	title_b.name = "LivingTitleBootBegin"
+	root.add_child(title_b)
+	if bool(title_b.get("_esc_routed_to_cc")):
+		_fail("fresh title must not already be Esc-routed")
+		title_b.queue_free()
+		cc.queue_free()
+		title.queue_free()
+		return
+	var bout: Dictionary = title_b.call("handle_live_begin")
+	if not bool(bout.get("closed", false)) and not bool(title_b.get("_closed")):
+		_fail("Begin must dismiss living title without Esc first")
+		title_b.queue_free()
+		cc.queue_free()
+		title.queue_free()
+		return
+	if bool(title_b.get("_esc_routed_to_cc")):
+		_fail("Begin-without-Esc must not pretend Esc arrived")
+		title_b.queue_free()
+		cc.queue_free()
+		title.queue_free()
+		return
+	_pass("mouse Command Center opens CC; Begin dismisses title without Esc")
+	title_b.queue_free()
+	cc.queue_free()
+	title.queue_free()
 
 
 func _test_runtime_esc_opens_cc() -> void:
