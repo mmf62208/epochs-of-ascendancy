@@ -1657,6 +1657,10 @@ func _is_live_escape_event(event: InputEvent) -> bool:
 			return false
 		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
 			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
 	if event != null and event.is_action_pressed("ui_cancel"):
 		return true
 	return false
@@ -1908,6 +1912,10 @@ func _input(event: InputEvent) -> void:
 			# swallow idle Esc after inspector close (play: Esc closed inspector,
 			# next idle Esc never opened Command Center).
 			# Live DisplayServer may deliver physical_keycode / ui_cancel, not keycode.
+			print(
+				"EOA_LIVE_ESC who=MapRenderer._input title_up=%s process_mode=%s handled=before"
+				% [str(_living_title_boot_is_up()), str(process_mode)]
+			)
 			_handle_escape_key()
 			get_viewport().set_input_as_handled()
 			return
@@ -2133,6 +2141,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Esc: dismiss stuck overlays (legend / tech / info) so playtest is never trapped.
 		if _is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 			# Backup if `_input` did not run. Same chain: dismiss then idle `_on_menu_pressed`.
+			print(
+				"EOA_LIVE_ESC who=MapRenderer._unhandled_input title_up=%s process_mode=%s"
+				% [str(_living_title_boot_is_up()), str(process_mode)]
+			)
 			_handle_escape_key()
 			get_viewport().set_input_as_handled()
 			return

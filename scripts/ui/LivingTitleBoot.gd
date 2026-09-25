@@ -31,6 +31,8 @@ var _status: Label
 var _closed := false
 ## Set when live Esc is accepted on this overlay (headless + Play proof).
 var _esc_routed_to_cc := false
+## Edge-trigger for `_process` Input-singleton poll (live DisplayServer may skip `_input`).
+var _esc_poll_held := false
 
 
 ## False for Maginot / QA / env-chosen boots. True for a normal graphical F5.
@@ -133,8 +135,13 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	# Live DisplayServer: MapRenderer._input runs before GUI and can swallow
 	# Begin / Esc if this overlay does not own input itself (Play d18cbae).
+	# `_process` poll is the remaining live path when computerUse Esc never
+	# reaches `_input` (Play 3d00182: headless `_input` green, live Esc no-op).
+	set_process(true)
 	set_process_input(true)
 	set_process_unhandled_input(true)
+	set_process_unhandled_key_input(true)
+	set_process_shortcut_input(true)
 	_build_ui()
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(true)
@@ -343,8 +350,8 @@ func _refresh_choice_buttons() -> void:
 		_status.text = "Click a playable nation on the map (or a tag). Default is GER 1936 Maginot until you Begin."
 
 
-## Live DisplayServer Esc: keycode, physical_keycode, or ui_cancel.
-## Headless KEY_ESCAPE-only simulation is not enough (Play d18cbae).
+## Live DisplayServer Esc: keycode, physical_keycode, key_label, unicode 27, or ui_cancel.
+## Headless KEY_ESCAPE-only / `_input`-only simulation is not enough (Play 3d00182).
 static func is_live_escape_event(event: InputEvent) -> bool:
 	if event == null:
 		return false
@@ -357,11 +364,27 @@ static func is_live_escape_event(event: InputEvent) -> bool:
 			return false
 		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
 			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
 		if key.is_action("ui_cancel"):
 			return true
 	if event.is_action_pressed("ui_cancel"):
 		return true
 	return false
+
+
+## True while the living-title overlay is in the tree (Play Esc ×2 must not close CC).
+static func is_up_in_tree(tree: SceneTree) -> bool:
+	if tree == null or tree.root == null:
+		return false
+	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
+	if boot == null or not is_instance_valid(boot) or boot.is_queued_for_deletion():
+		return false
+	if bool(boot.get("_closed")):
+		return false
+	return true
 
 
 func live_routing_facts() -> Dictionary:
@@ -390,6 +413,8 @@ func live_routing_facts() -> Dictionary:
 		"begin_gui_wired": gui_ok,
 		"esc_routed_to_cc": _esc_routed_to_cc,
 		"closed": _closed,
+		"processing_process": is_processing(),
+		"sticky_open_only": true,
 	}
 
 
@@ -421,14 +446,75 @@ func handle_live_begin() -> Dictionary:
 func handle_live_escape() -> bool:
 	if _closed:
 		return false
-	# Title _input + MapRenderer _input both see the same Esc. One open only —
-	# a second deferred _on_menu_pressed would toggle-close (looks like a no-op).
-	var frame_now: int = Engine.get_process_frames()
-	if has_meta("eoa_title_esc_frame") and int(get_meta("eoa_title_esc_frame")) == frame_now:
-		return _esc_routed_to_cc
-	set_meta("eoa_title_esc_frame", frame_now)
+	# Play softpipe presses Esc ×2 (dismiss-then-idle). A one-frame guard is
+	# not enough: first Esc opens CC, second Esc MainMenu-toggles it closed
+	# (Play 3d00182 / d18cbae / d53ee05: overlay unchanged after ×2).
+	# Sticky open-only while this title is up.
+	_log_live_esc("title.handle_live_escape", null)
+	if _esc_routed_to_cc or _command_center_is_up():
+		_esc_routed_to_cc = true
+		return _ensure_command_center_stays_open()
 	_esc_routed_to_cc = true
 	print("LivingTitleBoot: live Esc → Command Center")
+	return _open_command_center_from_title()
+
+
+func _log_live_esc(who: String, event: InputEvent) -> void:
+	var vp: Viewport = get_viewport()
+	var handled: bool = vp != null and vp.is_input_handled()
+	var ev_s := "none"
+	if event is InputEventKey:
+		var k: InputEventKey = event
+		ev_s = "key kc=%s phys=%s label=%s pressed=%s" % [
+			str(k.keycode), str(k.physical_keycode), str(k.key_label), str(k.pressed)
+		]
+	elif event is InputEventAction:
+		ev_s = "action %s" % str((event as InputEventAction).action)
+	print(
+		"EOA_LIVE_ESC who=%s process_mode=%s processing_input=%s handled=%s title_up=1 cc_up=%s event=%s"
+		% [who, str(process_mode), str(is_processing_input()), str(handled), str(_command_center_is_up()), ev_s]
+	)
+
+
+func _poll_live_escape_just_pressed() -> bool:
+	# Input singleton backup when `_input` never runs (focus / process_mode /
+	# another node handled first / computerUse DisplayServer shape).
+	if Input.is_action_just_pressed("ui_cancel"):
+		return true
+	var held: bool = Input.is_key_pressed(KEY_ESCAPE) or Input.is_physical_key_pressed(KEY_ESCAPE)
+	if held:
+		if _esc_poll_held:
+			return false
+		_esc_poll_held = true
+		return true
+	_esc_poll_held = false
+	return false
+
+
+func _process(_delta: float) -> void:
+	if _closed:
+		return
+	if _poll_live_escape_just_pressed():
+		_log_live_esc("title._process", null)
+		handle_live_escape()
+
+
+func _command_center_is_up() -> bool:
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var mm: Node = tree.root.get_node_or_null("MainMenu")
+	if mm == null or not is_instance_valid(mm) or mm.is_queued_for_deletion():
+		return false
+	if bool(mm.get("_closing")):
+		return false
+	return true
+
+
+func _ensure_command_center_stays_open() -> bool:
+	if _command_center_is_up():
+		print("EOA_LIVE_ESC who=LivingTitleBoot.stay cc already up (Play Esc ×2 open-only)")
+		return true
 	return _open_command_center_from_title()
 
 
@@ -459,15 +545,22 @@ func _open_command_center_from_title() -> bool:
 	var tree: SceneTree = get_tree()
 	if tree == null:
 		return false
+	if _command_center_is_up():
+		return true
+	# Immediate open-only (not deferred toggle). Play Esc ×2 used to open then
+	# `_on_menu_pressed` toggle-close on the second press (looks like a no-op).
 	var tib: Node = _find_top_info_bar(tree)
-	if tib != null and tib.has_method("_on_menu_pressed"):
-		# Deferred so this Esc cannot _force_close the new overlay.
-		tib.call_deferred("_on_menu_pressed")
-		return true
-	if tree.root != null and tree.root.get_node_or_null("MainMenu") != null:
-		return true
-	# No TopInfoBar (headless probe): still defer so the opening Esc cannot close CC.
-	call_deferred("_instance_command_center_now")
+	if tib != null:
+		if tib.has_method("open_command_center_stay"):
+			tib.call("open_command_center_stay")
+			return true
+		if tib.has_method("_open_command_center"):
+			tib.call("_open_command_center", false)
+			return true
+		if tib.has_method("_on_menu_pressed"):
+			tib.call("_on_menu_pressed")
+			return true
+	_instance_command_center_now()
 	return true
 
 
@@ -504,6 +597,7 @@ func _input(event: InputEvent) -> void:
 	if _closed:
 		return
 	if is_live_escape_event(event):
+		_log_live_esc("title._input", event)
 		if handle_live_escape():
 			var vp_e: Viewport = get_viewport()
 			if vp_e != null:
@@ -525,10 +619,33 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _closed:
 		return
 	if is_live_escape_event(event):
+		_log_live_esc("title._unhandled_input", event)
 		if handle_live_escape():
 			var vp_u: Viewport = get_viewport()
 			if vp_u != null:
 				vp_u.set_input_as_handled()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if is_live_escape_event(event):
+		_log_live_esc("title._unhandled_key_input", event)
+		if handle_live_escape():
+			var vp_k: Viewport = get_viewport()
+			if vp_k != null:
+				vp_k.set_input_as_handled()
+
+
+func _shortcut_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if is_live_escape_event(event):
+		_log_live_esc("title._shortcut_input", event)
+		if handle_live_escape():
+			var vp_s: Viewport = get_viewport()
+			if vp_s != null:
+				vp_s.set_input_as_handled()
 
 
 func _on_begin_new() -> void:

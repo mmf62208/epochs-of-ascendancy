@@ -694,10 +694,37 @@ func _show_living_title_boot() -> void:
 	add_child(boot)
 	if boot.has_signal("boot_closed"):
 		boot.connect("boot_closed", _on_living_title_boot_closed)
+	# Live DisplayServer backup: poll Esc if title `_input` never runs (Play 3d00182).
+	set_process(true)
 	print("TestRunner: living title boot — pick scenario date, country, or load")
 
 
+func _process(_delta: float) -> void:
+	# Only while the living title is up — cheap null check after Begin.
+	var boot: Node = get_node_or_null("LivingTitleBoot")
+	if boot == null or not is_instance_valid(boot) or bool(boot.get("_closed")):
+		return
+	var just: bool = Input.is_action_just_pressed("ui_cancel")
+	var held: bool = Input.is_key_pressed(KEY_ESCAPE) or Input.is_physical_key_pressed(KEY_ESCAPE)
+	if not just and not held:
+		if has_meta("eoa_title_esc_held"):
+			remove_meta("eoa_title_esc_held")
+		return
+	if held and not just and has_meta("eoa_title_esc_held"):
+		return
+	if held:
+		set_meta("eoa_title_esc_held", true)
+	print(
+		"EOA_LIVE_ESC who=TestRunner._process process_mode=%s title_up=1 processing=%s"
+		% [str(process_mode), str(is_processing())]
+	)
+	if boot.has_method("handle_live_escape"):
+		boot.call("handle_live_escape")
+
+
 func _on_living_title_boot_closed(result: Dictionary) -> void:
+	if has_meta("eoa_title_esc_held"):
+		remove_meta("eoa_title_esc_held")
 	print("TestRunner: living title closed %s" % str(result))
 	var tag := str(result.get("player_tag", player_tag)).strip_edges().to_upper()
 	if tag.is_empty():

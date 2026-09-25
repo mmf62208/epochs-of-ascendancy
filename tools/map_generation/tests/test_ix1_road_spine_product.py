@@ -168,6 +168,10 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertNotIn("living_title_esc_map_owns_click", tick.get("missing") or [])
         self.assertNotIn("living_title_rect_owns_click", tick.get("missing") or [])
         self.assertNotIn("living_title_live_input", tick.get("missing") or [])
+        self.assertNotIn("living_title_esc_process_poll", tick.get("missing") or [])
+        self.assertNotIn("living_title_esc_open_only", tick.get("missing") or [])
+        self.assertNotIn("top_bar_cc_open_only_on_title", tick.get("missing") or [])
+        self.assertNotIn("mainmenu_keep_cc_while_title", tick.get("missing") or [])
         self.assertNotIn("title_esc_begin_on_gates", tick.get("missing") or [])
 
 

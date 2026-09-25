@@ -534,6 +534,14 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("living_title_rect_owns_click")
     if "is_live_escape_event" not in title or "handle_live_begin" not in title:
         missing.append("living_title_live_input")
+    if "_poll_live_escape_just_pressed" not in title or "func _process" not in title:
+        missing.append("living_title_esc_process_poll")
+    if "_ensure_command_center_stays_open" not in title:
+        missing.append("living_title_esc_open_only")
+    if "open_command_center_stay" not in top or "_living_title_boot_is_up" not in top:
+        missing.append("top_bar_cc_open_only_on_title")
+    if "_living_title_is_up" not in cc:
+        missing.append("mainmenu_keep_cc_while_title")
     if "arm_play_clock_after_begin" not in top or "ACTION_MODE_BUTTON_PRESS" not in top:
         missing.append("top_bar_begin_arm")
     save_hook = _slice_func(save, "_on_day_advanced_for_autosave")

@@ -837,6 +837,10 @@ func _is_live_escape_event(event: InputEvent) -> bool:
 			return false
 		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
 			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
 	if event != null and event.is_action_pressed("ui_cancel"):
 		return true
 	return false
@@ -948,6 +952,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		# Backup: MapRenderer `_input` owns the Esc stack (dismiss then idle CC).
 		# Do not queue_free MainMenu here — `_on_menu_pressed` toggles Command Center.
 		# Live DisplayServer may deliver physical_keycode / ui_cancel instead of keycode.
+		print(
+			"EOA_LIVE_ESC who=TopInfoBar._unhandled_input title_up=%s process_mode=%s"
+			% [str(_living_title_boot_is_up()), str(process_mode)]
+		)
 		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
 		if mr == null and get_tree() and get_tree().current_scene:
 			mr = get_tree().current_scene.find_child("MapRenderer", true, false)
@@ -1536,14 +1544,67 @@ func _on_load_pressed() -> void:
 	_open_command_center(true)
 
 
+func _living_title_boot_is_up() -> bool:
+	# find_child — do not reference LivingTitleBoot class_name (-s harness parse).
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
+	if boot == null or not is_instance_valid(boot) or boot.is_queued_for_deletion():
+		return false
+	if bool(boot.get("_closed")):
+		return false
+	return true
+
+
 func _on_menu_pressed() -> void:
 	_open_command_center(false)
 
 
+## Open Command Center and keep it up. Never toggle-close (living-title Esc ×2).
+func open_command_center_stay() -> void:
+	_open_command_center_stay()
+
+
+func _open_command_center_stay() -> void:
+	var existing := get_tree().root.get_node_or_null("MainMenu") if get_tree() != null else null
+	if existing != null and is_instance_valid(existing) and not existing.is_queued_for_deletion():
+		if bool(existing.get("_closing")):
+			existing.name = "MainMenuLeftover"
+		else:
+			print("EOA_LIVE_ESC who=TopInfoBar.open_command_center_stay already_up")
+			return
+	_instance_command_center_now(true)
+
+
+func _instance_command_center_now(refresh_list: bool = true) -> void:
+	var packed := load("res://scenes/ui/MainMenu.tscn")
+	if packed == null:
+		_show_main_menu_popup_fallback()
+		return
+	var menu: Node = packed.instantiate()
+	menu.name = "MainMenu"
+	menu.process_mode = Node.PROCESS_MODE_ALWAYS
+	if menu.has_signal("menu_closed"):
+		menu.menu_closed.connect(func() -> void:
+			_sync_pause_from_time_manager()
+			_update_speed_buttons()
+		)
+	get_tree().root.add_child(menu)
+	if refresh_list and menu.has_method("_refresh_save_list"):
+		menu.call_deferred("_refresh_save_list")
+
+
 func _open_command_center(refresh_list: bool = true) -> void:
-	# Instance the Command Center overlay (CanvasLayer). Toggle closed if already open.
+	# Instance the Command Center overlay (CanvasLayer). Toggle closed if already open
+	# — except while the living title is up (Play Esc ×2 must not toggle-close).
 	var existing := get_tree().root.get_node_or_null("MainMenu")
 	if existing != null:
+		if _living_title_boot_is_up():
+			print("EOA_LIVE_ESC who=TopInfoBar.open_only title_up=1 (do not toggle-close)")
+			if refresh_list and existing.has_method("_refresh_save_list"):
+				existing.call("_refresh_save_list")
+			return
 		if refresh_list and existing.has_method("_refresh_save_list"):
 			existing.call("_refresh_save_list")
 			if existing.has_method("_set_status"):
@@ -1557,23 +1618,7 @@ func _open_command_center(refresh_list: bool = true) -> void:
 			existing.queue_free()
 			_pause_for_menu(false)
 		return
-
-	var packed := load("res://scenes/ui/MainMenu.tscn")
-	if packed == null:
-		_show_main_menu_popup_fallback()
-		return
-
-	var menu: Node = packed.instantiate()
-	menu.name = "MainMenu"
-	menu.process_mode = Node.PROCESS_MODE_ALWAYS
-	if menu.has_signal("menu_closed"):
-		menu.menu_closed.connect(func() -> void:
-			_sync_pause_from_time_manager()
-			_update_speed_buttons()
-		)
-	get_tree().root.add_child(menu)
-	if refresh_list and menu.has_method("_refresh_save_list"):
-		menu.call_deferred("_refresh_save_list")
+	_instance_command_center_now(refresh_list)
 
 
 func _on_settings_pressed() -> void:

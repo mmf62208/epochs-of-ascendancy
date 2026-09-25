@@ -90,20 +90,72 @@ func _ready() -> void:
 	set_process_unhandled_input(true)
 
 
+func _living_title_is_up() -> bool:
+	# Play Esc ×2 on the living title must leave Command Center visible.
+	# find_child — do not reference LivingTitleBoot class_name (-s harness parse).
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
+	if boot == null or not is_instance_valid(boot) or boot.is_queued_for_deletion():
+		return false
+	if bool(boot.get("_closed")):
+		return false
+	return true
+
+
+func _is_live_escape_event(event: InputEvent) -> bool:
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+		if key.key_label == KEY_ESCAPE:
+			return true
+		if int(key.unicode) == 27:
+			return true
+	if event != null and event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
 func _input(event: InputEvent) -> void:
 	if _closing:
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
-		_force_close()
+	if not _is_live_escape_event(event):
+		return
+	print(
+		"EOA_LIVE_ESC who=MainMenu._input process_mode=%s title_up=%s closing=%s handled=before"
+		% [str(process_mode), str(_living_title_is_up()), str(_closing)]
+	)
+	if _living_title_is_up():
+		# Open-only while the title overlay is up (Play 3d00182 Esc ×2 toggle-close).
+		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=1 (do not _force_close)")
 		get_viewport().set_input_as_handled()
+		return
+	_force_close()
+	get_viewport().set_input_as_handled()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _closing:
 		return
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
-		_force_close()
+	if not _is_live_escape_event(event):
+		return
+	print(
+		"EOA_LIVE_ESC who=MainMenu._unhandled_input process_mode=%s title_up=%s"
+		% [str(process_mode), str(_living_title_is_up())]
+	)
+	if _living_title_is_up():
+		print("EOA_LIVE_ESC who=MainMenu.keep_cc title_up=1 (do not _force_close)")
 		get_viewport().set_input_as_handled()
+		return
+	_force_close()
+	get_viewport().set_input_as_handled()
 
 
 func _build_ui() -> void:
