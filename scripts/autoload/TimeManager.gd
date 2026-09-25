@@ -86,6 +86,15 @@ var _draining_f5_flush: bool = false
 var _last_advance_real_msec: int = 0
 ## Soft budget (ms) for deferred sim work per frame — keeps pan/hover live past month ends.
 const INTERACTIVE_SIM_FLUSH_BUDGET_MS := 10
+## Live smoke past-+6: one advance_real_time per frame (never sync ×48 under combat).
+var _smoke_chunk_active: bool = false
+var _smoke_chunk_stepping: bool = false
+var _smoke_chunk_i: int = 0
+var _smoke_chunk_ticks: int = 48
+var _smoke_chunk_start_elapsed: int = 0
+var _smoke_chunk_start_hour: int = 0
+var _smoke_chunk_start_day: int = 0
+var _smoke_chunk_was_equiv: bool = false
 
 func _ready() -> void:
 	print("TimeManager: Initialized (default 1936-01-01)")
@@ -94,6 +103,10 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
+	# Live smoke past-+6: one hour-tick per idle frame so the window stays up.
+	if _smoke_chunk_active:
+		step_smoke_advance_chunk()
+		return
 	# Safety net: if deferred flush stalled (e.g. pause race), keep draining the queue.
 	if not paused and not _pending_sim_events.is_empty() and not _sim_flush_scheduled:
 		_schedule_sim_flush()
@@ -141,6 +154,12 @@ func initialize_from_scenario_start_date(start_date_str: String) -> void:
 	current_hour = 0
 	_accumulated_game_hours = 0.0
 	total_days_elapsed = 0
+	_smoke_chunk_active = false
+	_smoke_chunk_stepping = false
+	_smoke_chunk_i = 0
+	_smoke_chunk_start_elapsed = 0
+	_smoke_chunk_start_hour = 0
+	_smoke_chunk_start_day = 1
 
 	print("TimeManager: Scenario start date set to %s (year %d)" % [scenario_start_date, current_year])
 
@@ -305,25 +324,102 @@ func apply_smoke_advance_past_plus6() -> Dictionary:
 			"reason": "flag_off",
 			"smoke_only": true,
 			"product_clock_pass": false,
+			"chunked": false,
+			"window_stay": smoke_advance_window_stay(),
 		}
 	if has_meta("eoa_smoke_advance_applied") and bool(get_meta("eoa_smoke_advance_applied")):
-		var already_past := _smoke_calendar_is_past_7_jan()
-		print(
-			"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 already date=%04d-%02d-%02d %02d:00 past7=%s (NOT product clock PASS)"
-			% [current_year, current_month, current_day, current_hour, str(already_past)]
-		)
+		return _smoke_advance_already_result()
+	if _smoke_chunk_active:
+		return _smoke_chunk_status_dict("chunked_pending")
+	# Live windowed Play: never sync ×48 advance_real_time (combat wedge / window death).
+	# Headless DayTick keeps the sync loop. Force-chunk meta proves the live stepper -s.
+	if should_chunk_smoke_advance():
+		return _start_smoke_advance_chunked()
+	return _run_smoke_advance_sync()
+
+
+func should_chunk_smoke_advance() -> bool:
+	if has_meta("eoa_smoke_force_chunk") and bool(get_meta("eoa_smoke_force_chunk")):
+		return true
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	return true
+
+
+func smoke_advance_should_defer_combat() -> bool:
+	return _smoke_chunk_active
+
+
+func smoke_advance_window_stay() -> bool:
+	var ds := str(DisplayServer.get_name()).strip_edges()
+	return not ds.is_empty()
+
+
+func step_smoke_advance_chunk() -> Dictionary:
+	if has_meta("eoa_smoke_advance_applied") and bool(get_meta("eoa_smoke_advance_applied")):
+		return _smoke_advance_already_result()
+	if not _smoke_chunk_active:
 		return {
-			"ok": already_past,
-			"reason": "already",
-			"day": current_day,
-			"month": current_month,
-			"year": current_year,
-			"hour": current_hour,
-			"past_7_jan": already_past,
-			"past_plus6": already_past,
+			"ok": false,
+			"reason": "not_chunking",
 			"smoke_only": true,
 			"product_clock_pass": false,
+			"chunked": true,
+			"window_stay": smoke_advance_window_stay(),
 		}
+	if paused:
+		set_paused(false)
+	if _smoke_calendar_is_past_7_jan() or _smoke_chunk_i >= _smoke_chunk_ticks:
+		return _finish_smoke_advance_chunk()
+	_smoke_chunk_stepping = true
+	advance_real_time(1.0)
+	_smoke_chunk_stepping = false
+	_smoke_chunk_i += 1
+	# Do not flush the day_ai / day_battles queue here — one deferred event per
+	# frame keeps the live window alive. Combat is deferred while chunking.
+	if _smoke_chunk_i % 8 == 0 or _smoke_calendar_is_past_7_jan():
+		print(
+			"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 chunked tick=%d date=%04d-%02d-%02d %02d:00 window_stay=1 (NOT product clock PASS)"
+			% [_smoke_chunk_i, current_year, current_month, current_day, current_hour]
+		)
+	if _smoke_calendar_is_past_7_jan() or _smoke_chunk_i >= _smoke_chunk_ticks:
+		return _finish_smoke_advance_chunk()
+	return _smoke_chunk_status_dict("chunked_pending")
+
+
+func pump_smoke_advance_chunk_until_past7(max_steps: int = 64) -> Dictionary:
+	var cap := clampi(int(max_steps), 1, 128)
+	var last: Dictionary = _smoke_chunk_status_dict("chunked_pending")
+	var s := 0
+	while s < cap:
+		last = step_smoke_advance_chunk()
+		if bool(last.get("past_7_jan", false)) or str(last.get("reason", "")) != "chunked_pending":
+			return last
+		s += 1
+	return last
+
+
+func _start_smoke_advance_chunked() -> Dictionary:
+	mark_living_title_closed()
+	set_paused(false)
+	set_time_scale(4.0)
+	_smoke_chunk_was_equiv = _live_f5_equiv_clock
+	_live_f5_equiv_clock = true
+	_smoke_chunk_active = true
+	_smoke_chunk_stepping = false
+	_smoke_chunk_i = 0
+	_smoke_chunk_ticks = 48
+	_smoke_chunk_start_elapsed = total_days_elapsed
+	_smoke_chunk_start_hour = current_hour
+	_smoke_chunk_start_day = current_day
+	print(
+		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 chunked start window_stay=1 (NOT product clock/Begin/Esc PASS)"
+	)
+	return _smoke_chunk_status_dict("chunked_pending")
+
+
+func _run_smoke_advance_sync() -> Dictionary:
+	# Headless DayTick / -s only. Live windowed must use step_smoke_advance_chunk.
 	set_meta("eoa_smoke_advance_applied", true)
 	mark_living_title_closed()
 	set_paused(false)
@@ -347,6 +443,89 @@ func apply_smoke_advance_past_plus6() -> Dictionary:
 	if not _pending_sim_events.is_empty():
 		_drain_living_f5_flush(8)
 	_live_f5_equiv_clock = was_equiv
+	return _smoke_advance_finish_dict(i, start_elapsed, start_hour, start_day, false)
+
+
+func _finish_smoke_advance_chunk() -> Dictionary:
+	_drop_smoke_deferred_battles()
+	_smoke_chunk_active = false
+	_smoke_chunk_stepping = false
+	_live_f5_equiv_clock = _smoke_chunk_was_equiv
+	set_meta("eoa_smoke_advance_applied", true)
+	return _smoke_advance_finish_dict(
+		_smoke_chunk_i,
+		_smoke_chunk_start_elapsed,
+		_smoke_chunk_start_hour,
+		_smoke_chunk_start_day,
+		true
+	)
+
+
+func _drop_smoke_deferred_battles() -> void:
+	if _pending_sim_events.is_empty():
+		return
+	var kept: Array = []
+	for ev in _pending_sim_events:
+		if ev is Dictionary and str((ev as Dictionary).get("kind", "")) == "day_battles":
+			continue
+		kept.append(ev)
+	_pending_sim_events = kept
+
+
+func _smoke_advance_already_result() -> Dictionary:
+	var already_past := _smoke_calendar_is_past_7_jan()
+	print(
+		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 already date=%04d-%02d-%02d %02d:00 past7=%s window_stay=1 (NOT product clock PASS)"
+		% [current_year, current_month, current_day, current_hour, str(already_past)]
+	)
+	return {
+		"ok": already_past,
+		"reason": "already",
+		"day": current_day,
+		"month": current_month,
+		"year": current_year,
+		"hour": current_hour,
+		"past_7_jan": already_past,
+		"past_plus6": already_past,
+		"smoke_only": true,
+		"product_clock_pass": false,
+		"chunked": _smoke_chunk_i > 0,
+		"window_stay": smoke_advance_window_stay(),
+	}
+
+
+func _smoke_chunk_status_dict(reason: String) -> Dictionary:
+	var past_7_jan := _smoke_calendar_is_past_7_jan()
+	var elapsed_delta := total_days_elapsed - _smoke_chunk_start_elapsed
+	return {
+		"ok": false,
+		"reason": reason,
+		"ticks": _smoke_chunk_i,
+		"elapsed_delta": elapsed_delta,
+		"from_day": _smoke_chunk_start_day,
+		"day": current_day,
+		"month": current_month,
+		"year": current_year,
+		"hour": current_hour,
+		"paused": paused,
+		"past_plus6": elapsed_delta >= 7 and past_7_jan,
+		"past_7_jan": past_7_jan,
+		"smoke_only": true,
+		"product_clock_pass": false,
+		"chunked": true,
+		"window_stay": smoke_advance_window_stay(),
+		"live_f5_equiv": true,
+		"living_playtest_clock": false,
+	}
+
+
+func _smoke_advance_finish_dict(
+	ticks_done: int,
+	start_elapsed: int,
+	start_hour: int,
+	start_day: int,
+	chunked: bool
+) -> Dictionary:
 	var elapsed_delta := total_days_elapsed - start_elapsed
 	var hour_delta := elapsed_delta * 24 + (current_hour - start_hour)
 	if hour_delta < 0:
@@ -354,14 +533,26 @@ func apply_smoke_advance_past_plus6() -> Dictionary:
 	var past_7_jan := _smoke_calendar_is_past_7_jan()
 	var past_plus6 := elapsed_delta >= 7 and past_7_jan
 	var ok := (not paused) and past_plus6 and past_7_jan and hour_delta >= 24
+	var stay := smoke_advance_window_stay()
 	print(
-		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 ticks=%d date=%04d-%02d-%02d %02d:00 elapsed=%d past7=%s paused=%s (NOT product clock/Begin/Esc PASS)"
-		% [i, current_year, current_month, current_day, current_hour, elapsed_delta, str(past_7_jan), str(paused)]
+		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 ticks=%d date=%04d-%02d-%02d %02d:00 elapsed=%d past7=%s paused=%s window_stay=%s chunked=%s (NOT product clock/Begin/Esc PASS)"
+		% [
+			ticks_done,
+			current_year,
+			current_month,
+			current_day,
+			current_hour,
+			elapsed_delta,
+			str(past_7_jan),
+			str(paused),
+			"1" if stay else "0",
+			"1" if chunked else "0",
+		]
 	)
 	return {
 		"ok": ok,
 		"reason": "advanced" if ok else "short",
-		"ticks": i,
+		"ticks": ticks_done,
 		"elapsed_delta": elapsed_delta,
 		"hour_delta": hour_delta,
 		"from_day": start_day,
@@ -374,6 +565,8 @@ func apply_smoke_advance_past_plus6() -> Dictionary:
 		"past_7_jan": past_7_jan,
 		"smoke_only": true,
 		"product_clock_pass": false,
+		"chunked": chunked,
+		"window_stay": stay,
 		"live_f5_equiv": true,
 		"living_playtest_clock": false,
 	}
@@ -586,12 +779,15 @@ func advance_days(days: float) -> void:
 				"month": current_month,
 				"day": current_day,
 			})
-			_pending_sim_events.append({
-				"kind": "day_battles",
-				"year": current_year,
-				"month": current_month,
-				"day": current_day,
-			})
+			# Live smoke past-+6: defer combat load so sync/chunk ticks cannot
+			# open AI land battles under the Play F5 softpipe map.
+			if not _smoke_chunk_active:
+				_pending_sim_events.append({
+					"kind": "day_battles",
+					"year": current_year,
+					"month": current_month,
+					"day": current_day,
+				})
 			if crossed_month:
 				_pending_sim_events.append({
 					"kind": "month",
@@ -796,10 +992,12 @@ func _flush_sim_events() -> void:
 	elif kind == "day_ai":
 		_maybe_run_interactive_multi_ai()
 		_maybe_run_ai_infra_invest()
-		_maybe_run_ai_land_battle_starts()
+		if not smoke_advance_should_defer_combat():
+			_maybe_run_ai_land_battle_starts()
 	elif kind == "day_battles":
-		_tick_own_land_marches()
-		n_res = _tick_open_land_battles()
+		if not smoke_advance_should_defer_combat():
+			_tick_own_land_marches()
+			n_res = _tick_open_land_battles()
 		if n_res > 0 and is_interactive_light_sim():
 			call_deferred("_tick_out_of_combat_recovery")
 			call_deferred("_tick_organize_queue")
@@ -899,6 +1097,8 @@ func _maybe_run_ai_land_battle_starts() -> void:
 		# Compact 20d Maginot clock ticks open fights only — new AI assaults
 		# were opening extra fronts (and execute-risk on empty hexes).
 		return
+	if smoke_advance_should_defer_combat():
+		return
 	if OS.get_environment("EOA_AI_LAND_BATTLES").strip_edges() == "0":
 		return
 	if not _should_run_interactive_multi_ai():
@@ -928,6 +1128,8 @@ func _tick_own_land_marches() -> void:
 
 
 func _tick_open_land_battles() -> int:
+	if smoke_advance_should_defer_combat():
+		return 0
 	if typeof(BattleManager) == TYPE_NIL:
 		return 0
 	if not BattleManager.has_method("tick_open_land_battles"):
@@ -1051,6 +1253,9 @@ func is_live_f5_play_path() -> bool:
 ## Full day handlers only fire when the calendar day rolls (after 24 hours).
 func advance_real_time(real_seconds: float) -> void:
 	_last_advance_real_msec = Time.get_ticks_msec()
+	# Chunk stepper owns the live smoke clock — TopInfoBar 1 Hz must not double-tick.
+	if _smoke_chunk_active and not _smoke_chunk_stepping:
+		return
 	if paused:
 		return
 	if real_seconds <= 0.0:

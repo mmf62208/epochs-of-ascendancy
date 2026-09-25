@@ -845,6 +845,11 @@ func _smoke_advance_past_plus6_wanted() -> bool:
 
 
 func _maybe_smoke_advance_past_plus6(delta: float) -> void:
+	if has_meta("eoa_smoke_advance_done"):
+		return
+	if has_meta("eoa_smoke_advance_chunking"):
+		_poll_smoke_advance_past_plus6()
+		return
 	if has_meta("eoa_smoke_advance_tried"):
 		return
 	if not _smoke_advance_past_plus6_wanted():
@@ -865,6 +870,26 @@ func _smoke_advance_past_plus6_after_hatch() -> void:
 	if not _smoke_advance_past_plus6_wanted():
 		return
 	print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner._smoke_advance_past_plus6_after_hatch smoke-only (NOT product clock/Begin/Esc PASS)")
+	var out: Dictionary = _call_smoke_advance_past_plus6()
+	if str(out.get("reason", "")) == "chunked_pending":
+		set_meta("eoa_smoke_advance_chunking", true)
+		print(
+			"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner.after_hatch chunked pending window_stay=1 (NOT product clock PASS)"
+		)
+		return
+	_finish_smoke_advance_after_hatch(out)
+
+
+func _poll_smoke_advance_past_plus6() -> void:
+	if has_meta("eoa_smoke_advance_done"):
+		return
+	var out: Dictionary = _call_smoke_advance_past_plus6()
+	if str(out.get("reason", "")) == "chunked_pending":
+		return
+	_finish_smoke_advance_after_hatch(out)
+
+
+func _call_smoke_advance_past_plus6() -> Dictionary:
 	var out: Dictionary = {}
 	var top_bar: Node = get_node_or_null("UILayer/TopInfoBar")
 	if top_bar != null and top_bar.has_method("apply_smoke_advance_past_plus6"):
@@ -873,9 +898,25 @@ func _smoke_advance_past_plus6_after_hatch() -> void:
 		var tm: Node = get_node_or_null("/root/TimeManager")
 		if tm != null and tm.has_method("apply_smoke_advance_past_plus6"):
 			out = tm.call("apply_smoke_advance_past_plus6") as Dictionary
+		elif tm != null and tm.has_method("step_smoke_advance_chunk"):
+			out = tm.call("step_smoke_advance_chunk") as Dictionary
+	return out
+
+
+func _finish_smoke_advance_after_hatch(out: Dictionary) -> void:
+	if has_meta("eoa_smoke_advance_done"):
+		return
+	set_meta("eoa_smoke_advance_done", true)
+	if has_meta("eoa_smoke_advance_chunking"):
+		remove_meta("eoa_smoke_advance_chunking")
 	print(
-		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner.after_hatch ok=%s past7=%s date=%s (NOT product clock PASS)"
-		% [str(out.get("ok", false)), str(out.get("past_7_jan", false)), "%s-%s-%s %s:00" % [str(out.get("year", 0)), str(out.get("month", 0)), str(out.get("day", 0)), str(out.get("hour", 0))]]
+		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner.after_hatch ok=%s past7=%s date=%s window_stay=%s (NOT product clock PASS)"
+		% [
+			str(out.get("ok", false)),
+			str(out.get("past_7_jan", false)),
+			"%s-%s-%s %s:00" % [str(out.get("year", 0)), str(out.get("month", 0)), str(out.get("day", 0)), str(out.get("hour", 0))],
+			"1" if bool(out.get("window_stay", true)) else "0",
+		]
 	)
 
 

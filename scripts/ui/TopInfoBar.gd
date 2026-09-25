@@ -169,20 +169,24 @@ func apply_smoke_advance_past_plus6() -> Dictionary:
 	if not enabled:
 		print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=topbar.apply_smoke_advance_past_plus6 skipped flag_off (NOT product clock PASS)")
 		return {"ok": false, "reason": "flag_off", "smoke_only": true, "product_clock_pass": false}
-	if has_meta("eoa_smoke_advance_armed") and bool(get_meta("eoa_smoke_advance_armed")):
+	var already_armed := has_meta("eoa_smoke_advance_armed") and bool(get_meta("eoa_smoke_advance_armed"))
+	if already_armed:
 		var cached: Dictionary = {}
 		if has_meta("eoa_smoke_advance_result") and get_meta("eoa_smoke_advance_result") is Dictionary:
 			cached = get_meta("eoa_smoke_advance_result") as Dictionary
-		return cached
-	set_meta("eoa_smoke_advance_armed", true)
-	print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=topbar.apply_smoke_advance_past_plus6 smoke 4x owner (NOT product clock/Begin/Esc PASS)")
-	arm_play_clock_after_begin()
-	_set_game_speed(4)
+		if not cached.is_empty() and str(cached.get("reason", "")) != "chunked_pending":
+			return cached
+	else:
+		set_meta("eoa_smoke_advance_armed", true)
+		print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=topbar.apply_smoke_advance_past_plus6 smoke 4x owner (NOT product clock/Begin/Esc PASS)")
+		arm_play_clock_after_begin()
+		_set_game_speed(4)
 	var out: Dictionary = {}
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("apply_smoke_advance_past_plus6"):
 		out = TimeManager.call("apply_smoke_advance_past_plus6") as Dictionary
 	_update_date_time()
-	set_meta("eoa_smoke_advance_result", out)
+	if str(out.get("reason", "")) != "chunked_pending":
+		set_meta("eoa_smoke_advance_result", out)
 	return out
 
 

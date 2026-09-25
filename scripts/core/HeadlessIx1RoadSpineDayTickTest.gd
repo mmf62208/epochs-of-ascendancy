@@ -60,6 +60,7 @@ func _run() -> void:
 	_test_play_begin_clock_controls_leave_midnight()
 	_test_live_f5_softpipe_past_plus6_soak()
 	_test_smoke_advance_past_plus6_after_hatch()
+	_test_smoke_advance_chunked_live_path()
 	_test_mandate_cost_still_zero()
 
 
@@ -245,24 +246,40 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 		_fail("LivingTitleBoot must own live Esc/Begin input (not layer-only)")
 		return
 	var smoke_tm := _slice_func(tm, "apply_smoke_advance_past_plus6")
-	if smoke_tm.is_empty() or "advance_real_time" not in smoke_tm or "past_7_jan" not in smoke_tm:
-		_fail("apply_smoke_advance_past_plus6 must drive advance_real_time past 7 Jan")
+	var smoke_sync := _slice_func(tm, "_run_smoke_advance_sync")
+	if smoke_tm.is_empty() or "should_chunk_smoke_advance" not in smoke_tm:
+		_fail("apply_smoke_advance_past_plus6 must dispatch live chunked vs headless sync")
 		return
-	if "initialize_from_scenario_start_date" in smoke_tm:
+	if smoke_sync.is_empty() or "advance_real_time" not in smoke_sync or "past_7_jan" not in tm:
+		_fail("headless sync smoke must still drive advance_real_time past 7 Jan")
+		return
+	if "func step_smoke_advance_chunk" not in tm or "window_stay" not in tm:
+		_fail("live smoke past-+6 must chunk per frame with window_stay (no sync ×48)")
+		return
+	if "func smoke_advance_should_defer_combat" not in tm:
+		_fail("live smoke must defer combat load while chunking")
+		return
+	if "initialize_from_scenario_start_date" in smoke_tm or "initialize_from_scenario_start_date" in smoke_sync:
 		_fail("smoke advance must not reset the live calendar (not a soak reset)")
 		return
-	if "NOT product clock" not in smoke_tm and "product_clock_pass" not in smoke_tm:
+	if "NOT product clock" not in tm and "product_clock_pass" not in tm:
 		_fail("smoke advance must stay labeled as not product clock PASS")
 		return
 	var smoke_bar := _slice_func(_read("res://scripts/ui/TopInfoBar.gd"), "apply_smoke_advance_past_plus6")
 	if smoke_bar.is_empty() or "_set_game_speed(4)" not in smoke_bar:
 		_fail("TopInfoBar smoke advance must use _set_game_speed(4) owner path")
 		return
+	if "chunked_pending" not in smoke_bar:
+		_fail("TopInfoBar must poll chunked smoke until past7 (not cache pending)")
+		return
 	if "func smoke_advance_past_plus6_enabled" not in _read(SRC_TITLE):
 		_fail("LivingTitleBoot must expose smoke_advance_past_plus6_enabled")
 		return
 	if "_smoke_advance_past_plus6_after_hatch" not in tr:
 		_fail("TestRunner must hook smoke past-+6 after hatch")
+		return
+	if "_poll_smoke_advance_past_plus6" not in tr or "window_stay" not in tr:
+		_fail("TestRunner must poll chunked live smoke and log window_stay")
 		return
 	_pass("live F5 path cannot full-board AI scan; toast quiet; ring/day_emit/hour clock gated")
 
@@ -554,6 +571,67 @@ func _test_smoke_advance_past_plus6_after_hatch() -> void:
 	_pass(
 		"smoke advance past 7 Jan day=%s elapsed=%s paused=%s (NOT product clock PASS) (%dms)"
 		% [str(result.get("day")), str(result.get("elapsed_delta")), str(result.get("paused")), ms]
+	)
+
+
+func _test_smoke_advance_chunked_live_path() -> void:
+	var tm: Node = _autoload("TimeManager")
+	if tm == null:
+		_fail("TimeManager autoload missing")
+		return
+	if not tm.has_method("step_smoke_advance_chunk") or not tm.has_method("pump_smoke_advance_chunk_until_past7"):
+		_fail("chunked live smoke stepper missing (sync ×48 would kill the window)")
+		return
+	if tm.has_method("initialize_from_scenario_start_date"):
+		tm.call("initialize_from_scenario_start_date", "1936-01-01")
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", true)
+	if tm.has_method("set_time_scale"):
+		tm.call("set_time_scale", 1.0)
+	if tm.has_meta("eoa_smoke_advance_applied"):
+		tm.remove_meta("eoa_smoke_advance_applied")
+	if tm.has_meta("eoa_smoke_force_chunk"):
+		tm.remove_meta("eoa_smoke_force_chunk")
+	OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "")
+	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "1")
+	tm.set_meta("eoa_smoke_force_chunk", true)
+	var pending: Dictionary = tm.call("apply_smoke_advance_past_plus6") as Dictionary
+	if str(pending.get("reason", "")) != "chunked_pending":
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		tm.remove_meta("eoa_smoke_force_chunk")
+		_fail("force-chunk must return chunked_pending (not sync ×48): %s" % str(pending))
+		return
+	if bool(pending.get("product_clock_pass", false)):
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		tm.remove_meta("eoa_smoke_force_chunk")
+		_fail("chunked smoke must not claim product clock PASS")
+		return
+	var t0 := Time.get_ticks_msec()
+	var result: Dictionary = tm.call("pump_smoke_advance_chunk_until_past7", 64) as Dictionary
+	var ms := Time.get_ticks_msec() - t0
+	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+	tm.remove_meta("eoa_smoke_force_chunk")
+	if bool(result.get("product_clock_pass", false)):
+		_fail("chunked smoke must not claim product clock PASS")
+		return
+	if not bool(result.get("past_7_jan", false)):
+		_fail("chunked smoke did not pass 7 Jan: %s" % str(result))
+		return
+	if not bool(result.get("window_stay", false)):
+		_fail("chunked smoke must prove window_stay: %s" % str(result))
+		return
+	if not bool(result.get("chunked", false)):
+		_fail("chunked smoke result must stay labeled chunked: %s" % str(result))
+		return
+	if int(result.get("day", 0)) <= 7 and int(result.get("month", 1)) == 1:
+		_fail("chunked smoke calendar still on/before 7 Jan: %s" % str(result))
+		return
+	if ms > LIVE_DAY_BUDGET_MS:
+		_fail("chunked smoke took %dms (wedged)" % ms)
+		return
+	_pass(
+		"chunked smoke past 7 Jan day=%s ticks=%s window_stay=1 (NOT product clock PASS) (%dms)"
+		% [str(result.get("day")), str(result.get("ticks")), ms]
 	)
 
 
