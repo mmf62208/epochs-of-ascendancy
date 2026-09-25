@@ -77,6 +77,7 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (DAY_TICK_HARNESS, "past_freeze"),
     (GATES_SH, "HeadlessIx1RoadSpineDayTickTest"),
     (GATES_SH, "HeadlessIx1SearchGoInspectorTest"),
+    (GATES_SH, "HeadlessIx1LivingTitleEscBeginTest"),
     (SPEC_PATH, "first_session_mandate_cost"),
     (IDM_GD, "710417"),
     (MAP_MANAGER_GD, "func build_road_connection"),
@@ -538,6 +539,8 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("day_tick_harness")
     if "HeadlessIx1RoadSpineDayTickTest" not in gates:
         missing.append("day_tick_on_gates")
+    if "HeadlessIx1LivingTitleEscBeginTest" not in gates:
+        missing.append("title_esc_begin_on_gates")
     return {
         "ok": not missing,
         "missing": missing,
