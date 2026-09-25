@@ -694,7 +694,8 @@ func _show_living_title_boot() -> void:
 	add_child(boot)
 	if boot.has_signal("boot_closed"):
 		boot.connect("boot_closed", _on_living_title_boot_closed)
-	# Live DisplayServer backup: poll Esc if title `_input` never runs (Play 3d00182).
+	# Live DisplayServer backup: poll Esc / pointer if title `_input` never runs.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process(true)
 	print("TestRunner: living title boot — pick scenario date, country, or load (Esc / Esc · Menu / Begin without Esc)")
 
@@ -704,6 +705,18 @@ func _process(_delta: float) -> void:
 	var boot: Node = get_node_or_null("LivingTitleBoot")
 	if boot == null or not is_instance_valid(boot) or bool(boot.get("_closed")):
 		return
+	# Play 5adb38e: mouse Begin/CC never reached title `_input`. Poll the
+	# Input singleton the same way we poll Esc.
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		if not has_meta("eoa_title_ptr_held"):
+			set_meta("eoa_title_ptr_held", true)
+			if boot.has_method("handle_live_pointer"):
+				var ptr_act: String = str(boot.call("handle_live_pointer", null))
+				if ptr_act == "begin" or ptr_act == "cc":
+					print("EOA_LIVE_PTR who=TestRunner._process action=%s" % ptr_act)
+	else:
+		if has_meta("eoa_title_ptr_held"):
+			remove_meta("eoa_title_ptr_held")
 	var just: bool = Input.is_action_just_pressed("ui_cancel")
 	var held: bool = Input.is_key_pressed(KEY_ESCAPE) or Input.is_physical_key_pressed(KEY_ESCAPE)
 	if not just and not held:

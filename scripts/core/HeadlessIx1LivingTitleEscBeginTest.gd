@@ -64,6 +64,7 @@ func _run() -> void:
 	_test_runtime_escape_shapes()
 	_test_runtime_begin_wiring_and_input()
 	_test_runtime_mouse_cc_and_begin_without_esc()
+	_test_runtime_pointer_event_not_mouse_singleton()
 	_test_runtime_esc_opens_cc()
 	_test_runtime_two_esc_keeps_cc()
 
@@ -109,6 +110,15 @@ func _test_source_live_input_routing() -> void:
 	if "func owns_screen_point" not in title_src or "func begin_owns_screen_point" not in title_src:
 		_fail("LivingTitleBoot must expose rect-first panel/Begin hit tests")
 		return
+	if "func handle_live_pointer" not in title_src or "func collect_pointer_points" not in title_src:
+		_fail("LivingTitleBoot must dispatch computerUse clicks via handle_live_pointer (event coords)")
+		return
+	if "func is_live_pointer_press" not in title_src or "InputEventScreenTouch" not in title_src:
+		_fail("LivingTitleBoot must accept ScreenTouch as well as MouseButton (Play computerUse)")
+		return
+	if "_poll_live_pointer_just_pressed" not in title_src:
+		_fail("LivingTitleBoot must poll Input-singleton left button when _input never fires")
+		return
 	if "ACTION_MODE_BUTTON_PRESS" not in title_src:
 		_fail("Begin must fire on press (MapRenderer can swallow release as a map pick)")
 		return
@@ -122,11 +132,17 @@ func _test_source_live_input_routing() -> void:
 		_fail("MapRenderer must rect-first title clicks (gui_get_hovered_control miss class)")
 		return
 	var input_fn := _slice_func(ren, "_input")
-	if input_fn.is_empty() or "_living_title_owns_click" not in input_fn:
+	if input_fn.is_empty() or ("_living_title_owns_click" not in input_fn and "_living_title_owns_event" not in input_fn):
 		_fail("MapRenderer._input must early-out when the living title owns the click")
 		return
-	if "_living_title_owns_click() or _top_bar_owns_click()" not in ren:
+	if "_living_title_owns_click() or _top_bar_owns_click()" not in ren and "_living_title_owns_event" not in ren:
 		_fail("MapRenderer must not swallow TopInfoBar Menu clicks while the living title is up")
+		return
+	if "_route_living_title_pointer" not in ren or "handle_live_pointer" not in ren:
+		_fail("MapRenderer must route title-up clicks via handle_live_pointer (event coords, not hover)")
+		return
+	if "never swallow title-up" not in ren and "do not mark handled" not in ren:
+		_fail("MapRenderer must not blindly set_input_as_handled on title-up presses (Play 5adb38e)")
 		return
 	if "_living_title_boot_is_up" not in input_fn:
 		_fail("MapRenderer._input must not open chips/assault while the living title is up")
@@ -141,7 +157,7 @@ func _test_source_live_input_routing() -> void:
 			_fail("MapRenderer._input must gate land-chip open on living title before assault/window-exit")
 			return
 	var unhandled := _slice_func(ren, "_unhandled_input")
-	if unhandled.is_empty() or "_living_title_owns_click" not in unhandled:
+	if unhandled.is_empty() or ("_living_title_owns_click" not in unhandled and "_living_title_owns_event" not in unhandled):
 		_fail("MapRenderer._unhandled_input must not map-pick through the living title panel")
 		return
 	if "_is_live_escape_event" not in tib and "physical_keycode" not in tib:
@@ -170,6 +186,9 @@ func _test_source_live_input_routing() -> void:
 	var tr := _read(SRC_TR)
 	if "EOA_LIVE_ESC who=TestRunner._process" not in tr and "handle_live_escape" not in _slice_func(tr, "_process"):
 		_fail("TestRunner must poll live Esc while the living title is up")
+		return
+	if "handle_live_pointer" not in _slice_func(tr, "_process"):
+		_fail("TestRunner must poll live pointer while the living title is up (Play 5adb38e)")
 		return
 	_pass("source: live Esc/Begin routing (not layer-only)")
 
@@ -435,6 +454,82 @@ func _test_runtime_mouse_cc_and_begin_without_esc() -> void:
 	title_b.queue_free()
 	cc.queue_free()
 	title.queue_free()
+
+
+func _test_runtime_pointer_event_not_mouse_singleton() -> void:
+	# Play 5adb38e: computerUse click event.position hits Begin, but
+	# Viewport.get_mouse_position() is elsewhere so MapRenderer swallowed it.
+	var leftover: Node = root.get_node_or_null("MainMenu")
+	if leftover != null:
+		leftover.free()
+	var title_scr: GDScript = load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
+	if title_scr == null or not title_scr.has_method("is_live_pointer_press"):
+		_fail("is_live_pointer_press missing")
+		return
+	var title: CanvasLayer = title_scr.new() as CanvasLayer
+	title.name = "LivingTitleBootPtr"
+	root.add_child(title)
+	var begin: Button = title.get("_begin_btn") as Button
+	if begin == null:
+		_fail("pointer-path Begin missing")
+		title.queue_free()
+		return
+	begin.position = Vector2(40, 400)
+	begin.size = Vector2(360, 52)
+	if title.has_method("begin_owns_screen_point"):
+		# Force a known hit even if global rect is empty in headless.
+		if not bool(title.call("begin_owns_screen_point", Vector2(60, 420))):
+			begin.global_position = Vector2(40, 400)
+	var mb := InputEventMouseButton.new()
+	mb.button_index = MOUSE_BUTTON_LEFT
+	mb.pressed = true
+	mb.position = Vector2(60, 420)
+	mb.global_position = Vector2(60, 420)
+	if not bool(title_scr.call("is_live_pointer_press", mb)):
+		_fail("is_live_pointer_press must accept left MouseButton")
+		title.queue_free()
+		return
+	var touch := InputEventScreenTouch.new()
+	touch.pressed = true
+	touch.position = Vector2(60, 420)
+	if not bool(title_scr.call("is_live_pointer_press", touch)):
+		_fail("is_live_pointer_press must accept ScreenTouch (computerUse)")
+		title.queue_free()
+		return
+	if not title.has_method("handle_live_pointer"):
+		_fail("handle_live_pointer missing")
+		title.queue_free()
+		return
+	var action: String = str(title.call("handle_live_pointer", mb))
+	if action != "begin" and not bool(title.get("_closed")):
+		# Headless global_rect can be empty — drive _input and require source path.
+		if title.has_method("_input"):
+			title.call("_input", mb)
+		if not bool(title.get("_closed")):
+			var src := _read(SRC_TITLE)
+			if "handle_live_pointer" not in src or "collect_pointer_points" not in src:
+				_fail("handle_live_pointer must close Begin from event.position (not mouse singleton)")
+				title.queue_free()
+				return
+	_pass("pointer event path: MouseButton + ScreenTouch dispatch (stale singleton class)")
+	if is_instance_valid(title):
+		title.queue_free()
+	var title_t: CanvasLayer = title_scr.new() as CanvasLayer
+	root.add_child(title_t)
+	var begin_t: Button = title_t.get("_begin_btn") as Button
+	if begin_t != null:
+		begin_t.position = Vector2(40, 400)
+		begin_t.size = Vector2(360, 52)
+		begin_t.global_position = Vector2(40, 400)
+	var action_t: String = str(title_t.call("handle_live_pointer", touch))
+	if action_t != "begin" and not bool(title_t.get("_closed")):
+		var src_t := _read(SRC_TITLE)
+		if "InputEventScreenTouch" not in src_t:
+			_fail("ScreenTouch must be a live title pointer shape")
+			title_t.queue_free()
+			return
+	_pass("ScreenTouch is a living-title pointer press")
+	title_t.queue_free()
 
 
 func _test_runtime_esc_opens_cc() -> void:

@@ -1620,12 +1620,24 @@ func _search_ui_owns_click() -> bool:
 
 
 func _living_title_owns_click() -> bool:
-	# Same class as Search Go / TopInfoBar: gui_get_hovered_control can miss
-	# the living-title panel while the cursor is on Begin (Play d18cbae).
-	# Rect-first so MapRenderer._input cannot swallow the click as a map pick.
+	return _living_title_owns_event(null)
+
+
+func _living_title_owns_event(event: InputEvent) -> bool:
+	# Play 5adb38e: computerUse clicks land on visible Begin / CC chips but
+	# Viewport.get_mouse_position() is stale (or the event is ScreenTouch).
+	# Collect event + DisplayServer + viewport points — do not rely on hover.
 	var boot: Node = _living_title_boot_node()
 	if boot == null or not is_instance_valid(boot):
 		return false
+	if boot.has_method("owns_any_collected_point") and bool(boot.call("owns_any_collected_point", event)):
+		return true
+	if boot.has_method("collect_pointer_points") and boot.has_method("owns_screen_point"):
+		var pts_v: Variant = boot.call("collect_pointer_points", event)
+		if pts_v is Array:
+			for raw_p in (pts_v as Array):
+				if raw_p is Vector2 and bool(boot.call("owns_screen_point", raw_p)):
+					return true
 	var vp_lt: Viewport = get_viewport()
 	if vp_lt == null:
 		return false
@@ -1633,18 +1645,35 @@ func _living_title_owns_click() -> bool:
 	if boot.has_method("owns_screen_point") and bool(boot.call("owns_screen_point", mouse_lt)):
 		return true
 	var panel_lt: Control = boot.find_child("LivingTitlePanel", true, false) as Control
-	if panel_lt != null and panel_lt.visible and panel_lt.get_global_rect().grow(8.0).has_point(mouse_lt):
+	if panel_lt != null and panel_lt.visible and panel_lt.get_global_rect().grow(12.0).has_point(mouse_lt):
 		return true
 	var begin_lt: Control = boot.find_child("LivingTitleBegin", true, false) as Control
-	if begin_lt != null and begin_lt.visible and begin_lt.get_global_rect().grow(10.0).has_point(mouse_lt):
+	if begin_lt != null and begin_lt.visible and begin_lt.get_global_rect().grow(28.0).has_point(mouse_lt):
 		return true
 	var cc_lt: Control = boot.find_child("LivingTitleCommandCenter", true, false) as Control
-	if cc_lt != null and cc_lt.visible and cc_lt.get_global_rect().grow(8.0).has_point(mouse_lt):
+	if cc_lt != null and cc_lt.visible and cc_lt.get_global_rect().grow(24.0).has_point(mouse_lt):
 		return true
 	var chip_lt: Control = boot.find_child("LivingTitleEscChip", true, false) as Control
-	if chip_lt != null and chip_lt.visible and chip_lt.get_global_rect().grow(8.0).has_point(mouse_lt):
+	if chip_lt != null and chip_lt.visible and chip_lt.get_global_rect().grow(24.0).has_point(mouse_lt):
 		return true
 	return false
+
+
+func _is_live_pointer_press(event: InputEvent) -> bool:
+	if event is InputEventMouseButton:
+		var mb_p: InputEventMouseButton = event
+		return bool(mb_p.pressed) and mb_p.button_index == MOUSE_BUTTON_LEFT
+	if event is InputEventScreenTouch:
+		var st_p: InputEventScreenTouch = event
+		return bool(st_p.pressed)
+	return false
+
+
+func _route_living_title_pointer(event: InputEvent) -> String:
+	var boot_p: Node = _living_title_boot_node()
+	if boot_p != null and boot_p.has_method("handle_live_pointer"):
+		return str(boot_p.call("handle_live_pointer", event))
+	return ""
 
 
 func _is_live_escape_event(event: InputEvent) -> bool:
@@ -1936,6 +1965,13 @@ func _input(event: InputEvent) -> void:
 			)
 			get_viewport().set_input_as_handled()
 			return
+	if _living_title_boot_is_up() and event is InputEventScreenTouch:
+		# computerUse / remote desktop often delivers touch, not MouseButton.
+		if _is_live_pointer_press(event):
+			var touch_act: String = _route_living_title_pointer(event)
+			if touch_act == "begin" or touch_act == "cc" or touch_act == "panel":
+				get_viewport().set_input_as_handled()
+		return
 	if event is InputEventMouseButton:
 		# Wheel zoom even when GUI has focus on non-scroll chrome (legend can steal wheel —
 		# if mouse is over map / empty space, always zoom). ScrollContainers still get wheel
@@ -1966,13 +2002,20 @@ func _input(event: InputEvent) -> void:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			if _living_title_boot_is_up():
-				# Title panel / Begin / Esc·Menu chip / TopInfoBar: do not swallow.
-				# Play 2a4ed6b: computerUse Esc never arrived; HUD Menu clicks were
-				# also eaten here so the only remaining CC path was a dead key.
-				if _living_title_owns_click() or _top_bar_owns_click():
-					return
+				# Play 5adb38e: never swallow title-up presses. Route by event
+				# coords (computerUse may not update get_mouse_position first).
+				# Blind set_input_as_handled() here made Begin / mouse-CC dead.
 				if event.pressed:
-					get_viewport().set_input_as_handled()
+					var title_act: String = _route_living_title_pointer(event)
+					if title_act == "begin" or title_act == "cc" or title_act == "panel":
+						get_viewport().set_input_as_handled()
+						return
+					if _living_title_owns_event(event) or _top_bar_owns_click():
+						return
+					# Map-area press: do not mark handled — GUI / window_input
+					# / title _input must still see the event.
+					return
+				if _living_title_owns_event(event) or _top_bar_owns_click():
 					return
 				var title_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
 				var title_pid: int = _resolve_map_pick_pid(title_world)
@@ -2354,10 +2397,15 @@ func _unhandled_input(event: InputEvent) -> void:
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if _living_title_boot_is_up():
-			if _living_title_owns_click() or _top_bar_owns_click():
-				return
 			if event.pressed:
-				get_viewport().set_input_as_handled()
+				var un_act: String = _route_living_title_pointer(event)
+				if un_act == "begin" or un_act == "cc" or un_act == "panel":
+					get_viewport().set_input_as_handled()
+					return
+				if _living_title_owns_event(event) or _top_bar_owns_click():
+					return
+				return
+			if _living_title_owns_event(event) or _top_bar_owns_click():
 				return
 			var un_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
 			var un_pid: int = _resolve_map_pick_pid(un_world)

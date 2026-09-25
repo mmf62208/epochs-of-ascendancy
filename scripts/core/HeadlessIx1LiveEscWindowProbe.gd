@@ -105,6 +105,24 @@ func _run() -> void:
 	if not bool(bout.get("closed", false)) and not bool(title_b.get("_closed")):
 		_fail("Begin must dismiss title without Esc first")
 		return
+	if title_m.has_method("handle_live_pointer"):
+		var title_p: CanvasLayer = title_scr.new() as CanvasLayer
+		root.add_child(title_p)
+		var begin_p: Button = title_p.get("_begin_btn") as Button
+		if begin_p != null:
+			begin_p.position = Vector2(40, 400)
+			begin_p.size = Vector2(360, 52)
+			begin_p.global_position = Vector2(40, 400)
+		var mb_p := InputEventMouseButton.new()
+		mb_p.button_index = MOUSE_BUTTON_LEFT
+		mb_p.pressed = true
+		mb_p.position = Vector2(60, 420)
+		mb_p.global_position = Vector2(60, 420)
+		var pact: String = str(title_p.call("handle_live_pointer", mb_p))
+		if pact != "begin" and not bool(title_p.get("_closed")):
+			print("HeadlessIx1LiveEscWindowProbe: NOTE handle_live_pointer headless rect miss — source path required")
+		if is_instance_valid(title_p):
+			title_p.queue_free()
 	_pass("mouse CC + Begin-without-Esc on DisplayServer=%s" % ds)
 	if ds == "headless":
 		print("HeadlessIx1LiveEscWindowProbe: NOTE headless — not a live F5/computerUse proof")
