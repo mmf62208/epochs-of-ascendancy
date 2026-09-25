@@ -8,6 +8,8 @@ signal boot_closed(result: Dictionary)
 
 const LIVING_TITLE_NATIONS := ["GER", "ENG", "FRA", "JAP", "USA", "SOV", "ITA", "POL"]
 const LIVING_TITLE_ERAS := [1918, 1936, 2026]
+## Above UILayer HUD (110) and toasts (90) so Begin is not covered; below Command Center (130).
+const LIVING_TITLE_LAYER := 120
 const NATION_LABELS := {
 	"GER": "Germany",
 	"ENG": "United Kingdom",
@@ -124,7 +126,7 @@ static func apply_playable_country_from_province(province_id: int, year: int = 1
 
 
 func _ready() -> void:
-	layer = 90
+	layer = LIVING_TITLE_LAYER
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_build_ui()
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
@@ -146,6 +148,7 @@ func _build_ui() -> void:
 	var panel := PanelContainer.new()
 	panel.custom_minimum_size = Vector2(420, 560)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	RetrowaveTheme.style_menu_panel(panel)
 	root.add_child(panel)
 	panel.set_anchors_preset(Control.PRESET_CENTER_LEFT)
@@ -188,6 +191,7 @@ func _build_ui() -> void:
 		var ebtn := Button.new()
 		ebtn.text = str(int(yr))
 		ebtn.custom_minimum_size = Vector2(88, 34)
+		ebtn.mouse_filter = Control.MOUSE_FILTER_STOP
 		ebtn.pressed.connect(_on_year.bind(int(yr)))
 		era_row.add_child(ebtn)
 		_era_btns[int(yr)] = ebtn
@@ -208,6 +212,7 @@ func _build_ui() -> void:
 		nbtn.text = str(tag)
 		nbtn.tooltip_text = str(NATION_LABELS.get(str(tag), tag))
 		nbtn.custom_minimum_size = Vector2(88, 32)
+		nbtn.mouse_filter = Control.MOUSE_FILTER_STOP
 		nbtn.pressed.connect(_on_tag.bind(str(tag)))
 		if i < 4:
 			row_a.add_child(nbtn)
@@ -224,6 +229,9 @@ func _build_ui() -> void:
 
 	_begin_btn = Button.new()
 	_begin_btn.custom_minimum_size = Vector2(0, 42)
+	_begin_btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	_begin_btn.focus_mode = Control.FOCUS_ALL
+	_begin_btn.process_mode = Node.PROCESS_MODE_ALWAYS
 	_begin_btn.pressed.connect(_on_begin_new)
 	RetrowaveTheme.style_primary_button(_begin_btn)
 	col.add_child(_begin_btn)
@@ -254,6 +262,7 @@ func _fill_save_rows(col: VBoxContainer) -> void:
 			var btn := Button.new()
 			btn.text = "Load · %s" % str(row.get("label", slot))
 			btn.custom_minimum_size = Vector2(0, 30)
+			btn.mouse_filter = Control.MOUSE_FILTER_STOP
 			btn.pressed.connect(_on_load.bind(slot))
 			RetrowaveTheme.style_secondary_button(btn)
 			col.add_child(btn)

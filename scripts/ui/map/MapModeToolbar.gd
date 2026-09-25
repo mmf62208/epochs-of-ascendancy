@@ -139,6 +139,7 @@ func _build_ui() -> void:
 	_collapse_btn = Button.new()
 	_collapse_btn.text = "▾"
 	_collapse_btn.focus_mode = Control.FOCUS_NONE
+	_collapse_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_collapse_btn.custom_minimum_size = Vector2(28, 24)
 	_collapse_btn.pressed.connect(_toggle_collapsed)
 	outer.add_child(_collapse_btn)
@@ -177,6 +178,7 @@ func _build_ui() -> void:
 		btn.add_theme_font_size_override("font_size", 11)
 		btn.custom_minimum_size = Vector2(0, 28)
 		btn.tooltip_text = str(MODE_HINTS.get(mode, mode))
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
 		# Retrowave map-mode icons (HudIconLibrary)
 		var mode_tex: Texture2D = _HudIcons.map_mode_icon(mode, 32)
 		if mode_tex != null:
@@ -246,6 +248,7 @@ func _build_preset_row() -> void:
 				parts.append(str(sx))
 			stack_s = " + " + "+".join(parts)
 		btn.tooltip_text = "%s → %s%s" % [label, hint, stack_s]
+		btn.mouse_filter = Control.MOUSE_FILTER_STOP
 		var m: String = mode
 		var lbl: String = label
 		var st: Array = stack.duplicate()

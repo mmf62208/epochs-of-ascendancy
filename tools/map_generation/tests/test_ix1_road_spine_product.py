@@ -162,6 +162,10 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertNotIn("toast_cannot_steal_top_bar", tick.get("missing") or [])
         self.assertNotIn("mapmode_cannot_steal_top_bar", tick.get("missing") or [])
         self.assertNotIn("uilayer_above_mapmode_toasts", tick.get("missing") or [])
+        self.assertNotIn("living_title_above_uilayer", tick.get("missing") or [])
+        self.assertNotIn("command_center_above_uilayer", tick.get("missing") or [])
+        self.assertNotIn("testrunner_uilayer_not_20", tick.get("missing") or [])
+        self.assertNotIn("living_title_esc_map_owns_click", tick.get("missing") or [])
 
 
 if __name__ == "__main__":

@@ -1725,6 +1725,12 @@ func _handle_escape_key() -> void:
 	# Search LineEdit must not steal idle Esc→CC (Play MIXED e36825b after +6d).
 	# Release focus and keep walking the stack — do not treat unfocus as a dismiss.
 	_release_search_focus()
+	# Living title owns the boot screen: do not dismiss a hidden inspector first.
+	# Play d53ee05: Esc/Menu looked like a no-op while "Begin · Germany · 1936"
+	# stayed up (UILayer 110 sat above CC 100).
+	if _living_title_boot_is_up():
+		_esc_open_command_center()
+		return
 	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
 	# without GIS lock or a second search.
 	if _unit_detail_popup_is_visible():
@@ -2345,6 +2351,14 @@ func _unhandled_input(event: InputEvent) -> void:
 				return
 		_release_search_focus()
 		var world_pos := _screen_to_world(get_viewport().get_mouse_position())
+		# Living title owns map clicks: never open inspector / chips / assault (window-exit class).
+		if _living_title_boot_is_up():
+			var title_pid := _resolve_map_pick_pid(world_pos)
+			if title_pid <= 0:
+				title_pid = _resolve_hex_pick_pid(world_pos)
+			if _try_living_title_map_pick(title_pid):
+				get_viewport().set_input_as_handled()
+				return
 		# Land division chips beat capital stars (Play: chips opened Praha inspector).
 		# Air/fleet still lose to stars (Berlin star vs Air Wing PASS).
 		# Alt-click / infra empty-terrain prefers province (IX-1 Köln under garrison).
@@ -18198,23 +18212,31 @@ func _toast_living_diplomacy_pick(pid: int) -> void:
 		_show_inspector_toast(str(dip.get("sentence", "Influence")), 3.5)
 
 
-## Title boot: click playable land/capital on the political map (panel stays a list too).
-func _try_living_title_map_pick(pid: int) -> bool:
-	if _left_release_must_skip_pick() or _left_live_slop_is_drag():
-		return false
+func _living_title_boot_is_up() -> bool:
 	var tree := get_tree()
 	if tree == null or tree.root == null:
 		return false
 	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
 	if boot == null or not is_instance_valid(boot) or boot.is_queued_for_deletion():
 		return false
-	if not _overlay_node_is_up(boot):
+	return _overlay_node_is_up(boot)
+
+
+## Title boot: click playable land/capital on the political map (panel stays a list too).
+## While the overlay is up, consume the click even on a miss so inspector/assault
+## cannot run (Play d53ee05: map click after dead Begin exited the DEBUG window).
+func _try_living_title_map_pick(pid: int) -> bool:
+	if _left_release_must_skip_pick() or _left_live_slop_is_drag():
 		return false
-	if boot.has_method("select_from_province"):
-		var picked: Variant = boot.call("select_from_province", pid)
-		if picked is Dictionary and bool((picked as Dictionary).get("ok", false)):
-			return true
-	return false
+	if not _living_title_boot_is_up():
+		return false
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return false
+	var boot: Node = tree.root.find_child("LivingTitleBoot", true, false)
+	if boot != null and boot.has_method("select_from_province"):
+		boot.call("select_from_province", pid)
+	return true
 
 
 func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:

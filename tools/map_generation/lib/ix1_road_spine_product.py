@@ -39,6 +39,8 @@ DAY_TICK_HARNESS = ROOT / "scripts" / "core" / "HeadlessIx1RoadSpineDayTickTest.
 AGENT_GD = ROOT / "scripts" / "agents" / "AgentManager.gd"
 TOAST_GD = ROOT / "scripts" / "ui" / "LeaderEventUI.gd"
 MAPMODE_GD = ROOT / "scripts" / "ui" / "map" / "MapModeToolbar.gd"
+TITLE_GD = ROOT / "scripts" / "ui" / "LivingTitleBoot.gd"
+MAINMENU_GD = ROOT / "scripts" / "ui" / "MainMenu.gd"
 TEST_SCENE = ROOT / "scenes" / "TestScenario.tscn"
 GATES_SH = ROOT / "tools" / "eoa_full_test_gates.sh"
 ADJ_PATH = ROOT / "data" / "provinces_world_accurate" / "province_adjacency.json"
@@ -517,6 +519,16 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("mapmode_cannot_steal_top_bar")
     if "layer = 110" not in _read(TEST_SCENE):
         missing.append("uilayer_above_mapmode_toasts")
+    title = _read(TITLE_GD)
+    if "LIVING_TITLE_LAYER := 120" not in title and "layer = 120" not in title:
+        missing.append("living_title_above_uilayer")
+    cc = _read(MAINMENU_GD)
+    if "COMMAND_CENTER_LAYER := 130" not in cc and "layer = 130" not in cc:
+        missing.append("command_center_above_uilayer")
+    if "ui_layer.layer = 20" in ensure:
+        missing.append("testrunner_uilayer_not_20")
+    if "_living_title_boot_is_up" not in _read(RENDERER_GD):
+        missing.append("living_title_esc_map_owns_click")
     if "arm_play_clock_after_begin" not in top or "ACTION_MODE_BUTTON_PRESS" not in top:
         missing.append("top_bar_begin_arm")
     save_hook = _slice_func(save, "_on_day_advanced_for_autosave")

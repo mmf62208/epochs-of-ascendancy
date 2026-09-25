@@ -6,6 +6,8 @@ extends CanvasLayer
 
 const MENU_WIDTH := 960.0
 const MENU_HEIGHT := 680.0
+## Above living title (120) and UILayer HUD (110) so Esc→CC is not buried under the bar.
+const COMMAND_CENTER_LAYER := 130
 const LIVING_CC_NATIONS := ["GER", "ENG", "FRA", "JAP", "USA", "SOV", "ITA", "POL"]
 const LIVING_CC_ERAS := [1918, 1936, 2026]
 
@@ -78,7 +80,7 @@ var _era_btns: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	layer = 100
+	layer = COMMAND_CENTER_LAYER
 	_build_ui()
 	_ensure_dialogs()
 	_pause_game(true)

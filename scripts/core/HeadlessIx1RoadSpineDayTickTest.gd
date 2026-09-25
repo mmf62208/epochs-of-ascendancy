@@ -14,6 +14,8 @@ const SRC_TR := "res://scripts/core/TestRunner.gd"
 const SRC_AGENT := "res://scripts/agents/AgentManager.gd"
 const SRC_TOAST := "res://scripts/ui/LeaderEventUI.gd"
 const SRC_MAPMODE := "res://scripts/ui/map/MapModeToolbar.gd"
+const SRC_TITLE := "res://scripts/ui/LivingTitleBoot.gd"
+const SRC_CC := "res://scripts/ui/MainMenu.gd"
 const SRC_SCENE := "res://scenes/TestScenario.tscn"
 const HUB_ID := 710417
 const FREEZE_PROGRESS := 20.0
@@ -220,6 +222,20 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 	var scene := _read(SRC_SCENE)
 	if "layer = 110" not in scene:
 		_fail("TestScenario UILayer must be 110 (above Map Mode 20 and toasts 90)")
+		return
+	var title_src := _read(SRC_TITLE)
+	if "LIVING_TITLE_LAYER := 120" not in title_src and "layer = 120" not in title_src:
+		_fail("LivingTitleBoot must sit above UILayer 110 so Begin is not buried")
+		return
+	var cc_src := _read(SRC_CC)
+	if "COMMAND_CENTER_LAYER := 130" not in cc_src and "layer = 130" not in cc_src:
+		_fail("Command Center must sit above UILayer 110 so Esc→CC is visible")
+		return
+	if "ui_layer.layer = 20" in tr:
+		_fail("TestRunner must not smash UILayer back to 20 (buries bar under toasts, fights title/CC)")
+		return
+	if "_living_title_boot_is_up" not in _read(SRC_REN):
+		_fail("MapRenderer must route Esc/map clicks around living title (no inspector swallow / window-exit)")
 		return
 	_pass("live F5 path cannot full-board AI scan; toast quiet; ring/day_emit/hour clock gated")
 

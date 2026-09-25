@@ -560,7 +560,10 @@ func _ensure_game_interactive() -> void:
 	var ui_layer := get_node_or_null("UILayer") as CanvasLayer
 	if ui_layer:
 		ui_layer.visible = true
-		ui_layer.layer = 20  # above map / leftover load screens
+		# 110 = above Map Mode 20 / toasts 90 so 4x stays reachable. Must stay
+		# below living title 120 and Command Center 130 (Play d53ee05: 110
+		# without raising those overlays buried Begin + Esc→CC).
+		ui_layer.layer = 110
 	if _is_graphical_launch():
 		# Solo session so hotseat banner / End Turn stay hidden for normal F5.
 		# Default human tag GER (Europe Maginot theater) — first-session play path.
@@ -605,7 +608,11 @@ func _ensure_game_interactive() -> void:
 		):
 			set_meta("eoa_title_boot", true)
 			call_deferred("_show_living_title_boot")
-		elif not has_meta("eoa_first_session_toast"):
+		elif (
+			not has_meta("eoa_first_session_toast")
+			and not has_meta("eoa_title_boot")
+			and get_node_or_null("LivingTitleBoot") == null
+		):
 			set_meta("eoa_first_session_toast", true)
 			call_deferred("_toast_first_session_onboarding")
 		var tm := get_node_or_null("/root/TimeManager")
