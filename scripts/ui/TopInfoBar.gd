@@ -159,6 +159,31 @@ func arm_play_clock_after_begin() -> void:
 	_update_date_time()
 
 
+## Smoke-only past-+6 after hatch. Uses the real 4x owner (`_set_game_speed`)
+## then TimeManager `advance_real_time` (same class as headless DayTick).
+## Default OFF. Does NOT claim product 4x / clock / Begin / Esc PASS.
+func apply_smoke_advance_past_plus6() -> Dictionary:
+	var enabled := LivingTitleBoot.smoke_advance_past_plus6_enabled()
+	if not enabled:
+		print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=topbar.apply_smoke_advance_past_plus6 skipped flag_off (NOT product clock PASS)")
+		return {"ok": false, "reason": "flag_off", "smoke_only": true, "product_clock_pass": false}
+	if has_meta("eoa_smoke_advance_armed") and bool(get_meta("eoa_smoke_advance_armed")):
+		var cached: Dictionary = {}
+		if has_meta("eoa_smoke_advance_result") and get_meta("eoa_smoke_advance_result") is Dictionary:
+			cached = get_meta("eoa_smoke_advance_result") as Dictionary
+		return cached
+	set_meta("eoa_smoke_advance_armed", true)
+	print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=topbar.apply_smoke_advance_past_plus6 smoke 4x owner (NOT product clock/Begin/Esc PASS)")
+	arm_play_clock_after_begin()
+	_set_game_speed(4)
+	var out: Dictionary = {}
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("apply_smoke_advance_past_plus6"):
+		out = TimeManager.call("apply_smoke_advance_past_plus6") as Dictionary
+	_update_date_time()
+	set_meta("eoa_smoke_advance_result", out)
+	return out
+
+
 func _ensure_start_paused_for_playtest() -> void:
 	## Graphical F5: start paused so map/UI stay responsive while player looks around.
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):

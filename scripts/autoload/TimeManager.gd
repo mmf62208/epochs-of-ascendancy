@@ -271,6 +271,100 @@ func simulate_play_begin_clock_controls(hours: int = 8) -> Dictionary:
 	}
 
 
+## Smoke-harness clock drive after hatch. Same owner class as TopInfoBar
+## `_set_game_speed(4)` + `_on_tick` → `advance_real_time` (headless DayTick
+## soak). Does not reset the calendar. Default no-op unless the smoke
+## advance flag is on. Never treat the log as product 4x/clock PASS.
+func smoke_advance_past_plus6_enabled() -> bool:
+	return LivingTitleBoot.smoke_advance_past_plus6_enabled()
+
+
+func apply_smoke_advance_past_plus6() -> Dictionary:
+	if not smoke_advance_past_plus6_enabled():
+		print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 skipped flag_off (NOT product clock/Begin/Esc PASS)")
+		return {
+			"ok": false,
+			"reason": "flag_off",
+			"smoke_only": true,
+			"product_clock_pass": false,
+		}
+	if has_meta("eoa_smoke_advance_applied") and bool(get_meta("eoa_smoke_advance_applied")):
+		var already_past := _smoke_calendar_is_past_7_jan()
+		print(
+			"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 already date=%04d-%02d-%02d %02d:00 past7=%s (NOT product clock PASS)"
+			% [current_year, current_month, current_day, current_hour, str(already_past)]
+		)
+		return {
+			"ok": already_past,
+			"reason": "already",
+			"day": current_day,
+			"month": current_month,
+			"year": current_year,
+			"hour": current_hour,
+			"past_7_jan": already_past,
+			"past_plus6": already_past,
+			"smoke_only": true,
+			"product_clock_pass": false,
+		}
+	set_meta("eoa_smoke_advance_applied", true)
+	mark_living_title_closed()
+	set_paused(false)
+	set_time_scale(4.0)
+	var was_equiv := _live_f5_equiv_clock
+	_live_f5_equiv_clock = true
+	var start_elapsed := total_days_elapsed
+	var start_hour := current_hour
+	var start_day := current_day
+	# 4× · 1s tick = 4h (6h cap). 48 ticks ≈ 8d — must pass 7 Jan.
+	var ticks := 48
+	var i := 0
+	while i < ticks and not paused:
+		advance_real_time(1.0)
+		if not _pending_sim_events.is_empty():
+			_flush_sim_events()
+		if _smoke_calendar_is_past_7_jan():
+			i += 1
+			break
+		i += 1
+	if not _pending_sim_events.is_empty():
+		_drain_living_f5_flush(8)
+	_live_f5_equiv_clock = was_equiv
+	var elapsed_delta := total_days_elapsed - start_elapsed
+	var hour_delta := elapsed_delta * 24 + (current_hour - start_hour)
+	if hour_delta < 0:
+		hour_delta += 24
+	var past_7_jan := _smoke_calendar_is_past_7_jan()
+	var past_plus6 := elapsed_delta >= 7 and past_7_jan
+	var ok := (not paused) and past_plus6 and past_7_jan and hour_delta >= 24
+	print(
+		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 ticks=%d date=%04d-%02d-%02d %02d:00 elapsed=%d past7=%s paused=%s (NOT product clock/Begin/Esc PASS)"
+		% [i, current_year, current_month, current_day, current_hour, elapsed_delta, str(past_7_jan), str(paused)]
+	)
+	return {
+		"ok": ok,
+		"reason": "advanced" if ok else "short",
+		"ticks": i,
+		"elapsed_delta": elapsed_delta,
+		"hour_delta": hour_delta,
+		"from_day": start_day,
+		"day": current_day,
+		"month": current_month,
+		"year": current_year,
+		"hour": current_hour,
+		"paused": paused,
+		"past_plus6": past_plus6,
+		"past_7_jan": past_7_jan,
+		"smoke_only": true,
+		"product_clock_pass": false,
+		"live_f5_equiv": true,
+		"living_playtest_clock": false,
+	}
+
+
+func _smoke_calendar_is_past_7_jan() -> bool:
+	return current_year > 1936 or current_month > 1 or current_day > 7
+
+
 func simulate_live_f5_softpipe_past_plus6() -> Dictionary:
 	## Play softpipe soak: Begin+4x must cross past 7 Jan (not hour_delta=32 only).
 	## Exercises day-+5 harvest cadence, day-7 autosave skip, and toast+MapMode

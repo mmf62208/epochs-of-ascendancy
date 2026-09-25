@@ -11,6 +11,7 @@ const SRC_TITLE := "res://scripts/ui/LivingTitleBoot.gd"
 const SRC_TIB := "res://scripts/ui/TopInfoBar.gd"
 const SRC_MM := "res://scripts/ui/MainMenu.gd"
 const SRC_TR := "res://scripts/core/TestRunner.gd"
+const SRC_TM := "res://scripts/autoload/TimeManager.gd"
 
 var _failures := 0
 
@@ -69,6 +70,7 @@ func _run() -> void:
 	_test_runtime_esc_opens_cc()
 	_test_runtime_two_esc_keeps_cc()
 	_test_runtime_smoke_auto_begin_hatch()
+	_test_runtime_smoke_advance_past_plus6_flag()
 
 
 func _test_source_live_input_routing() -> void:
@@ -218,6 +220,21 @@ func _test_source_live_input_routing() -> void:
 		return
 	if "EOA_SMOKE_AUTO_BEGIN" not in tr or "_smoke_auto_begin_living_title" not in tr:
 		_fail("TestRunner must hook smoke-only auto-begin for Play F5")
+		return
+	if "func smoke_advance_past_plus6_enabled" not in title_src or "EOA_SMOKE_ADVANCE_PAST_PLUS6" not in title_src:
+		_fail("LivingTitleBoot must ship smoke-only past-+6 advance (EOA_SMOKE_ADVANCE_PAST_PLUS6)")
+		return
+	if "func apply_smoke_advance_past_plus6" not in _read(SRC_TM):
+		_fail("TimeManager must expose apply_smoke_advance_past_plus6")
+		return
+	if "func apply_smoke_advance_past_plus6" not in _read(SRC_TIB) or "_set_game_speed(4)" not in _read(SRC_TIB):
+		_fail("TopInfoBar must own smoke past-+6 via _set_game_speed(4)")
+		return
+	if "_smoke_advance_past_plus6_after_hatch" not in tr or "EOA_SMOKE_ADVANCE_PAST_PLUS6" not in tr:
+		_fail("TestRunner must hook smoke-only past-+6 after hatch")
+		return
+	if "NOT product clock" not in title_src and "NOT product clock" not in tr:
+		_fail("smoke past-+6 must stay labeled as not product clock PASS")
 		return
 	if "_is_live_begin_key" not in ren:
 		_fail("MapRenderer must route Enter/Space/B to living-title Begin while title is up")
@@ -766,3 +783,51 @@ func _test_runtime_smoke_auto_begin_hatch() -> void:
 	_pass("smoke auto-begin hatch opt-in only; default keeps title (not product Begin PASS)")
 	if is_instance_valid(title_on):
 		title_on.queue_free()
+
+
+func _test_runtime_smoke_advance_past_plus6_flag() -> void:
+	# Companion default OFF. AUTO_BEGIN implies advance unless explicitly 0.
+	# Drive prove lives in DayTick (advance_real_time past 7 Jan).
+	var title_scr: GDScript = load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
+	if title_scr == null or not title_scr.has_method("smoke_advance_past_plus6_enabled"):
+		_fail("smoke_advance_past_plus6_enabled missing")
+		return
+	OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "")
+	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+	if bool(title_scr.call("smoke_advance_past_plus6_enabled")):
+		_fail("smoke_advance_past_plus6_enabled must be OFF by default")
+		return
+	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "1")
+	if not bool(title_scr.call("smoke_advance_past_plus6_enabled")):
+		_fail("smoke_advance_past_plus6_enabled must be true when companion=1")
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		return
+	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+	OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
+	if not bool(title_scr.call("smoke_advance_past_plus6_enabled")):
+		_fail("EOA_SMOKE_AUTO_BEGIN=1 must imply smoke past-+6 (Play one-command)")
+		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "")
+		return
+	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "0")
+	if bool(title_scr.call("smoke_advance_past_plus6_enabled")):
+		_fail("EOA_SMOKE_ADVANCE_PAST_PLUS6=0 must disable implied AUTO_BEGIN advance")
+		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "")
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		return
+	OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "")
+	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+	var tm: Node = root.get_node_or_null("TimeManager")
+	if tm == null or not tm.has_method("apply_smoke_advance_past_plus6"):
+		_fail("TimeManager.apply_smoke_advance_past_plus6 missing")
+		return
+	if tm.has_method("initialize_from_scenario_start_date"):
+		tm.call("initialize_from_scenario_start_date", "1936-01-01")
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", true)
+	if tm.has_meta("eoa_smoke_advance_applied"):
+		tm.remove_meta("eoa_smoke_advance_applied")
+	var skipped: Dictionary = tm.call("apply_smoke_advance_past_plus6") as Dictionary
+	if bool(skipped.get("ok", true)) or str(skipped.get("reason", "")) != "flag_off":
+		_fail("apply_smoke_advance_past_plus6 must no-op when flags are unset: %s" % str(skipped))
+		return
+	_pass("smoke past-+6 opt-in only; AUTO_BEGIN implies; explicit 0 disables (not product clock PASS)")

@@ -721,6 +721,7 @@ func _process(_delta: float) -> void:
 	# Only while the living title is up — cheap null check after Begin.
 	var boot: Node = get_node_or_null("LivingTitleBoot")
 	if boot == null or not is_instance_valid(boot) or bool(boot.get("_closed")):
+		_maybe_smoke_advance_past_plus6(_delta)
 		return
 	# Play 6573d01 backup: if the flag is set and title._ready deferred missed.
 	if not has_meta("eoa_smoke_auto_begin_tried"):
@@ -826,6 +827,56 @@ func _on_living_title_boot_closed(result: Dictionary) -> void:
 	if not has_meta("eoa_first_session_toast"):
 		set_meta("eoa_first_session_toast", true)
 		_toast_first_session_onboarding()
+	# Play ae78507: hatch PASS, 4x/day undelivered — same computerUse hole.
+	# Smoke-only past-+6 via TopInfoBar 4x owner + advance_real_time.
+	if _smoke_advance_past_plus6_wanted():
+		print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner._on_living_title_boot_closed armed=1 (NOT product clock/Begin/Esc PASS)")
+		call_deferred("_smoke_advance_past_plus6_after_hatch")
+
+
+func _smoke_advance_past_plus6_wanted() -> bool:
+	var scr: GDScript = _living_title_boot_script()
+	if scr != null and scr.has_method("smoke_advance_past_plus6_enabled"):
+		return bool(scr.call("smoke_advance_past_plus6_enabled"))
+	var tm: Node = get_node_or_null("/root/TimeManager")
+	if tm != null and tm.has_method("smoke_advance_past_plus6_enabled"):
+		return bool(tm.call("smoke_advance_past_plus6_enabled"))
+	return false
+
+
+func _maybe_smoke_advance_past_plus6(delta: float) -> void:
+	if has_meta("eoa_smoke_advance_tried"):
+		return
+	if not _smoke_advance_past_plus6_wanted():
+		return
+	if not has_meta("eoa_living_title_closed"):
+		return
+	var waited: float = float(get_meta("eoa_smoke_advance_wait", 0.0))
+	waited += delta
+	set_meta("eoa_smoke_advance_wait", waited)
+	if waited >= 0.35:
+		_smoke_advance_past_plus6_after_hatch()
+
+
+func _smoke_advance_past_plus6_after_hatch() -> void:
+	if has_meta("eoa_smoke_advance_tried"):
+		return
+	set_meta("eoa_smoke_advance_tried", true)
+	if not _smoke_advance_past_plus6_wanted():
+		return
+	print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner._smoke_advance_past_plus6_after_hatch smoke-only (NOT product clock/Begin/Esc PASS)")
+	var out: Dictionary = {}
+	var top_bar: Node = get_node_or_null("UILayer/TopInfoBar")
+	if top_bar != null and top_bar.has_method("apply_smoke_advance_past_plus6"):
+		out = top_bar.call("apply_smoke_advance_past_plus6") as Dictionary
+	else:
+		var tm: Node = get_node_or_null("/root/TimeManager")
+		if tm != null and tm.has_method("apply_smoke_advance_past_plus6"):
+			out = tm.call("apply_smoke_advance_past_plus6") as Dictionary
+	print(
+		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner.after_hatch ok=%s past7=%s date=%s (NOT product clock PASS)"
+		% [str(out.get("ok", false)), str(out.get("past_7_jan", false)), "%s-%s-%s %s:00" % [str(out.get("year", 0)), str(out.get("month", 0)), str(out.get("day", 0)), str(out.get("hour", 0))]]
+	)
 
 
 ## One-shot first-session onboarding for graphical F5 (meta-guarded at call site).
@@ -1278,7 +1329,7 @@ func _ready() -> void:
 	# Diagnostic for "hang" / evidence misfires: always log exactly what the process received so we can see why graphical vs evidence path was chosen.
 	print("TestRunner: OS cmdline_args (for evidence detection): ", OS.get_cmdline_args())
 	print("TestRunner: DisplayServer name: ", DisplayServer.get_name(), " | has dedicated_server feature: ", OS.has_feature("dedicated_server"))
-	print("TestRunner: EOA envs: RUN_50=", OS.get_environment("EOA_RUN_50_TURN_SIM"), " LONG=", OS.get_environment("EOA_RUN_LONG_SIM"), " HEADLESS_EVIDENCE=", OS.get_environment("EOA_HEADLESS_EVIDENCE"), " FAST=", OS.get_environment("EOA_FAST_TEST"), " TEST_SAVE=", OS.get_environment("EOA_TEST_SAVE_LOAD"), " SMOKE_AUTO_BEGIN=", OS.get_environment("EOA_SMOKE_AUTO_BEGIN"))
+	print("TestRunner: EOA envs: RUN_50=", OS.get_environment("EOA_RUN_50_TURN_SIM"), " LONG=", OS.get_environment("EOA_RUN_LONG_SIM"), " HEADLESS_EVIDENCE=", OS.get_environment("EOA_HEADLESS_EVIDENCE"), " FAST=", OS.get_environment("EOA_FAST_TEST"), " TEST_SAVE=", OS.get_environment("EOA_TEST_SAVE_LOAD"), " SMOKE_AUTO_BEGIN=", OS.get_environment("EOA_SMOKE_AUTO_BEGIN"), " SMOKE_ADVANCE_PAST_PLUS6=", OS.get_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6"))
 	# Early space evidence force (for headless test runs to guarantee prints even if sim loop races quit or defer)
 	if OS.get_environment("EOA_HEADLESS_EVIDENCE").strip_edges() == "1" or OS.get_environment("EOA_TEST_SAVE_LOAD").strip_edges() == "1" or OS.get_environment("EOA_RUN_50_TURN_SIM").strip_edges() == "1":
 		call_deferred("_force_space_race_evidence_prints")

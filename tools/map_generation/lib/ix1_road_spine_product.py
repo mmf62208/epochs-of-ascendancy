@@ -557,6 +557,19 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         or "_smoke_auto_begin_living_title" not in _read(TEST_RUNNER_GD)
     ):
         missing.append("testrunner_smoke_auto_begin")
+    if "func smoke_advance_past_plus6_enabled" not in title or "EOA_SMOKE_ADVANCE_PAST_PLUS6" not in title:
+        missing.append("living_title_smoke_advance_past_plus6")
+    if "func apply_smoke_advance_past_plus6" not in _read(TIME_MANAGER_GD):
+        missing.append("timemanager_smoke_advance_past_plus6")
+    if "func apply_smoke_advance_past_plus6" not in _read(TOP_INFO_GD) or "_set_game_speed(4)" not in _read(TOP_INFO_GD):
+        missing.append("topbar_smoke_advance_past_plus6")
+    if (
+        "EOA_SMOKE_ADVANCE_PAST_PLUS6" not in _read(TEST_RUNNER_GD)
+        or "_smoke_advance_past_plus6_after_hatch" not in _read(TEST_RUNNER_GD)
+    ):
+        missing.append("testrunner_smoke_advance_past_plus6")
+    if "apply_smoke_advance_past_plus6" not in _read(DAY_TICK_HARNESS):
+        missing.append("day_tick_smoke_advance_harness")
     if (
         "_living_title_owns_click() or _top_bar_owns_click()" not in _read(RENDERER_GD)
         and "_living_title_owns_event(event) or _top_bar_owns_click()" not in _read(RENDERER_GD)

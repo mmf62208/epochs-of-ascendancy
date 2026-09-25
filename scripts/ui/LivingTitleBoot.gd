@@ -105,6 +105,25 @@ static func smoke_auto_begin_enabled() -> bool:
 	return false
 
 
+## Smoke-only past-+6 after hatch. Default OFF. Companion
+## EOA_SMOKE_ADVANCE_PAST_PLUS6=1, or implied by EOA_SMOKE_AUTO_BEGIN=1
+## unless the companion is explicitly 0/false/no. NOT product clock /
+## 4x / Begin / Esc PASS — Play F5 delivery stays FAIL.
+static func smoke_advance_past_plus6_enabled() -> bool:
+	var adv := OS.get_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6").strip_edges().to_lower()
+	if adv == "0" or adv == "false" or adv == "no" or adv == "off":
+		return false
+	if adv == "1" or adv == "true" or adv == "yes" or adv == "on":
+		return true
+	for a in OS.get_cmdline_args():
+		var al := str(a).to_lower().strip_edges()
+		if al == "--no-smoke-advance-past-plus6":
+			return false
+		if al == "--smoke-advance-past-plus6" or al == "--eoa-smoke-advance-past-plus6":
+			return true
+	return smoke_auto_begin_enabled()
+
+
 ## Headless-safe apply: new campaign pick, or load a save slot.
 static func apply_living_title_boot(
 	tag: String = "GER",
