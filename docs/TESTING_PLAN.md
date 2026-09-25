@@ -330,4 +330,18 @@ python3 -m unittest tools.map_generation.tests.test_seas_coarsen_feed10_tyrrheni
 
 On `--quick` via `tools/eoa_full_test_gates.sh`. Ligurian / Alboran / Adriatic meshes / Maginot land / Flanders land / SE England land / Great Lakes / Esc / G / Dig2 / combat are out of scope for this theater proof.
 
-Honest: `--quick` living-unit wiring fails (if any) are **tip-pre-existing** on `b335344c4c9d0cba1aa6c1ae7f51733e9e249731` (same files). This FEED does not touch those GD files. 
+Honest: `--quick` living-unit wiring fails (if any) are **tip-pre-existing** on `b335344c4c9d0cba1aa6c1ae7f51733e9e249731` (same files). This FEED does not touch those GD files.
+
+### IX-1 Play F5 smoke-only auto-begin (delivery hatch)
+
+Play F5 computerUse on `6573d01` never delivered post-boot `EOA_LIVE_RAW_*` into the Godot X11 window (`title.ready` only). Product Begin / Esc / mouse CC stay **FAIL**.
+
+For IX-1 **softpipe only** (past-+6 → Search Köln/Cologne + Go → spine), Play must launch:
+
+```bash
+EOA_SMOKE_AUTO_BEGIN=1 tools/run_godot.sh --path . res://scenes/TestScenario.tscn
+# or
+tools/eoa_play_f5_smoke_auto_begin.sh
+```
+
+Watch `godot.log` for `EOA_SMOKE_AUTO_BEGIN who=title.apply_smoke_auto_begin` then `LivingTitleBoot: live Begin`. Do **not** score product Begin/Esc PASS because the hatch fired. Default F5 (flag unset) keeps the living title. Do not use `EOA_SKIP_TITLE` (skips clock/Search/spine arm). Headless: `HeadlessIx1LivingTitleEscBeginTest` + `test_ix1_road_spine_product`. Dig2/G PARKED. 

@@ -548,6 +548,15 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("living_title_ds_button_poll")
     if "is_live_begin_event" not in title or "eoa_living_begin" not in title:
         missing.append("living_title_begin_keys")
+    if "EOA_SMOKE_AUTO_BEGIN" not in title or "func smoke_auto_begin_enabled" not in title:
+        missing.append("living_title_smoke_auto_begin")
+    if "func apply_smoke_auto_begin" not in title:
+        missing.append("living_title_smoke_auto_begin_apply")
+    if (
+        "EOA_SMOKE_AUTO_BEGIN" not in _read(TEST_RUNNER_GD)
+        or "_smoke_auto_begin_living_title" not in _read(TEST_RUNNER_GD)
+    ):
+        missing.append("testrunner_smoke_auto_begin")
     if (
         "_living_title_owns_click() or _top_bar_owns_click()" not in _read(RENDERER_GD)
         and "_living_title_owns_event(event) or _top_bar_owns_click()" not in _read(RENDERER_GD)

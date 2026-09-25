@@ -46,6 +46,9 @@ var _raw_ptr_log_msec := 0
 var _raw_key_log_msec := 0
 var _window_input_hooked := false
 var _always_on_top_set := false
+## Smoke-only auto-begin (EOA_SMOKE_AUTO_BEGIN=1). Default OFF. Not product Begin PASS.
+var _smoke_auto_begin_armed := false
+var _smoke_auto_begin_delay_s := 0.0
 ## Grown hit pads: computerUse screenshot clicks often land on the label edge, not the Control core.
 const BEGIN_HIT_GROW := 36.0
 const CC_HIT_GROW := 28.0
@@ -84,6 +87,22 @@ static func should_show_living_title() -> bool:
 		if al == "--map-evidence" or al == "--test-evidence":
 			return false
 	return true
+
+
+## Smoke-only living-title dismiss for Play IX-1 softpipe when computerUse
+## never delivers OS events into this X11 client (Play 6573d01: post-boot
+## EOA_LIVE_RAW_* = 0). Default OFF. Does NOT claim product Begin/Esc PASS.
+## Play: EOA_SMOKE_AUTO_BEGIN=1 tools/run_godot.sh --path . res://scenes/TestScenario.tscn
+## Do not use EOA_SKIP_TITLE — that skips Begin clock/Search/spine arming.
+static func smoke_auto_begin_enabled() -> bool:
+	var env := OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges().to_lower()
+	if env == "1" or env == "true" or env == "yes":
+		return true
+	for a in OS.get_cmdline_args():
+		var al := str(a).to_lower().strip_edges()
+		if al == "--smoke-auto-begin" or al == "--eoa-smoke-auto-begin":
+			return true
+	return false
 
 
 ## Headless-safe apply: new campaign pick, or load a save slot.
@@ -180,6 +199,9 @@ func _ready() -> void:
 			str(_viewport_mouse()),
 		]
 	)
+	if smoke_auto_begin_enabled():
+		print("EOA_SMOKE_AUTO_BEGIN who=title.ready armed=1 (smoke-only; product Begin/Esc still FAIL)")
+		call_deferred("apply_smoke_auto_begin")
 
 
 func _build_ui() -> void:
@@ -434,7 +456,10 @@ func _refresh_choice_buttons() -> void:
 		var place := str(NATION_LABELS.get(_tag, _tag))
 		_begin_btn.text = "Begin · %s · %d" % [place, _year]
 	if _status != null:
-		_status.text = "Click Begin · Germany · 1936 or press Enter / Space. Esc or Esc · Menu opens Command Center (Esc is not required to start)."
+		if smoke_auto_begin_enabled():
+			_status.text = "SMOKE AUTO-BEGIN armed — title will dismiss without a click. Product Begin/Esc still FAIL until post-boot EOA_LIVE_RAW_* arrives."
+		else:
+			_status.text = "Click Begin · Germany · 1936 or press Enter / Space. Esc or Esc · Menu opens Command Center (Esc is not required to start)."
 
 
 ## Live DisplayServer Esc: keycode, physical_keycode, key_label, unicode 27, or ui_cancel.
@@ -791,6 +816,21 @@ func handle_live_begin() -> Dictionary:
 	return {"ok": _closed, "closed": _closed, "mode": "new", "player_tag": _tag, "year": _year}
 
 
+## Opt-in smoke hatch. Default no-op. Calls the real Begin path so clock /
+## Search / spine arm. Never treat this log as product Begin/Esc PASS.
+func apply_smoke_auto_begin() -> bool:
+	if _closed:
+		return false
+	if not smoke_auto_begin_enabled():
+		return false
+	if _smoke_auto_begin_armed:
+		return _closed
+	_smoke_auto_begin_armed = true
+	print("EOA_SMOKE_AUTO_BEGIN who=title.apply_smoke_auto_begin smoke-only dismiss (NOT product Begin/Esc PASS)")
+	handle_live_begin()
+	return _closed
+
+
 func handle_live_command_center_click() -> bool:
 	print("LivingTitleBoot: live mouse Command Center · Esc (delivery backup)")
 	_log_live_esc("title.mouse_cc", null)
@@ -961,6 +1001,11 @@ func _log_live_raw_key(who: String, event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if _closed:
 		return
+	if smoke_auto_begin_enabled() and not _smoke_auto_begin_armed:
+		_smoke_auto_begin_delay_s += delta
+		if _smoke_auto_begin_delay_s >= 0.25:
+			apply_smoke_auto_begin()
+			return
 	_focus_nudge_s += delta
 	if _focus_nudge_s >= 0.4:
 		_focus_nudge_s = 0.0

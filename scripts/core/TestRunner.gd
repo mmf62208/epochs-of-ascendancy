@@ -698,6 +698,23 @@ func _show_living_title_boot() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	set_process(true)
 	print("TestRunner: living title boot — pick scenario date, country, or load (Esc / Esc · Menu / Begin without Esc)")
+	# Play 6573d01: computerUse never delivered post-boot EOA_LIVE_RAW_*.
+	# Opt-in smoke hatch dismisses via real handle_live_begin (clock/Search/spine).
+	# Default OFF — not product Begin/Esc PASS.
+	if script.has_method("smoke_auto_begin_enabled") and bool(script.call("smoke_auto_begin_enabled")):
+		print("EOA_SMOKE_AUTO_BEGIN who=TestRunner._show_living_title_boot armed=1 (smoke-only; product Begin/Esc still FAIL)")
+		call_deferred("_smoke_auto_begin_living_title")
+
+
+func _smoke_auto_begin_living_title() -> void:
+	var boot: Node = get_node_or_null("LivingTitleBoot")
+	if boot == null or not is_instance_valid(boot) or bool(boot.get("_closed")):
+		return
+	print("EOA_SMOKE_AUTO_BEGIN who=TestRunner._smoke_auto_begin_living_title smoke-only (NOT product Begin/Esc PASS)")
+	if boot.has_method("apply_smoke_auto_begin"):
+		boot.call("apply_smoke_auto_begin")
+	elif boot.has_method("handle_live_begin"):
+		boot.call("handle_live_begin")
 
 
 func _process(_delta: float) -> void:
@@ -705,6 +722,21 @@ func _process(_delta: float) -> void:
 	var boot: Node = get_node_or_null("LivingTitleBoot")
 	if boot == null or not is_instance_valid(boot) or bool(boot.get("_closed")):
 		return
+	# Play 6573d01 backup: if the flag is set and title._ready deferred missed.
+	if not has_meta("eoa_smoke_auto_begin_tried"):
+		var scr_ab: GDScript = _living_title_boot_script()
+		if scr_ab != null and scr_ab.has_method("smoke_auto_begin_enabled") and bool(scr_ab.call("smoke_auto_begin_enabled")):
+			var waited: float = float(get_meta("eoa_smoke_auto_begin_wait", 0.0))
+			waited += _delta
+			set_meta("eoa_smoke_auto_begin_wait", waited)
+			if waited >= 0.45:
+				set_meta("eoa_smoke_auto_begin_tried", true)
+				print("EOA_SMOKE_AUTO_BEGIN who=TestRunner._process backup (NOT product Begin/Esc PASS)")
+				if boot.has_method("apply_smoke_auto_begin"):
+					boot.call("apply_smoke_auto_begin")
+				elif boot.has_method("handle_live_begin"):
+					boot.call("handle_live_begin")
+				return
 	# Play 5adb38e / f9f249c: mouse Begin/CC never reached title `_input`.
 	# Poll Input AND DisplayServer.mouse_get_button_state() — computerUse
 	# clicks an unfocused window and the WM eats the ButtonPress so the
@@ -1246,7 +1278,7 @@ func _ready() -> void:
 	# Diagnostic for "hang" / evidence misfires: always log exactly what the process received so we can see why graphical vs evidence path was chosen.
 	print("TestRunner: OS cmdline_args (for evidence detection): ", OS.get_cmdline_args())
 	print("TestRunner: DisplayServer name: ", DisplayServer.get_name(), " | has dedicated_server feature: ", OS.has_feature("dedicated_server"))
-	print("TestRunner: EOA envs: RUN_50=", OS.get_environment("EOA_RUN_50_TURN_SIM"), " LONG=", OS.get_environment("EOA_RUN_LONG_SIM"), " HEADLESS_EVIDENCE=", OS.get_environment("EOA_HEADLESS_EVIDENCE"), " FAST=", OS.get_environment("EOA_FAST_TEST"), " TEST_SAVE=", OS.get_environment("EOA_TEST_SAVE_LOAD"))
+	print("TestRunner: EOA envs: RUN_50=", OS.get_environment("EOA_RUN_50_TURN_SIM"), " LONG=", OS.get_environment("EOA_RUN_LONG_SIM"), " HEADLESS_EVIDENCE=", OS.get_environment("EOA_HEADLESS_EVIDENCE"), " FAST=", OS.get_environment("EOA_FAST_TEST"), " TEST_SAVE=", OS.get_environment("EOA_TEST_SAVE_LOAD"), " SMOKE_AUTO_BEGIN=", OS.get_environment("EOA_SMOKE_AUTO_BEGIN"))
 	# Early space evidence force (for headless test runs to guarantee prints even if sim loop races quit or defer)
 	if OS.get_environment("EOA_HEADLESS_EVIDENCE").strip_edges() == "1" or OS.get_environment("EOA_TEST_SAVE_LOAD").strip_edges() == "1" or OS.get_environment("EOA_RUN_50_TURN_SIM").strip_edges() == "1":
 		call_deferred("_force_space_race_evidence_prints")

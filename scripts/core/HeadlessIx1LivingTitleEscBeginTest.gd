@@ -68,6 +68,7 @@ func _run() -> void:
 	_test_runtime_begin_key_and_raw_logs()
 	_test_runtime_esc_opens_cc()
 	_test_runtime_two_esc_keeps_cc()
+	_test_runtime_smoke_auto_begin_hatch()
 
 
 func _test_source_live_input_routing() -> void:
@@ -205,6 +206,18 @@ func _test_source_live_input_routing() -> void:
 		return
 	if "os_left_button_held" not in _slice_func(tr, "_process") and "mouse_get_button_state" not in _slice_func(tr, "_process"):
 		_fail("TestRunner must poll DisplayServer left-button while title is up (Play f9f249c)")
+		return
+	if "func smoke_auto_begin_enabled" not in title_src or "EOA_SMOKE_AUTO_BEGIN" not in title_src:
+		_fail("LivingTitleBoot must ship smoke-only auto-begin (EOA_SMOKE_AUTO_BEGIN)")
+		return
+	if "func apply_smoke_auto_begin" not in title_src:
+		_fail("LivingTitleBoot must expose apply_smoke_auto_begin")
+		return
+	if "NOT product Begin" not in title_src and "product Begin/Esc still FAIL" not in title_src:
+		_fail("smoke auto-begin must stay labeled as not product Begin/Esc PASS")
+		return
+	if "EOA_SMOKE_AUTO_BEGIN" not in tr or "_smoke_auto_begin_living_title" not in tr:
+		_fail("TestRunner must hook smoke-only auto-begin for Play F5")
 		return
 	if "_is_live_begin_key" not in ren:
 		_fail("MapRenderer must route Enter/Space/B to living-title Begin while title is up")
@@ -705,3 +718,51 @@ func _test_runtime_two_esc_keeps_cc() -> void:
 	title_poll.queue_free()
 	cc.queue_free()
 	title.queue_free()
+
+
+func _test_runtime_smoke_auto_begin_hatch() -> void:
+	# Play 6573d01: computerUse never entered this Godot window. Softpipe hatch
+	# is opt-in only — default F5 must keep the title. Flag uses real Begin.
+	var leftover: Node = root.get_node_or_null("MainMenu")
+	if leftover != null:
+		leftover.free()
+	var title_scr: GDScript = load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
+	if title_scr == null or not title_scr.has_method("smoke_auto_begin_enabled"):
+		_fail("smoke_auto_begin_enabled missing")
+		return
+	OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "")
+	if bool(title_scr.call("smoke_auto_begin_enabled")):
+		_fail("smoke_auto_begin_enabled must be OFF by default")
+		return
+	var title_off: CanvasLayer = title_scr.new() as CanvasLayer
+	title_off.name = "LivingTitleBootSmokeOff"
+	root.add_child(title_off)
+	if title_off.has_method("apply_smoke_auto_begin") and bool(title_off.call("apply_smoke_auto_begin")):
+		_fail("apply_smoke_auto_begin must no-op when EOA_SMOKE_AUTO_BEGIN is unset")
+		title_off.queue_free()
+		return
+	if bool(title_off.get("_closed")):
+		_fail("default F5 must keep living title up (do not silently auto-begin)")
+		title_off.queue_free()
+		return
+	title_off.queue_free()
+	OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "1")
+	if not bool(title_scr.call("smoke_auto_begin_enabled")):
+		_fail("smoke_auto_begin_enabled must be true when EOA_SMOKE_AUTO_BEGIN=1")
+		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "")
+		return
+	var title_on: CanvasLayer = title_scr.new() as CanvasLayer
+	title_on.name = "LivingTitleBootSmokeOn"
+	root.add_child(title_on)
+	var closed_on: bool = false
+	if title_on.has_method("apply_smoke_auto_begin"):
+		closed_on = bool(title_on.call("apply_smoke_auto_begin"))
+	if not closed_on and not bool(title_on.get("_closed")):
+		_fail("apply_smoke_auto_begin must dismiss via handle_live_begin when flag is set")
+		title_on.queue_free()
+		OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "")
+		return
+	OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "")
+	_pass("smoke auto-begin hatch opt-in only; default keeps title (not product Begin PASS)")
+	if is_instance_valid(title_on):
+		title_on.queue_free()
