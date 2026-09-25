@@ -902,12 +902,17 @@ func _test_designer_field() -> void:
 	if ger_hist != null and ger_hist.has_method("log_combat"):
 		ger_hist.call("log_combat", "1936-01-04", GER_FRONT, "win", PackedStringArray(["press"]), "Guderian", "victory")
 		var strip_h: Script = load("res://scripts/ui/UnitCardCombatStrip.gd") as Script
-		if strip_h != null and strip_h.has_method("lines_for"):
-			var hist_txt := "\n".join(strip_h.call("lines_for", ger_hist))
+		if strip_h != null:
+			var body_txt := "\n".join(strip_h.call("lines_for", ger_hist)) if strip_h.has_method("lines_for") else ""
+			if "Fill" not in body_txt:
+				_fail("card missing Fill/TOE fold: %s" % body_txt)
+			var hist_txt := body_txt
+			if strip_h.has_method("tooltip_lines_for"):
+				hist_txt = "\n".join(strip_h.call("tooltip_lines_for", ger_hist))
 			if "victory" not in hist_txt:
-				_fail("card missing battle history: %s" % hist_txt)
+				_fail("tooltip missing battle history: %s" % hist_txt)
 			else:
-				_pass("card battle history")
+				_pass("card Fill/TOE + tooltip battle history")
 	if ger_hist != null and "combat_experience" in ger_hist:
 		ger_hist.set("combat_experience", 90.0)
 		ger_hist.set("strength", 0.50)
