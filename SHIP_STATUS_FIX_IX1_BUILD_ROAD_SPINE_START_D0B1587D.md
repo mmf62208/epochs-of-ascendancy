@@ -1,4 +1,4 @@
-# STATUS — FIX IX-1 Build Road Spine **start** at Mandate 0 — DONE tip `99635f8d`
+# STATUS — FIX IX-1 Build Road Spine **start** at Mandate 0 — DONE tip `41127a8a`
 
 Updated: Fri Sep 25, 2026 ~2:50pm ET
 From: Ship · CA `bc-69b9277b-d508-5805-bec9-5ecbad90a9f9`
@@ -7,7 +7,7 @@ From: Ship · CA `bc-69b9277b-d508-5805-bec9-5ecbad90a9f9`
 
 - Start tip: `d0b1587d4b5888bbc556287e16ead2491eefa564` (`d0b1587d`)
 - Code commit: `01253362ad3f455e34b62c561e56b7c1e8298bdf` (`01253362`)
-- **GitHub head.sha:** `99635f8dcc8e61cca38ab2e7daf4dd25929a1225` (`99635f8d`)
+- **GitHub head.sha:** `41127a8ae10fbc1b64f1fb1dd090a193edfbdce0` (`41127a8a`)
 - PR 55 HOLD: https://github.com/mmf62208/epochs-of-ascendancy/pull/55 · branch `cursor/ix1-road-spine-9d9b` · draft
 - CA: https://cursor.com/agents/bc-69b9277b-d508-5805-bec9-5ecbad90a9f9
 
