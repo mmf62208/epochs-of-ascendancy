@@ -62,6 +62,7 @@ func _run() -> void:
 	_test_smoke_advance_past_plus6_after_hatch()
 	_test_smoke_advance_chunked_live_path()
 	_test_smoke_advance_softpipe_starvation_catchup()
+	_test_smoke_advance_softpipe_stay_alive_after_past7()
 	_test_mandate_cost_still_zero()
 
 
@@ -301,6 +302,30 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 		return
 	if "_nudge_smoke_advance_past_plus6" not in tr or "nudge_smoke_advance_chunk" not in tr:
 		_fail("TestRunner poller must nudge the chunker (not sit on pending)")
+		return
+	if "func smoke_advance_should_stay_alive" not in tm or "EOA_SMOKE_STAYALIVE" not in tm:
+		_fail("TimeManager must arm smoke stay-alive after past7 (Play 9625020 window death)")
+		return
+	if "func _drop_smoke_deferred_load" not in tm:
+		_fail("stay-alive must drop queued day_emit/day_ai/day_battles (not battles-only)")
+		return
+	var stay_defer := _slice_func(tm, "smoke_advance_should_defer_combat")
+	if "_smoke_stay_alive" not in stay_defer:
+		_fail("combat must stay deferred after past7 stay-alive")
+		return
+	var stay_proc := _slice_func(tm, "_process")
+	if "_smoke_stay_alive" not in stay_proc:
+		_fail("TimeManager._process must not 4x self-drive during stay-alive")
+		return
+	var after_hatch := _slice_func(tr, "_finish_smoke_advance_after_hatch")
+	if after_hatch.is_empty() or "get_tree().quit" in after_hatch:
+		_fail("TestRunner.after_hatch must not quit after past7")
+		return
+	if "EOA_SMOKE_STAYALIVE" not in after_hatch or "no_quit" not in after_hatch:
+		_fail("TestRunner.after_hatch must log stay-alive / no_quit")
+		return
+	if "_smoke_should_gate_post_hatch_heavy" not in tr or "skip_front_chips" not in tr:
+		_fail("TestRunner must gate post-hatch unit-icon flood under stay-alive")
 		return
 	_pass("live F5 path cannot full-board AI scan; toast quiet; ring/day_emit/hour clock gated")
 
@@ -757,6 +782,96 @@ func _test_smoke_advance_softpipe_starvation_catchup() -> void:
 	_pass(
 		"softpipe starve catch-up past 7 Jan day=%s ticks=%s catchup=1 window_stay=1 (NOT product clock PASS) (%dms)"
 		% [str(armed.get("day")), str(armed.get("ticks")), ms]
+	)
+
+
+func _test_smoke_advance_softpipe_stay_alive_after_past7() -> void:
+	## Play 9625020: after_hatch ok=true past7=true then Godot exited before
+	## Search. Combat re-armed (AI battles + air) + deferred 252 unit icons +
+	## 4x self-drive. Prove stay-alive drops the queue, keeps combat deferred,
+	## pauses AFTER the ok/past7 dict, and never quits.
+	var tm: Node = _autoload("TimeManager")
+	if tm == null:
+		_fail("TimeManager autoload missing")
+		return
+	if not tm.has_method("smoke_advance_should_stay_alive") or not tm.has_method("reset_smoke_stay_alive_for_tests"):
+		_fail("stay-alive APIs missing")
+		return
+	if tm.has_method("initialize_from_scenario_start_date"):
+		tm.call("initialize_from_scenario_start_date", "1936-01-01")
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", true)
+	if tm.has_method("set_time_scale"):
+		tm.call("set_time_scale", 1.0)
+	if tm.has_meta("eoa_smoke_advance_applied"):
+		tm.remove_meta("eoa_smoke_advance_applied")
+	if tm.has_meta("eoa_smoke_force_chunk"):
+		tm.remove_meta("eoa_smoke_force_chunk")
+	if tm.has_meta("eoa_smoke_force_softpipe_starve"):
+		tm.remove_meta("eoa_smoke_force_softpipe_starve")
+	if tm.has_meta("eoa_smoke_force_stay_alive"):
+		tm.remove_meta("eoa_smoke_force_stay_alive")
+	tm.call("reset_smoke_stay_alive_for_tests")
+	OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "")
+	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "1")
+	tm.set_meta("eoa_smoke_force_chunk", true)
+	tm.set_meta("eoa_smoke_force_softpipe_starve", true)
+	tm.set_meta("eoa_smoke_force_stay_alive", true)
+	var queued: Array = []
+	queued.append({"kind": "day_emit", "year": 1936, "month": 1, "day": 7})
+	queued.append({"kind": "day_ai", "year": 1936, "month": 1, "day": 7})
+	queued.append({"kind": "day_battles", "year": 1936, "month": 1, "day": 7})
+	tm.set("_pending_sim_events", queued)
+	var t0 := Time.get_ticks_msec()
+	var armed: Dictionary = tm.call("apply_smoke_advance_past_plus6") as Dictionary
+	var ms := Time.get_ticks_msec() - t0
+	var left: Array = tm.get("_pending_sim_events") as Array
+	var tm_paused := bool(tm.get("paused"))
+	var defer_on := bool(tm.call("smoke_advance_should_defer_combat"))
+	var stay_on := bool(tm.call("smoke_stay_alive_active"))
+	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+	tm.remove_meta("eoa_smoke_force_chunk")
+	tm.remove_meta("eoa_smoke_force_softpipe_starve")
+	tm.remove_meta("eoa_smoke_force_stay_alive")
+	tm.call("reset_smoke_stay_alive_for_tests")
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", true)
+	if bool(armed.get("product_clock_pass", false)):
+		_fail("stay-alive must not claim product clock PASS")
+		return
+	if not bool(armed.get("past_7_jan", false)) or not bool(armed.get("catchup", false)):
+		_fail("stay-alive must keep catch-up past7: %s" % str(armed))
+		return
+	if bool(armed.get("paused", true)):
+		_fail("finish dict paused must stay false (ok/past7 claim): %s" % str(armed))
+		return
+	if not bool(armed.get("ok", false)):
+		_fail("stay-alive must keep after_hatch ok=true: %s" % str(armed))
+		return
+	if not bool(armed.get("stay_alive", false)) or not bool(armed.get("no_quit", false)):
+		_fail("finish dict must label stay_alive + no_quit: %s" % str(armed))
+		return
+	if not left.is_empty():
+		_fail("stay-alive must drop queued day_emit/day_ai/day_battles: %s" % str(left))
+		return
+	if not defer_on:
+		_fail("stay-alive must keep combat deferred after past7")
+		return
+	if not stay_on:
+		_fail("stay-alive flag must arm on force-stay path")
+		return
+	if not tm_paused:
+		_fail("live stay-alive must pause AFTER ok so 4x does not self-drive")
+		return
+	if not bool(armed.get("window_stay", false)):
+		_fail("stay-alive must keep window_stay: %s" % str(armed))
+		return
+	if ms > LIVE_DAY_BUDGET_MS:
+		_fail("stay-alive catch-up took %dms (wedged)" % ms)
+		return
+	_pass(
+		"softpipe stay-alive after past7 day=%s catchup=1 stay_alive=1 no_quit=1 queued=0 paused_after_ok=1 (NOT product clock PASS) (%dms)"
+		% [str(armed.get("day")), ms]
 	)
 
 

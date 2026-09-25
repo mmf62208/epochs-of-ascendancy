@@ -575,6 +575,25 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("testrunner_smoke_advance_past_plus6")
     if "_nudge_smoke_advance_past_plus6" not in _read(TEST_RUNNER_GD):
         missing.append("testrunner_smoke_softpipe_nudge")
+    if (
+        "func smoke_advance_should_stay_alive" not in _read(TIME_MANAGER_GD)
+        or "EOA_SMOKE_STAYALIVE" not in _read(TIME_MANAGER_GD)
+        or "func _drop_smoke_deferred_load" not in _read(TIME_MANAGER_GD)
+    ):
+        missing.append("timemanager_smoke_softpipe_stay_alive")
+    if (
+        "EOA_SMOKE_STAYALIVE" not in _read(TEST_RUNNER_GD)
+        or "_smoke_should_gate_post_hatch_heavy" not in _read(TEST_RUNNER_GD)
+        or "skip_front_chips" not in _read(TEST_RUNNER_GD)
+    ):
+        missing.append("testrunner_smoke_softpipe_stay_alive")
+    after_hatch = _slice_func(_read(TEST_RUNNER_GD), "_finish_smoke_advance_after_hatch")
+    if after_hatch and "get_tree().quit" in after_hatch:
+        missing.append("testrunner_smoke_no_quit_after_hatch")
+    if "no_quit" not in after_hatch:
+        missing.append("testrunner_smoke_no_quit_after_hatch")
+    if "stay_alive_after_past7" not in _read(DAY_TICK_HARNESS):
+        missing.append("day_tick_smoke_stay_alive_harness")
     if "apply_smoke_advance_past_plus6" not in _read(DAY_TICK_HARNESS):
         missing.append("day_tick_smoke_advance_harness")
     if (

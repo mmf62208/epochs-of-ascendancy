@@ -98,7 +98,10 @@ var _smoke_chunk_was_equiv: bool = false
 var _smoke_chunk_last_step_msec: int = 0
 var _smoke_chunk_idle_armed: bool = false
 var _smoke_chunk_catchup_why: String = ""
+var _smoke_stay_alive: bool = false
+var _smoke_stay_alive_beats: int = 0
 const SMOKE_CHUNK_STARVE_MS := 150
+const SMOKE_STAY_ALIVE_BEATS := 4
 
 func _ready() -> void:
 	print("TimeManager: Initialized (default 1936-01-01)")
@@ -114,6 +117,10 @@ func _process(_delta: float) -> void:
 		else:
 			step_smoke_advance_chunk()
 		_arm_smoke_chunk_idle_pump()
+		return
+	# Play 9625020: after past7 the 4x self-drive + deferred combat killed the window
+	# before Search. Stay-alive holds the clock and does not flush.
+	if _smoke_stay_alive:
 		return
 	# Safety net: if deferred flush stalled (e.g. pause race), keep draining the queue.
 	if not paused and not _pending_sim_events.is_empty() and not _sim_flush_scheduled:
@@ -137,10 +144,10 @@ func _process(_delta: float) -> void:
 ## Called by ScenarioLoader when a scenario is loaded.
 ## Parses "YYYY-MM-DD" (falls back gracefully to year-only).
 func initialize_from_scenario_start_date(start_date_str: String) -> void:
-	# Do not disarm or rewind an in-flight live chunker. Hatch/era re-seed can
-	# land after `chunked start` and would otherwise drop the stepper with no past7.
-	if _smoke_chunk_active:
-		print("TimeManager: skip start-date reset (smoke chunk active)")
+	# Do not disarm or rewind an in-flight live chunker / stay-alive window.
+	# Hatch/era re-seed can land after `chunked start` or after past7.
+	if _smoke_chunk_active or _smoke_stay_alive:
+		print("TimeManager: skip start-date reset (smoke chunk/stay-alive)")
 		return
 	scenario_start_date = start_date_str.strip_edges()
 	if scenario_start_date.is_empty():
@@ -362,7 +369,27 @@ func should_chunk_smoke_advance() -> bool:
 
 
 func smoke_advance_should_defer_combat() -> bool:
-	return _smoke_chunk_active
+	return _smoke_chunk_active or _smoke_stay_alive
+
+
+func smoke_advance_should_stay_alive() -> bool:
+	# Live windowed Play: after past7 the deferred grand visuals / 252 unit icons
+	# / combat re-arm killed Godot before Search (Play 9625020 both attempts).
+	# Headless DayTick stays off unless the force-stay meta proves the path -s.
+	if has_meta("eoa_smoke_force_stay_alive") and bool(get_meta("eoa_smoke_force_stay_alive")):
+		return true
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	return smoke_advance_past_plus6_enabled()
+
+
+func smoke_stay_alive_active() -> bool:
+	return _smoke_stay_alive
+
+
+func reset_smoke_stay_alive_for_tests() -> void:
+	_smoke_stay_alive = false
+	_smoke_stay_alive_beats = 0
 
 
 func smoke_advance_window_stay() -> bool:
@@ -549,29 +576,59 @@ func _run_smoke_advance_sync() -> Dictionary:
 
 
 func _finish_smoke_advance_chunk() -> Dictionary:
-	_drop_smoke_deferred_battles()
+	_drop_smoke_deferred_load()
 	_smoke_chunk_active = false
 	_smoke_chunk_stepping = false
-	_live_f5_equiv_clock = _smoke_chunk_was_equiv
+	# Keep live-F5 skip gates on under stay-alive so Search does not rebound
+	# harvest / factory / icon walks. Headless restores the prior equiv flag.
+	if smoke_advance_should_stay_alive():
+		_smoke_stay_alive = true
+		_live_f5_equiv_clock = true
+	else:
+		_live_f5_equiv_clock = _smoke_chunk_was_equiv
 	set_meta("eoa_smoke_advance_applied", true)
-	return _smoke_advance_finish_dict(
+	var out: Dictionary = _smoke_advance_finish_dict(
 		_smoke_chunk_i,
 		_smoke_chunk_start_elapsed,
 		_smoke_chunk_start_hour,
 		_smoke_chunk_start_day,
 		true
 	)
+	if _smoke_stay_alive:
+		_arm_smoke_stay_alive_after_ok()
+		out["stay_alive"] = true
+		out["no_quit"] = true
+	return out
 
 
-func _drop_smoke_deferred_battles() -> void:
-	if _pending_sim_events.is_empty():
+func _drop_smoke_deferred_load() -> void:
+	# Catch-up queued day_emit / day_ai / day_battles. After past7 those flushed
+	# into AI land battles + air sorties (Play 9625020) then the window died.
+	_pending_sim_events.clear()
+	_sim_flush_scheduled = false
+
+
+func _arm_smoke_stay_alive_after_ok() -> void:
+	# Pause AFTER the finish dict is computed so after_hatch still logs
+	# paused=false / ok=true / past7=true. Live 4x must not keep ticking.
+	set_paused(true)
+	_drop_smoke_deferred_load()
+	print(
+		"EOA_SMOKE_STAYALIVE who=tm.arm past7=true paused_after_ok=1 combat_defer=1 no_quit=1 window_stay=1 (NOT product clock/Begin/Esc PASS)"
+	)
+	call_deferred("_smoke_stay_alive_heartbeat")
+
+
+func _smoke_stay_alive_heartbeat() -> void:
+	if not _smoke_stay_alive:
 		return
-	var kept: Array = []
-	for ev in _pending_sim_events:
-		if ev is Dictionary and str((ev as Dictionary).get("kind", "")) == "day_battles":
-			continue
-		kept.append(ev)
-	_pending_sim_events = kept
+	_smoke_stay_alive_beats += 1
+	print(
+		"EOA_SMOKE_STAYALIVE who=tm.heartbeat beat=%d past7=true window_alive=1 no_quit=1 (Search/spine window; NOT product clock PASS)"
+		% _smoke_stay_alive_beats
+	)
+	if _smoke_stay_alive_beats < SMOKE_STAY_ALIVE_BEATS:
+		call_deferred("_smoke_stay_alive_heartbeat")
 
 
 func _smoke_advance_already_result() -> Dictionary:
@@ -1069,6 +1126,9 @@ func _schedule_sim_flush() -> void:
 
 func _flush_sim_events() -> void:
 	_sim_flush_scheduled = false
+	if _smoke_stay_alive:
+		_drop_smoke_deferred_load()
+		return
 	if paused:
 		# Keep queue; resume via set_paused(false) / _process.
 		return

@@ -932,6 +932,42 @@ func _finish_smoke_advance_after_hatch(out: Dictionary) -> void:
 			"1" if bool(out.get("catchup", false)) else "0",
 		]
 	)
+	# Play 9625020: after_hatch ok=true past7=true then the window died before
+	# Search. Never treat advance-complete as harness done — do not quit.
+	print(
+		"EOA_SMOKE_STAYALIVE who=TestRunner.after_hatch no_quit=1 window_alive=1 past7=%s stay_alive=%s (Search/spine window; NOT product Begin/Esc/clock PASS)"
+		% [
+			str(out.get("past_7_jan", false)),
+			"1" if bool(out.get("stay_alive", _smoke_should_gate_post_hatch_heavy())) else "0",
+		]
+	)
+	call_deferred("_smoke_stay_alive_heartbeat")
+
+
+func _smoke_should_gate_post_hatch_heavy() -> bool:
+	# Live smoke: skip the post-past7 unit-icon / grand-visual rebound.
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	var tm: Node = get_node_or_null("/root/TimeManager")
+	if tm != null and tm.has_method("smoke_stay_alive_active") and bool(tm.call("smoke_stay_alive_active")):
+		return true
+	if tm != null and tm.has_method("smoke_advance_should_stay_alive"):
+		return bool(tm.call("smoke_advance_should_stay_alive"))
+	return _smoke_advance_past_plus6_wanted()
+
+
+func _smoke_stay_alive_heartbeat() -> void:
+	if not has_meta("eoa_smoke_advance_done"):
+		return
+	var beats: int = int(get_meta("eoa_smoke_stay_alive_beats", 0))
+	beats += 1
+	set_meta("eoa_smoke_stay_alive_beats", beats)
+	print(
+		"EOA_SMOKE_STAYALIVE who=TestRunner.heartbeat beat=%d window_alive=1 no_quit=1 (Search/spine window; NOT product clock PASS)"
+		% beats
+	)
+	if beats < 4:
+		call_deferred("_smoke_stay_alive_heartbeat")
 
 
 ## One-shot first-session onboarding for graphical F5 (meta-guarded at call site).
@@ -3607,25 +3643,35 @@ func _deferred_grand_visuals_and_setup() -> void:
 
 	# world_accurate F5: phase1 seed block never runs. Park Maginot chips after Europe frame.
 	# EOA_UNIT_ORDER_QA must park even in headless (evidence skips this otherwise).
+	# Live smoke stay-alive: skip the 252-icon flood after past7 (Play 9625020 exit).
+	var smoke_gate_heavy := _smoke_should_gate_post_hatch_heavy()
+	if smoke_gate_heavy:
+		print("EOA_SMOKE_STAYALIVE who=TestRunner.deferred_grand_visuals gate_chips=1 no_quit=1 (NOT product Begin/Esc/clock PASS)")
 	if (
 		map_renderer
 		and map_renderer.has_method("ensure_playable_front_chips")
+		and not smoke_gate_heavy
 		and (
 			not _wants_headless_evidence()
 			or OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() == "1"
 		)
 	):
 		map_renderer.call("ensure_playable_front_chips", OS.get_environment("EOA_UNIT_ORDER_QA").strip_edges() != "1")
+	elif smoke_gate_heavy:
+		print("EOA_SMOKE_STAYALIVE who=TestRunner.skip_front_chips past7_window=1 (Search/spine; no unit-icon flood)")
 
 	# Final safety hide if loading screen still up (e.g. non-heavy path or orphaned node).
 	_ensure_game_interactive()
 
-	if OS.get_environment("EOA_RUN_SIM_CYCLES") == "1" or _wants_50_turn_sim():
+	if not smoke_gate_heavy and (OS.get_environment("EOA_RUN_SIM_CYCLES") == "1" or _wants_50_turn_sim()):
 		call_deferred("_run_deferred_save_load_stockpile_test")
 		call_deferred("_run_deferred_combat_persist_test")
 
 	print("TestRunner: [DEFERRED GRAND VISUALS] Complete (bg + vis prints + basic seeds done post first frame; heavy + cycles + nudge already scheduled).")
 
+	if smoke_gate_heavy:
+		print("EOA_SMOKE_STAYALIVE who=TestRunner.deferred_grand_visuals complete no_quit=1 window_alive=1 (NOT product clock PASS)")
+		return
 	if typeof(AgentManager) != TYPE_NIL:
 		AgentManager.apply_agent_national_impacts()
 

@@ -248,6 +248,21 @@ func _test_source_live_input_routing() -> void:
 	if "_nudge_smoke_advance_past_plus6" not in tr:
 		_fail("TestRunner must nudge chunked smoke under softpipe starvation")
 		return
+	if "func smoke_advance_should_stay_alive" not in _read(SRC_TM) or "EOA_SMOKE_STAYALIVE" not in _read(SRC_TM):
+		_fail("TimeManager must arm stay-alive after past7 (Play 9625020 window death)")
+		return
+	if "func _drop_smoke_deferred_load" not in _read(SRC_TM):
+		_fail("stay-alive must drop queued day_emit/day_ai/day_battles")
+		return
+	if "EOA_SMOKE_STAYALIVE" not in tr or "no_quit" not in _slice_func(tr, "_finish_smoke_advance_after_hatch"):
+		_fail("TestRunner.after_hatch must log stay-alive / no_quit and must not quit")
+		return
+	if "get_tree().quit" in _slice_func(tr, "_finish_smoke_advance_after_hatch"):
+		_fail("TestRunner.after_hatch must not quit after past7")
+		return
+	if "_smoke_should_gate_post_hatch_heavy" not in tr or "skip_front_chips" not in tr:
+		_fail("TestRunner must gate post-hatch unit-icon flood under stay-alive")
+		return
 	if "NOT product clock" not in title_src and "NOT product clock" not in tr:
 		_fail("smoke past-+6 must stay labeled as not product clock PASS")
 		return
