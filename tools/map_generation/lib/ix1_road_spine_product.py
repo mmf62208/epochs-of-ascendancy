@@ -530,6 +530,10 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("testrunner_uilayer_not_20")
     if "_living_title_boot_is_up" not in _read(RENDERER_GD):
         missing.append("living_title_esc_map_owns_click")
+    if "_living_title_owns_click" not in _read(RENDERER_GD):
+        missing.append("living_title_rect_owns_click")
+    if "is_live_escape_event" not in title or "handle_live_begin" not in title:
+        missing.append("living_title_live_input")
     if "arm_play_clock_after_begin" not in top or "ACTION_MODE_BUTTON_PRESS" not in top:
         missing.append("top_bar_begin_arm")
     save_hook = _slice_func(save, "_on_day_advanced_for_autosave")

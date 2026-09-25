@@ -166,6 +166,8 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertNotIn("command_center_above_uilayer", tick.get("missing") or [])
         self.assertNotIn("testrunner_uilayer_not_20", tick.get("missing") or [])
         self.assertNotIn("living_title_esc_map_owns_click", tick.get("missing") or [])
+        self.assertNotIn("living_title_rect_owns_click", tick.get("missing") or [])
+        self.assertNotIn("living_title_live_input", tick.get("missing") or [])
         self.assertNotIn("title_esc_begin_on_gates", tick.get("missing") or [])
 
 

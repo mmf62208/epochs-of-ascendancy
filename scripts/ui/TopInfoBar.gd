@@ -928,9 +928,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			print("Ctrl+L QuickLoad triggered")
 		get_viewport().set_input_as_handled()
 		return
-	if event.keycode == KEY_ESCAPE:
+	if LivingTitleBoot.is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 		# Backup: MapRenderer `_input` owns the Esc stack (dismiss then idle CC).
 		# Do not queue_free MainMenu here — `_on_menu_pressed` toggles Command Center.
+		# Live DisplayServer may deliver physical_keycode / ui_cancel instead of keycode.
 		var mr := get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
 		if mr == null and get_tree() and get_tree().current_scene:
 			mr = get_tree().current_scene.find_child("MapRenderer", true, false)

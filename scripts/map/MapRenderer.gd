@@ -1619,6 +1619,43 @@ func _search_ui_owns_click() -> bool:
 	return sr.get_global_rect().grow(6.0).has_point(vp_r.get_mouse_position())
 
 
+func _living_title_owns_click() -> bool:
+	# Same class as Search Go / TopInfoBar: gui_get_hovered_control can miss
+	# the living-title panel while the cursor is on Begin (Play d18cbae).
+	# Rect-first so MapRenderer._input cannot swallow the click as a map pick.
+	if not _living_title_boot_is_up():
+		return false
+	var tree_t: SceneTree = get_tree()
+	if tree_t == null or tree_t.root == null:
+		return false
+	var boot: Node = tree_t.root.find_child("LivingTitleBoot", true, false)
+	if boot == null or not is_instance_valid(boot):
+		return false
+	var vp_lt: Viewport = get_viewport()
+	if vp_lt == null:
+		return false
+	var mouse_lt: Vector2 = vp_lt.get_mouse_position()
+	if boot.has_method("owns_screen_point") and bool(boot.call("owns_screen_point", mouse_lt)):
+		return true
+	var panel_lt: Control = boot.find_child("LivingTitlePanel", true, false) as Control
+	if panel_lt != null and panel_lt.visible and panel_lt.get_global_rect().grow(8.0).has_point(mouse_lt):
+		return true
+	var begin_lt: Control = boot.find_child("LivingTitleBegin", true, false) as Control
+	if begin_lt != null and begin_lt.visible and begin_lt.get_global_rect().grow(10.0).has_point(mouse_lt):
+		return true
+	return false
+
+
+func _route_living_title_escape() -> void:
+	var tree_e: SceneTree = get_tree()
+	if tree_e != null and tree_e.root != null:
+		var boot_e: Node = tree_e.root.find_child("LivingTitleBoot", true, false)
+		if boot_e != null and boot_e.has_method("handle_live_escape"):
+			boot_e.call("handle_live_escape")
+			return
+	_esc_open_command_center()
+
+
 func _top_bar_owns_click() -> bool:
 	# Softpipe / living-title: gui_get_hovered_control() can miss TopInfoBar
 	# 4x / pause (same class as Search Go). Rect first so leftover pick-block
@@ -1726,10 +1763,10 @@ func _handle_escape_key() -> void:
 	# Release focus and keep walking the stack — do not treat unfocus as a dismiss.
 	_release_search_focus()
 	# Living title owns the boot screen: do not dismiss a hidden inspector first.
-	# Play d53ee05: Esc/Menu looked like a no-op while "Begin · Germany · 1936"
-	# stayed up (UILayer 110 sat above CC 100).
+	# Play d18cbae: layer 120/130 was not enough — title must accept live Esc
+	# (keycode / physical / ui_cancel) and MapRenderer must not also toggle-close.
 	if _living_title_boot_is_up():
-		_esc_open_command_center()
+		_route_living_title_escape()
 		return
 	# Garrison / unit card first: Close/Esc restores province inspector (Köln spine)
 	# without GIS lock or a second search.
@@ -1789,7 +1826,7 @@ func _input(event: InputEvent) -> void:
 	# Esc / I / Home must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
 	if event is InputEventKey and event.pressed and not event.echo:
 		# Search / any LineEdit: do not steal letters (Play: typing "i" fired I-glyphs).
-		if _gui_text_field_has_focus() and event.keycode != KEY_ESCAPE:
+		if _gui_text_field_has_focus() and not LivingTitleBoot.is_live_escape_event(event) and event.keycode != KEY_ESCAPE:
 			return
 		if event.keycode == KEY_HOME:
 			_apply_home_key(event.shift_pressed)
@@ -1850,10 +1887,11 @@ func _input(event: InputEvent) -> void:
 				set_map_mode("resources")
 			get_viewport().set_input_as_handled()
 			return
-		if event.keycode == KEY_ESCAPE:
+		if LivingTitleBoot.is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 			# Full Esc chain in `_input` (Home-key pattern) so search/GUI cannot
 			# swallow idle Esc after inspector close (play: Esc closed inspector,
 			# next idle Esc never opened Command Center).
+			# Live DisplayServer may deliver physical_keycode / ui_cancel, not keycode.
 			_handle_escape_key()
 			get_viewport().set_input_as_handled()
 			return
@@ -1904,10 +1942,26 @@ func _input(event: InputEvent) -> void:
 			else:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
+			if _living_title_boot_is_up():
+				# Title panel / Begin: do not arm map gesture or mark handled.
+				# Map click: consume so chip/assault cannot window-exit (Play d18cbae).
+				if _living_title_owns_click():
+					return
+				if event.pressed:
+					get_viewport().set_input_as_handled()
+					return
+				var title_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+				var title_pid: int = _resolve_map_pick_pid(title_world)
+				if title_pid <= 0:
+					title_pid = _resolve_hex_pick_pid(title_world)
+				_try_living_title_map_pick(title_pid)
+				get_viewport().set_input_as_handled()
+				return
 			if event.pressed and (
 				_top_bar_owns_click()
 				or _mouse_over_search_control()
 				or _search_ui_owns_click()
+				or _living_title_owns_click()
 			):
 				return
 			if event.pressed:
@@ -1975,6 +2029,15 @@ func _input(event: InputEvent) -> void:
 				if did_left_pan:
 					_mark_left_pan_blocked_pick()
 					get_viewport().set_input_as_handled()
+				elif _living_title_boot_is_up():
+					# Never open chips / inspector / assault under the title (window-exit).
+					var rel_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+					var rel_pid: int = _resolve_map_pick_pid(rel_world)
+					if rel_pid <= 0:
+						rel_pid = _resolve_hex_pick_pid(rel_world)
+					_try_living_title_map_pick(rel_pid)
+					get_viewport().set_input_as_handled()
+					return
 				elif (
 					not event.shift_pressed
 					and not event.alt_pressed
@@ -2041,7 +2104,7 @@ func _wheel_should_zoom_map() -> bool:
 			return false
 		if nn.ends_with("Screen") or nn.ends_with("Popup"):
 			return false
-		if nn == "TopInfoBar":
+		if nn == "TopInfoBar" or nn == "LivingTitleBoot" or nn == "LivingTitlePanel" or nn == "LivingTitleBegin":
 			return false
 		n = n.get_parent()
 	return true
@@ -2049,10 +2112,10 @@ func _wheel_should_zoom_map() -> bool:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if _gui_text_field_has_focus() and event.keycode != KEY_ESCAPE:
+		if _gui_text_field_has_focus() and not LivingTitleBoot.is_live_escape_event(event) and event.keycode != KEY_ESCAPE:
 			return
 		# Esc: dismiss stuck overlays (legend / tech / info) so playtest is never trapped.
-		if event.keycode == KEY_ESCAPE:
+		if LivingTitleBoot.is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 			# Backup if `_input` did not run. Same chain: dismiss then idle `_on_menu_pressed`.
 			_handle_escape_key()
 			get_viewport().set_input_as_handled()
@@ -2262,12 +2325,25 @@ func _unhandled_input(event: InputEvent) -> void:
 	# Spatial picking click handling — this path makes the system fully functional
 	# even when create_area_nodes_for_fallback=false (pure MapPickGrid mode, zero Area2D nodes).
 	if use_spatial_picking and event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
+		if _living_title_boot_is_up():
+			if _living_title_owns_click():
+				return
+			if event.pressed:
+				get_viewport().set_input_as_handled()
+				return
+			var un_world: Vector2 = _screen_to_world(get_viewport().get_mouse_position())
+			var un_pid: int = _resolve_map_pick_pid(un_world)
+			if un_pid <= 0:
+				un_pid = _resolve_hex_pick_pid(un_world)
+			_try_living_title_map_pick(un_pid)
+			get_viewport().set_input_as_handled()
+			return
 		if _mouse_over_close_control():
 			if _inspector_stack_blocking_input():
 				_dismiss_inspector_and_restore_input()
 			get_viewport().set_input_as_handled()
 			return
-		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click():
+		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _living_title_owns_click():
 			return
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
@@ -17663,6 +17739,9 @@ func _is_mouse_over_blocking_ui() -> bool:
 			"BtnOpenFight",
 			"OpenFightFoldBtn",
 			"BtnClose",
+			"LivingTitleBoot",
+			"LivingTitlePanel",
+			"LivingTitleBegin",
 		]:
 			return true
 		if nn.ends_with("Screen") or nn.ends_with("Popup") or nn.ends_with("View"):

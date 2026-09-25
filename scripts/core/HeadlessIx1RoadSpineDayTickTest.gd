@@ -237,6 +237,12 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 	if "_living_title_boot_is_up" not in _read(SRC_REN):
 		_fail("MapRenderer must route Esc/map clicks around living title (no inspector swallow / window-exit)")
 		return
+	if "_living_title_owns_click" not in _read(SRC_REN):
+		_fail("MapRenderer must rect-first living title clicks (live Begin cannot depend on hover)")
+		return
+	if "is_live_escape_event" not in _read(SRC_TITLE) or "handle_live_begin" not in _read(SRC_TITLE):
+		_fail("LivingTitleBoot must own live Esc/Begin input (not layer-only)")
+		return
 	_pass("live F5 path cannot full-board AI scan; toast quiet; ring/day_emit/hour clock gated")
 
 

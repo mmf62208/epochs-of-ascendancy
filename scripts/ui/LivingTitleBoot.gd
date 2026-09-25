@@ -26,8 +26,11 @@ var _year := 1936
 var _nation_btns: Dictionary = {}
 var _era_btns: Dictionary = {}
 var _begin_btn: Button
+var _panel: PanelContainer
 var _status: Label
 var _closed := false
+## Set when live Esc is accepted on this overlay (headless + Play proof).
+var _esc_routed_to_cc := false
 
 
 ## False for Maginot / QA / env-chosen boots. True for a normal graphical F5.
@@ -128,9 +131,14 @@ static func apply_playable_country_from_province(province_id: int, year: int = 1
 func _ready() -> void:
 	layer = LIVING_TITLE_LAYER
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Live DisplayServer: MapRenderer._input runs before GUI and can swallow
+	# Begin / Esc if this overlay does not own input itself (Play d18cbae).
+	set_process_input(true)
+	set_process_unhandled_input(true)
 	_build_ui()
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(true)
+	_grab_live_focus()
 
 
 func _build_ui() -> void:
@@ -146,11 +154,13 @@ func _build_ui() -> void:
 	root.add_child(dim)
 
 	var panel := PanelContainer.new()
+	panel.name = "LivingTitlePanel"
 	panel.custom_minimum_size = Vector2(420, 560)
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	panel.process_mode = Node.PROCESS_MODE_ALWAYS
 	RetrowaveTheme.style_menu_panel(panel)
 	root.add_child(panel)
+	_panel = panel
 	panel.set_anchors_preset(Control.PRESET_CENTER_LEFT)
 	panel.offset_left = 28
 	panel.offset_top = -280
@@ -192,6 +202,7 @@ func _build_ui() -> void:
 		ebtn.text = str(int(yr))
 		ebtn.custom_minimum_size = Vector2(88, 34)
 		ebtn.mouse_filter = Control.MOUSE_FILTER_STOP
+		ebtn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		ebtn.pressed.connect(_on_year.bind(int(yr)))
 		era_row.add_child(ebtn)
 		_era_btns[int(yr)] = ebtn
@@ -213,6 +224,7 @@ func _build_ui() -> void:
 		nbtn.tooltip_text = str(NATION_LABELS.get(str(tag), tag))
 		nbtn.custom_minimum_size = Vector2(88, 32)
 		nbtn.mouse_filter = Control.MOUSE_FILTER_STOP
+		nbtn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 		nbtn.pressed.connect(_on_tag.bind(str(tag)))
 		if i < 4:
 			row_a.add_child(nbtn)
@@ -228,11 +240,16 @@ func _build_ui() -> void:
 	_fill_save_rows(col)
 
 	_begin_btn = Button.new()
+	_begin_btn.name = "LivingTitleBegin"
 	_begin_btn.custom_minimum_size = Vector2(0, 42)
 	_begin_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_begin_btn.focus_mode = Control.FOCUS_ALL
 	_begin_btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	# Press, not release: MapRenderer _input can swallow the release as a map pick
+	# (Play d18cbae: cursor on Begin, no transition, then window-exit).
+	_begin_btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	_begin_btn.pressed.connect(_on_begin_new)
+	_begin_btn.gui_input.connect(_on_begin_gui_input)
 	RetrowaveTheme.style_primary_button(_begin_btn)
 	col.add_child(_begin_btn)
 
@@ -263,6 +280,7 @@ func _fill_save_rows(col: VBoxContainer) -> void:
 			btn.text = "Load · %s" % str(row.get("label", slot))
 			btn.custom_minimum_size = Vector2(0, 30)
 			btn.mouse_filter = Control.MOUSE_FILTER_STOP
+			btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 			btn.pressed.connect(_on_load.bind(slot))
 			RetrowaveTheme.style_secondary_button(btn)
 			col.add_child(btn)
@@ -323,6 +341,180 @@ func _refresh_choice_buttons() -> void:
 		_begin_btn.text = "Begin · %s · %d" % [place, _year]
 	if _status != null:
 		_status.text = "Click a playable nation on the map (or a tag). Default is GER 1936 Maginot until you Begin."
+
+
+## Live DisplayServer Esc: keycode, physical_keycode, or ui_cancel.
+## Headless KEY_ESCAPE-only simulation is not enough (Play d18cbae).
+static func is_live_escape_event(event: InputEvent) -> bool:
+	if event == null:
+		return false
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+		if key.is_action("ui_cancel"):
+			return true
+	if event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
+func live_routing_facts() -> Dictionary:
+	var pressed_ok: bool = false
+	var gui_ok: bool = false
+	if _begin_btn != null and is_instance_valid(_begin_btn):
+		pressed_ok = _begin_btn.pressed.is_connected(_on_begin_new)
+		gui_ok = _begin_btn.gui_input.is_connected(_on_begin_gui_input)
+	return {
+		"ok": true,
+		"process_mode_always": process_mode == Node.PROCESS_MODE_ALWAYS,
+		"processing_input": is_processing_input(),
+		"processing_unhandled": is_processing_unhandled_input(),
+		"layer": int(layer),
+		"begin_stop": (
+			_begin_btn != null
+			and is_instance_valid(_begin_btn)
+			and _begin_btn.mouse_filter == Control.MOUSE_FILTER_STOP
+		),
+		"begin_press_mode": (
+			_begin_btn != null
+			and is_instance_valid(_begin_btn)
+			and _begin_btn.action_mode == BaseButton.ACTION_MODE_BUTTON_PRESS
+		),
+		"begin_pressed_wired": pressed_ok,
+		"begin_gui_wired": gui_ok,
+		"esc_routed_to_cc": _esc_routed_to_cc,
+		"closed": _closed,
+	}
+
+
+func panel_owns_screen_point(screen: Vector2) -> bool:
+	if _panel == null or not is_instance_valid(_panel) or not _panel.visible:
+		return false
+	return _panel.get_global_rect().grow(8.0).has_point(screen)
+
+
+func begin_owns_screen_point(screen: Vector2) -> bool:
+	if _begin_btn == null or not is_instance_valid(_begin_btn) or not _begin_btn.visible:
+		return false
+	return _begin_btn.get_global_rect().grow(10.0).has_point(screen)
+
+
+func owns_screen_point(screen: Vector2) -> bool:
+	if begin_owns_screen_point(screen):
+		return true
+	if panel_owns_screen_point(screen):
+		return true
+	return false
+
+
+func handle_live_begin() -> Dictionary:
+	_on_begin_new()
+	return {"ok": _closed, "closed": _closed, "mode": "new", "player_tag": _tag, "year": _year}
+
+
+func handle_live_escape() -> bool:
+	if _closed:
+		return false
+	# Title _input + MapRenderer _input both see the same Esc. One open only —
+	# a second deferred _on_menu_pressed would toggle-close (looks like a no-op).
+	var frame_now: int = Engine.get_process_frames()
+	if has_meta("eoa_title_esc_frame") and int(get_meta("eoa_title_esc_frame")) == frame_now:
+		return _esc_routed_to_cc
+	set_meta("eoa_title_esc_frame", frame_now)
+	_esc_routed_to_cc = true
+	return _open_command_center_from_title()
+
+
+func _grab_live_focus() -> void:
+	if _begin_btn != null and is_instance_valid(_begin_btn):
+		_begin_btn.grab_focus()
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return
+	var win: Window = get_window()
+	if win != null and win.has_method("grab_focus"):
+		win.grab_focus()
+
+
+func _open_command_center_from_title() -> bool:
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return false
+	var tib: Node = TopInfoBar.find_in_tree(tree)
+	if tib != null and tib.has_method("_on_menu_pressed"):
+		# Deferred so this Esc cannot _force_close the new overlay.
+		tib.call_deferred("_on_menu_pressed")
+		return true
+	if tree.root != null and tree.root.get_node_or_null("MainMenu") != null:
+		return true
+	# No TopInfoBar (headless probe): still defer so the opening Esc cannot close CC.
+	call_deferred("_instance_command_center_now")
+	return true
+
+
+func _instance_command_center_now() -> void:
+	var tree: SceneTree = get_tree()
+	if tree == null or tree.root == null:
+		return
+	if tree.root.get_node_or_null("MainMenu") != null:
+		return
+	var packed: PackedScene = load("res://scenes/ui/MainMenu.tscn") as PackedScene
+	if packed == null:
+		return
+	var menu: Node = packed.instantiate()
+	if menu == null:
+		return
+	menu.name = "MainMenu"
+	menu.process_mode = Node.PROCESS_MODE_ALWAYS
+	tree.root.add_child(menu)
+
+
+func _on_begin_gui_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event
+		if mb.pressed and mb.button_index == MOUSE_BUTTON_LEFT:
+			_on_begin_new()
+			var vp_g: Viewport = get_viewport()
+			if vp_g != null:
+				vp_g.set_input_as_handled()
+
+
+func _input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if is_live_escape_event(event):
+		if handle_live_escape():
+			var vp_e: Viewport = get_viewport()
+			if vp_e != null:
+				vp_e.set_input_as_handled()
+		return
+	if event is InputEventMouseButton:
+		var mb: InputEventMouseButton = event
+		if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+			return
+		var vp: Viewport = get_viewport()
+		var mouse: Vector2 = vp.get_mouse_position() if vp != null else mb.position
+		if begin_owns_screen_point(mouse) or begin_owns_screen_point(mb.position):
+			_on_begin_new()
+			if vp != null:
+				vp.set_input_as_handled()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _closed:
+		return
+	if is_live_escape_event(event):
+		if handle_live_escape():
+			var vp_u: Viewport = get_viewport()
+			if vp_u != null:
+				vp_u.set_input_as_handled()
 
 
 func _on_begin_new() -> void:
