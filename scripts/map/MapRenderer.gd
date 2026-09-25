@@ -53,10 +53,12 @@ const _TerrainTiles = preload("res://scripts/map/TerrainTileLibrary.gd")
 # Dynamically created infrastructure investment UI (MVP — matches engineers button pattern)
 var _btn_invest_infra: Button = null
 var _btn_build_road_spine: Button = null
+var _label_spine_progress: Label = null
 var _ix1_reveal_busy: bool = false
 var _ix1_spine_inspector_pid: int = -1
 var _ix1_spine_press_guard_msec: int = 0
 var _ix1_last_spine_press: Dictionary = {}
+var _ix1_last_progress_band: int = -1
 const IX1_SPINE_PRESS_GUARD_MS := 180
 var _btn_develop_resource: Button = null
 var _label_invest_status: Label = null
@@ -3369,11 +3371,21 @@ func _zoom_toward_mouse(zoom_change: float) -> void:
 	if new_zoom == old_zoom:
 		return
 
+	eoa_log_flush(
+		"EOA_ZOOM_BEGIN who=MapRenderer._zoom_toward_mouse from=%.3f to=%.3f factor=%.3f"
+		% [old_zoom.x, new_zoom.x, zoom_change]
+	)
 	var world_before := cam.get_canvas_transform().affine_inverse() * mouse_screen
 	cam.zoom = new_zoom
 	var world_after := cam.get_canvas_transform().affine_inverse() * mouse_screen
 	cam.global_position += world_before - world_after
 	_clamp_camera_to_theater()
+	# Light LOD only — never full 3520 fill / RoadLayer rebuild on a wheel notch.
+	_refresh_terrain_zoom_light()
+	eoa_log_flush(
+		"EOA_ZOOM_END who=MapRenderer._zoom_toward_mouse z=%.3f ok=1"
+		% new_zoom.x
+	)
 
 ## Converts screen (pixel) mouse position to world/map space using the active Camera2D.
 ## This is the key bridge for using MapPickGrid / MapManager picking.
@@ -17938,10 +17950,18 @@ func _clear_selection() -> void:
 	_update_compare_hint_label()
 
 
+func eoa_log_flush(msg: String) -> void:
+	print(msg)
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+
+
 ## Select a province and pan the map camera to it (used by production / relocate UI).
 ## Now also drives the modern CameraController (ProvinceContainers) so auto-center works reliably for map tools / changes.
 ## Pass 51: zoom_mode = tactical | soft | keep (pan only).
-func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> bool:
+## Live F5: "tactical" is redirected to soft-pan (2.4 zoom after +6d / spine start
+## killed the process with no SCRIPT ERROR).
+func focus_province_by_id(province_id: int, zoom_mode: String = "soft") -> bool:
 	if province_id < 0:
 		return false
 	var province: Province = null
@@ -17965,18 +17985,21 @@ func focus_province_by_id(province_id: int, zoom_mode: String = "tactical") -> b
 	_select_province(province, node)
 	var zm := zoom_mode.strip_edges().to_lower()
 	if zm == "soft" or zm == "keep":
+		eoa_log_flush("EOA_ZOOM_BEGIN who=MapRenderer.focus_province_by_id mode=%s pid=%d" % [zm, province_id])
 		_soft_pan_camera_to_province(province_id, zm == "keep")
+		eoa_log_flush("EOA_ZOOM_END who=MapRenderer.focus_province_by_id mode=%s pid=%d ok=1" % [zm, province_id])
 	else:
-		var pos: Vector2 = province_centroids.get(province_id, Vector2.ZERO)
-		if pos == Vector2.ZERO and typeof(MapManager) != TYPE_NIL:
-			pos = MapManager.get_province_centroid(province_id)
-		var cam := get_node_or_null("MapCamera") as Camera2D
-		if cam == null:
-			cam = get_viewport().get_camera_2d() if get_viewport() else null
-		if cam != null and pos != Vector2.ZERO and not _camera_is_held():
-			var tactical_z := clampf(2.4 * MapCanvasConfig.THEATER_SCALE, min_zoom, max_zoom)
-			cam.global_position = _apply_camera_bounds(pos)
-			cam.zoom = Vector2(tactical_z, tactical_z)
+		# Live F5 / smoke: tactical 2.4 after +6d (or after IX-1 spine start)
+		# exited Godot with no SCRIPT ERROR. Soft-pan is the shipped path.
+		eoa_log_flush(
+			"EOA_ZOOM_BEGIN who=MapRenderer.focus_province_by_id mode=tactical_redirected_soft pid=%d"
+			% province_id
+		)
+		_soft_pan_camera_to_province(province_id, false)
+		eoa_log_flush(
+			"EOA_ZOOM_END who=MapRenderer.focus_province_by_id mode=tactical_redirected_soft pid=%d ok=1"
+			% province_id
+		)
 	_raise_province_inspector_over_unit_card()
 	show_info_panel(province, true)
 	if typeof(MapManager) != TYPE_NIL:
@@ -18113,8 +18136,11 @@ func _center_camera_on_province(province_id: int, zoom_mode: String = "soft") ->
 	var zm := zoom_mode.strip_edges().to_lower()
 	var cur_z := maxf(absf(cam.zoom.x), 0.01)
 	if zm == "tactical":
-		cur_z = clampf(2.2 * MapCanvasConfig.THEATER_SCALE, min_zoom, max_zoom)
-		cam.zoom = Vector2(cur_z, cur_z)
+		# Same class as Search/spine start: snap-to-2.2+ killed the softpipe.
+		eoa_log_flush("EOA_ZOOM_BEGIN who=MapRenderer._center_camera_on_province mode=tactical_redirected_soft pid=%d" % province_id)
+		_soft_pan_camera_to_province(province_id, false)
+		eoa_log_flush("EOA_ZOOM_END who=MapRenderer._center_camera_on_province mode=tactical_redirected_soft pid=%d ok=1" % province_id)
+		return
 	elif zm == "soft":
 		var soft_target := clampf(maxf(cur_z, 0.9), min_zoom, max_zoom)
 		if cur_z < 0.75:
@@ -20113,7 +20139,11 @@ func _update_infrastructure_investment_ui(province: Province) -> void:
 		if mgr.has_method("should_show_investment_button")
 		else true
 	)
-	if not show_ui:
+	var spine_status: Dictionary = (
+		mgr.get_project_status(province.id) if mgr.has_method("get_project_status") else {}
+	)
+	var spine_active := bool(spine_status.get("active", false)) and bool(spine_status.get("build_road_spine", false))
+	if not show_ui and not spine_active:
 		_btn_invest_infra.visible = false
 		_label_invest_status.visible = false
 		if _progress_invest: _progress_invest.visible = false
@@ -20319,6 +20349,7 @@ func _prepend_ix1_spine_build_row(province: Province) -> void:
 	row.name = "Ix1SpineBuildRow"
 	row.add_theme_constant_override("separation", 8)
 	var info_label := Label.new()
+	info_label.name = "Ix1SpineBuildInfo"
 	info_label.text = "Build Road Spine (Mandate 0, Bonn–Köln–Leverkusen)"
 	info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -20344,6 +20375,8 @@ func _update_road_spine_button(province: Province) -> void:
 	var mgr = _get_infra_manager()
 	if province == null:
 		_btn_build_road_spine.visible = false
+		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+			_label_spine_progress.visible = false
 		return
 	var show_btn := _ix1_should_show_spine_button(province)
 	_btn_build_road_spine.visible = show_btn
@@ -20357,16 +20390,23 @@ func _update_road_spine_button(province: Province) -> void:
 	var active := bool(status.get("active", false))
 	var spine_proj := bool(status.get("build_road_spine", false))
 	if active:
-		_btn_build_road_spine.disabled = true
-		_btn_build_road_spine.text = "Building Road Spine" if spine_proj else "Project Active"
 		var eta := int(status.get("eta_days", 0))
 		var pct := int(round(float(status.get("progress", 0.0))))
+		_btn_build_road_spine.disabled = true
+		_btn_build_road_spine.text = "Building…" if spine_proj else "Project Active"
 		_btn_build_road_spine.tooltip_text = "Road spine %d%% · ETA %d days" % [pct, eta]
+		_ensure_spine_progress_label()
+		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+			_label_spine_progress.visible = true
+			_label_spine_progress.text = "Road spine %d%% · ETA %d days" % [pct, eta]
 	else:
 		_btn_build_road_spine.disabled = false
 		_btn_build_road_spine.text = "Build Road Spine"
 		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). First-session starter grant — GER 1936 day-0 Mandate is enough (generic Invest stays gated). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
+		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+			_label_spine_progress.visible = false
 	_layout_road_spine_chrome_button()
+	_layout_spine_progress_label()
 
 
 func _ix1_spine_target_province_id() -> int:
@@ -20425,11 +20465,19 @@ func _on_build_road_spine_pressed() -> void:
 		var pname := ""
 		if provinces.has(pid):
 			pname = provinces[pid].name
-		focus_province_by_id(pid)
+		# Toast + Building… BEFORE any camera work. Play MIXED 002df244:
+		# focus_province_by_id defaulted to tactical 2.4 and the process died
+		# before the player saw start feedback.
+		_apply_spine_building_button_state(pid, 0, eta)
 		_show_inspector_toast("Road spine started in %s · ETA %d days" % [pname, eta], 3.0)
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast("Road spine started in %s · ETA %d days" % [pname, eta], 3.5)
 		_play_map_sfx("confirm")
 		if provinces.has(pid):
 			show_info_panel(provinces[pid])
+			_apply_spine_building_button_state(pid, 0, eta)
+		# Soft pan only — never tactical 2.4 (softpipe silent exit).
+		focus_province_by_id(pid, "soft")
 	else:
 		_show_inspector_toast(str(result.get("reason", "Cannot start road spine")), 3.5, true)
 		_play_map_sfx("error")
@@ -20447,7 +20495,7 @@ func _log_smoke_spine_start(report: Dictionary) -> void:
 	var vis := bool(report.get("visible", false))
 	var armed := bool(report.get("armed", false))
 	# Visible button + start never arms after press = FAIL for the live softpipe.
-	print(
+	eoa_log_flush(
 		"EOA_SMOKE_SPINE_START who=MapRenderer.press visible=%s armed=%s pid=%s reason=%s (live press; NOT product Begin/Esc/clock PASS)"
 		% [
 			"1" if vis else "0",
@@ -20456,6 +20504,107 @@ func _log_smoke_spine_start(report: Dictionary) -> void:
 			str(report.get("reason", "")),
 		]
 	)
+
+
+func _log_smoke_spine_progress(pid: int, pct: int, eta: int, who: String = "MapRenderer") -> void:
+	var band := int(pct / 10)
+	if band == _ix1_last_progress_band and pct < 100:
+		return
+	_ix1_last_progress_band = band
+	eoa_log_flush(
+		"EOA_SMOKE_SPINE_PROGRESS who=%s pid=%d pct=%d eta=%d (NOT product Begin/Esc/clock PASS)"
+		% [who, pid, pct, eta]
+	)
+
+
+func _log_smoke_spine_complete(pid: int, who: String = "MapRenderer") -> void:
+	eoa_log_flush(
+		"EOA_SMOKE_SPINE_COMPLETE who=%s pid=%d (NOT product Begin/Esc/clock PASS)"
+		% [who, pid]
+	)
+
+
+func _apply_spine_building_button_state(pid: int, pct: int, eta: int) -> void:
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
+		_btn_build_road_spine.visible = true
+		_btn_build_road_spine.disabled = true
+		_btn_build_road_spine.text = "Building…"
+		_btn_build_road_spine.tooltip_text = "Road spine %d%% · ETA %d days" % [pct, eta]
+	_ensure_spine_progress_label()
+	if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+		_label_spine_progress.visible = true
+		_label_spine_progress.text = "Road spine %d%% · ETA %d days" % [pct, eta]
+	var list_row: Node = null
+	if _special_sites_container != null and is_instance_valid(_special_sites_container):
+		list_row = _special_sites_container.get_node_or_null("Ix1SpineBuildRow")
+	if list_row != null:
+		var list_btn: Button = list_row.find_child("BtnBuildRoadSpineInList", true, false) as Button
+		if list_btn != null:
+			list_btn.disabled = true
+			list_btn.text = "Building…"
+		var list_lab: Label = list_row.find_child("Ix1SpineBuildInfo", true, false) as Label
+		if list_lab == null:
+			for ch in list_row.get_children():
+				if ch is Label:
+					list_lab = ch
+					break
+		if list_lab != null:
+			list_lab.text = "Road spine %d%% · ETA %d days (Bonn–Köln–Leverkusen)" % [pct, eta]
+	_log_smoke_spine_progress(pid, pct, eta, "MapRenderer.button")
+
+
+func _ensure_spine_progress_label() -> void:
+	if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+		_layout_spine_progress_label()
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	_label_spine_progress = Label.new()
+	_label_spine_progress.name = "LabelSpineProgress"
+	_label_spine_progress.text = ""
+	_label_spine_progress.visible = false
+	_label_spine_progress.add_theme_font_size_override("font_size", 12)
+	_label_spine_progress.modulate = Color(0.75, 0.95, 0.82, 1.0)
+	_label_spine_progress.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	(info_panel as Control).add_child(_label_spine_progress)
+	_layout_spine_progress_label()
+
+
+func _layout_spine_progress_label() -> void:
+	if _label_spine_progress == null or not is_instance_valid(_label_spine_progress):
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	var panel_w := absf(ip.offset_right - ip.offset_left)
+	if panel_w < 80.0:
+		panel_w = maxf(ip.size.x, 520.0)
+	_label_spine_progress.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_label_spine_progress.position = Vector2(12.0, 66.0)
+	_label_spine_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 20.0)
+	_label_spine_progress.size = _label_spine_progress.custom_minimum_size
+
+
+func drive_ix1_zoom_and_roadlayer_redraw(zoom_mode: String = "soft") -> Dictionary:
+	# Headless / smoke: start spine → clock → this path. Never snaps to 2.4.
+	var mode := zoom_mode.strip_edges().to_lower()
+	if mode == "tactical":
+		mode = "soft"
+	eoa_log_flush("EOA_ZOOM_BEGIN who=MapRenderer.drive_ix1 mode=%s pid=710417" % mode)
+	_soft_pan_camera_to_province(710417, mode == "keep")
+	_refresh_terrain_zoom_light()
+	var ol: Node = get_overlay_layer("InfrastructureOverlayLayer")
+	if ol != null and ol.has_method("rebuild_road_layer"):
+		ol.call("rebuild_road_layer")
+	var report: Dictionary = {}
+	if ol != null and ol.has_method("ix1_spine_roadlayer_report"):
+		report = ol.call("ix1_spine_roadlayer_report")
+	eoa_log_flush("EOA_ZOOM_END who=MapRenderer.drive_ix1 mode=%s ok=1" % mode)
+	return {
+		"ok": true,
+		"mode": mode,
+		"roadlayer": report,
+	}
 
 
 func _on_invest_infrastructure_pressed() -> void:
@@ -20527,6 +20676,16 @@ func _on_cancel_infra_project_pressed() -> void:
 ## Live refresh for inspector when infra project on selected province makes progress or completes.
 ## Keeps "active project %/ETA" and derived effects (supply/org) up to date without manual re-click.
 func _on_infra_progress_for_inspector(pid: int, _proj: Variant, _delta: float) -> void:
+	var spine := false
+	var pct := 0
+	var eta := 0
+	if _proj != null:
+		spine = bool(_proj.build_road_spine)
+		pct = int(round(float(_proj.progress)))
+		if _proj.has_method("get_eta_days"):
+			eta = int(_proj.get_eta_days())
+	if spine:
+		_apply_spine_building_button_state(pid, pct, eta)
 	if pid == selected_province_id and info_panel != null and info_panel.visible and provinces.has(pid):
 		# Refresh just the invest UI. Do not notify_province_changed here — that
 		# re-entered show_info_panel + overlay rebuild on every spine day tick.
@@ -20553,6 +20712,13 @@ func _on_infra_completed_for_inspector(pid: int, new_level: int, _axis: String, 
 		spine = bool(_proj.build_road_spine)
 	var flair: Dictionary = _MapNextListHelpers.format_infra_project_flair(pname, "complete", new_level)
 	if spine:
+		_log_smoke_spine_complete(pid, "MapRenderer.complete")
+		if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
+			_btn_build_road_spine.disabled = true
+			_btn_build_road_spine.text = "Spine complete"
+		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+			_label_spine_progress.visible = true
+			_label_spine_progress.text = "Road spine complete · infra %d" % new_level
 		_show_inspector_toast("Road spine complete in %s · infra %d" % [pname, new_level], 3.5)
 		_play_map_sfx("achievement")
 	else:

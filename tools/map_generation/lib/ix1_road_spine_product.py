@@ -36,6 +36,7 @@ TIME_MANAGER_GD = ROOT / "scripts" / "autoload" / "TimeManager.gd"
 TEST_RUNNER_GD = ROOT / "scripts" / "core" / "TestRunner.gd"
 TOP_INFO_GD = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
 DAY_TICK_HARNESS = ROOT / "scripts" / "core" / "HeadlessIx1RoadSpineDayTickTest.gd"
+COMPLETE_HARNESS = ROOT / "scripts" / "core" / "HeadlessIx1RoadSpineCompleteTest.gd"
 AGENT_GD = ROOT / "scripts" / "agents" / "AgentManager.gd"
 TOAST_GD = ROOT / "scripts" / "ui" / "LeaderEventUI.gd"
 MAPMODE_GD = ROOT / "scripts" / "ui" / "map" / "MapModeToolbar.gd"
@@ -79,6 +80,15 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (GATES_SH, "HeadlessIx1RoadSpineDayTickTest"),
     (GATES_SH, "HeadlessIx1SearchGoInspectorTest"),
     (GATES_SH, "HeadlessIx1LivingTitleEscBeginTest"),
+    (GATES_SH, "HeadlessIx1RoadSpineCompleteTest"),
+    (COMPLETE_HARNESS, "EOA_SMOKE_SPINE_COMPLETE"),
+    (IDM_GD, "simulate_ix1_spine_start_to_complete"),
+    (RENDERER_GD, "EOA_ZOOM_BEGIN"),
+    (RENDERER_GD, "EOA_ZOOM_END"),
+    (RENDERER_GD, "EOA_SMOKE_SPINE_PROGRESS"),
+    (RENDERER_GD, "EOA_SMOKE_SPINE_COMPLETE"),
+    (RENDERER_GD, "Building…"),
+    (RENDERER_GD, "tactical_redirected_soft"),
     (SPEC_PATH, "first_session_mandate_cost"),
     (IDM_GD, "710417"),
     (MAP_MANAGER_GD, "func build_road_connection"),
@@ -894,6 +904,57 @@ def ix1_spine_start_after_press() -> Dict[str, Any]:
     }
 
 
+def ix1_spine_complete_zoom_gate() -> Dict[str, Any]:
+    """Play MIXED 002df244: start logic PASS then silent exit after zoom.
+
+    Spine start must toast + Building… before any camera work, never snap
+    tactical 2.4, bracket zoom with flushed EOA_ZOOM_* logs, and a headless
+    start→complete path must prove RoadLayer Bonn–Köln–Leverkusen + Essen off.
+    """
+    ren = _read(RENDERER_GD)
+    idm = _read(IDM_GD)
+    ol = _read(OVERLAY_GD)
+    tr = _read(TEST_RUNNER_GD)
+    complete = _read(COMPLETE_HARNESS)
+    missing: List[str] = []
+    press = _slice_func(ren, "_on_build_road_spine_pressed")
+    if 'focus_province_by_id(pid, "soft")' not in press:
+        missing.append("press_soft_pan")
+    if "Building…" not in ren:
+        missing.append("building_ellipsis")
+    if "_apply_spine_building_button_state" not in press:
+        missing.append("button_state_before_zoom")
+    if press.find("_show_inspector_toast") > press.find("focus_province_by_id"):
+        missing.append("toast_after_zoom")
+    if "EOA_ZOOM_BEGIN" not in ren or "EOA_ZOOM_END" not in ren:
+        missing.append("zoom_brackets")
+    if "flush_stdout" not in ren:
+        missing.append("zoom_flush")
+    if "tactical_redirected_soft" not in ren:
+        missing.append("tactical_redirect")
+    if "EOA_SMOKE_SPINE_PROGRESS" not in ren or "EOA_SMOKE_SPINE_COMPLETE" not in idm:
+        missing.append("progress_complete_logs")
+    if "LabelSpineProgress" not in ren:
+        missing.append("panel_progress_label")
+    if "simulate_ix1_spine_start_to_complete" not in idm:
+        missing.append("start_to_complete_sim")
+    if "ix1_spine_roadlayer_report" not in ol:
+        missing.append("roadlayer_report")
+    if "func _quit_logged" not in tr or "EOA_HARNESS_QUIT" not in tr:
+        missing.append("harness_quit_logged")
+    if "EOA_SMOKE_SPINE_COMPLETE" not in complete:
+        missing.append("complete_harness")
+    start = ix1_spine_start_after_press()
+    if not start.get("ok"):
+        missing.append("spine_start_after_press")
+    return {
+        "ok": not missing,
+        "missing": missing,
+        "hub_id": HUB_ID,
+        "spine_start_after_press": start,
+    }
+
+
 def ix1_search_go_live_signals() -> Dict[str, Any]:
     """Prove live LineEdit+Go/Enter signals are wired — not resolve-only.
 
@@ -1117,6 +1178,12 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
     else:
         fails.append("spine_start_after_press")
 
+    complete_zoom = ix1_spine_complete_zoom_gate()
+    if complete_zoom.get("ok"):
+        passes.append("spine_complete_zoom_gate")
+    else:
+        fails.append("spine_complete_zoom_gate")
+
     return {
         "ok": not fails,
         "slice": SLICE_NAME,
@@ -1139,6 +1206,7 @@ def build_ix1_road_spine_product() -> Dict[str, Any]:
         "search_go_live_signals": search_signals,
         "search_go_spine_visible": spine_visible,
         "spine_start_after_press": spine_start,
+        "spine_complete_zoom_gate": complete_zoom,
         "parked": [
             "Dig2 pan",
             "old G polyline dig",

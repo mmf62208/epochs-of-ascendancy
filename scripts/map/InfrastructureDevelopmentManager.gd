@@ -18,6 +18,8 @@ signal project_completed(province_id: int, new_level: int, axis: String, project
 signal project_cancelled(province_id: int, reason: String)
 signal project_sabotaged(province_id: int, work_lost: float, severity: String)
 
+var _ix1_smoke_progress_band: int = -1
+
 # --- Inner data model (can be promoted to its own Resource later) ---
 class ProvincialProject:
 	var id: String = ""
@@ -347,10 +349,17 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 
 		if delta > 0.001:
 			project_progress_updated.emit(pid, proj, delta)
+			if proj.build_road_spine:
+				_log_smoke_spine_progress(pid, int(round(proj.progress)), proj.get_eta_days(), "IDM.advance_daily")
 			# Light event feedback for playability (avoid spam; only on significant chunks or high %).
 			if (int(proj.progress) % 25 == 0 or proj.progress > 90) and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 				var pname := p.name if p else str(pid)
-				LeaderEventUI.show_toast("%s infra project ~%d%% complete (ETA %d days)" % [pname, int(proj.progress), proj.get_eta_days()], 2.0)
+				var toast_txt := (
+					"Road spine ~%d%% · ETA %d days" % [int(proj.progress), proj.get_eta_days()]
+					if proj.build_road_spine
+					else "%s infra project ~%d%% complete (ETA %d days)" % [pname, int(proj.progress), proj.get_eta_days()]
+				)
+				LeaderEventUI.show_toast(toast_txt, 2.0)
 
 		if proj.progress >= 100.0 or proj.days_remaining <= 0:
 			to_complete.append({"pid": pid, "proj": proj})
@@ -507,6 +516,8 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 				LeaderEventUI.show_toast("Investment complete in %s: %s now level %d" % [pname, axis, new_level], 4.0)
 
 	print("InfrastructureDevelopmentManager: COMPLETED %s project on province %d → level %d for %s" % [axis, province_id, new_level, proj.owner_tag])
+	if proj.build_road_spine:
+		_log_smoke_spine_complete(province_id, "IDM.complete")
 
 
 func _get_era_max(country_tag: String, axis: String) -> int:
@@ -1107,6 +1118,7 @@ func start_road_spine_project(province_id: int, investor_tag: String) -> Provinc
 			"infrastructure",
 		)
 	print("InfrastructureDevelopmentManager: started IX-1 road spine on province %d for %s" % [province_id, tag])
+	_log_smoke_spine_progress(province_id, int(round(proj.progress)), proj.get_eta_days(), "IDM.start")
 	return proj
 
 
@@ -1247,6 +1259,167 @@ func simulate_ix1_spine_days(days: int = 12, use_f5_flush: bool = true) -> Dicti
 		"build_road_spine": true,
 		"hub_id": hub,
 		"full_board_ai_invest": _should_run_full_board_ai_invest(),
+	}
+
+
+func _eoa_log_flush(msg: String) -> void:
+	print(msg)
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+
+
+func _log_smoke_spine_progress(pid: int, pct: int, eta: int, who: String) -> void:
+	var band := int(pct / 10)
+	if band == _ix1_smoke_progress_band and pct < 100 and who != "IDM.start":
+		return
+	_ix1_smoke_progress_band = band
+	_eoa_log_flush(
+		"EOA_SMOKE_SPINE_PROGRESS who=%s pid=%d pct=%d eta=%d (NOT product Begin/Esc/clock PASS)"
+		% [who, pid, pct, eta]
+	)
+
+
+func _log_smoke_spine_complete(pid: int, who: String) -> void:
+	_eoa_log_flush(
+		"EOA_SMOKE_SPINE_COMPLETE who=%s pid=%d (NOT product Begin/Esc/clock PASS)"
+		% [who, pid]
+	)
+
+
+func ensure_ix1_theater_provinces_for_headless() -> Dictionary:
+	# Seed Köln/Bonn/Leverkusen/Essen only when missing. Never renumber.
+	var seeded: Array[int] = []
+	if typeof(MapManager) == TYPE_NIL:
+		return {"ok": false, "reason": "no_map_manager", "seeded": seeded}
+	var specs: Array[Dictionary] = [
+		{"id": 710417, "name": "Köln, Kreisfreie Stadt", "pos": Vector2(0, 0)},
+		{"id": 710416, "name": "Bonn, Kreisfreie Stadt", "pos": Vector2(0, 80)},
+		{"id": 710418, "name": "Leverkusen, Kreisfreie Stadt", "pos": Vector2(0, -80)},
+		{"id": 710403, "name": "Essen, Kreisfreie Stadt", "pos": Vector2(90, 0)},
+	]
+	var cents: Dictionary = MapManager.get("_centroids") if MapManager.get("_centroids") is Dictionary else {}
+	var provs: Dictionary = MapManager.get("_provinces") if MapManager.get("_provinces") is Dictionary else {}
+	for row in specs:
+		var pid := int(row.get("id", -1))
+		if MapManager.get_province(pid) != null:
+			continue
+		var p := Province.new()
+		p.id = pid
+		p.name = str(row.get("name", str(pid)))
+		p.owner_tag = "GER"
+		p.controller_tag = "GER"
+		p.infrastructure = 4
+		p.development_level = 2
+		p.terrain = "plains"
+		p.is_sea = false
+		p.coordinates = row.get("pos", Vector2.ZERO)
+		provs[pid] = p
+		cents[pid] = p.coordinates
+		seeded.append(pid)
+	if not seeded.is_empty():
+		MapManager.set("_provinces", provs)
+		MapManager.set("_centroids", cents)
+	var adj: AdjacencySystem = MapManager.get_adjacency_system()
+	if adj == null:
+		adj = AdjacencySystem.new()
+		adj.load_from_dict({
+			"710416": [710417],
+			"710417": [710416, 710418],
+			"710418": [710417],
+			"710403": [],
+		})
+		MapManager.set("_adjacency", adj)
+	elif adj.get_land_neighbors(710417).is_empty() and adj.get_neighbors(710417).is_empty():
+		adj.load_from_dict({
+			"710416": [710417],
+			"710417": [710416, 710418],
+			"710418": [710417],
+			"710403": [],
+		})
+	for row2 in specs:
+		var p2: Province = MapManager.get_province(int(row2.get("id", -1)))
+		if p2 != null:
+			adj.register_province(p2)
+	return {
+		"ok": MapManager.get_province(710417) != null,
+		"seeded": seeded,
+		"hub": MapManager.get_province(710417) != null,
+	}
+
+
+func simulate_ix1_spine_start_to_complete(max_days: int = 60) -> Dictionary:
+	# Headless: start Köln spine, tick to complete, prove RoadLayer + Essen impact.
+	var n := clampi(int(max_days), 8, 90)
+	var theater: Dictionary = ensure_ix1_theater_provinces_for_headless()
+	if not _is_initialized:
+		initialize_with_time()
+	var hub := IX1_FALLBACK_HUB
+	if has_active_project(hub):
+		var existing: ProvincialProject = get_active_project(hub)
+		if existing == null or not bool(existing.build_road_spine):
+			cancel_project(hub, "headless_spine_complete_reset")
+	var start_result: Dictionary = {}
+	if not has_active_project(hub):
+		start_result = try_start_road_spine(hub, "GER")
+		if not bool(start_result.get("success", false)):
+			start_road_spine_project(hub, "GER")
+			start_result = {"success": has_active_project(hub), "reason": "seeded_project"}
+	var koln: Province = MapManager.get_province(hub) if typeof(MapManager) != TYPE_NIL else null
+	var essen: Province = MapManager.get_province(710403) if typeof(MapManager) != TYPE_NIL else null
+	var cost_before := koln.get_movement_cost() if koln != null else -1.0
+	var essen_before := essen.get_movement_cost() if essen != null else -1.0
+	var days := 0
+	var last_pct := 0
+	while days < n and has_active_project(hub):
+		advance_daily_projects(1936, 1, 1 + days)
+		days += 1
+		var live: ProvincialProject = get_active_project(hub)
+		if live != null:
+			last_pct = int(round(live.progress))
+	var completed := not has_active_project(hub)
+	var cost_after := koln.get_movement_cost() if koln != null else -1.0
+	var essen_after := essen.get_movement_cost() if essen != null else -1.0
+	var bonn: Province = MapManager.get_province(710416) if typeof(MapManager) != TYPE_NIL else null
+	var lev: Province = MapManager.get_province(710418) if typeof(MapManager) != TYPE_NIL else null
+	var edge_bonn := koln != null and bonn != null and (710416 in koln.built_road_neighbors) and (710417 in bonn.built_road_neighbors)
+	var edge_lev := koln != null and lev != null and (710418 in koln.built_road_neighbors) and (710417 in lev.built_road_neighbors)
+	var essen_edge := koln != null and essen != null and (710403 in koln.built_road_neighbors)
+	var overlay: Node = null
+	if get_tree() != null:
+		overlay = get_tree().get_first_node_in_group("infrastructure_overlay")
+	if overlay == null:
+		overlay = InfrastructureOverlayLayer.new()
+		overlay.name = "Ix1HeadlessRoadLayer"
+		if get_tree() != null:
+			get_tree().root.add_child(overlay)
+	if overlay.get("map_manager") == null and typeof(MapManager) != TYPE_NIL:
+		overlay.set("map_manager", MapManager)
+	if overlay.has_method("rebuild_road_layer"):
+		overlay.call("rebuild_road_layer")
+	var road_report: Dictionary = {}
+	if overlay.has_method("ix1_spine_roadlayer_report"):
+		road_report = overlay.call("ix1_spine_roadlayer_report")
+	var cheaper_than_before := cost_after > 0.0 and cost_before > 0.0 and cost_after < cost_before - 0.0001
+	var cheaper_than_essen := cost_after > 0.0 and essen_after > 0.0 and cost_after < essen_after - 0.0001
+	var essen_unchanged := essen != null and essen.built_road_neighbors.is_empty() and not essen_edge
+	return {
+		"ok": completed and edge_bonn and edge_lev and essen_unchanged and cheaper_than_before and cheaper_than_essen and bool(road_report.get("ok", false)),
+		"completed": completed,
+		"days": days,
+		"progress_last": last_pct,
+		"cost_before": cost_before,
+		"cost_after": cost_after,
+		"essen_before": essen_before,
+		"essen_after": essen_after,
+		"edge_bonn_koln": edge_bonn,
+		"edge_koln_leverkusen": edge_lev,
+		"essen_edge": essen_edge,
+		"cheaper_than_before": cheaper_than_before,
+		"cheaper_than_essen": cheaper_than_essen,
+		"essen_impact_none": essen_unchanged,
+		"roadlayer": road_report,
+		"theater": theater,
+		"start": start_result,
 	}
 
 

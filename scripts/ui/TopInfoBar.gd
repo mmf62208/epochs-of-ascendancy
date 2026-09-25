@@ -236,10 +236,14 @@ func _protect_search_from_resource_overflow() -> void:
 		rubber_label.visible = false
 	if oil_label != null and room < 160.0:
 		oil_label.visible = false
-	if aluminum_label != null and room < 110.0:
+	# Play MIXED 002df244: at 1280px Steel/Al painted under Search. Hide them
+	# before they can clip the sticky Search slot.
+	if aluminum_label != null and (room < 280.0 or vp_w < 1680.0):
 		aluminum_label.visible = false
-	if steel_label != null and room < 70.0:
+	if steel_label != null and (room < 200.0 or vp_w < 1560.0):
 		steel_label.visible = false
+	if _resources_container != null:
+		_resources_container.clip_contents = true
 
 
 func arm_play_clock_after_begin() -> void:
@@ -354,9 +358,9 @@ func _apply_responsive_layout() -> void:
 		_resources_container.add_theme_constant_override("separation", 8)
 
 	if steel_label:
-		steel_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 40
+		steel_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 80
 	if aluminum_label:
-		aluminum_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 160
+		aluminum_label.visible = show_resources and vp_w >= WIDTH_SHOW_RESOURCES + 220
 	if oil_label:
 		oil_label.visible = show_resources
 	if rubber_label:

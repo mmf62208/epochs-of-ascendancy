@@ -717,6 +717,23 @@ func _smoke_auto_begin_living_title() -> void:
 		boot.call("handle_live_begin")
 
 
+func _quit_logged(code: int, reason: String) -> void:
+	# Any intended quit must log a reason. Silent get_tree().quit is a softpipe FAIL.
+	print("EOA_HARNESS_QUIT who=TestRunner reason=%s code=%d" % [reason, code])
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+	var stay := false
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("smoke_advance_should_stay_alive"):
+		stay = bool(TimeManager.call("smoke_advance_should_stay_alive"))
+	if stay and not reason.begins_with("ui_smoke") and reason != "unit_order_qa" and not reason.begins_with("feb_clock"):
+		print("EOA_HARNESS_QUIT who=TestRunner suppressed stay_alive=1 reason=%s (Search/spine window; NOT product clock PASS)" % reason)
+		if OS.has_method("flush_stdout"):
+			OS.call("flush_stdout")
+		return
+	if get_tree() != null:
+		get_tree().quit(code)
+
+
 func _process(_delta: float) -> void:
 	# Only while the living title is up — cheap null check after Begin.
 	var boot: Node = get_node_or_null("LivingTitleBoot")
@@ -1058,7 +1075,7 @@ func _run_feb_clock_advance_test() -> void:
 	await get_tree().create_timer(2.0).timeout
 	if typeof(TimeManager) == TYPE_NIL:
 		print("HeadlessFebClockAdvanceTest: RESULT=FAIL no_tm")
-		get_tree().quit(1)
+		_quit_logged(1, "feb_clock_no_tm")
 		return
 	TimeManager.set_paused(false)
 	TimeManager.set_time_scale(1.0)
@@ -1084,17 +1101,17 @@ func _run_feb_clock_advance_test() -> void:
 		print("HeadlessFebClockAdvanceTest: day %d  %s → %s  (%dms)" % [i + 1, before, after, d1])
 		if before == after:
 			print("HeadlessFebClockAdvanceTest: RESULT=FAIL stuck at %s" % after)
-			get_tree().quit(1)
+			_quit_logged(1, "feb_clock_stuck")
 			return
 	var final := "%04d-%02d-%02d" % [TimeManager.current_year, TimeManager.current_month, TimeManager.current_day]
 	if TimeManager.current_month < 3:
 		print("HeadlessFebClockAdvanceTest: RESULT=FAIL no_march final=%s" % final)
-		get_tree().quit(1)
+		_quit_logged(1, "feb_clock_no_march")
 		return
 	print("HeadlessFebClockAdvanceTest: RESULT=PASS final=%s max_day_ms=%d" % [final, max_day_ms])
 	print("=== EOA FEB CLOCK ADVANCE end ===")
 	if OS.get_environment("EOA_FEB_CLOCK").strip_edges() == "1" and OS.get_environment("EOA_UI_SMOKE").strip_edges() != "1":
-		get_tree().quit(0)
+		_quit_logged(0, "feb_clock_pass")
 
 
 ## Headless F5 proof: Maginot chip exists with strength and can be ordered.
@@ -1212,7 +1229,7 @@ func _run_unit_order_qa_and_quit() -> void:
 	print("EOA UNIT ORDER QA: %s fail=%s" % ["PASS" if ok else "FAIL", str(fail)])
 	print("RESULT=%s" % ("PASS" if ok else "FAIL"))
 	print("=== EOA UNIT ORDER QA end ===")
-	get_tree().quit(0 if ok else 1)
+	_quit_logged(0 if ok else 1, "unit_order_qa")
 
 
 ## Headless/editor automation: verify top bar, blockers, province pick after interactive unlock.
@@ -1337,10 +1354,10 @@ func _run_ui_smoke_and_quit() -> void:
 		print("  FAIL: ", f)
 	if fail.is_empty():
 		print("=== EOA UI SMOKE OVERALL PASS ===")
-		get_tree().quit(0)
+		_quit_logged(0, "ui_smoke_pass")
 	else:
 		print("=== EOA UI SMOKE OVERALL FAIL ===")
-		get_tree().quit(1)
+		_quit_logged(1, "ui_smoke_fail")
 
 
 func _force_clear_input_blockers() -> void:

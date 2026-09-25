@@ -1640,10 +1640,14 @@ func _notify_infra_layer_rebuild() -> void:
 	var overlay := get_tree().get_first_node_in_group("infrastructure_overlay") if get_tree() else null
 	if overlay == null:
 		return
-	if overlay.has_method("_schedule_rebuild_all_infra_layers"):
-		overlay.call("_schedule_rebuild_all_infra_layers")
-	elif overlay.has_method("rebuild_all_infra_layers"):
-		overlay.rebuild_all_infra_layers()
+	# Road/rail edge writes must not schedule a full city/sites rebuild during
+	# live zoom (Play MIXED 002df244 silent exit after spine + zoom).
+	if overlay.has_method("_schedule_rebuild_light_infra_layers"):
+		overlay.call("_schedule_rebuild_light_infra_layers")
+	elif overlay.has_method("rebuild_roads_rails_sites_only"):
+		overlay.rebuild_roads_rails_sites_only()
+	elif overlay.has_method("rebuild_road_layer"):
+		overlay.rebuild_road_layer()
 	elif overlay.has_method("force_full_refresh"):
 		overlay.force_full_refresh()
 

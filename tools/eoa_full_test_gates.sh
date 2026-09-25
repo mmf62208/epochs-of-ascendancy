@@ -227,6 +227,9 @@ else
   run_step launch_ix1_title_esc_begin \
     tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessIx1LivingTitleEscBeginTest.gd || fail
 
+  run_step launch_ix1_spine_complete \
+    tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd || fail
+
   if [[ -n "$LOG_DIR" ]] && [[ -f "$LOG_DIR/launch_assault.log" ]]; then
     if grep -q 'SCRIPT ERROR' "$LOG_DIR/launch_assault.log"; then
       log "FAIL launch_assault has SCRIPT ERROR"

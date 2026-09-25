@@ -266,6 +266,12 @@ func _test_spine_start_after_press_wiring() -> void:
 	if "EOA_SMOKE_SPINE_START" not in ren:
 		_fail("EOA_SMOKE_SPINE_START live start gate missing")
 		return
+	if "EOA_ZOOM_BEGIN" not in ren or "EOA_ZOOM_END" not in ren:
+		_fail("EOA_ZOOM_BEGIN/END missing (silent-exit capture)")
+		return
+	if 'focus_province_by_id(pid, "soft")' not in _slice_func(ren, "_on_build_road_spine_pressed"):
+		_fail("spine press still tactical-zooms (softpipe silent exit)")
+		return
 	var press := _slice_func(ren, "_on_build_road_spine_pressed")
 	if "_ix1_spine_target_province_id" not in press:
 		_fail("spine press does not resolve inspector pid")

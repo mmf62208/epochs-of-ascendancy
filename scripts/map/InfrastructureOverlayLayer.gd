@@ -67,6 +67,7 @@ var industry_layer: Node2D
 var _last_era_band: int = -1
 var _infra_rebuild_scheduled: bool = false
 var _infra_light_rebuild_scheduled: bool = false
+var _road_rebuild_busy: bool = false
 var _last_infra_rebuild_msec: int = 0
 const INFRA_REBUILD_MIN_INTERVAL_MS := 1200
 ## ColorRect city nodes (4500+) freeze pan/zoom; _draw fallback is cheaper for playtest.
@@ -385,6 +386,11 @@ func _get_provinces_for_layers() -> Dictionary:
         return {}
     var all: Dictionary = map_manager.get_all_provinces()
     var out: Dictionary = {}
+    # Always keep the IX-1 corridor so Bonn–Köln–Leverkusen explicit edges paint
+    # even if major-owner culling drops them. Essen 710403 stays off-spine.
+    for spine_pid in [710416, 710417, 710418]:
+        if all.has(spine_pid):
+            out[spine_pid] = all[spine_pid]
     var major_tags: Array[String] = ["GER", "FRA", "ENG", "SOV", "USA", "ITA", "POL", "JAP"]
     for tag in major_tags:
         if map_manager.has_method("get_provinces_by_owner"):
@@ -419,8 +425,18 @@ func _get_provinces_for_layers() -> Dictionary:
 ## Rebuild the road layer using explicit built roads from provinces (or fallback to infra level).
 ## Call this after any "build road" decision or project complete.
 func rebuild_road_layer():
+    if _road_rebuild_busy:
+        return
+    _road_rebuild_busy = true
+    _rebuild_road_layer_inner()
+    _road_rebuild_busy = false
+
+
+func _rebuild_road_layer_inner() -> void:
     if road_layer == null:
         _ensure_sub_layers()
+    if road_layer == null:
+        return
     # Robust clear: remove immediately then queue_free to prevent accumulation on rapid successive rebuilds (e.g. many data updates in test harness)
     var kids = road_layer.get_children()
     for k in kids:
@@ -529,8 +545,49 @@ func rebuild_road_layer():
             line.set_meta("tier", tier)
             line.set_meta("corridor", on_corridor)
             road_layer.add_child(line)
+    # Explicit IX-1 edges even if adjacency cache missed the corridor.
+    _paint_explicit_ix1_spine_if_missing(provinces, drawn)
     if road_layer.get_child_count() > 0 and _get_current_zoom() > 0.10:
         road_layer.visible = true
+
+
+func _paint_explicit_ix1_spine_if_missing(provinces: Dictionary, drawn: Dictionary) -> void:
+    if road_layer == null or map_manager == null:
+        return
+    for pid in [710416, 710417, 710418]:
+        var p: Province = provinces.get(pid) as Province
+        if p == null:
+            p = map_manager.get_province(pid) if map_manager.has_method("get_province") else null
+        if p == null:
+            continue
+        var c1: Vector2 = map_manager.get_province_centroid(pid)
+        if c1 == Vector2.ZERO:
+            c1 = p.coordinates
+        for nid in p.built_road_neighbors:
+            var key := "%d_%d" % [mini(pid, nid), maxi(pid, nid)]
+            if drawn.has(key):
+                continue
+            drawn[key] = true
+            var n: Province = provinces.get(nid) as Province
+            if n == null and map_manager.has_method("get_province"):
+                n = map_manager.get_province(nid)
+            if n == null:
+                continue
+            var c2: Vector2 = map_manager.get_province_centroid(nid)
+            if c2 == Vector2.ZERO:
+                c2 = n.coordinates
+            var line := Line2D.new()
+            line.points = [c1, c2]
+            line.antialiased = true
+            line.default_color = Color(0.50, 0.36, 0.14, 0.82)
+            line.width = 2.8
+            line.z_index = 3
+            line.set_meta("p1", pid)
+            line.set_meta("p2", nid)
+            line.set_meta("explicit", true)
+            line.set_meta("tier", 2)
+            line.set_meta("corridor", false)
+            road_layer.add_child(line)
 
 ## Similar for rails - higher threshold, distinct style (e.g. dashed via multiple segments or color)
 func rebuild_rail_layer():
@@ -848,6 +905,44 @@ func find_road_node(p1: int, p2: int) -> Line2D:
         if child is Line2D and child.get_meta("p1", -1) in [p1, p2] and child.get_meta("p2", -1) in [p1, p2]:
             return child
     return null
+
+
+func collect_explicit_road_edges() -> Array[Dictionary]:
+    var out: Array[Dictionary] = []
+    if road_layer == null:
+        return out
+    var seen: Dictionary = {}
+    for child in road_layer.get_children():
+        if not (child is Line2D):
+            continue
+        if not bool(child.get_meta("explicit", false)):
+            continue
+        var a := int(child.get_meta("p1", -1))
+        var b := int(child.get_meta("p2", -1))
+        if a <= 0 or b <= 0:
+            continue
+        var key := "%d_%d" % [mini(a, b), maxi(a, b)]
+        if seen.has(key):
+            continue
+        seen[key] = true
+        out.append({"a": mini(a, b), "b": maxi(a, b)})
+    return out
+
+
+func ix1_spine_roadlayer_report() -> Dictionary:
+    if road_layer == null:
+        _ensure_sub_layers()
+    var bonn_koln := find_road_node(710417, 710416) != null
+    var koln_lev := find_road_node(710417, 710418) != null
+    var essen_hit := find_road_node(710417, 710403) != null
+    return {
+        "ok": bonn_koln and koln_lev and not essen_hit,
+        "bonn_koln": bonn_koln,
+        "koln_leverkusen": koln_lev,
+        "essen_edge": essen_hit,
+        "child_count": road_layer.get_child_count() if road_layer else 0,
+        "explicit_edges": collect_explicit_road_edges(),
+    }
 
 func find_rail_node(p1: int, p2: int) -> Line2D:
     if not rail_layer: return null

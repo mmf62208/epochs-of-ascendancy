@@ -206,7 +206,13 @@ func _zoom_toward_mouse(factor: float) -> void:
 	var next := clampf(cur * factor, min_zoom, max_zoom)
 	if is_equal_approx(next, cur):
 		return
+	print("EOA_ZOOM_BEGIN who=CameraController._zoom_toward_mouse from=%.3f to=%.3f factor=%.3f" % [cur, next, factor])
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
 	_target_zoom = next
+	print("EOA_ZOOM_END who=CameraController._zoom_toward_mouse z=%.3f ok=1" % next)
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
 
 
 func _adjust_origin_for_uniform_zoom(old_s: float, new_s: float) -> void:
