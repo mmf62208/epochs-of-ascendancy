@@ -8,7 +8,7 @@ PR 55 HOLD: https://github.com/mmf62208/epochs-of-ascendancy/pull/55 · branch `
 
 Start tip: `c7f24242a1f7952216c5c510b281f7bde561d507`
 Instrumentation (no toast fix): `328a83845090adf44ce53e92635b9869a71eacc1`
-**GitHub head.sha (verified after push):** 
+**GitHub head.sha (verified on `origin/cursor/ix1-road-spine-9d9b`):** `d88615f470e41dd8d94fb087005628028511b01f` 
 
 ## Spinning call
 
