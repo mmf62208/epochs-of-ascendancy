@@ -20596,9 +20596,13 @@ func drive_ix1_zoom_and_roadlayer_redraw(zoom_mode: String = "soft") -> Dictiona
 	var ol: Node = get_overlay_layer("InfrastructureOverlayLayer")
 	if ol != null and ol.has_method("rebuild_road_layer"):
 		ol.call("rebuild_road_layer")
+	if ol != null and ol.has_method("refresh_ix1_spine_preview"):
+		ol.call("refresh_ix1_spine_preview")
 	var report: Dictionary = {}
 	if ol != null and ol.has_method("ix1_spine_roadlayer_report"):
 		report = ol.call("ix1_spine_roadlayer_report")
+	if ol != null and ol.has_method("ix1_spine_preview_report"):
+		report["preview"] = ol.call("ix1_spine_preview_report")
 	eoa_log_flush("EOA_ZOOM_END who=MapRenderer.drive_ix1 mode=%s ok=1" % mode)
 	return {
 		"ok": true,

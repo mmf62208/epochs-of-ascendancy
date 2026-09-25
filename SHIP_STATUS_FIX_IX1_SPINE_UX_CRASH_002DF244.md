@@ -29,12 +29,26 @@ Headless CompleteTest hang (same revision): first progress toast after 90% calle
 3. `EOA_ZOOM_BEGIN` / `EOA_ZOOM_END` on MapRenderer + CameraController, flushed via `OS.flush_stdout`.
 4. Road writes use **light** RoadLayer rebuild (not full city/sites). Rebuild is re-entrancy-guarded; IX-1 corridor IDs are force-included; major-owner paint is capped at 120.
 5. Köln panel `LabelSpineProgress` + invest bar when spine is active; `EOA_SMOKE_SPINE_PROGRESS` / `EOA_SMOKE_SPINE_COMPLETE`.
-6. `HeadlessIx1RoadSpineCompleteTest` — start→complete days=36, RoadLayer Bonn–Köln–Leverkusen, Essen off-spine + higher move cost, zoom+redraw stays alive.
+6. `HeadlessIx1RoadSpineCompleteTest` — start→complete days=36, visual states queued→construction→built, RoadLayer Bonn–Köln–Leverkusen, Essen off-spine + higher move cost, zoom+preview redraw stays alive.
 7. TestRunner `_quit_logged` — no silent `get_tree().quit` outside that helper. Stay-alive still suppresses smoke-window quits.
 8. Headless `show_toast` no-ops; spine complete sim skips full-board AI invest.
 9. Optional: hide Steel/Al before they clip Search at ~1280px.
+10. **(c) three visual states** on Bonn–Köln–Leverkusen (IDs unchanged): **queued** faint dashed `_draw`; **construction** hatched/partial line advancing with `%`; **built** existing RoadLayer. `EOA_SMOKE_SPINE_STATE state=queued|construction|built pid=…`. Preview is `Ix1SpinePreviewDraw` (2 edges, no Line2D children). Zoom only toggles visibility / `queue_redraw` — never `rebuild_road_layer`. CompleteTest asserts queued → construction → built in order.
 
 Sticky Search / stay-alive / catch-up / hatch / `EOA_SMOKE_SPINE_START` **kept**. Corridor IDs unchanged (Köln 710417, Bonn 710416, Leverkusen 710418, Essen 710403). Dig2/G / rail / industry PARKED.
+
+## Road effects (proposal, later)
+
+Proposal only — **no code in this revision**. Built-state movement discount already exists (`ROAD_SPINE_INFRA_BONUS`). Do not wire these until Scott asks; do not invent a new dual package.
+
+| Effect | Fits current systems? | Hook (or none) | Rough number |
+|--------|------------------------|----------------|--------------|
+| Faster movement through the province | **Yes — already shipped on complete** | `Province.get_movement_cost` / `get_effective_infrastructure_for_movement` (`ROAD_SPINE_INFRA_BONUS` 2.0 + `ROAD_SPINE_NEIGHBOR_BONUS` 0.5); `FormationMovement._infra_unit`; `SupplyPathfinder` already consumes move cost | Extra **−12%** move cost / **+15%** hop speed on-spine vs same-infra off-spine (on top of today's bonus, or as a documented target if we retune) |
+| More resource output leaving the province | **Partial** | `ProductionManager.daily_resource_harvest_tick` + `Province.resources` / `ResourceHarvestCalculator`. **No** dedicated export-throughput field today; harvest is deposit × occ × plants, not a road leave-rate | Harvest leave-rate **+10–15%** on spine hexes only |
+| Faster supply distribution | **Yes, unused by roads today** | `SupplyManager` depot `infra_factor` (`0.8 + hub.infrastructure * 0.04`) does **not** read `built_road_neighbors`; path cost already cheaper via `SupplyPathfinder` + `get_movement_cost` | Depot throughput **+8–12%** when hub or edge is on-spine |
+| Less fuel for units passing through | **No land-hex fuel** | `Formation.fuel_level` exists; `SupplyManager` burns/refuels **naval** fuel only. No land-fuel-per-hex | **−8%** fuel burn if a land-hop fuel tick is wired later |
+
+Keep the existing Essen control: off-spine hexes get none of the above. Visual states (queued / construction / built) stay presentation-only until a later slice.
 
 ## Play launch
 
@@ -49,7 +63,7 @@ The smoke harness is **not** the product. Product Begin / Esc / mouse CC / 4x / 
 | Test | Result |
 |------|--------|
 | `test_ix1_road_spine_product` | 15/15 OK |
-| `HeadlessIx1RoadSpineCompleteTest` | RESULT=PASS · days=36 · RoadLayer Bonn–Köln + Köln–Leverkusen · Essen off |
+| `HeadlessIx1RoadSpineCompleteTest` | RESULT=PASS · days=36 · states queued→construction→built · RoadLayer Bonn–Köln + Köln–Leverkusen · Essen off |
 | `HeadlessIx1RoadSpineMandateGateTest` | PASS (failures=0) |
 | `HeadlessIx1RoadSpineDayTickTest` | RESULT=PASS |
 | `HeadlessIx1SearchGoInspectorTest` | RESULT=PASS |

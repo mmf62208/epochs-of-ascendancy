@@ -22,6 +22,8 @@ var _ix1_smoke_progress_band: int = -1
 ## Headless start→complete must not run the 3520×N AI invest scan (Play MIXED
 ## hang class: spine active → consider → continent mesh). F5 already skips.
 var _ix1_skip_full_board_ai_invest: bool = false
+var _ix1_spine_visual_state: String = ""
+var _ix1_spine_states_seen: Array[String] = []
 
 # --- Inner data model (can be promoted to its own Resource later) ---
 class ProvincialProject:
@@ -353,6 +355,8 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 		if delta > 0.001:
 			project_progress_updated.emit(pid, proj, delta)
 			if proj.build_road_spine:
+				if proj.progress > 0.001:
+					_set_ix1_spine_visual_state("construction", pid, proj.progress)
 				_log_smoke_spine_progress(pid, int(round(proj.progress)), proj.get_eta_days(), "IDM.advance_daily")
 			# Light event feedback for playability (avoid spam; only on significant chunks or high %).
 			if (int(proj.progress) % 25 == 0 or proj.progress > 90) and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
@@ -520,6 +524,7 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 
 	print("InfrastructureDevelopmentManager: COMPLETED %s project on province %d → level %d for %s" % [axis, province_id, new_level, proj.owner_tag])
 	if proj.build_road_spine:
+		_set_ix1_spine_visual_state("built", province_id, 100.0)
 		_log_smoke_spine_complete(province_id, "IDM.complete")
 
 
@@ -1121,6 +1126,9 @@ func start_road_spine_project(province_id: int, investor_tag: String) -> Provinc
 			"infrastructure",
 		)
 	print("InfrastructureDevelopmentManager: started IX-1 road spine on province %d for %s" % [province_id, tag])
+	_ix1_spine_states_seen.clear()
+	_ix1_spine_visual_state = ""
+	_set_ix1_spine_visual_state("queued", province_id, 0.0)
 	_log_smoke_spine_progress(province_id, int(round(proj.progress)), proj.get_eta_days(), "IDM.start")
 	return proj
 
@@ -1291,6 +1299,41 @@ func _log_smoke_spine_complete(pid: int, who: String) -> void:
 	)
 
 
+func get_ix1_spine_visual_state() -> String:
+	return _ix1_spine_visual_state
+
+
+func get_ix1_spine_state_order() -> Array[String]:
+	return _ix1_spine_states_seen.duplicate()
+
+
+func _set_ix1_spine_visual_state(state: String, pid: int, pct: float) -> void:
+	var s := state.strip_edges().to_lower()
+	if s not in ["queued", "construction", "built"]:
+		return
+	if s == _ix1_spine_visual_state:
+		if s == "construction":
+			_notify_ix1_spine_preview(s, pid, pct)
+		return
+	_ix1_spine_visual_state = s
+	if s not in _ix1_spine_states_seen:
+		_ix1_spine_states_seen.append(s)
+	_eoa_log_flush(
+		"EOA_SMOKE_SPINE_STATE state=%s pid=%d pct=%d (NOT product Begin/Esc/clock PASS)"
+		% [s, pid, int(round(pct))]
+	)
+	_notify_ix1_spine_preview(s, pid, pct)
+
+
+func _notify_ix1_spine_preview(state: String, pid: int, pct: float) -> void:
+	# Preview only — never rebuild_road_layer here (zoom silent-exit class).
+	if get_tree() == null:
+		return
+	var overlay: Node = get_tree().get_first_node_in_group("infrastructure_overlay")
+	if overlay != null and overlay.has_method("set_ix1_spine_preview"):
+		overlay.call("set_ix1_spine_preview", state, pid, pct)
+
+
 func ensure_ix1_theater_provinces_for_headless() -> Dictionary:
 	# Seed Köln/Bonn/Leverkusen/Essen only when missing. Never renumber.
 	var seeded: Array[int] = []
@@ -1372,26 +1415,6 @@ func simulate_ix1_spine_start_to_complete(max_days: int = 60) -> Dictionary:
 		if not bool(start_result.get("success", false)):
 			start_road_spine_project(hub, "GER")
 			start_result = {"success": has_active_project(hub), "reason": "seeded_project"}
-	var koln: Province = MapManager.get_province(hub) if typeof(MapManager) != TYPE_NIL else null
-	var essen: Province = MapManager.get_province(710403) if typeof(MapManager) != TYPE_NIL else null
-	var cost_before := koln.get_movement_cost() if koln != null else -1.0
-	var essen_before := essen.get_movement_cost() if essen != null else -1.0
-	var days := 0
-	var last_pct := 0
-	while days < n and has_active_project(hub):
-		advance_daily_projects(1936, 1, 1 + days)
-		days += 1
-		var live: ProvincialProject = get_active_project(hub)
-		if live != null:
-			last_pct = int(round(live.progress))
-	var completed := not has_active_project(hub)
-	var cost_after := koln.get_movement_cost() if koln != null else -1.0
-	var essen_after := essen.get_movement_cost() if essen != null else -1.0
-	var bonn: Province = MapManager.get_province(710416) if typeof(MapManager) != TYPE_NIL else null
-	var lev: Province = MapManager.get_province(710418) if typeof(MapManager) != TYPE_NIL else null
-	var edge_bonn := koln != null and bonn != null and (710416 in koln.built_road_neighbors) and (710417 in bonn.built_road_neighbors)
-	var edge_lev := koln != null and lev != null and (710418 in koln.built_road_neighbors) and (710417 in lev.built_road_neighbors)
-	var essen_edge := koln != null and essen != null and (710403 in koln.built_road_neighbors)
 	var overlay: Node = null
 	if get_tree() != null:
 		overlay = get_tree().get_first_node_in_group("infrastructure_overlay")
@@ -1402,17 +1425,52 @@ func simulate_ix1_spine_start_to_complete(max_days: int = 60) -> Dictionary:
 			get_tree().root.add_child(overlay)
 	if overlay.get("map_manager") == null and typeof(MapManager) != TYPE_NIL:
 		overlay.set("map_manager", MapManager)
+	if overlay.has_method("set_ix1_spine_preview"):
+		overlay.call("set_ix1_spine_preview", get_ix1_spine_visual_state(), hub, 0.0)
+	var preview_queued: Dictionary = {}
+	if overlay.has_method("ix1_spine_preview_report"):
+		preview_queued = overlay.call("ix1_spine_preview_report")
+	var koln: Province = MapManager.get_province(hub) if typeof(MapManager) != TYPE_NIL else null
+	var essen: Province = MapManager.get_province(710403) if typeof(MapManager) != TYPE_NIL else null
+	var cost_before := koln.get_movement_cost() if koln != null else -1.0
+	var essen_before := essen.get_movement_cost() if essen != null else -1.0
+	var days := 0
+	var last_pct := 0
+	var preview_construction: Dictionary = {}
+	while days < n and has_active_project(hub):
+		advance_daily_projects(1936, 1, 1 + days)
+		days += 1
+		var live: ProvincialProject = get_active_project(hub)
+		if live != null:
+			last_pct = int(round(live.progress))
+			if preview_construction.is_empty() and live.progress > 0.001 and overlay.has_method("ix1_spine_preview_report"):
+				preview_construction = overlay.call("ix1_spine_preview_report")
+	var completed := not has_active_project(hub)
+	var cost_after := koln.get_movement_cost() if koln != null else -1.0
+	var essen_after := essen.get_movement_cost() if essen != null else -1.0
+	var bonn: Province = MapManager.get_province(710416) if typeof(MapManager) != TYPE_NIL else null
+	var lev: Province = MapManager.get_province(710418) if typeof(MapManager) != TYPE_NIL else null
+	var edge_bonn := koln != null and bonn != null and (710416 in koln.built_road_neighbors) and (710417 in bonn.built_road_neighbors)
+	var edge_lev := koln != null and lev != null and (710418 in koln.built_road_neighbors) and (710417 in lev.built_road_neighbors)
+	var essen_edge := koln != null and essen != null and (710403 in koln.built_road_neighbors)
 	if overlay.has_method("rebuild_road_layer"):
 		overlay.call("rebuild_road_layer")
+	if overlay.has_method("refresh_ix1_spine_preview"):
+		overlay.call("refresh_ix1_spine_preview")
 	var road_report: Dictionary = {}
 	if overlay.has_method("ix1_spine_roadlayer_report"):
 		road_report = overlay.call("ix1_spine_roadlayer_report")
+	var preview_built: Dictionary = {}
+	if overlay.has_method("ix1_spine_preview_report"):
+		preview_built = overlay.call("ix1_spine_preview_report")
+	var states: Array[String] = get_ix1_spine_state_order()
+	var states_ok := states.size() >= 3 and str(states[0]) == "queued" and str(states[1]) == "construction" and str(states[states.size() - 1]) == "built"
 	var cheaper_than_before := cost_after > 0.0 and cost_before > 0.0 and cost_after < cost_before - 0.0001
 	var cheaper_than_essen := cost_after > 0.0 and essen_after > 0.0 and cost_after < essen_after - 0.0001
 	var essen_unchanged := essen != null and essen.built_road_neighbors.is_empty() and not essen_edge
 	_ix1_skip_full_board_ai_invest = false
 	return {
-		"ok": completed and edge_bonn and edge_lev and essen_unchanged and cheaper_than_before and cheaper_than_essen and bool(road_report.get("ok", false)),
+		"ok": completed and edge_bonn and edge_lev and essen_unchanged and cheaper_than_before and cheaper_than_essen and bool(road_report.get("ok", false)) and states_ok,
 		"completed": completed,
 		"days": days,
 		"progress_last": last_pct,
@@ -1427,6 +1485,10 @@ func simulate_ix1_spine_start_to_complete(max_days: int = 60) -> Dictionary:
 		"cheaper_than_essen": cheaper_than_essen,
 		"essen_impact_none": essen_unchanged,
 		"roadlayer": road_report,
+		"visual_states": states,
+		"preview_queued": preview_queued,
+		"preview_construction": preview_construction,
+		"preview_built": preview_built,
 		"theater": theater,
 		"start": start_result,
 	}

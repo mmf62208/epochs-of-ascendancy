@@ -2,7 +2,8 @@ extends SceneTree
 
 ## IX-1: spine start → daily tick → complete, then RoadLayer has
 ## Bonn–Köln–Leverkusen and Essen is off-spine (no road, higher move cost).
-## Also drives the zoom + RoadLayer redraw path that killed Play after start.
+## Visual states must occur in order: queued → construction → built.
+## Also drives the zoom + RoadLayer/preview redraw path that killed Play after start.
 ##
 ##   tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd
 
@@ -76,6 +77,7 @@ func _run() -> void:
 	_test_source_no_tactical_on_spine_start()
 	_test_source_zoom_brackets_and_flush()
 	_test_source_progress_complete_logs()
+	_test_source_spine_visual_states()
 	_test_source_building_ellipsis_and_toast_before_zoom()
 	_test_source_harness_quit_logged()
 	_test_spine_start_to_complete_roadlayer_essen()
@@ -137,6 +139,31 @@ func _test_source_progress_complete_logs() -> void:
 		_fail("RoadLayer missing ix1_spine_roadlayer_report")
 		return
 	_pass("progress/complete logs + panel + RoadLayer report shipped")
+
+
+func _test_source_spine_visual_states() -> void:
+	var idm := _read(SRC_IDM)
+	var ol := _read(SRC_OL)
+	if "EOA_SMOKE_SPINE_STATE" not in idm:
+		_fail("EOA_SMOKE_SPINE_STATE log missing")
+		return
+	if 'state=queued' not in idm and '"queued"' not in idm:
+		_fail("queued visual state missing")
+		return
+	if "construction" not in idm or "built" not in idm:
+		_fail("construction/built visual states missing")
+		return
+	if "class Ix1SpinePreviewDraw" not in ol or "set_ix1_spine_preview" not in ol:
+		_fail("Ix1SpinePreviewDraw / set_ix1_spine_preview missing")
+		return
+	if "rebuild_road_layer" in _slice_func(idm, "_notify_ix1_spine_preview"):
+		_fail("preview notify must not rebuild_road_layer (zoom silent-exit)")
+		return
+	var rebuild := _slice_func(ol, "_rebuild_road_layer_inner")
+	if "spine_preview_layer" in rebuild:
+		_fail("rebuild_road_layer must not touch spine preview")
+		return
+	_pass("queued → construction → built preview is _draw-only")
 
 
 func _test_source_building_ellipsis_and_toast_before_zoom() -> void:
@@ -209,11 +236,29 @@ func _test_spine_start_to_complete_roadlayer_essen() -> void:
 	if bool(roads.get("essen_edge", false)):
 		_fail("RoadLayer painted Essen–Köln")
 		return
+	var states: Array = result.get("visual_states", []) as Array
+	if states.size() < 3 or str(states[0]) != "queued" or str(states[1]) != "construction" or str(states[states.size() - 1]) != "built":
+		_fail("visual states not queued→construction→built: %s" % str(states))
+		return
+	var pq: Dictionary = result.get("preview_queued", {}) as Dictionary
+	var pc: Dictionary = result.get("preview_construction", {}) as Dictionary
+	if str(pq.get("state", "")) != "queued" or not bool(pq.get("bonn_koln", false)) or not bool(pq.get("koln_leverkusen", false)):
+		_fail("queued preview missing Bonn–Köln–Leverkusen: %s" % str(pq))
+		return
+	if int(pq.get("line2d_children", 1)) != 0:
+		_fail("queued preview used Line2D children (zoom death class): %s" % str(pq))
+		return
+	if str(pc.get("state", "")) != "construction" or not bool(pc.get("bonn_koln", false)):
+		_fail("construction preview missing: %s" % str(pc))
+		return
+	if bool(pq.get("essen_edge", false)) or bool(pc.get("essen_edge", false)):
+		_fail("preview painted Essen")
+		return
 	if ms > 20000:
 		_fail("start→complete took %dms" % ms)
 		return
 	_pass(
-		"start→complete days=%s RoadLayer Bonn–Köln–Leverkusen Essen off-spine (%dms)"
+		"start→complete days=%s states=queued→construction→built RoadLayer Bonn–Köln–Leverkusen Essen off-spine (%dms)"
 		% [str(result.get("days")), ms]
 	)
 
@@ -225,17 +270,22 @@ func _test_zoom_path_after_spine_does_not_die() -> void:
 		OS.call("flush_stdout")
 	var idm: Node = _autoload("InfrastructureDevelopmentManager")
 	var overlay: Node = get_first_node_in_group("infrastructure_overlay")
+	if overlay == null:
+		overlay = root.find_child("Ix1HeadlessRoadLayer", true, false)
 	if overlay != null and overlay.has_method("rebuild_road_layer"):
 		overlay.call("rebuild_road_layer")
-		var report: Dictionary = overlay.call("ix1_spine_roadlayer_report") if overlay.has_method("ix1_spine_roadlayer_report") else {}
+	if overlay != null and overlay.has_method("refresh_ix1_spine_preview"):
+		overlay.call("refresh_ix1_spine_preview")
+	if overlay != null and overlay.has_method("ix1_spine_roadlayer_report"):
+		var report: Dictionary = overlay.call("ix1_spine_roadlayer_report")
 		if not bool(report.get("ok", false)):
 			_fail("RoadLayer report after zoom-path rebuild: %s" % str(report))
 			return
-	elif idm != null and idm.has_method("simulate_ix1_spine_start_to_complete"):
-		# Overlay was created inside simulate; find it.
-		var found: Node = root.find_child("Ix1HeadlessRoadLayer", true, false)
-		if found != null and found.has_method("rebuild_road_layer"):
-			found.call("rebuild_road_layer")
+	if overlay != null and overlay.has_method("ix1_spine_preview_report"):
+		var prev: Dictionary = overlay.call("ix1_spine_preview_report")
+		if int(prev.get("line2d_children", 1)) != 0:
+			_fail("zoom-path preview spawned Line2D children: %s" % str(prev))
+			return
 	print("EOA_ZOOM_END who=HeadlessIx1RoadSpineCompleteTest.drive ok=1")
 	if OS.has_method("flush_stdout"):
 		OS.call("flush_stdout")

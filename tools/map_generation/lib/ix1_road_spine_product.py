@@ -940,6 +940,12 @@ def ix1_spine_complete_zoom_gate() -> Dict[str, Any]:
         missing.append("start_to_complete_sim")
     if "ix1_spine_roadlayer_report" not in ol:
         missing.append("roadlayer_report")
+    if "EOA_SMOKE_SPINE_STATE" not in idm:
+        missing.append("spine_state_log")
+    if "set_ix1_spine_preview" not in ol or "Ix1SpinePreviewDraw" not in ol:
+        missing.append("spine_preview_draw")
+    if "visual_states" not in idm or "queued" not in complete:
+        missing.append("three_state_assert")
     if "func _quit_logged" not in tr or "EOA_HARNESS_QUIT" not in tr:
         missing.append("harness_quit_logged")
     if "EOA_SMOKE_SPINE_COMPLETE" not in complete:
