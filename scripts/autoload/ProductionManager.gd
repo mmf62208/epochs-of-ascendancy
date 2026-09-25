@@ -2384,11 +2384,26 @@ func daily_formation_reinforce_from_stockpile() -> Dictionary:
 	}
 	if typeof(LeaderManager) == TYPE_NIL or not ("formations" in LeaderManager):
 		return report
+	var live_f5 := (
+		typeof(TimeManager) != TYPE_NIL
+		and TimeManager.has_method("is_live_f5_play_path")
+		and bool(TimeManager.is_live_f5_play_path())
+	)
+	var player_tag := ""
+	if live_f5 and typeof(LeaderManager) != TYPE_NIL and LeaderManager.has_method("get_player_country_tag"):
+		player_tag = str(LeaderManager.get_player_country_tag()).strip_edges().to_upper()
 	var formations: Array = []
+	var reinforce_cap := 32 if live_f5 else 100000
 	for fid in LeaderManager.formations:
 		var ff = LeaderManager.formations[fid]
 		if ff != null:
+			if live_f5 and not player_tag.is_empty():
+				var ftag := str(ff.country_tag).strip_edges().to_upper() if "country_tag" in ff else ""
+				if ftag != player_tag:
+					continue
 			formations.append(ff)
+		if formations.size() >= reinforce_cap:
+			break
 	for f in formations:
 		if f == null:
 			continue
@@ -3741,6 +3756,7 @@ func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
 			day_n = int(TimeManager.total_days_elapsed)
 	# Interactive: keep production line ticks cheap; harvest/reinforce only every 5th day.
 	# (Daily harvest + reinforce scans were still heavy enough to stall 1x near Feb→Mar.)
+	# Live F5: same cadence, but reinforce stays player-capped (day +5 hitch).
 	if light:
 		advance_days(1.0)
 		if day_n % 5 == 0:

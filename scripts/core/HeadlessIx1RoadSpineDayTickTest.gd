@@ -11,6 +11,10 @@ const SRC_REN := "res://scripts/map/MapRenderer.gd"
 const SRC_SAVE := "res://scripts/autoload/SaveLoadManager.gd"
 const SRC_TM := "res://scripts/autoload/TimeManager.gd"
 const SRC_TR := "res://scripts/core/TestRunner.gd"
+const SRC_AGENT := "res://scripts/agents/AgentManager.gd"
+const SRC_TOAST := "res://scripts/ui/LeaderEventUI.gd"
+const SRC_MAPMODE := "res://scripts/ui/map/MapModeToolbar.gd"
+const SRC_SCENE := "res://scenes/TestScenario.tscn"
 const HUB_ID := 710417
 const FREEZE_PROGRESS := 20.0
 const LIVE_DAY_BUDGET_MS := 18000
@@ -52,6 +56,7 @@ func _run() -> void:
 	_test_spine_can_complete()
 	_test_live_f5_equivalent_day_advance()
 	_test_play_begin_clock_controls_leave_midnight()
+	_test_live_f5_softpipe_past_plus6_soak()
 	_test_mandate_cost_still_zero()
 
 
@@ -189,6 +194,32 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 		return
 	if "advance_real_time" not in begin_clock or "past_hour_plus6" not in begin_clock:
 		_fail("simulate_play_begin_clock_controls must drive advance_real_time past +6")
+		return
+	var soak := _slice_func(tm, "simulate_live_f5_softpipe_past_plus6")
+	if soak.is_empty() or "past_7_jan" not in soak or "advance_real_time" not in soak:
+		_fail("simulate_live_f5_softpipe_past_plus6 must drive hour clock past 7 Jan")
+		return
+	if "Province captured" not in soak or "toast_mouse_ignore" not in soak:
+		_fail("softpipe soak must exercise capture toasts + input ignore")
+		return
+	var agent_day := _slice_func(_read(SRC_AGENT), "_on_game_day_advanced")
+	if "is_live_f5_play_path" not in agent_day:
+		_fail("AgentManager day tick must skip networks on live F5 (day-6 pulse)")
+		return
+	var toast_src := _read(SRC_TOAST)
+	if "live_f5_toast_stack_cannot_steal_top_bar" not in toast_src:
+		_fail("LeaderEventUI must expose toast-stack cannot steal TopInfoBar")
+		return
+	if "MOUSE_FILTER_IGNORE" not in toast_src:
+		_fail("toast container must IGNORE empty chrome (layer 90 swallow)")
+		return
+	var mapmode := _read(SRC_MAPMODE)
+	if "live_f5_cannot_steal_top_bar" not in mapmode or "MOUSE_FILTER_IGNORE" not in mapmode:
+		_fail("MapModeToolbar must IGNORE + clip so it cannot steal TopInfoBar")
+		return
+	var scene := _read(SRC_SCENE)
+	if "layer = 110" not in scene:
+		_fail("TestScenario UILayer must be 110 (above Map Mode 20 and toasts 90)")
 		return
 	_pass("live F5 path cannot full-board AI scan; toast quiet; ring/day_emit/hour clock gated")
 
@@ -378,6 +409,52 @@ func _test_play_begin_clock_controls_leave_midnight() -> void:
 	_pass(
 		"play-begin 4x left 00:00 hour_delta=%s past+6 paused=%s (%dms)"
 		% [str(result.get("hour_delta")), str(result.get("paused")), ms]
+	)
+
+
+func _test_live_f5_softpipe_past_plus6_soak() -> void:
+	var tm: Node = _autoload("TimeManager")
+	if tm == null:
+		_fail("TimeManager autoload missing")
+		return
+	if not tm.has_method("simulate_live_f5_softpipe_past_plus6"):
+		_fail("simulate_live_f5_softpipe_past_plus6 missing (6 Jan 20:00 wedge would PASS)")
+		return
+	if tm.has_method("initialize_from_scenario_start_date"):
+		tm.call("initialize_from_scenario_start_date", "1936-01-01")
+	var t0 := Time.get_ticks_msec()
+	var result: Dictionary = tm.call("simulate_live_f5_softpipe_past_plus6")
+	var ms := Time.get_ticks_msec() - t0
+	if bool(result.get("paused", true)):
+		_fail("softpipe soak left TimeManager paused: %s" % str(result))
+		return
+	if bool(result.get("stuck_at_6_jan", true)):
+		_fail("softpipe soak stuck at 6 Jan: %s" % str(result))
+		return
+	if not bool(result.get("past_7_jan", false)):
+		_fail("softpipe soak did not pass 7 Jan: %s" % str(result))
+		return
+	if not bool(result.get("past_plus6", false)):
+		_fail("softpipe soak did not prove past day +6: %s" % str(result))
+		return
+	if not bool(result.get("harvest_day5", false)):
+		_fail("softpipe soak never crossed day +5 harvest cadence: %s" % str(result))
+		return
+	if int(result.get("calendar_autosave_gathers", 1)) != 0:
+		_fail("softpipe soak gathered calendar autosave: %s" % str(result))
+		return
+	if not bool(result.get("toast_mouse_ignore", false)):
+		_fail("toast stack still steals TopInfoBar: %s" % str(result))
+		return
+	if not bool(result.get("ok", false)):
+		_fail("softpipe past-+6 soak not ok: %s" % str(result))
+		return
+	if ms > LIVE_DAY_BUDGET_MS:
+		_fail("softpipe soak took %dms (wedged)" % ms)
+		return
+	_pass(
+		"softpipe soak past 7 Jan day=%s elapsed=%s paused=%s autosave=0 toast_ignore=1 (%dms)"
+		% [str(result.get("day")), str(result.get("elapsed_delta")), str(result.get("paused")), ms]
 	)
 
 

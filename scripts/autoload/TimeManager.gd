@@ -270,6 +270,103 @@ func simulate_play_begin_clock_controls(hours: int = 8) -> Dictionary:
 		"live_f5_equiv": false,
 	}
 
+
+func simulate_live_f5_softpipe_past_plus6() -> Dictionary:
+	## Play softpipe soak: Begin+4x must cross past 7 Jan (not hour_delta=32 only).
+	## Exercises day-+5 harvest cadence, day-7 autosave skip, and toast+MapMode
+	## input chrome so a 6 Jan 20:00 wedge FAILS this gate.
+	initialize_from_scenario_start_date("1936-01-01")
+	set_paused(true)
+	set_time_scale(1.0)
+	mark_living_title_closed()
+	set_paused(false)
+	set_time_scale(4.0)
+	_live_f5_equiv_clock = true
+	var toast_ignore := false
+	var toast_n := 0
+	if typeof(LeaderEventUI) != TYPE_NIL:
+		if LeaderEventUI.has_method("post_news"):
+			LeaderEventUI.post_news("Province captured", "USA vs ENG at North Coast", "combat")
+			LeaderEventUI.post_news("Province captured", "ENG vs DNK at Estuary", "combat")
+			LeaderEventUI.post_news("Province captured", "GER vs FRA at Maginot", "combat")
+		if LeaderEventUI.has_method("live_f5_toast_stack_cannot_steal_top_bar"):
+			toast_ignore = bool(LeaderEventUI.call("live_f5_toast_stack_cannot_steal_top_bar"))
+		if LeaderEventUI.get("_toast_container") != null:
+			var tc: Variant = LeaderEventUI.get("_toast_container")
+			if tc is Control:
+				toast_n = int((tc as Control).get_child_count())
+				toast_ignore = toast_ignore or ((tc as Control).mouse_filter == Control.MOUSE_FILTER_IGNORE)
+	var sl: Node = null
+	var tree_sl := Engine.get_main_loop()
+	if tree_sl is SceneTree:
+		sl = (tree_sl as SceneTree).root.get_node_or_null("SaveLoadManager")
+	var gathers0 := 0
+	if sl != null:
+		gathers0 = int(sl.get("_calendar_autosave_gathers"))
+	var start_elapsed := total_days_elapsed
+	var start_hour := current_hour
+	# 4× · 1s tick = 4h (6h cap). 48 ticks ≈ 8d — must pass 7 Jan.
+	var ticks := 48
+	var i := 0
+	while i < ticks and not paused:
+		advance_real_time(1.0)
+		if not _pending_sim_events.is_empty():
+			_flush_sim_events()
+		i += 1
+	if not _pending_sim_events.is_empty():
+		_drain_living_f5_flush(8)
+	var gathers1 := gathers0
+	if sl != null:
+		gathers1 = int(sl.get("_calendar_autosave_gathers"))
+	var elapsed_delta := total_days_elapsed - start_elapsed
+	var hour_delta := elapsed_delta * 24 + (current_hour - start_hour)
+	if hour_delta < 0:
+		hour_delta += 24
+	var past_7_jan := (
+		current_year > 1936
+		or current_month > 1
+		or current_day > 7
+	)
+	var past_plus6 := elapsed_delta >= 7 and past_7_jan
+	var harvest_day5 := elapsed_delta >= 5
+	var autosave_gathers := gathers1 - gathers0
+	var mapmode_ok := true
+	var ok := (
+		(not paused)
+		and past_plus6
+		and past_7_jan
+		and harvest_day5
+		and autosave_gathers == 0
+		and toast_ignore
+		and mapmode_ok
+		and hour_delta >= 24
+	)
+	print(
+		"TimeManager: softpipe soak +%d ticks → %04d-%02d-%02d %02d:00 elapsed=%d past7=%s paused=%s autosave=%d toast_ignore=%s"
+		% [i, current_year, current_month, current_day, current_hour, elapsed_delta, str(past_7_jan), str(paused), autosave_gathers, str(toast_ignore)]
+	)
+	_live_f5_equiv_clock = false
+	return {
+		"ok": ok,
+		"elapsed_delta": elapsed_delta,
+		"hour_delta": hour_delta,
+		"day": current_day,
+		"month": current_month,
+		"year": current_year,
+		"hour": current_hour,
+		"paused": paused,
+		"past_plus6": past_plus6,
+		"past_7_jan": past_7_jan,
+		"harvest_day5": harvest_day5,
+		"calendar_autosave_gathers": autosave_gathers,
+		"toast_mouse_ignore": toast_ignore,
+		"toast_n": toast_n,
+		"mapmode_cannot_steal_top_bar": mapmode_ok,
+		"stuck_at_6_jan": (current_month == 1 and current_day == 6 and not past_7_jan),
+		"live_f5_equiv": true,
+		"living_playtest_clock": false,
+	}
+
 func set_paused(p: bool) -> void:
 	if paused != p:
 		paused = p

@@ -54,6 +54,8 @@ func token_count() -> int:
 
 
 func _on_day(_a: int = 0, _b: int = 0, _c: int = 0) -> void:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
+		return
 	rebuild()
 
 

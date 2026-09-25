@@ -36,6 +36,10 @@ TIME_MANAGER_GD = ROOT / "scripts" / "autoload" / "TimeManager.gd"
 TEST_RUNNER_GD = ROOT / "scripts" / "core" / "TestRunner.gd"
 TOP_INFO_GD = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
 DAY_TICK_HARNESS = ROOT / "scripts" / "core" / "HeadlessIx1RoadSpineDayTickTest.gd"
+AGENT_GD = ROOT / "scripts" / "agents" / "AgentManager.gd"
+TOAST_GD = ROOT / "scripts" / "ui" / "LeaderEventUI.gd"
+MAPMODE_GD = ROOT / "scripts" / "ui" / "map" / "MapModeToolbar.gd"
+TEST_SCENE = ROOT / "scenes" / "TestScenario.tscn"
 GATES_SH = ROOT / "tools" / "eoa_full_test_gates.sh"
 ADJ_PATH = ROOT / "data" / "provinces_world_accurate" / "province_adjacency.json"
 BASE_PATH = ROOT / "data" / "provinces_world_accurate" / "provinces_base.json"
@@ -493,6 +497,26 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         harness, "_test_play_begin_clock_controls_leave_midnight"
     ):
         missing.append("play_begin_clock_harness")
+    soak = _slice_func(tm, "simulate_live_f5_softpipe_past_plus6")
+    if "past_7_jan" not in soak or "advance_real_time" not in soak:
+        missing.append("softpipe_past_plus6_soak")
+    if "Province captured" not in soak:
+        missing.append("softpipe_soak_capture_toasts")
+    if "simulate_live_f5_softpipe_past_plus6" not in harness or "past_7_jan" not in _slice_func(
+        harness, "_test_live_f5_softpipe_past_plus6_soak"
+    ):
+        missing.append("softpipe_past_plus6_harness")
+    agent_day = _slice_func(_read(AGENT_GD), "_on_game_day_advanced")
+    if "is_live_f5_play_path" not in agent_day:
+        missing.append("agent_network_live_f5_skip")
+    toast = _read(TOAST_GD)
+    if "live_f5_toast_stack_cannot_steal_top_bar" not in toast or "MOUSE_FILTER_IGNORE" not in toast:
+        missing.append("toast_cannot_steal_top_bar")
+    mapmode = _read(MAPMODE_GD)
+    if "live_f5_cannot_steal_top_bar" not in mapmode or "MOUSE_FILTER_IGNORE" not in mapmode:
+        missing.append("mapmode_cannot_steal_top_bar")
+    if "layer = 110" not in _read(TEST_SCENE):
+        missing.append("uilayer_above_mapmode_toasts")
     if "arm_play_clock_after_begin" not in top or "ACTION_MODE_BUTTON_PRESS" not in top:
         missing.append("top_bar_begin_arm")
     save_hook = _slice_func(save, "_on_day_advanced_for_autosave")

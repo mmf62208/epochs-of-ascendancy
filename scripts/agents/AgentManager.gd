@@ -78,6 +78,10 @@ func _on_game_year_advanced(year: int) -> void:
 
 func _on_game_day_advanced(_year: int, _month: int, _day: int) -> void:
 	# Daily updates for persistent agent networks + real sabotage effects (supply/infra).
+	# Live F5 / softpipe: skip entirely (day-6 %3 pulse stacked with day-+5 harvest
+	# and capture toasts and wedged the hour clock at 6 Jan 20:00).
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
+		return
 	# Interactive F5: run every 3rd day only (full daily freezes map/HUD after multi-week 1x).
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
 		var day_n := int(TimeManager.total_days_elapsed) if "total_days_elapsed" in TimeManager else _day

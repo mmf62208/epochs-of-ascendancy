@@ -156,6 +156,12 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertNotIn("no_repause_after_begin", tick.get("missing") or [])
         self.assertNotIn("play_begin_clock_sim", tick.get("missing") or [])
         self.assertNotIn("play_begin_clock_harness", tick.get("missing") or [])
+        self.assertNotIn("softpipe_past_plus6_soak", tick.get("missing") or [])
+        self.assertNotIn("softpipe_past_plus6_harness", tick.get("missing") or [])
+        self.assertNotIn("agent_network_live_f5_skip", tick.get("missing") or [])
+        self.assertNotIn("toast_cannot_steal_top_bar", tick.get("missing") or [])
+        self.assertNotIn("mapmode_cannot_steal_top_bar", tick.get("missing") or [])
+        self.assertNotIn("uilayer_above_mapmode_toasts", tick.get("missing") or [])
 
 
 if __name__ == "__main__":

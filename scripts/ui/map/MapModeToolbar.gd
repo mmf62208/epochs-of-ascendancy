@@ -104,8 +104,16 @@ var _collapsed: bool = false
 
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	# IGNORE empty chrome + clip overflow. An unclipped preset HBox used to
+	# paint/click across the full width (layer 20, above TopInfoBar layer 10)
+	# and swallow 4x/pause after the panel expanded on Play softpipe.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	clip_contents = true
 	_build_ui()
+
+
+func live_f5_cannot_steal_top_bar() -> bool:
+	return mouse_filter == Control.MOUSE_FILTER_IGNORE and clip_contents
 
 
 func bind_map_renderer(renderer: Node) -> void:
@@ -124,6 +132,8 @@ func get_panel_height() -> float:
 func _build_ui() -> void:
 	var outer := HBoxContainer.new()
 	outer.add_theme_constant_override("separation", 6)
+	outer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	outer.clip_contents = true
 	add_child(outer)
 
 	_collapse_btn = Button.new()
@@ -136,10 +146,13 @@ func _build_ui() -> void:
 	_body = VBoxContainer.new()
 	_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_body.add_theme_constant_override("separation", 2)
+	_body.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_body.clip_contents = true
 	outer.add_child(_body)
 
 	var title_row := HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 8)
+	title_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_body.add_child(title_row)
 
 	var title := Label.new()
@@ -149,6 +162,8 @@ func _build_ui() -> void:
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 3)
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.clip_contents = true
 	_body.add_child(row)
 
 	_mode_group = ButtonGroup.new()
@@ -178,6 +193,8 @@ func _build_ui() -> void:
 	# Pass 14: quick mapmode presets.
 	_preset_row = HBoxContainer.new()
 	_preset_row.add_theme_constant_override("separation", 4)
+	_preset_row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_preset_row.clip_contents = true
 	_body.add_child(_preset_row)
 	_build_preset_row()
 

@@ -56,6 +56,10 @@ func get_marker(pid: int) -> Dictionary:
 
 
 func _on_day(_year: int = 0, _month: int = 0, _day: int = 0) -> void:
+	# Live F5 / softpipe: skip factory-marker rebuild on day_emit (llvmpipe hitch
+	# stacked with day-+5 harvest / capture toasts at ~6 Jan 20:00).
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
+		return
 	rebuild()
 
 

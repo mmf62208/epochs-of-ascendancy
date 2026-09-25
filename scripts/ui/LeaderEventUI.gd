@@ -70,9 +70,13 @@ func _ensure_toast_layer() -> void:
 
 	_toast_container = VBoxContainer.new()
 	_toast_container.name = "ToastContainer"
+	# IGNORE empty chrome so a mis-sized stack cannot steal TopInfoBar 4x/pause
+	# (CanvasLayer 90 sits above the default HUD layer).
+	_toast_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toast_container.clip_contents = true
 	_toast_container.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	_toast_container.offset_left = -420.0
-	_toast_container.offset_top = -280.0
+	_toast_container.offset_top = -220.0
 	_toast_container.offset_right = -16.0
 	_toast_container.offset_bottom = -16.0
 	_toast_container.add_theme_constant_override("separation", 8)
@@ -212,7 +216,9 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 		)
 		vbox.add_child(respond_btn)
 
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_toast_container.add_child(panel)
+	_trim_live_f5_toast_stack()
 	while _toast_container.get_child_count() > 4:
 		_dismiss_toast(_toast_container.get_child(0) as PanelContainer)
 
@@ -237,6 +243,8 @@ func post_news(title: String, body: String, category: String = "general") -> voi
 	news_posted.emit(entry)
 	if _should_skip_toast_ui():
 		return
+	if _should_coalesce_live_f5_combat_toast(category):
+		return
 	_show_toast(entry)
 
 
@@ -248,6 +256,39 @@ func _should_skip_toast_ui() -> bool:
 	if typeof(TimeManager) != TYPE_NIL and bool(TimeManager.get("_living_playtest_clock")):
 		return true
 	return false
+
+
+func _live_f5_toast_path() -> bool:
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_live_f5_play_path"):
+		return bool(TimeManager.is_live_f5_play_path())
+	return DisplayServer.get_name() != "headless" and not OS.has_feature("dedicated_server")
+
+
+func _should_coalesce_live_f5_combat_toast(category: String) -> bool:
+	# Stacked Province-captured cards on layer 90 stole 4x/pause after ~6 Jan.
+	# Keep one combat toast; news_history still records every capture.
+	if not _live_f5_toast_path():
+		return false
+	var cat := category.strip_edges().to_lower()
+	if cat not in ["combat", "war", "military"]:
+		return false
+	if _toast_container == null:
+		return false
+	return _toast_container.get_child_count() >= 1
+
+
+func _trim_live_f5_toast_stack() -> void:
+	if _toast_container == null or not _live_f5_toast_path():
+		return
+	while _toast_container.get_child_count() > 2:
+		_dismiss_toast(_toast_container.get_child(0) as PanelContainer)
+
+
+func live_f5_toast_stack_cannot_steal_top_bar() -> bool:
+	_ensure_toast_layer()
+	if _toast_container == null:
+		return false
+	return _toast_container.mouse_filter == Control.MOUSE_FILTER_IGNORE
 
 
 func get_recent_news(limit: int = 10) -> Array[Dictionary]:
@@ -372,7 +413,9 @@ func _show_toast(entry: Dictionary) -> void:
 	RetrowaveTheme.style_body_label(body_label)
 	vbox.add_child(body_label)
 
+	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_toast_container.add_child(panel)
+	_trim_live_f5_toast_stack()
 	while _toast_container.get_child_count() > 4:
 		_dismiss_toast(_toast_container.get_child(0) as PanelContainer)
 

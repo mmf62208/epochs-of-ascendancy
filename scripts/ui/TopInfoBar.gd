@@ -82,7 +82,9 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	clip_contents = false
-	z_index = 20
+	# Stay above Map Mode (WorldMap UI layer 20) and toast stack (layer 90)
+	# once UILayer is 110 — z_index is local to that layer.
+	z_index = 40
 	_apply_theme()
 	_connect_buttons()
 	_sync_pause_from_time_manager()

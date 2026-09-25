@@ -2814,6 +2814,8 @@ func _setup_player_map_ux() -> void:
 		_map_mode_toolbar = PanelContainer.new()
 		_map_mode_toolbar.set_script(ToolbarScript)
 		_map_mode_toolbar.name = "MapModeToolbar"
+		_map_mode_toolbar.clip_contents = true
+		_map_mode_toolbar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		ui.add_child(_map_mode_toolbar)
 		if _map_mode_toolbar.has_method("bind_map_renderer"):
 			_map_mode_toolbar.call("bind_map_renderer", self)
@@ -2886,6 +2888,8 @@ func _layout_map_ui() -> void:
 
 	if _map_mode_toolbar is Control:
 		var tb := _map_mode_toolbar as Control
+		tb.clip_contents = true
+		tb.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		tb.set_anchors_preset(Control.PRESET_TOP_LEFT)
 		tb.offset_left = 8.0
 		tb.offset_top = top_clearance
