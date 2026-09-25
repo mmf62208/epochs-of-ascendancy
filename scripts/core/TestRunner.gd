@@ -1100,7 +1100,8 @@ func _smoke_ix1_frame_guard_press() -> void:
 		"EOA_SMOKE_FRAME_GUARD who=TestRunner.mouse_press_returned ok=%s reason=%s"
 		% [str(bool(report.get("ok", false))), str(report.get("reason", ""))]
 	)
-	_log_ix1_guard_visible_feedback()
+	var vis0: Dictionary = _log_ix1_guard_visible_feedback()
+	set_meta("eoa_smoke_frame_guard_vis_ok", bool(vis0.get("ok", false)))
 	set_meta("eoa_smoke_frame_guard_t0", Time.get_ticks_msec())
 	set_meta("eoa_smoke_frame_guard_frames", 0)
 	set_meta("eoa_smoke_frame_guard_rss0", _read_godot_rss_mb())
@@ -1138,7 +1139,11 @@ func _tick_smoke_ix1_frame_guard(_delta: float) -> void:
 	if elapsed >= secs:
 		var vis: Dictionary = _log_ix1_guard_visible_feedback()
 		var frames_ok := frames >= maxi(secs * 2, 10)
-		var vis_ok := bool(vis.get("ok", false))
+		# Toast cards expire in 3–6s; latch the post-press visible check.
+		# Building… must still be on the button at 60s.
+		var vis_latched := bool(get_meta("eoa_smoke_frame_guard_vis_ok", false))
+		var building_still := "Building" in str(vis.get("building", ""))
+		var vis_ok := vis_latched and building_still
 		var verdict := "PASS" if frames_ok and rss < 3072 and vis_ok else "FAIL"
 		_eoa_flush("EOA_SMOKE_FRAME_GUARD frames=%d rss_mb=%d %s" % [frames, rss, verdict])
 		_quit_logged(0 if verdict == "PASS" else 1, "ix1_frame_guard_%s" % verdict.to_lower())
@@ -1182,17 +1187,26 @@ func _log_ix1_guard_visible_feedback() -> Dictionary:
 func _read_godot_rss_mb() -> int:
 	var path := "/proc/%d/status" % OS.get_process_id()
 	var f := FileAccess.open(path, FileAccess.READ)
-	if f == null:
-		return 0
-	var txt := f.get_as_text()
-	f.close()
-	for line in txt.split("\n"):
-		if not line.begins_with("VmRSS:"):
-			continue
-		var compact := line.replace("\t", " ")
-		var parts: PackedStringArray = compact.split(" ", false)
-		if parts.size() >= 2:
-			return int(round(float(parts[1]) / 1024.0))
+	if f != null:
+		var txt := f.get_as_text()
+		f.close()
+		for line in txt.split("\n"):
+			if not line.begins_with("VmRSS:"):
+				continue
+			var compact := line.replace("\t", " ")
+			var parts: PackedStringArray = compact.split(" ", false)
+			if parts.size() >= 2:
+				var mb: int = int(round(float(parts[1]) / 1024.0))
+				if mb > 0:
+					return mb
+	# FileAccess often cannot read /proc; sidecar awk is the same number.
+	var out: Array = []
+	var awk_path := "/proc/%d/status" % OS.get_process_id()
+	OS.execute("awk", PackedStringArray(["/VmRSS/{printf \"%d\", $2/1024}", awk_path]), out, true, false)
+	if out.size() > 0:
+		var s: String = str(out[0]).strip_edges()
+		if s.is_valid_int():
+			return int(s)
 	return 0
 
 
