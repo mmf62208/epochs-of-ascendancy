@@ -205,7 +205,7 @@ func _test_source_spine_visible_after_search() -> void:
 		_fail("special-sites Build list does not prepend Build Road Spine")
 		return
 	var layout := _slice_func(ren, "_layout_road_spine_chrome_button")
-	if "66" not in layout or "below Settle" not in layout:
+	if "66" not in layout or "BELOW Settle" not in layout:
 		_fail("Build Road Spine chrome must sit on its own row below Settle (no overlap)")
 		return
 	_pass("Search+Go live path pins Build Road Spine on chrome + facility Build list")

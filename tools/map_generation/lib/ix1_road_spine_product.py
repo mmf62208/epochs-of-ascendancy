@@ -852,7 +852,7 @@ def ix1_search_go_spine_visible() -> Dict[str, Any]:
     if "_prepend_ix1_spine_build_row" not in _slice_func(ren, "_update_special_sites_ui"):
         missing.append("special_sites_prepend_spine")
     layout = _slice_func(ren, "_layout_road_spine_chrome_button")
-    if "66" not in layout or "below Settle" not in layout:
+    if "66" not in layout or "BELOW Settle" not in layout:
         missing.append("spine_chrome_below_settle")
     show_btn = _slice_func(idm, "should_show_road_spine_button")
     if "p == null" not in show_btn:
