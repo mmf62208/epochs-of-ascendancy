@@ -7,7 +7,7 @@ PR 55 HOLD: https://github.com/mmf62208/epochs-of-ascendancy/pull/55 · branch `
 ## Verdict: machine FIX (Play rebound still required)
 
 Start tip: `9ebd17f109f0060b9b2ae14d418ae8856844d97a`
-**GitHub head.sha (verified after headless 5/5 + xvfb frame guard):** see the follow-up STATUS-pointer commit on `cursor/ix1-road-spine-9d9b`.
+**GitHub head.sha (verified after headless 5/5 + xvfb frame guard):** `d91996b9a7e74080c3632851cfccf34655de6adc`
 
 ## Root cause (kernel OOM, not a crash)
 
