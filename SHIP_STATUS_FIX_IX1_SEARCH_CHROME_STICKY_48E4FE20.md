@@ -1,4 +1,4 @@
-# STATUS — FIX IX-1 Search chrome **sticky** through TopInfoBar reflow — DONE tip pending push
+# STATUS — FIX IX-1 Search chrome **sticky** through TopInfoBar reflow — DONE
 
 Updated: Fri Sep 25, 2026
 From: Ship · one CA · PR 55 HOLD
@@ -6,7 +6,8 @@ From: Ship · one CA · PR 55 HOLD
 ## Verdict: DONE (sticky pixel Search after More+/Steel/Al reflow; smoke softpipe path)
 
 - Start tip: `48e4fe209ddf031d587b1d3d5f944a14a4580d32` (`48e4fe20`)
-- **New GitHub head.sha:** report after push (`git rev-parse origin/cursor/ix1-road-spine-9d9b`)
+- **New GitHub head.sha:** `22679ad036f553e37ad2459a52e11cbef39a2974` (`22679ad0`) — this STATUS commit will move HEAD; use `git rev-parse origin/cursor/ix1-road-spine-9d9b` after push
+- Code: `22679ad036f553e37ad2459a52e11cbef39a2974`
 - PR 55 HOLD: https://github.com/mmf62208/epochs-of-ascendancy/pull/55 · branch `cursor/ix1-road-spine-9d9b` · draft
 - Same draft PR / same branch. No second PR. Do not merge.
 
@@ -29,6 +30,9 @@ Require live: hatch + softpipe_catchup past7 + `EOA_SMOKE_STAYALIVE` **and** pix
 
 ## Honest
 Smoke sticky pixel Search after TopInfoBar reflow only. Stay-alive / catch-up / first-paint host **kept**. Product Begin / Esc / mouse CC / 4x / clock **UNFIXED**. Play-F5 **UNFIXED** unless proven. Headless SearchGo PASS ≠ live softpipe proof.
+
+## Headless (CA)
+LivingTitleEscBegin · DayTick (stay-alive EXIT 0) · SearchGoInspector · MandateGate · `test_ix1_road_spine_product` 13/13 · SCRIPT ERROR **0**
 
 ## Next
 Scott rebounds Play. HOLD merge. Quiet Mike.
