@@ -14,20 +14,24 @@ Play MIXED `002df244`: Search→Köln→Go + spine visible PASS; start **logic**
 
 1. `_on_build_road_spine_pressed` called `focus_province_by_id(pid)` with default **tactical 2.4** (same class as Search after +6d, already documented as a softpipe process death). Toast and button state ran **after** that zoom, so UX never painted if the process died.
 2. `build_road_connection` scheduled a **full** city/sites infra rebuild that could race the zoom / RoadLayer redraw.
-3. stdout was not flushed, so later clock / zoom lines vanished when the process died.
+3. RoadLayer `_get_provinces_for_layers` added **all** major-owner hexes; `MAX_LAYER_PROVINCES` 120 never capped after majors (OOM / silent kill class during zoom redraw).
+4. stdout was not flushed, so later clock / zoom lines vanished when the process died.
 
 Not the smoke harness calling quit (stay-alive `no_quit=1` was already on). The harness now logs `EOA_HARNESS_QUIT reason=…` for any intended quit.
 
+Headless CompleteTest hang (same revision): first progress toast after 90% called `LeaderEventUI.show_toast` without `_should_skip_toast_ui` (known `-s` CanvasLayer/timer hang). `advance_daily_projects` could also run the 3520×N AI consider while the spine was active.
+
 ## What changed
 
-1. Toast + **Building…** (disabled) **before** any camera work; persists while the project runs.
+1. Toast + **Building…** (disabled) **before** any camera work; persists while the project runs (graphical Play).
 2. Spine start soft-pans only. `focus_province_by_id` default is **soft**; leftover tactical is redirected (`tactical_redirected_soft`).
 3. `EOA_ZOOM_BEGIN` / `EOA_ZOOM_END` on MapRenderer + CameraController, flushed via `OS.flush_stdout`.
-4. Road writes use **light** RoadLayer rebuild (not full city/sites). Rebuild is re-entrancy-guarded; IX-1 corridor IDs are force-included.
+4. Road writes use **light** RoadLayer rebuild (not full city/sites). Rebuild is re-entrancy-guarded; IX-1 corridor IDs are force-included; major-owner paint is capped at 120.
 5. Köln panel `LabelSpineProgress` + invest bar when spine is active; `EOA_SMOKE_SPINE_PROGRESS` / `EOA_SMOKE_SPINE_COMPLETE`.
-6. `HeadlessIx1RoadSpineCompleteTest` — start→complete, RoadLayer Bonn–Köln–Leverkusen, Essen off-spine + higher move cost, zoom+redraw stays alive.
-7. TestRunner `_quit_logged` — no silent `get_tree().quit`. Stay-alive still suppresses smoke-window quits.
-8. Optional: hide Steel/Al before they clip Search at ~1280px.
+6. `HeadlessIx1RoadSpineCompleteTest` — start→complete days=36, RoadLayer Bonn–Köln–Leverkusen, Essen off-spine + higher move cost, zoom+redraw stays alive.
+7. TestRunner `_quit_logged` — no silent `get_tree().quit` outside that helper. Stay-alive still suppresses smoke-window quits.
+8. Headless `show_toast` no-ops; spine complete sim skips full-board AI invest.
+9. Optional: hide Steel/Al before they clip Search at ~1280px.
 
 Sticky Search / stay-alive / catch-up / hatch / `EOA_SMOKE_SPINE_START` **kept**. Corridor IDs unchanged (Köln 710417, Bonn 710416, Leverkusen 710418, Essen 710403). Dig2/G / rail / industry PARKED.
 
@@ -39,9 +43,21 @@ tools/eoa_play_f5_smoke_auto_begin.sh
 
 The smoke harness is **not** the product. Product Begin / Esc / mouse CC / 4x / clock stay **FAIL**. Play-F5 delivery stays **UNFIXED**.
 
-## Headless
+## Headless (this revision, SCRIPT ERROR 0)
 
-Existing IX-1 headless + new CompleteTest + `test_ix1_road_spine_product`. Require SCRIPT ERROR **0**.
+| Test | Result |
+|------|--------|
+| `test_ix1_road_spine_product` | 15/15 OK |
+| `HeadlessIx1RoadSpineCompleteTest` | RESULT=PASS · days=36 · RoadLayer Bonn–Köln + Köln–Leverkusen · Essen off |
+| `HeadlessIx1RoadSpineMandateGateTest` | PASS (failures=0) |
+| `HeadlessIx1RoadSpineDayTickTest` | RESULT=PASS |
+| `HeadlessIx1SearchGoInspectorTest` | RESULT=PASS |
+| `HeadlessIx1LivingTitleEscBeginTest` | RESULT=PASS |
+| pick harness accurate | ok=true |
+| `HeadlessWorldAccurateMultiFrontAssaultTest` | PASS (failures=0) |
+| `HeadlessWorldAccurateUnitOrderLoopTest` | RESULT=PASS |
+
+`--quick` `unit_board_play_path` still has pre-existing living-unit product fails (`air_region_cas`, `peace_occupation`, `nation_era_next`, `map_country_select`, `playtest_clock`) — not this spine slice.
 
 ## Next
 
