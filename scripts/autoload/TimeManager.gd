@@ -276,7 +276,25 @@ func simulate_play_begin_clock_controls(hours: int = 8) -> Dictionary:
 ## soak). Does not reset the calendar. Default no-op unless the smoke
 ## advance flag is on. Never treat the log as product 4x/clock PASS.
 func smoke_advance_past_plus6_enabled() -> bool:
-	return LivingTitleBoot.smoke_advance_past_plus6_enabled()
+	var adv := OS.get_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6").strip_edges().to_lower()
+	if adv == "0" or adv == "false" or adv == "no" or adv == "off":
+		return false
+	if adv == "1" or adv == "true" or adv == "yes" or adv == "on":
+		return true
+	for a in OS.get_cmdline_args():
+		var al := str(a).to_lower().strip_edges()
+		if al == "--no-smoke-advance-past-plus6":
+			return false
+		if al == "--smoke-advance-past-plus6" or al == "--eoa-smoke-advance-past-plus6":
+			return true
+	var begin_env := OS.get_environment("EOA_SMOKE_AUTO_BEGIN").strip_edges().to_lower()
+	if begin_env == "1" or begin_env == "true" or begin_env == "yes":
+		return true
+	for a2 in OS.get_cmdline_args():
+		var al2 := str(a2).to_lower().strip_edges()
+		if al2 == "--smoke-auto-begin" or al2 == "--eoa-smoke-auto-begin":
+			return true
+	return false
 
 
 func apply_smoke_advance_past_plus6() -> Dictionary:

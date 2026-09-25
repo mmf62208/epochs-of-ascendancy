@@ -163,7 +163,9 @@ func arm_play_clock_after_begin() -> void:
 ## then TimeManager `advance_real_time` (same class as headless DayTick).
 ## Default OFF. Does NOT claim product 4x / clock / Begin / Esc PASS.
 func apply_smoke_advance_past_plus6() -> Dictionary:
-	var enabled := LivingTitleBoot.smoke_advance_past_plus6_enabled()
+	var enabled := false
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("smoke_advance_past_plus6_enabled"):
+		enabled = bool(TimeManager.smoke_advance_past_plus6_enabled())
 	if not enabled:
 		print("EOA_SMOKE_ADVANCE_PAST_PLUS6 who=topbar.apply_smoke_advance_past_plus6 skipped flag_off (NOT product clock PASS)")
 		return {"ok": false, "reason": "flag_off", "smoke_only": true, "product_clock_pass": false}
