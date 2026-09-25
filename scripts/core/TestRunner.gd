@@ -705,18 +705,45 @@ func _process(_delta: float) -> void:
 	var boot: Node = get_node_or_null("LivingTitleBoot")
 	if boot == null or not is_instance_valid(boot) or bool(boot.get("_closed")):
 		return
-	# Play 5adb38e: mouse Begin/CC never reached title `_input`. Poll the
-	# Input singleton the same way we poll Esc.
-	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+	# Play 5adb38e / f9f249c: mouse Begin/CC never reached title `_input`.
+	# Poll Input AND DisplayServer.mouse_get_button_state() — computerUse
+	# clicks an unfocused window and the WM eats the ButtonPress so the
+	# Input singleton stays false (zero EOA_LIVE_PTR).
+	var os_left: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	if not os_left and boot.has_method("os_left_button_held"):
+		os_left = bool(boot.call("os_left_button_held"))
+	elif not os_left and DisplayServer.get_name() != "headless":
+		os_left = (int(DisplayServer.mouse_get_button_state()) & int(MOUSE_BUTTON_MASK_LEFT)) != 0
+	if os_left:
 		if not has_meta("eoa_title_ptr_held"):
 			set_meta("eoa_title_ptr_held", true)
+			print(
+				"EOA_LIVE_RAW_PTR who=TestRunner._process ds_btn=%s vp=%s"
+				% [str(int(DisplayServer.mouse_get_button_state())), str(get_viewport().get_mouse_position() if get_viewport() != null else Vector2.ZERO)]
+			)
 			if boot.has_method("handle_live_pointer"):
 				var ptr_act: String = str(boot.call("handle_live_pointer", null))
-				if ptr_act == "begin" or ptr_act == "cc":
-					print("EOA_LIVE_PTR who=TestRunner._process action=%s" % ptr_act)
+				print("EOA_LIVE_PTR who=TestRunner._process action=%s" % ptr_act)
 	else:
 		if has_meta("eoa_title_ptr_held"):
 			remove_meta("eoa_title_ptr_held")
+	if boot.has_method("is_live_begin_event") == false:
+		pass
+	elif (
+		(InputMap.has_action("eoa_living_begin") and Input.is_action_just_pressed("eoa_living_begin"))
+		or (InputMap.has_action("ui_accept") and Input.is_action_just_pressed("ui_accept"))
+		or Input.is_key_pressed(KEY_ENTER)
+		or Input.is_physical_key_pressed(KEY_ENTER)
+	):
+		if not has_meta("eoa_title_begin_key_held"):
+			set_meta("eoa_title_begin_key_held", true)
+			print("EOA_LIVE_RAW_KEY who=TestRunner._process event=begin_key")
+			if boot.has_method("handle_live_begin"):
+				boot.call("handle_live_begin")
+				print("EOA_LIVE_PTR who=TestRunner._process action=begin_key")
+	else:
+		if has_meta("eoa_title_begin_key_held"):
+			remove_meta("eoa_title_begin_key_held")
 	var just: bool = Input.is_action_just_pressed("ui_cancel")
 	var held: bool = Input.is_key_pressed(KEY_ESCAPE) or Input.is_physical_key_pressed(KEY_ESCAPE)
 	if not just and not held:

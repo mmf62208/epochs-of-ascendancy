@@ -542,7 +542,16 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("living_title_mouse_cc")
     if "LivingTitleEscChip" not in title or "begin_without_esc" not in title:
         missing.append("living_title_begin_without_esc")
-    if "_living_title_owns_click() or _top_bar_owns_click()" not in _read(RENDERER_GD):
+    if "EOA_LIVE_RAW_PTR" not in title or "EOA_LIVE_RAW_KEY" not in title:
+        missing.append("living_title_raw_event_log")
+    if "mouse_get_button_state" not in title or "os_left_button_held" not in title:
+        missing.append("living_title_ds_button_poll")
+    if "is_live_begin_event" not in title or "eoa_living_begin" not in title:
+        missing.append("living_title_begin_keys")
+    if (
+        "_living_title_owns_click() or _top_bar_owns_click()" not in _read(RENDERER_GD)
+        and "_living_title_owns_event(event) or _top_bar_owns_click()" not in _read(RENDERER_GD)
+    ):
         missing.append("title_up_top_bar_clicks")
     if "open_command_center_stay" not in top or "_living_title_boot_is_up" not in top:
         missing.append("top_bar_cc_open_only_on_title")

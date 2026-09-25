@@ -1676,6 +1676,28 @@ func _route_living_title_pointer(event: InputEvent) -> String:
 	return ""
 
 
+func _is_live_begin_key(event: InputEvent) -> bool:
+	# Enter / Space / B start the campaign while the living title is up
+	# (Play f9f249c: computerUse mouse never reached handle_live_pointer).
+	var boot_k: Node = _living_title_boot_node()
+	if boot_k != null and boot_k.has_method("is_live_begin_event"):
+		return bool(boot_k.call("is_live_begin_event", event))
+	if event is InputEventKey:
+		var key_b: InputEventKey = event
+		if not key_b.pressed or key_b.echo:
+			return false
+		if key_b.ctrl_pressed or key_b.alt_pressed or key_b.meta_pressed:
+			return false
+		if (
+			key_b.keycode == KEY_ENTER
+			or key_b.keycode == KEY_KP_ENTER
+			or key_b.keycode == KEY_SPACE
+			or key_b.keycode == KEY_B
+		):
+			return true
+	return false
+
+
 func _is_live_escape_event(event: InputEvent) -> bool:
 	# Live DisplayServer: keycode, physical_keycode, or ui_cancel (Play d18cbae).
 	if event is InputEventAction:
@@ -1947,6 +1969,14 @@ func _input(event: InputEvent) -> void:
 			_handle_escape_key()
 			get_viewport().set_input_as_handled()
 			return
+		if _living_title_boot_is_up() and _is_live_begin_key(event):
+			print("EOA_LIVE_RAW_KEY who=MapRenderer._input event=begin_key")
+			var boot_bk: Node = _living_title_boot_node()
+			if boot_bk != null and boot_bk.has_method("handle_live_begin"):
+				boot_bk.call("handle_live_begin")
+				print("EOA_LIVE_PTR who=MapRenderer._input action=begin_key")
+			get_viewport().set_input_as_handled()
+			return
 		if (
 			event.keycode == KEY_I
 			and not event.ctrl_pressed
@@ -2006,7 +2036,12 @@ func _input(event: InputEvent) -> void:
 				# coords (computerUse may not update get_mouse_position first).
 				# Blind set_input_as_handled() here made Begin / mouse-CC dead.
 				if event.pressed:
+					print(
+						"EOA_LIVE_RAW_PTR who=MapRenderer._input class=mouse btn=%s pos=%s"
+						% [str(event.button_index), str(event.position)]
+					)
 					var title_act: String = _route_living_title_pointer(event)
+					print("EOA_LIVE_PTR who=MapRenderer._input action=%s" % title_act)
 					if title_act == "begin" or title_act == "cc" or title_act == "panel":
 						get_viewport().set_input_as_handled()
 						return
@@ -2345,6 +2380,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			return
 		# Phase C: B — live fronts. Toast + cycle + camera ONLY (never outline/scan on key frame).
 		if event.keycode == KEY_B and not event.ctrl_pressed and not event.alt_pressed and not event.shift_pressed:
+			if _living_title_boot_is_up():
+				var boot_b: Node = _living_title_boot_node()
+				if boot_b != null and boot_b.has_method("handle_live_begin"):
+					boot_b.call("handle_live_begin")
+					print("EOA_LIVE_PTR who=MapRenderer._unhandled_input action=begin_key")
+				get_viewport().set_input_as_handled()
+				return
 			_run_live_border_fronts_instant()
 			get_viewport().set_input_as_handled()
 			return

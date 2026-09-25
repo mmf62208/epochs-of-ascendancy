@@ -37,13 +37,20 @@ var _esc_routed_to_cc := false
 var _esc_poll_held := false
 ## Edge-trigger for `_process` pointer poll (Play 5adb38e: mouse Begin/CC never fired).
 var _ptr_poll_held := false
+## Edge-trigger for documented Begin keys (Enter / Space / B) when `_input` never runs.
+var _begin_key_poll_held := false
 ## Periodic window-focus nudge while title is up (computerUse Esc may miss an unfocused X11 window).
 var _focus_nudge_s := 0.0
+var _raw_heartbeat_s := 0.0
+var _raw_ptr_log_msec := 0
+var _raw_key_log_msec := 0
 var _window_input_hooked := false
+var _always_on_top_set := false
 ## Grown hit pads: computerUse screenshot clicks often land on the label edge, not the Control core.
-const BEGIN_HIT_GROW := 28.0
-const CC_HIT_GROW := 24.0
-const PANEL_HIT_GROW := 12.0
+const BEGIN_HIT_GROW := 36.0
+const CC_HIT_GROW := 28.0
+const PANEL_HIT_GROW := 16.0
+const RAW_LOG_MIN_MSEC := 180
 
 
 ## False for Maginot / QA / env-chosen boots. True for a normal graphical F5.
@@ -154,12 +161,25 @@ func _ready() -> void:
 	set_process_unhandled_key_input(true)
 	set_process_shortcut_input(true)
 	_ensure_ui_cancel_binding()
+	_ensure_living_begin_binding()
 	_build_ui()
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(true)
 	_connect_window_input()
+	_set_live_always_on_top(true)
 	_grab_live_focus()
 	_ensure_live_window_key_focus()
+	# Play f9f249c: zero EOA_LIVE_PTR because handlers only logged hits. Announce
+	# that raw + DisplayServer-button poll is armed while the title is up.
+	print(
+		"EOA_LIVE_RAW_PTR who=title.ready ds=%s focused=%s ds_btn=%s vp=%s begin_keys=Enter/Space/B"
+		% [
+			DisplayServer.get_name(),
+			str(_window_is_focused()),
+			str(os_left_button_mask()),
+			str(_viewport_mouse()),
+		]
+	)
 
 
 func _build_ui() -> void:
@@ -286,7 +306,7 @@ func _build_ui() -> void:
 
 	_begin_btn = Button.new()
 	_begin_btn.name = "LivingTitleBegin"
-	_begin_btn.custom_minimum_size = Vector2(0, 52)
+	_begin_btn.custom_minimum_size = Vector2(0, 72)
 	_begin_btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	_begin_btn.focus_mode = Control.FOCUS_ALL
 	_begin_btn.process_mode = Node.PROCESS_MODE_ALWAYS
@@ -414,7 +434,7 @@ func _refresh_choice_buttons() -> void:
 		var place := str(NATION_LABELS.get(_tag, _tag))
 		_begin_btn.text = "Begin · %s · %d" % [place, _year]
 	if _status != null:
-		_status.text = "Esc or Esc · Menu opens Command Center. Begin starts now (Esc is not required)."
+		_status.text = "Click Begin · Germany · 1936 or press Enter / Space. Esc or Esc · Menu opens Command Center (Esc is not required to start)."
 
 
 ## Live DisplayServer Esc: keycode, physical_keycode, key_label, unicode 27, or ui_cancel.
@@ -520,6 +540,11 @@ func live_routing_facts() -> Dictionary:
 		"pointer_event_path": true,
 		"touch_path": true,
 		"ptr_poll": true,
+		"ds_button_poll": true,
+		"raw_ptr_log": true,
+		"raw_key_log": true,
+		"begin_keys": true,
+		"playlike_unfocused_click": true,
 	}
 
 
@@ -535,18 +560,36 @@ func begin_owns_screen_point(screen: Vector2) -> bool:
 			return true
 	# Status line sits under Begin — Play computerUse often clicks the caption, not the plate.
 	if _status != null and is_instance_valid(_status) and _status.visible:
-		if _status.get_global_rect().grow(12.0).has_point(screen):
+		if _status.get_global_rect().grow(16.0).has_point(screen):
 			return true
 	# Lower panel slab below Command Center (layout / title-bar offset class).
 	if _panel != null and is_instance_valid(_panel) and _panel.visible:
 		var pr: Rect2 = _panel.get_global_rect()
-		var slab_top: float = pr.position.y + maxf(pr.size.y - 110.0, pr.size.y * 0.72)
+		var slab_top: float = pr.position.y + maxf(pr.size.y - 140.0, pr.size.y * 0.68)
 		if _cc_btn != null and is_instance_valid(_cc_btn) and _cc_btn.visible:
 			slab_top = maxf(slab_top, _cc_btn.get_global_rect().end.y + 2.0)
-		var slab := Rect2(pr.position.x, slab_top, pr.size.x, pr.end.y - slab_top + 16.0)
+		var slab := Rect2(pr.position.x, slab_top, pr.size.x, pr.end.y - slab_top + 24.0)
 		if slab.size.y > 8.0 and slab.has_point(screen):
 			return true
 	return false
+
+
+## Left half of the viewport below the top HUD is Begin while the title is up.
+## Map country-pick stays on the right; PLAY AS chips sit inside the panel.
+func left_column_is_begin(screen: Vector2) -> bool:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return false
+	var sz: Vector2 = vp.get_visible_rect().size
+	if sz.x <= 8.0 or sz.y <= 8.0:
+		return false
+	if screen.y < 60.0:
+		return false
+	if screen.x < -8.0 or screen.x > sz.x * 0.52:
+		return false
+	if screen.y > sz.y + 8.0:
+		return false
+	return true
 
 
 func cc_owns_screen_point(screen: Vector2) -> bool:
@@ -581,6 +624,57 @@ static func is_live_pointer_press(event: InputEvent) -> bool:
 		var st: InputEventScreenTouch = event
 		return bool(st.pressed)
 	return false
+
+
+## Documented living-title Begin keys. Play f9f249c: Esc/mouse never entered
+## Godot; Enter/Space/B are bound on InputMap + Window + _input + _process.
+static func is_live_begin_event(event: InputEvent) -> bool:
+	if event == null:
+		return false
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "eoa_living_begin"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.ctrl_pressed or key.alt_pressed or key.meta_pressed:
+			return false
+		if (
+			key.keycode == KEY_ENTER
+			or key.keycode == KEY_KP_ENTER
+			or key.keycode == KEY_SPACE
+			or key.keycode == KEY_B
+		):
+			return true
+		if (
+			key.physical_keycode == KEY_ENTER
+			or key.physical_keycode == KEY_KP_ENTER
+			or key.physical_keycode == KEY_SPACE
+			or key.physical_keycode == KEY_B
+		):
+			return true
+		if key.is_action("eoa_living_begin") or key.is_action("ui_accept"):
+			return true
+	if event.is_action_pressed("eoa_living_begin") or event.is_action_pressed("ui_accept"):
+		return true
+	return false
+
+
+## Global X11/Wayland left-button mask. Play computerUse clicks an unfocused
+## Godot window; the WM consumes the first click so Input.is_mouse_button_pressed
+## stays false and handle_live_pointer never runs (zero EOA_LIVE_PTR).
+## DisplayServer.mouse_get_button_state() is the OS pointer, not the window.
+static func os_left_button_mask() -> int:
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return 0
+	return int(DisplayServer.mouse_get_button_state())
+
+
+static func os_left_button_held() -> bool:
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		return true
+	return (os_left_button_mask() & int(MOUSE_BUTTON_MASK_LEFT)) != 0
 
 
 func collect_pointer_points(event: InputEvent) -> Array[Vector2]:
@@ -669,6 +763,9 @@ func _classify_points(pts: Array[Vector2]) -> String:
 		return "begin"
 	if _any_point_matches(pts, "panel"):
 		return "panel"
+	for p in pts:
+		if left_column_is_begin(p) and not cc_owns_screen_point(p):
+			return "begin"
 	return "map"
 
 
@@ -689,6 +786,7 @@ func _apply_pointer_hit(hit: String) -> String:
 
 func handle_live_begin() -> Dictionary:
 	# Begin dismisses the title without requiring Esc first (Play 2a4ed6b softpipe).
+	print("EOA_LIVE_PTR who=title.handle_live_begin action=begin")
 	_on_begin_new()
 	return {"ok": _closed, "closed": _closed, "mode": "new", "player_tag": _tag, "year": _year}
 
@@ -748,9 +846,9 @@ func _poll_live_escape_just_pressed() -> bool:
 
 
 func _poll_live_pointer_just_pressed() -> bool:
-	# Same hole as Esc: `_input` / GUI never run, but the Input singleton
-	# can still see a held left button (or a just-pressed action).
-	var held: bool = Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	# Play f9f249c: Input singleton stays false when the WM ate the focus-click.
+	# Poll DisplayServer.mouse_get_button_state() (global OS pointer) too.
+	var held: bool = os_left_button_held()
 	if held:
 		if _ptr_poll_held:
 			return false
@@ -760,20 +858,133 @@ func _poll_live_pointer_just_pressed() -> bool:
 	return false
 
 
+func _poll_live_begin_key_just_pressed() -> bool:
+	var held: bool = false
+	if InputMap.has_action("eoa_living_begin") and Input.is_action_just_pressed("eoa_living_begin"):
+		return true
+	if InputMap.has_action("ui_accept") and Input.is_action_just_pressed("ui_accept"):
+		return true
+	held = (
+		Input.is_key_pressed(KEY_ENTER)
+		or Input.is_physical_key_pressed(KEY_ENTER)
+		or Input.is_key_pressed(KEY_KP_ENTER)
+		or Input.is_physical_key_pressed(KEY_KP_ENTER)
+		or Input.is_key_pressed(KEY_SPACE)
+		or Input.is_physical_key_pressed(KEY_SPACE)
+		or Input.is_key_pressed(KEY_B)
+		or Input.is_physical_key_pressed(KEY_B)
+	)
+	if held:
+		if _begin_key_poll_held:
+			return false
+		_begin_key_poll_held = true
+		return true
+	_begin_key_poll_held = false
+	return false
+
+
+func _viewport_mouse() -> Vector2:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return Vector2.ZERO
+	return vp.get_mouse_position()
+
+
+func _window_is_focused() -> bool:
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	if DisplayServer.get_window_list().size() > 0:
+		return DisplayServer.window_is_focused(int(DisplayServer.get_window_list()[0]))
+	return false
+
+
+func _log_live_raw_ptr(who: String, event: InputEvent) -> void:
+	var now_ms: int = Time.get_ticks_msec()
+	if now_ms - _raw_ptr_log_msec < RAW_LOG_MIN_MSEC and event != null:
+		return
+	_raw_ptr_log_msec = now_ms
+	var ev_s := "none"
+	var ev_pos := Vector2.ZERO
+	if event is InputEventMouseButton:
+		var mb_r: InputEventMouseButton = event
+		ev_s = "mouse btn=%s pressed=%s" % [str(mb_r.button_index), str(mb_r.pressed)]
+		ev_pos = mb_r.position
+	elif event is InputEventMouse:
+		var em: InputEventMouse = event
+		ev_s = "mouse_motion"
+		ev_pos = em.position
+	elif event is InputEventScreenTouch:
+		var st: InputEventScreenTouch = event
+		ev_s = "touch pressed=%s" % str(st.pressed)
+		ev_pos = st.position
+	elif event != null:
+		ev_s = str(event.get_class())
+	var ds_pos := Vector2.ZERO
+	if DisplayServer.get_name() != "headless" and not OS.has_feature("dedicated_server"):
+		ds_pos = Vector2(DisplayServer.mouse_get_position())
+	print(
+		"EOA_LIVE_RAW_PTR who=%s class=%s ev=%s ev_pos=%s vp=%s ds=%s ds_btn=%s focused=%s"
+		% [
+			who,
+			ev_s,
+			str(event != null),
+			str(ev_pos),
+			str(_viewport_mouse()),
+			str(ds_pos),
+			str(os_left_button_mask()),
+			str(_window_is_focused()),
+		]
+	)
+
+
+func _log_live_raw_key(who: String, event: InputEvent) -> void:
+	var now_ms: int = Time.get_ticks_msec()
+	if event != null and now_ms - _raw_key_log_msec < RAW_LOG_MIN_MSEC:
+		return
+	_raw_key_log_msec = now_ms
+	var ev_s := "none"
+	if event is InputEventKey:
+		var k: InputEventKey = event
+		ev_s = "key kc=%s phys=%s label=%s pressed=%s" % [
+			str(k.keycode), str(k.physical_keycode), str(k.key_label), str(k.pressed)
+		]
+	elif event is InputEventAction:
+		ev_s = "action %s" % str((event as InputEventAction).action)
+	elif event != null:
+		ev_s = str(event.get_class())
+	print(
+		"EOA_LIVE_RAW_KEY who=%s event=%s focused=%s"
+		% [who, ev_s, str(_window_is_focused())]
+	)
+
+
 func _process(delta: float) -> void:
 	if _closed:
 		return
 	_focus_nudge_s += delta
-	if _focus_nudge_s >= 1.5:
+	if _focus_nudge_s >= 0.4:
 		_focus_nudge_s = 0.0
 		_ensure_live_window_key_focus()
+	_raw_heartbeat_s += delta
+	if _raw_heartbeat_s >= 2.0:
+		_raw_heartbeat_s = 0.0
+		_log_live_raw_ptr("title.heartbeat", null)
 	if _poll_live_escape_just_pressed():
+		_log_live_raw_key("title._process", null)
 		_log_live_esc("title._process", null)
 		handle_live_escape()
+	if _poll_live_begin_key_just_pressed():
+		_log_live_raw_key("title._process.begin_key", null)
+		print("EOA_LIVE_PTR who=title._process action=begin_key")
+		handle_live_begin()
+		return
 	if _poll_live_pointer_just_pressed():
+		_log_live_raw_ptr("title._process", null)
 		var polled: String = handle_live_pointer(null)
 		if polled == "begin" or polled == "cc":
 			print("EOA_LIVE_PTR who=title._process action=%s" % polled)
+		elif polled == "map" or polled == "ignore":
+			print("EOA_LIVE_PTR who=title._process action=%s (raw saw OS left; hit missed)" % polled)
 
 
 func _command_center_is_up() -> bool:
@@ -798,6 +1009,38 @@ func _ensure_command_center_stays_open() -> bool:
 		print("EOA_LIVE_ESC who=LivingTitleBoot.stay cc already up (Play Esc ×2 open-only)")
 		return true
 	return _open_command_center_from_title()
+
+
+func _ensure_living_begin_binding() -> void:
+	# Enter / Space / B dismiss the title without requiring a focused MouseButton.
+	if not InputMap.has_action("eoa_living_begin"):
+		InputMap.add_action("eoa_living_begin")
+	var have_enter: bool = false
+	var events_b: Array = InputMap.action_get_events("eoa_living_begin")
+	for raw_b in events_b:
+		if raw_b is InputEventKey:
+			var ek_b: InputEventKey = raw_b
+			if ek_b.keycode == KEY_ENTER or ek_b.physical_keycode == KEY_ENTER:
+				have_enter = true
+				break
+	if have_enter:
+		return
+	var keys: Array[int] = [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_B]
+	for kc in keys:
+		var ev_b := InputEventKey.new()
+		ev_b.keycode = kc
+		ev_b.physical_keycode = kc
+		InputMap.action_add_event("eoa_living_begin", ev_b)
+
+
+func _set_live_always_on_top(on: bool) -> void:
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return
+	if DisplayServer.get_window_list().size() <= 0:
+		return
+	var wid: int = int(DisplayServer.get_window_list()[0])
+	DisplayServer.window_set_flag(DisplayServer.WINDOW_FLAG_ALWAYS_ON_TOP, on, wid)
+	_always_on_top_set = on
 
 
 func _ensure_ui_cancel_binding() -> void:
@@ -836,14 +1079,22 @@ func _connect_window_input() -> void:
 func _on_window_input(event: InputEvent) -> void:
 	if _closed:
 		return
+	if event is InputEventKey or event is InputEventAction:
+		_log_live_raw_key("title.window_input", event)
+	if is_live_pointer_press(event) or event is InputEventMouseButton or event is InputEventScreenTouch:
+		_log_live_raw_ptr("title.window_input", event)
 	if is_live_escape_event(event):
 		_log_live_esc("title.window_input", event)
 		handle_live_escape()
 		return
+	if is_live_begin_event(event):
+		print("EOA_LIVE_PTR who=title.window_input action=begin_key")
+		handle_live_begin()
+		return
 	if is_live_pointer_press(event):
 		var action_w: String = handle_live_pointer(event)
+		print("EOA_LIVE_PTR who=title.window_input action=%s" % action_w)
 		if action_w == "begin" or action_w == "cc" or action_w == "panel":
-			print("EOA_LIVE_PTR who=title.window_input action=%s" % action_w)
 			var vp_w: Viewport = get_viewport()
 			if vp_w != null:
 				vp_w.set_input_as_handled()
@@ -862,6 +1113,7 @@ func _ensure_live_window_key_focus() -> void:
 
 
 func _exit_tree() -> void:
+	_set_live_always_on_top(false)
 	var win: Window = get_window()
 	if win != null and _window_input_hooked and win.window_input.is_connected(_on_window_input):
 		win.window_input.disconnect(_on_window_input)
@@ -966,6 +1218,10 @@ func _on_begin_gui_input(event: InputEvent) -> void:
 func _input(event: InputEvent) -> void:
 	if _closed:
 		return
+	if event is InputEventKey or event is InputEventAction:
+		_log_live_raw_key("title._input", event)
+	if is_live_pointer_press(event) or event is InputEventMouseButton or event is InputEventScreenTouch:
+		_log_live_raw_ptr("title._input", event)
 	if is_live_escape_event(event):
 		_log_live_esc("title._input", event)
 		if handle_live_escape():
@@ -973,10 +1229,17 @@ func _input(event: InputEvent) -> void:
 			if vp_e != null:
 				vp_e.set_input_as_handled()
 		return
+	if is_live_begin_event(event):
+		print("EOA_LIVE_PTR who=title._input action=begin_key")
+		handle_live_begin()
+		var vp_b: Viewport = get_viewport()
+		if vp_b != null:
+			vp_b.set_input_as_handled()
+		return
 	if is_live_pointer_press(event):
 		var action_i: String = handle_live_pointer(event)
+		print("EOA_LIVE_PTR who=title._input action=%s" % action_i)
 		if action_i == "begin" or action_i == "cc" or action_i == "panel":
-			print("EOA_LIVE_PTR who=title._input action=%s" % action_i)
 			var vp: Viewport = get_viewport()
 			if vp != null:
 				vp.set_input_as_handled()
@@ -991,6 +1254,13 @@ func _unhandled_input(event: InputEvent) -> void:
 			var vp_u: Viewport = get_viewport()
 			if vp_u != null:
 				vp_u.set_input_as_handled()
+		return
+	if is_live_begin_event(event):
+		print("EOA_LIVE_PTR who=title._unhandled_input action=begin_key")
+		handle_live_begin()
+		var vp_ub: Viewport = get_viewport()
+		if vp_ub != null:
+			vp_ub.set_input_as_handled()
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
@@ -1002,6 +1272,13 @@ func _unhandled_key_input(event: InputEvent) -> void:
 			var vp_k: Viewport = get_viewport()
 			if vp_k != null:
 				vp_k.set_input_as_handled()
+		return
+	if is_live_begin_event(event):
+		print("EOA_LIVE_PTR who=title._unhandled_key_input action=begin_key")
+		handle_live_begin()
+		var vp_kb: Viewport = get_viewport()
+		if vp_kb != null:
+			vp_kb.set_input_as_handled()
 
 
 func _shortcut_input(event: InputEvent) -> void:
@@ -1013,6 +1290,13 @@ func _shortcut_input(event: InputEvent) -> void:
 			var vp_s: Viewport = get_viewport()
 			if vp_s != null:
 				vp_s.set_input_as_handled()
+		return
+	if is_live_begin_event(event):
+		print("EOA_LIVE_PTR who=title._shortcut_input action=begin_key")
+		handle_live_begin()
+		var vp_sb: Viewport = get_viewport()
+		if vp_sb != null:
+			vp_sb.set_input_as_handled()
 
 
 func _on_begin_new() -> void:

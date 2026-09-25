@@ -2,12 +2,13 @@ extends SceneTree
 
 ## Lean living-title-only window. No 3520 board.
 ## Proves a real DisplayServer pointer can dismiss the title / open CC.
-## Pair with tools/eoa_lean_title_click_prove.sh (xdotool click --window).
+## Pair with tools/eoa_lean_title_click_prove.sh (xdotool + windowactivate)
+## and tools/eoa_playlike_title_click_prove.sh (NO windowactivate — Play class).
 ##
 ##   DISPLAY=:1 tools/run_godot.sh -s res://scripts/core/LeanLivingTitleX11ClickProve.gd
 ##
-## Not a substitute for Play computerUse on TestScenario. Same
-## tools/run_godot.sh + Window.window_input / handle_live_pointer path.
+## Play computerUse on TestScenario is still the human gate. This scene is the
+## same tools/run_godot.sh + DisplayServer pointer path without the 3520 board.
 
 var _title: CanvasLayer
 var _timer: Timer
@@ -45,7 +46,7 @@ func _after_layout() -> void:
 	var ds := DisplayServer.get_name()
 	_print_hits()
 	print(
-		"LEAN_CLICK_READY displayserver=%s pointer_event_path=1 touch_path=1 begin_without_esc=1"
+		"LEAN_CLICK_READY displayserver=%s pointer_event_path=1 touch_path=1 begin_without_esc=1 ds_button_poll=1 raw_ptr=1 begin_keys=Enter/Space/B"
 		% ds
 	)
 	_timer = Timer.new()

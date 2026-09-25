@@ -65,6 +65,7 @@ func _run() -> void:
 	_test_runtime_begin_wiring_and_input()
 	_test_runtime_mouse_cc_and_begin_without_esc()
 	_test_runtime_pointer_event_not_mouse_singleton()
+	_test_runtime_begin_key_and_raw_logs()
 	_test_runtime_esc_opens_cc()
 	_test_runtime_two_esc_keeps_cc()
 
@@ -118,6 +119,18 @@ func _test_source_live_input_routing() -> void:
 		return
 	if "_poll_live_pointer_just_pressed" not in title_src:
 		_fail("LivingTitleBoot must poll Input-singleton left button when _input never fires")
+		return
+	if "EOA_LIVE_RAW_PTR" not in title_src or "EOA_LIVE_RAW_KEY" not in title_src:
+		_fail("LivingTitleBoot must log ANY title-up mouse/key (EOA_LIVE_RAW_PTR / EOA_LIVE_RAW_KEY)")
+		return
+	if "mouse_get_button_state" not in title_src or "os_left_button_held" not in title_src:
+		_fail("LivingTitleBoot must poll DisplayServer.mouse_get_button_state (Play unfocused click)")
+		return
+	if "func is_live_begin_event" not in title_src or "eoa_living_begin" not in title_src:
+		_fail("LivingTitleBoot must bind Enter/Space/B as a playtest Begin key")
+		return
+	if "left_column_is_begin" not in title_src:
+		_fail("LivingTitleBoot must treat the left title column as Begin for offset computerUse clicks")
 		return
 	if "ACTION_MODE_BUTTON_PRESS" not in title_src:
 		_fail("Begin must fire on press (MapRenderer can swallow release as a map pick)")
@@ -189,6 +202,12 @@ func _test_source_live_input_routing() -> void:
 		return
 	if "handle_live_pointer" not in _slice_func(tr, "_process"):
 		_fail("TestRunner must poll live pointer while the living title is up (Play 5adb38e)")
+		return
+	if "os_left_button_held" not in _slice_func(tr, "_process") and "mouse_get_button_state" not in _slice_func(tr, "_process"):
+		_fail("TestRunner must poll DisplayServer left-button while title is up (Play f9f249c)")
+		return
+	if "_is_live_begin_key" not in ren:
+		_fail("MapRenderer must route Enter/Space/B to living-title Begin while title is up")
 		return
 	_pass("source: live Esc/Begin routing (not layer-only)")
 
@@ -530,6 +549,51 @@ func _test_runtime_pointer_event_not_mouse_singleton() -> void:
 			return
 	_pass("ScreenTouch is a living-title pointer press")
 	title_t.queue_free()
+
+
+func _test_runtime_begin_key_and_raw_logs() -> void:
+	# Play f9f249c: zero EOA_LIVE_PTR. Next fail must prove whether Godot saw
+	# the event. Enter is the documented Begin key when mouse stays env-hard.
+	var leftover: Node = root.get_node_or_null("MainMenu")
+	if leftover != null:
+		leftover.free()
+	var title_scr: GDScript = load("res://scripts/ui/LivingTitleBoot.gd") as GDScript
+	if title_scr == null or not title_scr.has_method("is_live_begin_event"):
+		_fail("is_live_begin_event missing")
+		return
+	var enter := InputEventKey.new()
+	enter.keycode = KEY_ENTER
+	enter.physical_keycode = KEY_ENTER
+	enter.pressed = true
+	if not bool(title_scr.call("is_live_begin_event", enter)):
+		_fail("is_live_begin_event must accept Enter")
+		return
+	var space := InputEventKey.new()
+	space.keycode = KEY_SPACE
+	space.physical_keycode = KEY_SPACE
+	space.pressed = true
+	if not bool(title_scr.call("is_live_begin_event", space)):
+		_fail("is_live_begin_event must accept Space")
+		return
+	var title: CanvasLayer = title_scr.new() as CanvasLayer
+	title.name = "LivingTitleBootBeginKey"
+	root.add_child(title)
+	if title.has_method("_input"):
+		title.call("_input", enter)
+	if not bool(title.get("_closed")):
+		if title.has_method("handle_live_begin"):
+			title.call("handle_live_begin")
+		if not bool(title.get("_closed")):
+			_fail("Enter / handle_live_begin must dismiss the living title")
+			title.queue_free()
+			return
+	var src := _read(SRC_TITLE)
+	if "EOA_LIVE_RAW_PTR" not in src or "os_left_button_held" not in src:
+		_fail("raw pointer log + DisplayServer button poll must stay in LivingTitleBoot")
+		return
+	_pass("Enter/Space Begin key + raw PTR/KEY instrumentation")
+	if is_instance_valid(title):
+		title.queue_free()
 
 
 func _test_runtime_esc_opens_cc() -> void:
