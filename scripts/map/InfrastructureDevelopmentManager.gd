@@ -19,6 +19,9 @@ signal project_cancelled(province_id: int, reason: String)
 signal project_sabotaged(province_id: int, work_lost: float, severity: String)
 
 var _ix1_smoke_progress_band: int = -1
+## Headless start→complete must not run the 3520×N AI invest scan (Play MIXED
+## hang class: spine active → consider → continent mesh). F5 already skips.
+var _ix1_skip_full_board_ai_invest: bool = false
 
 # --- Inner data model (can be promoted to its own Resource later) ---
 class ProvincialProject:
@@ -371,7 +374,7 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 	# Full-board AI invest scan is 3520×N and only runs because a project is active.
 	# F5 already budgets 1 AI infra start/day via try_ai_start_infra_project — do not
 	# turn an IX-1 spine into a continent mesh consider. Headless/harness keep the scan.
-	if _should_run_full_board_ai_invest() and randi() % 5 == 0:
+	if not _ix1_skip_full_board_ai_invest and _should_run_full_board_ai_invest() and randi() % 5 == 0:
 		ai_consider_daily_invests([], 0.08)
 
 
@@ -1175,6 +1178,8 @@ func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
 ## Graphical editor/export Play must skip even if light-sim is somehow false
 ## (softpipe smoke is DisplayServer X11/OpenGL, not headless).
 func _should_run_full_board_ai_invest() -> bool:
+	if _ix1_skip_full_board_ai_invest:
+		return false
 	if typeof(TimeManager) != TYPE_NIL:
 		if TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
 			return false
@@ -1349,6 +1354,9 @@ func ensure_ix1_theater_provinces_for_headless() -> Dictionary:
 
 func simulate_ix1_spine_start_to_complete(max_days: int = 60) -> Dictionary:
 	# Headless: start Köln spine, tick to complete, prove RoadLayer + Essen impact.
+	# Skip the full-board AI invest scan — that is what wedged CompleteTest after
+	# 91% (spine active → consider → continent mesh). Progress/complete logs stay.
+	_ix1_skip_full_board_ai_invest = true
 	var n := clampi(int(max_days), 8, 90)
 	var theater: Dictionary = ensure_ix1_theater_provinces_for_headless()
 	if not _is_initialized:
@@ -1402,6 +1410,7 @@ func simulate_ix1_spine_start_to_complete(max_days: int = 60) -> Dictionary:
 	var cheaper_than_before := cost_after > 0.0 and cost_before > 0.0 and cost_after < cost_before - 0.0001
 	var cheaper_than_essen := cost_after > 0.0 and essen_after > 0.0 and cost_after < essen_after - 0.0001
 	var essen_unchanged := essen != null and essen.built_road_neighbors.is_empty() and not essen_edge
+	_ix1_skip_full_board_ai_invest = false
 	return {
 		"ok": completed and edge_bonn and edge_lev and essen_unchanged and cheaper_than_before and cheaper_than_essen and bool(road_report.get("ok", false)),
 		"completed": completed,

@@ -393,8 +393,12 @@ func _get_provinces_for_layers() -> Dictionary:
             out[spine_pid] = all[spine_pid]
     var major_tags: Array[String] = ["GER", "FRA", "ENG", "SOV", "USA", "ITA", "POL", "JAP"]
     for tag in major_tags:
+        if out.size() >= MAX_LAYER_PROVINCES:
+            break
         if map_manager.has_method("get_provinces_by_owner"):
             for pid in map_manager.get_provinces_by_owner(tag):
+                if out.size() >= MAX_LAYER_PROVINCES:
+                    break
                 if all.has(pid) and not out.has(pid):
                     out[pid] = all[pid]
     if game_data and game_data.has_method("get_provinces_with_active_riots"):
