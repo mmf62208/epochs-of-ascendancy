@@ -177,6 +177,11 @@ func initialize_with_time() -> void:
 
 
 func _on_game_day_advanced(year: int, month: int, day: int) -> void:
+	# Light-sim advance_days already ticked construction with the calendar
+	# (FIX3: stay-alive drops day_emit). Skip a second tick the same elapsed day.
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_meta("eoa_idm_calendar_tick_elapsed"):
+		if int(TimeManager.get_meta("eoa_idm_calendar_tick_elapsed")) == TimeManager.get_total_days_elapsed():
+			return
 	advance_daily_projects(year, month, day)
 
 

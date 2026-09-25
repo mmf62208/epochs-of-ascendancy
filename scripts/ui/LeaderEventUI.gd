@@ -241,6 +241,8 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 		vbox.add_child(respond_btn)
 
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	if "Road spine started" in message or "Road spine ~" in message:
+		panel.set_meta("eoa_spine_start_toast", true)
 	_toast_container.add_child(panel)
 	_eoa_flush(
 		"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.before_trim n=%d"
@@ -259,8 +261,7 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 		)
 	_trim_toast_stack_to(4)
 
-	var timer := get_tree().create_timer(maxf(1.0, duration_sec))
-	timer.timeout.connect(_on_toast_timer_expired.bind(panel), CONNECT_ONE_SHOT)
+	_arm_toast_timeout(panel, duration_sec)
 	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.exit")
 
 
@@ -324,11 +325,20 @@ func _trim_toast_stack_to(max_keep: int) -> int:
 	var n: int = kids.size()
 	if n <= max_keep:
 		return 0
+	var evict: Array[Node] = []
+	var ki := 0
+	while ki < kids.size():
+		var kid: Node = kids[ki]
+		if kid != null and kid.has_meta("eoa_spine_start_toast") and bool(kid.get_meta("eoa_spine_start_toast")):
+			ki += 1
+			continue
+		evict.append(kid)
+		ki += 1
 	var excess: int = n - max_keep
-	var cap: int = mini(excess, n)
+	var cap: int = mini(excess, evict.size())
 	var i := 0
 	while i < cap:
-		_dismiss_toast(kids[i] as PanelContainer)
+		_dismiss_toast(evict[i])
 		i += 1
 	return cap
 
@@ -481,30 +491,70 @@ func _show_toast(entry: Dictionary) -> void:
 	vbox.add_child(body_label)
 
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	var body_l := str(entry.get("body", "")).to_lower()
+	var title_l := str(entry.get("title", "")).to_lower()
+	if "road spine" in body_l or "road spine" in title_l or "ix-1" in title_l:
+		panel.set_meta("eoa_spine_start_toast", true)
 	_toast_container.add_child(panel)
 	_trim_live_f5_toast_stack()
 	_trim_toast_stack_to(4)
 
-	var timer := get_tree().create_timer(TOAST_DURATION_SEC)
-	timer.timeout.connect(_on_toast_timer_expired.bind(panel), CONNECT_ONE_SHOT)
-	dismiss_button.pressed.connect(_dismiss_toast.bind(panel))
+	_arm_toast_timeout(panel, TOAST_DURATION_SEC)
+	dismiss_button.pressed.connect(_dismiss_toast.bind(weakref(panel)))
 
 
-func _dismiss_toast(panel: PanelContainer) -> void:
+func _arm_toast_timeout(panel: PanelContainer, duration_sec: float) -> void:
+	# Bind WeakRef, never the Control itself. A typed PanelContainer callback
+	# on a freed toast is Godot "Cannot convert argument 1 from Object to Object".
 	if panel == null or not is_instance_valid(panel):
 		return
-	if panel.has_meta(TOAST_DISMISSING_META) and bool(panel.get_meta(TOAST_DISMISSING_META)):
+	var wr: WeakRef = weakref(panel)
+	var tree: SceneTree = get_tree()
+	if tree == null:
 		return
-	panel.set_meta(TOAST_DISMISSING_META, true)
-	var parent: Node = panel.get_parent()
-	if parent != null:
-		parent.remove_child(panel)
-	# One-shot free. Never start a second tween/timer on a dismissing panel.
-	panel.queue_free()
+	var timer: SceneTreeTimer = tree.create_timer(maxf(1.0, duration_sec))
+	if timer == null:
+		return
+	timer.timeout.connect(_on_toast_timer_expired.bind(wr), CONNECT_ONE_SHOT)
 
 
-func _on_toast_timer_expired(panel: PanelContainer) -> void:
-	_dismiss_toast(panel)
+func _dismiss_toast(panel: Variant = null) -> void:
+	var toast: Object = _toast_object_from_ref(panel)
+	if toast == null or not is_instance_valid(toast):
+		return
+	if toast.has_meta(TOAST_DISMISSING_META) and bool(toast.get_meta(TOAST_DISMISSING_META)):
+		return
+	toast.set_meta(TOAST_DISMISSING_META, true)
+	if toast is Node:
+		var node: Node = toast as Node
+		var parent: Node = node.get_parent()
+		if parent != null:
+			parent.remove_child(node)
+		# One-shot free. Never start a second tween/timer on a dismissing panel.
+		node.queue_free()
+
+
+func _toast_object_from_ref(panel: Variant) -> Object:
+	if panel == null:
+		return null
+	if panel is WeakRef:
+		var got: Variant = (panel as WeakRef).get_ref()
+		if got is Object:
+			return got as Object
+		return null
+	if panel is Object:
+		return panel as Object
+	return null
+
+
+func _on_toast_timer_expired(panel: Variant = null) -> void:
+	# Variant / WeakRef: a freed Control cannot convert into typed PanelContainer.
+	if panel == null:
+		return
+	var toast: Object = _toast_object_from_ref(panel)
+	if toast == null or not is_instance_valid(toast):
+		return
+	_dismiss_toast(toast)
 
 
 func _on_retirement_offered(leader_id: String) -> void:

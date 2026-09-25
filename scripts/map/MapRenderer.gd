@@ -54,6 +54,7 @@ const _TerrainTiles = preload("res://scripts/map/TerrainTileLibrary.gd")
 var _btn_invest_infra: Button = null
 var _btn_build_road_spine: Button = null
 var _label_spine_progress: Label = null
+var _label_spine_start_notice: Label = null
 var _ix1_reveal_busy: bool = false
 var _ix1_spine_inspector_pid: int = -1
 var _ix1_spine_press_guard_msec: int = 0
@@ -20275,14 +20276,15 @@ func _layout_road_spine_chrome_button() -> void:
 	var panel_w := absf(ip.offset_right - ip.offset_left)
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
-	# Same chrome row as Settle (8,38,225,62) so Search+Go does not require scrolling.
-	var left := 230.0
-	var top := 38.0
-	var height := 24.0
-	var width := minf(280.0, maxf(200.0, panel_w - left - 16.0))
+	# Own row BELOW Settle (8,38,225,62). Same-row x=230 overlapped the
+	# overflowing "Settle Köln…" label ("Now building…" drawn on top).
+	var left := 8.0
+	var top := 66.0
+	var height := 26.0
+	var width := minf(480.0, maxf(220.0, panel_w - left - 16.0))
 	_btn_build_road_spine.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
 	_btn_build_road_spine.position = Vector2(left, top)
-	_btn_build_road_spine.custom_minimum_size = Vector2(200, height)
+	_btn_build_road_spine.custom_minimum_size = Vector2(220, height)
 	_btn_build_road_spine.size = Vector2(width, height)
 
 
@@ -20384,6 +20386,8 @@ func _update_road_spine_button(province: Province) -> void:
 		_btn_build_road_spine.visible = false
 		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
 			_label_spine_progress.visible = false
+		if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
+			_label_spine_start_notice.visible = false
 		return
 	var show_btn := _ix1_should_show_spine_button(province)
 	_btn_build_road_spine.visible = show_btn
@@ -20412,6 +20416,8 @@ func _update_road_spine_button(province: Province) -> void:
 		_btn_build_road_spine.tooltip_text = "IX-1: build the Rhineland road spine (Bonn–Köln–Leverkusen). First-session starter grant — GER 1936 day-0 Mandate is enough (generic Invest stays gated). Completes into visible RoadLayer edges and cheaper move/supply on the corridor."
 		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
 			_label_spine_progress.visible = false
+		if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
+			_label_spine_start_notice.visible = false
 	_layout_road_spine_chrome_button()
 	_layout_spine_progress_label()
 
@@ -20596,6 +20602,13 @@ func _apply_spine_building_button_state(pid: int, pct: int, eta: int) -> void:
 	if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
 		_label_spine_progress.visible = true
 		_label_spine_progress.text = "Road spine %d%% · ETA %d days" % [pct, eta]
+	_ensure_spine_start_notice()
+	if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
+		_label_spine_start_notice.visible = true
+		if pct <= 0:
+			_label_spine_start_notice.text = "Road spine started · ETA %d days" % eta
+		else:
+			_label_spine_start_notice.text = "Road spine underway · %d%%" % pct
 	var list_row: Node = null
 	if _special_sites_container != null and is_instance_valid(_special_sites_container):
 		list_row = _special_sites_container.get_node_or_null("Ix1SpineBuildRow")
@@ -20642,9 +20655,42 @@ func _layout_spine_progress_label() -> void:
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
 	_label_spine_progress.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	_label_spine_progress.position = Vector2(12.0, 66.0)
-	_label_spine_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 20.0)
+	_label_spine_progress.position = Vector2(8.0, 96.0)
+	_label_spine_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 22.0)
 	_label_spine_progress.size = _label_spine_progress.custom_minimum_size
+	_layout_spine_start_notice()
+
+
+func _ensure_spine_start_notice() -> void:
+	if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
+		_layout_spine_start_notice()
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	_label_spine_start_notice = Label.new()
+	_label_spine_start_notice.name = "LabelSpineStartNotice"
+	_label_spine_start_notice.text = ""
+	_label_spine_start_notice.visible = false
+	_label_spine_start_notice.add_theme_font_size_override("font_size", 13)
+	_label_spine_start_notice.add_theme_color_override("font_color", Color(0.95, 0.92, 0.45, 1.0))
+	_label_spine_start_notice.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	(info_panel as Control).add_child(_label_spine_start_notice)
+	_layout_spine_start_notice()
+
+
+func _layout_spine_start_notice() -> void:
+	if _label_spine_start_notice == null or not is_instance_valid(_label_spine_start_notice):
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	var panel_w := absf(ip.offset_right - ip.offset_left)
+	if panel_w < 80.0:
+		panel_w = maxf(ip.size.x, 520.0)
+	_label_spine_start_notice.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_label_spine_start_notice.position = Vector2(8.0, 120.0)
+	_label_spine_start_notice.custom_minimum_size = Vector2(minf(500.0, maxf(280.0, panel_w - 24.0)), 22.0)
+	_label_spine_start_notice.size = _label_spine_start_notice.custom_minimum_size
 
 
 func drive_ix1_zoom_and_roadlayer_redraw(zoom_mode: String = "soft") -> Dictionary:
@@ -21461,6 +21507,8 @@ func _ensure_settle_button() -> void:
 	_btn_settle.offset_top = 38.0   # below close/spirits row
 	_btn_settle.offset_right = 225.0
 	_btn_settle.offset_bottom = 62.0
+	_btn_settle.clip_contents = true
+	_btn_settle.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	if not _btn_settle.pressed.is_connected(_on_settle_province_pressed):
 		_btn_settle.pressed.connect(_on_settle_province_pressed)
 	info_panel.add_child(_btn_settle)

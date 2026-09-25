@@ -309,6 +309,17 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 	if "func _drop_smoke_deferred_load" not in tm:
 		_fail("stay-alive must drop queued day_emit/day_ai/day_battles (not battles-only)")
 		return
+	var adv_days := _slice_func(tm, "advance_days")
+	if "_tick_live_construction_on_calendar_day" not in adv_days:
+		_fail("light-sim advance_days must tick IDM construction (stay-alive drops day_emit)")
+		return
+	if "func _tick_live_construction_on_calendar_day" not in tm:
+		_fail("_tick_live_construction_on_calendar_day missing")
+		return
+	var idm_day := _slice_func(_read(SRC_IDM), "_on_game_day_advanced")
+	if "eoa_idm_calendar_tick_elapsed" not in idm_day:
+		_fail("IDM must skip a second tick when the calendar already advanced projects")
+		return
 	var stay_defer := _slice_func(tm, "smoke_advance_should_defer_combat")
 	if "_smoke_stay_alive" not in stay_defer:
 		_fail("combat must stay deferred after past7 stay-alive")

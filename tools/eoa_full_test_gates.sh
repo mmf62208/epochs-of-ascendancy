@@ -221,6 +221,9 @@ else
   run_step launch_ix1_day_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineDayTickTest.gd || fail
 
+  run_step launch_ix1_live_stay_alive_tick \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineLiveStayAliveTickTest.gd || fail
+
   run_step launch_ix1_search_go \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1SearchGoInspectorTest.gd || fail
 

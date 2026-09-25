@@ -616,6 +616,23 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("testrunner_smoke_no_quit_after_hatch")
     if "stay_alive_after_past7" not in _read(DAY_TICK_HARNESS):
         missing.append("day_tick_smoke_stay_alive_harness")
+    if "_tick_live_construction_on_calendar_day" not in _read(TIME_MANAGER_GD):
+        missing.append("timemanager_live_construction_calendar_tick")
+    if "eoa_idm_calendar_tick_elapsed" not in _read(IDM_GD):
+        missing.append("idm_skip_double_calendar_tick")
+    if "EOA_SMOKE_SPINE_LIVE_PROGRESS" not in _read(TEST_RUNNER_GD):
+        missing.append("testrunner_live_progress_guard")
+    if "advance_real_time" not in _slice_func(_read(TEST_RUNNER_GD), "_tick_smoke_ix1_live_progress"):
+        missing.append("testrunner_live_progress_uses_advance_real_time")
+    if "advance_daily_projects" in _slice_func(_read(TEST_RUNNER_GD), "_tick_smoke_ix1_live_progress"):
+        missing.append("testrunner_live_progress_idm_shortcut")
+    live_prog_sh = _read(ROOT / "tools" / "eoa_ix1_spine_live_progress_guard.sh")
+    if "EOA_SMOKE_SPINE_LIVE_PROGRESS" not in live_prog_sh:
+        missing.append("live_progress_guard_sh")
+    if "eoa_play_f5_smoke_auto_begin.sh" not in live_prog_sh:
+        missing.append("live_progress_guard_play_launch")
+    if "/proc/" not in live_prog_sh or "VmRSS" not in live_prog_sh:
+        missing.append("live_progress_guard_proc_rss")
     if "apply_smoke_advance_past_plus6" not in _read(DAY_TICK_HARNESS):
         missing.append("day_tick_smoke_advance_harness")
     if (
@@ -636,6 +653,8 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("day_tick_harness")
     if "HeadlessIx1RoadSpineDayTickTest" not in gates:
         missing.append("day_tick_on_gates")
+    if "HeadlessIx1RoadSpineLiveStayAliveTickTest" not in gates:
+        missing.append("live_stay_alive_tick_on_gates")
     if "HeadlessIx1LivingTitleEscBeginTest" not in gates:
         missing.append("title_esc_begin_on_gates")
     return {
@@ -833,8 +852,8 @@ def ix1_search_go_spine_visible() -> Dict[str, Any]:
     if "_prepend_ix1_spine_build_row" not in _slice_func(ren, "_update_special_sites_ui"):
         missing.append("special_sites_prepend_spine")
     layout = _slice_func(ren, "_layout_road_spine_chrome_button")
-    if "230" not in layout or "38" not in layout:
-        missing.append("spine_chrome_next_to_settle")
+    if "66" not in layout or "below Settle" not in layout:
+        missing.append("spine_chrome_below_settle")
     show_btn = _slice_func(idm, "should_show_road_spine_button")
     if "p == null" not in show_btn:
         missing.append("idm_null_province_fallback")
@@ -981,6 +1000,12 @@ def ix1_spine_complete_zoom_gate() -> Dict[str, Any]:
         missing.append("toast_dismiss_remove_child")
     if "eoa_toast_dismissing" not in toast:
         missing.append("toast_dismiss_idempotent")
+    if "func _arm_toast_timeout" not in toast or "weakref" not in toast:
+        missing.append("toast_timer_weakref")
+    if "func _on_toast_timer_expired(panel: PanelContainer)" in toast:
+        missing.append("toast_timer_typed_panelcontainer")
+    if "eoa_spine_start_toast" not in toast:
+        missing.append("toast_keeps_spine_start")
     if "while _toast_container.get_child_count()" in toast:
         missing.append("toast_child_count_queue_free_spin")
     if "EOA_SMOKE_FRAME_GUARD" not in _slice_func(toast, "_eoa_spine_bisect_enabled"):

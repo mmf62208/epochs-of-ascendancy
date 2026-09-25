@@ -1071,7 +1071,7 @@ func _smoke_frame_guard_wanted() -> bool:
 
 
 func _maybe_start_ix1_frame_guard() -> void:
-	if not _smoke_frame_guard_wanted():
+	if not _smoke_frame_guard_wanted() and not _smoke_live_progress_wanted():
 		return
 	if has_meta("eoa_smoke_frame_guard_started"):
 		return
@@ -1107,13 +1107,22 @@ func _smoke_ix1_frame_guard_press() -> void:
 	set_meta("eoa_smoke_frame_guard_rss0", _read_godot_rss_mb())
 	set_meta("eoa_smoke_frame_guard_last_sec", -1)
 	set_meta("eoa_smoke_frame_guard_active", true)
+	if _smoke_live_progress_wanted():
+		_arm_smoke_ix1_live_progress()
+
+
+func _smoke_live_progress_wanted() -> bool:
+	return OS.get_environment("EOA_SMOKE_SPINE_LIVE_PROGRESS").strip_edges() == "1"
 
 
 func _tick_smoke_ix1_frame_guard(_delta: float) -> void:
-	if not _smoke_frame_guard_wanted():
+	if not _smoke_frame_guard_wanted() and not _smoke_live_progress_wanted():
 		return
 	if not bool(get_meta("eoa_smoke_frame_guard_active", false)):
 		_maybe_start_ix1_frame_guard()
+		return
+	if _smoke_live_progress_wanted():
+		_tick_smoke_ix1_live_progress()
 		return
 	var frames: int = int(get_meta("eoa_smoke_frame_guard_frames", 0)) + 1
 	set_meta("eoa_smoke_frame_guard_frames", frames)
@@ -1185,29 +1194,165 @@ func _log_ix1_guard_visible_feedback() -> Dictionary:
 
 
 func _read_godot_rss_mb() -> int:
-	var path := "/proc/%d/status" % OS.get_process_id()
-	var f := FileAccess.open(path, FileAccess.READ)
-	if f != null:
-		var txt := f.get_as_text()
-		f.close()
-		for line in txt.split("\n"):
-			if not line.begins_with("VmRSS:"):
-				continue
-			var compact := line.replace("\t", " ")
-			var parts: PackedStringArray = compact.split(" ", false)
-			if parts.size() >= 2:
-				var mb: int = int(round(float(parts[1]) / 1024.0))
-				if mb > 0:
-					return mb
-	# FileAccess often cannot read /proc; sidecar awk is the same number.
-	var out: Array = []
-	var awk_path := "/proc/%d/status" % OS.get_process_id()
-	OS.execute("awk", PackedStringArray(["/VmRSS/{printf \"%d\", $2/1024}", awk_path]), out, true, false)
-	if out.size() > 0:
-		var s: String = str(out[0]).strip_edges()
-		if s.is_valid_int():
-			return int(s)
+	# Measure THIS Godot pid. Never /proc/self via OS.execute (that is awk).
+	var pid := OS.get_process_id()
+	var from_statm := _parse_statm_rss_mb("/proc/%d/statm" % pid)
+	if from_statm > 0:
+		return from_statm
+	var from_status := _parse_vmrss_mb_text(_read_abs_text("/proc/%d/status" % pid))
+	if from_status > 0:
+		return from_status
+	var awk_bins: Array[String] = ["/usr/bin/awk", "awk"]
+	var awk_path := "/proc/%d/status" % pid
+	for bin in awk_bins:
+		var out: Array = []
+		OS.execute(bin, PackedStringArray(["/VmRSS/{printf \"%d\", $2/1024}", awk_path]), out, true, false)
+		if out.size() > 0:
+			var s: String = str(out[0]).strip_edges()
+			if s.is_valid_int() and int(s) > 0:
+				return int(s)
 	return 0
+
+
+func _read_abs_text(path: String) -> String:
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return ""
+	var txt := f.get_as_text()
+	f.close()
+	return txt
+
+
+func _parse_vmrss_mb_text(txt: String) -> int:
+	for line in txt.split("\n"):
+		if not line.begins_with("VmRSS:"):
+			continue
+		var compact := line.replace("\t", " ")
+		var parts: PackedStringArray = compact.split(" ", false)
+		if parts.size() >= 2:
+			var mb: int = int(round(float(parts[1]) / 1024.0))
+			if mb > 0:
+				return mb
+	return 0
+
+
+func _parse_statm_rss_mb(path: String) -> int:
+	var txt := _read_abs_text(path)
+	if txt.is_empty():
+		return 0
+	var parts: PackedStringArray = txt.strip_edges().split(" ", false)
+	if parts.size() < 2:
+		return 0
+	var pages := int(parts[1])
+	if pages <= 0:
+		return 0
+	return int(round(float(pages) * 4096.0 / 1024.0 / 1024.0))
+
+
+func _arm_smoke_ix1_live_progress() -> void:
+	# After the real viewport mouse press: unpause the stay-alive clock and
+	# drive the SAME live hour path TopInfoBar uses (advance_real_time).
+	# Do NOT call IDM.advance_daily_projects or drain the F5 flush — that is
+	# the headless shortcut that PASSed on 2bc8f19 while live stayed 0%.
+	set_meta("eoa_smoke_live_progress_armed", true)
+	set_meta("eoa_smoke_live_progress_saw_pct", 0)
+	set_meta("eoa_smoke_live_progress_complete", false)
+	if typeof(TimeManager) != TYPE_NIL:
+		if TimeManager.has_method("set_paused"):
+			TimeManager.set_paused(false)
+		if TimeManager.has_method("set_time_scale"):
+			TimeManager.set_time_scale(4.0)
+	_eoa_flush(
+		"EOA_SMOKE_SPINE_LIVE_PROGRESS who=TestRunner.arm stay_alive=%s paused=0 scale=4 (live advance_real_time; NOT IDM shortcut)"
+		% str(
+			TimeManager.call("smoke_stay_alive_active")
+			if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("smoke_stay_alive_active")
+			else "?"
+		)
+	)
+
+
+func _tick_smoke_ix1_live_progress() -> void:
+	if not bool(get_meta("eoa_smoke_live_progress_armed", false)):
+		return
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_paused"):
+		if bool(TimeManager.is_paused()) and TimeManager.has_method("set_paused"):
+			TimeManager.set_paused(false)
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_real_time"):
+		TimeManager.advance_real_time(1.0)
+	var frames: int = int(get_meta("eoa_smoke_frame_guard_frames", 0)) + 1
+	set_meta("eoa_smoke_frame_guard_frames", frames)
+	var status: Dictionary = _ix1_live_progress_status()
+	var pct: int = int(status.get("pct", 0))
+	var eta: int = int(status.get("eta", 0))
+	var elapsed_days: int = int(status.get("elapsed", 0))
+	var done := bool(status.get("complete", false))
+	if pct > int(get_meta("eoa_smoke_live_progress_saw_pct", 0)):
+		set_meta("eoa_smoke_live_progress_saw_pct", pct)
+	if done:
+		set_meta("eoa_smoke_live_progress_complete", true)
+	var rss: int = _read_godot_rss_mb()
+	if frames % 6 == 0 or done or pct >= 100:
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_LIVE_PROGRESS who=TestRunner.tick days=%d pct=%d eta=%d rss_mb=%d complete=%d (advance_real_time; NOT product Begin/Esc/clock PASS)"
+			% [elapsed_days, pct, eta, rss, 1 if done else 0]
+		)
+	if rss >= 3072:
+		_eoa_flush("EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=FAIL rss_mb=%d" % rss)
+		_quit_logged(1, "ix1_live_progress_rss")
+		return
+	var saw := int(get_meta("eoa_smoke_live_progress_saw_pct", 0))
+	if elapsed_days >= 5 and saw <= 0 and not done:
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=FAIL days=%d pct=0 (stay-alive day_emit drop; live calendar did not tick IDM)"
+			% elapsed_days
+		)
+		_quit_logged(1, "ix1_live_progress_stuck_zero")
+		return
+	if done or pct >= 100:
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=PASS days=%d pct=%d rss_mb=%d (live path COMPLETE)"
+			% [elapsed_days, pct, rss]
+		)
+		_quit_logged(0, "ix1_live_progress_pass")
+		return
+	if elapsed_days >= 45:
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_LIVE_PROGRESS RESULT=FAIL days=%d pct=%d never COMPLETE"
+			% [elapsed_days, pct]
+		)
+		_quit_logged(1, "ix1_live_progress_no_complete")
+
+
+func _ix1_live_progress_status() -> Dictionary:
+	var out := {"pct": 0, "eta": 0, "elapsed": 0, "complete": false}
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		out["elapsed"] = int(TimeManager.get_total_days_elapsed())
+	var start_elapsed := 0
+	if has_meta("eoa_smoke_live_progress_start_elapsed"):
+		start_elapsed = int(get_meta("eoa_smoke_live_progress_start_elapsed"))
+	else:
+		start_elapsed = int(out["elapsed"])
+		set_meta("eoa_smoke_live_progress_start_elapsed", start_elapsed)
+	out["elapsed"] = maxi(0, int(out["elapsed"]) - start_elapsed)
+	if typeof(InfrastructureDevelopmentManager) == TYPE_NIL:
+		return out
+	if InfrastructureDevelopmentManager.has_method("get_ix1_spine_visual_state"):
+		if str(InfrastructureDevelopmentManager.call("get_ix1_spine_visual_state")) == "built":
+			out["complete"] = true
+			out["pct"] = 100
+	if InfrastructureDevelopmentManager.has_method("get_project_status"):
+		var st: Dictionary = InfrastructureDevelopmentManager.call("get_project_status", 710417) as Dictionary
+		out["pct"] = int(round(float(st.get("progress", 0.0))))
+		out["eta"] = int(st.get("eta_days", 0))
+		if not bool(st.get("active", false)) and bool(out["complete"]):
+			out["pct"] = 100
+	if InfrastructureDevelopmentManager.has_method("has_active_project"):
+		if not bool(InfrastructureDevelopmentManager.call("has_active_project", 710417)):
+			if int(out["pct"]) >= 99 or bool(out["complete"]):
+				out["complete"] = true
+				out["pct"] = 100
+	return out
 
 
 ## One-shot first-session onboarding for graphical F5 (meta-guarded at call site).

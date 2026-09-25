@@ -951,6 +951,11 @@ func advance_days(days: float) -> void:
 					"month": current_month,
 					"day": current_day,
 				})
+			# Product FIX3 (2bc8f19): stay-alive `_drop_smoke_deferred_load`
+			# clears this day_emit queue, so game_day_advanced never reached
+			# IDM while the HUD calendar still rolled (80 live days at 0%).
+			# Tick player construction with the calendar the player sees.
+			_tick_live_construction_on_calendar_day(current_year, current_month, current_day)
 			if crossed_month:
 				_pending_sim_events.append({
 					"kind": "month",
@@ -1115,6 +1120,19 @@ func _drain_living_f5_flush(days: int) -> int:
 	_draining_f5_flush = false
 	_sim_flush_scheduled = false
 	return flushed
+
+
+func _tick_live_construction_on_calendar_day(year: int, month: int, day: int) -> void:
+	# Same store the live Build Road Spine button writes: IDM autoload
+	# `active_projects`. Not a harness-only path. Headless sync advance_days
+	# still emits game_day_advanced (light=false); IDM skips a second tick
+	# when this meta matches total_days_elapsed.
+	if typeof(InfrastructureDevelopmentManager) == TYPE_NIL:
+		return
+	if not InfrastructureDevelopmentManager.has_method("advance_daily_projects"):
+		return
+	InfrastructureDevelopmentManager.call("advance_daily_projects", year, month, day)
+	set_meta("eoa_idm_calendar_tick_elapsed", total_days_elapsed)
 
 
 func _schedule_sim_flush() -> void:
