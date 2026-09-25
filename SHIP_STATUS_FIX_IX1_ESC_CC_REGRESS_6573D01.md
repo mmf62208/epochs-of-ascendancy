@@ -64,6 +64,17 @@ Then: past+6 → Search Köln/Cologne + Go → Build Road Spine. Window stays.
 
 **Scorecard:** product Begin / Enter/Space/B / mouse CC / Esc ×2 = **FAIL** (delivery). Softpipe gates may run after hatch. Do not redefine softpipe success as auto-begin forever.
 
+## Headless (this CA)
+- `test_ix1_road_spine_product` **13/13 OK**
+- `HeadlessIx1LivingTitleEscBeginTest` **RESULT=PASS** (includes smoke hatch opt-in only)
+- `HeadlessIx1SearchGoInspectorTest` **RESULT=PASS**
+- `HeadlessIx1RoadSpineMandateGateTest` **PASS**
+- `HeadlessIx1RoadSpineDayTickTest` **RESULT=PASS** (play-begin hour+6 + softpipe soak past 7 Jan)
+- `HeadlessIx1LiveEscWindowProbe` **RESULT=PASS** (DisplayServer=headless; not live computerUse proof)
+- `--check-only` exit 0
+
+`--quick` living-unit wiring fails (`air_region_cas` / `peace_occupation` / `nation_era_next` / `map_country_select` / `playtest_clock`) + Pillow map_qc are **tip-pre-existing** on this PR branch. Not this hatch.
+
 ## PARK
 HOLD merge. Dig2/G PARKED. Quiet Mike beyond tip SHA / PR URL.
 Scott: rebound Play to the new head with `EOA_SMOKE_AUTO_BEGIN=1`.
