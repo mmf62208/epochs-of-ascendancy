@@ -327,6 +327,9 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 	if "_restore_live_search_chrome_after_stay_alive" not in tr or "EOA_SMOKE_SEARCH_CHROME" not in tr:
 		_fail("TestRunner must restore live Search chrome after stay-alive (not headless-only)")
 		return
+	if "EOA_SMOKE_SEARCH_CHROME_PIXEL" not in tr or "search_chrome_pixel_report" not in tr:
+		_fail("TestRunner must log EOA_SMOKE_SEARCH_CHROME_PIXEL and use pixel report")
+		return
 	if "ensure_live_search_chrome" not in after_hatch and "ensure_live_search_chrome" not in _slice_func(tr, "_restore_live_search_chrome_after_stay_alive"):
 		_fail("stay-alive after_hatch must call MapRenderer.ensure_live_search_chrome")
 		return

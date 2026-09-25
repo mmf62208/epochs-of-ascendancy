@@ -1771,16 +1771,25 @@ func rebind_map_search() -> void:
 
 
 func ensure_live_search_chrome() -> Control:
-	## Host Search on TestScenario UILayer 110 (above Map Mode 20) with an
-	## explicit TOP_LEFT pixel rect. CanvasLayer-parent TOP_RIGHT + 0-height
-	## LineEdit left Search off-screen after stay-alive (Play 8f89145).
-	var host: CanvasLayer = _search_hud_layer()
+	## Host Search on UILayer 110 TopInfoBar (a Control with real size), not
+	## as a CanvasLayer child. Play c82233c8: flags were live=1 but LineEdit/Go
+	## painted 0px — CanvasLayer parent size 0 collapsed height, and the field
+	## sat under the expanded Map Mode wall. TOP_RIGHT of the 52px bar strip
+	## cannot sit under Map Mode (layer 20) or the NEXT banner.
+	var layer: CanvasLayer = _search_hud_layer()
+	if layer != null:
+		layer.visible = true
+		layer.process_mode = Node.PROCESS_MODE_ALWAYS
+	var host: Control = _search_hud_control_host()
 	if host == null:
 		return null
 	host.visible = true
 	host.process_mode = Node.PROCESS_MODE_ALWAYS
 	if _map_search == null or not is_instance_valid(_map_search):
 		_map_search = host.get_node_or_null("MapProvinceSearch") as HBoxContainer
+	if _map_search == null or not is_instance_valid(_map_search):
+		if layer != null:
+			_map_search = layer.get_node_or_null("MapProvinceSearch") as HBoxContainer
 	if _map_search == null or not is_instance_valid(_map_search):
 		var world_ui := get_node_or_null("UI") as CanvasLayer
 		if world_ui != null:
@@ -1804,6 +1813,8 @@ func ensure_live_search_chrome() -> Control:
 		sr_boot.z_index = 80
 		sr_boot.z_as_relative = false
 		sr_boot.process_mode = Node.PROCESS_MODE_ALWAYS
+	if host.has_method("host_map_search_chrome"):
+		host.call("host_map_search_chrome", _map_search)
 	_layout_map_search_chrome()
 	if _map_search.has_method("ensure_chrome_visible"):
 		_map_search.call("ensure_chrome_visible")
@@ -1814,20 +1825,106 @@ func ensure_live_search_chrome() -> Control:
 
 
 func search_chrome_is_live() -> bool:
+	return bool(search_chrome_pixel_report().get("live", false))
+
+
+func search_chrome_pixel_report() -> Dictionary:
+	## Pixel gate: flags alone are not live. Fail when drawn rect has zero
+	## area, is off-screen, or is fully covered by Map Mode / NEXT.
+	var report: Dictionary = {
+		"visible": false,
+		"focusable": false,
+		"on_screen": false,
+		"overlap": 1.0,
+		"area": 0.0,
+		"live": false,
+		"line_w": 0.0,
+		"line_h": 0.0,
+		"go_w": 0.0,
+		"go_h": 0.0,
+		"x": 0.0,
+		"y": 0.0,
+		"host": "",
+		"layer": -1,
+	}
 	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
-		return false
+		return report
 	var sr_live: Control = _map_search as Control
-	if not sr_live.visible or sr_live.get_global_rect().size.x < 8.0:
-		return false
+	var parent_n: Node = sr_live.get_parent()
+	report["host"] = str(parent_n.name) if parent_n != null else ""
+	report["layer"] = _canvas_layer_index_of(sr_live)
 	var line_live: LineEdit = sr_live.get_node_or_null("SearchLineEdit") as LineEdit
 	var go_live: Button = sr_live.get_node_or_null("SearchGoButton") as Button
 	if line_live == null or go_live == null:
-		return false
-	if not line_live.visible or not go_live.visible:
-		return false
-	if line_live.focus_mode == Control.FOCUS_NONE or not line_live.editable:
-		return false
-	return line_live.custom_minimum_size.y >= 24.0 and go_live.custom_minimum_size.x >= 24.0
+		return report
+	report["visible"] = sr_live.is_visible_in_tree() and line_live.is_visible_in_tree() and go_live.is_visible_in_tree()
+	report["focusable"] = (
+		line_live.focus_mode != Control.FOCUS_NONE
+		and line_live.editable
+		and go_live.focus_mode != Control.FOCUS_NONE
+	)
+	var line_r: Rect2 = line_live.get_global_rect()
+	var go_r: Rect2 = go_live.get_global_rect()
+	report["line_w"] = line_r.size.x
+	report["line_h"] = line_r.size.y
+	report["go_w"] = go_r.size.x
+	report["go_h"] = go_r.size.y
+	report["x"] = line_r.position.x
+	report["y"] = line_r.position.y
+	var area: float = maxf(0.0, line_r.size.x) * maxf(0.0, line_r.size.y)
+	area += maxf(0.0, go_r.size.x) * maxf(0.0, go_r.size.y)
+	report["area"] = area
+	var vp_r: Rect2 = Rect2(Vector2.ZERO, Vector2(1280, 720))
+	if get_viewport() != null:
+		vp_r = get_viewport().get_visible_rect()
+	var line_on: bool = line_r.size.x >= 80.0 and line_r.size.y >= 16.0 and vp_r.intersects(line_r)
+	var go_on: bool = go_r.size.x >= 24.0 and go_r.size.y >= 16.0 and vp_r.intersects(go_r)
+	report["on_screen"] = line_on and go_on
+	var covered: float = _search_chrome_cover_fraction(line_r.merge(go_r))
+	report["overlap"] = covered
+	var host_ok: bool = parent_n is Control and not (parent_n is CanvasLayer)
+	var layer_ok: bool = int(report["layer"]) >= 110
+	report["live"] = (
+		bool(report["visible"])
+		and bool(report["focusable"])
+		and bool(report["on_screen"])
+		and area >= 1600.0
+		and covered < 0.45
+		and host_ok
+		and layer_ok
+	)
+	return report
+
+
+func _search_chrome_cover_fraction(r: Rect2) -> float:
+	if r.size.x < 1.0 or r.size.y < 1.0:
+		return 1.0
+	var cover: float = 0.0
+	var search_layer: int = _canvas_layer_index_of(_map_search)
+	var blockers: Array[Control] = []
+	if _map_mode_toolbar is Control:
+		blockers.append(_map_mode_toolbar as Control)
+	if _next_hook_chip is Control:
+		blockers.append(_next_hook_chip as Control)
+	for b in blockers:
+		if b == null or not is_instance_valid(b) or not b.is_visible_in_tree():
+			continue
+		var b_layer: int = _canvas_layer_index_of(b)
+		if b_layer < search_layer:
+			continue
+		var inter: Rect2 = r.intersection(b.get_global_rect())
+		if inter.size.x > 0.0 and inter.size.y > 0.0:
+			cover += (inter.size.x * inter.size.y) / (r.size.x * r.size.y)
+	return minf(1.0, cover)
+
+
+func _canvas_layer_index_of(n: Node) -> int:
+	var walk: Node = n
+	while walk != null:
+		if walk is CanvasLayer:
+			return (walk as CanvasLayer).layer
+		walk = walk.get_parent()
+	return 0
 
 
 func _search_hud_layer() -> CanvasLayer:
@@ -1845,40 +1942,96 @@ func _search_hud_layer() -> CanvasLayer:
 	return get_node_or_null("UI") as CanvasLayer
 
 
+func _search_hud_control_host() -> Control:
+	## Search must parent to a Control with a real size (TopInfoBar), never a
+	## 0-size CanvasLayer. PRESET_TOP_RIGHT on CanvasLayer → x=-320 off-screen.
+	var layer: CanvasLayer = _search_hud_layer()
+	if layer != null:
+		var tib: Control = layer.get_node_or_null("TopInfoBar") as Control
+		if tib != null:
+			return tib
+	if get_tree() != null:
+		var found: TopInfoBar = TopInfoBar.find_in_tree(get_tree())
+		if found != null:
+			return found
+	if layer != null:
+		var row: Control = layer.get_node_or_null("SearchChromeRow") as Control
+		if row == null:
+			row = Control.new()
+			row.name = "SearchChromeRow"
+			layer.add_child(row)
+			row.set_anchors_preset(Control.PRESET_TOP_WIDE)
+			row.offset_top = 0.0
+			row.offset_bottom = 52.0
+			row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			row.z_index = 80
+			row.clip_contents = false
+		return row
+	return null
+
+
 func _layout_map_search_chrome() -> void:
 	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
 		return
 	var sr: Control = _map_search as Control
-	var vp_sz: Vector2 = Vector2(1280, 720)
-	if get_viewport() != null:
-		var vis: Vector2 = get_viewport().get_visible_rect().size
-		if vis.x >= 64.0 and vis.y >= 64.0:
-			vp_sz = vis
-	var top_h := UI_TOP_BAR_CLEARANCE
-	if get_tree():
-		var tib := TopInfoBar.find_in_tree(get_tree())
-		if tib != null and tib.has_method("get_bar_height"):
-			top_h = maxf(top_h, float(tib.call("get_bar_height")) + 6.0)
-	# Explicit TOP_LEFT pixels — never PRESET_TOP_RIGHT on a CanvasLayer
-	# parent (parent size 0 → x=-320, off-screen). Sit just under TopInfoBar
-	# at the right so expanded Map Mode cannot bury the field.
+	var host: Control = _search_hud_control_host()
+	if host != null and sr.get_parent() != host:
+		var old_p: Node = sr.get_parent()
+		if old_p != null:
+			old_p.remove_child(sr)
+		host.add_child(sr)
+	# TOP_RIGHT of the TopInfoBar strip. Parent is a Control with width —
+	# never PRESET_TOP_RIGHT on a CanvasLayer (parent size 0 → x=-320).
+	var bar_h := 52.0
+	if host != null:
+		if host.has_method("get_bar_height"):
+			bar_h = maxf(44.0, float(host.call("get_bar_height")))
+		elif host.size.y > 8.0:
+			bar_h = host.size.y
 	var box_w := 308.0
 	var box_h := 32.0
-	var pos_x := maxf(8.0, vp_sz.x - box_w - 12.0)
-	sr.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
-	sr.anchor_left = 0.0
-	sr.anchor_top = 0.0
-	sr.anchor_right = 0.0
-	sr.anchor_bottom = 0.0
-	sr.position = Vector2(pos_x, top_h)
-	sr.size = Vector2(box_w, box_h)
+	var top_pad := maxf(8.0, (bar_h - box_h) * 0.5)
+	var host_w := 0.0
+	if host != null:
+		host_w = host.size.x
+	if host_w >= 64.0:
+		# TOP_RIGHT is safe: parent Control has a real width.
+		sr.set_anchors_preset(Control.PRESET_TOP_RIGHT, false)
+		sr.anchor_left = 1.0
+		sr.anchor_top = 0.0
+		sr.anchor_right = 1.0
+		sr.anchor_bottom = 0.0
+		sr.offset_left = -box_w - 8.0
+		sr.offset_right = -8.0
+		sr.offset_top = top_pad
+		sr.offset_bottom = top_pad + box_h
+	else:
+		# Parent not laid out yet — explicit viewport pixels, still in the strip.
+		var vp_sz: Vector2 = Vector2(1280, 720)
+		if get_viewport() != null:
+			var vis: Vector2 = get_viewport().get_visible_rect().size
+			if vis.x >= 64.0:
+				vp_sz = vis
+		sr.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
+		sr.anchor_left = 0.0
+		sr.anchor_top = 0.0
+		sr.anchor_right = 0.0
+		sr.anchor_bottom = 0.0
+		sr.position = Vector2(maxf(8.0, vp_sz.x - box_w - 8.0), top_pad)
 	sr.custom_minimum_size = Vector2(box_w, box_h)
+	sr.size = Vector2(box_w, box_h)
 	sr.visible = true
 	sr.modulate = Color(1, 1, 1, 1)
 	sr.z_index = 80
 	sr.z_as_relative = false
 	sr.mouse_filter = Control.MOUSE_FILTER_STOP
 	sr.process_mode = Node.PROCESS_MODE_ALWAYS
+	sr.clip_contents = false
+	if host != null:
+		host.clip_contents = false
+		host.visible = true
+	sr.reset_size()
+	sr.force_update_transform()
 
 
 func _release_search_focus() -> void:

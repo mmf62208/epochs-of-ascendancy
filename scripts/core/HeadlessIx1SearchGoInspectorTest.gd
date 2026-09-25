@@ -89,26 +89,48 @@ func _test_source_live_inspector_path() -> void:
 	if "ensure_live_search_chrome" not in ren or "search_chrome_is_live" not in ren:
 		_fail("MapRenderer missing ensure_live_search_chrome after stay-alive")
 		return
+	if "search_chrome_pixel_report" not in ren:
+		_fail("MapRenderer missing search_chrome_pixel_report (log live=1 is not enough)")
+		return
 	var ensure_fn := _slice_func(ren, "ensure_live_search_chrome")
 	if ensure_fn.is_empty() or "UILayer" not in ensure_fn:
 		_fail("ensure_live_search_chrome must host Search on UILayer 110 (not WorldMap UI 20)")
 		return
+	if "TopInfoBar" not in ensure_fn and "TopInfoBar" not in _slice_func(ren, "_search_hud_control_host"):
+		_fail("Search must parent to TopInfoBar (Control with size), not a 0-size CanvasLayer")
+		return
 	var layout_fn := _slice_func(ren, "_layout_map_search_chrome")
-	if layout_fn.is_empty() or "PRESET_TOP_LEFT" not in layout_fn:
-		_fail("Search layout must use explicit TOP_LEFT pixels (TOP_RIGHT goes off-screen)")
+	if layout_fn.is_empty() or ("TopInfoBar" not in layout_fn and "PRESET_TOP_RIGHT" not in layout_fn):
+		_fail("Search layout must pin TOP_RIGHT of the TopInfoBar strip")
 		return
 	if "PRESET_TOP_RIGHT" in _slice_func(ren, "_layout_map_ui"):
 		_fail("Search must not use PRESET_TOP_RIGHT on a CanvasLayer parent")
 		return
+	var pixel_fn := _slice_func(ren, "search_chrome_pixel_report")
+	if pixel_fn.is_empty() or "on_screen" not in pixel_fn or "overlap" not in pixel_fn:
+		_fail("pixel report must include on_screen / overlap (fail live when pixels absent)")
+		return
+	if "live" not in pixel_fn:
+		_fail("pixel report must set live=0 when drawn rect is missing")
+		return
 	if "ensure_chrome_visible" not in search or "custom_minimum_size = Vector2(180, 28)" not in search:
 		_fail("Search LineEdit must keep a 28px min height so stay-alive chrome is visible")
+		return
+	if "_force_child_geometry" not in search:
+		_fail("Search must force LineEdit/Go actual size (min size alone can paint 0px)")
 		return
 	var tr := _read(SRC_TR)
 	if "_restore_live_search_chrome_after_stay_alive" not in tr or "EOA_SMOKE_SEARCH_CHROME" not in tr:
 		_fail("TestRunner must restore live Search chrome after stay-alive (not a headless-only path)")
 		return
+	if "EOA_SMOKE_SEARCH_CHROME_PIXEL" not in tr:
+		_fail("TestRunner must log EOA_SMOKE_SEARCH_CHROME_PIXEL (rect/overlap/on_screen)")
+		return
 	if "ensure_live_search_chrome" not in _slice_func(tr, "_restore_live_search_chrome_after_stay_alive"):
 		_fail("stay-alive restore must call ensure_live_search_chrome")
+		return
+	if "search_chrome_pixel_report" not in _slice_func(tr, "_restore_live_search_chrome_after_stay_alive"):
+		_fail("stay-alive restore must use search_chrome_pixel_report (not flag-only live)")
 		return
 	var live := _slice_func(ren, "open_province_inspector_from_search")
 	if live.is_empty():
@@ -282,6 +304,33 @@ func _test_go_enter_signal_wiring() -> void:
 		_fail("Search LineEdit min height is 0 — live chrome vanishes after stay-alive")
 		node.queue_free()
 		return
+	# Pixel prove: parent to a sized Control (TopInfoBar class) so layout is real.
+	var bar := Control.new()
+	bar.name = "TopInfoBar"
+	bar.size = Vector2(1280, 52)
+	bar.custom_minimum_size = Vector2(1280, 52)
+	bar.clip_contents = false
+	root.add_child(bar)
+	if node.get_parent() != null:
+		node.get_parent().remove_child(node)
+	bar.add_child(node)
+	node.set_anchors_preset(Control.PRESET_TOP_RIGHT, false)
+	node.offset_left = -316.0
+	node.offset_right = -8.0
+	node.offset_top = 10.0
+	node.offset_bottom = 42.0
+	if node.has_method("ensure_chrome_visible"):
+		node.call("ensure_chrome_visible")
+	var line_r: Rect2 = line.get_global_rect()
+	var go_r: Rect2 = btn.get_global_rect()
+	if line_r.size.x < 80.0 or line_r.size.y < 16.0 or go_r.size.x < 24.0 or go_r.size.y < 16.0:
+		_fail("Search LineEdit/Go drawn rect is zero/off-parent after TopInfoBar host")
+		bar.queue_free()
+		return
+	if line_r.position.x < 0.0 or line_r.end.x > 1280.0 or line_r.position.y < 0.0:
+		_fail("Search LineEdit is off-screen on TopInfoBar host (x=%s y=%s)" % [str(line_r.position.x), str(line_r.position.y)])
+		bar.queue_free()
+		return
 	var pressed_wired: bool = false
 	for c in btn.get_signal_connection_list("pressed"):
 		if str(c.get("callable", "")).find("_on_go_pressed") >= 0:
@@ -335,4 +384,7 @@ func _test_go_enter_signal_wiring() -> void:
 			return
 	_pass("Go pressed + Enter text_submitted call open_province_inspector_from_search(710417)")
 	stub.queue_free()
-	node.queue_free()
+	if is_instance_valid(bar):
+		bar.queue_free()
+	elif is_instance_valid(node):
+		node.queue_free()

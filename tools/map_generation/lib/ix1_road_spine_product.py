@@ -109,6 +109,7 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (RENDERER_GD, "rebind_map_search"),
     (RENDERER_GD, "ensure_live_search_chrome"),
     (RENDERER_GD, "search_chrome_is_live"),
+    (RENDERER_GD, "search_chrome_pixel_report"),
     (SEARCH_GD, "ensure_chrome_visible"),
     (FORMATTERS_GD, "Road Spine"),
     (FORMATTERS_PY, "Road Spine"),
@@ -870,12 +871,19 @@ def ix1_search_go_live_signals() -> Dict[str, Any]:
         missing.append("ensure_live_search_chrome")
     if "UILayer" not in _slice_func(ren, "ensure_live_search_chrome"):
         missing.append("search_hosted_on_uilayer")
+    if "search_chrome_pixel_report" not in ren:
+        missing.append("search_chrome_pixel_report")
+    host_fn = _slice_func(ren, "_search_hud_control_host")
+    if "TopInfoBar" not in _slice_func(ren, "ensure_live_search_chrome") and "TopInfoBar" not in host_fn:
+        missing.append("search_hosted_on_topinfobar")
     if "PRESET_TOP_RIGHT" in _slice_func(ren, "_layout_map_ui"):
         missing.append("search_top_right_offscreen")
     if "ensure_chrome_visible" not in search:
         missing.append("ensure_chrome_visible")
     if "Vector2(180, 28)" not in search:
         missing.append("line_edit_min_height")
+    if "_force_child_geometry" not in search:
+        missing.append("force_child_geometry")
     if "get_global_rect" not in _slice_func(ren, "_search_ui_owns_click"):
         missing.append("search_global_rect")
     if "_release_search_focus" not in _slice_func(ren, "_handle_escape_key"):

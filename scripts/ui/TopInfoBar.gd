@@ -144,6 +144,27 @@ func get_bar_height() -> float:
 	return custom_minimum_size.y
 
 
+func host_map_search_chrome(search: Control) -> void:
+	## Durable Search slot: TOP_RIGHT of this 52px strip (UILayer 110).
+	## Parent is a Control with real width — Map Mode layer 20 cannot bury it.
+	if search == null or not is_instance_valid(search):
+		return
+	clip_contents = false
+	visible = true
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	if search.get_parent() != self:
+		var old_p: Node = search.get_parent()
+		if old_p != null:
+			old_p.remove_child(search)
+		add_child(search)
+	search.z_index = 80
+	search.z_as_relative = false
+	search.mouse_filter = Control.MOUSE_FILTER_STOP
+	search.visible = true
+	search.modulate = Color(1, 1, 1, 1)
+	move_child(search, get_child_count() - 1)
+
+
 func arm_play_clock_after_begin() -> void:
 	## Living title Begin: keep start-paused until 4x / Space / pause-play, but
 	## re-wire chrome so those clicks reach TimeManager on the softpipe path.

@@ -974,35 +974,40 @@ func _smoke_stay_alive_heartbeat() -> void:
 
 
 func _restore_live_search_chrome_after_stay_alive(who: String) -> void:
-	# Play 8f89145: window stayed after past7 but Search LineEdit/Go were gone.
-	# Re-host onto UILayer 110 with an explicit pixel rect (not headless-only).
+	# Play c82233c8: flags were live=1 but LineEdit/Go painted 0px under Map Mode.
+	# Re-host onto TopInfoBar (UILayer 110) and fail live when pixels are absent.
 	if map_renderer == null or not is_instance_valid(map_renderer):
-		print("EOA_SMOKE_SEARCH_CHROME who=TestRunner.%s visible=0 focusable=0 (no renderer; NOT product Begin/Esc PASS)" % who)
+		print("EOA_SMOKE_SEARCH_CHROME who=TestRunner.%s visible=0 focusable=0 live=0 (no renderer; NOT product Begin/Esc PASS)" % who)
+		print("EOA_SMOKE_SEARCH_CHROME_PIXEL who=TestRunner.%s on_screen=0 overlap=1 area=0 live=0 (no renderer; NOT product Begin/Esc PASS)" % who)
 		return
 	if map_renderer.has_method("ensure_live_search_chrome"):
 		map_renderer.call("ensure_live_search_chrome")
-	var live_ok := false
-	if map_renderer.has_method("search_chrome_is_live"):
-		live_ok = bool(map_renderer.call("search_chrome_is_live"))
-	var sr: Control = map_renderer.get("_map_search") as Control
-	if sr == null:
-		var hud: Node = get_node_or_null("UILayer")
-		if hud != null:
-			sr = hud.get_node_or_null("MapProvinceSearch") as Control
-	var line_c: Control = sr.get_node_or_null("SearchLineEdit") as Control if sr != null else null
-	var go_c: Control = sr.get_node_or_null("SearchGoButton") as Control if sr != null else null
-	var vis := sr != null and sr.visible and (line_c == null or line_c.visible) and (go_c == null or go_c.visible)
-	var focusable := (
-		line_c != null
-		and go_c != null
-		and line_c.visible
-		and go_c.visible
-		and line_c.focus_mode != Control.FOCUS_NONE
-		and (line_c.size.x >= 8.0 or line_c.custom_minimum_size.x >= 8.0)
+	var pixel: Dictionary = {}
+	if map_renderer.has_method("search_chrome_pixel_report"):
+		pixel = map_renderer.call("search_chrome_pixel_report") as Dictionary
+	# Pixel report is the only live signal — flags without on_screen/area FAIL.
+	var live_ok := (not pixel.is_empty()) and bool(pixel.get("live", false))
+	var vis := bool(pixel.get("visible", false))
+	var focusable := bool(pixel.get("focusable", false))
+	print(
+		"EOA_SMOKE_SEARCH_CHROME who=TestRunner.%s visible=%s focusable=%s live=%s (Search LineEdit+Go on TopInfoBar UILayer; NOT product Begin/Esc/clock PASS)"
+		% [who, "1" if vis else "0", "1" if focusable else "0", "1" if live_ok else "0"]
 	)
 	print(
-		"EOA_SMOKE_SEARCH_CHROME who=TestRunner.%s visible=%s focusable=%s live=%s (Search LineEdit+Go on UILayer; NOT product Begin/Esc/clock PASS)"
-		% [who, "1" if vis else "0", "1" if focusable else "0", "1" if live_ok else "0"]
+		"EOA_SMOKE_SEARCH_CHROME_PIXEL who=TestRunner.%s on_screen=%s overlap=%s area=%s line=%sx%s go=%sx%s host=%s layer=%s live=%s (pixel gate; NOT product Begin/Esc/clock PASS)"
+		% [
+			who,
+			"1" if bool(pixel.get("on_screen", false)) else "0",
+			"%.2f" % float(pixel.get("overlap", 1.0)),
+			"%.0f" % float(pixel.get("area", 0.0)),
+			"%.0f" % float(pixel.get("line_w", 0.0)),
+			"%.0f" % float(pixel.get("line_h", 0.0)),
+			"%.0f" % float(pixel.get("go_w", 0.0)),
+			"%.0f" % float(pixel.get("go_h", 0.0)),
+			str(pixel.get("host", "")),
+			str(pixel.get("layer", -1)),
+			"1" if live_ok else "0",
+		]
 	)
 
 

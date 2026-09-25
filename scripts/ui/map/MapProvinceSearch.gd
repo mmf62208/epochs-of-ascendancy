@@ -81,22 +81,25 @@ static func fold_search_key(s: String) -> String:
 
 
 func ensure_chrome_visible() -> void:
-	## Stay-alive / hatch: LineEdit+Go must stay on-screen and focusable.
-	## Play 8f89145: Search on WorldMap UI layer 20 + TOP_RIGHT + 0-height
-	## LineEdit was missing after past7 while Map Mode ate the top-right.
+	## Stay-alive / hatch: LineEdit+Go must paint and accept focus.
+	## Play c82233c8: visible/focusable/live flags were 1 but drawn height was
+	## 0 on a CanvasLayer parent — force actual child sizes here.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = true
 	modulate = Color(1, 1, 1, 1)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	z_index = 80
 	z_as_relative = false
+	clip_contents = false
 	custom_minimum_size = Vector2(308, 32)
+	size = Vector2(maxf(size.x, 308.0), maxf(size.y, 32.0))
 	add_theme_constant_override("separation", 6)
 	_ensure_live_controls()
 	if _line != null:
 		_style_search_line(_line)
 	if _go != null:
 		_style_search_go(_go)
+	_force_child_geometry()
 
 
 func _ensure_live_controls() -> void:
@@ -131,11 +134,29 @@ func _ensure_live_controls() -> void:
 		_go.gui_input.connect(_on_go_gui_input)
 
 
+func _force_child_geometry() -> void:
+	if _line != null and is_instance_valid(_line):
+		_line.custom_minimum_size = Vector2(180, 28)
+		_line.size = Vector2(180, 28)
+		_line.visible = true
+	if _go != null and is_instance_valid(_go):
+		_go.custom_minimum_size = Vector2(48, 28)
+		_go.size = Vector2(48, 28)
+		_go.visible = true
+	reset_size()
+	queue_sort()
+	if _line != null and is_instance_valid(_line):
+		_line.force_update_transform()
+	if _go != null and is_instance_valid(_go):
+		_go.force_update_transform()
+
+
 func _style_search_line(line: LineEdit) -> void:
 	line.process_mode = Node.PROCESS_MODE_ALWAYS
 	line.visible = true
 	line.modulate = Color(1, 1, 1, 1)
 	line.custom_minimum_size = Vector2(180, 28)
+	line.size = Vector2(180, 28)
 	line.mouse_filter = Control.MOUSE_FILTER_STOP
 	line.focus_mode = Control.FOCUS_ALL
 	line.editable = true
@@ -159,8 +180,18 @@ func _style_search_go(btn: Button) -> void:
 	btn.visible = true
 	btn.modulate = Color(1, 1, 1, 1)
 	btn.custom_minimum_size = Vector2(48, 28)
+	btn.size = Vector2(48, 28)
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn.focus_mode = Control.FOCUS_ALL
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.12, 0.22, 0.34, 0.98)
+	sb.border_color = Color(0.2, 0.9, 1, 0.9)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(3)
+	btn.add_theme_stylebox_override("normal", sb)
+	btn.add_theme_stylebox_override("hover", sb)
+	btn.add_theme_stylebox_override("pressed", sb)
+	btn.add_theme_color_override("font_color", Color(0.95, 0.96, 1, 1))
 
 
 func _search_owns_focus() -> bool:
