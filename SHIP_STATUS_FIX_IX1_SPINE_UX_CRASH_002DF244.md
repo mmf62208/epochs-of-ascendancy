@@ -7,7 +7,7 @@ PR 55 HOLD: https://github.com/mmf62208/epochs-of-ascendancy/pull/55 · branch `
 ## Verdict: machine FIX (Play rebound still required)
 
 Start tip: `002df244b3df91ca358be7c44e7314ddb2e430c4`
-**GitHub head.sha (STATUS snapshot):** `f5ba54612ab1f01d3f8fe6820c11ae099d4b4da8` (`f5ba5461`)
+**GitHub head.sha (STATUS snapshot):** `bdab13a910ee2fe782c8cec40a4e819b3219317d` (`bdab13a9`) — three-state add-on + CompleteTest PASS; STATUS tip follows this commit.
 
 ## Root cause (silent Godot exit)
 
@@ -63,7 +63,7 @@ The smoke harness is **not** the product. Product Begin / Esc / mouse CC / 4x / 
 | Test | Result |
 |------|--------|
 | `test_ix1_road_spine_product` | 15/15 OK |
-| `HeadlessIx1RoadSpineCompleteTest` | RESULT=PASS · days=36 · states queued→construction→built · RoadLayer Bonn–Köln + Köln–Leverkusen · Essen off |
+| `HeadlessIx1RoadSpineCompleteTest` | RESULT=PASS · days=36 · `EOA_SMOKE_SPINE_STATE` queued→construction→built · RoadLayer Bonn–Köln + Köln–Leverkusen · Essen off · SCRIPT_ERROR 0 |
 | `HeadlessIx1RoadSpineMandateGateTest` | PASS (failures=0) |
 | `HeadlessIx1RoadSpineDayTickTest` | RESULT=PASS |
 | `HeadlessIx1SearchGoInspectorTest` | RESULT=PASS |
