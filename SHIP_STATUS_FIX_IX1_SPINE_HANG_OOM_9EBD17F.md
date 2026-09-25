@@ -7,7 +7,7 @@ PR 55 HOLD: https://github.com/mmf62208/epochs-of-ascendancy/pull/55 · branch `
 ## Verdict: machine FIX (Play rebound still required)
 
 Start tip: `9ebd17f109f0060b9b2ae14d418ae8856844d97a`
-**GitHub head.sha (STATUS snapshot):** see latest push on this branch after this STATUS.
+**GitHub head.sha (verified after headless 5/5 + xvfb frame guard):** see the follow-up STATUS-pointer commit on `cursor/ix1-road-spine-9d9b`.
 
 ## Root cause (kernel OOM, not a crash)
 
@@ -32,6 +32,17 @@ Isolated xvfb repro of two short AA dashes at those cents **did** keep ticking (
 3. Toast + **Building…** on the press frame; `show_info_panel` + soft-pan `call_deferred` (`_ix1_spine_start_after_first_frame`).
 4. Preview notify is **sync** (hub-local `_draw` is cheap; CompleteTest construction same-tick). Spine start/progress does **not** light-rebuild RoadLayer/sites (preview only). Rail ties capped (`MAX_RAIL_TIES_PER_EDGE`).
 5. Windowed guard: `tools/eoa_ix1_spine_frame_guard.sh` (xvfb) · `EOA_SMOKE_FRAME_GUARD frames=… rss_mb=… PASS|FAIL` · frames keep advancing · RSS < 2 GB for 60 s after a simulated press.
+
+## Verified evidence (this run)
+
+| Gate | Result |
+|------|--------|
+| `test_ix1_road_spine_product` | 15/15 OK |
+| Headless IX-1 5/5 (`Mandate` / `DayTick` / `SearchGo` / `LivingTitle` / `CompleteTest`) | PASS · SCRIPT_ERROR 0 |
+| xvfb `eoa_ix1_spine_frame_guard.sh` 60 s | **PASS** · frames **16488** · sidecar RSS **370 → 1317 MB flat** (under 2 GB; pre-fix Play OOM 8.3 / 9.4 / **9.9 GB**) |
+| xvfb guard 8 s (RSS reader confirm) | **PASS** · `EOA_SMOKE_FRAME_GUARD frames=2389 rss_mb=1314 PASS` · sidecar_max **1314** |
+
+Smoke harness is **not** the product. Product Begin / Esc / mouse CC / 4x / clock stay **FAIL**. Play-F5 stays **UNFIXED**.
 
 Three corridor states, progress/ETA, CompleteTest, sticky Search, stay-alive, catch-up, smoke auto-begin hatch, `EOA_SMOKE_SPINE_START` **kept**. Corridor IDs unchanged.
 

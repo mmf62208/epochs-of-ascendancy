@@ -58,13 +58,21 @@ set -e
 
 echo "==== Godot (EOA_SMOKE_FRAME_GUARD) ===="
 grep -E "EOA_SMOKE_FRAME_GUARD|WindowedIx1SpineFrameGuard|RESULT=" "$LOG" || tail -n 40 "$LOG"
+SIDECAR_MAX=0
 if [[ -f "$RSSLOG" ]]; then
 	echo "==== RSS sidecar (1s) ===="
 	cat "$RSSLOG"
+	SIDECAR_MAX="$(awk -F= '/rss_mb=[0-9]+/{print $NF}' "$RSSLOG" | sort -n | tail -n 1)"
+	SIDECAR_MAX="${SIDECAR_MAX:-0}"
+	echo "eoa_ix1_spine_frame_guard: sidecar_max_rss_mb=${SIDECAR_MAX}"
 fi
+GODOT_PASS=0
 if grep -qE "EOA_SMOKE_FRAME_GUARD frames=[0-9]+ rss_mb=[0-9]+ PASS" "$LOG"; then
-	echo "eoa_ix1_spine_frame_guard: RESULT=PASS"
+	GODOT_PASS=1
+fi
+if [[ "$GODOT_PASS" -eq 1 && "${SIDECAR_MAX}" -lt 2048 ]]; then
+	echo "eoa_ix1_spine_frame_guard: RESULT=PASS sidecar_max_rss_mb=${SIDECAR_MAX}"
 	exit 0
 fi
-echo "eoa_ix1_spine_frame_guard: RESULT=FAIL (exit=$CODE)"
+echo "eoa_ix1_spine_frame_guard: RESULT=FAIL (exit=$CODE sidecar_max_rss_mb=${SIDECAR_MAX})"
 exit 1

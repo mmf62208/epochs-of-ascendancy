@@ -169,11 +169,30 @@ func _finish(ok: bool, rss: int) -> void:
 
 
 func _read_rss_mb() -> int:
-	var f := FileAccess.open("/proc/self/status", FileAccess.READ)
+	# Never /proc/self via OS.execute — that is the child (awk), not Godot.
+	var path := "/proc/%d/status" % OS.get_process_id()
+	var from_file := _parse_vmrss_kb_text(_read_text_file(path))
+	if from_file > 0:
+		return from_file
+	var output: Array = []
+	var code := OS.execute("/usr/bin/awk", PackedStringArray(["/VmRSS/{print $2}", path]), output, true, false)
+	if code == 0 and not output.is_empty():
+		var kb := int(str(output[0]).strip_edges())
+		if kb > 0:
+			return int(round(float(kb) / 1024.0))
+	return 0
+
+
+func _read_text_file(path: String) -> String:
+	var f := FileAccess.open(path, FileAccess.READ)
 	if f == null:
-		return 0
+		return ""
 	var txt := f.get_as_text()
 	f.close()
+	return txt
+
+
+func _parse_vmrss_kb_text(txt: String) -> int:
 	for line in txt.split("\n"):
 		if not line.begins_with("VmRSS:"):
 			continue
