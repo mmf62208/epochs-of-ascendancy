@@ -150,9 +150,13 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
 
     def test_spine_complete_zoom_gate(self) -> None:
         # Play MIXED 002df244: start logic PASS, then silent exit after zoom.
+        # Play FAIL 9ebd17f: windowed hang/OOM after press (headless still PASS).
         gate = ix1_spine_complete_zoom_gate()
         self.assertTrue(gate.get("ok"), msg=gate)
         self.assertEqual(int(gate.get("hub_id")), HUB_ID)
+        self.assertNotIn("preview_loop_caps", gate.get("missing") or [])
+        self.assertNotIn("windowed_frame_guard", gate.get("missing") or [])
+        self.assertNotIn("first_frame_paint", gate.get("missing") or [])
         p = build_ix1_road_spine_product()
         self.assertIn("spine_complete_zoom_gate", p.get("passes") or [])
 

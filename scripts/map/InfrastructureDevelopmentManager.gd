@@ -1327,11 +1327,12 @@ func _set_ix1_spine_visual_state(state: String, pid: int, pct: float) -> void:
 
 func _notify_ix1_spine_preview(state: String, pid: int, pct: float) -> void:
 	# Preview only — never rebuild the RoadLayer here (zoom silent-exit class).
+	# Deferred so the press frame can paint toast + Building… first (windowed OOM).
 	if get_tree() == null:
 		return
 	var overlay: Node = get_tree().get_first_node_in_group("infrastructure_overlay")
 	if overlay != null and overlay.has_method("set_ix1_spine_preview"):
-		overlay.call("set_ix1_spine_preview", state, pid, pct)
+		overlay.call_deferred("set_ix1_spine_preview", state, pid, pct)
 
 
 func ensure_ix1_theater_provinces_for_headless() -> Dictionary:

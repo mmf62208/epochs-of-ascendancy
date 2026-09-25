@@ -96,6 +96,9 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (PROVINCE_GD, "ROAD_SPINE_INFRA_BONUS"),
     (OVERLAY_GD, "explicit"),
     (OVERLAY_GD, "_road_layer_has_explicit_lines"),
+    (OVERLAY_GD, "IX1_PREVIEW_MAX_SEGS"),
+    (OVERLAY_GD, "IX1_PREVIEW_MIN_STEP"),
+    (OVERLAY_GD, "MAX_RAIL_TIES_PER_EDGE"),
     (RENDERER_GD, "BtnBuildRoadSpine"),
     (RENDERER_GD, "_on_build_road_spine_pressed"),
     (RENDERER_GD, "press_build_road_spine_from_live_ui"),
@@ -918,13 +921,16 @@ def ix1_spine_complete_zoom_gate() -> Dict[str, Any]:
     complete = _read(COMPLETE_HARNESS)
     missing: List[str] = []
     press = _slice_func(ren, "_on_build_road_spine_pressed")
-    if 'focus_province_by_id(pid, "soft")' not in press:
+    after = _slice_func(ren, "_ix1_spine_start_after_first_frame")
+    if 'focus_province_by_id(pid, "soft")' not in after:
         missing.append("press_soft_pan")
+    if 'call_deferred("_ix1_spine_start_after_first_frame"' not in press:
+        missing.append("first_frame_paint")
     if "Building…" not in ren:
         missing.append("building_ellipsis")
     if "_apply_spine_building_button_state" not in press:
         missing.append("button_state_before_zoom")
-    if press.find("_show_inspector_toast") > press.find("focus_province_by_id"):
+    if press.find("_show_inspector_toast") > press.find("call_deferred"):
         missing.append("toast_after_zoom")
     if "EOA_ZOOM_BEGIN" not in ren or "EOA_ZOOM_END" not in ren:
         missing.append("zoom_brackets")
@@ -944,6 +950,21 @@ def ix1_spine_complete_zoom_gate() -> Dict[str, Any]:
         missing.append("spine_state_log")
     if "set_ix1_spine_preview" not in ol or "Ix1SpinePreviewDraw" not in ol:
         missing.append("spine_preview_draw")
+    if "IX1_PREVIEW_MAX_SEGS" not in ol or "IX1_PREVIEW_MIN_STEP" not in ol:
+        missing.append("preview_loop_caps")
+    if "is_finite(length)" not in _slice_func(ol, "_draw_spine_dashed"):
+        missing.append("preview_finite_step")
+    if ", true)" in _slice_func(ol, "_draw_spine_dashed"):
+        missing.append("preview_antialiased_oom")
+    if "position = hub_c" not in ol:
+        missing.append("preview_hub_local")
+    if "MAX_RAIL_TIES_PER_EDGE" not in ol:
+        missing.append("rail_tie_cap")
+    guard = _read(ROOT / "scripts" / "core" / "WindowedIx1SpineFrameGuard.gd")
+    if "EOA_SMOKE_FRAME_GUARD" not in guard:
+        missing.append("windowed_frame_guard")
+    if "EOA_SMOKE_FRAME_GUARD" not in _read(ROOT / "tools" / "eoa_ix1_spine_frame_guard.sh"):
+        missing.append("windowed_frame_guard_sh")
     if "visual_states" not in idm or "queued" not in complete:
         missing.append("three_state_assert")
     if "func _quit_logged" not in tr or "EOA_HARNESS_QUIT" not in tr:

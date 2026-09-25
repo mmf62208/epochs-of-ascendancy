@@ -79,6 +79,7 @@ func _run() -> void:
 	_test_source_progress_complete_logs()
 	_test_source_spine_visual_states()
 	_test_source_building_ellipsis_and_toast_before_zoom()
+	_test_source_preview_loop_caps()
 	_test_source_harness_quit_logged()
 	_test_spine_start_to_complete_roadlayer_essen()
 	_test_zoom_path_after_spine_does_not_die()
@@ -90,10 +91,14 @@ func _test_source_no_tactical_on_spine_start() -> void:
 	if press.is_empty():
 		_fail("_on_build_road_spine_pressed missing")
 		return
-	if "focus_province_by_id(pid, \"soft\")" not in press:
+	var after := _slice_func(ren, "_ix1_spine_start_after_first_frame")
+	if "call_deferred(\"_ix1_spine_start_after_first_frame\"" not in press:
+		_fail("spine start must defer panel/zoom so toast paints first")
+		return
+	if "focus_province_by_id(pid, \"soft\")" not in after:
 		_fail("spine start must soft-pan (never tactical 2.4)")
 		return
-	if "focus_province_by_id(pid)" in press and "focus_province_by_id(pid, \"soft\")" not in press:
+	if "focus_province_by_id(pid)" in after and "focus_province_by_id(pid, \"soft\")" not in after:
 		_fail("spine start still calls default focus_province_by_id (tactical death)")
 		return
 	if "tactical_redirected_soft" not in ren:
@@ -174,14 +179,35 @@ func _test_source_building_ellipsis_and_toast_before_zoom() -> void:
 		_fail("Building… button state missing")
 		return
 	var toast_i := press.find("_show_inspector_toast")
-	var focus_i := press.find("focus_province_by_id")
-	if toast_i < 0 or focus_i < 0 or toast_i > focus_i:
-		_fail("toast must happen before camera/zoom on spine start")
+	var defer_i := press.find("call_deferred")
+	if toast_i < 0 or defer_i < 0 or toast_i > defer_i:
+		_fail("toast must happen before deferred camera/zoom on spine start")
 		return
 	if "_apply_spine_building_button_state" not in press:
 		_fail("Building… state not applied on start")
 		return
 	_pass("toast + Building… persist before zoom")
+
+
+func _test_source_preview_loop_caps() -> void:
+	var ol := _read(SRC_OL)
+	var dashed := _slice_func(ol, "_draw_spine_dashed")
+	if "IX1_PREVIEW_MAX_SEGS" not in dashed or "IX1_PREVIEW_MIN_STEP" not in dashed:
+		_fail("preview dash loop missing hard caps")
+		return
+	if "is_finite(length)" not in dashed:
+		_fail("preview dash must reject non-finite length")
+		return
+	if ", true)" in dashed:
+		_fail("preview dash must not use antialiased draw_line (windowed OOM)")
+		return
+	if "position = hub_c" not in ol and "position = hub" not in ol:
+		_fail("preview must draw hub-local (not absolute GIS cents)")
+		return
+	if "EOA_SMOKE_FRAME_GUARD" not in _read("res://scripts/core/WindowedIx1SpineFrameGuard.gd"):
+		_fail("windowed frame/RSS guard missing")
+		return
+	_pass("preview loops are hard-capped + hub-local; windowed guard shipped")
 
 
 func _test_source_harness_quit_logged() -> void:

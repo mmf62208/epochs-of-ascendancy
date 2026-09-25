@@ -20473,14 +20473,22 @@ func _on_build_road_spine_pressed() -> void:
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 			LeaderEventUI.show_toast("Road spine started in %s · ETA %d days" % [pname, eta], 3.5)
 		_play_map_sfx("confirm")
-		if provinces.has(pid):
-			show_info_panel(provinces[pid])
-			_apply_spine_building_button_state(pid, 0, eta)
-		# Soft pan only — never tactical 2.4 (softpipe silent exit).
-		focus_province_by_id(pid, "soft")
+		# Windowed 9ebd17f: show_info_panel + preview _draw flushed the canvas
+		# on this frame (toast/Building… never painted; RSS climbed to OOM).
+		# Paint UI first; soft-pan after the next idle frame.
+		call_deferred("_ix1_spine_start_after_first_frame", pid)
 	else:
 		_show_inspector_toast(str(result.get("reason", "Cannot start road spine")), 3.5, true)
 		_play_map_sfx("error")
+
+
+func _ix1_spine_start_after_first_frame(pid: int) -> void:
+	# Runs after toast + Building… have had one frame. Soft pan only.
+	if provinces.has(pid):
+		show_info_panel(provinces[pid])
+		var eta_defer := int(_ix1_last_spine_press.get("eta_days", 35))
+		_apply_spine_building_button_state(pid, 0, eta_defer)
+	focus_province_by_id(pid, "soft")
 
 
 func press_build_road_spine_from_live_ui() -> Dictionary:
