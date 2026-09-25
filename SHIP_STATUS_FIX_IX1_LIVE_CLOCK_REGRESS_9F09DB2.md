@@ -31,7 +31,7 @@ Parent-of-regress `5732d34` had live past +6 PASS.
 
 Search Go wiring from `5732d34` and Build Road Spine CTA pin from `36485b9` **kept**. Corridor IDs unchanged. Dig2/G PARKED.
 
-## Gates (head `4a9836aab1f783498ae31f2cb7530fa136683183`)
+## Gates (head `53f45ac91467b6900107cf68f6669790352b56b0`)
 
 - `test_ix1_road_spine_product` **13/13** including `search_go_spine_visible` + SearchGo signals + Mandate 0 + strengthened `day_tick_unblocked` (`top_bar_owns_click_rect`, `begin_clears_clock_input`, `no_repause_after_begin`, `play_begin_clock_sim`)
 - `HeadlessIx1SearchGoInspectorTest` **RESULT=PASS** — Go+Enter inspector + spine chrome/list + IDM should_show Köln / Mandate 0
