@@ -22,12 +22,13 @@ Headless day-tick papered over the live path: `is_live_f5_play_path()` deferred 
 
 Search Go wiring from `5732d34` and Build Road Spine CTA pin from `36485b9` **kept**. Corridor IDs unchanged. Dig2/G PARKED.
 
-## Gates
+## Gates (this SHA)
 
-- `test_ix1_road_spine_product` including `search_go_spine_visible` + strengthened `day_tick_unblocked`
-- `HeadlessIx1SearchGoInspectorTest` (spine pin still visible/startable)
-- `HeadlessIx1RoadSpineMandateGateTest` cost=0
-- `HeadlessIx1RoadSpineDayTickTest` hours past +6 + days past +6
+- `test_ix1_road_spine_product` **13/13** including `search_go_spine_visible` + SearchGo signals + Mandate 0 + strengthened `day_tick_unblocked` (`past_hour_plus6`, DisplayServer live-F5, day_emit/rings)
+- `HeadlessIx1SearchGoInspectorTest` **RESULT=PASS** — Go+Enter inspector + spine chrome/list + IDM should_show Köln / not Essen / Mandate 0
+- `HeadlessIx1RoadSpineMandateGateTest` **PASS (failures=0)** cost=0
+- `HeadlessIx1RoadSpineDayTickTest` **RESULT=PASS**: +12d 17.0%→50.6%; complete; **live-F5-equiv hours +8 (past hour +6) then +8d past+6 consider=0 pick=0 autosave=0 mem=33564 (32ms)**
+- Official `--quick` `living_unit_order_loop` wiring FAIL + Pillow `map_qc` are **pre-existing** (not this FIX)
 
 ## HOLD
 
