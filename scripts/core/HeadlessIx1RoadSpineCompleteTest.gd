@@ -216,6 +216,17 @@ func _test_source_preview_loop_caps() -> void:
 	if "press_build_road_spine_from_live_ui()" in deliver or "try_start_road_spine" in deliver:
 		_fail("viewport mouse press must not call the spine helper/API")
 		return
+	var toast := _read("res://scripts/ui/LeaderEventUI.gd")
+	var dismiss := _slice_func(toast, "_dismiss_toast")
+	if "remove_child" not in dismiss:
+		_fail("toast dismiss must remove_child before queue_free (queue_free-only spins)")
+		return
+	if "eoa_toast_dismissing" not in toast:
+		_fail("toast dismiss must be idempotent")
+		return
+	if "while _toast_container.get_child_count()" in toast:
+		_fail("toast trim must not while get_child_count after queue_free")
+		return
 	_pass("preview loops are hard-capped + hub-local; Play-launch viewport mouse guard shipped")
 
 

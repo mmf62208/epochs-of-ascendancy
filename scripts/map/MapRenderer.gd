@@ -17951,6 +17951,13 @@ func _clear_selection() -> void:
 
 
 func eoa_log_flush(msg: String) -> void:
+	# Bisect prints stay, but stay cheap unless the Play-launch guard is on.
+	if msg.begins_with("EOA_SMOKE_SPINE_BISECT"):
+		if (
+			OS.get_environment("EOA_SMOKE_FRAME_GUARD") != "1"
+			and OS.get_environment("EOA_SMOKE_SPINE_BISECT") != "1"
+		):
+			return
 	print(msg)
 	if OS.has_method("flush_stdout"):
 		OS.call("flush_stdout")

@@ -1100,6 +1100,7 @@ func _smoke_ix1_frame_guard_press() -> void:
 		"EOA_SMOKE_FRAME_GUARD who=TestRunner.mouse_press_returned ok=%s reason=%s"
 		% [str(bool(report.get("ok", false))), str(report.get("reason", ""))]
 	)
+	_log_ix1_guard_visible_feedback()
 	set_meta("eoa_smoke_frame_guard_t0", Time.get_ticks_msec())
 	set_meta("eoa_smoke_frame_guard_frames", 0)
 	set_meta("eoa_smoke_frame_guard_rss0", _read_godot_rss_mb())
@@ -1135,10 +1136,47 @@ func _tick_smoke_ix1_frame_guard(_delta: float) -> void:
 		_quit_logged(1, "ix1_frame_guard_rss")
 		return
 	if elapsed >= secs:
+		var vis: Dictionary = _log_ix1_guard_visible_feedback()
 		var frames_ok := frames >= maxi(secs * 2, 10)
-		var verdict := "PASS" if frames_ok and rss < 3072 else "FAIL"
+		var vis_ok := bool(vis.get("ok", false))
+		var verdict := "PASS" if frames_ok and rss < 3072 and vis_ok else "FAIL"
 		_eoa_flush("EOA_SMOKE_FRAME_GUARD frames=%d rss_mb=%d %s" % [frames, rss, verdict])
 		_quit_logged(0 if verdict == "PASS" else 1, "ix1_frame_guard_%s" % verdict.to_lower())
+
+
+func _log_ix1_guard_visible_feedback() -> Dictionary:
+	var toast_n := 0
+	var toast_body := ""
+	if typeof(LeaderEventUI) != TYPE_NIL:
+		var cont: Variant = LeaderEventUI.get("_toast_container")
+		if cont is Node:
+			var node: Node = cont as Node
+			toast_n = node.get_child_count()
+			if toast_n > 0:
+				var last: Node = node.get_child(toast_n - 1)
+				var labels: Array[Node] = last.find_children("*", "Label", true, false)
+				var li := 0
+				while li < labels.size():
+					var lab_node: Node = labels[li]
+					if lab_node is Label:
+						var t: String = (lab_node as Label).text
+						if not t.is_empty():
+							toast_body = t
+							break
+					li += 1
+	var building := ""
+	if map_renderer != null and is_instance_valid(map_renderer):
+		var btn: Variant = map_renderer.get("_btn_build_road_spine")
+		if btn is Button:
+			building = (btn as Button).text
+	var toast_ok := toast_n > 0 and ("Road spine" in toast_body or "Building" in toast_body or toast_n >= 1)
+	var building_ok := "Building" in building
+	var ok := toast_ok and building_ok
+	_eoa_flush(
+		"EOA_SMOKE_FRAME_GUARD who=visible toast_n=%d building=%s toast_ok=%d building_ok=%d"
+		% [toast_n, building, 1 if toast_ok else 0, 1 if building_ok else 0]
+	)
+	return {"ok": ok, "toast_n": toast_n, "building": building}
 
 
 func _read_godot_rss_mb() -> int:

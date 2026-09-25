@@ -157,6 +157,8 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertNotIn("preview_loop_caps", gate.get("missing") or [])
         self.assertNotIn("windowed_frame_guard", gate.get("missing") or [])
         self.assertNotIn("first_frame_paint", gate.get("missing") or [])
+        self.assertNotIn("toast_dismiss_remove_child", gate.get("missing") or [])
+        self.assertNotIn("toast_child_count_queue_free_spin", gate.get("missing") or [])
         p = build_ix1_road_spine_product()
         self.assertIn("spine_complete_zoom_gate", p.get("passes") or [])
 

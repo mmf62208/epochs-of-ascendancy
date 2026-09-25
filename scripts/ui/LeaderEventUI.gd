@@ -7,6 +7,7 @@ signal news_posted(entry: Dictionary)
 
 const MAX_NEWS_ITEMS := 40
 const TOAST_DURATION_SEC := 6.0
+const TOAST_DISMISSING_META := "eoa_toast_dismissing"
 
 var news_history: Array[Dictionary] = []
 var _retirement_queue: Array[String] = []
@@ -15,6 +16,8 @@ var _replacement_queue: Array[String] = []
 var _active_replacement_popup: LeaderReplacementPickerPopup = null
 var _toast_layer: CanvasLayer
 var _toast_container: VBoxContainer
+var _spine_bisect_logs: bool = false
+var _spine_bisect_logs_resolved: bool = false
 
 # Preloaded custom icons for event toasts (beyond unicode); riot for crisis/riot cats per graphics wiring.
 var _riot_crowd_icon: Texture2D = null
@@ -86,7 +89,21 @@ func _ensure_toast_layer() -> void:
 ## Simple toast for save/menu/system feedback (non-news).
 # Enhanced for important messages (toasts first): Always has close/dismiss X. For is_important, adds "Respond" button (e.g. opens PolicyLawScreen or launches dialogue for welfare/crisis choices).
 # Clean, interactive, fun: Player informed immediately, can dismiss or act on cultural war / policy decisions.
+func _eoa_spine_bisect_enabled() -> bool:
+	if _spine_bisect_logs_resolved:
+		return _spine_bisect_logs
+	_spine_bisect_logs = (
+		OS.get_environment("EOA_SMOKE_FRAME_GUARD") == "1"
+		or OS.get_environment("EOA_SMOKE_SPINE_BISECT") == "1"
+	)
+	_spine_bisect_logs_resolved = true
+	return _spine_bisect_logs
+
+
 func _eoa_flush(msg: String) -> void:
+	# Cheap: silent unless the Play-launch frame guard / bisect flag is on.
+	if not _eoa_spine_bisect_enabled():
+		return
 	print(msg)
 	if OS.has_method("flush_stdout"):
 		OS.call("flush_stdout")
@@ -192,11 +209,7 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 	var close_btn := Button.new()
 	close_btn.text = "×"
 	close_btn.custom_minimum_size = Vector2(20, 20)
-	close_btn.pressed.connect(func(): 
-		if panel.get_parent():
-			panel.get_parent().remove_child(panel)
-			panel.queue_free()
-	)
+	close_btn.pressed.connect(_dismiss_toast.bind(panel))
 	title_row.add_child(close_btn)
 	vbox.add_child(title_row)
 
@@ -223,9 +236,7 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 				# Fallback: toast reminder.
 				show_toast("Open Policy / Law screen to adjust welfare/social services and respond to the cultural decision.", 4.0)
 			# Dismiss after respond.
-			if panel.get_parent():
-				panel.get_parent().remove_child(panel)
-				panel.queue_free()
+			_dismiss_toast(panel)
 		)
 		vbox.add_child(respond_btn)
 
@@ -240,15 +251,13 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 		"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.after_trim n=%d"
 		% _toast_container.get_child_count()
 	)
-	var trim_guard := 0
-	while _toast_container.get_child_count() > 4:
-		if trim_guard == 0:
-			_eoa_flush(
-				"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.cap4_iter0 n=%d"
-				% _toast_container.get_child_count()
-			)
-		_dismiss_toast(_toast_container.get_child(0) as PanelContainer)
-		trim_guard += 1
+	var n_cap: int = _toast_container.get_child_count()
+	if n_cap > 4:
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.cap4_iter0 n=%d"
+			% n_cap
+		)
+	_trim_toast_stack_to(4)
 
 	var timer := get_tree().create_timer(maxf(1.0, duration_sec))
 	timer.timeout.connect(_on_toast_timer_expired.bind(panel), CONNECT_ONE_SHOT)
@@ -306,21 +315,36 @@ func _should_coalesce_live_f5_combat_toast(category: String) -> bool:
 	return _toast_container.get_child_count() >= 1
 
 
+func _trim_toast_stack_to(max_keep: int) -> int:
+	# Snapshot + immediate remove. queue_free alone never drops get_child_count()
+	# this frame — a while-count loop spun forever (~140 MB/s) on live F5.
+	if _toast_container == null or max_keep < 0:
+		return 0
+	var kids: Array[Node] = _toast_container.get_children()
+	var n: int = kids.size()
+	if n <= max_keep:
+		return 0
+	var excess: int = n - max_keep
+	var cap: int = mini(excess, n)
+	var i := 0
+	while i < cap:
+		_dismiss_toast(kids[i] as PanelContainer)
+		i += 1
+	return cap
+
+
 func _trim_live_f5_toast_stack() -> void:
 	if _toast_container == null or not _live_f5_toast_path():
 		_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.skip")
 		return
 	var n0: int = _toast_container.get_child_count()
 	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.enter n=%d" % n0)
-	var iter := 0
-	while _toast_container.get_child_count() > 2:
-		if iter == 0:
-			_eoa_flush(
-				"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.iter0 n=%d"
-				% _toast_container.get_child_count()
-			)
-		_dismiss_toast(_toast_container.get_child(0) as PanelContainer)
-		iter += 1
+	if n0 > 2:
+		_eoa_flush(
+			"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.iter0 n=%d"
+			% n0
+		)
+	var iter: int = _trim_toast_stack_to(2)
 	_eoa_flush(
 		"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.exit n=%d iters=%d"
 		% [_toast_container.get_child_count(), iter]
@@ -459,8 +483,7 @@ func _show_toast(entry: Dictionary) -> void:
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_toast_container.add_child(panel)
 	_trim_live_f5_toast_stack()
-	while _toast_container.get_child_count() > 4:
-		_dismiss_toast(_toast_container.get_child(0) as PanelContainer)
+	_trim_toast_stack_to(4)
 
 	var timer := get_tree().create_timer(TOAST_DURATION_SEC)
 	timer.timeout.connect(_on_toast_timer_expired.bind(panel), CONNECT_ONE_SHOT)
@@ -468,8 +491,16 @@ func _show_toast(entry: Dictionary) -> void:
 
 
 func _dismiss_toast(panel: PanelContainer) -> void:
-	if panel != null and is_instance_valid(panel):
-		panel.queue_free()
+	if panel == null or not is_instance_valid(panel):
+		return
+	if panel.has_meta(TOAST_DISMISSING_META) and bool(panel.get_meta(TOAST_DISMISSING_META)):
+		return
+	panel.set_meta(TOAST_DISMISSING_META, true)
+	var parent: Node = panel.get_parent()
+	if parent != null:
+		parent.remove_child(panel)
+	# One-shot free. Never start a second tween/timer on a dismissing panel.
+	panel.queue_free()
 
 
 func _on_toast_timer_expired(panel: PanelContainer) -> void:

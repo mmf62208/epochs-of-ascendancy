@@ -975,6 +975,16 @@ def ix1_spine_complete_zoom_gate() -> Dict[str, Any]:
         missing.append("frame_guard_direct_spine_api")
     if "_maybe_start_ix1_frame_guard" not in tr:
         missing.append("frame_guard_testrunner")
+    toast = _read(TOAST_GD)
+    dismiss = _slice_func(toast, "_dismiss_toast")
+    if "remove_child" not in dismiss:
+        missing.append("toast_dismiss_remove_child")
+    if "eoa_toast_dismissing" not in toast:
+        missing.append("toast_dismiss_idempotent")
+    if "while _toast_container.get_child_count()" in toast:
+        missing.append("toast_child_count_queue_free_spin")
+    if "EOA_SMOKE_FRAME_GUARD" not in _slice_func(toast, "_eoa_spine_bisect_enabled"):
+        missing.append("toast_bisect_gated")
     if "visual_states" not in idm or "queued" not in complete:
         missing.append("three_state_assert")
     if "func _quit_logged" not in tr or "EOA_HARNESS_QUIT" not in tr:
