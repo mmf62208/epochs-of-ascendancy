@@ -1326,7 +1326,7 @@ func _set_ix1_spine_visual_state(state: String, pid: int, pct: float) -> void:
 
 
 func _notify_ix1_spine_preview(state: String, pid: int, pct: float) -> void:
-	# Preview only — never rebuild_road_layer here (zoom silent-exit class).
+	# Preview only — never rebuild the RoadLayer here (zoom silent-exit class).
 	if get_tree() == null:
 		return
 	var overlay: Node = get_tree().get_first_node_in_group("infrastructure_overlay")

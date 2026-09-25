@@ -156,8 +156,9 @@ func _test_source_spine_visual_states() -> void:
 	if "class Ix1SpinePreviewDraw" not in ol or "set_ix1_spine_preview" not in ol:
 		_fail("Ix1SpinePreviewDraw / set_ix1_spine_preview missing")
 		return
-	if "rebuild_road_layer" in _slice_func(idm, "_notify_ix1_spine_preview"):
-		_fail("preview notify must not rebuild_road_layer (zoom silent-exit)")
+	var notify := _slice_func(idm, "_notify_ix1_spine_preview")
+	if 'call("rebuild_road_layer")' in notify or "rebuild_road_layer(" in notify:
+		_fail("preview notify must not rebuild the RoadLayer (zoom silent-exit)")
 		return
 	var rebuild := _slice_func(ol, "_rebuild_road_layer_inner")
 	if "spine_preview_layer" in rebuild:
