@@ -7,7 +7,7 @@
 **This follow-up:** https://github.com/mmf62208/epochs-of-ascendancy/pull/56 (draft)  
 **Branch:** `cursor/ix1-live-esc-begin-26e3`  
 **Functional fix:** `4868b880ef50586b176482d4f317d7df82d96148`  
-**New head:** (stamped after this commit)
+**New head:** `8bce8b7f23e5a2730503ab8d77501fa0b10b99e6`
 
 ## Soft wall
 Play RESULT FAIL on `d18cbae` (same as `d53ee05`): Esc→CC HARD FAIL; Begin · Germany · 1936 no transition; Godot DEBUG window exited. Headless LivingTitleEscBegin (layers 120/130) was green. Later PR 55 work added poll / `window_input` / mouse-CC / smoke hatch and still recorded **product Begin/Esc FAIL** (zero post-boot `EOA_LIVE_RAW_*` — computerUse never activated the main game X11 client).
