@@ -18,8 +18,14 @@ Also: toast timer WeakRef (no `Object → Object`); spine chrome **below** Settl
 
 ## Guard
 
-- `HeadlessIx1RoadSpineLiveStayAliveTickTest` — stay-alive + `advance_real_time` (**FAIL** on `2bc8f19`: calendar +6d, spine 0.0%; **PASS** on tip: 0%→100% `built`).
-- `tools/eoa_ix1_spine_live_progress_guard.sh` — Play wrapper + viewport mouse + `/proc` RSS. First new-tip run: press `viewport_mouse` → construction 3% day 1 → COMPLETE day 35; sidecar RSS **2052–2053 MB**. Stay-alive used to swallow `ix1_live_progress` quit (rss_mb=0 from FileAccess `/proc`); now quit is allowed and RSS uses `/usr/bin/cat` of the Godot pid.
+Tip `4cb70bdb`. Same live path on both tips: Play wrapper + viewport `InputEventMouseButton` → `MapRenderer.button` + stay-alive `advance_real_time` (NOT IDM shortcut).
+
+| Path | `2bc8f19` | `4cb70bdb` |
+|------|-----------|------------|
+| Headless stay-alive + `advance_real_time` (new test only on old tip) | **FAIL** calendar +6d, spine 0.0% | **PASS** +6d 0%→100% `built` |
+| Windowed `eoa_ix1_spine_live_progress_guard.sh` (harness overlay on old tip) | **FAIL** press ok, days=5 pct=0; TestRunner rss_mb=**1346**; sidecar max **1360 MB** | **PASS** 3% day 1 → 15% day 5 → COMPLETE day 35; TestRunner rss_mb=**2023**; sidecar max **2052 MB** |
+
+Headless LivingTitle / RoadSpineComplete / RoadSpineDayTick / MandateGate / SearchGo **PASS**. `test_ix1_road_spine_product` **15/15**. `--quick` `living_unit_order_loop` FAIL is **pre-existing on `2bc8f19`** (not a FIX3 regression).
 
 ## Honest labels
 
