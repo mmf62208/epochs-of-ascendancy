@@ -428,6 +428,7 @@ func handle_live_escape() -> bool:
 		return _esc_routed_to_cc
 	set_meta("eoa_title_esc_frame", frame_now)
 	_esc_routed_to_cc = true
+	print("LivingTitleBoot: live Esc → Command Center")
 	return _open_command_center_from_title()
 
 
@@ -531,6 +532,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_begin_new() -> void:
+	print("LivingTitleBoot: live Begin · %s · %d" % [_tag, _year])
 	var out: Dictionary = apply_living_title_boot(_tag, _year, "")
 	_finish(out)
 
