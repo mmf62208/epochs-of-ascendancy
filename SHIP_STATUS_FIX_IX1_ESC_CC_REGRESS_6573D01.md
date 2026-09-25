@@ -4,7 +4,7 @@ From: Ship
 Assign: `/workspace/SHIP_ASSIGN_FIX_IX1_ESC_CC_REGRESS_6573D01.md`
 Evidence: `/workspace/eoa-smoke-6573d01/RESULT.md` (`EOA_LIVE_RAW_PTR`=1 `title.ready` only)
 Start tip: `6573d01d74ff087f8bc4ffe33f37e11ff553419b`
-**New tip (GitHub `head.sha`):** *(pending commit)*
+**New tip (GitHub `head.sha`):** `4258efcc37aff847665101a815971c62e39fbcd3`
 PR: https://github.com/mmf62208/epochs-of-ascendancy/pull/55 (**HOLD merge**, draft)
 
 ## State: DONE — HOLD await Play (smoke-auto-begin only)
