@@ -377,6 +377,50 @@ func advance_live_f5_equivalent_days(days: int = 5) -> Dictionary:
 	}
 
 
+## TopInfoBar live path: 1 wall-sec → 1 game hour at 1×. Headless day-tick that only
+## calls advance_days can PASS while softpipe Play stays wedged at 1 Jan 00:00.
+func advance_live_f5_equivalent_hours(hours: int = 8) -> Dictionary:
+	var n := clampi(int(hours), 1, 24)
+	var start_hour := current_hour
+	var start_elapsed := total_days_elapsed
+	var start_day := current_day
+	var was_paused := paused
+	var was_scale := time_scale
+	paused = false
+	time_scale = 1.0
+	_live_f5_equiv_clock = true
+	for _i: int in range(n):
+		advance_real_time(1.0)
+	var flushed := 0
+	if not _pending_sim_events.is_empty():
+		flushed = _drain_living_f5_flush(2)
+	_live_f5_equiv_clock = false
+	time_scale = was_scale
+	paused = was_paused
+	var hour_delta := (total_days_elapsed - start_elapsed) * 24 + (current_hour - start_hour)
+	if hour_delta < 0:
+		hour_delta += 24
+	var left_midnight := hour_delta >= 1
+	print(
+		"TimeManager: live-F5-equiv +%d hours → %04d-%02d-%02d %02d:00 (hour_delta=%d)"
+		% [n, current_year, current_month, current_day, current_hour, hour_delta]
+	)
+	return {
+		"ok": hour_delta >= n and left_midnight,
+		"hours": n,
+		"hour_delta": hour_delta,
+		"from_hour": start_hour,
+		"from_day": start_day,
+		"hour": current_hour,
+		"day": current_day,
+		"past_hour_plus6": hour_delta >= mini(n, 6),
+		"left_00": left_midnight,
+		"live_f5_equiv": true,
+		"living_playtest_clock": false,
+		"flushed": flushed,
+	}
+
+
 ## Maginot / PLAYTEST item 14: drive the real F5 1x path (advance_days + split
 ## day_emit / day_ai / day_battles flush). Light capture, never execute.
 func advance_living_playtest_days(days: int = 5) -> Dictionary:
@@ -701,6 +745,8 @@ func is_interactive_light_sim() -> bool:
 
 ## Editor / export Play (X11, softpipe, Vulkan) — not the compact Maginot playtest clock.
 ## Headless tests opt in with `_live_f5_equiv_clock` / EOA_LIVE_F5_EQUIV=1.
+## Any windowed DisplayServer is live F5 — do not require is_interactive_light_sim()
+## (that return papered over llvmpipe Play when a CA only set the equiv flag).
 func is_live_f5_play_path() -> bool:
 	if _live_f5_equiv_clock:
 		return true
@@ -710,7 +756,7 @@ func is_live_f5_play_path() -> bool:
 		return false
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
 		return false
-	return is_interactive_light_sim()
+	return true
 
 
 ## Called by real-time timers (e.g. TopInfoBar) to advance simulation based on wall time.

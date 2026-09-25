@@ -53,6 +53,7 @@ const _TerrainTiles = preload("res://scripts/map/TerrainTileLibrary.gd")
 # Dynamically created infrastructure investment UI (MVP — matches engineers button pattern)
 var _btn_invest_infra: Button = null
 var _btn_build_road_spine: Button = null
+var _ix1_reveal_busy: bool = false
 var _btn_develop_resource: Button = null
 var _label_invest_status: Label = null
 var _progress_invest: ProgressBar = null
@@ -844,13 +845,16 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 	_legend_tracked_day = day
 	_legend_tracked_month = month
 	_legend_tracked_year = year
-	# Interactive 1x: never repaint fills on the day tick (even deferred queue) — month only.
-	var light := (
+	# Interactive 1x / live F5 softpipe: never repaint fills on the day tick — month only.
+	# is_live_f5_play_path covers windowed DisplayServer even if light_sim is somehow false.
+	var live_or_light := (
 		typeof(TimeManager) != TYPE_NIL
-		and TimeManager.has_method("is_interactive_light_sim")
-		and bool(TimeManager.is_interactive_light_sim())
+		and (
+			(TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()))
+			or (TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()))
+		)
 	)
-	if not light:
+	if not live_or_light:
 		_refresh_province_fill_colors()
 	_refresh_map_time_ui()
 	var open_n := _sync_land_battle_bubbles()
@@ -872,7 +876,7 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 				_play_map_sfx("achievement" if str(aar.get("winner", "")) == "attacker" else "map")
 	# Pass 17: live-update airfield repair rings without full province rebuild.
 	# Live F5 / softpipe: walking 3520 province_nodes on every day_emit wedges the clock.
-	if not light:
+	if not live_or_light:
 		call_deferred("_refresh_feature_progress_rings")
 	# Pass 22: refresh repair queue chip list on day advance.
 	if _repair_queue_chip != null and is_instance_valid(_repair_queue_chip) and _repair_queue_chip.visible:
@@ -889,19 +893,23 @@ func _on_game_day_advanced_legend(year: int, month: int, day: int) -> void:
 		if _map_minimap.has_method("invalidate_munitions_cache"):
 			_map_minimap.call_deferred("invalidate_munitions_cache")
 	# Pass 25: sample multi-day risk history for active compare paths.
-	_sample_route_risk_day_history()
+	# Live F5 / softpipe: skip path-risk walks on the hour/day emit (clock at 00:00).
+	if not live_or_light:
+		_sample_route_risk_day_history()
 
 
 func _on_time_advanced_refresh_legend(_a: Variant = null, _b: Variant = null) -> void:
 	_note_time_boundary_for_legend(_b != null)
 	_refresh_map_time_ui()
-	var light := (
+	var live_or_light := (
 		typeof(TimeManager) != TYPE_NIL
-		and TimeManager.has_method("is_interactive_light_sim")
-		and bool(TimeManager.is_interactive_light_sim())
+		and (
+			(TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()))
+			or (TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()))
+		)
 	)
 	# Month boundary: one deferred fill is enough; never sync-paint inside the tick.
-	if light:
+	if live_or_light:
 		call_deferred("_refresh_province_fill_colors")
 	else:
 		_refresh_province_fill_colors()
@@ -19607,20 +19615,23 @@ func _ix1_should_show_spine_button(province: Province) -> bool:
 
 func _reveal_ix1_road_spine_on_inspector(province: Province, reset_scroll: bool = true) -> void:
 	# Live-facing: Build Road Spine must be visible+startable after Search Köln/Cologne+Go.
-	if province == null:
+	# Re-entrancy: show_info_panel already laid out; a second inner layout + header_h
+	# change was a softpipe resize-storm suspect after the spine-pin CA.
+	if province == null or _ix1_reveal_busy:
 		return
+	_ix1_reveal_busy = true
 	_ensure_road_spine_button()
 	_update_road_spine_button(province)
-	_prepend_ix1_spine_build_row(province)
+	if _ix1_should_show_spine_button(province):
+		_prepend_ix1_spine_build_row(province)
 	if reset_scroll and info_panel is Control:
 		var scroll := (info_panel as Control).get_node_or_null("InfoScroll") as ScrollContainer
 		if scroll != null:
 			scroll.scroll_vertical = 0
 			scroll.scroll_horizontal = 0
 	_layout_road_spine_chrome_button()
-	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
-		_layout_info_panel_inner()
 	_raise_province_inspector_over_unit_card()
+	_ix1_reveal_busy = false
 
 
 func _prepend_ix1_spine_build_row(province: Province) -> void:
@@ -24732,13 +24743,11 @@ func _on_feature_ring_clicked(province_id: int) -> void:
 func _refresh_feature_progress_rings() -> void:
 	if province_nodes.is_empty():
 		return
-	var light := (
-		typeof(TimeManager) != TYPE_NIL
-		and TimeManager.has_method("is_interactive_light_sim")
-		and bool(TimeManager.is_interactive_light_sim())
-	)
-	if light:
-		return
+	if typeof(TimeManager) != TYPE_NIL:
+		if TimeManager.has_method("is_live_f5_play_path") and bool(TimeManager.is_live_f5_play_path()):
+			return
+		if TimeManager.has_method("is_interactive_light_sim") and bool(TimeManager.is_interactive_light_sim()):
+			return
 	for pid_v in province_nodes.keys():
 		var node: Node2D = province_nodes[pid_v] as Node2D
 		if node == null or not is_instance_valid(node):

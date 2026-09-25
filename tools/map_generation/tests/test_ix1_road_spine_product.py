@@ -146,6 +146,9 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertNotIn("pick_full_board_scan", tick.get("missing") or [])
         self.assertNotIn("graphical_play_gate", tick.get("missing") or [])
         self.assertNotIn("live_equiv_past_plus6", tick.get("missing") or [])
+        self.assertNotIn("live_equiv_past_hour_plus6", tick.get("missing") or [])
+        self.assertNotIn("live_f5_depends_on_light_sim", tick.get("missing") or [])
+        self.assertNotIn("day_emit_live_f5", tick.get("missing") or [])
         self.assertNotIn("live_f5_autosave_skip", tick.get("missing") or [])
 
 

@@ -1254,6 +1254,10 @@ func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
 		TimeManager.set("_live_f5_equiv_clock", was_equiv)
 	var mem0 := int(OS.get_static_memory_usage())
 	var t0 := Time.get_ticks_msec()
+	var hour_clock: Dictionary = {}
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_live_f5_equivalent_hours"):
+		# TopInfoBar path — headless advance_days alone cannot catch a 00:00 softpipe wedge.
+		hour_clock = TimeManager.call("advance_live_f5_equivalent_hours", 8)
 	var clock: Dictionary = {}
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_live_f5_equivalent_days"):
 		clock = TimeManager.call("advance_live_f5_equivalent_days", n)
@@ -1274,12 +1278,16 @@ func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
 	var consider_calls := _full_board_ai_invest_calls
 	var past_plus2 := elapsed_delta >= mini(n, 3)
 	var past_plus6 := elapsed_delta >= mini(n, 7)
+	var past_hour_plus6 := bool(hour_clock.get("past_hour_plus6", false))
+	var hour_delta := int(hour_clock.get("hour_delta", 0))
+	if hour_clock.is_empty():
+		past_hour_plus6 = false
 	var autosave_gathers := 0
 	var autosave_skips := 0
 	if sl != null:
 		autosave_gathers = int(sl.get("_calendar_autosave_gathers"))
 		autosave_skips = int(sl.get("_calendar_autosave_live_f5_skips"))
-	var ms_budget := 12000 if n >= 7 else 8000
+	var ms_budget := 16000 if n >= 7 else 8000
 	var mem_budget := 48 * 1024 * 1024
 	var ok := (
 		elapsed_delta >= n
@@ -1287,6 +1295,7 @@ func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
 		and not gate_on
 		and past_plus2
 		and past_plus6
+		and past_hour_plus6
 		and autosave_gathers == 0
 		and mem_delta <= mem_budget
 		and ms <= ms_budget
@@ -1297,6 +1306,9 @@ func simulate_live_f5_day_advance(days: int = 8) -> Dictionary:
 		"elapsed_delta": elapsed_delta,
 		"past_plus2": past_plus2,
 		"past_plus6": past_plus6,
+		"past_hour_plus6": past_hour_plus6,
+		"hour_delta": hour_delta,
+		"hour_clock": hour_clock,
 		"full_board_ai_invest": gate_on,
 		"full_board_ai_invest_calls": consider_calls,
 		"provinces_considered": _ai_infra_provinces_considered,

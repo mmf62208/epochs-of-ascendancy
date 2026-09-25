@@ -436,12 +436,27 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("selected_only_inspector")
     if "is_interactive_light_sim" not in rings:
         missing.append("ring_walk_gated")
+    if "is_live_f5_play_path" not in rings:
+        missing.append("ring_walk_live_f5")
+    day_emit = _slice_func(ren, "_on_game_day_advanced_legend")
+    if "is_live_f5_play_path" not in day_emit:
+        missing.append("day_emit_live_f5")
+    live_path = _slice_func(tm, "is_live_f5_play_path")
+    if "DisplayServer.get_name()" not in live_path:
+        missing.append("live_f5_displayserver")
+    if "return is_interactive_light_sim()" in live_path:
+        missing.append("live_f5_depends_on_light_sim")
+    hour_clock = _slice_func(tm, "advance_live_f5_equivalent_hours")
+    if "advance_real_time" not in hour_clock:
+        missing.append("live_equiv_hour_clock")
     if "_deferred_calendar_autosave" not in save:
         missing.append("deferred_autosave")
     if "past_freeze" not in sim or "advance_living_playtest_days" not in sim:
         missing.append("simulate_ix1_spine_days")
     if "advance_live_f5_equivalent_days" not in live_sim or "past_plus2" not in live_sim:
         missing.append("simulate_live_f5_day_advance")
+    if "advance_live_f5_equivalent_hours" not in live_sim or "past_hour_plus6" not in live_sim:
+        missing.append("live_equiv_past_hour_plus6")
     if "past_plus6" not in live_sim or "calendar_autosave_gathers" not in live_sim:
         missing.append("live_equiv_past_plus6")
     if "_living_playtest_clock = true" in live_clock:
@@ -452,6 +467,8 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("live_equiv_harness")
     if "past_plus6" not in harness or "calendar_autosave_gathers" not in harness:
         missing.append("live_equiv_plus6_harness")
+    if "past_hour_plus6" not in harness:
+        missing.append("live_equiv_hour_harness")
     save_hook = _slice_func(save, "_on_day_advanced_for_autosave")
     if "is_live_f5_play_path" not in save_hook and "_should_skip_live_f5_calendar_autosave" not in save_hook:
         missing.append("live_f5_autosave_skip")

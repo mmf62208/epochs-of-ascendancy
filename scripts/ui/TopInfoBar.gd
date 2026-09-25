@@ -53,6 +53,9 @@ var _sim_tick_busy: bool = false
 var _sim_tick_busy_since_msec: int = 0
 const SIM_TICK_INTERVAL_MS := 1000
 const SIM_TICK_BUSY_WATCHDOG_MS := 8000
+## After 1x/Space, softpipe must leave 1 Jan 00:00. Force one hour if the first tick was lost.
+const LIVE_CLOCK_00_WATCHDOG_MS := 2000
+var _clock_unpause_msec: int = 0
 
 ## Layout breakpoints (viewport width). Secondary screens always live in More ▾ for usability.
 const WIDTH_COMPACT := 1400
@@ -123,6 +126,7 @@ func _ready() -> void:
 	# double-scales day advance when both Engine and TimeManager scale are applied.
 	_last_sim_tick_msec = Time.get_ticks_msec()
 	set_process(true)
+	set_process_input(true)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 
 	if get_viewport():
@@ -734,6 +738,25 @@ func _process(_delta: float) -> void:
 	):
 		TimeManager.set_paused(false)
 		TimeManager.set_time_scale(float(current_speed))
+	if (
+		not is_paused
+		and has_meta("player_owns_clock")
+		and bool(get_meta("player_owns_clock"))
+		and _clock_unpause_msec > 0
+		and now - _clock_unpause_msec >= LIVE_CLOCK_00_WATCHDOG_MS
+		and typeof(TimeManager) != TYPE_NIL
+		and int(TimeManager.current_hour) == 0
+		and int(TimeManager.total_days_elapsed) == 0
+	):
+		# Live softpipe: first hour never left 00:00 (busy latch / lost deferred tick).
+		_sim_tick_busy = false
+		_sim_tick_busy_since_msec = 0
+		if TimeManager.has_method("set_paused"):
+			TimeManager.set_paused(false)
+		_on_tick()
+		_clock_unpause_msec = 0
+		_last_sim_tick_msec = Time.get_ticks_msec()
+		return
 	if is_paused or _sim_tick_busy:
 		return
 	if _last_sim_tick_msec <= 0:
@@ -781,11 +804,36 @@ func _update_direction() -> void:
 	pass
 
 
+func _search_line_owns_typed_keys() -> bool:
+	var vp: Viewport = get_viewport()
+	if vp == null:
+		return false
+	var fo: Control = vp.gui_get_focus_owner()
+	if not (fo is LineEdit):
+		return false
+	# Empty Search leftover after Begin must not swallow Space.
+	return not str((fo as LineEdit).text).is_empty()
+
+
+func _input(event: InputEvent) -> void:
+	# Live F5: Search LineEdit focus makes Space/_unhandled_input a no-op.
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	var key: InputEventKey = event
+	if key.keycode == KEY_SPACE or key.keycode == KEY_PERIOD:
+		if _search_line_owns_typed_keys():
+			return
+		_on_pause_pressed()
+		get_viewport().set_input_as_handled()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if not (event is InputEventKey and event.pressed and not event.echo):
 		return
 	# Space / > : toggle pause (fallback if 1x click is blocked by an overlay)
 	if event.keycode == KEY_SPACE or event.keycode == KEY_PERIOD:
+		if _search_line_owns_typed_keys():
+			return
 		_on_pause_pressed()
 		get_viewport().set_input_as_handled()
 		return
@@ -891,6 +939,7 @@ func _set_game_speed(speed: int) -> void:
 	# Defer first day so this click returns immediately (hover/scroll stay live).
 	# Immediate advance_days() was freezing the main thread for multiple seconds.
 	_last_sim_tick_msec = 0  # force next _process to fire soon
+	_clock_unpause_msec = Time.get_ticks_msec()
 	call_deferred("_deferred_first_day_step")
 	print("TopInfoBar: SPEED %dx (unpaused) — clock running" % current_speed)
 
@@ -930,6 +979,7 @@ func _on_pause_pressed() -> void:
 	_update_date_time()
 	if not is_paused:
 		_last_sim_tick_msec = 0
+		_clock_unpause_msec = Time.get_ticks_msec()
 		call_deferred("_deferred_first_day_step")
 	print("TopInfoBar: %s (speed %dx)" % ["PAUSED" if is_paused else "RESUMED", current_speed])
 

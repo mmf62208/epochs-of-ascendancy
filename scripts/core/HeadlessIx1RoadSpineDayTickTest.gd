@@ -12,7 +12,7 @@ const SRC_SAVE := "res://scripts/autoload/SaveLoadManager.gd"
 const SRC_TM := "res://scripts/autoload/TimeManager.gd"
 const HUB_ID := 710417
 const FREEZE_PROGRESS := 20.0
-const LIVE_DAY_BUDGET_MS := 12000
+const LIVE_DAY_BUDGET_MS := 18000
 const LIVE_SOAK_DAYS := 8
 
 var _failures := 0
@@ -125,6 +125,9 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 	if sim.is_empty() or "advance_live_f5_equivalent_days" not in sim:
 		_fail("simulate_live_f5_day_advance must drive live-equiv days (not playtest clock)")
 		return
+	if "advance_live_f5_equivalent_hours" not in sim or "past_hour_plus6" not in sim:
+		_fail("simulate_live_f5_day_advance must drive TopInfoBar hour clock (not days-only)")
+		return
 	if "past_plus6" not in sim or "calendar_autosave_gathers" not in sim:
 		_fail("simulate_live_f5_day_advance must prove past +6 and skip calendar autosave")
 		return
@@ -139,11 +142,29 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 	if "_live_f5_equiv_clock = true" not in live:
 		_fail("advance_live_f5_equivalent_days must set _live_f5_equiv_clock")
 		return
+	var hours := _slice_func(tm, "advance_live_f5_equivalent_hours")
+	if hours.is_empty() or "advance_real_time" not in hours:
+		_fail("advance_live_f5_equivalent_hours must drive advance_real_time (TopInfoBar path)")
+		return
+	var live_path := _slice_func(tm, "is_live_f5_play_path")
+	if "DisplayServer.get_name()" not in live_path:
+		_fail("is_live_f5_play_path must use DisplayServer (windowed Play, not equiv-flag only)")
+		return
+	if "return is_interactive_light_sim()" in live_path:
+		_fail("is_live_f5_play_path must not defer to light_sim (headless-only paper-over)")
+		return
 	var rings := _slice_func(_read(SRC_REN), "_refresh_feature_progress_rings")
 	if "is_interactive_light_sim" not in rings:
 		_fail("feature-ring day walk must early-out on F5 light sim")
 		return
-	_pass("live F5 path cannot full-board AI scan; toast quiet; ring walk gated")
+	if "is_live_f5_play_path" not in rings:
+		_fail("feature-ring day walk must early-out on is_live_f5_play_path")
+		return
+	var day_emit := _slice_func(_read(SRC_REN), "_on_game_day_advanced_legend")
+	if "is_live_f5_play_path" not in day_emit:
+		_fail("MapRenderer day_emit must gate on is_live_f5_play_path (DisplayServer Play)")
+		return
+	_pass("live F5 path cannot full-board AI scan; toast quiet; ring/day_emit/hour clock gated")
 
 
 func _test_source_progress_does_not_renotify() -> void:
@@ -257,6 +278,9 @@ func _test_live_f5_equivalent_day_advance() -> void:
 	if not bool(result.get("past_plus6", false)):
 		_fail("live-F5-equiv did not prove past day +6: %s" % str(result))
 		return
+	if not bool(result.get("past_hour_plus6", false)):
+		_fail("live-F5-equiv did not prove TopInfoBar hour clock past +6: %s" % str(result))
+		return
 	if consider != 0:
 		_fail("full-board ai_consider_daily_invests ran %d times on live-equiv path" % consider)
 		return
@@ -279,7 +303,7 @@ func _test_live_f5_equivalent_day_advance() -> void:
 		_fail("live-equiv result must not claim living_playtest_clock")
 		return
 	_pass(
-		"live-F5-equiv +%dd past+6 consider=%d pick=%d autosave=0 mem=%d (%dms)"
+		"live-F5-equiv +%dd past+6 hour+6 consider=%d pick=%d autosave=0 mem=%d (%dms)"
 		% [elapsed, consider, considered, mem_delta, ms]
 	)
 
