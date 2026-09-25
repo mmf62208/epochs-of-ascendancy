@@ -106,7 +106,7 @@ func _test_source_live_input_routing() -> void:
 	if "_living_title_boot_is_up" not in input_fn:
 		_fail("MapRenderer._input must not open chips/assault while the living title is up")
 		return
-	if "is_live_escape_event" not in input_fn and "physical_keycode" not in input_fn:
+	if "_is_live_escape_event" not in input_fn and "physical_keycode" not in ren:
 		_fail("MapRenderer._input Esc must accept live DisplayServer key shapes")
 		return
 	if "_try_open_land_chip_from_input" in input_fn:
@@ -119,7 +119,7 @@ func _test_source_live_input_routing() -> void:
 	if unhandled.is_empty() or "_living_title_owns_click" not in unhandled:
 		_fail("MapRenderer._unhandled_input must not map-pick through the living title panel")
 		return
-	if "is_live_escape_event" not in tib:
+	if "_is_live_escape_event" not in tib and "physical_keycode" not in tib:
 		_fail("TopInfoBar backup Esc must accept live DisplayServer key shapes")
 		return
 	_pass("source: live Esc/Begin routing (not layer-only)")

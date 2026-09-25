@@ -1646,6 +1646,22 @@ func _living_title_owns_click() -> bool:
 	return false
 
 
+func _is_live_escape_event(event: InputEvent) -> bool:
+	# Live DisplayServer: keycode, physical_keycode, or ui_cancel (Play d18cbae).
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+	if event != null and event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
 func _route_living_title_escape() -> void:
 	var tree_e: SceneTree = get_tree()
 	if tree_e != null and tree_e.root != null:
@@ -1826,7 +1842,7 @@ func _input(event: InputEvent) -> void:
 	# Esc / I / Home must beat GUI focus (search LineEdit) so a stuck inspector cannot eat keys.
 	if event is InputEventKey and event.pressed and not event.echo:
 		# Search / any LineEdit: do not steal letters (Play: typing "i" fired I-glyphs).
-		if _gui_text_field_has_focus() and not LivingTitleBoot.is_live_escape_event(event) and event.keycode != KEY_ESCAPE:
+		if _gui_text_field_has_focus() and not _is_live_escape_event(event) and event.keycode != KEY_ESCAPE:
 			return
 		if event.keycode == KEY_HOME:
 			_apply_home_key(event.shift_pressed)
@@ -1887,7 +1903,7 @@ func _input(event: InputEvent) -> void:
 				set_map_mode("resources")
 			get_viewport().set_input_as_handled()
 			return
-		if LivingTitleBoot.is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
+		if _is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 			# Full Esc chain in `_input` (Home-key pattern) so search/GUI cannot
 			# swallow idle Esc after inspector close (play: Esc closed inspector,
 			# next idle Esc never opened Command Center).
@@ -2112,10 +2128,10 @@ func _wheel_should_zoom_map() -> bool:
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
-		if _gui_text_field_has_focus() and not LivingTitleBoot.is_live_escape_event(event) and event.keycode != KEY_ESCAPE:
+		if _gui_text_field_has_focus() and not _is_live_escape_event(event) and event.keycode != KEY_ESCAPE:
 			return
 		# Esc: dismiss stuck overlays (legend / tech / info) so playtest is never trapped.
-		if LivingTitleBoot.is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
+		if _is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 			# Backup if `_input` did not run. Same chain: dismiss then idle `_on_menu_pressed`.
 			_handle_escape_key()
 			get_viewport().set_input_as_handled()

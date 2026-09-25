@@ -441,11 +441,24 @@ func _grab_live_focus() -> void:
 		win.grab_focus()
 
 
+func _find_top_info_bar(tree: SceneTree) -> Node:
+	# Name/group only — do not reference TopInfoBar class_name ( -s harness parse).
+	if tree == null:
+		return null
+	var from_group: Node = tree.get_first_node_in_group("top_info_bar")
+	if from_group != null:
+		return from_group
+	if tree.root == null:
+		return null
+	var nested: Node = tree.root.find_child("TopInfoBar", true, false)
+	return nested
+
+
 func _open_command_center_from_title() -> bool:
 	var tree: SceneTree = get_tree()
 	if tree == null:
 		return false
-	var tib: Node = TopInfoBar.find_in_tree(tree)
+	var tib: Node = _find_top_info_bar(tree)
 	if tib != null and tib.has_method("_on_menu_pressed"):
 		# Deferred so this Esc cannot _force_close the new overlay.
 		tib.call_deferred("_on_menu_pressed")

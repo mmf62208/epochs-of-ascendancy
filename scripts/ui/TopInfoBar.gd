@@ -826,6 +826,22 @@ func _update_direction() -> void:
 	pass
 
 
+func _is_live_escape_event(event: InputEvent) -> bool:
+	# Live DisplayServer: keycode, physical_keycode, or ui_cancel (Play d18cbae).
+	if event is InputEventAction:
+		var act: InputEventAction = event
+		return bool(act.pressed) and str(act.action) == "ui_cancel"
+	if event is InputEventKey:
+		var key: InputEventKey = event
+		if not key.pressed or key.echo:
+			return false
+		if key.keycode == KEY_ESCAPE or key.physical_keycode == KEY_ESCAPE:
+			return true
+	if event != null and event.is_action_pressed("ui_cancel"):
+		return true
+	return false
+
+
 func _search_line_owns_typed_keys() -> bool:
 	var vp: Viewport = get_viewport()
 	if vp == null:
@@ -928,7 +944,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			print("Ctrl+L QuickLoad triggered")
 		get_viewport().set_input_as_handled()
 		return
-	if LivingTitleBoot.is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
+	if _is_live_escape_event(event) or event.keycode == KEY_ESCAPE:
 		# Backup: MapRenderer `_input` owns the Esc stack (dismiss then idle CC).
 		# Do not queue_free MainMenu here — `_on_menu_pressed` toggles Command Center.
 		# Live DisplayServer may deliver physical_keycode / ui_cancel instead of keycode.
