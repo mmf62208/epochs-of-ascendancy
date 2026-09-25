@@ -86,12 +86,21 @@ func _ensure_toast_layer() -> void:
 ## Simple toast for save/menu/system feedback (non-news).
 # Enhanced for important messages (toasts first): Always has close/dismiss X. For is_important, adds "Respond" button (e.g. opens PolicyLawScreen or launches dialogue for welfare/crisis choices).
 # Clean, interactive, fun: Player informed immediately, can dismiss or act on cultural war / policy decisions.
+func _eoa_flush(msg: String) -> void:
+	print(msg)
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+
+
 func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = false, is_important: bool = false, on_respond: Callable = Callable()) -> void:
 	# Same skip as post_news: headless -s toast timers + CanvasLayer hung
 	# CompleteTest after spine 91% (and Maginot after RESULT=PASS).
+	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.enter")
 	if _should_skip_toast_ui():
+		_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.skip")
 		return
 	_ensure_toast_layer()
+	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.after_ensure")
 	var entry := {
 		"title": "Notice" if not is_error else "Error",
 		"body": message,
@@ -222,12 +231,28 @@ func show_toast(message: String, duration_sec: float = 3.0, is_error: bool = fal
 
 	panel.mouse_filter = Control.MOUSE_FILTER_STOP
 	_toast_container.add_child(panel)
+	_eoa_flush(
+		"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.before_trim n=%d"
+		% _toast_container.get_child_count()
+	)
 	_trim_live_f5_toast_stack()
+	_eoa_flush(
+		"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.after_trim n=%d"
+		% _toast_container.get_child_count()
+	)
+	var trim_guard := 0
 	while _toast_container.get_child_count() > 4:
+		if trim_guard == 0:
+			_eoa_flush(
+				"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.cap4_iter0 n=%d"
+				% _toast_container.get_child_count()
+			)
 		_dismiss_toast(_toast_container.get_child(0) as PanelContainer)
+		trim_guard += 1
 
 	var timer := get_tree().create_timer(maxf(1.0, duration_sec))
 	timer.timeout.connect(_on_toast_timer_expired.bind(panel), CONNECT_ONE_SHOT)
+	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI.show_toast.exit")
 
 
 func post_news(title: String, body: String, category: String = "general") -> void:
@@ -283,9 +308,23 @@ func _should_coalesce_live_f5_combat_toast(category: String) -> bool:
 
 func _trim_live_f5_toast_stack() -> void:
 	if _toast_container == null or not _live_f5_toast_path():
+		_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.skip")
 		return
+	var n0: int = _toast_container.get_child_count()
+	_eoa_flush("EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.enter n=%d" % n0)
+	var iter := 0
 	while _toast_container.get_child_count() > 2:
+		if iter == 0:
+			_eoa_flush(
+				"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.iter0 n=%d"
+				% _toast_container.get_child_count()
+			)
 		_dismiss_toast(_toast_container.get_child(0) as PanelContainer)
+		iter += 1
+	_eoa_flush(
+		"EOA_SMOKE_SPINE_BISECT who=LeaderEventUI._trim_live_f5_toast_stack.exit n=%d iters=%d"
+		% [_toast_container.get_child_count(), iter]
+	)
 
 
 func live_f5_toast_stack_cannot_steal_top_bar() -> bool:

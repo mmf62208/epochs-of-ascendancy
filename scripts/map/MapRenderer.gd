@@ -20469,14 +20469,19 @@ func _on_build_road_spine_pressed() -> void:
 		# focus_province_by_id defaulted to tactical 2.4 and the process died
 		# before the player saw start feedback.
 		_apply_spine_building_button_state(pid, 0, eta)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.button.after_apply pid=%d" % pid)
 		_show_inspector_toast("Road spine started in %s · ETA %d days" % [pname, eta], 3.0)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.button.after_inspector_toast pid=%d" % pid)
 		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 			LeaderEventUI.show_toast("Road spine started in %s · ETA %d days" % [pname, eta], 3.5)
+			eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.button.after_leader_toast pid=%d" % pid)
 		_play_map_sfx("confirm")
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.button.after_sfx pid=%d" % pid)
 		# Windowed 9ebd17f: show_info_panel + preview _draw flushed the canvas
 		# on this frame (toast/Building… never painted; RSS climbed to OOM).
 		# Paint UI first; soft-pan after the next idle frame.
 		call_deferred("_ix1_spine_start_after_first_frame", pid)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.button.after_deferred pid=%d" % pid)
 	else:
 		_show_inspector_toast(str(result.get("reason", "Cannot start road spine")), 3.5, true)
 		_play_map_sfx("error")
@@ -20484,11 +20489,53 @@ func _on_build_road_spine_pressed() -> void:
 
 func _ix1_spine_start_after_first_frame(pid: int) -> void:
 	# Runs after toast + Building… have had one frame. Soft pan only.
+	eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.after_frame.enter pid=%d" % pid)
 	if provinces.has(pid):
 		show_info_panel(provinces[pid])
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.after_frame.after_show_info_panel pid=%d" % pid)
 		var eta_defer := int(_ix1_last_spine_press.get("eta_days", 35))
 		_apply_spine_building_button_state(pid, 0, eta_defer)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.after_frame.after_apply pid=%d" % pid)
 	focus_province_by_id(pid, "soft")
+	eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.after_frame.after_soft_pan pid=%d" % pid)
+
+
+func deliver_ix1_spine_button_mouse_press() -> Dictionary:
+	# Smoke / frame-guard only. Synthesize a left-click and deliver it to the
+	# live Build Road Spine button through the viewport — same MapRenderer.button
+	# handler Play hits. Never call try_start_road_spine or
+	# press_build_road_spine_from_live_ui from here.
+	if _btn_build_road_spine == null or not is_instance_valid(_btn_build_road_spine):
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.deliver_mouse reason=no_button")
+		return {"ok": false, "reason": "no_button"}
+	var btn: Button = _btn_build_road_spine
+	btn.visible = true
+	_layout_road_spine_chrome_button()
+	var rect: Rect2 = btn.get_global_rect()
+	var pos: Vector2 = rect.get_center()
+	var vp: Viewport = btn.get_viewport()
+	if vp == null:
+		vp = get_viewport()
+	if vp == null:
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.deliver_mouse reason=no_viewport")
+		return {"ok": false, "reason": "no_viewport"}
+	eoa_log_flush(
+		"EOA_SMOKE_SPINE_BISECT who=MapRenderer.deliver_mouse pos=%.1f,%.1f w=%.0f h=%.0f"
+		% [pos.x, pos.y, rect.size.x, rect.size.y]
+	)
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.warp_mouse(Vector2i(int(round(pos.x)), int(round(pos.y))))
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.position = pos
+	ev.global_position = pos
+	vp.push_input(ev, true)
+	# Also deliver the same mouse event onto the button's gui_input so a
+	# missed viewport hit still runs MapRenderer.button — not the spine API.
+	btn.gui_input.emit(ev)
+	eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer.deliver_mouse pushed=1")
+	return {"ok": true, "reason": "viewport_mouse", "pos": pos}
 
 
 func press_build_road_spine_from_live_ui() -> Dictionary:
@@ -20783,10 +20830,13 @@ func _on_infra_cancelled_for_inspector(pid: int, reason: String) -> void:
 
 
 func _show_inspector_toast(message: String, duration: float = 2.5, is_error: bool = false) -> void:
+	eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer._show_inspector_toast.enter")
 	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 		LeaderEventUI.show_toast(message, duration, is_error)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer._show_inspector_toast.after_show_toast")
 	else:
 		print(message)
+		eoa_log_flush("EOA_SMOKE_SPINE_BISECT who=MapRenderer._show_inspector_toast.print_only")
 
 
 ## Select flair: short toast + sfx from pure formatter (damage/HH context when present).

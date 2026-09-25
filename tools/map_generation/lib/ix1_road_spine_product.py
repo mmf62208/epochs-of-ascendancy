@@ -960,11 +960,21 @@ def ix1_spine_complete_zoom_gate() -> Dict[str, Any]:
         missing.append("preview_hub_local")
     if "MAX_RAIL_TIES_PER_EDGE" not in ol:
         missing.append("rail_tie_cap")
-    guard = _read(ROOT / "scripts" / "core" / "WindowedIx1SpineFrameGuard.gd")
-    if "EOA_SMOKE_FRAME_GUARD" not in guard:
-        missing.append("windowed_frame_guard")
-    if "EOA_SMOKE_FRAME_GUARD" not in _read(ROOT / "tools" / "eoa_ix1_spine_frame_guard.sh"):
+    guard_sh = _read(ROOT / "tools" / "eoa_ix1_spine_frame_guard.sh")
+    if "EOA_SMOKE_FRAME_GUARD" not in guard_sh:
         missing.append("windowed_frame_guard_sh")
+    if "eoa_play_f5_smoke_auto_begin.sh" not in guard_sh:
+        missing.append("frame_guard_play_launch")
+    if "deliver_ix1_spine_button_mouse_press" not in ren:
+        missing.append("frame_guard_real_button_input")
+    if "push_input" not in _slice_func(ren, "deliver_ix1_spine_button_mouse_press"):
+        missing.append("frame_guard_viewport_mouse")
+    if "press_build_road_spine_from_live_ui()" in _slice_func(ren, "deliver_ix1_spine_button_mouse_press"):
+        missing.append("frame_guard_helper_call")
+    if "try_start_road_spine" in _slice_func(ren, "deliver_ix1_spine_button_mouse_press"):
+        missing.append("frame_guard_direct_spine_api")
+    if "_maybe_start_ix1_frame_guard" not in tr:
+        missing.append("frame_guard_testrunner")
     if "visual_states" not in idm or "queued" not in complete:
         missing.append("three_state_assert")
     if "func _quit_logged" not in tr or "EOA_HARNESS_QUIT" not in tr:

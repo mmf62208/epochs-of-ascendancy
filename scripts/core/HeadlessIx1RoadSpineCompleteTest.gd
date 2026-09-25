@@ -204,10 +204,19 @@ func _test_source_preview_loop_caps() -> void:
 	if "position = hub_c" not in ol and "position = hub" not in ol:
 		_fail("preview must draw hub-local (not absolute GIS cents)")
 		return
-	if "EOA_SMOKE_FRAME_GUARD" not in _read("res://scripts/core/WindowedIx1SpineFrameGuard.gd"):
-		_fail("windowed frame/RSS guard missing")
+	var sh := _read("res://tools/eoa_ix1_spine_frame_guard.sh")
+	if "EOA_SMOKE_FRAME_GUARD" not in sh or "eoa_play_f5_smoke_auto_begin.sh" not in sh:
+		_fail("frame guard must launch via eoa_play_f5_smoke_auto_begin.sh")
 		return
-	_pass("preview loops are hard-capped + hub-local; windowed guard shipped")
+	var ren := _read("res://scripts/map/MapRenderer.gd")
+	var deliver := _slice_func(ren, "deliver_ix1_spine_button_mouse_press")
+	if deliver.is_empty() or "push_input" not in deliver:
+		_fail("frame guard must deliver InputEventMouseButton through the viewport")
+		return
+	if "press_build_road_spine_from_live_ui()" in deliver or "try_start_road_spine" in deliver:
+		_fail("viewport mouse press must not call the spine helper/API")
+		return
+	_pass("preview loops are hard-capped + hub-local; Play-launch viewport mouse guard shipped")
 
 
 func _test_source_harness_quit_logged() -> void:

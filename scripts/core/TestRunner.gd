@@ -725,7 +725,7 @@ func _quit_logged(code: int, reason: String) -> void:
 	var stay := false
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("smoke_advance_should_stay_alive"):
 		stay = bool(TimeManager.call("smoke_advance_should_stay_alive"))
-	if stay and not reason.begins_with("ui_smoke") and reason != "unit_order_qa" and not reason.begins_with("feb_clock"):
+	if stay and not reason.begins_with("ui_smoke") and reason != "unit_order_qa" and not reason.begins_with("feb_clock") and not reason.begins_with("ix1_frame_guard"):
 		print("EOA_HARNESS_QUIT who=TestRunner suppressed stay_alive=1 reason=%s (Search/spine window; NOT product clock PASS)" % reason)
 		if OS.has_method("flush_stdout"):
 			OS.call("flush_stdout")
@@ -739,6 +739,7 @@ func _process(_delta: float) -> void:
 	var boot: Node = get_node_or_null("LivingTitleBoot")
 	if boot == null or not is_instance_valid(boot) or bool(boot.get("_closed")):
 		_maybe_smoke_advance_past_plus6(_delta)
+		_tick_smoke_ix1_frame_guard(_delta)
 		return
 	# Play 6573d01 backup: if the flag is set and title._ready deferred missed.
 	if not has_meta("eoa_smoke_auto_begin_tried"):
@@ -961,6 +962,7 @@ func _finish_smoke_advance_after_hatch(out: Dictionary) -> void:
 	_restore_live_search_chrome_after_stay_alive("after_hatch")
 	call_deferred("_smoke_search_chrome_sticky_after_reflow")
 	call_deferred("_smoke_stay_alive_heartbeat")
+	call_deferred("_maybe_start_ix1_frame_guard")
 
 
 func _smoke_should_gate_post_hatch_heavy() -> bool:
@@ -1056,6 +1058,104 @@ func _restore_live_search_chrome_after_stay_alive(who: String) -> void:
 			"1" if live_ok else "0",
 		]
 	)
+
+
+func _eoa_flush(msg: String) -> void:
+	print(msg)
+	if OS.has_method("flush_stdout"):
+		OS.call("flush_stdout")
+
+
+func _smoke_frame_guard_wanted() -> bool:
+	return OS.get_environment("EOA_SMOKE_FRAME_GUARD").strip_edges() == "1"
+
+
+func _maybe_start_ix1_frame_guard() -> void:
+	if not _smoke_frame_guard_wanted():
+		return
+	if has_meta("eoa_smoke_frame_guard_started"):
+		return
+	if not has_meta("eoa_smoke_advance_done"):
+		return
+	set_meta("eoa_smoke_frame_guard_started", true)
+	_eoa_flush("EOA_SMOKE_FRAME_GUARD who=TestRunner.start_after_stayalive (Play launch + viewport mouse; NOT product Begin/Esc/clock PASS)")
+	call_deferred("_smoke_ix1_frame_guard_open_and_press")
+
+
+func _smoke_ix1_frame_guard_open_and_press() -> void:
+	# Same Köln inspector Play had open, then a real mouse event on the button.
+	_eoa_flush("EOA_SMOKE_FRAME_GUARD who=TestRunner.open_koln pid=710417")
+	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("open_province_inspector_from_search"):
+		map_renderer.call("open_province_inspector_from_search", 710417)
+	_eoa_flush("EOA_SMOKE_FRAME_GUARD who=TestRunner.koln_open")
+	call_deferred("_smoke_ix1_frame_guard_press")
+
+
+func _smoke_ix1_frame_guard_press() -> void:
+	_eoa_flush("EOA_SMOKE_FRAME_GUARD who=TestRunner.mouse_press")
+	var report: Dictionary = {}
+	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("deliver_ix1_spine_button_mouse_press"):
+		report = map_renderer.call("deliver_ix1_spine_button_mouse_press") as Dictionary
+	_eoa_flush(
+		"EOA_SMOKE_FRAME_GUARD who=TestRunner.mouse_press_returned ok=%s reason=%s"
+		% [str(bool(report.get("ok", false))), str(report.get("reason", ""))]
+	)
+	set_meta("eoa_smoke_frame_guard_t0", Time.get_ticks_msec())
+	set_meta("eoa_smoke_frame_guard_frames", 0)
+	set_meta("eoa_smoke_frame_guard_rss0", _read_godot_rss_mb())
+	set_meta("eoa_smoke_frame_guard_last_sec", -1)
+	set_meta("eoa_smoke_frame_guard_active", true)
+
+
+func _tick_smoke_ix1_frame_guard(_delta: float) -> void:
+	if not _smoke_frame_guard_wanted():
+		return
+	if not bool(get_meta("eoa_smoke_frame_guard_active", false)):
+		_maybe_start_ix1_frame_guard()
+		return
+	var frames: int = int(get_meta("eoa_smoke_frame_guard_frames", 0)) + 1
+	set_meta("eoa_smoke_frame_guard_frames", frames)
+	var t0: int = int(get_meta("eoa_smoke_frame_guard_t0", 0))
+	var elapsed: int = int((Time.get_ticks_msec() - t0) / 1000.0)
+	var last: int = int(get_meta("eoa_smoke_frame_guard_last_sec", -1))
+	if elapsed == last:
+		return
+	set_meta("eoa_smoke_frame_guard_last_sec", elapsed)
+	var rss: int = _read_godot_rss_mb()
+	_eoa_flush(
+		"EOA_SMOKE_FRAME_GUARD frames=%d rss_mb=%d elapsed=%d (after press; NOT product Begin/Esc/clock PASS)"
+		% [frames, rss, elapsed]
+	)
+	var secs := 60
+	var env_secs := OS.get_environment("EOA_FRAME_GUARD_SECS").strip_edges()
+	if env_secs.is_valid_int():
+		secs = clampi(int(env_secs), 5, 120)
+	if rss >= 3072:
+		_eoa_flush("EOA_SMOKE_FRAME_GUARD frames=%d rss_mb=%d FAIL" % [frames, rss])
+		_quit_logged(1, "ix1_frame_guard_rss")
+		return
+	if elapsed >= secs:
+		var frames_ok := frames >= maxi(secs * 2, 10)
+		var verdict := "PASS" if frames_ok and rss < 3072 else "FAIL"
+		_eoa_flush("EOA_SMOKE_FRAME_GUARD frames=%d rss_mb=%d %s" % [frames, rss, verdict])
+		_quit_logged(0 if verdict == "PASS" else 1, "ix1_frame_guard_%s" % verdict.to_lower())
+
+
+func _read_godot_rss_mb() -> int:
+	var path := "/proc/%d/status" % OS.get_process_id()
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return 0
+	var txt := f.get_as_text()
+	f.close()
+	for line in txt.split("\n"):
+		if not line.begins_with("VmRSS:"):
+			continue
+		var compact := line.replace("\t", " ")
+		var parts: PackedStringArray = compact.split(" ", false)
+		if parts.size() >= 2:
+			return int(round(float(parts[1]) / 1024.0))
+	return 0
 
 
 ## One-shot first-session onboarding for graphical F5 (meta-guarded at call site).
