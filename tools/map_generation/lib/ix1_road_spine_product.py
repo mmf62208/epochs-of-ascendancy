@@ -971,7 +971,7 @@ def ix1_spine_complete_zoom_gate() -> Dict[str, Any]:
         missing.append("frame_guard_viewport_mouse")
     if "press_build_road_spine_from_live_ui()" in _slice_func(ren, "deliver_ix1_spine_button_mouse_press"):
         missing.append("frame_guard_helper_call")
-    if "try_start_road_spine" in _slice_func(ren, "deliver_ix1_spine_button_mouse_press"):
+    if "try_start_road_spine(" in _slice_func(ren, "deliver_ix1_spine_button_mouse_press"):
         missing.append("frame_guard_direct_spine_api")
     if "_maybe_start_ix1_frame_guard" not in tr:
         missing.append("frame_guard_testrunner")

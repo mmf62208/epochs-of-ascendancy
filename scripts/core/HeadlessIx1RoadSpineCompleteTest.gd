@@ -213,7 +213,7 @@ func _test_source_preview_loop_caps() -> void:
 	if deliver.is_empty() or "push_input" not in deliver:
 		_fail("frame guard must deliver InputEventMouseButton through the viewport")
 		return
-	if "press_build_road_spine_from_live_ui()" in deliver or "try_start_road_spine" in deliver:
+	if "press_build_road_spine_from_live_ui()" in deliver or "try_start_road_spine(" in deliver:
 		_fail("viewport mouse press must not call the spine helper/API")
 		return
 	var toast := _read("res://scripts/ui/LeaderEventUI.gd")
