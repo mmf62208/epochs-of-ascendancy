@@ -4,7 +4,7 @@ extends SceneTree
 ## Bonn–Köln–Leverkusen and Essen is off-spine (no road, higher move cost).
 ## Also drives the zoom + RoadLayer redraw path that killed Play after start.
 ##
-##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd
+##   tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd
 
 const SRC_IDM := "res://scripts/map/InfrastructureDevelopmentManager.gd"
 const SRC_REN := "res://scripts/map/MapRenderer.gd"
@@ -161,7 +161,12 @@ func _test_source_harness_quit_logged() -> void:
 	if "func _quit_logged" not in tr or "EOA_HARNESS_QUIT" not in tr:
 		_fail("TestRunner must log EOA_HARNESS_QUIT with a reason")
 		return
-	if tr.count("get_tree().quit") > 1:
+	var quit_fn := _slice_func(tr, "_quit_logged")
+	if "get_tree().quit" not in quit_fn:
+		_fail("_quit_logged must call get_tree().quit after logging a reason")
+		return
+	var outside := tr.replace(quit_fn, "")
+	if "get_tree().quit" in outside:
 		_fail("TestRunner still has silent get_tree().quit besides _quit_logged")
 		return
 	_pass("harness quit always logs a reason")
