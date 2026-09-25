@@ -132,6 +132,19 @@ func _test_source_live_inspector_path() -> void:
 	if "search_chrome_pixel_report" not in _slice_func(tr, "_restore_live_search_chrome_after_stay_alive"):
 		_fail("stay-alive restore must use search_chrome_pixel_report (not flag-only live)")
 		return
+	if "layout_settle" not in tr or "_smoke_search_chrome_sticky_after_reflow" not in tr:
+		_fail("TestRunner must PIXEL-check Search after TopInfoBar layout settle (not first-paint only)")
+		return
+	if "in_bar" not in pixel_fn:
+		_fail("pixel report must require Search in the TopInfoBar strip (in_bar)")
+		return
+	var tib_src := _read("res://scripts/ui/TopInfoBar.gd")
+	if "_keep_search_chrome_sticky" not in tib_src:
+		_fail("TopInfoBar must re-apply Search after More+/Steel/Al reflow")
+		return
+	if "RightContainer" not in _slice_func(tib_src, "host_map_search_chrome"):
+		_fail("host_map_search_chrome must place Search in RightContainer (not overlay-only TOP_RIGHT)")
+		return
 	var live := _slice_func(ren, "open_province_inspector_from_search")
 	if live.is_empty():
 		_fail("open_province_inspector_from_search missing")
@@ -329,6 +342,38 @@ func _test_go_enter_signal_wiring() -> void:
 		return
 	if line_r.position.x < 0.0 or line_r.end.x > 1280.0 or line_r.position.y < 0.0:
 		_fail("Search LineEdit is off-screen on TopInfoBar host (x=%s y=%s)" % [str(line_r.position.x), str(line_r.position.y)])
+		bar.queue_free()
+		return
+	# Play 48e4fe20: overlay TOP_RIGHT vanished after Steel/Al reflow. In-flow
+	# RightContainer must keep LineEdit/Go sized and focusable.
+	var right: HBoxContainer = HBoxContainer.new()
+	right.name = "RightContainer"
+	right.custom_minimum_size = Vector2(800, 40)
+	right.size = Vector2(800, 40)
+	bar.add_child(right)
+	var steel_l: Label = Label.new()
+	steel_l.name = "SteelLabel"
+	steel_l.text = "Steel: 12000"
+	steel_l.visible = true
+	right.add_child(steel_l)
+	var al_l: Label = Label.new()
+	al_l.name = "AluminumLabel"
+	al_l.text = "Aluminum: 8000"
+	al_l.visible = true
+	right.add_child(al_l)
+	if node.get_parent() != null:
+		node.get_parent().remove_child(node)
+	right.add_child(node)
+	node.size_flags_horizontal = Control.SIZE_SHRINK_END
+	node.custom_minimum_size = Vector2(308, 32)
+	if node.has_method("ensure_chrome_visible"):
+		node.call("ensure_chrome_visible")
+	if line.custom_minimum_size.x < 160.0 or line.custom_minimum_size.y < 24.0 or btn.custom_minimum_size.x < 40.0:
+		_fail("Search LineEdit/Go lost min size after Steel/Al reflow")
+		bar.queue_free()
+		return
+	if not line.visible or not btn.visible or line.focus_mode == Control.FOCUS_NONE or not line.editable:
+		_fail("Search LineEdit/Go not focusable after Steel/Al reflow")
 		bar.queue_free()
 		return
 	var pressed_wired: bool = false

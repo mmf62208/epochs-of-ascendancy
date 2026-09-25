@@ -333,6 +333,9 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 	if "ensure_live_search_chrome" not in after_hatch and "ensure_live_search_chrome" not in _slice_func(tr, "_restore_live_search_chrome_after_stay_alive"):
 		_fail("stay-alive after_hatch must call MapRenderer.ensure_live_search_chrome")
 		return
+	if "_smoke_search_chrome_sticky_after_reflow" not in tr or "layout_settle" not in tr:
+		_fail("stay-alive must PIXEL-check Search after TopInfoBar layout settle (sticky, not first-paint)")
+		return
 	if "_smoke_should_gate_post_hatch_heavy" not in tr or "skip_front_chips" not in tr:
 		_fail("TestRunner must gate post-hatch unit-icon flood under stay-alive")
 		return

@@ -145,24 +145,101 @@ func get_bar_height() -> float:
 
 
 func host_map_search_chrome(search: Control) -> void:
-	## Durable Search slot: TOP_RIGHT of this 52px strip (UILayer 110).
-	## Parent is a Control with real width — Map Mode layer 20 cannot bury it.
+	## Durable Search slot on the 52px strip (UILayer 110): in-flow on
+	## RightContainer, immediately before Menu. Overlay TOP_RIGHT was first-
+	## paint only — Play 48e4fe20: More+/Steel/Al reflow ate that space and
+	## Search vanished while PIXEL still logged live=1.
 	if search == null or not is_instance_valid(search):
 		return
 	clip_contents = false
 	visible = true
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	if search.get_parent() != self:
+	if _right_container != null:
+		_right_container.clip_contents = false
+		_right_container.visible = true
+		_right_container.mouse_filter = Control.MOUSE_FILTER_PASS
+	var slot: Control = _right_container if _right_container != null else self
+	if search.get_parent() != slot:
 		var old_p: Node = search.get_parent()
 		if old_p != null:
 			old_p.remove_child(search)
-		add_child(search)
+		slot.add_child(search)
 	search.z_index = 80
 	search.z_as_relative = false
 	search.mouse_filter = Control.MOUSE_FILTER_STOP
 	search.visible = true
 	search.modulate = Color(1, 1, 1, 1)
-	move_child(search, get_child_count() - 1)
+	search.process_mode = Node.PROCESS_MODE_ALWAYS
+	search.clip_contents = false
+	search.custom_minimum_size = Vector2(308, 32)
+	if slot == _right_container:
+		search.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
+		search.anchor_left = 0.0
+		search.anchor_top = 0.0
+		search.anchor_right = 0.0
+		search.anchor_bottom = 0.0
+		search.offset_left = 0.0
+		search.offset_top = 0.0
+		search.offset_right = 0.0
+		search.offset_bottom = 0.0
+		search.size_flags_horizontal = Control.SIZE_SHRINK_END
+		search.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		# [Resources] [Search+Go] [Menu] — Search stays on the right through reflow.
+		if _resources_container != null and _resources_container.get_parent() == _right_container:
+			_right_container.move_child(_resources_container, 0)
+			_right_container.move_child(search, 1)
+		else:
+			_right_container.move_child(search, 0)
+		if _menu_container != null and _menu_container.get_parent() == _right_container:
+			_right_container.move_child(_menu_container, _right_container.get_child_count() - 1)
+	else:
+		move_child(search, get_child_count() - 1)
+	if search.has_method("ensure_chrome_visible"):
+		search.call("ensure_chrome_visible")
+
+
+func _find_hosted_map_search() -> Control:
+	var n: Node = get_node_or_null("ContentRow/RightContainer/MapProvinceSearch")
+	if n is Control:
+		return n as Control
+	n = get_node_or_null("MapProvinceSearch")
+	if n is Control:
+		return n as Control
+	if _right_container != null:
+		n = _right_container.get_node_or_null("MapProvinceSearch")
+		if n is Control:
+			return n as Control
+	for child in get_children():
+		if str(child.name) == "MapProvinceSearch" and child is Control:
+			return child as Control
+	return null
+
+
+func _keep_search_chrome_sticky() -> void:
+	## Re-apply after More+/Steel/Al settle so Search is not first-paint only.
+	var search: Control = _find_hosted_map_search()
+	if search == null or not is_instance_valid(search):
+		return
+	host_map_search_chrome(search)
+
+
+func _protect_search_from_resource_overflow() -> void:
+	## Hide extra resource chips before Search can be pushed off the strip.
+	var vp_w := 1280.0
+	if get_viewport() != null:
+		vp_w = get_viewport().get_visible_rect().size.x
+	var reserved := 308.0 + 72.0 + 24.0
+	var left_min := 240.0
+	var center_min := 360.0
+	var room: float = vp_w - left_min - center_min - reserved
+	if rubber_label != null and room < 220.0:
+		rubber_label.visible = false
+	if oil_label != null and room < 160.0:
+		oil_label.visible = false
+	if aluminum_label != null and room < 110.0:
+		aluminum_label.visible = false
+	if steel_label != null and room < 70.0:
+		steel_label.visible = false
 
 
 func arm_play_clock_after_begin() -> void:
@@ -260,6 +337,7 @@ func _apply_responsive_layout() -> void:
 	if _right_container:
 		_right_container.add_theme_constant_override("separation", 6)
 		_right_container.size_flags_horizontal = Control.SIZE_SHRINK_END
+		_right_container.clip_contents = false
 		if _menu_container:
 			_right_container.move_child(_menu_container, _right_container.get_child_count() - 1)
 
@@ -303,6 +381,8 @@ func _apply_responsive_layout() -> void:
 	custom_minimum_size.y = 48.0 if compact else 52.0
 	offset_bottom = custom_minimum_size.y
 	_refresh_hotseat_visibility()
+	_protect_search_from_resource_overflow()
+	_keep_search_chrome_sticky()
 
 
 func _ensure_speed_overflow_menu() -> void:
@@ -1173,6 +1253,8 @@ func _update_resources() -> void:
 	else:
 		oil_label.text = "Fuel: %.0f" % fuel_amt
 	rubber_label.text = "Rubber: %.0f" % float(stockpile.get("rubber", 0.0))
+	# Steel/Al text widen is the Play 48e4fe20 reflow that dropped overlay Search.
+	_keep_search_chrome_sticky()
 
 
 func _close_overlay_screens() -> void:

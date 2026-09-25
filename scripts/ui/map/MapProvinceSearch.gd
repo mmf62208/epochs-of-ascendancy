@@ -84,6 +84,8 @@ func ensure_chrome_visible() -> void:
 	## Stay-alive / hatch: LineEdit+Go must paint and accept focus.
 	## Play c82233c8: visible/focusable/live flags were 1 but drawn height was
 	## 0 on a CanvasLayer parent — force actual child sizes here.
+	## Play 48e4fe20: first paint was live then TopInfoBar Steel/Al reflow
+	## dropped overlay chrome — keep forced geometry when re-hosted in-flow.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	visible = true
 	modulate = Color(1, 1, 1, 1)

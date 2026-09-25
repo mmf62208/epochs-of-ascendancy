@@ -942,6 +942,7 @@ func _finish_smoke_advance_after_hatch(out: Dictionary) -> void:
 		]
 	)
 	_restore_live_search_chrome_after_stay_alive("after_hatch")
+	call_deferred("_smoke_search_chrome_sticky_after_reflow")
 	call_deferred("_smoke_stay_alive_heartbeat")
 
 
@@ -967,45 +968,74 @@ func _smoke_stay_alive_heartbeat() -> void:
 		"EOA_SMOKE_STAYALIVE who=TestRunner.heartbeat beat=%d window_alive=1 no_quit=1 (Search/spine window; NOT product clock PASS)"
 		% beats
 	)
-	if beats == 1:
-		_restore_live_search_chrome_after_stay_alive("heartbeat")
+	# Every beat: first-paint live=1 is not enough — chrome must stay after reflow.
+	_restore_live_search_chrome_after_stay_alive("heartbeat")
+	if beats == 2:
+		call_deferred("_smoke_search_chrome_sticky_after_reflow")
 	if beats < 4:
 		call_deferred("_smoke_stay_alive_heartbeat")
 
 
+func _smoke_search_chrome_sticky_after_reflow() -> void:
+	# Play 48e4fe20: first PIXEL live=1 then TopInfoBar More+/Steel/Al reflow
+	# dropped chrome. Force layout settle and fail live if Search is gone.
+	var tib: Node = get_tree().get_first_node_in_group("top_info_bar") if get_tree() != null else null
+	if tib == null and get_tree() != null:
+		tib = get_tree().root.find_child("TopInfoBar", true, false)
+	if tib != null:
+		if tib.has_method("_apply_responsive_layout"):
+			tib.call("_apply_responsive_layout")
+		if tib.has_method("_update_resources"):
+			tib.call("_update_resources")
+		if tib.has_method("_keep_search_chrome_sticky"):
+			tib.call("_keep_search_chrome_sticky")
+	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("ensure_live_search_chrome"):
+		map_renderer.call("ensure_live_search_chrome")
+	_restore_live_search_chrome_after_stay_alive("layout_settle")
+
+
 func _restore_live_search_chrome_after_stay_alive(who: String) -> void:
 	# Play c82233c8: flags were live=1 but LineEdit/Go painted 0px under Map Mode.
-	# Re-host onto TopInfoBar (UILayer 110) and fail live when pixels are absent.
+	# Play 48e4fe20: first-paint live=1 then chrome vanished after Steel/Al reflow.
+	# Re-host onto TopInfoBar RightContainer and fail live when pixels are absent.
 	if map_renderer == null or not is_instance_valid(map_renderer):
 		print("EOA_SMOKE_SEARCH_CHROME who=TestRunner.%s visible=0 focusable=0 live=0 (no renderer; NOT product Begin/Esc PASS)" % who)
-		print("EOA_SMOKE_SEARCH_CHROME_PIXEL who=TestRunner.%s on_screen=0 overlap=1 area=0 live=0 (no renderer; NOT product Begin/Esc PASS)" % who)
+		print("EOA_SMOKE_SEARCH_CHROME_PIXEL who=TestRunner.%s on_screen=0 in_bar=0 overlap=1 area=0 live=0 sticky=0 (no renderer; NOT product Begin/Esc PASS)" % who)
 		return
 	if map_renderer.has_method("ensure_live_search_chrome"):
 		map_renderer.call("ensure_live_search_chrome")
 	var pixel: Dictionary = {}
 	if map_renderer.has_method("search_chrome_pixel_report"):
 		pixel = map_renderer.call("search_chrome_pixel_report") as Dictionary
-	# Pixel report is the only live signal — flags without on_screen/area FAIL.
+	# Pixel report is the only live signal — flags without on_screen/area/in_bar FAIL.
 	var live_ok := (not pixel.is_empty()) and bool(pixel.get("live", false))
 	var vis := bool(pixel.get("visible", false))
 	var focusable := bool(pixel.get("focusable", false))
+	var sticky_ok := live_ok and bool(pixel.get("sticky", live_ok)) and bool(pixel.get("in_bar", false))
+	if who == "layout_settle" and not sticky_ok:
+		live_ok = false
 	print(
 		"EOA_SMOKE_SEARCH_CHROME who=TestRunner.%s visible=%s focusable=%s live=%s (Search LineEdit+Go on TopInfoBar UILayer; NOT product Begin/Esc/clock PASS)"
 		% [who, "1" if vis else "0", "1" if focusable else "0", "1" if live_ok else "0"]
 	)
 	print(
-		"EOA_SMOKE_SEARCH_CHROME_PIXEL who=TestRunner.%s on_screen=%s overlap=%s area=%s line=%sx%s go=%sx%s host=%s layer=%s live=%s (pixel gate; NOT product Begin/Esc/clock PASS)"
+		"EOA_SMOKE_SEARCH_CHROME_PIXEL who=TestRunner.%s on_screen=%s in_bar=%s overlap=%s area=%s line=%sx%s go=%sx%s xy=%s,%s host=%s layer=%s reflow=%s sticky=%s live=%s (pixel sticky gate; NOT product Begin/Esc/clock PASS)"
 		% [
 			who,
 			"1" if bool(pixel.get("on_screen", false)) else "0",
+			"1" if bool(pixel.get("in_bar", false)) else "0",
 			"%.2f" % float(pixel.get("overlap", 1.0)),
 			"%.0f" % float(pixel.get("area", 0.0)),
 			"%.0f" % float(pixel.get("line_w", 0.0)),
 			"%.0f" % float(pixel.get("line_h", 0.0)),
 			"%.0f" % float(pixel.get("go_w", 0.0)),
 			"%.0f" % float(pixel.get("go_h", 0.0)),
+			"%.0f" % float(pixel.get("x", 0.0)),
+			"%.0f" % float(pixel.get("y", 0.0)),
 			str(pixel.get("host", "")),
 			str(pixel.get("layer", -1)),
+			"1" if bool(pixel.get("reflow", false)) else "0",
+			"1" if sticky_ok else "0",
 			"1" if live_ok else "0",
 		]
 	)

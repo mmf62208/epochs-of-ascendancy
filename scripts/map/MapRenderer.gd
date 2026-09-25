@@ -1800,7 +1800,7 @@ func ensure_live_search_chrome() -> Control:
 		_map_search.set_script(SearchScript)
 		_map_search.name = "MapProvinceSearch"
 		host.add_child(_map_search)
-	elif _map_search.get_parent() != host:
+	elif _map_search.get_parent() != host and not host.is_ancestor_of(_map_search):
 		var old_p: Node = _map_search.get_parent()
 		if old_p != null:
 			old_p.remove_child(_map_search)
@@ -1846,13 +1846,26 @@ func search_chrome_pixel_report() -> Dictionary:
 		"y": 0.0,
 		"host": "",
 		"layer": -1,
+		"in_bar": false,
+		"sticky": false,
+		"reflow": false,
 	}
 	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
 		return report
 	var sr_live: Control = _map_search as Control
 	var parent_n: Node = sr_live.get_parent()
-	report["host"] = str(parent_n.name) if parent_n != null else ""
+	var host_name: String = str(parent_n.name) if parent_n != null else ""
+	var walk_h: Node = parent_n
+	while walk_h != null:
+		if walk_h is TopInfoBar or str(walk_h.name) == "TopInfoBar":
+			host_name = "TopInfoBar"
+			break
+		walk_h = walk_h.get_parent()
+	report["host"] = host_name
 	report["layer"] = _canvas_layer_index_of(sr_live)
+	report["in_bar"] = false
+	report["sticky"] = false
+	report["reflow"] = false
 	var line_live: LineEdit = sr_live.get_node_or_null("SearchLineEdit") as LineEdit
 	var go_live: Button = sr_live.get_node_or_null("SearchGoButton") as Button
 	if line_live == null or go_live == null:
@@ -1884,16 +1897,57 @@ func search_chrome_pixel_report() -> Dictionary:
 	report["overlap"] = covered
 	var host_ok: bool = parent_n is Control and not (parent_n is CanvasLayer)
 	var layer_ok: bool = int(report["layer"]) >= 110
+	var in_bar: bool = _search_chrome_is_in_top_bar(line_r.merge(go_r), parent_n)
+	report["in_bar"] = in_bar
+	report["reflow"] = _search_bar_reflow_settled(parent_n)
+	var sticky_ok: bool = in_bar and bool(report["on_screen"]) and area >= 1600.0 and covered < 0.45
+	report["sticky"] = sticky_ok
 	report["live"] = (
 		bool(report["visible"])
 		and bool(report["focusable"])
 		and bool(report["on_screen"])
+		and in_bar
 		and area >= 1600.0
 		and covered < 0.45
 		and host_ok
 		and layer_ok
 	)
 	return report
+
+
+func _search_chrome_is_in_top_bar(r: Rect2, from_n: Node) -> bool:
+	var walk_b: Node = from_n
+	while walk_b != null:
+		if walk_b is TopInfoBar or str(walk_b.name) == "TopInfoBar":
+			if not (walk_b is Control):
+				return false
+			var tib_c: Control = walk_b as Control
+			var bar_r: Rect2 = tib_c.get_global_rect()
+			if bar_r.size.x < 8.0 or bar_r.size.y < 8.0:
+				bar_r = Rect2(tib_c.global_position, Vector2(maxf(tib_c.size.x, 64.0), maxf(tib_c.size.y, 44.0)))
+			var inter: Rect2 = bar_r.grow(6.0).intersection(r)
+			if inter.size.x < 80.0 or inter.size.y < 16.0:
+				return false
+			return r.position.y < bar_r.end.y + 10.0
+		walk_b = walk_b.get_parent()
+	return false
+
+
+func _search_bar_reflow_settled(from_n: Node) -> bool:
+	var walk_r: Node = from_n
+	var tib_n: Node = null
+	while walk_r != null:
+		if walk_r is TopInfoBar or str(walk_r.name) == "TopInfoBar":
+			tib_n = walk_r
+			break
+		walk_r = walk_r.get_parent()
+	if tib_n == null:
+		return false
+	var more: Control = tib_n.get_node_or_null("ContentRow/CenterContainer/NavOverflowMenu") as Control
+	var steel: Control = tib_n.get_node_or_null("ContentRow/RightContainer/ResourcesContainer/SteelLabel") as Control
+	var more_on: bool = more != null and more.is_visible_in_tree()
+	var steel_on: bool = steel != null and steel.is_visible_in_tree()
+	return more_on or steel_on
 
 
 func _search_chrome_cover_fraction(r: Rect2) -> float:
@@ -1906,9 +1960,26 @@ func _search_chrome_cover_fraction(r: Rect2) -> float:
 		blockers.append(_map_mode_toolbar as Control)
 	if _next_hook_chip is Control:
 		blockers.append(_next_hook_chip as Control)
+	var tib_host: Control = _search_hud_control_host()
+	if tib_host != null:
+		var extra_paths: PackedStringArray = PackedStringArray([
+			"ContentRow/RightContainer/ResourcesContainer",
+			"ContentRow/RightContainer/ResourcesContainer/SteelLabel",
+			"ContentRow/RightContainer/ResourcesContainer/AluminumLabel",
+			"ContentRow/RightContainer/ResourcesContainer/OilLabel",
+			"ContentRow/RightContainer/ResourcesContainer/RubberLabel",
+			"ContentRow/CenterContainer/NavOverflowMenu",
+		])
+		for pth in extra_paths:
+			var extra: Control = tib_host.get_node_or_null(pth) as Control
+			if extra != null:
+				blockers.append(extra)
 	for b in blockers:
 		if b == null or not is_instance_valid(b) or not b.is_visible_in_tree():
 			continue
+		if _map_search != null and is_instance_valid(_map_search):
+			if b == _map_search or b.is_ancestor_of(_map_search) or _map_search.is_ancestor_of(b):
+				continue
 		var b_layer: int = _canvas_layer_index_of(b)
 		if b_layer < search_layer:
 			continue
@@ -1975,27 +2046,46 @@ func _layout_map_search_chrome() -> void:
 		return
 	var sr: Control = _map_search as Control
 	var host: Control = _search_hud_control_host()
-	if host != null and sr.get_parent() != host:
+	if host != null and sr.get_parent() != host and not host.is_ancestor_of(sr):
 		var old_p: Node = sr.get_parent()
 		if old_p != null:
 			old_p.remove_child(sr)
 		host.add_child(sr)
-	# TOP_RIGHT of the TopInfoBar strip. Parent is a Control with width —
-	# never PRESET_TOP_RIGHT on a CanvasLayer (parent size 0 → x=-320).
+	if host != null and host.has_method("host_map_search_chrome"):
+		host.call("host_map_search_chrome", sr)
+	var box_w := 308.0
+	var box_h := 32.0
+	# In-flow on TopInfoBar RightContainer survives More+/Steel/Al reflow.
+	# Overlay PRESET_TOP_RIGHT is fallback only (parent Control with real width —
+	# never PRESET_TOP_RIGHT on a CanvasLayer; parent size 0 → x=-320).
+	if sr.get_parent() is BoxContainer:
+		sr.custom_minimum_size = Vector2(box_w, box_h)
+		sr.size_flags_horizontal = Control.SIZE_SHRINK_END
+		sr.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		sr.visible = true
+		sr.modulate = Color(1, 1, 1, 1)
+		sr.z_index = 80
+		sr.z_as_relative = false
+		sr.mouse_filter = Control.MOUSE_FILTER_STOP
+		sr.process_mode = Node.PROCESS_MODE_ALWAYS
+		sr.clip_contents = false
+		if sr.has_method("ensure_chrome_visible"):
+			sr.call("ensure_chrome_visible")
+		sr.reset_size()
+		sr.force_update_transform()
+		return
 	var bar_h := 52.0
 	if host != null:
 		if host.has_method("get_bar_height"):
 			bar_h = maxf(44.0, float(host.call("get_bar_height")))
 		elif host.size.y > 8.0:
 			bar_h = host.size.y
-	var box_w := 308.0
-	var box_h := 32.0
 	var top_pad := maxf(8.0, (bar_h - box_h) * 0.5)
 	var host_w := 0.0
 	if host != null:
 		host_w = host.size.x
 	if host_w >= 64.0:
-		# TOP_RIGHT is safe: parent Control has a real width.
+		# TOP_RIGHT fallback: parent Control has a real width (TopInfoBar strip).
 		sr.set_anchors_preset(Control.PRESET_TOP_RIGHT, false)
 		sr.anchor_left = 1.0
 		sr.anchor_top = 0.0
