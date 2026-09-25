@@ -3,7 +3,7 @@
 **State:** DONE (machine). **HOLD merge.**  
 **Assign:** `/workspace/SHIP_ASSIGN_FIX_IX1_ESC_CC_REGRESS_5ADB38E.md`  
 **Start tip:** `5adb38ee1e54c0abde523b27f126696df1c1c341` (`5adb38e`)  
-**New head:** `df26cda7c2ae9d6eef37a6bb73ba9a38db3fd62f` (`df26cda7`)  
+**New head:** `a0f576bb49cab622fb6d11a1e6e2126a0ccbc739` (`a0f576bb`)  
 **PR:** https://github.com/mmf62208/epochs-of-ascendancy/pull/55 (draft, HOLD merge)  
 **Branch:** `cursor/ix1-road-spine-9d9b`
 
