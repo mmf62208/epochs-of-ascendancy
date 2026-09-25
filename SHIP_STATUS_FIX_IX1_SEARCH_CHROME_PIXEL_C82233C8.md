@@ -1,12 +1,13 @@
-# STATUS — FIX IX-1 Search chrome **pixel-visible** after stay-alive — DONE tip `230cafd7`
+# STATUS — FIX IX-1 Search chrome **pixel-visible** after stay-alive — DONE tip `cf28e86b`
 
-Updated: Fri Sep 25, 2026 ~1:55pm UTC
+Updated: Fri Sep 25, 2026 ~1:56pm UTC
 From: Ship · CA `bc-61c194e8-deaf-5975-be50-48938d025710`
 
 ## Verdict: DONE (pixel-visible Search after stay-alive; smoke softpipe path)
 
 - Start tip: `c82233c8b9fa41b2ddc96cba0c913bd58845961d` (`c82233c8`)
-- **New tip (GitHub head.sha):** `230cafd70a8c9af299979712371c198b21436ccc` (`230cafd7`)
+- **New tip (GitHub head.sha):** `cf28e86be8e69979ec2fb2857f38b668fd709672` (`cf28e86b`)
+- Code commit: `230cafd70a8c9af299979712371c198b21436ccc` (`230cafd7`)
 - PR 55 HOLD: https://github.com/mmf62208/epochs-of-ascendancy/pull/55 · branch `cursor/ix1-road-spine-9d9b` · draft
 - CA: https://cursor.com/agents/bc-61c194e8-deaf-5975-be50-48938d025710
 
@@ -36,4 +37,4 @@ Smoke Search chrome **pixel-visible** after stay-alive only. Play-F5 delivery **
 - SCRIPT ERROR **0**
 
 ## Next
-Scott rebounds Play on tip `230cafd70a8c9af299979712371c198b21436ccc`. Ship HOLD await Play RESULT. No second CA. Dig2/G PARKED. Quiet Mike.
+Scott rebounds Play on tip `cf28e86be8e69979ec2fb2857f38b668fd709672`. Ship HOLD await Play RESULT. No second CA. Dig2/G PARKED. Quiet Mike.
