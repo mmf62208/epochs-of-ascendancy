@@ -7,7 +7,7 @@ PR 55 HOLD: https://github.com/mmf62208/epochs-of-ascendancy/pull/55 · branch `
 ## Verdict: machine FIX (Play rebound still required)
 
 Start tip: `002df244b3df91ca358be7c44e7314ddb2e430c4`
-**GitHub head.sha (STATUS snapshot):** `bdab13a910ee2fe782c8cec40a4e819b3219317d` (`bdab13a9`) — three-state add-on + CompleteTest PASS; STATUS tip follows this commit.
+**GitHub head.sha (STATUS snapshot):** `fc5252eba192a0fe6b53f22ab29e4a321231b957` (`fc5252eb`)
 
 ## Root cause (silent Godot exit)
 
