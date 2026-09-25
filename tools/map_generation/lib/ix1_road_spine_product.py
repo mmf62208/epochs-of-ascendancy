@@ -33,6 +33,8 @@ FORMATTERS_GD = ROOT / "scripts" / "map" / "MapPolishFormatters.gd"
 FORMATTERS_PY = ROOT / "tools" / "map_generation" / "lib" / "map_polish_formatters.py"
 SAVE_LOAD_GD = ROOT / "scripts" / "autoload" / "SaveLoadManager.gd"
 TIME_MANAGER_GD = ROOT / "scripts" / "autoload" / "TimeManager.gd"
+TEST_RUNNER_GD = ROOT / "scripts" / "core" / "TestRunner.gd"
+TOP_INFO_GD = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
 DAY_TICK_HARNESS = ROOT / "scripts" / "core" / "HeadlessIx1RoadSpineDayTickTest.gd"
 GATES_SH = ROOT / "tools" / "eoa_full_test_gates.sh"
 ADJ_PATH = ROOT / "data" / "provinces_world_accurate" / "province_adjacency.json"
@@ -405,6 +407,8 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
     ren = _read(RENDERER_GD)
     save = _read(SAVE_LOAD_GD)
     tm = _read(TIME_MANAGER_GD)
+    tr = _read(TEST_RUNNER_GD)
+    top = _read(TOP_INFO_GD)
     harness = _read(DAY_TICK_HARNESS)
     gates = _read(GATES_SH)
     gate = _slice_func(idm, "_should_run_full_board_ai_invest")
@@ -469,6 +473,28 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("live_equiv_plus6_harness")
     if "past_hour_plus6" not in harness:
         missing.append("live_equiv_hour_harness")
+    input_fn = _slice_func(ren, "_input")
+    if "_top_bar_owns_click" not in ren or "get_global_rect" not in _slice_func(ren, "_top_bar_owns_click"):
+        missing.append("top_bar_owns_click_rect")
+    if "_top_bar_owns_click" not in input_fn:
+        missing.append("top_bar_owns_click_input")
+    if "release_play_clock_input_blockers" not in ren:
+        missing.append("release_play_clock_input")
+    boot_closed = _slice_func(tr, "_on_living_title_boot_closed")
+    if "mark_living_title_closed" not in boot_closed or "release_play_clock_input_blockers" not in boot_closed:
+        missing.append("begin_clears_clock_input")
+    ensure = _slice_func(tr, "_ensure_game_interactive")
+    if "should_force_playtest_start_pause" not in ensure and "eoa_living_title_closed" not in ensure:
+        missing.append("no_repause_after_begin")
+    begin_clock = _slice_func(tm, "simulate_play_begin_clock_controls")
+    if "advance_real_time" not in begin_clock or "should_force_playtest_start_pause" not in begin_clock:
+        missing.append("play_begin_clock_sim")
+    if "simulate_play_begin_clock_controls" not in harness or "past_hour_plus6" not in _slice_func(
+        harness, "_test_play_begin_clock_controls_leave_midnight"
+    ):
+        missing.append("play_begin_clock_harness")
+    if "arm_play_clock_after_begin" not in top or "ACTION_MODE_BUTTON_PRESS" not in top:
+        missing.append("top_bar_begin_arm")
     save_hook = _slice_func(save, "_on_day_advanced_for_autosave")
     if "is_live_f5_play_path" not in save_hook and "_should_skip_live_f5_calendar_autosave" not in save_hook:
         missing.append("live_f5_autosave_skip")

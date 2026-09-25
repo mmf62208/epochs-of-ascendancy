@@ -1619,6 +1619,42 @@ func _search_ui_owns_click() -> bool:
 	return sr.get_global_rect().grow(6.0).has_point(vp_r.get_mouse_position())
 
 
+func _top_bar_owns_click() -> bool:
+	# Softpipe / living-title: gui_get_hovered_control() can miss TopInfoBar
+	# 4x / pause (same class as Search Go). Rect first so leftover pick-block
+	# cannot set_input_as_handled over the live clock chrome.
+	var tree: SceneTree = get_tree()
+	if tree == null:
+		return false
+	var tib: Control = TopInfoBar.find_in_tree(tree) as Control
+	if tib == null or not is_instance_valid(tib) or not tib.visible:
+		return false
+	var vp_t: Viewport = get_viewport()
+	if vp_t == null:
+		return false
+	var mouse_t: Vector2 = vp_t.get_mouse_position()
+	if tib.get_global_rect().grow(4.0).has_point(mouse_t):
+		return true
+	var speed_row: Control = tib.get_node_or_null("ContentRow/LeftContainer/TimeSpeedContainer") as Control
+	if speed_row != null and speed_row.visible and speed_row.get_global_rect().grow(8.0).has_point(mouse_t):
+		return true
+	return false
+
+
+func release_play_clock_input_blockers() -> void:
+	# After living title Begin: leftover pan/pick from title map-clicks / soft
+	# camera center must not swallow the first 4x / pause / Space press.
+	_arm_still_click_after_pan()
+	_left_btn_down = false
+	_left_pan_armed = false
+	_left_pan_active = false
+	_left_button_was_up = true
+	_release_search_focus()
+	var vp_clk: Viewport = get_viewport()
+	if vp_clk != null:
+		vp_clk.gui_release_focus()
+
+
 func rebind_map_search() -> void:
 	# Living title Begin can leave Search bound to a stale renderer / empty index.
 	if _map_search == null or not is_instance_valid(_map_search):
@@ -1862,7 +1898,11 @@ func _input(event: InputEvent) -> void:
 			else:
 				_is_middle_dragging = false
 		elif event.button_index == MOUSE_BUTTON_LEFT:
-			if event.pressed and (_mouse_over_search_control() or _search_ui_owns_click()):
+			if event.pressed and (
+				_top_bar_owns_click()
+				or _mouse_over_search_control()
+				or _search_ui_owns_click()
+			):
 				return
 			if event.pressed:
 				# New map press unlocks Close/Esc camera lock *before* leftover
@@ -1891,7 +1931,7 @@ func _input(event: InputEvent) -> void:
 					# Pan latch stays. Do not swallow Open fight / unit-card buttons
 					# (2d47d06: fold click was tooltip-only no-op after pan PASS).
 					# Search LineEdit/Go already returned above — do not touch that path.
-					if _search_ui_owns_click():
+					if _top_bar_owns_click() or _search_ui_owns_click():
 						return
 					if not _is_mouse_over_blocking_ui():
 						_arm_left_map_press()
@@ -1909,7 +1949,7 @@ func _input(event: InputEvent) -> void:
 					_dismiss_inspector_and_restore_input()
 					get_viewport().set_input_as_handled()
 					return
-				if _mouse_over_search_control() or _search_ui_owns_click():
+				if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click():
 					return
 				_finish_close_click_guard_on_new_press()
 				# Arm pan on the map even if a HUD Control is hovered (search/toolbar).
@@ -2221,7 +2261,7 @@ func _unhandled_input(event: InputEvent) -> void:
 				_dismiss_inspector_and_restore_input()
 			get_viewport().set_input_as_handled()
 			return
-		if _mouse_over_search_control() or _search_ui_owns_click():
+		if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click():
 			return
 		if not event.ctrl_pressed and not event.shift_pressed:
 			if event.pressed:
@@ -18177,7 +18217,7 @@ func _try_open_land_chip_from_input(ctrl_click: bool = false) -> bool:
 	# `_input` still-click path: beat GUI so a follow-mouse glance card cannot
 	# swallow GER Division. Search / Close / unit-card / modal stay theirs.
 	# Esc helpers + Dig2 / Drag2+3 pan helpers untouched.
-	if _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control():
+	if _top_bar_owns_click() or _mouse_over_search_control() or _search_ui_owns_click() or _mouse_over_close_control():
 		return false
 	if _is_mouse_over_blocking_ui():
 		return false

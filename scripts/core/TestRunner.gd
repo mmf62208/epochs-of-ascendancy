@@ -625,20 +625,35 @@ func _ensure_game_interactive() -> void:
 				and top_bar.has_meta("player_owns_clock")
 				and bool(top_bar.get_meta("player_owns_clock"))
 			)
-			if not _wants_automated_harness_cycles() and not player_owns_clock:
+			var title_closed := false
+			if tm.has_method("living_title_has_closed"):
+				title_closed = bool(tm.call("living_title_has_closed"))
+			elif has_meta("eoa_living_title_closed"):
+				title_closed = bool(get_meta("eoa_living_title_closed"))
+			var force_start_pause := true
+			if tm.has_method("should_force_playtest_start_pause"):
+				force_start_pause = bool(tm.call("should_force_playtest_start_pause"))
+			else:
+				force_start_pause = not player_owns_clock and not title_closed
+			if (
+				not _wants_automated_harness_cycles()
+				and force_start_pause
+				and not player_owns_clock
+				and not title_closed
+			):
 				if tm.has_method("set_paused"):
 					tm.set_paused(true)
 				if top_bar:
 					top_bar.is_paused = true
 					if top_bar.has_method("_update_speed_buttons"):
 						top_bar._update_speed_buttons()
-			elif player_owns_clock and top_bar:
-				# Honor live speed/pause from the bar (do not clobber).
+			elif (player_owns_clock or title_closed) and top_bar:
+				# Honor live speed/pause from the bar (do not clobber after Begin / 1x).
 				if top_bar.has_method("_sync_time_manager_controls"):
 					top_bar.call("_sync_time_manager_controls")
 				elif top_bar.has_method("_update_speed_buttons"):
 					top_bar._update_speed_buttons()
-	print("TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; sim paused for playtest.")
+	print("TestRunner: _ensure_game_interactive() — blockers cleared; camera/map/UI always-on; clock owned by player/Begin after title (no deferred re-pause).")
 	# Automated UI smoke: EOA_UI_SMOKE=1 godot --headless res://scenes/TestScenario.tscn
 	if OS.get_environment("EOA_UI_SMOKE").strip_edges() == "1" and not has_meta("eoa_ui_smoke_ran"):
 		set_meta("eoa_ui_smoke_ran", true)
@@ -681,16 +696,27 @@ func _on_living_title_boot_closed(result: Dictionary) -> void:
 	if tag.is_empty():
 		tag = "GER"
 	player_tag = tag
+	set_meta("eoa_living_title_closed", true)
+	var tm_boot := get_node_or_null("/root/TimeManager")
+	if tm_boot != null and tm_boot.has_method("mark_living_title_closed"):
+		tm_boot.call("mark_living_title_closed")
 	# Live Search LineEdit+Go can be unbound / empty-index after title Begin.
 	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("rebind_map_search"):
 		map_renderer.call("rebind_map_search")
-	# Begin leftover Search focus must not swallow Space; clear a stuck sim-tick latch.
-	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("_release_search_focus"):
-		map_renderer.call("_release_search_focus")
+	# Begin leftover Search focus must not swallow Space; leftover pan/pick must
+	# not swallow 4x / pause (Play 9f09db2: gui_get_hovered_control missed chrome).
+	if map_renderer != null and is_instance_valid(map_renderer):
+		if map_renderer.has_method("release_play_clock_input_blockers"):
+			map_renderer.call("release_play_clock_input_blockers")
+		elif map_renderer.has_method("_release_search_focus"):
+			map_renderer.call("_release_search_focus")
 	var top_bar_boot := get_node_or_null("UILayer/TopInfoBar")
 	if top_bar_boot != null:
-		top_bar_boot.set("_sim_tick_busy", false)
-		top_bar_boot.set("_sim_tick_busy_since_msec", 0)
+		if top_bar_boot.has_method("arm_play_clock_after_begin"):
+			top_bar_boot.call("arm_play_clock_after_begin")
+		else:
+			top_bar_boot.set("_sim_tick_busy", false)
+			top_bar_boot.set("_sim_tick_busy_since_msec", 0)
 	if not has_meta("eoa_first_session_toast"):
 		set_meta("eoa_first_session_toast", true)
 		_toast_first_session_onboarding()

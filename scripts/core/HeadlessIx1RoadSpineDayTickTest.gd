@@ -10,6 +10,7 @@ const SRC_IDM := "res://scripts/map/InfrastructureDevelopmentManager.gd"
 const SRC_REN := "res://scripts/map/MapRenderer.gd"
 const SRC_SAVE := "res://scripts/autoload/SaveLoadManager.gd"
 const SRC_TM := "res://scripts/autoload/TimeManager.gd"
+const SRC_TR := "res://scripts/core/TestRunner.gd"
 const HUB_ID := 710417
 const FREEZE_PROGRESS := 20.0
 const LIVE_DAY_BUDGET_MS := 18000
@@ -50,6 +51,7 @@ func _run() -> void:
 	_test_clock_advances_past_freeze()
 	_test_spine_can_complete()
 	_test_live_f5_equivalent_day_advance()
+	_test_play_begin_clock_controls_leave_midnight()
 	_test_mandate_cost_still_zero()
 
 
@@ -163,6 +165,30 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 	var day_emit := _slice_func(_read(SRC_REN), "_on_game_day_advanced_legend")
 	if "is_live_f5_play_path" not in day_emit:
 		_fail("MapRenderer day_emit must gate on is_live_f5_play_path (DisplayServer Play)")
+		return
+	var top_click := _slice_func(_read(SRC_REN), "_top_bar_owns_click")
+	if top_click.is_empty() or "get_global_rect" not in top_click:
+		_fail("_top_bar_owns_click must rect-test TopInfoBar (softpipe hover miss)")
+		return
+	var input_fn := _slice_func(_read(SRC_REN), "_input")
+	if "_top_bar_owns_click" not in input_fn or "_top_bar_owns_click()" not in input_fn:
+		_fail("MapRenderer._input must early-out on TopInfoBar before leftover pick swallow")
+		return
+	var tr := _read(SRC_TR)
+	var boot_closed := _slice_func(tr, "_on_living_title_boot_closed")
+	if "mark_living_title_closed" not in boot_closed or "release_play_clock_input_blockers" not in boot_closed:
+		_fail("living title Begin must mark clock runnable and clear leftover pick-block")
+		return
+	var ensure := _slice_func(tr, "_ensure_game_interactive")
+	if "should_force_playtest_start_pause" not in ensure and "eoa_living_title_closed" not in ensure:
+		_fail("_ensure_game_interactive must not force-pause after living title Begin")
+		return
+	var begin_clock := _slice_func(tm, "simulate_play_begin_clock_controls")
+	if begin_clock.is_empty() or "should_force_playtest_start_pause" not in begin_clock:
+		_fail("simulate_play_begin_clock_controls must prove Begin+4x is not re-paused")
+		return
+	if "advance_real_time" not in begin_clock or "past_hour_plus6" not in begin_clock:
+		_fail("simulate_play_begin_clock_controls must drive advance_real_time past +6")
 		return
 	_pass("live F5 path cannot full-board AI scan; toast quiet; ring/day_emit/hour clock gated")
 
@@ -305,6 +331,53 @@ func _test_live_f5_equivalent_day_advance() -> void:
 	_pass(
 		"live-F5-equiv +%dd past+6 hour+6 consider=%d pick=%d autosave=0 mem=%d (%dms)"
 		% [elapsed, consider, considered, mem_delta, ms]
+	)
+
+
+func _test_play_begin_clock_controls_leave_midnight() -> void:
+	var tm: Node = _autoload("TimeManager")
+	if tm == null:
+		_fail("TimeManager autoload missing")
+		return
+	if not tm.has_method("simulate_play_begin_clock_controls"):
+		_fail("simulate_play_begin_clock_controls missing (stuck-paused after Begin would pass)")
+		return
+	if not tm.has_method("should_force_playtest_start_pause"):
+		_fail("should_force_playtest_start_pause missing")
+		return
+	if tm.has_method("initialize_from_scenario_start_date"):
+		tm.call("initialize_from_scenario_start_date", "1936-01-01")
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", true)
+	if tm.has_meta("eoa_living_title_closed"):
+		tm.remove_meta("eoa_living_title_closed")
+	if not bool(tm.call("should_force_playtest_start_pause")):
+		_fail("should_force_playtest_start_pause must be true before living title Begin")
+		return
+	var t0 := Time.get_ticks_msec()
+	var result: Dictionary = tm.call("simulate_play_begin_clock_controls", 8)
+	var ms := Time.get_ticks_msec() - t0
+	if bool(result.get("would_force_repause_after_begin", true)):
+		_fail("Begin must leave clock runnable (TestRunner would re-pause 4x): %s" % str(result))
+		return
+	if bool(result.get("stuck_paused", true)):
+		_fail("4x after Begin left TimeManager paused: %s" % str(result))
+		return
+	if not bool(result.get("ok", false)):
+		_fail("play-begin clock controls not ok: %s" % str(result))
+		return
+	if not bool(result.get("left_00", false)):
+		_fail("play-begin 4x did not leave 1 Jan 00:00: %s" % str(result))
+		return
+	if not bool(result.get("past_hour_plus6", false)):
+		_fail("play-begin 4x did not prove past hour +6: %s" % str(result))
+		return
+	if int(result.get("hour_delta", 0)) < 6:
+		_fail("play-begin hour_delta=%s (need ≥6)" % str(result.get("hour_delta")))
+		return
+	_pass(
+		"play-begin 4x left 00:00 hour_delta=%s past+6 paused=%s (%dms)"
+		% [str(result.get("hour_delta")), str(result.get("paused")), ms]
 	)
 
 

@@ -82,6 +82,8 @@ var _living_playtest_clock: bool = false
 ## Headless stand-in for editor/export Play: light sim + day_ai/invest, no playtest skips.
 var _live_f5_equiv_clock: bool = false
 var _draining_f5_flush: bool = false
+## Wall-clock last advance_real_time (msec). Windowed Play fallback if TopInfoBar skips a tick.
+var _last_advance_real_msec: int = 0
 ## Soft budget (ms) for deferred sim work per frame — keeps pan/hover live past month ends.
 const INTERACTIVE_SIM_FLUSH_BUDGET_MS := 10
 
@@ -95,6 +97,21 @@ func _process(_delta: float) -> void:
 	# Safety net: if deferred flush stalled (e.g. pause race), keep draining the queue.
 	if not paused and not _pending_sim_events.is_empty() and not _sim_flush_scheduled:
 		_schedule_sim_flush()
+	# Windowed Play only: if unpaused but TopInfoBar lost a tick (busy latch /
+	# swallowed click race), keep the hour hand moving. Headless -s stays manual.
+	# Do not self-drive during load / living title (Begin still start-paused).
+	if paused:
+		return
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return
+	if not living_title_has_closed():
+		return
+	var now_ms := Time.get_ticks_msec()
+	if _last_advance_real_msec <= 0:
+		_last_advance_real_msec = now_ms
+		return
+	if now_ms - _last_advance_real_msec >= 1000:
+		advance_real_time(1.0)
 
 ## Called by ScenarioLoader when a scenario is loaded.
 ## Parses "YYYY-MM-DD" (falls back gracefully to year-only).
@@ -193,6 +210,65 @@ func get_scenario_start_date() -> String:
 
 func is_paused() -> bool:
 	return paused
+
+
+func mark_living_title_closed() -> void:
+	## Begin finished — TestRunner must not keep force-pausing deferred frames.
+	set_meta("eoa_living_title_closed", true)
+
+
+func living_title_has_closed() -> bool:
+	return has_meta("eoa_living_title_closed") and bool(get_meta("eoa_living_title_closed"))
+
+
+func should_force_playtest_start_pause() -> bool:
+	## True only before living-title Begin. After Begin, 4x / Space / pause-play own the clock.
+	if living_title_has_closed():
+		return false
+	return true
+
+
+func simulate_play_begin_clock_controls(hours: int = 8) -> Dictionary:
+	## Play softpipe path: Begin leaves 1 Jan 00:00 paused, then 4x must stick
+	## even if a deferred TestRunner pass asks "should we force pause?"
+	initialize_from_scenario_start_date("1936-01-01")
+	set_paused(true)
+	set_time_scale(1.0)
+	mark_living_title_closed()
+	var would_repause := should_force_playtest_start_pause()
+	# Player 4x / pause-play / Space — same flags TopInfoBar._set_game_speed uses.
+	set_paused(false)
+	set_time_scale(4.0)
+	if should_force_playtest_start_pause():
+		set_paused(true)
+	var n := clampi(int(hours), 1, 24)
+	var start_hour := current_hour
+	var start_elapsed := total_days_elapsed
+	for _i: int in range(n):
+		if paused:
+			break
+		advance_real_time(1.0)
+	var hour_delta := (total_days_elapsed - start_elapsed) * 24 + (current_hour - start_hour)
+	if hour_delta < 0:
+		hour_delta += 24
+	var left_midnight := hour_delta >= 1
+	print(
+		"TimeManager: play-begin clock +%d ticks → %04d-%02d-%02d %02d:00 (hour_delta=%d paused=%s would_repause=%s)"
+		% [n, current_year, current_month, current_day, current_hour, hour_delta, str(paused), str(would_repause)]
+	)
+	return {
+		"ok": (not would_repause) and (not paused) and hour_delta >= mini(n, 6) and left_midnight,
+		"hours": n,
+		"hour_delta": hour_delta,
+		"hour": current_hour,
+		"day": current_day,
+		"paused": paused,
+		"would_force_repause_after_begin": would_repause,
+		"stuck_paused": paused,
+		"past_hour_plus6": hour_delta >= mini(n, 6),
+		"left_00": left_midnight,
+		"live_f5_equiv": false,
+	}
 
 func set_paused(p: bool) -> void:
 	if paused != p:
@@ -765,6 +841,7 @@ func is_live_f5_play_path() -> bool:
 ## 1× rate: **1 wall second ≈ 1 game hour** (not 1 day). 2×/3×/4× scale hours.
 ## Full day handlers only fire when the calendar day rolls (after 24 hours).
 func advance_real_time(real_seconds: float) -> void:
+	_last_advance_real_msec = Time.get_ticks_msec()
 	if paused:
 		return
 	if real_seconds <= 0.0:

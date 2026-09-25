@@ -142,6 +142,21 @@ func get_bar_height() -> float:
 	return custom_minimum_size.y
 
 
+func arm_play_clock_after_begin() -> void:
+	## Living title Begin: keep start-paused until 4x / Space / pause-play, but
+	## re-wire chrome so those clicks reach TimeManager on the softpipe path.
+	_sim_tick_busy = false
+	_sim_tick_busy_since_msec = 0
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	set_process(true)
+	set_process_input(true)
+	visible = true
+	mouse_filter = Control.MOUSE_FILTER_PASS
+	_connect_buttons()
+	_update_speed_buttons()
+	_update_date_time()
+
+
 func _ensure_start_paused_for_playtest() -> void:
 	## Graphical F5: start paused so map/UI stay responsive while player looks around.
 	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
@@ -151,6 +166,9 @@ func _ensure_start_paused_for_playtest() -> void:
 	# Don't re-pause if the player already hit 1x/▶ (deferred interactive can race this).
 	if has_meta("player_owns_clock") and bool(get_meta("player_owns_clock")):
 		return
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("living_title_has_closed"):
+		if bool(TimeManager.living_title_has_closed()):
+			return
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("set_paused"):
 		TimeManager.set_paused(true)
 		is_paused = true
@@ -698,6 +716,8 @@ func _wire_speed_button(btn: Button, speed_or_pause: int) -> void:
 	btn.mouse_filter = Control.MOUSE_FILTER_STOP
 	btn.disabled = false
 	btn.focus_mode = Control.FOCUS_ALL
+	# Press-on-down: leftover map-pan / pick-block cannot eat button-up (Search Go).
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	btn.set_meta("eoa_speed", speed_or_pause)
 	# Disconnect stale connections then attach one clean handler.
 	for c in btn.pressed.get_connections():

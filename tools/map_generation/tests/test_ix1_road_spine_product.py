@@ -150,6 +150,12 @@ class TestIx1RoadSpineProduct(unittest.TestCase):
         self.assertNotIn("live_f5_depends_on_light_sim", tick.get("missing") or [])
         self.assertNotIn("day_emit_live_f5", tick.get("missing") or [])
         self.assertNotIn("live_f5_autosave_skip", tick.get("missing") or [])
+        self.assertNotIn("top_bar_owns_click_rect", tick.get("missing") or [])
+        self.assertNotIn("top_bar_owns_click_input", tick.get("missing") or [])
+        self.assertNotIn("begin_clears_clock_input", tick.get("missing") or [])
+        self.assertNotIn("no_repause_after_begin", tick.get("missing") or [])
+        self.assertNotIn("play_begin_clock_sim", tick.get("missing") or [])
+        self.assertNotIn("play_begin_clock_harness", tick.get("missing") or [])
 
 
 if __name__ == "__main__":
