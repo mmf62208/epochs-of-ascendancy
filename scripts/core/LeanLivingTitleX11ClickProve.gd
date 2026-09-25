@@ -50,7 +50,11 @@ func _after_layout() -> void:
 		% ds
 	)
 	_timer = Timer.new()
-	_timer.wait_time = 14.0
+	# Play-like computerUse prove needs a long window; lean xdotool stays 14s.
+	var wait_s: float = 14.0
+	if OS.get_environment("EOA_PLAYLIKE_WAIT").strip_edges() == "1":
+		wait_s = 90.0
+	_timer.wait_time = wait_s
 	_timer.one_shot = true
 	_timer.timeout.connect(_finish)
 	root.add_child(_timer)

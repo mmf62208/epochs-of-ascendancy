@@ -76,24 +76,20 @@ if [[ -z "${WID}" ]]; then
 	exit 0
 fi
 
-# Steal focus the way Play does: do NOT windowactivate Godot. Click a pixel
-# that is not the Godot client (root 4,4 or below the window), then click Begin
-# at the printed screen coordinate.
+# Steal focus the way Play does: do NOT windowactivate Godot.
+# Activate Desktop / xfce4-panel, then hold-click Begin at screen coords
+# (mousedown so DisplayServer.mouse_get_button_state can latch).
 BEFORE_FOCUS="$(xdotool getactivewindow || true)"
-eval "$(xdotool getwindowgeometry --shell "$WID" 2>/dev/null || true)"
-OUT_X=4
-OUT_Y=4
-if [[ -n "${X:-}" && -n "${Y:-}" && -n "${HEIGHT:-}" ]]; then
-	OUT_X=$((X + 8))
-	OUT_Y=$((Y + HEIGHT + 24))
-	if [[ "$OUT_Y" -lt 4 ]]; then
-		OUT_Y=4
-	fi
+SINK="$(xdotool search --onlyvisible --name "Desktop" | head -n 1 || true)"
+if [[ -z "${SINK}" ]]; then
+	SINK="$(xdotool search --onlyvisible --class xfce4-panel | head -n 1 || true)"
 fi
-xdotool mousemove "$OUT_X" "$OUT_Y" click 1 || true
-sleep 0.2
+if [[ -n "${SINK}" && "${SINK}" != "${WID}" ]]; then
+	xdotool windowactivate --sync "$SINK" || true
+	sleep 0.15
+fi
 AFTER_STEAL="$(xdotool getactivewindow || true)"
-echo "eoa_playlike_title_click_prove: godot_wid=$WID before=$BEFORE_FOCUS after_steal=$AFTER_STEAL out=${OUT_X},${OUT_Y}"
+echo "eoa_playlike_title_click_prove: godot_wid=$WID before=$BEFORE_FOCUS after_steal=$AFTER_STEAL sink=$SINK"
 
 BEGIN_LINE="$(grep "LEAN_HIT_BEGIN_CLIENT=" "$LOG" | tail -n 1 || true)"
 sx="$(echo "$BEGIN_LINE" | sed -n 's/.*screen=\([0-9]*\),\([0-9]*\).*/\1/p')"
@@ -103,9 +99,11 @@ if [[ -z "${sx}" || -z "${sy}" ]]; then
 	exit 0
 fi
 
-# computerUse-like: move + click the pixel. No windowactivate. No --window.
-xdotool mousemove "$sx" "$sy" click 1 || true
-echo "eoa_playlike_title_click_prove: unfocused screen click ${sx},${sy}"
+# computerUse-like: move + hold-click the pixel. No windowactivate. No --window.
+xdotool mousemove "$sx" "$sy" mousedown 1 || true
+sleep 0.2
+xdotool mouseup 1 || true
+echo "eoa_playlike_title_click_prove: unfocused screen hold-click ${sx},${sy} active=$(xdotool getactivewindow || true)"
 
 for _i in $(seq 1 24); do
 	if grep -qE "RESULT=PASS|live Begin|action=begin|action=cc" "$LOG" 2>/dev/null; then
