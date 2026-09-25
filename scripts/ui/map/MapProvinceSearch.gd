@@ -34,11 +34,7 @@ var _last_live_submit_pid: int = -1
 
 
 func _ready() -> void:
-	process_mode = Node.PROCESS_MODE_ALWAYS
-	mouse_filter = Control.MOUSE_FILTER_STOP
-	z_index = 90
-	add_theme_constant_override("separation", 6)
-	_ensure_live_controls()
+	ensure_chrome_visible()
 
 
 func _input(event: InputEvent) -> void:
@@ -62,7 +58,7 @@ func _input(event: InputEvent) -> void:
 
 func bind(map_renderer: Node, _camera: Camera2D) -> void:
 	_map_renderer = map_renderer
-	_ensure_live_controls()
+	ensure_chrome_visible()
 	rebuild_index()
 
 
@@ -84,6 +80,25 @@ static func fold_search_key(s: String) -> String:
 	return t
 
 
+func ensure_chrome_visible() -> void:
+	## Stay-alive / hatch: LineEdit+Go must stay on-screen and focusable.
+	## Play 8f89145: Search on WorldMap UI layer 20 + TOP_RIGHT + 0-height
+	## LineEdit was missing after past7 while Map Mode ate the top-right.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	visible = true
+	modulate = Color(1, 1, 1, 1)
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	z_index = 80
+	z_as_relative = false
+	custom_minimum_size = Vector2(308, 32)
+	add_theme_constant_override("separation", 6)
+	_ensure_live_controls()
+	if _line != null:
+		_style_search_line(_line)
+	if _go != null:
+		_style_search_go(_go)
+
+
 func _ensure_live_controls() -> void:
 	if _line == null or not is_instance_valid(_line):
 		_line = get_node_or_null(LINE_NAME) as LineEdit
@@ -92,10 +107,7 @@ func _ensure_live_controls() -> void:
 		_line.name = LINE_NAME
 		add_child(_line)
 	_line.placeholder_text = "Search province..."
-	_line.custom_minimum_size = Vector2(180, 0)
-	_line.mouse_filter = Control.MOUSE_FILTER_STOP
-	_line.focus_mode = Control.FOCUS_ALL
-	_line.editable = true
+	_style_search_line(_line)
 	if not _line.text_submitted.is_connected(_on_submit):
 		_line.text_submitted.connect(_on_submit)
 	if not _line.gui_input.is_connected(_on_line_gui_input):
@@ -108,8 +120,7 @@ func _ensure_live_controls() -> void:
 		_go.name = GO_NAME
 		add_child(_go)
 	_go.text = "Go"
-	_go.mouse_filter = Control.MOUSE_FILTER_STOP
-	_go.focus_mode = Control.FOCUS_ALL
+	_style_search_go(_go)
 	# Press-on-down so leftover map-pan / pick-block cannot eat button-up.
 	_go.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
 	if not _go.pressed.is_connected(_on_go_pressed):
@@ -118,6 +129,38 @@ func _ensure_live_controls() -> void:
 		_go.button_down.connect(_on_go_pressed)
 	if not _go.gui_input.is_connected(_on_go_gui_input):
 		_go.gui_input.connect(_on_go_gui_input)
+
+
+func _style_search_line(line: LineEdit) -> void:
+	line.process_mode = Node.PROCESS_MODE_ALWAYS
+	line.visible = true
+	line.modulate = Color(1, 1, 1, 1)
+	line.custom_minimum_size = Vector2(180, 28)
+	line.mouse_filter = Control.MOUSE_FILTER_STOP
+	line.focus_mode = Control.FOCUS_ALL
+	line.editable = true
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.07, 0.09, 0.16, 0.96)
+	sb.border_color = Color(0.2, 0.9, 1, 0.9)
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(3)
+	sb.content_margin_left = 8
+	sb.content_margin_right = 8
+	sb.content_margin_top = 4
+	sb.content_margin_bottom = 4
+	line.add_theme_stylebox_override("normal", sb)
+	line.add_theme_stylebox_override("focus", sb)
+	line.add_theme_color_override("font_color", Color(0.95, 0.96, 1, 1))
+	line.add_theme_color_override("font_placeholder_color", Color(0.7, 0.78, 0.9, 0.85))
+
+
+func _style_search_go(btn: Button) -> void:
+	btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	btn.visible = true
+	btn.modulate = Color(1, 1, 1, 1)
+	btn.custom_minimum_size = Vector2(48, 28)
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.focus_mode = Control.FOCUS_ALL
 
 
 func _search_owns_focus() -> bool:

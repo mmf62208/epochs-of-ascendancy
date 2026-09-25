@@ -941,6 +941,7 @@ func _finish_smoke_advance_after_hatch(out: Dictionary) -> void:
 			"1" if bool(out.get("stay_alive", _smoke_should_gate_post_hatch_heavy())) else "0",
 		]
 	)
+	_restore_live_search_chrome_after_stay_alive("after_hatch")
 	call_deferred("_smoke_stay_alive_heartbeat")
 
 
@@ -966,8 +967,43 @@ func _smoke_stay_alive_heartbeat() -> void:
 		"EOA_SMOKE_STAYALIVE who=TestRunner.heartbeat beat=%d window_alive=1 no_quit=1 (Search/spine window; NOT product clock PASS)"
 		% beats
 	)
+	if beats == 1:
+		_restore_live_search_chrome_after_stay_alive("heartbeat")
 	if beats < 4:
 		call_deferred("_smoke_stay_alive_heartbeat")
+
+
+func _restore_live_search_chrome_after_stay_alive(who: String) -> void:
+	# Play 8f89145: window stayed after past7 but Search LineEdit/Go were gone.
+	# Re-host onto UILayer 110 with an explicit pixel rect (not headless-only).
+	if map_renderer == null or not is_instance_valid(map_renderer):
+		print("EOA_SMOKE_SEARCH_CHROME who=TestRunner.%s visible=0 focusable=0 (no renderer; NOT product Begin/Esc PASS)" % who)
+		return
+	if map_renderer.has_method("ensure_live_search_chrome"):
+		map_renderer.call("ensure_live_search_chrome")
+	var live_ok := false
+	if map_renderer.has_method("search_chrome_is_live"):
+		live_ok = bool(map_renderer.call("search_chrome_is_live"))
+	var sr: Control = map_renderer.get("_map_search") as Control
+	if sr == null:
+		var hud: Node = get_node_or_null("UILayer")
+		if hud != null:
+			sr = hud.get_node_or_null("MapProvinceSearch") as Control
+	var line_c: Control = sr.get_node_or_null("SearchLineEdit") as Control if sr != null else null
+	var go_c: Control = sr.get_node_or_null("SearchGoButton") as Control if sr != null else null
+	var vis := sr != null and sr.visible and (line_c == null or line_c.visible) and (go_c == null or go_c.visible)
+	var focusable := (
+		line_c != null
+		and go_c != null
+		and line_c.visible
+		and go_c.visible
+		and line_c.focus_mode != Control.FOCUS_NONE
+		and (line_c.size.x >= 8.0 or line_c.custom_minimum_size.x >= 8.0)
+	)
+	print(
+		"EOA_SMOKE_SEARCH_CHROME who=TestRunner.%s visible=%s focusable=%s live=%s (Search LineEdit+Go on UILayer; NOT product Begin/Esc/clock PASS)"
+		% [who, "1" if vis else "0", "1" if focusable else "0", "1" if live_ok else "0"]
+	)
 
 
 ## One-shot first-session onboarding for graphical F5 (meta-guarded at call site).

@@ -8,6 +8,7 @@ extends SceneTree
 
 const SRC_SEARCH := "res://scripts/ui/map/MapProvinceSearch.gd"
 const SRC_REN := "res://scripts/map/MapRenderer.gd"
+const SRC_TR := "res://scripts/core/TestRunner.gd"
 const HUB_ID := 710417
 
 var _failures := 0
@@ -84,6 +85,30 @@ func _test_source_live_inspector_path() -> void:
 		return
 	if "_search_ui_owns_click" not in ren or "rebind_map_search" not in ren:
 		_fail("MapRenderer missing search rect / rebind after living title")
+		return
+	if "ensure_live_search_chrome" not in ren or "search_chrome_is_live" not in ren:
+		_fail("MapRenderer missing ensure_live_search_chrome after stay-alive")
+		return
+	var ensure_fn := _slice_func(ren, "ensure_live_search_chrome")
+	if ensure_fn.is_empty() or "UILayer" not in ensure_fn:
+		_fail("ensure_live_search_chrome must host Search on UILayer 110 (not WorldMap UI 20)")
+		return
+	var layout_fn := _slice_func(ren, "_layout_map_search_chrome")
+	if layout_fn.is_empty() or "PRESET_TOP_LEFT" not in layout_fn:
+		_fail("Search layout must use explicit TOP_LEFT pixels (TOP_RIGHT goes off-screen)")
+		return
+	if "PRESET_TOP_RIGHT" in _slice_func(ren, "_layout_map_ui"):
+		_fail("Search must not use PRESET_TOP_RIGHT on a CanvasLayer parent")
+		return
+	if "ensure_chrome_visible" not in search or "custom_minimum_size = Vector2(180, 28)" not in search:
+		_fail("Search LineEdit must keep a 28px min height so stay-alive chrome is visible")
+		return
+	var tr := _read(SRC_TR)
+	if "_restore_live_search_chrome_after_stay_alive" not in tr or "EOA_SMOKE_SEARCH_CHROME" not in tr:
+		_fail("TestRunner must restore live Search chrome after stay-alive (not a headless-only path)")
+		return
+	if "ensure_live_search_chrome" not in _slice_func(tr, "_restore_live_search_chrome_after_stay_alive"):
+		_fail("stay-alive restore must call ensure_live_search_chrome")
 		return
 	var live := _slice_func(ren, "open_province_inspector_from_search")
 	if live.is_empty():
@@ -245,6 +270,16 @@ func _test_go_enter_signal_wiring() -> void:
 	var btn: Button = node.get_node_or_null("SearchGoButton") as Button
 	if line == null or btn == null:
 		_fail("SearchLineEdit / SearchGoButton missing after _ready")
+		node.queue_free()
+		return
+	if node.has_method("ensure_chrome_visible"):
+		node.call("ensure_chrome_visible")
+	if not line.visible or not btn.visible or line.focus_mode == Control.FOCUS_NONE:
+		_fail("Search LineEdit/Go not visible/focusable after ensure_chrome_visible")
+		node.queue_free()
+		return
+	if line.custom_minimum_size.y < 24.0:
+		_fail("Search LineEdit min height is 0 — live chrome vanishes after stay-alive")
 		node.queue_free()
 		return
 	var pressed_wired: bool = false

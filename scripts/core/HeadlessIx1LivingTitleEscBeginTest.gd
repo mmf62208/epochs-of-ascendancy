@@ -257,6 +257,9 @@ func _test_source_live_input_routing() -> void:
 	if "EOA_SMOKE_STAYALIVE" not in tr or "no_quit" not in _slice_func(tr, "_finish_smoke_advance_after_hatch"):
 		_fail("TestRunner.after_hatch must log stay-alive / no_quit and must not quit")
 		return
+	if "_restore_live_search_chrome_after_stay_alive" not in tr or "EOA_SMOKE_SEARCH_CHROME" not in tr:
+		_fail("TestRunner must restore live Search LineEdit/Go after stay-alive")
+		return
 	if "get_tree().quit" in _slice_func(tr, "_finish_smoke_advance_after_hatch"):
 		_fail("TestRunner.after_hatch must not quit after past7")
 		return

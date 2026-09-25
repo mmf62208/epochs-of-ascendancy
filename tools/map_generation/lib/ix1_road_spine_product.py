@@ -107,6 +107,9 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (SEARCH_GD, "submit_from_live_ui"),
     (RENDERER_GD, "_search_ui_owns_click"),
     (RENDERER_GD, "rebind_map_search"),
+    (RENDERER_GD, "ensure_live_search_chrome"),
+    (RENDERER_GD, "search_chrome_is_live"),
+    (SEARCH_GD, "ensure_chrome_visible"),
     (FORMATTERS_GD, "Road Spine"),
     (FORMATTERS_PY, "Road Spine"),
 )
@@ -863,6 +866,16 @@ def ix1_search_go_live_signals() -> Dict[str, Any]:
         missing.append("search_rect_owns_click")
     if "rebind_map_search" not in ren:
         missing.append("rebind_after_title")
+    if "ensure_live_search_chrome" not in ren:
+        missing.append("ensure_live_search_chrome")
+    if "UILayer" not in _slice_func(ren, "ensure_live_search_chrome"):
+        missing.append("search_hosted_on_uilayer")
+    if "PRESET_TOP_RIGHT" in _slice_func(ren, "_layout_map_ui"):
+        missing.append("search_top_right_offscreen")
+    if "ensure_chrome_visible" not in search:
+        missing.append("ensure_chrome_visible")
+    if "Vector2(180, 28)" not in search:
+        missing.append("line_edit_min_height")
     if "get_global_rect" not in _slice_func(ren, "_search_ui_owns_click"):
         missing.append("search_global_rect")
     if "_release_search_focus" not in _slice_func(ren, "_handle_escape_key"):

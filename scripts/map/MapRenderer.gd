@@ -1764,15 +1764,121 @@ func release_play_clock_input_blockers() -> void:
 
 func rebind_map_search() -> void:
 	# Living title Begin can leave Search bound to a stale renderer / empty index.
-	if _map_search == null or not is_instance_valid(_map_search):
-		_map_search = null
-		_setup_player_map_ux()
-		return
-	var cam_rb := get_node_or_null("MapCamera") as Camera2D
-	if _map_search.has_method("bind"):
-		_map_search.call("bind", self, cam_rb)
-	if _map_search.has_method("rebuild_index"):
+	# Play 8f89145: also re-host onto UILayer 110 so stay-alive chrome is live.
+	ensure_live_search_chrome()
+	if _map_search != null and _map_search.has_method("rebuild_index"):
 		_map_search.call("rebuild_index")
+
+
+func ensure_live_search_chrome() -> Control:
+	## Host Search on TestScenario UILayer 110 (above Map Mode 20) with an
+	## explicit TOP_LEFT pixel rect. CanvasLayer-parent TOP_RIGHT + 0-height
+	## LineEdit left Search off-screen after stay-alive (Play 8f89145).
+	var host: CanvasLayer = _search_hud_layer()
+	if host == null:
+		return null
+	host.visible = true
+	host.process_mode = Node.PROCESS_MODE_ALWAYS
+	if _map_search == null or not is_instance_valid(_map_search):
+		_map_search = host.get_node_or_null("MapProvinceSearch") as HBoxContainer
+	if _map_search == null or not is_instance_valid(_map_search):
+		var world_ui := get_node_or_null("UI") as CanvasLayer
+		if world_ui != null:
+			_map_search = world_ui.get_node_or_null("MapProvinceSearch") as HBoxContainer
+	if _map_search == null or not is_instance_valid(_map_search):
+		var SearchScript := preload("res://scripts/ui/map/MapProvinceSearch.gd")
+		_map_search = HBoxContainer.new()
+		_map_search.set_script(SearchScript)
+		_map_search.name = "MapProvinceSearch"
+		host.add_child(_map_search)
+	elif _map_search.get_parent() != host:
+		var old_p: Node = _map_search.get_parent()
+		if old_p != null:
+			old_p.remove_child(_map_search)
+		host.add_child(_map_search)
+	if _map_search is Control:
+		var sr_boot: Control = _map_search as Control
+		sr_boot.visible = true
+		sr_boot.modulate = Color(1, 1, 1, 1)
+		sr_boot.mouse_filter = Control.MOUSE_FILTER_STOP
+		sr_boot.z_index = 80
+		sr_boot.z_as_relative = false
+		sr_boot.process_mode = Node.PROCESS_MODE_ALWAYS
+	_layout_map_search_chrome()
+	if _map_search.has_method("ensure_chrome_visible"):
+		_map_search.call("ensure_chrome_visible")
+	var cam_es := get_node_or_null("MapCamera") as Camera2D
+	if _map_search.has_method("bind"):
+		_map_search.call("bind", self, cam_es)
+	return _map_search as Control
+
+
+func search_chrome_is_live() -> bool:
+	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
+		return false
+	var sr_live: Control = _map_search as Control
+	if not sr_live.visible or sr_live.get_global_rect().size.x < 8.0:
+		return false
+	var line_live: LineEdit = sr_live.get_node_or_null("SearchLineEdit") as LineEdit
+	var go_live: Button = sr_live.get_node_or_null("SearchGoButton") as Button
+	if line_live == null or go_live == null:
+		return false
+	if not line_live.visible or not go_live.visible:
+		return false
+	if line_live.focus_mode == Control.FOCUS_NONE or not line_live.editable:
+		return false
+	return line_live.custom_minimum_size.y >= 24.0 and go_live.custom_minimum_size.x >= 24.0
+
+
+func _search_hud_layer() -> CanvasLayer:
+	# Prefer UILayer 110 so Search paints with TopInfoBar, above Map Mode 20.
+	var tree_h: SceneTree = get_tree()
+	if tree_h != null:
+		var scene_h: Node = tree_h.current_scene
+		if scene_h != null:
+			var hud: CanvasLayer = scene_h.get_node_or_null("UILayer") as CanvasLayer
+			if hud != null:
+				return hud
+		var root_hud: CanvasLayer = tree_h.root.get_node_or_null("UILayer") as CanvasLayer
+		if root_hud != null:
+			return root_hud
+	return get_node_or_null("UI") as CanvasLayer
+
+
+func _layout_map_search_chrome() -> void:
+	if _map_search == null or not is_instance_valid(_map_search) or not (_map_search is Control):
+		return
+	var sr: Control = _map_search as Control
+	var vp_sz: Vector2 = Vector2(1280, 720)
+	if get_viewport() != null:
+		var vis: Vector2 = get_viewport().get_visible_rect().size
+		if vis.x >= 64.0 and vis.y >= 64.0:
+			vp_sz = vis
+	var top_h := UI_TOP_BAR_CLEARANCE
+	if get_tree():
+		var tib := TopInfoBar.find_in_tree(get_tree())
+		if tib != null and tib.has_method("get_bar_height"):
+			top_h = maxf(top_h, float(tib.call("get_bar_height")) + 6.0)
+	# Explicit TOP_LEFT pixels — never PRESET_TOP_RIGHT on a CanvasLayer
+	# parent (parent size 0 → x=-320, off-screen). Sit just under TopInfoBar
+	# at the right so expanded Map Mode cannot bury the field.
+	var box_w := 308.0
+	var box_h := 32.0
+	var pos_x := maxf(8.0, vp_sz.x - box_w - 12.0)
+	sr.set_anchors_preset(Control.PRESET_TOP_LEFT, false)
+	sr.anchor_left = 0.0
+	sr.anchor_top = 0.0
+	sr.anchor_right = 0.0
+	sr.anchor_bottom = 0.0
+	sr.position = Vector2(pos_x, top_h)
+	sr.size = Vector2(box_w, box_h)
+	sr.custom_minimum_size = Vector2(box_w, box_h)
+	sr.visible = true
+	sr.modulate = Color(1, 1, 1, 1)
+	sr.z_index = 80
+	sr.z_as_relative = false
+	sr.mouse_filter = Control.MOUSE_FILTER_STOP
+	sr.process_mode = Node.PROCESS_MODE_ALWAYS
 
 
 func _release_search_focus() -> void:
@@ -3030,20 +3136,9 @@ func _setup_player_map_ux() -> void:
 		if _map_mode_toolbar.has_signal("layout_changed"):
 			_map_mode_toolbar.layout_changed.connect(_layout_map_ui)
 
-	if _map_search == null:
-		var SearchScript := preload("res://scripts/ui/map/MapProvinceSearch.gd")
-		_map_search = HBoxContainer.new()
-		_map_search.set_script(SearchScript)
-		_map_search.name = "MapProvinceSearch"
-		ui.add_child(_map_search)
-		if _map_search is Control:
-			var sr_boot: Control = _map_search as Control
-			sr_boot.mouse_filter = Control.MOUSE_FILTER_STOP
-			sr_boot.z_index = 90
-			sr_boot.process_mode = Node.PROCESS_MODE_ALWAYS
-		var cam := get_node_or_null("MapCamera") as Camera2D
-		if _map_search.has_method("bind"):
-			_map_search.call("bind", self, cam)
+	# Host on UILayer 110 (not WorldMap UI 20). TOP_RIGHT on layer 20 left
+	# Search off-screen under the expanded Map Mode wall (Play 8f89145).
+	ensure_live_search_chrome()
 
 	if _map_minimap == null:
 		var MinimapScript := preload("res://scripts/ui/map/MapMinimap.gd")
@@ -3104,16 +3199,7 @@ func _layout_map_ui() -> void:
 		tb.offset_right = minf(620.0, get_viewport().get_visible_rect().size.x - 16.0)
 		tb.offset_bottom = top_clearance + toolbar_h
 
-	if _map_search is Control:
-		var sr := _map_search as Control
-		sr.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-		sr.offset_left = -320.0
-		sr.offset_top = chrome_top
-		sr.offset_right = -12.0
-		sr.offset_bottom = chrome_top + 32.0
-		sr.z_index = 90
-		sr.mouse_filter = Control.MOUSE_FILTER_STOP
-		sr.process_mode = Node.PROCESS_MODE_ALWAYS
+	_layout_map_search_chrome()
 
 	if info_panel is Control and not info_panel.has_meta("user_moved"):
 		var ip := info_panel as Control
