@@ -61,6 +61,7 @@ func _run() -> void:
 	_test_live_f5_softpipe_past_plus6_soak()
 	_test_smoke_advance_past_plus6_after_hatch()
 	_test_smoke_advance_chunked_live_path()
+	_test_smoke_advance_softpipe_starvation_catchup()
 	_test_mandate_cost_still_zero()
 
 
@@ -259,6 +260,23 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 	if "func smoke_advance_should_defer_combat" not in tm:
 		_fail("live smoke must defer combat load while chunking")
 		return
+	if "func nudge_smoke_advance_chunk" not in tm or "func smoke_advance_should_catchup_on_arm" not in tm:
+		_fail("live smoke must catch-up when softpipe idle frames are scarce")
+		return
+	if "softpipe_catchup" not in tm or "nudge_starve" not in tm:
+		_fail("live smoke must log softpipe_catchup (Play 8129648 starve)")
+		return
+	var catchup := _slice_func(tm, "_smoke_chunk_catchup")
+	if catchup.is_empty() or "pump_smoke_advance_chunk_until_past7" not in catchup:
+		_fail("softpipe catch-up must reuse the chunked pump (no sync ×48 flush)")
+		return
+	if "_flush_sim_events" in catchup or "_drain_living_f5_flush" in catchup or "_run_smoke_advance_sync" in catchup:
+		_fail("softpipe catch-up must not flush combat / re-enter sync ×48")
+		return
+	var start_fn := _slice_func(tm, "_start_smoke_advance_chunked")
+	if "smoke_advance_should_catchup_on_arm" not in start_fn:
+		_fail("live chunked start must catch-up on arm under softpipe")
+		return
 	if "initialize_from_scenario_start_date" in smoke_tm or "initialize_from_scenario_start_date" in smoke_sync:
 		_fail("smoke advance must not reset the live calendar (not a soak reset)")
 		return
@@ -280,6 +298,9 @@ func _test_source_live_f5_path_cannot_full_board_scan() -> void:
 		return
 	if "_poll_smoke_advance_past_plus6" not in tr or "window_stay" not in tr:
 		_fail("TestRunner must poll chunked live smoke and log window_stay")
+		return
+	if "_nudge_smoke_advance_past_plus6" not in tr or "nudge_smoke_advance_chunk" not in tr:
+		_fail("TestRunner poller must nudge the chunker (not sit on pending)")
 		return
 	_pass("live F5 path cannot full-board AI scan; toast quiet; ring/day_emit/hour clock gated")
 
@@ -632,6 +653,110 @@ func _test_smoke_advance_chunked_live_path() -> void:
 	_pass(
 		"chunked smoke past 7 Jan day=%s ticks=%s window_stay=1 (NOT product clock PASS) (%dms)"
 		% [str(result.get("day")), str(result.get("ticks")), ms]
+	)
+
+
+func _test_smoke_advance_softpipe_starvation_catchup() -> void:
+	## Play 8129648: chunked start armed, then TestRunner deferred load starved
+	## _process — clock stuck 1 Jan 16:00, never past7. Prove catch-up completes
+	## without idle frames and without sync ×48 + combat flush.
+	var tm: Node = _autoload("TimeManager")
+	if tm == null:
+		_fail("TimeManager autoload missing")
+		return
+	if not tm.has_method("nudge_smoke_advance_chunk") or not tm.has_method("smoke_advance_should_catchup_on_arm"):
+		_fail("softpipe catch-up APIs missing")
+		return
+	if tm.has_method("initialize_from_scenario_start_date"):
+		tm.call("initialize_from_scenario_start_date", "1936-01-01")
+	if tm.has_method("set_paused"):
+		tm.call("set_paused", true)
+	if tm.has_method("set_time_scale"):
+		tm.call("set_time_scale", 1.0)
+	if tm.has_meta("eoa_smoke_advance_applied"):
+		tm.remove_meta("eoa_smoke_advance_applied")
+	if tm.has_meta("eoa_smoke_force_chunk"):
+		tm.remove_meta("eoa_smoke_force_chunk")
+	if tm.has_meta("eoa_smoke_force_softpipe_starve"):
+		tm.remove_meta("eoa_smoke_force_softpipe_starve")
+	OS.set_environment("EOA_SMOKE_AUTO_BEGIN", "")
+	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "1")
+	tm.set_meta("eoa_smoke_force_chunk", true)
+	tm.set_meta("eoa_smoke_force_softpipe_starve", true)
+	var t0 := Time.get_ticks_msec()
+	var armed: Dictionary = tm.call("apply_smoke_advance_past_plus6") as Dictionary
+	var ms := Time.get_ticks_msec() - t0
+	# No SceneTree idle / _process / pump_until from this test — arm catch-up only.
+	if str(armed.get("reason", "")) == "chunked_pending":
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		tm.remove_meta("eoa_smoke_force_chunk")
+		tm.remove_meta("eoa_smoke_force_softpipe_starve")
+		_fail("softpipe starve catch-up must complete on arm (not wait idle): %s" % str(armed))
+		return
+	if bool(armed.get("product_clock_pass", false)):
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		tm.remove_meta("eoa_smoke_force_chunk")
+		tm.remove_meta("eoa_smoke_force_softpipe_starve")
+		_fail("starve catch-up must not claim product clock PASS")
+		return
+	if not bool(armed.get("past_7_jan", false)):
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		tm.remove_meta("eoa_smoke_force_chunk")
+		tm.remove_meta("eoa_smoke_force_softpipe_starve")
+		_fail("starve catch-up did not pass 7 Jan: %s" % str(armed))
+		return
+	if not bool(armed.get("window_stay", false)):
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		tm.remove_meta("eoa_smoke_force_chunk")
+		tm.remove_meta("eoa_smoke_force_softpipe_starve")
+		_fail("starve catch-up must prove window_stay: %s" % str(armed))
+		return
+	if not bool(armed.get("chunked", false)) or not bool(armed.get("catchup", false)):
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		tm.remove_meta("eoa_smoke_force_chunk")
+		tm.remove_meta("eoa_smoke_force_softpipe_starve")
+		_fail("starve catch-up must stay labeled chunked+catchup: %s" % str(armed))
+		return
+	if int(armed.get("day", 0)) <= 7 and int(armed.get("month", 1)) == 1:
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		tm.remove_meta("eoa_smoke_force_chunk")
+		tm.remove_meta("eoa_smoke_force_softpipe_starve")
+		_fail("starve catch-up calendar still on/before 7 Jan: %s" % str(armed))
+		return
+	if ms > LIVE_DAY_BUDGET_MS:
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		tm.remove_meta("eoa_smoke_force_chunk")
+		tm.remove_meta("eoa_smoke_force_softpipe_starve")
+		_fail("starve catch-up took %dms (wedged)" % ms)
+		return
+	# Path B: no arm-catch-up — pending then nudge (poller under starvation).
+	if tm.has_method("initialize_from_scenario_start_date"):
+		tm.call("initialize_from_scenario_start_date", "1936-01-01")
+	if tm.has_meta("eoa_smoke_advance_applied"):
+		tm.remove_meta("eoa_smoke_advance_applied")
+	if tm.has_meta("eoa_smoke_force_softpipe_starve"):
+		tm.remove_meta("eoa_smoke_force_softpipe_starve")
+	tm.set_meta("eoa_smoke_force_chunk", true)
+	var pending: Dictionary = tm.call("apply_smoke_advance_past_plus6") as Dictionary
+	if str(pending.get("reason", "")) != "chunked_pending":
+		OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+		tm.remove_meta("eoa_smoke_force_chunk")
+		_fail("force-chunk without starve meta must stay pending: %s" % str(pending))
+		return
+	var nudged: Dictionary = tm.call("nudge_smoke_advance_chunk") as Dictionary
+	OS.set_environment("EOA_SMOKE_ADVANCE_PAST_PLUS6", "")
+	tm.remove_meta("eoa_smoke_force_chunk")
+	if tm.has_meta("eoa_smoke_force_softpipe_starve"):
+		tm.remove_meta("eoa_smoke_force_softpipe_starve")
+	if not bool(nudged.get("past_7_jan", false)) or not bool(nudged.get("catchup", false)):
+		_fail("nudge under starve must catch-up past7: %s" % str(nudged))
+		return
+	if bool(nudged.get("product_clock_pass", false)):
+		_fail("nudge catch-up must not claim product clock PASS")
+		return
+	_pass(
+		"softpipe starve catch-up past 7 Jan day=%s ticks=%s catchup=1 window_stay=1 (NOT product clock PASS) (%dms)"
+		% [str(armed.get("day")), str(armed.get("ticks")), ms]
 	)
 
 

@@ -230,6 +230,9 @@ func _test_source_live_input_routing() -> void:
 	if "func step_smoke_advance_chunk" not in _read(SRC_TM) or "window_stay" not in _read(SRC_TM):
 		_fail("TimeManager must chunk live smoke past-+6 (window_stay; no sync ×48)")
 		return
+	if "func nudge_smoke_advance_chunk" not in _read(SRC_TM) or "softpipe_catchup" not in _read(SRC_TM):
+		_fail("TimeManager must catch-up chunked smoke when softpipe frames are scarce")
+		return
 	if "func apply_smoke_advance_past_plus6" not in _read(SRC_TIB) or "_set_game_speed(4)" not in _read(SRC_TIB):
 		_fail("TopInfoBar must own smoke past-+6 via _set_game_speed(4)")
 		return
@@ -241,6 +244,9 @@ func _test_source_live_input_routing() -> void:
 		return
 	if "_poll_smoke_advance_past_plus6" not in tr or "window_stay" not in tr:
 		_fail("TestRunner must poll live chunked smoke and log window_stay")
+		return
+	if "_nudge_smoke_advance_past_plus6" not in tr:
+		_fail("TestRunner must nudge chunked smoke under softpipe starvation")
 		return
 	if "NOT product clock" not in title_src and "NOT product clock" not in tr:
 		_fail("smoke past-+6 must stay labeled as not product clock PASS")

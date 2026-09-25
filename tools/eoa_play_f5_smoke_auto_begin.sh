@@ -6,8 +6,9 @@
 # RAW_KEY=0, PTR=0, ESC=0; tip ae78507: hatch PASS, 4x/day still undelivered).
 # This wrapper sets EOA_SMOKE_AUTO_BEGIN=1 so the living title closes via
 # handle_live_begin, then EOA_SMOKE_ADVANCE_PAST_PLUS6=1 so the real TopInfoBar
-# 4x owner + TimeManager chunked advance_real_time (1 tick/frame, combat deferred)
-# drives past 7 Jan without a sync ×48 wedge.
+# 4x owner + TimeManager chunked advance_real_time (combat deferred; live
+# softpipe catch-up when idle frames are scarce) drives past 7 Jan without a
+# sync ×48 + combat-flush wedge.
 #
 # Does NOT claim product Begin / Esc / mouse CC / 4x / clock PASS. Leave those
 # FAIL until post-boot EOA_LIVE_RAW_* appears from a real click or key.

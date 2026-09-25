@@ -95,6 +95,10 @@ var _smoke_chunk_start_elapsed: int = 0
 var _smoke_chunk_start_hour: int = 0
 var _smoke_chunk_start_day: int = 0
 var _smoke_chunk_was_equiv: bool = false
+var _smoke_chunk_last_step_msec: int = 0
+var _smoke_chunk_idle_armed: bool = false
+var _smoke_chunk_catchup_why: String = ""
+const SMOKE_CHUNK_STARVE_MS := 150
 
 func _ready() -> void:
 	print("TimeManager: Initialized (default 1936-01-01)")
@@ -103,9 +107,13 @@ func _ready() -> void:
 
 
 func _process(_delta: float) -> void:
-	# Live smoke past-+6: one hour-tick per idle frame so the window stays up.
+	# Live smoke past-+6: keep the chunker moving even when softpipe frames are scarce.
 	if _smoke_chunk_active:
-		step_smoke_advance_chunk()
+		if smoke_advance_chunk_is_starved():
+			nudge_smoke_advance_chunk()
+		else:
+			step_smoke_advance_chunk()
+		_arm_smoke_chunk_idle_pump()
 		return
 	# Safety net: if deferred flush stalled (e.g. pause race), keep draining the queue.
 	if not paused and not _pending_sim_events.is_empty() and not _sim_flush_scheduled:
@@ -129,6 +137,11 @@ func _process(_delta: float) -> void:
 ## Called by ScenarioLoader when a scenario is loaded.
 ## Parses "YYYY-MM-DD" (falls back gracefully to year-only).
 func initialize_from_scenario_start_date(start_date_str: String) -> void:
+	# Do not disarm or rewind an in-flight live chunker. Hatch/era re-seed can
+	# land after `chunked start` and would otherwise drop the stepper with no past7.
+	if _smoke_chunk_active:
+		print("TimeManager: skip start-date reset (smoke chunk active)")
+		return
 	scenario_start_date = start_date_str.strip_edges()
 	if scenario_start_date.is_empty():
 		scenario_start_date = "1936-01-01"
@@ -154,12 +167,13 @@ func initialize_from_scenario_start_date(start_date_str: String) -> void:
 	current_hour = 0
 	_accumulated_game_hours = 0.0
 	total_days_elapsed = 0
-	_smoke_chunk_active = false
 	_smoke_chunk_stepping = false
 	_smoke_chunk_i = 0
 	_smoke_chunk_start_elapsed = 0
 	_smoke_chunk_start_hour = 0
 	_smoke_chunk_start_day = 1
+	_smoke_chunk_last_step_msec = 0
+	_smoke_chunk_idle_armed = false
 
 	print("TimeManager: Scenario start date set to %s (year %d)" % [scenario_start_date, current_year])
 
@@ -330,8 +344,9 @@ func apply_smoke_advance_past_plus6() -> Dictionary:
 	if has_meta("eoa_smoke_advance_applied") and bool(get_meta("eoa_smoke_advance_applied")):
 		return _smoke_advance_already_result()
 	if _smoke_chunk_active:
-		return _smoke_chunk_status_dict("chunked_pending")
-	# Live windowed Play: never sync ×48 advance_real_time (combat wedge / window death).
+		# Poller / TopInfoBar re-entry: step or catch-up, never sit on pending forever.
+		return nudge_smoke_advance_chunk()
+	# Live windowed Play: never sync ×48 + combat flush (window death).
 	# Headless DayTick keeps the sync loop. Force-chunk meta proves the live stepper -s.
 	if should_chunk_smoke_advance():
 		return _start_smoke_advance_chunked()
@@ -355,6 +370,26 @@ func smoke_advance_window_stay() -> bool:
 	return not ds.is_empty()
 
 
+func smoke_advance_should_catchup_on_arm() -> bool:
+	# Live windowed Play: after-hatch idle is already queued behind TestRunner
+	# deferred load. Waiting 1 tick/_process starves at ~16:00 (4 ticks) then hangs.
+	# Headless DayTick force-chunk stays pending so the pump test still proves
+	# the stepper. Meta eoa_smoke_force_softpipe_starve proves the catch-up -s.
+	if has_meta("eoa_smoke_force_softpipe_starve") and bool(get_meta("eoa_smoke_force_softpipe_starve")):
+		return true
+	if DisplayServer.get_name() == "headless" or OS.has_feature("dedicated_server"):
+		return false
+	return true
+
+
+func smoke_advance_chunk_is_starved() -> bool:
+	if not _smoke_chunk_active:
+		return false
+	if _smoke_chunk_last_step_msec <= 0:
+		return true
+	return (Time.get_ticks_msec() - _smoke_chunk_last_step_msec) >= SMOKE_CHUNK_STARVE_MS
+
+
 func step_smoke_advance_chunk() -> Dictionary:
 	if has_meta("eoa_smoke_advance_applied") and bool(get_meta("eoa_smoke_advance_applied")):
 		return _smoke_advance_already_result()
@@ -375,6 +410,7 @@ func step_smoke_advance_chunk() -> Dictionary:
 	advance_real_time(1.0)
 	_smoke_chunk_stepping = false
 	_smoke_chunk_i += 1
+	_smoke_chunk_last_step_msec = Time.get_ticks_msec()
 	# Do not flush the day_ai / day_battles queue here — one deferred event per
 	# frame keeps the live window alive. Combat is deferred while chunking.
 	if _smoke_chunk_i % 8 == 0 or _smoke_calendar_is_past_7_jan():
@@ -399,6 +435,61 @@ func pump_smoke_advance_chunk_until_past7(max_steps: int = 64) -> Dictionary:
 	return last
 
 
+func nudge_smoke_advance_chunk() -> Dictionary:
+	# Poller / idle / _process entry when frames may be scarce.
+	# Catch-up uses step_smoke_advance_chunk (no combat flush) — not sync ×48.
+	if has_meta("eoa_smoke_advance_applied") and bool(get_meta("eoa_smoke_advance_applied")):
+		return _smoke_advance_already_result()
+	if not _smoke_chunk_active:
+		return {
+			"ok": false,
+			"reason": "not_chunking",
+			"smoke_only": true,
+			"product_clock_pass": false,
+			"chunked": true,
+			"window_stay": smoke_advance_window_stay(),
+		}
+	if smoke_advance_chunk_is_starved():
+		return _smoke_chunk_catchup("nudge_starve")
+	return step_smoke_advance_chunk()
+
+
+func _smoke_chunk_catchup(why: String) -> Dictionary:
+	var starve_ms := 0
+	if _smoke_chunk_last_step_msec > 0:
+		starve_ms = Time.get_ticks_msec() - _smoke_chunk_last_step_msec
+	elif _smoke_chunk_i == 0:
+		starve_ms = SMOKE_CHUNK_STARVE_MS
+	_smoke_chunk_catchup_why = why
+	print(
+		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.softpipe_catchup why=%s starve_ms=%d ticks=%d window_stay=1 (NOT product clock PASS)"
+		% [why, starve_ms, _smoke_chunk_i]
+	)
+	# Calendar-only pump. step_smoke_advance_chunk never flushes day_ai / battles.
+	var last: Dictionary = pump_smoke_advance_chunk_until_past7(_smoke_chunk_ticks)
+	last["catchup"] = true
+	last["starve_ms"] = starve_ms
+	last["catchup_why"] = why
+	return last
+
+
+func _arm_smoke_chunk_idle_pump() -> void:
+	if not _smoke_chunk_active or _smoke_chunk_idle_armed:
+		return
+	_smoke_chunk_idle_armed = true
+	call_deferred("_smoke_chunk_idle_pump")
+
+
+func _smoke_chunk_idle_pump() -> void:
+	_smoke_chunk_idle_armed = false
+	if not _smoke_chunk_active or _smoke_chunk_stepping:
+		return
+	var i0 := _smoke_chunk_i
+	nudge_smoke_advance_chunk()
+	if _smoke_chunk_active and _smoke_chunk_i > i0:
+		_arm_smoke_chunk_idle_pump()
+
+
 func _start_smoke_advance_chunked() -> Dictionary:
 	mark_living_title_closed()
 	set_paused(false)
@@ -412,9 +503,20 @@ func _start_smoke_advance_chunked() -> Dictionary:
 	_smoke_chunk_start_elapsed = total_days_elapsed
 	_smoke_chunk_start_hour = current_hour
 	_smoke_chunk_start_day = current_day
+	_smoke_chunk_last_step_msec = 0
+	_smoke_chunk_idle_armed = false
+	_smoke_chunk_catchup_why = ""
 	print(
 		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 chunked start window_stay=1 (NOT product clock/Begin/Esc PASS)"
 	)
+	# Live softpipe: catch-up NOW (same idle as after_hatch) so past7 lands before
+	# TestRunner deferred grand visuals starve _process. Not sync ×48 + flush.
+	if smoke_advance_should_catchup_on_arm():
+		var caught: Dictionary = _smoke_chunk_catchup("arm")
+		if _smoke_chunk_active:
+			_arm_smoke_chunk_idle_pump()
+		return caught
+	_arm_smoke_chunk_idle_pump()
 	return _smoke_chunk_status_dict("chunked_pending")
 
 
@@ -534,8 +636,9 @@ func _smoke_advance_finish_dict(
 	var past_plus6 := elapsed_delta >= 7 and past_7_jan
 	var ok := (not paused) and past_plus6 and past_7_jan and hour_delta >= 24
 	var stay := smoke_advance_window_stay()
+	var catchup_on := not _smoke_chunk_catchup_why.is_empty()
 	print(
-		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 ticks=%d date=%04d-%02d-%02d %02d:00 elapsed=%d past7=%s paused=%s window_stay=%s chunked=%s (NOT product clock/Begin/Esc PASS)"
+		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=tm.apply_smoke_advance_past_plus6 ticks=%d date=%04d-%02d-%02d %02d:00 elapsed=%d past7=%s paused=%s window_stay=%s chunked=%s catchup=%s (NOT product clock/Begin/Esc PASS)"
 		% [
 			ticks_done,
 			current_year,
@@ -547,6 +650,7 @@ func _smoke_advance_finish_dict(
 			str(paused),
 			"1" if stay else "0",
 			"1" if chunked else "0",
+			"1" if catchup_on else "0",
 		]
 	)
 	return {
@@ -567,6 +671,8 @@ func _smoke_advance_finish_dict(
 		"product_clock_pass": false,
 		"chunked": chunked,
 		"window_stay": stay,
+		"catchup": catchup_on,
+		"catchup_why": _smoke_chunk_catchup_why,
 		"live_f5_equiv": true,
 		"living_playtest_clock": false,
 	}

@@ -883,10 +883,21 @@ func _smoke_advance_past_plus6_after_hatch() -> void:
 func _poll_smoke_advance_past_plus6() -> void:
 	if has_meta("eoa_smoke_advance_done"):
 		return
-	var out: Dictionary = _call_smoke_advance_past_plus6()
+	# Softpipe: do not only re-read pending. Nudge the chunker so a scarce
+	# idle frame still consumes ticks (catch-up if starved).
+	var out: Dictionary = _nudge_smoke_advance_past_plus6()
 	if str(out.get("reason", "")) == "chunked_pending":
 		return
 	_finish_smoke_advance_after_hatch(out)
+
+
+func _nudge_smoke_advance_past_plus6() -> Dictionary:
+	var tm: Node = get_node_or_null("/root/TimeManager")
+	if tm != null and tm.has_method("nudge_smoke_advance_chunk"):
+		return tm.call("nudge_smoke_advance_chunk") as Dictionary
+	if tm != null and tm.has_method("step_smoke_advance_chunk"):
+		return tm.call("step_smoke_advance_chunk") as Dictionary
+	return _call_smoke_advance_past_plus6()
 
 
 func _call_smoke_advance_past_plus6() -> Dictionary:
@@ -898,6 +909,8 @@ func _call_smoke_advance_past_plus6() -> Dictionary:
 		var tm: Node = get_node_or_null("/root/TimeManager")
 		if tm != null and tm.has_method("apply_smoke_advance_past_plus6"):
 			out = tm.call("apply_smoke_advance_past_plus6") as Dictionary
+		elif tm != null and tm.has_method("nudge_smoke_advance_chunk"):
+			out = tm.call("nudge_smoke_advance_chunk") as Dictionary
 		elif tm != null and tm.has_method("step_smoke_advance_chunk"):
 			out = tm.call("step_smoke_advance_chunk") as Dictionary
 	return out
@@ -910,12 +923,13 @@ func _finish_smoke_advance_after_hatch(out: Dictionary) -> void:
 	if has_meta("eoa_smoke_advance_chunking"):
 		remove_meta("eoa_smoke_advance_chunking")
 	print(
-		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner.after_hatch ok=%s past7=%s date=%s window_stay=%s (NOT product clock PASS)"
+		"EOA_SMOKE_ADVANCE_PAST_PLUS6 who=TestRunner.after_hatch ok=%s past7=%s date=%s window_stay=%s catchup=%s (NOT product clock PASS)"
 		% [
 			str(out.get("ok", false)),
 			str(out.get("past_7_jan", false)),
 			"%s-%s-%s %s:00" % [str(out.get("year", 0)), str(out.get("month", 0)), str(out.get("day", 0)), str(out.get("hour", 0))],
 			"1" if bool(out.get("window_stay", true)) else "0",
+			"1" if bool(out.get("catchup", false)) else "0",
 		]
 	)
 

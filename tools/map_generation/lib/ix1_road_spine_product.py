@@ -561,6 +561,11 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         missing.append("living_title_smoke_advance_past_plus6")
     if "func apply_smoke_advance_past_plus6" not in _read(TIME_MANAGER_GD):
         missing.append("timemanager_smoke_advance_past_plus6")
+    if (
+        "func nudge_smoke_advance_chunk" not in _read(TIME_MANAGER_GD)
+        or "softpipe_catchup" not in _read(TIME_MANAGER_GD)
+    ):
+        missing.append("timemanager_smoke_softpipe_catchup")
     if "func apply_smoke_advance_past_plus6" not in _read(TOP_INFO_GD) or "_set_game_speed(4)" not in _read(TOP_INFO_GD):
         missing.append("topbar_smoke_advance_past_plus6")
     if (
@@ -568,6 +573,8 @@ def ix1_day_tick_unblocked() -> Dict[str, Any]:
         or "_smoke_advance_past_plus6_after_hatch" not in _read(TEST_RUNNER_GD)
     ):
         missing.append("testrunner_smoke_advance_past_plus6")
+    if "_nudge_smoke_advance_past_plus6" not in _read(TEST_RUNNER_GD):
+        missing.append("testrunner_smoke_softpipe_nudge")
     if "apply_smoke_advance_past_plus6" not in _read(DAY_TICK_HARNESS):
         missing.append("day_tick_smoke_advance_harness")
     if (
