@@ -209,6 +209,9 @@ static func _edge_cost(
 		return 999.0
 	var move := to_p.get_movement_cost()
 	var cost := move * rules.get_float("routing", "base_days_per_movement_cost", 0.45)
+	# RX-1: trivial supply-pathing hook — same edge multiplier as movement.
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("rx1_move_mult"):
+		cost *= float(MapManager.rx1_move_mult(int(_from_id), int(to_id)))
 	var hub: ProvinceSupplyHub = hubs.get(to_id)
 	if hub != null:
 		cost *= rules.get_float("routing", "hub_transit_discount", 0.72)

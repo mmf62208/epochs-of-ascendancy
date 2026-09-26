@@ -61,6 +61,14 @@ var _ix1_spine_press_guard_msec: int = 0
 var _ix1_last_spine_press: Dictionary = {}
 var _ix1_last_progress_band: int = -1
 const IX1_SPINE_PRESS_GUARD_MS := 180
+var _rx1_rhine_layer: Node2D = null
+var _btn_build_rhine_bridge: Button = null
+var _label_rx1_progress: Label = null
+var _rx1_reveal_busy: bool = false
+var _rx1_inspector_pid: int = -1
+var _rx1_press_guard_msec: int = 0
+var _rx1_last_press: Dictionary = {}
+const RX1_PRESS_GUARD_MS := 180
 var _btn_develop_resource: Button = null
 var _label_invest_status: Label = null
 var _progress_invest: ProgressBar = null
@@ -1635,6 +1643,9 @@ func _road_spine_btn_owns_click() -> bool:
 	var mouse_sp: Vector2 = vp_sp.get_mouse_position()
 	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
 		if _btn_build_road_spine.get_global_rect().grow(6.0).has_point(mouse_sp):
+			return true
+	if _btn_build_rhine_bridge != null and is_instance_valid(_btn_build_rhine_bridge) and _btn_build_rhine_bridge.visible:
+		if _btn_build_rhine_bridge.get_global_rect().grow(6.0).has_point(mouse_sp):
 			return true
 	if info_panel == null or not (info_panel is Control) or not (info_panel as Control).visible:
 		return false
@@ -3542,6 +3553,8 @@ func _layout_info_panel_inner() -> void:
 	var header_h := 40.0
 	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine) and _btn_build_road_spine.visible:
 		header_h = 68.0
+	if _btn_build_rhine_bridge != null and is_instance_valid(_btn_build_rhine_bridge) and _btn_build_rhine_bridge.visible:
+		header_h = maxf(header_h, 96.0)
 
 	if btn_national_spirits != null:
 		btn_national_spirits.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -14747,6 +14760,7 @@ func _render_provinces_finish(raster_preserved: Dictionary) -> void:
 	_setup_agent_presence_layer()
 	_setup_agent_layer()
 	_setup_infrastructure_overlay_layer()
+	_setup_rx1_rhine_layer()
 	call_deferred("_setup_terrain_layer_stack")
 	call_deferred("_setup_weather_overlay_layer")
 	_refresh_supply_highlights()
@@ -18642,6 +18656,12 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 	_refresh_oob_strip_for_province(province)
 	# Köln Search+Go must keep Build Road Spine on the live chrome, not only in buried scroll.
 	_reveal_ix1_road_spine_on_inspector(province, false)
+	_reveal_rx1_rhine_on_inspector(province)
+	if info_combat != null:
+		var rhine_lines: PackedStringArray = Rx1RhineCrossing.inspector_lines(province.id)
+		if rhine_lines.size() > 0:
+			# Inspector copy: "Rhine crossing: bridged" / "Rhine crossing: no bridge"
+			info_combat.text += "\n" + "\n".join(rhine_lines)
 
 
 func _ensure_oob_strip() -> void:
@@ -20288,8 +20308,28 @@ func _layout_road_spine_chrome_button() -> void:
 	_btn_build_road_spine.size = Vector2(width, height)
 
 
+func inspector_should_show_spine_status(province_id: int) -> bool:
+	# FIX1: IX-1 "Road spine" chrome only on Bonn / Köln / Leverkusen — never Neuss 710413.
+	return province_id == 710416 or province_id == 710417 or province_id == 710418
+
+
+func _hide_ix1_spine_inspector_chrome() -> void:
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
+		_btn_build_road_spine.visible = false
+	if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+		_label_spine_progress.visible = false
+	if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
+		_label_spine_start_notice.visible = false
+	if _special_sites_container != null and is_instance_valid(_special_sites_container):
+		var stale: Node = _special_sites_container.get_node_or_null("Ix1SpineBuildRow")
+		if stale != null:
+			stale.visible = false
+
+
 func _ix1_should_show_spine_button(province: Province) -> bool:
 	if province == null:
+		return false
+	if not inspector_should_show_spine_status(province.id):
 		return false
 	var mgr = _get_infra_manager()
 	if mgr != null and mgr.has_method("should_show_road_spine_button"):
@@ -20299,7 +20339,7 @@ func _ix1_should_show_spine_button(province: Province) -> bool:
 	if mgr != null and mgr.has_method("is_ix1_road_spine_province"):
 		if not bool(mgr.is_ix1_road_spine_province(province.id)):
 			return false
-	elif province.id != 710416 and province.id != 710417 and province.id != 710418:
+	elif not inspector_should_show_spine_status(province.id):
 		return false
 	if province.is_sea:
 		return false
@@ -20383,16 +20423,14 @@ func _update_road_spine_button(province: Province) -> void:
 		return
 	var mgr = _get_infra_manager()
 	if province == null:
-		_btn_build_road_spine.visible = false
-		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
-			_label_spine_progress.visible = false
-		if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
-			_label_spine_start_notice.visible = false
+		_hide_ix1_spine_inspector_chrome()
 		return
 	var show_btn := _ix1_should_show_spine_button(province)
 	_btn_build_road_spine.visible = show_btn
 	_pin_road_spine_button_to_inspector_chrome()
 	if not show_btn:
+		# Play MIXED 9750f3d: leftover Köln chrome leaked onto Neuss 710413.
+		_hide_ix1_spine_inspector_chrome()
 		return
 	_btn_build_road_spine.visible = true
 	var status: Dictionary = {}
@@ -20593,6 +20631,14 @@ func _log_smoke_spine_complete(pid: int, who: String = "MapRenderer") -> void:
 
 
 func _apply_spine_building_button_state(pid: int, pct: int, eta: int) -> void:
+	# Never paint IX-1 chrome onto a non-spine inspector (Neuss 710413).
+	var open_pid := _ix1_spine_inspector_pid if _ix1_spine_inspector_pid >= 0 else selected_province_id
+	if open_pid >= 0 and not inspector_should_show_spine_status(open_pid):
+		_hide_ix1_spine_inspector_chrome()
+		return
+	if not inspector_should_show_spine_status(pid):
+		_hide_ix1_spine_inspector_chrome()
+		return
 	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
 		_btn_build_road_spine.visible = true
 		_btn_build_road_spine.disabled = true
@@ -20655,7 +20701,7 @@ func _layout_spine_progress_label() -> void:
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
 	_label_spine_progress.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	_label_spine_progress.position = Vector2(8.0, 96.0)
+	_label_spine_progress.position = Vector2(8.0, 94.0)
 	_label_spine_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 22.0)
 	_label_spine_progress.size = _label_spine_progress.custom_minimum_size
 	_layout_spine_start_notice()
@@ -20691,6 +20737,355 @@ func _layout_spine_start_notice() -> void:
 	_label_spine_start_notice.position = Vector2(8.0, 120.0)
 	_label_spine_start_notice.custom_minimum_size = Vector2(minf(500.0, maxf(280.0, panel_w - 24.0)), 22.0)
 	_label_spine_start_notice.size = _label_spine_start_notice.custom_minimum_size
+
+
+func _setup_rx1_rhine_layer() -> void:
+	# Vector Rhine is _draw-only. Never rebuild on zoom.
+	if container == null:
+		return
+	var existing := get_overlay_layer("Rx1RhineLayer")
+	if existing != null and is_instance_valid(existing):
+		_rx1_rhine_layer = existing
+		existing.z_as_relative = false
+		existing.z_index = 36
+		if existing.has_method("refresh"):
+			existing.call("refresh")
+		return
+	var LayerScript := load("res://scripts/map/Rx1RhineLayer.gd")
+	if LayerScript == null:
+		return
+	var layer: Node = LayerScript.new() if LayerScript is GDScript else null
+	if layer == null:
+		return
+	# z=36 sits above DemoUnitIcon z=28. Layer also sets ABOVE_UNIT_COUNTERS_Z in _ready.
+	add_overlay_layer("Rx1RhineLayer", layer as Node2D, 36)
+	_rx1_rhine_layer = layer as Node2D
+	if _rx1_rhine_layer != null:
+		_rx1_rhine_layer.z_as_relative = false
+		_rx1_rhine_layer.z_index = 36
+	Rx1RhineCrossing.ensure_loaded()
+
+
+func refresh_rx1_rhine_layer() -> void:
+	if _rx1_rhine_layer != null and is_instance_valid(_rx1_rhine_layer) and _rx1_rhine_layer.has_method("refresh"):
+		_rx1_rhine_layer.call("refresh")
+	elif container != null:
+		_setup_rx1_rhine_layer()
+
+
+func set_rx1_bridge_preview(state: String, _pid: int, _pct: float) -> void:
+	# Three visual states: queued / under construction / built. _draw only.
+	refresh_rx1_rhine_layer()
+	if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+		if state == "construction":
+			_label_rx1_progress.visible = true
+		elif state == "built":
+			_label_rx1_progress.text = "Rhine bridge complete"
+			_label_rx1_progress.visible = true
+
+
+func _reveal_rx1_rhine_on_inspector(province: Province) -> void:
+	if province == null or _rx1_reveal_busy:
+		return
+	_rx1_reveal_busy = true
+	_rx1_inspector_pid = province.id
+	_ensure_rhine_bridge_button()
+	_update_rhine_bridge_button(province)
+	_rx1_reveal_busy = false
+
+
+func _ensure_rhine_bridge_button() -> void:
+	if _btn_build_rhine_bridge == null or not is_instance_valid(_btn_build_rhine_bridge):
+		_btn_build_rhine_bridge = Button.new()
+		_btn_build_rhine_bridge.name = "BtnBuildRhineBridge"
+		_btn_build_rhine_bridge.text = "Build Bridge"
+		_btn_build_rhine_bridge.tooltip_text = "RX-1: build a 1936-era road bridge on the unbridged Rhine crossing. First-session Mandate grant (same class as IX-1 spine starter)."
+		_btn_build_rhine_bridge.custom_minimum_size = Vector2(220, 24)
+		_btn_build_rhine_bridge.visible = false
+	_wire_rhine_bridge_live_button(_btn_build_rhine_bridge)
+	_pin_rhine_bridge_button_to_inspector_chrome()
+
+
+func _wire_rhine_bridge_live_button(btn: Button) -> void:
+	if btn == null or not is_instance_valid(btn):
+		return
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	btn.z_index = 20
+	if not btn.pressed.is_connected(_on_build_rhine_bridge_pressed):
+		btn.pressed.connect(_on_build_rhine_bridge_pressed)
+	if not btn.button_down.is_connected(_on_build_rhine_bridge_pressed):
+		btn.button_down.connect(_on_build_rhine_bridge_pressed)
+	if not btn.gui_input.is_connected(_on_build_rhine_bridge_gui_input):
+		btn.gui_input.connect(_on_build_rhine_bridge_gui_input)
+
+
+func _pin_rhine_bridge_button_to_inspector_chrome() -> void:
+	if _btn_build_rhine_bridge == null or not is_instance_valid(_btn_build_rhine_bridge):
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	var parent: Node = _btn_build_rhine_bridge.get_parent()
+	if parent != ip:
+		if parent != null:
+			parent.remove_child(_btn_build_rhine_bridge)
+		ip.add_child(_btn_build_rhine_bridge)
+	_wire_rhine_bridge_live_button(_btn_build_rhine_bridge)
+	_layout_rhine_bridge_chrome_button()
+
+
+func _layout_rhine_bridge_chrome_button() -> void:
+	if _btn_build_rhine_bridge == null or not is_instance_valid(_btn_build_rhine_bridge):
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	var panel_w := absf(ip.offset_right - ip.offset_left)
+	if panel_w < 80.0:
+		panel_w = maxf(ip.size.x, 520.0)
+	# Stack below IX-1 chrome when that chrome is actually visible (Köln).
+	# On Neuss the spine row is hidden — sit at the first chrome row so we
+	# do not overlap a leftover "Road spine" label (Play MIXED 9750f3d).
+	var left := 8.0
+	var spine_up := (
+		_btn_build_road_spine != null
+		and is_instance_valid(_btn_build_road_spine)
+		and _btn_build_road_spine.visible
+	)
+	var top := 146.0 if spine_up else 66.0
+	var height := 26.0
+	var width := minf(480.0, maxf(220.0, panel_w - left - 16.0))
+	_btn_build_rhine_bridge.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	_btn_build_rhine_bridge.position = Vector2(left, top)
+	_btn_build_rhine_bridge.custom_minimum_size = Vector2(220, height)
+	_btn_build_rhine_bridge.size = Vector2(width, height)
+
+
+func _rx1_should_show_bridge_button(province: Province) -> bool:
+	if province == null:
+		return false
+	var mgr = _get_infra_manager()
+	if mgr != null and mgr.has_method("should_show_build_bridge_button"):
+		return bool(mgr.should_show_build_bridge_button(province.id, _player_tag()))
+	if not Rx1RhineCrossing.is_crossing_province(province.id):
+		return false
+	return not Rx1RhineCrossing.first_unbridged_for(province.id).is_empty()
+
+
+func _update_rhine_bridge_button(province: Province) -> void:
+	_ensure_rhine_bridge_button()
+	if _btn_build_rhine_bridge == null or not is_instance_valid(_btn_build_rhine_bridge):
+		return
+	if province == null:
+		_btn_build_rhine_bridge.visible = false
+		if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+			_label_rx1_progress.visible = false
+		return
+	var show_btn := _rx1_should_show_bridge_button(province)
+	_btn_build_rhine_bridge.visible = show_btn
+	_pin_rhine_bridge_button_to_inspector_chrome()
+	if not show_btn:
+		return
+	var mgr = _get_infra_manager()
+	var status: Dictionary = {}
+	if mgr != null and mgr.has_method("get_project_status"):
+		status = mgr.get_project_status(province.id)
+	var active := bool(status.get("active", false))
+	var bridge_proj := bool(status.get("build_rhine_bridge", false))
+	if active and bridge_proj:
+		var eta := int(status.get("eta_days", 0))
+		var pct := int(round(float(status.get("progress", 0.0))))
+		_btn_build_rhine_bridge.disabled = true
+		_btn_build_rhine_bridge.text = "Building…"
+		_btn_build_rhine_bridge.tooltip_text = "Rhine bridge %d%% · ETA %d days" % [pct, eta]
+		_ensure_rx1_progress_label()
+		if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+			_label_rx1_progress.visible = true
+			_label_rx1_progress.text = "Rhine bridge %d%% · ETA %d days" % [pct, eta]
+	else:
+		_btn_build_rhine_bridge.disabled = false
+		_btn_build_rhine_bridge.text = "Build Bridge"
+		_btn_build_rhine_bridge.tooltip_text = "RX-1: build a road Rhine bridge on the unbridged Neuss–Mettmann crossing. First-session Mandate grant."
+		if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+			_label_rx1_progress.visible = false
+	_layout_rhine_bridge_chrome_button()
+	_layout_rx1_progress_label()
+
+
+func _rx1_target_province_id() -> int:
+	if selected_province_id >= 0:
+		return selected_province_id
+	if _rx1_inspector_pid >= 0:
+		return _rx1_inspector_pid
+	return -1
+
+
+func _on_build_rhine_bridge_gui_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton):
+		return
+	var mb: InputEventMouseButton = event
+	if not mb.pressed or mb.button_index != MOUSE_BUTTON_LEFT:
+		return
+	_on_build_rhine_bridge_pressed()
+	if _btn_build_rhine_bridge != null and is_instance_valid(_btn_build_rhine_bridge):
+		_btn_build_rhine_bridge.accept_event()
+	var vp_sp: Viewport = get_viewport()
+	if vp_sp != null:
+		vp_sp.set_input_as_handled()
+
+
+func _on_build_rhine_bridge_pressed() -> void:
+	var now_ms: int = Time.get_ticks_msec()
+	if now_ms - _rx1_press_guard_msec < RX1_PRESS_GUARD_MS:
+		return
+	_rx1_press_guard_msec = now_ms
+	var pid: int = _rx1_target_province_id()
+	var chrome_vis := _btn_build_rhine_bridge != null and is_instance_valid(_btn_build_rhine_bridge) and _btn_build_rhine_bridge.visible
+	if pid < 0:
+		_rx1_last_press = {"ok": false, "armed": false, "visible": chrome_vis, "pid": pid, "reason": "no_province"}
+		_log_smoke_rx1_start(_rx1_last_press)
+		_show_inspector_toast("Rhine bridge: open Neuss first", 2.5, true)
+		return
+	var mgr = _get_infra_manager()
+	if mgr == null or not mgr.has_method("try_start_rhine_bridge"):
+		_rx1_last_press = {"ok": false, "armed": false, "visible": chrome_vis, "pid": pid, "reason": "manager_missing"}
+		_log_smoke_rx1_start(_rx1_last_press)
+		_show_inspector_toast("Rhine bridge unavailable", 2.5, true)
+		return
+	var result: Dictionary = mgr.try_start_rhine_bridge(pid, _player_tag())
+	var armed := bool(result.get("success", false))
+	_rx1_last_press = {
+		"ok": armed,
+		"armed": armed,
+		"visible": chrome_vis,
+		"pid": pid,
+		"reason": str(result.get("reason", "")),
+		"eta_days": int(result.get("eta_days", 0)),
+	}
+	_log_smoke_rx1_start(_rx1_last_press)
+	if armed:
+		var eta := int(result.get("eta_days", 36))
+		var pname := ""
+		if provinces.has(pid):
+			pname = provinces[pid].name
+		_apply_rx1_building_button_state(pid, 0, eta)
+		_show_inspector_toast("Rhine bridge started in %s · ETA %d days" % [pname, eta], 3.0)
+		if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
+			LeaderEventUI.show_toast("Rhine bridge started in %s · ETA %d days" % [pname, eta], 3.5)
+		_play_map_sfx("confirm")
+		call_deferred("_rx1_bridge_start_after_first_frame", pid)
+	else:
+		_show_inspector_toast(str(result.get("reason", "Cannot start Rhine bridge")), 3.5, true)
+		_play_map_sfx("error")
+
+
+func _rx1_bridge_start_after_first_frame(pid: int) -> void:
+	if provinces.has(pid):
+		show_info_panel(provinces[pid])
+		var eta_defer := int(_rx1_last_press.get("eta_days", 36))
+		_apply_rx1_building_button_state(pid, 0, eta_defer)
+	focus_province_by_id(pid, "soft")
+
+
+func deliver_rx1_bridge_button_mouse_press() -> Dictionary:
+	# Smoke / live-progress only. Viewport mouse → MapRenderer.button.
+	if _btn_build_rhine_bridge == null or not is_instance_valid(_btn_build_rhine_bridge):
+		eoa_log_flush("EOA_SMOKE_RX1_START who=MapRenderer.deliver_mouse reason=no_button")
+		return {"ok": false, "reason": "no_button"}
+	var btn: Button = _btn_build_rhine_bridge
+	btn.visible = true
+	_layout_rhine_bridge_chrome_button()
+	var rect: Rect2 = btn.get_global_rect()
+	var pos: Vector2 = rect.get_center()
+	var vp: Viewport = btn.get_viewport()
+	if vp == null:
+		vp = get_viewport()
+	if vp == null:
+		return {"ok": false, "reason": "no_viewport"}
+	if DisplayServer.get_name() != "headless":
+		DisplayServer.warp_mouse(Vector2i(int(round(pos.x)), int(round(pos.y))))
+	var ev := InputEventMouseButton.new()
+	ev.button_index = MOUSE_BUTTON_LEFT
+	ev.pressed = true
+	ev.position = pos
+	ev.global_position = pos
+	vp.push_input(ev, true)
+	btn.gui_input.emit(ev)
+	eoa_log_flush("EOA_SMOKE_RX1_START who=MapRenderer.deliver_mouse pushed=1")
+	return {"ok": true, "reason": "viewport_mouse", "pos": pos}
+
+
+func press_build_rhine_bridge_from_live_ui() -> Dictionary:
+	_rx1_press_guard_msec = 0
+	_on_build_rhine_bridge_pressed()
+	return _rx1_last_press.duplicate()
+
+
+func _log_smoke_rx1_start(report: Dictionary) -> void:
+	eoa_log_flush(
+		"EOA_SMOKE_RX1_START who=MapRenderer.press visible=%s armed=%s pid=%s reason=%s (live press; NOT product Begin/Esc/clock PASS)"
+		% [
+			"1" if bool(report.get("visible", false)) else "0",
+			"1" if bool(report.get("armed", false)) else "0",
+			str(int(report.get("pid", -1))),
+			str(report.get("reason", "")),
+		]
+	)
+
+
+func _apply_rx1_building_button_state(pid: int, pct: int, eta: int) -> void:
+	if _btn_build_rhine_bridge != null and is_instance_valid(_btn_build_rhine_bridge):
+		_btn_build_rhine_bridge.visible = true
+		_btn_build_rhine_bridge.disabled = true
+		_btn_build_rhine_bridge.text = "Building…"
+		_btn_build_rhine_bridge.tooltip_text = "Rhine bridge %d%% · ETA %d days" % [pct, eta]
+	_ensure_rx1_progress_label()
+	if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+		_label_rx1_progress.visible = true
+		_label_rx1_progress.text = "Rhine bridge %d%% · ETA %d days" % [pct, eta]
+	eoa_log_flush("EOA_SMOKE_RX1_PROGRESS who=MapRenderer.button pid=%d pct=%d eta=%d" % [pid, pct, eta])
+
+
+func _ensure_rx1_progress_label() -> void:
+	if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+		_layout_rx1_progress_label()
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	_label_rx1_progress = Label.new()
+	_label_rx1_progress.name = "LabelRx1BridgeProgress"
+	_label_rx1_progress.text = ""
+	_label_rx1_progress.visible = false
+	_label_rx1_progress.add_theme_font_size_override("font_size", 12)
+	_label_rx1_progress.modulate = Color(0.72, 0.88, 0.98, 1.0)
+	_label_rx1_progress.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	(info_panel as Control).add_child(_label_rx1_progress)
+	_layout_rx1_progress_label()
+
+
+func _layout_rx1_progress_label() -> void:
+	if _label_rx1_progress == null or not is_instance_valid(_label_rx1_progress):
+		return
+	if info_panel == null or not (info_panel is Control):
+		return
+	var ip := info_panel as Control
+	var panel_w := absf(ip.offset_right - ip.offset_left)
+	if panel_w < 80.0:
+		panel_w = maxf(ip.size.x, 520.0)
+	_label_rx1_progress.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	# Below Build Bridge. Spine notice stays at y=120 only on Bonn/Köln/Leverkusen.
+	var spine_up := (
+		_btn_build_road_spine != null
+		and is_instance_valid(_btn_build_road_spine)
+		and _btn_build_road_spine.visible
+	)
+	var top := 174.0 if spine_up else 94.0
+	_label_rx1_progress.position = Vector2(8.0, top)
+	_label_rx1_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 22.0)
+	_label_rx1_progress.size = _label_rx1_progress.custom_minimum_size
 
 
 func drive_ix1_zoom_and_roadlayer_redraw(zoom_mode: String = "soft") -> Dictionary:

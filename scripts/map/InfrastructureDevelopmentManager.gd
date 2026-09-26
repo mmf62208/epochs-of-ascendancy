@@ -12,6 +12,9 @@
 
 extends Node
 
+## Preload so a stale class cache cannot fail this autoload at parse (Play attempt 1).
+const _Rx1Rhine := preload("res://scripts/map/Rx1RhineCrossing.gd")
+
 signal project_started(project: ProvincialProject)
 signal project_progress_updated(province_id: int, project: ProvincialProject, work_delta: float)
 signal project_completed(province_id: int, new_level: int, axis: String, project: ProvincialProject)
@@ -24,6 +27,7 @@ var _ix1_smoke_progress_band: int = -1
 var _ix1_skip_full_board_ai_invest: bool = false
 var _ix1_spine_visual_state: String = ""
 var _ix1_spine_states_seen: Array[String] = []
+var _rx1_bridge_visual_state: String = ""
 
 # --- Inner data model (can be promoted to its own Resource later) ---
 class ProvincialProject:
@@ -42,6 +46,8 @@ class ProvincialProject:
 	var status: String = "active"                # active | paused | sabotaged | complete | cancelled
 	var build_road_spine: bool = false           # IX-1: complete also writes built_road_neighbors
 	var spine_neighbor_ids: Array[int] = []
+	var build_rhine_bridge: bool = false         # RX-1: complete flips the named crossing to bridged
+	var bridge_edge: Array[int] = []
 
 	func get_id() -> String:
 		if id.is_empty():
@@ -87,7 +93,9 @@ class ProvincialProject:
 			"days_remaining": days_remaining,
 			"status": status,
 			"build_road_spine": build_road_spine,
-			"spine_neighbor_ids": spine_neighbor_ids.duplicate()
+			"spine_neighbor_ids": spine_neighbor_ids.duplicate(),
+			"build_rhine_bridge": build_rhine_bridge,
+			"bridge_edge": bridge_edge.duplicate(),
 		}
 
 	static func from_save_dict(d: Dictionary) -> ProvincialProject:
@@ -109,6 +117,10 @@ class ProvincialProject:
 		var raw_n: Variant = d.get("spine_neighbor_ids", [])
 		if raw_n is Array:
 			p.spine_neighbor_ids = Array(raw_n, TYPE_INT, "", null)
+		p.build_rhine_bridge = bool(d.get("build_rhine_bridge", false))
+		var raw_e: Variant = d.get("bridge_edge", [])
+		if raw_e is Array:
+			p.bridge_edge = Array(raw_e, TYPE_INT, "", null)
 		return p
 
 
@@ -363,13 +375,21 @@ func advance_daily_projects(_year: int, _month: int, _day: int) -> void:
 				if proj.progress > 0.001:
 					_set_ix1_spine_visual_state("construction", pid, proj.progress)
 				_log_smoke_spine_progress(pid, int(round(proj.progress)), proj.get_eta_days(), "IDM.advance_daily")
+			if proj.build_rhine_bridge:
+				if proj.progress > 0.001:
+					_set_rx1_bridge_visual_state("construction", pid, proj.progress)
+				_log_smoke_rx1_progress(pid, int(round(proj.progress)), proj.get_eta_days(), "IDM.advance_daily")
 			# Light event feedback for playability (avoid spam; only on significant chunks or high %).
 			if (int(proj.progress) % 25 == 0 or proj.progress > 90) and typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("show_toast"):
 				var pname := p.name if p else str(pid)
 				var toast_txt := (
 					"Road spine ~%d%% · ETA %d days" % [int(proj.progress), proj.get_eta_days()]
 					if proj.build_road_spine
-					else "%s infra project ~%d%% complete (ETA %d days)" % [pname, int(proj.progress), proj.get_eta_days()]
+					else (
+						"Rhine bridge ~%d%% · ETA %d days" % [int(proj.progress), proj.get_eta_days()]
+						if proj.build_rhine_bridge
+						else "%s infra project ~%d%% complete (ETA %d days)" % [pname, int(proj.progress), proj.get_eta_days()]
+					)
 				)
 				LeaderEventUI.show_toast(toast_txt, 2.0)
 
@@ -477,10 +497,14 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 		# still mark the spine COMPLETE so calendar ticks that reach 100%
 		# emit built (edges need the hex on-tree — RoadLayer is skipped).
 		active_projects.erase(province_id)
-		if proj != null and proj.build_road_spine:
+		if proj != null and (proj.build_road_spine or proj.build_rhine_bridge):
 			proj.status = "complete"
-			_set_ix1_spine_visual_state("built", province_id, 100.0)
-			_log_smoke_spine_complete(province_id, "IDM.complete")
+			if proj.build_road_spine:
+				_set_ix1_spine_visual_state("built", province_id, 100.0)
+				_log_smoke_spine_complete(province_id, "IDM.complete")
+			if proj.build_rhine_bridge:
+				_apply_rx1_bridge_complete(proj)
+				_log_smoke_rx1_complete(province_id, "IDM.complete")
 			print(
 				"InfrastructureDevelopmentManager: COMPLETED %s project on province %d (hex off-tree)"
 				% [proj.axis, province_id]
@@ -502,6 +526,8 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 
 	if proj.build_road_spine:
 		link_ix1_road_spine_edges(province_id, proj.spine_neighbor_ids)
+	if proj.build_rhine_bridge:
+		_apply_rx1_bridge_complete(proj)
 
 	# Wire to pop/econ (per goals + DESIGN): infra upgrade attracts population (industrialization pull) + labor for future production.
 	# Uses direct mutate + notify (pop is runtime in Province; settlement also boosted for org/attrit/supply combat payoff).
@@ -533,6 +559,14 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 			)
 			if LeaderEventUI.has_method("show_toast"):
 				LeaderEventUI.show_toast("Road spine complete in %s · infra %d · edges live" % [pname, new_level], 4.0)
+		elif proj.build_rhine_bridge:
+			LeaderEventUI.post_news(
+				"RX-1 Rhine Bridge Complete",
+				"Rhine bridge finished at %s. Crossing is now bridged (hop ×1.15, attack −10%%)." % pname,
+				"infrastructure",
+			)
+			if LeaderEventUI.has_method("show_toast"):
+				LeaderEventUI.show_toast("Rhine bridge complete at %s" % pname, 4.0)
 		else:
 			LeaderEventUI.post_news("Infrastructure Complete", "%s project finished in %s (now level %d). Local supply, org recovery, and combat width improved for %s." % [axis.capitalize(), pname, new_level, proj.owner_tag], "infrastructure")
 			if LeaderEventUI.has_method("show_toast"):
@@ -542,6 +576,8 @@ func _complete_project(province_id: int, proj: ProvincialProject) -> void:
 	if proj.build_road_spine:
 		_set_ix1_spine_visual_state("built", province_id, 100.0)
 		_log_smoke_spine_complete(province_id, "IDM.complete")
+	if proj.build_rhine_bridge:
+		_log_smoke_rx1_complete(province_id, "IDM.complete")
 
 
 func _get_era_max(country_tag: String, axis: String) -> int:
@@ -908,6 +944,8 @@ func get_project_status(province_id: int) -> Dictionary:
 		"current_dev": p.development_level if p else 0,
 		"build_road_spine": proj.build_road_spine,
 		"spine_neighbor_ids": proj.spine_neighbor_ids.duplicate(),
+		"build_rhine_bridge": proj.build_rhine_bridge,
+		"bridge_edge": proj.bridge_edge.duplicate(),
 	}
 
 
@@ -1194,6 +1232,217 @@ func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
 		"cost_pp": pp_cost,
 		"spine_neighbor_ids": proj.spine_neighbor_ids.duplicate(),
 		"build_road_spine": true
+	}
+
+
+func should_show_build_bridge_button(province_id: int, player_tag: String) -> bool:
+	if not _Rx1Rhine.is_crossing_province(province_id):
+		return false
+	if has_active_project(province_id):
+		var existing: ProvincialProject = get_active_project(province_id)
+		return existing != null and bool(existing.build_rhine_bridge)
+	var tag := player_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		return false
+	var unbridged: Dictionary = _Rx1Rhine.first_unbridged_for(province_id)
+	if unbridged.is_empty():
+		return false
+	var p: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	if p == null:
+		return true
+	if p.is_sea:
+		return false
+	if p.owner_tag.to_upper() != tag and p.controller_tag.to_upper() != tag:
+		return false
+	return true
+
+
+func get_rx1_bridge_mandate_cost() -> int:
+	return _Rx1Rhine.first_session_mandate_cost()
+
+
+func start_rhine_bridge_project(province_id: int, investor_tag: String) -> ProvincialProject:
+	if has_active_project(province_id):
+		return null
+	var tag := investor_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "GER"
+	var p: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	if p == null:
+		return null
+	var edge_row: Dictionary = _Rx1Rhine.first_unbridged_for(province_id)
+	if edge_row.is_empty():
+		return null
+	var proj := ProvincialProject.new()
+	proj.province_id = province_id
+	proj.axis = "infrastructure"
+	proj.owner_tag = tag
+	proj.starting_level = p.infrastructure
+	proj.target_level = p.infrastructure
+	proj.work_per_day_base = _calculate_base_work_rate(p, "infrastructure", tag)
+	proj.political_power_cost = get_rx1_bridge_mandate_cost()
+	proj.start_day = _current_game_day_index()
+	proj.status = "active"
+	proj.build_rhine_bridge = true
+	proj.bridge_edge = [int(edge_row.get("a", 0)), int(edge_row.get("b", 0))]
+	_refresh_project_modifiers(proj, p)
+	proj.days_remaining = maxi(1, proj.get_eta_days())
+	active_projects[province_id] = proj
+	project_started.emit(proj)
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("notify_province_changed"):
+		MapManager.notify_province_changed(province_id, "infrastructure_project")
+	if typeof(LeaderEventUI) != TYPE_NIL and LeaderEventUI.has_method("post_news"):
+		LeaderEventUI.post_news(
+			"RX-1 Rhine Bridge Started",
+			"%s begins a Rhine bridge at %s (ETA %d days)." % [proj.owner_tag, p.name, proj.get_eta_days()],
+			"infrastructure",
+		)
+	print("InfrastructureDevelopmentManager: started RX-1 Rhine bridge on province %d for %s" % [province_id, tag])
+	_set_rx1_bridge_visual_state("queued", province_id, 0.0)
+	_log_smoke_rx1_progress(province_id, int(round(proj.progress)), proj.get_eta_days(), "IDM.start")
+	return proj
+
+
+func try_start_rhine_bridge(province_id: int, investor_tag: String) -> Dictionary:
+	if not _Rx1Rhine.is_crossing_province(province_id):
+		return {"success": false, "reason": "Not a RX-1 Rhine crossing province."}
+	if has_active_project(province_id):
+		var existing: ProvincialProject = get_active_project(province_id)
+		var already := existing != null and bool(existing.build_rhine_bridge)
+		return {
+			"success": false,
+			"reason": "Rhine bridge already in progress." if already else "A project is already active in this province.",
+			"already_active": true,
+			"build_rhine_bridge": already,
+		}
+	var tag := investor_tag.strip_edges().to_upper()
+	if tag.is_empty():
+		tag = "GER"
+	var edge_row: Dictionary = _Rx1Rhine.first_unbridged_for(province_id)
+	if edge_row.is_empty():
+		return {"success": false, "reason": "No unbridged Rhine crossing from this province."}
+	var p_for_target: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
+	if p_for_target != null:
+		if p_for_target.is_sea:
+			return {"success": false, "reason": "Rhine bridge is land-only."}
+		var owner := str(p_for_target.owner_tag).strip_edges().to_upper()
+		var ctrl := str(p_for_target.controller_tag).strip_edges().to_upper()
+		if owner != tag and ctrl != tag and not owner.is_empty():
+			return {"success": false, "reason": "You must control the province to start the Rhine bridge."}
+	var pp_cost := get_rx1_bridge_mandate_cost()
+	var gate: Dictionary = ix1_day0_mandate_can_start(tag)
+	if not bool(gate.get("ok", false)):
+		var current_mand := int(gate.get("mandate", 0))
+		return {"success": false, "reason": "Insufficient Mandate (%d < %d)" % [current_mand, pp_cost]}
+	if pp_cost > 0 and typeof(GameData) != TYPE_NIL:
+		GameData.apply_pillar_shift(tag, "mandate", -pp_cost, "rhine_bridge_" + str(province_id))
+	var proj: ProvincialProject = start_rhine_bridge_project(province_id, tag)
+	if proj == null:
+		return {"success": false, "reason": "Failed to create Rhine bridge project"}
+	return {
+		"success": true,
+		"reason": "Rhine bridge project started",
+		"project": proj,
+		"eta_days": proj.get_eta_days(),
+		"cost_pp": pp_cost,
+		"bridge_edge": proj.bridge_edge.duplicate(),
+		"build_rhine_bridge": true,
+	}
+
+
+func _apply_rx1_bridge_complete(proj: ProvincialProject) -> void:
+	if proj == null or proj.bridge_edge.size() < 2:
+		return
+	_Rx1Rhine.set_bridged(int(proj.bridge_edge[0]), int(proj.bridge_edge[1]), true)
+	_set_rx1_bridge_visual_state("built", proj.province_id, 100.0)
+	var mr: Node = _rx1_map_renderer()
+	if mr != null and mr.has_method("refresh_rx1_rhine_layer"):
+		mr.call("refresh_rx1_rhine_layer")
+
+
+func get_rx1_bridge_visual_state() -> String:
+	return _rx1_bridge_visual_state
+
+
+func _set_rx1_bridge_visual_state(state: String, pid: int, pct: float) -> void:
+	var s := state.strip_edges().to_lower()
+	if s in ["queued", "construction", "built"]:
+		_rx1_bridge_visual_state = s
+	print("EOA_SMOKE_RX1_STATE who=IDM pid=%d state=%s pct=%d" % [pid, s if not s.is_empty() else state, int(round(pct))])
+	var mr: Node = _rx1_map_renderer()
+	if mr != null and mr.has_method("set_rx1_bridge_preview"):
+		mr.call("set_rx1_bridge_preview", s if not s.is_empty() else state, pid, pct)
+
+
+func _log_smoke_rx1_progress(pid: int, pct: int, eta: int, who: String) -> void:
+	print("EOA_SMOKE_RX1_PROGRESS who=%s pid=%d pct=%d eta=%d" % [who, pid, pct, eta])
+
+
+func _log_smoke_rx1_complete(pid: int, who: String) -> void:
+	print("EOA_SMOKE_RX1_COMPLETE who=%s pid=%d" % [who, pid])
+
+
+func _rx1_map_renderer() -> Node:
+	var tree := Engine.get_main_loop()
+	if tree == null or tree.root == null:
+		return null
+	var mr: Node = tree.root.get_node_or_null("/root/WorldMap")
+	if mr != null:
+		return mr
+	return tree.root.get_tree().get_first_node_in_group("map_renderer") if tree.root.get_tree() else null
+
+
+func simulate_rx1_bridge_start_to_complete(days: int = 40) -> Dictionary:
+	_ix1_skip_full_board_ai_invest = true
+	_Rx1Rhine.ensure_loaded()
+	_Rx1Rhine.reset_to_1936()
+	var target := _Rx1Rhine.unbridged_build_target()
+	var pid := target[0] if target.size() >= 1 else 710413
+	var a := target[0] if target.size() >= 1 else 710413
+	var b := target[1] if target.size() >= 2 else 710412
+	if not active_projects.has(pid):
+		var started: Dictionary = try_start_rhine_bridge(pid, "GER")
+		if not bool(started.get("success", false)):
+			# Headless -s may lack the hex or owner; restore a synthetic project.
+			restore_project(pid, {
+				"province_id": pid,
+				"axis": "infrastructure",
+				"owner_tag": "GER",
+				"starting_level": 4,
+				"target_level": 4,
+				"progress": 0.0,
+				"work_per_day_base": 2.8,
+				"days_remaining": 36,
+				"build_rhine_bridge": true,
+				"bridge_edge": [a, b],
+				"status": "active",
+			})
+			_set_rx1_bridge_visual_state("queued", pid, 0.0)
+	var states: Array[String] = []
+	states.append("queued")
+	_set_rx1_bridge_visual_state("queued", pid, 0.0)
+	var n := clampi(int(days), 1, 80)
+	var last_pct := 0
+	for _i in range(n):
+		# Same cheap daily tick IX-1 complete uses. Live calendar path is
+		# HeadlessRx1RhineLiveStayAliveTickTest (advance_real_time).
+		advance_daily_projects(1936, 1, 1 + _i)
+		var proj: ProvincialProject = get_active_project(pid)
+		if proj != null:
+			last_pct = int(round(proj.progress))
+			if last_pct > 0 and "construction" not in states:
+				states.append("construction")
+		if not active_projects.has(pid) and _Rx1Rhine.is_bridged(a, b):
+			if "built" not in states:
+				states.append("built")
+			break
+	return {
+		"ok": _Rx1Rhine.is_bridged(a, b) and "queued" in states and "construction" in states and "built" in states,
+		"province_id": pid,
+		"edge": [a, b],
+		"bridged": _Rx1Rhine.is_bridged(a, b),
+		"visual_states": states,
+		"pct": last_pct,
 	}
 
 

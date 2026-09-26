@@ -201,7 +201,7 @@ static func find_own_land_path(from_id: int, to_id: int, owner_tag: String, max_
 	return empty
 
 
-static func _hop_cost_into(pid: int, profile: Dictionary) -> float:
+static func _hop_cost_into(pid: int, profile: Dictionary, from_id: int = -1) -> float:
 	if typeof(MapManager) == TYPE_NIL or not MapManager.has_method("get_province"):
 		return 1.0
 	var p: Province = MapManager.get_province(pid)
@@ -210,12 +210,16 @@ static func _hop_cost_into(pid: int, profile: Dictionary) -> float:
 	if p != null:
 		terr = _norm_terrain(str(p.terrain))
 		infra = _infra_unit(p)
-	return hop_days(
+	var days := hop_days(
 		terr,
 		infra,
 		float(profile.get("template_speed", INFANTRY_SPEED)),
 		str(profile.get("template_kind", "infantry")),
 	)
+	# RX-1: edge-level Rhine multiplier stacks on top of the IX-1 road infra bonus.
+	if from_id > 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("rx1_move_mult"):
+		days *= float(MapManager.rx1_move_mult(from_id, pid))
+	return days
 
 
 static func remaining_eta_days(order: Dictionary) -> float:
@@ -232,7 +236,7 @@ static func remaining_eta_days(order: Dictionary) -> float:
 		f = LeaderManager.get_formation(fid)
 	var prof: Dictionary = template_profile(f)
 	for i in range(hop_i + 1, path.size()):
-		left += _hop_cost_into(int(path[i]), prof)
+		left += _hop_cost_into(int(path[i]), prof, int(path[i - 1]))
 	return left
 
 
@@ -268,7 +272,7 @@ static func enqueue_own_land_march(
 	if path.size() < 2:
 		return {"ok": false, "reason": "no own-land path"}
 	var prof: Dictionary = template_profile(f)
-	var first_cost := _hop_cost_into(int(path[1]), prof)
+	var first_cost := _hop_cost_into(int(path[1]), prof, int(path[0]))
 	var order := {
 		"formation_id": fid,
 		"country_tag": tag,
@@ -544,7 +548,7 @@ static func _commit_ready_hops(order: Dictionary) -> Array:
 			order["hop_index"] = path.size()
 			break
 		order["hop_index"] = hop_i + 1
-		order["hop_cost"] = _hop_cost_into(int(path[hop_i + 1]), template_profile(f2))
+		order["hop_cost"] = _hop_cost_into(int(path[hop_i + 1]), template_profile(f2), int(path[hop_i]))
 	return out
 
 

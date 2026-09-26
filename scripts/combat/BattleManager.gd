@@ -282,6 +282,13 @@ func can_assault_province(
 	source["target_name"] = target.name
 	source["defender_tag"] = defender_tag
 	source["attacker_tag"] = tag
+	var rx1_from := int(source.get("from_province_id", from_province_id))
+	var rx1_malus := Rx1RhineCrossing.attack_malus(rx1_from, target_province_id)
+	if rx1_malus > 0.0:
+		source["attack_power"] = float(source.get("attack_power", 0.0)) * (1.0 - rx1_malus)
+		source["rhine_attack_malus"] = rx1_malus
+		source["rhine_crossing"] = "bridged" if Rx1RhineCrossing.is_bridged(rx1_from, target_province_id) else "unbridged"
+		source["river_penalty_line"] = Rx1RhineCrossing.battle_penalty_line(rx1_from, target_province_id)
 	# Carry air dominance from ProvinceInsight for battle context (used in result merge + logs + AAR)
 	if typeof(ProvinceInsight) != TYPE_NIL and typeof(MapManager) != TYPE_NIL:
 		var from_p: Province = MapManager.get_province(from_province_id) if from_province_id >= 0 else target
@@ -380,9 +387,10 @@ func execute_province_assault(
 	# Stacks with settlement/terrain/snow. Demo apply makes it live for testing without full 471 swap.
 	var river_def_bonus: float = 1.0
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_river_border") and MapManager.has_river_border(target_province_id):
-		river_def_bonus = 1.05  # 5% defender edge for river lines (historical e.g. Rhine defenses)
-		if "defense_power" in preview:
-			preview["defense_power"] = float(preview.get("defense_power", 0)) * river_def_bonus
+		if not Rx1RhineCrossing.is_crossing_province(target_province_id):
+			river_def_bonus = 1.05  # 5% defender edge for river lines (historical e.g. Rhine defenses)
+			if "defense_power" in preview:
+				preview["defense_power"] = float(preview.get("defense_power", 0)) * river_def_bonus
 
 	var context := {
 		"attacker_tag": tag,
@@ -395,6 +403,8 @@ func execute_province_assault(
 		"settlement_def_bonus": settlement_def_bonus,
 		"target_settlement_level": target.settlement_level if target else 0.0,
 		"river_def_bonus": river_def_bonus,
+		"rhine_attack_malus": float(preview.get("rhine_attack_malus", 0.0)),
+		"river_penalty_line": str(preview.get("river_penalty_line", "")),
 	}
 	battle_started.emit(context)
 
@@ -406,6 +416,8 @@ func execute_province_assault(
 		defender.formation_id,
 	)
 	result.merge(context)
+	if str(context.get("river_penalty_line", "")) != "":
+		print("[BATTLEMANAGER RHINE] %s" % str(context.get("river_penalty_line", "")))
 	result["aftermath"] = _resolver.resolve_battle_aftermath(
 		fid,
 		defender.formation_id,
