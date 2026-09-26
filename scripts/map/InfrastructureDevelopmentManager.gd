@@ -1390,6 +1390,7 @@ func _rx1_map_renderer() -> Node:
 
 
 func simulate_rx1_bridge_start_to_complete(days: int = 40) -> Dictionary:
+	_ix1_skip_full_board_ai_invest = true
 	Rx1RhineCrossing.ensure_loaded()
 	Rx1RhineCrossing.reset_to_1936()
 	var target := Rx1RhineCrossing.unbridged_build_target()
@@ -1416,13 +1417,13 @@ func simulate_rx1_bridge_start_to_complete(days: int = 40) -> Dictionary:
 			_set_rx1_bridge_visual_state("queued", pid, 0.0)
 	var states: Array[String] = []
 	states.append("queued")
+	_set_rx1_bridge_visual_state("queued", pid, 0.0)
 	var n := clampi(int(days), 1, 80)
 	var last_pct := 0
 	for _i in range(n):
-		if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_one_day"):
-			TimeManager.advance_one_day()
-		else:
-			advance_daily_projects(1936, 1, 1)
+		# Same cheap daily tick IX-1 complete uses. Live calendar path is
+		# HeadlessRx1RhineLiveStayAliveTickTest (advance_real_time).
+		advance_daily_projects(1936, 1, 1 + _i)
 		var proj: ProvincialProject = get_active_project(pid)
 		if proj != null:
 			last_pct = int(round(proj.progress))

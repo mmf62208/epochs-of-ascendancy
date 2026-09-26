@@ -1702,6 +1702,7 @@ func resolve_combat(
 	if battle_province == null:
 		return {"winner": "", "outcome": "invalid", "province_control_change": false}
 
+	var rx1_malus: float = 0.0
 	var att_tag := attacker.country_tag if attacker != null else ""
 	var def_tag := battle_province.owner_tag
 	if def_tag.is_empty() and defender != null:
@@ -1731,7 +1732,6 @@ func resolve_combat(
 	var rx1_from := -1
 	if attacker != null and "stationed_province_id" in attacker:
 		rx1_from = int(attacker.stationed_province_id)
-	var rx1_malus := 0.0
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("rx1_attack_malus"):
 		rx1_malus = float(MapManager.rx1_attack_malus(rx1_from, battle_province.id))
 	else:
@@ -1855,6 +1855,8 @@ func resolve_combat(
 	combat_phase_advanced.emit(PHASE_ENGAGEMENT, _phase_engagement(battle_province, side_state, att_power, def_power))
 	combat_phase_advanced.emit(PHASE_ATTRITION, _phase_attrition(battle_province, side_state, att_power, def_power))
 	var result := _phase_resolution(battle_province, side_state, att_tag, def_tag)
+	result["rhine_attack_malus"] = rx1_malus
+	result["river_penalty_line"] = str(att_power.get("rhine_penalty_line", ""))
 	combat_phase_advanced.emit(PHASE_RESOLUTION, result)
 	combat_resolved.emit(result)
 	return result
@@ -2109,8 +2111,6 @@ func _phase_resolution(
 		"attacker_tag": attacker_tag,
 		"defender_tag": defender_tag,
 		"province_id": battle_province.id,
-		"rhine_attack_malus": rx1_malus,
-		"river_penalty_line": str(att_power.get("rhine_penalty_line", "")),
 	}
 	# Add duration estimate for preview/AAR (how long battle "takes" based on org/power diff, terrain)
 	var org_diff := def_org - float(side_state["attacker"].get("org", 1.0))

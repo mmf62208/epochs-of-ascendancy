@@ -18660,6 +18660,7 @@ func show_info_panel(province: Province, force_open: bool = false, keep_camera: 
 	if info_combat != null:
 		var rhine_lines: PackedStringArray = Rx1RhineCrossing.inspector_lines(province.id)
 		if rhine_lines.size() > 0:
+			# Inspector copy: "Rhine crossing: bridged" / "Rhine crossing: no bridge"
 			info_combat.text += "\n" + "\n".join(rhine_lines)
 
 
