@@ -307,8 +307,9 @@ func get_effective_combat_power(
 
 	# River natural border from real layers inference / demo sample apply (river-cross children): slight defender edge (river lines as prepared defensive features).
 	# High value for map data driving combat (Rhine, etc. historical). Uses has_river_border from demo or geo flag.
+	# RX-1 theater uses named edge malus instead of this flat 0.96 (see resolve_combat).
 	if pid_for_weather >= 0 and typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_river_border"):
-		if MapManager.has_river_border(pid_for_weather):
+		if (not Rx1RhineCrossing.is_crossing_province(pid_for_weather)) and MapManager.has_river_border(pid_for_weather):
 			# Attacker crossing penalty, defender prepared (small but stacks with terrain/snow/fort/settlement).
 			final_soft *= 0.96
 			final_hard *= 0.95
@@ -1726,6 +1727,21 @@ func resolve_combat(
 	if att_power.is_empty() or def_power.is_empty():
 		return {"winner": "", "outcome": "invalid", "province_control_change": false}
 
+	# RX-1: attacker crossing a named Rhine edge pays the bridged/unbridged malus.
+	var rx1_from := -1
+	if attacker != null and "stationed_province_id" in attacker:
+		rx1_from = int(attacker.stationed_province_id)
+	var rx1_malus := 0.0
+	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("rx1_attack_malus"):
+		rx1_malus = float(MapManager.rx1_attack_malus(rx1_from, battle_province.id))
+	else:
+		rx1_malus = Rx1RhineCrossing.attack_malus(rx1_from, battle_province.id)
+	if rx1_malus > 0.0:
+		att_power["soft_attack"] = float(att_power.get("soft_attack", 0.0)) * (1.0 - rx1_malus)
+		att_power["hard_attack"] = float(att_power.get("hard_attack", 0.0)) * (1.0 - rx1_malus)
+		att_power["rhine_attack_malus"] = rx1_malus
+		att_power["rhine_penalty_line"] = Rx1RhineCrossing.battle_penalty_line(rx1_from, battle_province.id)
+
 	var side_state := {
 		"attacker": {
 			"soft": float(att_power.get("soft_attack", 1.0)),
@@ -2093,6 +2109,8 @@ func _phase_resolution(
 		"attacker_tag": attacker_tag,
 		"defender_tag": defender_tag,
 		"province_id": battle_province.id,
+		"rhine_attack_malus": rx1_malus,
+		"river_penalty_line": str(att_power.get("rhine_penalty_line", "")),
 	}
 	# Add duration estimate for preview/AAR (how long battle "takes" based on org/power diff, terrain)
 	var org_diff := def_org - float(side_state["attacker"].get("org", 1.0))

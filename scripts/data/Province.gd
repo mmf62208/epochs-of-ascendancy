@@ -118,7 +118,14 @@ func get_movement_cost() -> float:
 		if snow_potential > 0.2 and mult < 1.0:
 			mult *= 0.9  # extra on high snow potential
 	var mm: Node = _get_map_manager()
-	if mm != null and mm.has_method("has_river_border") and bool(mm.call("has_river_border", id)):
+	# RX-1: skip the backwards flat 0.97 for this theater. Crossing cost is
+	# edge-level (FormationMovement / SupplyPathfinder via Rx1RhineCrossing).
+	var rx1_theater := false
+	if mm != null and mm.has_method("is_rx1_crossing_province"):
+		rx1_theater = bool(mm.call("is_rx1_crossing_province", id))
+	else:
+		rx1_theater = Rx1RhineCrossing.is_crossing_province(id)
+	if (not rx1_theater) and mm != null and mm.has_method("has_river_border") and bool(mm.call("has_river_border", id)):
 		mult *= 0.97  # river border friction (natural barrier for movement/invasion)
 	return terrain_mult * infra_factor * dev_factor * mult
 

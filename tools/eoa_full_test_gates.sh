@@ -103,6 +103,7 @@ run_step unit_board_play_path \
     tools.map_generation.tests.test_seas_coarsen_feed8_ligurian_product \
     tools.map_generation.tests.test_se_england_shire_land_uniformity_product \
     tools.map_generation.tests.test_ix1_road_spine_product \
+    tools.map_generation.tests.test_rx1_rhine_crossing_product \
     tools.map_generation.tests.test_world_accurate_capital_pick_product \
     tools.map_generation.tests.test_world_accurate_strategic_and_assault \
     tools.map_generation.tests.test_world_accurate_multi_front_and_deploy \
@@ -232,6 +233,12 @@ else
 
   run_step launch_ix1_spine_complete \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessIx1RoadSpineCompleteTest.gd || fail
+
+  run_step launch_rx1_rhine_crossing \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineCrossingTest.gd || fail
+
+  run_step launch_rx1_live_stay_alive_tick \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineLiveStayAliveTickTest.gd || fail
 
   if [[ -n "$LOG_DIR" ]] && [[ -f "$LOG_DIR/launch_assault.log" ]]; then
     if grep -q 'SCRIPT ERROR' "$LOG_DIR/launch_assault.log"; then

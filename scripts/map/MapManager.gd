@@ -595,6 +595,22 @@ func apply_sample_subdiv_demo(parent_id: int = 82) -> void:
 func get_demo_subdiv_children(parent_id: int) -> Array:
 	return _demo_applied_subdiv.get(parent_id, [])
 
+func is_rx1_crossing(a: int, b: int) -> bool:
+	return Rx1RhineCrossing.is_crossing(a, b)
+
+
+func is_rx1_crossing_province(pid: int) -> bool:
+	return Rx1RhineCrossing.is_crossing_province(pid)
+
+
+func rx1_move_mult(a: int, b: int) -> float:
+	return Rx1RhineCrossing.move_mult(a, b)
+
+
+func rx1_attack_malus(a: int, b: int) -> float:
+	return Rx1RhineCrossing.attack_malus(a, b)
+
+
 func has_river_border(pid: int) -> bool:
 	# Demo sample children
 	if _demo_applied_subdiv.has(pid):
