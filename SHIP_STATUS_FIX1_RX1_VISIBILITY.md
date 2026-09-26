@@ -7,7 +7,7 @@
 | **PR** | https://github.com/mmf62208/epochs-of-ascendancy/pull/57 (draft) |
 | **Branch** | `cursor/rx1-rhine-crossing-e117` |
 | **Base Play fail** | `9750f3d3` (Rhine under unit counters; Neuss spine overlap; stale class cache) |
-| **Tip** | see git on the PR after this commit |
+| **Tip** | `431c30e92a0a55d93cc8ecc03d78011c9c03c3e9` |
 
 ## Fixes
 
@@ -22,11 +22,15 @@ Move ETA preview UI — none exists today; inspector hop × / attack −% stays 
 
 ## Guards
 
-| Guard | on `9750f3d` | on tip |
+| Guard | on `9750f3d` | on tip `431c30e9` |
 |-------|----------------|--------|
-| `test_visibility_order_above_unit_counters` | **FAIL** | must **PASS** |
-| `test_fresh_checkout_launch_imports_class_cache` | **FAIL** | must **PASS** |
-| `HeadlessRx1RhineVisibilityTest` | **FAIL** (z=7 / no helpers) | must **PASS** |
-| existing RX-1 / IX-1 headless + py | stay green | stay green |
+| `test_visibility_order_above_unit_counters` | **FAIL** (z=-1 / no helpers) | **PASS** |
+| `test_fresh_checkout_launch_imports_class_cache` | **FAIL** (no import gate / no preload) | **PASS** |
+| `test_product` (visibility + fresh extras) | **FAIL** shipped_apis / visibility_order / fresh_checkout | **PASS** 7/7 RX-1 |
+| `HeadlessRx1RhineVisibilityTest` | **RESULT=FAIL** (3) | **RESULT=PASS** |
+| `HeadlessRx1RhineCrossingTest` | n/a (already green) | **RESULT=PASS** |
+| `HeadlessRx1RhineLiveStayAliveTickTest` | n/a | **RESULT=PASS** |
+| `HeadlessIx1RoadSpineLiveStayAliveTickTest` | n/a | **RESULT=PASS** |
+| `test_ix1_road_spine_product` | n/a | **PASS** 15/15 |
 
 Smoke harness is **not** the product.
