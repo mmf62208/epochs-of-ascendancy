@@ -90,6 +90,11 @@ var _layer_provs_cache: Dictionary = {}
 var _layer_provs_cache_msec: int = 0
 const LAYER_PROV_CACHE_MS := 400
 
+## DemoUnitIcon_* is z=28 z_as_relative=false. Built IX-1 roads must read above those plates.
+const UNIT_COUNTER_Z := 28
+const ROAD_ABOVE_UNIT_COUNTERS_Z := 32
+const SPINE_ABOVE_UNIT_COUNTERS_Z := 33
+
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
     special_site_manager = get_node_or_null("/root/SpecialSiteManager")
@@ -127,8 +132,12 @@ func _ensure_sub_layers():
         if road_layer == null:
             road_layer = Node2D.new()
             road_layer.name = "RoadLayer"
-            road_layer.z_index = 1
+            road_layer.z_as_relative = false
+            road_layer.z_index = ROAD_ABOVE_UNIT_COUNTERS_Z
             add_child(road_layer)
+    if road_layer != null:
+        road_layer.z_as_relative = false
+        road_layer.z_index = ROAD_ABOVE_UNIT_COUNTERS_Z
     if rail_layer == null:
         rail_layer = get_node_or_null("RailLayer")
         if rail_layer == null:
@@ -162,8 +171,12 @@ func _ensure_sub_layers():
         if spine_preview_layer == null:
             spine_preview_layer = Ix1SpinePreviewDraw.new()
             spine_preview_layer.name = "Ix1SpinePreview"
-            spine_preview_layer.z_index = 6
+            spine_preview_layer.z_as_relative = false
+            spine_preview_layer.z_index = SPINE_ABOVE_UNIT_COUNTERS_Z
             add_child(spine_preview_layer)
+    if spine_preview_layer != null:
+        spine_preview_layer.z_as_relative = false
+        spine_preview_layer.z_index = SPINE_ABOVE_UNIT_COUNTERS_Z
 
 func _apply_layer_visibilities():
     _update_sub_layer_visibilities()

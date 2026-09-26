@@ -8,7 +8,7 @@
 
 | | Before (tip `1d092a14`) | After (this slice) |
 |--|-------------------------|--------------------|
-| Rhine look | Raster river bake; stored `rivers_world.json` Rhine 321 Y is mercator (~1781–1864), so it does **not** sit on NUTS3 Köln. | Vector polyline, invert mercator-Y then `lonlat_to_canvas`. Köln d≈0.05, Bonn 0.45, Düsseldorf 0.36, Duisburg 1.36; Essen 7.03 **off**. `_draw` only — no rebuild on zoom. |
+| Rhine look | Raster river bake; stored `rivers_world.json` Rhine 321 Y is mercator (~1781–1864), so it does **not** sit on NUTS3 Köln. Play MIXED `9750f3d`: vector sat at z=7 under DemoUnitIcon z=28. | Vector polyline, invert mercator-Y then `lonlat_to_canvas`. Köln d≈0.05, Bonn 0.45, Düsseldorf 0.36, Duisburg 1.36; Essen 7.03 **off**. `_draw` only — no rebuild on zoom. **FIX1:** `ABOVE_UNIT_COUNTERS_Z=36` + halo; RoadLayer `ROAD_ABOVE_UNIT_COUNTERS_Z=32`. |
 | Crossings | `has_river_border` + flat **0.97** per-province. `province_adjacency.json` is shared-edge + kNN (non-touching pairs). | Six **GISCO shared-border** edges the Rhine actually sits on. Guard fails if a listed edge is not a real shared border. Köln–Essen is **not** a crossing. |
 | Bridges | None as a named 1936 fact. | Historical road bridges at the cities. Neuss–Mettmann left **unbridged** so Build Bridge has a target. |
 | Player order | Invest / IX-1 spine only. | One **Build Bridge** order on the IX-1 IDM project + FIX3 `_tick_live_construction_on_calendar_day`. |
@@ -68,8 +68,17 @@ Stored Rhine 321 canvas Y ~1781–1864 is the world_full mercator bake (`use_mer
 | `HeadlessRx1RhineCrossingTest` | Edge penalties, bridged vs unbridged, no Köln–Essen, Build Bridge complete. |
 | `HeadlessRx1RhineLiveStayAliveTickTest` | Real `advance_real_time` under stay-alive: 0% → >0 in ~5d → COMPLETE. |
 | `tools/eoa_rx1_bridge_live_progress_guard.sh` | Windowed smoke: viewport mouse on Build Bridge. **Not the product.** |
+| `HeadlessRx1RhineVisibilityTest` | Rhine/road z > DemoUnitIcon 28; spine chrome absent on Neuss 710413; `run_godot.sh` import-if-needed. |
 
-Must **FAIL** on `1d092a14` and **PASS** on this tip. IX-1 headless + python stay green.
+Must **FAIL** on `1d092a14` / `9750f3d` (visibility) and **PASS** on this tip. IX-1 headless + python stay green.
+
+## Fresh checkout (FIX1)
+
+Stale `.godot/global_script_class_cache.cfg` (gitignored) used to parse-fail GameData (`Identifier Rx1RhineCrossing not declared`) and blank the map. `tools/run_godot.sh` runs a one-time `--headless --import` when the cache is missing or lacks `Rx1RhineCrossing`. Autoloads (GameData / MapManager / IDM) **preload** `res://scripts/map/Rx1RhineCrossing.gd` so they do not depend on class_name at parse. Smoke wrappers already `exec` `run_godot.sh`.
+
+## Later (not this slice)
+
+Move ETA **preview UI** — there is no preview today; inspector hop × / attack −% is the living copy. Do not invent a preview here.
 
 ## Parked
 

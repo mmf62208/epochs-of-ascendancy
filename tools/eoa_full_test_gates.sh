@@ -237,6 +237,9 @@ else
   run_step launch_rx1_rhine_crossing \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineCrossingTest.gd || fail
 
+  run_step launch_rx1_visibility \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineVisibilityTest.gd || fail
+
   run_step launch_rx1_live_stay_alive_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineLiveStayAliveTickTest.gd || fail
 

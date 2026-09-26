@@ -12,6 +12,9 @@
 
 extends Node
 
+## Preload so a stale class cache cannot fail this autoload at parse (Play attempt 1).
+const _Rx1Rhine := preload("res://scripts/map/Rx1RhineCrossing.gd")
+
 signal project_started(project: ProvincialProject)
 signal project_progress_updated(province_id: int, project: ProvincialProject, work_delta: float)
 signal project_completed(province_id: int, new_level: int, axis: String, project: ProvincialProject)
@@ -1233,7 +1236,7 @@ func try_start_road_spine(province_id: int, investor_tag: String) -> Dictionary:
 
 
 func should_show_build_bridge_button(province_id: int, player_tag: String) -> bool:
-	if not Rx1RhineCrossing.is_crossing_province(province_id):
+	if not _Rx1Rhine.is_crossing_province(province_id):
 		return false
 	if has_active_project(province_id):
 		var existing: ProvincialProject = get_active_project(province_id)
@@ -1241,7 +1244,7 @@ func should_show_build_bridge_button(province_id: int, player_tag: String) -> bo
 	var tag := player_tag.strip_edges().to_upper()
 	if tag.is_empty():
 		return false
-	var unbridged: Dictionary = Rx1RhineCrossing.first_unbridged_for(province_id)
+	var unbridged: Dictionary = _Rx1Rhine.first_unbridged_for(province_id)
 	if unbridged.is_empty():
 		return false
 	var p: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
@@ -1255,7 +1258,7 @@ func should_show_build_bridge_button(province_id: int, player_tag: String) -> bo
 
 
 func get_rx1_bridge_mandate_cost() -> int:
-	return Rx1RhineCrossing.first_session_mandate_cost()
+	return _Rx1Rhine.first_session_mandate_cost()
 
 
 func start_rhine_bridge_project(province_id: int, investor_tag: String) -> ProvincialProject:
@@ -1267,7 +1270,7 @@ func start_rhine_bridge_project(province_id: int, investor_tag: String) -> Provi
 	var p: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
 	if p == null:
 		return null
-	var edge_row: Dictionary = Rx1RhineCrossing.first_unbridged_for(province_id)
+	var edge_row: Dictionary = _Rx1Rhine.first_unbridged_for(province_id)
 	if edge_row.is_empty():
 		return null
 	var proj := ProvincialProject.new()
@@ -1301,7 +1304,7 @@ func start_rhine_bridge_project(province_id: int, investor_tag: String) -> Provi
 
 
 func try_start_rhine_bridge(province_id: int, investor_tag: String) -> Dictionary:
-	if not Rx1RhineCrossing.is_crossing_province(province_id):
+	if not _Rx1Rhine.is_crossing_province(province_id):
 		return {"success": false, "reason": "Not a RX-1 Rhine crossing province."}
 	if has_active_project(province_id):
 		var existing: ProvincialProject = get_active_project(province_id)
@@ -1315,7 +1318,7 @@ func try_start_rhine_bridge(province_id: int, investor_tag: String) -> Dictionar
 	var tag := investor_tag.strip_edges().to_upper()
 	if tag.is_empty():
 		tag = "GER"
-	var edge_row: Dictionary = Rx1RhineCrossing.first_unbridged_for(province_id)
+	var edge_row: Dictionary = _Rx1Rhine.first_unbridged_for(province_id)
 	if edge_row.is_empty():
 		return {"success": false, "reason": "No unbridged Rhine crossing from this province."}
 	var p_for_target: Province = MapManager.get_province(province_id) if typeof(MapManager) != TYPE_NIL else null
@@ -1350,7 +1353,7 @@ func try_start_rhine_bridge(province_id: int, investor_tag: String) -> Dictionar
 func _apply_rx1_bridge_complete(proj: ProvincialProject) -> void:
 	if proj == null or proj.bridge_edge.size() < 2:
 		return
-	Rx1RhineCrossing.set_bridged(int(proj.bridge_edge[0]), int(proj.bridge_edge[1]), true)
+	_Rx1Rhine.set_bridged(int(proj.bridge_edge[0]), int(proj.bridge_edge[1]), true)
 	_set_rx1_bridge_visual_state("built", proj.province_id, 100.0)
 	var mr: Node = _rx1_map_renderer()
 	if mr != null and mr.has_method("refresh_rx1_rhine_layer"):
@@ -1391,9 +1394,9 @@ func _rx1_map_renderer() -> Node:
 
 func simulate_rx1_bridge_start_to_complete(days: int = 40) -> Dictionary:
 	_ix1_skip_full_board_ai_invest = true
-	Rx1RhineCrossing.ensure_loaded()
-	Rx1RhineCrossing.reset_to_1936()
-	var target := Rx1RhineCrossing.unbridged_build_target()
+	_Rx1Rhine.ensure_loaded()
+	_Rx1Rhine.reset_to_1936()
+	var target := _Rx1Rhine.unbridged_build_target()
 	var pid := target[0] if target.size() >= 1 else 710413
 	var a := target[0] if target.size() >= 1 else 710413
 	var b := target[1] if target.size() >= 2 else 710412
@@ -1429,15 +1432,15 @@ func simulate_rx1_bridge_start_to_complete(days: int = 40) -> Dictionary:
 			last_pct = int(round(proj.progress))
 			if last_pct > 0 and "construction" not in states:
 				states.append("construction")
-		if not active_projects.has(pid) and Rx1RhineCrossing.is_bridged(a, b):
+		if not active_projects.has(pid) and _Rx1Rhine.is_bridged(a, b):
 			if "built" not in states:
 				states.append("built")
 			break
 	return {
-		"ok": Rx1RhineCrossing.is_bridged(a, b) and "queued" in states and "construction" in states and "built" in states,
+		"ok": _Rx1Rhine.is_bridged(a, b) and "queued" in states and "construction" in states and "built" in states,
 		"province_id": pid,
 		"edge": [a, b],
-		"bridged": Rx1RhineCrossing.is_bridged(a, b),
+		"bridged": _Rx1Rhine.is_bridged(a, b),
 		"visual_states": states,
 		"pct": last_pct,
 	}

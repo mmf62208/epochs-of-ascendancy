@@ -63,7 +63,8 @@ def render_midzoom(spec: dict, out: Path) -> None:
     font = _font(16)
     small = _font(13)
     pts = [xy(p) for p in course]
-    dr.line(pts, fill=(46, 118, 199), width=5)
+    dr.line(pts, fill=(10, 26, 48), width=12)
+    dr.line(pts, fill=(56, 148, 235), width=5)
     for row in edges:
         mid = row.get("midpoint") or []
         if len(mid) < 2:
@@ -91,6 +92,43 @@ def render_midzoom(spec: dict, out: Path) -> None:
     img.save(out)
 
 
+def render_closezoom_with_units(spec: dict, out: Path) -> None:
+    """Close-zoom mock: unit plates under a haloed Rhine through Köln. Not live F5."""
+    course = (spec.get("course") or {}).get("points") or []
+    cities = ((spec.get("alignment") or {}).get("city_distances_canvas") or {})
+    koeln = (cities.get("Köln") or {}).get("canvas") or [4253.87, 944.58]
+    cx, cy = float(koeln[0]), float(koeln[1])
+    span = 6.0
+    minx, miny, maxx, maxy = cx - span, cy - span, cx + span, cy + span
+    w, h = 1280, 720
+    sx = (w - 80) / max(0.001, maxx - minx)
+    sy = (h - 80) / max(0.001, maxy - miny)
+    s = min(sx, sy)
+
+    def xy(p):
+        return (40 + (float(p[0]) - minx) * s, 40 + (float(p[1]) - miny) * s)
+
+    img = Image.new("RGB", (w, h), (22, 38, 28))
+    dr = ImageDraw.Draw(img)
+    font = _font(16)
+    small = _font(13)
+    # Unit plates first (under the river) — FIX1 order.
+    for ox, oy, tag in ((-1.6, -0.8, "GER"), (1.2, 0.6, "GER"), (0.2, 1.8, "GER")):
+        px, py = xy((cx + ox, cy + oy))
+        dr.rectangle((px - 34, py - 22, px + 34, py + 22), fill=(196, 168, 78), outline=(40, 32, 16))
+        dr.text((px - 16, py - 10), tag, fill=(30, 24, 10), font=small)
+    pts = [xy(p) for p in course]
+    dr.line(pts, fill=(10, 26, 48), width=16)
+    dr.line(pts, fill=(56, 148, 235), width=7)
+    kxy = xy(koeln)
+    dr.ellipse((kxy[0] - 5, kxy[1] - 5, kxy[0] + 5, kxy[1] + 5), fill=(240, 230, 180))
+    dr.text((kxy[0] + 10, kxy[1] - 12), "Köln", fill=(240, 230, 180), font=small)
+    dr.text((20, 12), "RX-1 close-zoom Rhine through Köln · units under the river (z 36 > 28)", fill=(230, 230, 230), font=font)
+    dr.text((20, h - 28), "Alignment / z-order mock · not a live F5 Play screenshot", fill=(160, 160, 160), font=small)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    img.save(out)
+
+
 def render_inspector(title: str, lines: list[str], out: Path, button: str = "") -> None:
     w, h = 720, 420
     img = Image.new("RGB", (w, h), (28, 30, 36))
@@ -107,8 +145,8 @@ def render_inspector(title: str, lines: list[str], out: Path, button: str = "") 
         dr.text((32, y), line, fill=col, font=body)
         y += 26
     if button:
-        dr.rectangle((32, h - 78, 280, h - 42), fill=(52, 78, 110), outline=(180, 200, 220))
-        dr.text((48, h - 72), button, fill=(235, 240, 250), font=body)
+        dr.rectangle((32, y + 8, 280, y + 42), fill=(52, 78, 110), outline=(180, 200, 220))
+        dr.text((48, y + 14), button, fill=(235, 240, 250), font=body)
     dr.text((28, h - 30), "Inspector state mock · not a live F5 Play screenshot", fill=(140, 140, 140), font=_font(12))
     out.parent.mkdir(parents=True, exist_ok=True)
     img.save(out)
@@ -118,6 +156,19 @@ def main() -> None:
     spec = json.loads(SPEC.read_text(encoding="utf-8"))
     OUT.mkdir(parents=True, exist_ok=True)
     render_midzoom(spec, OUT / "rx1_rhine_midzoom_bonn_koeln_duesseldorf_duisburg.png")
+    render_closezoom_with_units(spec, OUT / "rx1_rhine_closezoom_koeln_units.png")
+    render_inspector(
+        "Neuss · #710413  (no IX-1 Road spine line)",
+        [
+            "Build Bridge",
+            "Rhine bridge started · ETA 36 days",
+            "Rhine crossing: no bridge (Rhein-Kreis Neuss ↔ Mettmann)",
+            "  hop ×2.00 · attack −30%",
+            "Rhine crossing: bridged (Rhein-Kreis Neuss ↔ Düsseldorf)",
+            "  hop ×1.15 · attack −10%",
+        ],
+        OUT / "rx1_inspector_neuss_stacked.png",
+    )
     render_inspector(
         "Neuss · #710413",
         [

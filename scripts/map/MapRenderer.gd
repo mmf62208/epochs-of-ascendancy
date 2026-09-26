@@ -20308,8 +20308,28 @@ func _layout_road_spine_chrome_button() -> void:
 	_btn_build_road_spine.size = Vector2(width, height)
 
 
+func inspector_should_show_spine_status(province_id: int) -> bool:
+	# FIX1: IX-1 "Road spine" chrome only on Bonn / Köln / Leverkusen — never Neuss 710413.
+	return province_id == 710416 or province_id == 710417 or province_id == 710418
+
+
+func _hide_ix1_spine_inspector_chrome() -> void:
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
+		_btn_build_road_spine.visible = false
+	if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+		_label_spine_progress.visible = false
+	if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
+		_label_spine_start_notice.visible = false
+	if _special_sites_container != null and is_instance_valid(_special_sites_container):
+		var stale: Node = _special_sites_container.get_node_or_null("Ix1SpineBuildRow")
+		if stale != null:
+			stale.visible = false
+
+
 func _ix1_should_show_spine_button(province: Province) -> bool:
 	if province == null:
+		return false
+	if not inspector_should_show_spine_status(province.id):
 		return false
 	var mgr = _get_infra_manager()
 	if mgr != null and mgr.has_method("should_show_road_spine_button"):
@@ -20319,7 +20339,7 @@ func _ix1_should_show_spine_button(province: Province) -> bool:
 	if mgr != null and mgr.has_method("is_ix1_road_spine_province"):
 		if not bool(mgr.is_ix1_road_spine_province(province.id)):
 			return false
-	elif province.id != 710416 and province.id != 710417 and province.id != 710418:
+	elif not inspector_should_show_spine_status(province.id):
 		return false
 	if province.is_sea:
 		return false
@@ -20403,16 +20423,14 @@ func _update_road_spine_button(province: Province) -> void:
 		return
 	var mgr = _get_infra_manager()
 	if province == null:
-		_btn_build_road_spine.visible = false
-		if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
-			_label_spine_progress.visible = false
-		if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
-			_label_spine_start_notice.visible = false
+		_hide_ix1_spine_inspector_chrome()
 		return
 	var show_btn := _ix1_should_show_spine_button(province)
 	_btn_build_road_spine.visible = show_btn
 	_pin_road_spine_button_to_inspector_chrome()
 	if not show_btn:
+		# Play MIXED 9750f3d: leftover Köln chrome leaked onto Neuss 710413.
+		_hide_ix1_spine_inspector_chrome()
 		return
 	_btn_build_road_spine.visible = true
 	var status: Dictionary = {}
@@ -20613,6 +20631,14 @@ func _log_smoke_spine_complete(pid: int, who: String = "MapRenderer") -> void:
 
 
 func _apply_spine_building_button_state(pid: int, pct: int, eta: int) -> void:
+	# Never paint IX-1 chrome onto a non-spine inspector (Neuss 710413).
+	var open_pid := _ix1_spine_inspector_pid if _ix1_spine_inspector_pid >= 0 else selected_province_id
+	if open_pid >= 0 and not inspector_should_show_spine_status(open_pid):
+		_hide_ix1_spine_inspector_chrome()
+		return
+	if not inspector_should_show_spine_status(pid):
+		_hide_ix1_spine_inspector_chrome()
+		return
 	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
 		_btn_build_road_spine.visible = true
 		_btn_build_road_spine.disabled = true
@@ -20675,7 +20701,7 @@ func _layout_spine_progress_label() -> void:
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
 	_label_spine_progress.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	_label_spine_progress.position = Vector2(8.0, 96.0)
+	_label_spine_progress.position = Vector2(8.0, 94.0)
 	_label_spine_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 22.0)
 	_label_spine_progress.size = _label_spine_progress.custom_minimum_size
 	_layout_spine_start_notice()
@@ -20720,6 +20746,8 @@ func _setup_rx1_rhine_layer() -> void:
 	var existing := get_overlay_layer("Rx1RhineLayer")
 	if existing != null and is_instance_valid(existing):
 		_rx1_rhine_layer = existing
+		existing.z_as_relative = false
+		existing.z_index = 36
 		if existing.has_method("refresh"):
 			existing.call("refresh")
 		return
@@ -20729,8 +20757,12 @@ func _setup_rx1_rhine_layer() -> void:
 	var layer: Node = LayerScript.new() if LayerScript is GDScript else null
 	if layer == null:
 		return
-	add_overlay_layer("Rx1RhineLayer", layer as Node2D, 7)
+	# z=36 sits above DemoUnitIcon z=28. Layer also sets ABOVE_UNIT_COUNTERS_Z in _ready.
+	add_overlay_layer("Rx1RhineLayer", layer as Node2D, 36)
 	_rx1_rhine_layer = layer as Node2D
+	if _rx1_rhine_layer != null:
+		_rx1_rhine_layer.z_as_relative = false
+		_rx1_rhine_layer.z_index = 36
 	Rx1RhineCrossing.ensure_loaded()
 
 
@@ -20814,9 +20846,16 @@ func _layout_rhine_bridge_chrome_button() -> void:
 	var panel_w := absf(ip.offset_right - ip.offset_left)
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
-	# Own row below IX-1 spine chrome (spine is y=66).
+	# Stack below IX-1 chrome when that chrome is actually visible (Köln).
+	# On Neuss the spine row is hidden — sit at the first chrome row so we
+	# do not overlap a leftover "Road spine" label (Play MIXED 9750f3d).
 	var left := 8.0
-	var top := 94.0
+	var spine_up := (
+		_btn_build_road_spine != null
+		and is_instance_valid(_btn_build_road_spine)
+		and _btn_build_road_spine.visible
+	)
+	var top := 146.0 if spine_up else 66.0
 	var height := 26.0
 	var width := minf(480.0, maxf(220.0, panel_w - left - 16.0))
 	_btn_build_rhine_bridge.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
@@ -21037,7 +21076,14 @@ func _layout_rx1_progress_label() -> void:
 	if panel_w < 80.0:
 		panel_w = maxf(ip.size.x, 520.0)
 	_label_rx1_progress.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
-	_label_rx1_progress.position = Vector2(8.0, 122.0)
+	# Below Build Bridge. Spine notice stays at y=120 only on Bonn/Köln/Leverkusen.
+	var spine_up := (
+		_btn_build_road_spine != null
+		and is_instance_valid(_btn_build_road_spine)
+		and _btn_build_road_spine.visible
+	)
+	var top := 174.0 if spine_up else 94.0
+	_label_rx1_progress.position = Vector2(8.0, top)
 	_label_rx1_progress.custom_minimum_size = Vector2(minf(480.0, maxf(280.0, panel_w - 24.0)), 22.0)
 	_label_rx1_progress.size = _label_rx1_progress.custom_minimum_size
 

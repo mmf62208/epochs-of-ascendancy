@@ -25,12 +25,14 @@ from rx1_rhine_crossing_product import (  # noqa: E402
     attack_malus,
     attack_power_after,
     build_rx1_rhine_crossing_product,
+    fresh_checkout_launch,
     hop_eta_days,
     knn_has_koeln_essen,
     listed_edges,
     load_rx1_spec,
     move_mult,
     shared_border_guard,
+    visibility_order,
 )
 
 
@@ -93,6 +95,19 @@ class TestRx1RhineCrossingProduct(unittest.TestCase):
         theater = {BONN_ID, KOELN_ID, DUSSELDORF_ID, DUISBURG_ID}
         names = {int(e[0]) for e in listed_edges(spec)} | {int(e[1]) for e in listed_edges(spec)}
         self.assertTrue(theater & names)
+
+    def test_visibility_order_above_unit_counters(self) -> None:
+        vis = visibility_order()
+        self.assertTrue(vis.get("ok"), msg=vis)
+        self.assertGreater(int(vis.get("rhine_z", -1)), int(vis.get("unit_z", 99)))
+        self.assertGreater(int(vis.get("road_z", -1)), int(vis.get("unit_z", 99)))
+        self.assertTrue(vis.get("spine_ok"), msg=vis)
+
+    def test_fresh_checkout_launch_imports_class_cache(self) -> None:
+        fresh = fresh_checkout_launch()
+        self.assertTrue(fresh.get("ok"), msg=fresh)
+        self.assertTrue(fresh.get("import_gate"), msg=fresh)
+        self.assertTrue(fresh.get("preload"), msg=fresh)
 
 
 if __name__ == "__main__":

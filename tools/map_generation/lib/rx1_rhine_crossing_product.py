@@ -38,12 +38,16 @@ BATTLE_GD = ROOT / "scripts" / "combat" / "BattleManager.gd"
 SUPPLY_GD = ROOT / "scripts" / "supply" / "SupplyPathfinder.gd"
 RENDERER_GD = ROOT / "scripts" / "map" / "MapRenderer.gd"
 MAP_MANAGER_GD = ROOT / "scripts" / "map" / "MapManager.gd"
+INFRA_OVERLAY_GD = ROOT / "scripts" / "map" / "InfrastructureOverlayLayer.gd"
+GAMEDATA_GD = ROOT / "scripts" / "autoload" / "GameData.gd"
 TIME_MANAGER_GD = ROOT / "scripts" / "autoload" / "TimeManager.gd"
 TEST_RUNNER_GD = ROOT / "scripts" / "core" / "TestRunner.gd"
 GATES_SH = ROOT / "tools" / "eoa_full_test_gates.sh"
 HEADLESS_GD = ROOT / "scripts" / "core" / "HeadlessRx1RhineCrossingTest.gd"
 LIVE_HARNESS = ROOT / "scripts" / "core" / "HeadlessRx1RhineLiveStayAliveTickTest.gd"
+VIS_HARNESS = ROOT / "scripts" / "core" / "HeadlessRx1RhineVisibilityTest.gd"
 LIVE_GUARD_SH = ROOT / "tools" / "eoa_rx1_bridge_live_progress_guard.sh"
+RUN_GODOT_SH = ROOT / "tools" / "run_godot.sh"
 
 SLICE_NAME = "RX-1 Rhine Crossing"
 OWNER_TAG = "GER"
@@ -139,6 +143,13 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (RULES_GD, "func set_bridged"),
     (LAYER_GD, "class_name Rx1RhineLayer"),
     (LAYER_GD, "func _draw"),
+    (LAYER_GD, "ABOVE_UNIT_COUNTERS_Z"),
+    (INFRA_OVERLAY_GD, "ROAD_ABOVE_UNIT_COUNTERS_Z"),
+    (RENDERER_GD, "inspector_should_show_spine_status"),
+    (RENDERER_GD, "_hide_ix1_spine_inspector_chrome"),
+    (RUN_GODOT_SH, "class cache missing Rx1RhineCrossing"),
+    (GAMEDATA_GD, 'preload("res://scripts/map/Rx1RhineCrossing.gd")'),
+    (VIS_HARNESS, "HeadlessRx1RhineVisibilityTest"),
     (IDM_GD, "try_start_rhine_bridge"),
     (IDM_GD, "start_rhine_bridge_project"),
     (IDM_GD, "should_show_build_bridge_button"),
@@ -158,6 +169,7 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (LIVE_HARNESS, "_tick_live_construction_on_calendar_day"),
     (LIVE_GUARD_SH, "EOA_SMOKE_RX1_LIVE_PROGRESS"),
     (GATES_SH, "HeadlessRx1RhineCrossingTest"),
+    (GATES_SH, "HeadlessRx1RhineVisibilityTest"),
     (GATES_SH, "test_rx1_rhine_crossing_product"),
 )
 
@@ -581,6 +593,63 @@ def shipped_api_integrity() -> Dict[str, Any]:
     return {"ok": not missing, "found": found, "missing": missing}
 
 
+def _const_int(src: str, name: str) -> int:
+    import re
+
+    m = re.search(r"const %s := (\d+)" % name, src)
+    return int(m.group(1)) if m else -1
+
+
+def visibility_order() -> Dict[str, Any]:
+    """FIX1: Rhine + built road z above DemoUnitIcon 28; spine chrome not on Neuss."""
+    layer = _read(LAYER_GD)
+    infra = _read(INFRA_OVERLAY_GD)
+    ren = _read(RENDERER_GD)
+    rhine_z = _const_int(layer, "ABOVE_UNIT_COUNTERS_Z")
+    unit_z = _const_int(layer, "UNIT_COUNTER_Z")
+    road_z = _const_int(infra, "ROAD_ABOVE_UNIT_COUNTERS_Z")
+    overlay_unit = _const_int(infra, "UNIT_COUNTER_Z")
+    spine_ok = (
+        "inspector_should_show_spine_status" in ren
+        and "_hide_ix1_spine_inspector_chrome" in ren
+        and "710413" in ren
+        and "710417" in ren
+    )
+    ok = (
+        unit_z == 28
+        and overlay_unit == 28
+        and rhine_z > unit_z
+        and road_z > overlay_unit
+        and spine_ok
+        and "HALO_WIDTH" in layer
+    )
+    return {
+        "ok": ok,
+        "rhine_z": rhine_z,
+        "road_z": road_z,
+        "unit_z": unit_z,
+        "spine_ok": spine_ok,
+    }
+
+
+def fresh_checkout_launch() -> Dict[str, Any]:
+    """Launch path imports when class cache lacks Rx1RhineCrossing; autoloads preload."""
+    run = _read(RUN_GODOT_SH)
+    gd = _read(GAMEDATA_GD)
+    mm = _read(MAP_MANAGER_GD)
+    idm = _read(IDM_GD)
+    preload = 'preload("res://scripts/map/Rx1RhineCrossing.gd")'
+    ok = (
+        "--headless --import" in run
+        and "Rx1RhineCrossing" in run
+        and "class cache missing" in run
+        and preload in gd
+        and preload in mm
+        and preload in idm
+    )
+    return {"ok": ok, "import_gate": "--headless --import" in run and "class cache missing" in run, "preload": preload in gd}
+
+
 def ix1_unchanged() -> Dict[str, Any]:
     """RX-1 must not strip the IX-1 spine APIs."""
     missing: List[str] = []
@@ -691,6 +760,18 @@ def build_rx1_rhine_crossing_product() -> Dict[str, Any]:
     else:
         fails.append("no_knn_koeln_essen")
 
+    vis = visibility_order()
+    if vis.get("ok"):
+        passes.append("visibility_order")
+    else:
+        fails.append("visibility_order")
+
+    fresh = fresh_checkout_launch()
+    if fresh.get("ok"):
+        passes.append("fresh_checkout_launch")
+    else:
+        fails.append("fresh_checkout_launch")
+
     return {
         "ok": not fails,
         "slice": SLICE_NAME,
@@ -704,6 +785,8 @@ def build_rx1_rhine_crossing_product() -> Dict[str, Any]:
         "shared_border_guard": guard,
         "shipped": api,
         "ix1_unchanged": ix1,
+        "visibility_order": vis,
+        "fresh_checkout_launch": fresh,
         "move_unbridged": move_mult(ua, ub, False, spec),
         "move_bridged": move_mult(ba, bb, True, spec),
         "attack_unbridged": attack_malus(ua, ub, False, spec),

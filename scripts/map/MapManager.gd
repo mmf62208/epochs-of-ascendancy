@@ -21,6 +21,7 @@ extends Node
 
 ## Preload (not bare class_name) so pick helpers resolve even before global class cache refresh.
 const _PickPolicy = preload("res://scripts/map/MapProvincePickPolicy.gd")
+const _Rx1Rhine = preload("res://scripts/map/Rx1RhineCrossing.gd")
 
 signal scenario_map_ready()
 signal provinces_loaded(province_count: int)
@@ -596,19 +597,19 @@ func get_demo_subdiv_children(parent_id: int) -> Array:
 	return _demo_applied_subdiv.get(parent_id, [])
 
 func is_rx1_crossing(a: int, b: int) -> bool:
-	return Rx1RhineCrossing.is_crossing(a, b)
+	return _Rx1Rhine.is_crossing(a, b)
 
 
 func is_rx1_crossing_province(pid: int) -> bool:
-	return Rx1RhineCrossing.is_crossing_province(pid)
+	return _Rx1Rhine.is_crossing_province(pid)
 
 
 func rx1_move_mult(a: int, b: int) -> float:
-	return Rx1RhineCrossing.move_mult(a, b)
+	return _Rx1Rhine.move_mult(a, b)
 
 
 func rx1_attack_malus(a: int, b: int) -> float:
-	return Rx1RhineCrossing.attack_malus(a, b)
+	return _Rx1Rhine.attack_malus(a, b)
 
 
 func has_river_border(pid: int) -> bool:

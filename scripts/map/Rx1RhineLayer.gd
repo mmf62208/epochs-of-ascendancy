@@ -2,9 +2,18 @@ class_name Rx1RhineLayer
 extends Node2D
 
 ## Vector Rhine (Bonn→Köln→Düsseldorf→Duisburg). _draw only — never rebuild on zoom.
+## Play MIXED 9750f3d: z=7 sat under DemoUnitIcon z=28. Draw above unit counters
+## with a halo so the line still reads at mid and close zoom.
 
-const RIVER_COLOR := Color(0.18, 0.46, 0.78, 0.92)
-const RIVER_WIDTH := 2.35
+const _Rx1 := preload("res://scripts/map/Rx1RhineCrossing.gd")
+
+## DemoUnitIcon_* uses z_as_relative=false, z_index=28 (MapRenderer).
+const UNIT_COUNTER_Z := 28
+const ABOVE_UNIT_COUNTERS_Z := 36
+const HALO_COLOR := Color(0.04, 0.10, 0.20, 0.88)
+const HALO_WIDTH := 5.6
+const RIVER_COLOR := Color(0.22, 0.58, 0.92, 0.98)
+const RIVER_WIDTH := 2.8
 const BRIDGE_COLOR := Color(0.42, 0.32, 0.16, 0.95)
 const UNBRIDGED_COLOR := Color(0.72, 0.22, 0.16, 0.88)
 const MAX_SEGS := 160
@@ -12,9 +21,9 @@ const MAX_SEGS := 160
 
 func _ready() -> void:
 	z_as_relative = false
-	z_index = 7
+	z_index = ABOVE_UNIT_COUNTERS_Z
 	set_process(false)
-	Rx1RhineCrossing.ensure_loaded()
+	_Rx1.ensure_loaded()
 	queue_redraw()
 
 
@@ -23,7 +32,7 @@ func refresh() -> void:
 
 
 func _draw() -> void:
-	var pts: PackedVector2Array = Rx1RhineCrossing.course_points()
+	var pts: PackedVector2Array = _Rx1.course_points()
 	if pts.size() < 2:
 		return
 	var n := mini(pts.size(), MAX_SEGS + 1)
@@ -37,6 +46,8 @@ func _draw() -> void:
 		if last.distance_squared_to(nxt) < 0.04:
 			last = nxt
 			continue
+		# Halo first so the river stays readable through unit plates.
+		draw_line(last, nxt, HALO_COLOR, HALO_WIDTH, false)
 		draw_line(last, nxt, RIVER_COLOR, RIVER_WIDTH, false)
 		drawn += 1
 		if drawn >= MAX_SEGS:
@@ -46,8 +57,8 @@ func _draw() -> void:
 
 
 func _draw_bridge_markers() -> void:
-	for key in Rx1RhineCrossing._edges.keys():
-		var row: Dictionary = Rx1RhineCrossing._edges[key]
+	for key in _Rx1._edges.keys():
+		var row: Dictionary = _Rx1._edges[key]
 		var mid_v: Variant = row.get("midpoint", [])
 		if typeof(mid_v) != TYPE_ARRAY or (mid_v as Array).size() < 2:
 			continue
@@ -57,7 +68,7 @@ func _draw_bridge_markers() -> void:
 		var pair: Variant = row.get("edge", [])
 		var bridged := false
 		if pair is Array and (pair as Array).size() >= 2:
-			bridged = Rx1RhineCrossing.is_bridged(int(pair[0]), int(pair[1]))
+			bridged = _Rx1.is_bridged(int(pair[0]), int(pair[1]))
 		var col := BRIDGE_COLOR if bridged else UNBRIDGED_COLOR
 		var half := 3.4 if bridged else 2.4
 		# Short bar across the river (east–west tick, river runs ~N–S).
