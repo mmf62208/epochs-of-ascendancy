@@ -7,7 +7,7 @@
 | **PR** | https://github.com/mmf62208/epochs-of-ascendancy/pull/57 (draft) |
 | **Branch** | `cursor/rx1-rhine-crossing-e117` |
 | **Base** | `1d092a14` IX-1 Road Spine |
-| **Tip** | see git on the PR |
+| **Tip** | `21981465d8387b2846859b1d3f1f1eca8b4f69b2` |
 
 ## Tunable constants (single place: `data/map/rx1_rhine_crossings.json` + `Rx1RhineCrossing.gd`)
 
