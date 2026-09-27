@@ -9,6 +9,7 @@
 | **Base Play fail** | `816cdc921c8072928d24a90a71a0d4088e9cde05` (mechanics PASS; screen FAIL) |
 | **Implementation** | `69b6d8d3` (screen-space / labels / Köln built) + `c128ca78` (theater scale) |
 | **Pixel guard** | `73dc3dc3` (Köln frame + local-stroke sample) |
+| **HEAD** | `21235a3653d4255379a7041103a4ed919099577a` |
 
 ## Root cause (items 1–2)
 
