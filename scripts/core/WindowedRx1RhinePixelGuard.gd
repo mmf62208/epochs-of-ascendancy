@@ -20,7 +20,7 @@ const METTMANN := 710412
 const MID_ZOOM := 0.48
 const CLOSE_ZOOM := 1.20
 const WAIT_MAP_SECS := 420
-const SETTLE_FRAMES := 10
+const SETTLE_FRAMES := 24
 const RIVER_MIN_HIT := 0.18
 const ROAD_MIN_HIT := 0.14
 const SAMPLE_RADIUS := 3
@@ -119,11 +119,16 @@ func _tick_wait_map() -> void:
 		return
 	if elapsed != _last_wait_log and elapsed > 0 and elapsed % 15 == 0:
 		_last_wait_log = elapsed
-		_log("EOA_RX1_PIXEL_GUARD who=guard.wait_map elapsed=%d" % elapsed)
+		_log("EOA_RX1_PIXEL_GUARD who=guard.wait_map elapsed=%d title=%s closed=%s n=%d" % [
+			elapsed,
+			str(_find_named("LivingTitleBoot") != null),
+			str(_title_has_closed()),
+			_province_count(),
+		])
+	_dismiss_title_if_needed()
 	if not _map_is_ready():
 		return
-	_log("EOA_RX1_PIXEL_GUARD who=guard.map_ready elapsed=%d" % elapsed)
-	_dismiss_title_if_needed()
+	_log("EOA_RX1_PIXEL_GUARD who=guard.map_ready elapsed=%d n=%d (title gone; live board)" % [elapsed, _province_count()])
 	_frame_over_koln(MID_ZOOM, true)
 	_go_settle(Phase.DO_MID)
 
@@ -205,6 +210,15 @@ func _map_manager() -> Node:
 
 
 func _map_is_ready() -> bool:
+	# First 816cdc9 run captured the living-title load screen (pillars +
+	# "Rendering provinces") because MapManager/MapRenderer exist under the
+	# CanvasLayer. Wait until Begin has closed the title.
+	if not _title_has_closed():
+		return false
+	if _find_named("LivingTitleBoot") != null:
+		return false
+	if _province_count() < 3000:
+		return false
 	var mm := _map_manager()
 	if mm == null or not mm.has_method("get_province"):
 		return false
@@ -212,24 +226,46 @@ func _map_is_ready() -> bool:
 		return false
 	if _map_renderer() == null:
 		return false
-	if _title_blocking():
+	if _camera() == null:
 		return false
 	return true
 
 
-func _title_blocking() -> bool:
+func _title_has_closed() -> bool:
+	var tr := _test_runner()
+	if tr != null and bool(tr.get_meta("eoa_living_title_closed", false)):
+		return true
 	var boot: Node = _find_named("LivingTitleBoot")
-	if boot == null:
-		return false
-	if boot is CanvasLayer:
-		return (boot as CanvasLayer).visible
-	return bool(boot.get("visible"))
+	if boot != null and bool(boot.get("_closed")):
+		return true
+	return false
+
+
+func _test_runner() -> Node:
+	var n := _find_named("TestRunner")
+	if n != null:
+		return n
+	var scene := current_scene
+	if scene != null and scene.get_script() != null:
+		return scene
+	return current_scene
+
+
+func _province_count() -> int:
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_province_count"):
+		return int(mm.call("get_province_count"))
+	return 0
 
 
 func _dismiss_title_if_needed() -> void:
 	var boot: Node = _find_named("LivingTitleBoot")
-	if boot != null and boot.has_method("apply_smoke_auto_begin"):
+	if boot == null:
+		return
+	if boot.has_method("apply_smoke_auto_begin"):
 		boot.call("apply_smoke_auto_begin")
+	elif boot.has_method("handle_live_begin"):
+		boot.call("handle_live_begin")
 
 
 func _map_renderer() -> Node:
