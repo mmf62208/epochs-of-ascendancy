@@ -30,7 +30,7 @@ const SETTLE_FRAMES := 48
 const RIVER_MIN_HIT := 0.18
 const ROAD_MIN_HIT := 0.20
 const UNIT_MIN_HIT := 0.22
-const SAMPLE_RADIUS := 3
+const SAMPLE_RADIUS := 5
 const LOCAL_RIVER_WORLD := 120.0
 
 enum Phase {
@@ -193,8 +193,8 @@ func _do_close() -> void:
 
 func _do_roads() -> void:
 	_reassert_camera()
+	var layer := _ensure_gold_spine_layer()
 	var img := _capture("rx1_pixel_road_spine_units_off")
-	var layer := _road_layer()
 	if layer == null:
 		layer = _rhine_layer()
 	_road_hit = _sample_polyline(img, _spine_pts(), layer, "road")
@@ -543,7 +543,8 @@ func _sample_polyline(img: Image, pts: PackedVector2Array, layer: CanvasItem, ki
 	for i in range(1, pts.size()):
 		var a: Vector2 = xform * pts[i - 1]
 		var b: Vector2 = xform * pts[i]
-		var steps := maxi(4, int(a.distance_to(b) / 3.0))
+		var step_px := 2.0 if kind == "road" else 3.0
+		var steps := maxi(6 if kind == "road" else 4, int(a.distance_to(b) / step_px))
 		for s in range(steps + 1):
 			var t := float(s) / float(maxi(steps, 1))
 			var p := a.lerp(b, t)
@@ -679,6 +680,19 @@ func _road_layer() -> CanvasItem:
 
 func _spine_pts() -> PackedVector2Array:
 	var out := PackedVector2Array()
+	var rl := _road_layer()
+	if rl != null:
+		for c in rl.get_children():
+			if not (c is Line2D):
+				continue
+			var line := c as Line2D
+			var explicit := bool(line.get_meta("explicit", false)) or bool(line.get_meta("rx1_gold_spine", false))
+			if not explicit:
+				continue
+			for p in line.points:
+				out.append(p)
+		if out.size() >= 2:
+			return out
 	var mm := _map_manager()
 	if mm != null and mm.has_method("get_province_centroid"):
 		var b: Vector2 = mm.call("get_province_centroid", BONN)
@@ -704,6 +718,19 @@ func _ensure_spine_built() -> void:
 	var ol := _find_named("InfrastructureOverlayLayer")
 	if ol != null and ol.has_method("rebuild_road_layer"):
 		ol.call("rebuild_road_layer")
+	_ensure_gold_spine_layer()
+
+
+func _ensure_gold_spine_layer() -> CanvasItem:
+	var ol := _find_named("InfrastructureOverlayLayer")
+	if ol != null and ol.has_method("force_paint_ix1_gold_spine"):
+		var n: int = int(ol.call("force_paint_ix1_gold_spine"))
+		_log("EOA_RX1_PIXEL_GUARD who=guard.gold_spine painted=%d (tip API)" % n)
+	var rl := _road_layer()
+	if rl != null:
+		rl.visible = true
+		_log("EOA_RX1_PIXEL_GUARD who=guard.road_layer vis=%s children=%d" % [str(rl.visible), rl.get_child_count()])
+	return rl
 
 
 func _open_inspector(pid: int) -> void:

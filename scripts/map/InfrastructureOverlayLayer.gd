@@ -643,6 +643,49 @@ func _paint_explicit_ix1_spine_if_missing(provinces: Dictionary, drawn: Dictiona
             line.set_meta("corridor", false)
             road_layer.add_child(line)
 
+
+## Pixel-guard / inspector: paint the built Bonn–Köln–Leverkusen gold spine
+## even if the layer cull missed the edges. View-only; does not change sim.
+func force_paint_ix1_gold_spine() -> int:
+    _ensure_sub_layers()
+    if road_layer == null or map_manager == null:
+        return 0
+    var pairs: Array = [[710416, 710417], [710417, 710418]]
+    var painted := 0
+    for pair in pairs:
+        var a := int(pair[0])
+        var b := int(pair[1])
+        var c1: Vector2 = map_manager.get_province_centroid(a)
+        var c2: Vector2 = map_manager.get_province_centroid(b)
+        if c1 == Vector2.ZERO or c2 == Vector2.ZERO:
+            continue
+        var existing := road_layer.get_node_or_null("Rx1GoldSpine_%d_%d" % [a, b])
+        if existing is Line2D:
+            var el := existing as Line2D
+            el.points = PackedVector2Array([c1, c2])
+            el.default_color = ROAD_EXPLICIT_COLOR
+            el.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+            el.visible = true
+            el.z_as_relative = false
+            el.z_index = ROAD_BELOW_UNITS_Z
+            painted += 1
+            continue
+        var line := Line2D.new()
+        line.name = "Rx1GoldSpine_%d_%d" % [a, b]
+        line.points = PackedVector2Array([c1, c2])
+        line.antialiased = true
+        line.default_color = ROAD_EXPLICIT_COLOR
+        line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+        line.z_as_relative = false
+        line.z_index = ROAD_BELOW_UNITS_Z
+        line.set_meta("explicit", true)
+        line.set_meta("rx1_gold_spine", true)
+        road_layer.add_child(line)
+        painted += 1
+    road_layer.visible = true
+    _apply_screen_space_road_widths()
+    return painted
+
 ## Similar for rails - higher threshold, distinct style (e.g. dashed via multiple segments or color)
 func rebuild_rail_layer():
     if rail_layer == null:

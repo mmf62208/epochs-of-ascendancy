@@ -153,6 +153,7 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (INFRA_OVERLAY_GD, "ROAD_BELOW_UNITS_Z"),
     (INFRA_OVERLAY_GD, "ROAD_EXPLICIT_SCREEN_PX"),
     (INFRA_OVERLAY_GD, "ROAD_EXPLICIT_COLOR"),
+    (INFRA_OVERLAY_GD, "func force_paint_ix1_gold_spine"),
     (RENDERER_GD, "func set_unit_counters_visible"),
     (RENDERER_GD, "func units_view_report"),
     (RENDERER_GD, "inspector_should_show_spine_status"),
