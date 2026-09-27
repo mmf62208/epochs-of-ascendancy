@@ -101,6 +101,9 @@ func _test_z_order() -> void:
 	if "RIVER_SCREEN_PX" not in layer:
 		_fail("Rx1RhineLayer missing screen-space river width")
 		return
+	if "scale_points" not in layer and "THEATER_SCALE" not in layer:
+		_fail("Rx1RhineLayer must scale course points onto the live theater canvas")
+		return
 	if "ROAD_EXPLICIT_SCREEN_PX" not in infra:
 		_fail("InfrastructureOverlayLayer missing screen-space road width")
 		return

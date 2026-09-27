@@ -7,6 +7,7 @@ extends Node2D
 ## Screen-space stroke + z above labels so the river reads at mid and close.
 
 const _Rx1 := preload("res://scripts/map/Rx1RhineCrossing.gd")
+const _Canvas := preload("res://scripts/map/MapCanvasConfig.gd")
 
 ## DemoUnitIcon_* uses z_as_relative=false, z_index=28 (MapRenderer).
 ## MapPoliticalLabelsLayer nation Labels use z_as_relative=false, z_index=40.
@@ -61,7 +62,9 @@ func _world_width(screen_px: float) -> float:
 
 
 func _draw() -> void:
-	var pts: PackedVector2Array = _Rx1.course_points()
+	# Spec course is 8192-space; live world_accurate board is × THEATER_SCALE (1.728).
+	# Play MIXED 816cdc9: unscaled points sat near 4254,944 while Köln is 7351,1631.
+	var pts: PackedVector2Array = _Canvas.scale_points(_Rx1.course_points())
 	if pts.size() < 2:
 		return
 	var halo_w := _world_width(HALO_SCREEN_PX)
@@ -95,7 +98,7 @@ func _draw_bridge_markers() -> void:
 		var mid_v: Variant = row.get("midpoint", [])
 		if typeof(mid_v) != TYPE_ARRAY or (mid_v as Array).size() < 2:
 			continue
-		var mid := Vector2(float((mid_v as Array)[0]), float((mid_v as Array)[1]))
+		var mid: Vector2 = _Canvas.scale_point(Vector2(float((mid_v as Array)[0]), float((mid_v as Array)[1])))
 		if not mid.is_finite():
 			continue
 		var pair: Variant = row.get("edge", [])

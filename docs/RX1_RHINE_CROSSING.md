@@ -76,7 +76,7 @@ Must **FAIL** on `816cdc9` (pixels + Köln re-offer + bridge leak) and **PASS** 
 
 ## FIX2 (Play MIXED `816cdc9`)
 
-Root cause of the empty screen: (1) `draw_line` / Line2D widths were **world units**, so at mid Camera2D.zoom (~0.4) a 2.8u stroke is ~1 screen pixel; (2) `MapPoliticalLabelsLayer` nation Labels use `z_as_relative=false` **z=40**, which paints over Rhine z=36 and RoadLayer z=32 — "Netherlands" / "Belgium" / "Luxembourg" bury Köln at close zoom. FIX1's z-order guard only compared 36>28, so it passed while the pixels failed.
+Root cause of the empty screen: (1) spec course points are **8192-space**; the live `world_accurate` board is × `THEATER_SCALE` 1.728, so the polyline sat near 4254,944 while Köln is 7351,1631 — off the framed Rhineland; (2) `draw_line` / Line2D widths were **world units**, so at mid Camera2D.zoom a 2.8u stroke is ~1 screen pixel; (3) `MapPoliticalLabelsLayer` nation Labels use `z_as_relative=false` **z=40**, which paints over Rhine z=36 and RoadLayer z=32 — "Netherlands" / "Belgium" / "Luxembourg" bury Köln at close zoom. FIX1's z-order guard only compared 36>28, so it passed while the pixels failed.
 
 Köln after `state=built` re-offered **Build Road Spine** because `should_show_road_spine_button` ignored built edges and `_ix1_should_show_spine_button` fell through after a false. The Köln panel also kept Neuss's `Rhine bridge 100% · ETA 0 days` because `_update_rhine_bridge_button` returned early without hiding `_label_rx1_progress`.
 

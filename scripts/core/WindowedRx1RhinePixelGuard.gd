@@ -88,6 +88,7 @@ func _on_process() -> void:
 		Phase.WAIT_MAP:
 			_tick_wait_map()
 		Phase.SETTLE:
+			_reassert_camera()
 			_settle_left -= 1
 			if _settle_left <= 0:
 				_phase = _after_settle
@@ -128,12 +129,19 @@ func _tick_wait_map() -> void:
 	_dismiss_title_if_needed()
 	if not _map_is_ready():
 		return
-	_log("EOA_RX1_PIXEL_GUARD who=guard.map_ready elapsed=%d n=%d (title gone; live board)" % [elapsed, _province_count()])
+	if int(root.get_meta("rx1_ready_msec", 0)) == 0:
+		root.set_meta("rx1_ready_msec", Time.get_ticks_msec())
+		_log("EOA_RX1_PIXEL_GUARD who=guard.map_ready elapsed=%d n=%d (hold 2s then frame)" % [elapsed, _province_count()])
+		return
+	if Time.get_ticks_msec() - int(root.get_meta("rx1_ready_msec", 0)) < 2000:
+		return
+	_log("EOA_RX1_PIXEL_GUARD who=guard.frame_start elapsed=%d n=%d" % [elapsed, _province_count()])
 	_frame_over_koln(MID_ZOOM, true)
 	_go_settle(Phase.DO_MID)
 
 
 func _do_mid() -> void:
+	_reassert_camera()
 	var img := _capture("rx1_pixel_mid_koeln")
 	var layer := _rhine_layer()
 	_mid_river_hit = _sample_polyline(img, _course_pts(), layer, "river")
@@ -145,6 +153,7 @@ func _do_mid() -> void:
 
 
 func _do_close() -> void:
+	_reassert_camera()
 	var img := _capture("rx1_pixel_close_koeln")
 	var layer := _rhine_layer()
 	_close_river_hit = _sample_polyline(img, _course_pts(), layer, "river")
@@ -157,6 +166,7 @@ func _do_close() -> void:
 
 
 func _do_roads() -> void:
+	_reassert_camera()
 	var img := _capture("rx1_pixel_road_spine")
 	var layer := _road_layer()
 	if layer == null:
@@ -283,10 +293,7 @@ func _find_named(nm: String) -> Node:
 
 func _frame_over_koln(zoom: float, hide_inspector: bool) -> void:
 	var pos := _koln_world()
-	var cam := _camera()
-	if cam != null:
-		cam.zoom = Vector2(zoom, zoom)
-		cam.global_position = pos
+	_apply_camera(pos, zoom)
 	var mr := _map_renderer()
 	if hide_inspector and mr != null:
 		if "info_panel" in mr:
@@ -303,6 +310,26 @@ func _frame_over_koln(zoom: float, hide_inspector: bool) -> void:
 	if ol != null and ol.has_method("_apply_screen_space_road_widths"):
 		ol.call("_apply_screen_space_road_widths")
 	_log("EOA_RX1_PIXEL_GUARD who=guard.frame zoom=%.2f pos=%.1f,%.1f" % [zoom, pos.x, pos.y])
+
+
+var _cam_pos: Vector2 = Vector2.ZERO
+var _cam_zoom: float = MID_ZOOM
+
+
+func _reassert_camera() -> void:
+	if _cam_pos != Vector2.ZERO:
+		_apply_camera(_cam_pos, _cam_zoom)
+
+
+func _apply_camera(pos: Vector2, zoom: float) -> void:
+	_cam_pos = pos
+	_cam_zoom = zoom
+	var cam := _camera()
+	if cam != null:
+		cam.zoom = Vector2(zoom, zoom)
+		cam.global_position = pos
+		cam.reset_smoothing()
+	# GIS boards lock ProvinceContainers at identity. Do not scale it.
 
 
 func _camera() -> Camera2D:
@@ -323,7 +350,7 @@ func _koln_world() -> Vector2:
 		var c: Vector2 = mm.call("get_province_centroid", KOELN)
 		if c != Vector2.ZERO:
 			return c
-	return Vector2(4254.32, 944.10)
+	return Vector2(4254.32 * 1.728, 944.10 * 1.728)
 
 
 func _capture(name: String) -> Image:
@@ -374,7 +401,9 @@ func _sample_polyline(img: Image, pts: PackedVector2Array, layer: CanvasItem, ki
 			if _neighborhood_hit(img, ix, iy, kind):
 				hits += 1
 	if total <= 0:
+		_log("EOA_RX1_PIXEL_GUARD who=guard.sample kind=%s hits=0 total=0 (off-screen or no layer)" % kind)
 		return 0.0
+	_log("EOA_RX1_PIXEL_GUARD who=guard.sample kind=%s hits=%d total=%d" % [kind, hits, total])
 	return float(hits) / float(total)
 
 
@@ -425,10 +454,17 @@ func _is_road_color(c: Color) -> bool:
 
 
 func _course_pts() -> PackedVector2Array:
+	var raw := PackedVector2Array()
 	var scr: Script = load("res://scripts/map/Rx1RhineCrossing.gd") as Script
 	if scr != null and scr.has_method("course_points"):
-		return scr.call("course_points") as PackedVector2Array
-	return PackedVector2Array()
+		raw = scr.call("course_points") as PackedVector2Array
+	var canvas_scr: Script = load("res://scripts/map/MapCanvasConfig.gd") as Script
+	if canvas_scr != null and canvas_scr.has_method("scale_points"):
+		return canvas_scr.call("scale_points", raw) as PackedVector2Array
+	var out := PackedVector2Array()
+	for p in raw:
+		out.append(p * 1.728)
+	return out
 
 
 func _rhine_layer() -> CanvasItem:
@@ -459,9 +495,9 @@ func _spine_pts() -> PackedVector2Array:
 			out.append(k)
 			out.append(l)
 			return out
-	out.append(Vector2(4257.18, 951.42))
-	out.append(Vector2(4254.32, 944.10))
-	out.append(Vector2(4254.88, 940.99))
+	out.append(Vector2(4257.18 * 1.728, 951.42 * 1.728))
+	out.append(Vector2(4254.32 * 1.728, 944.10 * 1.728))
+	out.append(Vector2(4254.88 * 1.728, 940.99 * 1.728))
 	return out
 
 

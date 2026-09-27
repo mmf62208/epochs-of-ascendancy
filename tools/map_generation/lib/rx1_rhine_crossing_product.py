@@ -625,7 +625,11 @@ def visibility_order() -> Dict[str, Any]:
         and "710413" in ren
         and "710417" in ren
     )
-    screen_ok = "RIVER_SCREEN_PX" in layer and "ROAD_EXPLICIT_SCREEN_PX" in infra
+    screen_ok = (
+        "RIVER_SCREEN_PX" in layer
+        and "ROAD_EXPLICIT_SCREEN_PX" in infra
+        and ("scale_points" in layer or "THEATER_SCALE" in layer)
+    )
     labels_ok = "CLOSE_HIDE_ZOOM" in labels and "sync_camera_zoom" in labels
     ok = (
         unit_z == 28
