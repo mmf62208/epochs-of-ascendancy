@@ -4,16 +4,17 @@ extends Node2D
 ## Vector Rhine (Bonn→Köln→Düsseldorf→Duisburg). _draw only — never rebuild on zoom.
 ## Play MIXED 816cdc9: z=36 sat under country Labels (z=40 absolute) and
 ## draw_line widths 2.8/5.6 were world units — sub-pixel at mid Camera2D.zoom.
-## Screen-space stroke + z above labels so the river reads at mid and close.
+## FIX2 keeps theater-scale + screen-space width. Owner: units stay on top
+## (z=28); river sits above labels and below counters. U hides counters.
 
 const _Rx1 := preload("res://scripts/map/Rx1RhineCrossing.gd")
 const _Canvas := preload("res://scripts/map/MapCanvasConfig.gd")
 
 ## DemoUnitIcon_* uses z_as_relative=false, z_index=28 (MapRenderer).
-## MapPoliticalLabelsLayer nation Labels use z_as_relative=false, z_index=40.
+## Nation labels stay under the river (NATION_LABEL_Z=18).
 const UNIT_COUNTER_Z := 28
-const NATION_LABEL_Z := 40
-const ABOVE_UNIT_COUNTERS_Z := 90
+const NATION_LABEL_Z := 18
+const MAP_BELOW_UNITS_Z := 22
 const HALO_COLOR := Color(0.04, 0.10, 0.20, 0.88)
 const RIVER_COLOR := Color(0.22, 0.58, 0.92, 0.98)
 const BRIDGE_COLOR := Color(0.42, 0.32, 0.16, 0.95)
@@ -29,7 +30,7 @@ var _last_zoom: float = -1.0
 
 func _ready() -> void:
 	z_as_relative = false
-	z_index = ABOVE_UNIT_COUNTERS_Z
+	z_index = MAP_BELOW_UNITS_Z
 	visible = true
 	modulate = Color(1, 1, 1, 1)
 	set_process(true)

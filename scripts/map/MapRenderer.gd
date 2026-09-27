@@ -2305,6 +2305,16 @@ func _input(event: InputEvent) -> void:
 			_request_hang_safe_supply_corridor()
 			get_viewport().set_input_as_handled()
 			return
+		# U = view-only unit counters (default shown). Search LineEdit already
+		# returned above, so typing in Search cannot fire this.
+		if event.keycode == KEY_U and not event.ctrl_pressed and not event.alt_pressed:
+			if event.shift_pressed:
+				var onu: bool = toggle_strategic_flow_overlay()
+				_show_map_layer_toast("Supply/sealane flow %s (Shift+U)" % ("ON" if onu else "OFF"))
+			else:
+				toggle_unit_counters()
+			get_viewport().set_input_as_handled()
+			return
 		# Mapmodes in _input so toolbar/search focus cannot swallow F2–F4 / Ctrl+F9.
 		if event.keycode == KEY_F1:
 			set_map_mode("political")
@@ -2647,14 +2657,15 @@ func _unhandled_input(event: InputEvent) -> void:
 			_show_map_layer_toast("Battle indicators %s" % ("ON" if onj else "OFF"))
 			get_viewport().set_input_as_handled()
 			return
-		# Shift+U — unit counters. Must beat plain U (supply flow) the same way Shift+I beats I.
+		# U — view-only unit counters (default shown). Shift+U — supply/sealane flow.
+		# Search focus already returned above via _gui_text_field_has_focus.
 		if event.keycode == KEY_U and event.shift_pressed and not event.ctrl_pressed and not event.alt_pressed:
-			toggle_unit_counters()
+			var onu: bool = toggle_strategic_flow_overlay()
+			_show_map_layer_toast("Supply/sealane flow %s (Shift+U)" % ("ON" if onu else "OFF"))
 			get_viewport().set_input_as_handled()
 			return
 		if event.keycode == KEY_U and not event.ctrl_pressed and not event.shift_pressed:
-			var onu: bool = toggle_strategic_flow_overlay()
-			_show_map_layer_toast("Supply/sealane flow %s" % ("ON" if onu else "OFF"))
+			toggle_unit_counters()
 			get_viewport().set_input_as_handled()
 			return
 		# I: EquipmentFlow glyphs · Shift+I: first-session WarLoop (flow + fronts + assault brief)
@@ -2709,13 +2720,10 @@ func _unhandled_input(event: InputEvent) -> void:
 			get_viewport().set_input_as_handled()
 			return
 
-		# Real-world terrain sub-layers (U/H/V) when TerrainLayerStack is loaded.
+		# Real-world terrain sub-layers (H/V) when TerrainLayerStack is loaded.
+		# Plain U is reserved for the view-only Units toggle (see above).
 		# Default view is clean high-quality parchment + rivers + directional hills + coast (world-class readable).
 		# V reveals the very faint optional vegetation tint layer (pastel, low alpha, toggleable, zoom-friendly in future).
-		if event.keycode == KEY_U and terrain_layer_stack:
-			terrain_layer_stack.toggle_rivers()
-			get_viewport().set_input_as_handled()
-			return
 		if event.keycode == KEY_H and terrain_layer_stack:
 			terrain_layer_stack.toggle_elevation()
 			get_viewport().set_input_as_handled()
@@ -20880,7 +20888,7 @@ func _setup_rx1_rhine_layer() -> void:
 	if existing != null and is_instance_valid(existing):
 		_rx1_rhine_layer = existing
 		existing.z_as_relative = false
-		existing.z_index = 90
+		existing.z_index = 22
 		if existing.has_method("refresh"):
 			existing.call("refresh")
 		return
@@ -20890,12 +20898,12 @@ func _setup_rx1_rhine_layer() -> void:
 	var layer: Node = LayerScript.new() if LayerScript is GDScript else null
 	if layer == null:
 		return
-	# z=90 sits above DemoUnitIcon 28 and nation Labels 40. Layer also sets this in _ready.
-	add_overlay_layer("Rx1RhineLayer", layer as Node2D, 90)
+	# z=22: above nation labels 18, below DemoUnitIcon 28. Layer also sets this in _ready.
+	add_overlay_layer("Rx1RhineLayer", layer as Node2D, 22)
 	_rx1_rhine_layer = layer as Node2D
 	if _rx1_rhine_layer != null:
 		_rx1_rhine_layer.z_as_relative = false
-		_rx1_rhine_layer.z_index = 90
+		_rx1_rhine_layer.z_index = 22
 	Rx1RhineCrossing.ensure_loaded()
 
 
@@ -24199,9 +24207,59 @@ func _sync_unit_counter_paint(z: float = -1.0) -> void:
 
 
 func _sync_unit_counter_visibility(z: float = -1.0) -> void:
-	if _demo_unit_icon_pids.is_empty():
-		return
 	var vis := _unit_counters_want_visible(z)
+	if not _demo_unit_icon_pids.is_empty():
+		for id_v in _demo_unit_icon_pids:
+			var id := int(id_v)
+			if not province_nodes.has(id):
+				continue
+			var node: Node2D = province_nodes[id] as Node2D
+			if node == null:
+				continue
+			# Host must stay on when chips want paint (leftover cull must not eat GER).
+			if vis:
+				node.visible = true
+			for c in node.get_children():
+				if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
+					(c as Node2D).visible = vis
+	_sync_unit_overlay_visibility(vis)
+	_notify_units_view_hud()
+
+
+## View-only: stack chips, selection rings, pin pulse, battle bubbles.
+## Must not touch sim, selection ids, orders, or save data.
+func _sync_unit_overlay_visibility(vis: bool) -> void:
+	if _pin_focus_pulse_node != null and is_instance_valid(_pin_focus_pulse_node):
+		_pin_focus_pulse_node.visible = vis
+	if _land_battle_bubble_layer != null and is_instance_valid(_land_battle_bubble_layer):
+		_land_battle_bubble_layer.visible = vis
+	if not _demo_unit_icon_pids.is_empty():
+		for id_v in _demo_unit_icon_pids:
+			var id := int(id_v)
+			if not province_nodes.has(id):
+				continue
+			var node: Node2D = province_nodes[id] as Node2D
+			if node == null:
+				continue
+			for c in node.get_children():
+				if c == null:
+					continue
+				var nm := str(c.name)
+				if nm == "StackBadge" or nm == "PinFocusPulse" or nm.begins_with("SelectedFrame"):
+					if c is CanvasItem:
+						(c as CanvasItem).visible = vis
+				if c is Node2D and nm.begins_with("DemoUnitIcon_"):
+					for inner in c.get_children():
+						if inner == null:
+							continue
+						var iname := str(inner.name)
+						if iname == "StackBadge" or iname == "SelectedFrame" or iname == "PinFocusPulse":
+							if inner is CanvasItem:
+								(inner as CanvasItem).visible = vis
+
+
+func _count_visible_unit_icons() -> int:
+	var n := 0
 	for id_v in _demo_unit_icon_pids:
 		var id := int(id_v)
 		if not province_nodes.has(id):
@@ -24209,12 +24267,46 @@ func _sync_unit_counter_visibility(z: float = -1.0) -> void:
 		var node: Node2D = province_nodes[id] as Node2D
 		if node == null:
 			continue
-		# Host must stay on when chips want paint (leftover cull must not eat GER).
-		if vis:
-			node.visible = true
 		for c in node.get_children():
-			if c is Node2D and str(c.name).begins_with("DemoUnitIcon_"):
-				(c as Node2D).visible = vis
+			if c is Node2D and str(c.name).begins_with("DemoUnitIcon_") and (c as Node2D).visible:
+				n += 1
+	return n
+
+
+func _notify_units_view_hud() -> void:
+	var tree := get_tree()
+	if tree == null:
+		return
+	var tib: Node = TopInfoBar.find_in_tree(tree)
+	if tib != null and tib.has_method("sync_units_view_button"):
+		tib.call("sync_units_view_button", show_unit_counters)
+
+
+func set_unit_counters_visible(on: bool) -> bool:
+	show_unit_counters = on
+	_sync_unit_counter_visibility()
+	return show_unit_counters
+
+
+func units_view_report() -> Dictionary:
+	var btn_pressed := show_unit_counters
+	var btn_name := ""
+	var tree := get_tree()
+	if tree != null:
+		var tib: Node = TopInfoBar.find_in_tree(tree)
+		if tib != null and "units_view_button" in tib:
+			var b: Variant = tib.get("units_view_button")
+			if b is Button:
+				btn_pressed = (b as Button).button_pressed
+				btn_name = str((b as Button).name)
+	return {
+		"show_unit_counters": show_unit_counters,
+		"visible_icon_count": _count_visible_unit_icons(),
+		"button_pressed": btn_pressed,
+		"button_matches": btn_pressed == show_unit_counters,
+		"button_name": btn_name,
+		"view_only": true,
+	}
 
 
 func toggle_unit_counters() -> bool:
@@ -24222,8 +24314,8 @@ func toggle_unit_counters() -> bool:
 	_sync_unit_counter_visibility()
 	var z := _get_camera_zoom() if has_method("_get_camera_zoom") else 1.0
 	var shown := _unit_counters_want_visible(z)
-	var msg := "Unit counters OFF (master)" if not show_unit_counters else (
-		"Unit counters ON · visible at this zoom" if shown else "Unit counters ON · hidden (Shift+U)"
+	var msg := "Unit counters OFF (U)" if not show_unit_counters else (
+		"Unit counters ON (U)" if shown else "Unit counters ON · hidden at this zoom (U)"
 	)
 	if has_method("_show_map_layer_toast"):
 		_show_map_layer_toast(msg)

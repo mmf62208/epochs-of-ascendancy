@@ -50,6 +50,7 @@ PANEL_HARNESS = ROOT / "scripts" / "core" / "HeadlessRx1RhinePanelStateTest.gd"
 PIXEL_GUARD_GD = ROOT / "scripts" / "core" / "WindowedRx1RhinePixelGuard.gd"
 PIXEL_GUARD_SH = ROOT / "tools" / "eoa_rx1_pixel_guard.sh"
 LABELS_GD = ROOT / "scripts" / "map" / "MapPoliticalLabelsLayer.gd"
+TOPINFO_GD = ROOT / "scripts" / "ui" / "TopInfoBar.gd"
 LIVE_GUARD_SH = ROOT / "tools" / "eoa_rx1_bridge_live_progress_guard.sh"
 RUN_GODOT_SH = ROOT / "tools" / "run_godot.sh"
 
@@ -147,14 +148,19 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (RULES_GD, "func set_bridged"),
     (LAYER_GD, "class_name Rx1RhineLayer"),
     (LAYER_GD, "func _draw"),
-    (LAYER_GD, "ABOVE_UNIT_COUNTERS_Z"),
+    (LAYER_GD, "MAP_BELOW_UNITS_Z"),
     (LAYER_GD, "RIVER_SCREEN_PX"),
-    (INFRA_OVERLAY_GD, "ROAD_ABOVE_UNIT_COUNTERS_Z"),
+    (INFRA_OVERLAY_GD, "ROAD_BELOW_UNITS_Z"),
     (INFRA_OVERLAY_GD, "ROAD_EXPLICIT_SCREEN_PX"),
+    (INFRA_OVERLAY_GD, "ROAD_EXPLICIT_COLOR"),
+    (RENDERER_GD, "func set_unit_counters_visible"),
+    (RENDERER_GD, "func units_view_report"),
     (RENDERER_GD, "inspector_should_show_spine_status"),
     (RENDERER_GD, "inspector_should_show_bridge_status"),
     (IDM_GD, "is_ix1_road_spine_built"),
     (PIXEL_GUARD_SH, "xvfb-run"),
+    (PIXEL_GUARD_GD, "_hide_unit_nodes_direct"),
+    (TOPINFO_GD, "BtnUnitsView"),
     (RENDERER_GD, "_hide_ix1_spine_inspector_chrome"),
     (RUN_GODOT_SH, "class cache missing Rx1RhineCrossing"),
     (GAMEDATA_GD, 'preload("res://scripts/map/Rx1RhineCrossing.gd")'),
@@ -610,14 +616,15 @@ def _const_int(src: str, name: str) -> int:
 
 
 def visibility_order() -> Dict[str, Any]:
-    """FIX1+FIX2: z above units/labels; screen-space stroke; nation labels fade at close."""
+    """FIX2 scope change: labels 18 < river/road < units 28; screen-space; close fade."""
     layer = _read(LAYER_GD)
     infra = _read(INFRA_OVERLAY_GD)
     ren = _read(RENDERER_GD)
     labels = _read(LABELS_GD)
-    rhine_z = _const_int(layer, "ABOVE_UNIT_COUNTERS_Z")
+    rhine_z = _const_int(layer, "MAP_BELOW_UNITS_Z")
     unit_z = _const_int(layer, "UNIT_COUNTER_Z")
-    road_z = _const_int(infra, "ROAD_ABOVE_UNIT_COUNTERS_Z")
+    label_z = _const_int(layer, "NATION_LABEL_Z")
+    road_z = _const_int(infra, "ROAD_BELOW_UNITS_Z")
     overlay_unit = _const_int(infra, "UNIT_COUNTER_Z")
     spine_ok = (
         "inspector_should_show_spine_status" in ren
@@ -629,27 +636,52 @@ def visibility_order() -> Dict[str, Any]:
         "RIVER_SCREEN_PX" in layer
         and "ROAD_EXPLICIT_SCREEN_PX" in infra
         and ("scale_points" in layer or "THEATER_SCALE" in layer)
+        and "ROAD_EXPLICIT_COLOR" in infra
     )
     labels_ok = "CLOSE_HIDE_ZOOM" in labels and "sync_camera_zoom" in labels
-    ok = (
+    units_on_top = (
         unit_z == 28
         and overlay_unit == 28
-        and rhine_z > unit_z
-        and rhine_z > 40
-        and road_z > overlay_unit
-        and road_z > 40
-        and spine_ok
-        and screen_ok
-        and labels_ok
+        and label_z == 18
+        and 18 < rhine_z < 28
+        and 18 < road_z < 28
+        and "ABOVE_UNIT_COUNTERS_Z" not in layer
+        and "ROAD_ABOVE_UNIT_COUNTERS_Z" not in infra
     )
+    ok = units_on_top and spine_ok and screen_ok and labels_ok
     return {
         "ok": ok,
         "rhine_z": rhine_z,
         "road_z": road_z,
         "unit_z": unit_z,
+        "label_z": label_z,
+        "units_on_top": units_on_top,
         "spine_ok": spine_ok,
         "screen_space": screen_ok,
         "labels_close": labels_ok,
+    }
+
+
+def units_view_toggle() -> Dict[str, Any]:
+    """View-only Units HUD + U. Does not touch sim / selection / orders / save."""
+    ren = _read(RENDERER_GD)
+    bar = _read(TOPINFO_GD)
+    guard = _read(PIXEL_GUARD_GD)
+    api_ok = (
+        "func set_unit_counters_visible" in ren
+        and "func units_view_report" in ren
+        and "func _sync_unit_overlay_visibility" in ren
+        and "toggle_unit_counters()" in ren
+        and "Supply/sealane flow %s (Shift+U)" in ren
+        and "_gui_text_field_has_focus()" in ren
+    )
+    hud_ok = "BtnUnitsView" in bar and "func sync_units_view_button" in bar
+    hide_ok = "_hide_unit_nodes_direct" in guard
+    return {
+        "ok": api_ok and hud_ok and hide_ok,
+        "api_ok": api_ok,
+        "hud_ok": hud_ok,
+        "direct_hide_816cdc9": hide_ok,
     }
 
 
@@ -819,6 +851,12 @@ def build_rx1_rhine_crossing_product() -> Dict[str, Any]:
     else:
         fails.append("fresh_checkout_launch")
 
+    units = units_view_toggle()
+    if units.get("ok"):
+        passes.append("units_view_toggle")
+    else:
+        fails.append("units_view_toggle")
+
     return {
         "ok": not fails,
         "slice": SLICE_NAME,
@@ -835,6 +873,7 @@ def build_rx1_rhine_crossing_product() -> Dict[str, Any]:
         "visibility_order": vis,
         "panel_state_scope": panel,
         "fresh_checkout_launch": fresh,
+        "units_view_toggle": units,
         "move_unbridged": move_mult(ua, ub, False, spec),
         "move_bridged": move_mult(ba, bb, True, spec),
         "attack_unbridged": attack_malus(ua, ub, False, spec),

@@ -1,8 +1,8 @@
 extends SceneTree
 
-## FIX1 RX-1 visibility: Rhine + RoadLayer z above DemoUnitIcon (28),
-## spine chrome only on Bonn/Köln/Leverkusen, launch path imports class cache.
-## Must FAIL on 9750f3d (z=7 / leaked Neuss spine / no import gate) and PASS on tip.
+## FIX2 scope change: units stay on top (z=28). Rhine/road sit above
+## nation labels (18) and below counters. View-only U + HUD Units button.
+## Spine chrome only on Bonn/Köln/Leverkusen. Launch path imports class cache.
 ##
 ##   tools/run_godot.sh --headless --path . -s res://scripts/core/HeadlessRx1RhineVisibilityTest.gd
 
@@ -71,32 +71,40 @@ func _run() -> void:
 	_test_z_order()
 	_test_spine_chrome_scope()
 	_test_fresh_checkout_launch()
+	_test_units_view_toggle()
 
 
 func _test_z_order() -> void:
 	var layer := _read(SRC_LAYER)
 	var infra := _read(SRC_INFRA)
 	var ren := _read(SRC_REN)
-	var rhine_z := _const_int(layer, "ABOVE_UNIT_COUNTERS_Z")
+	var rhine_z := _const_int(layer, "MAP_BELOW_UNITS_Z")
 	var unit_z := _const_int(layer, "UNIT_COUNTER_Z")
-	var road_z := _const_int(infra, "ROAD_ABOVE_UNIT_COUNTERS_Z")
+	var label_z := _const_int(layer, "NATION_LABEL_Z")
+	var road_z := _const_int(infra, "ROAD_BELOW_UNITS_Z")
 	if unit_z != 28:
 		_fail("UNIT_COUNTER_Z must stay 28 (DemoUnitIcon)")
 		return
-	if rhine_z <= unit_z:
-		_fail("Rhine ABOVE_UNIT_COUNTERS_Z=%d must be > unit %d" % [rhine_z, unit_z])
+	if label_z != 18:
+		_fail("NATION_LABEL_Z must stay 18 (labels must not bury river/road)")
 		return
-	if rhine_z <= 40:
-		_fail("Rhine z=%d must sit above nation Labels z=40 (Play MIXED 816cdc9)" % rhine_z)
+	if rhine_z >= unit_z:
+		_fail("Rhine MAP_BELOW_UNITS_Z=%d must sit below unit %d" % [rhine_z, unit_z])
 		return
-	if road_z <= 28:
-		_fail("RoadLayer ROAD_ABOVE_UNIT_COUNTERS_Z=%d must be > 28" % road_z)
+	if rhine_z <= label_z:
+		_fail("Rhine z=%d must sit above nation Labels z=%d" % [rhine_z, label_z])
 		return
-	if road_z <= 40:
-		_fail("RoadLayer z=%d must sit above nation Labels z=40" % road_z)
+	if road_z >= 28:
+		_fail("RoadLayer ROAD_BELOW_UNITS_Z=%d must sit below units 28" % road_z)
 		return
-	if "add_overlay_layer(\"Rx1RhineLayer\"" in ren and "90" not in ren:
-		_fail("MapRenderer must spawn Rx1RhineLayer at z=90")
+	if road_z <= 18:
+		_fail("RoadLayer z=%d must sit above nation Labels 18" % road_z)
+		return
+	if "add_overlay_layer(\"Rx1RhineLayer\"" in ren and ", 22)" not in ren:
+		_fail("MapRenderer must spawn Rx1RhineLayer at z=22 (below units)")
+		return
+	if "ABOVE_UNIT_COUNTERS_Z" in layer or "ROAD_ABOVE_UNIT_COUNTERS_Z" in infra:
+		_fail("FIX1 raise-above-units constants must be gone")
 		return
 	if "RIVER_SCREEN_PX" not in layer:
 		_fail("Rx1RhineLayer missing screen-space river width")
@@ -107,7 +115,10 @@ func _test_z_order() -> void:
 	if "ROAD_EXPLICIT_SCREEN_PX" not in infra:
 		_fail("InfrastructureOverlayLayer missing screen-space road width")
 		return
-	_pass("Rhine z=%d and Road z=%d sit above units 28 and nation Labels 40" % [rhine_z, road_z])
+	if "ROAD_EXPLICIT_COLOR" not in infra:
+		_fail("InfrastructureOverlayLayer missing gold ROAD_EXPLICIT_COLOR")
+		return
+	_pass("Rhine z=%d and Road z=%d sit above labels 18 and below units 28" % [rhine_z, road_z])
 
 
 func _test_spine_chrome_scope() -> void:
@@ -154,3 +165,38 @@ func _test_fresh_checkout_launch() -> void:
 		_fail("GameData must preload Rx1RhineCrossing.gd (no class_name at autoload parse)")
 		return
 	_pass("fresh-checkout launch: import-if-needed + GameData preload")
+
+
+func _test_units_view_toggle() -> void:
+	var ren := _read(SRC_REN)
+	var bar := _read("res://scripts/ui/TopInfoBar.gd")
+	var guard := _read("res://scripts/core/WindowedRx1RhinePixelGuard.gd")
+	if "func set_unit_counters_visible" not in ren:
+		_fail("MapRenderer missing set_unit_counters_visible")
+		return
+	if "func units_view_report" not in ren:
+		_fail("MapRenderer missing units_view_report")
+		return
+	if "func _sync_unit_overlay_visibility" not in ren:
+		_fail("MapRenderer missing overlay hide for stack/rings/bubbles")
+		return
+	if "toggle_unit_counters()" not in ren:
+		_fail("MapRenderer must bind plain U to toggle_unit_counters")
+		return
+	# Plain U (not shift) must toggle units; Shift+U is supply flow.
+	if "Supply/sealane flow %s (Shift+U)" not in ren:
+		_fail("Shift+U must be supply/sealane flow (U is units)")
+		return
+	if "_gui_text_field_has_focus()" not in ren:
+		_fail("U must not fire while Search has focus")
+		return
+	if "BtnUnitsView" not in bar:
+		_fail("TopInfoBar missing BtnUnitsView HUD button")
+		return
+	if "func sync_units_view_button" not in bar:
+		_fail("TopInfoBar missing sync_units_view_button")
+		return
+	if "_hide_unit_nodes_direct" not in guard:
+		_fail("pixel guard must document 816cdc9 direct node hide")
+		return
+	_pass("view-only Units toggle: U + BtnUnitsView + Search-focus guard")

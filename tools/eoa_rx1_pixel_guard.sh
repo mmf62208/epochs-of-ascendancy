@@ -3,6 +3,11 @@
 # Loads TestScenario (world_accurate, same F5 path) via tools/run_godot.sh.
 # Never EOA_SKIP_TITLE. Uses EOA_SMOKE_AUTO_BEGIN only to dismiss the living title.
 #
+# 816cdc9 baseline has no Units toggle. The guard hides DemoUnitIcon_*,
+# StackBadge, PinFocusPulse, LandBattleBubbleLayer, SelectedFrame by walking
+# the tree (_hide_unit_nodes_direct) so units-OFF river/road samples are
+# not covered by chips. Tip uses set_unit_counters_visible (view-only).
+#
 #   tools/eoa_rx1_pixel_guard.sh
 #   EOA_RX1_PIXEL_OUT=/tmp/eoa-rx1-pixel tools/eoa_rx1_pixel_guard.sh
 set -euo pipefail

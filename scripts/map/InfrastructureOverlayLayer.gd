@@ -90,14 +90,15 @@ var _layer_provs_cache: Dictionary = {}
 var _layer_provs_cache_msec: int = 0
 const LAYER_PROV_CACHE_MS := 400
 
-## DemoUnitIcon_* is z=28 z_as_relative=false. Built IX-1 roads must read above
-## those plates AND above nation Labels (z=40). Play MIXED 816cdc9: world-width
-## 2.8 Line2Ds sat under "Netherlands"/"Belgium" and vanished at mid zoom.
+## DemoUnitIcon_* is z=28 z_as_relative=false. Owner: units stay on top.
+## Roads sit above nation labels (18) and below counters. Gold stroke is
+## distinct from GER red fill and tan land so the pixel guard can fail 816cdc9.
 const UNIT_COUNTER_Z := 28
-const ROAD_ABOVE_UNIT_COUNTERS_Z := 88
-const SPINE_ABOVE_UNIT_COUNTERS_Z := 89
+const ROAD_BELOW_UNITS_Z := 21
+const SPINE_BELOW_UNITS_Z := 21
 const ROAD_EXPLICIT_SCREEN_PX := 7.0
 const ROAD_INFERRED_SCREEN_PX := 4.0
+const ROAD_EXPLICIT_COLOR := Color(0.92, 0.62, 0.08, 0.96)
 
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
@@ -137,11 +138,11 @@ func _ensure_sub_layers():
             road_layer = Node2D.new()
             road_layer.name = "RoadLayer"
             road_layer.z_as_relative = false
-            road_layer.z_index = ROAD_ABOVE_UNIT_COUNTERS_Z
+            road_layer.z_index = ROAD_BELOW_UNITS_Z
             add_child(road_layer)
     if road_layer != null:
         road_layer.z_as_relative = false
-        road_layer.z_index = ROAD_ABOVE_UNIT_COUNTERS_Z
+        road_layer.z_index = ROAD_BELOW_UNITS_Z
     if rail_layer == null:
         rail_layer = get_node_or_null("RailLayer")
         if rail_layer == null:
@@ -176,11 +177,11 @@ func _ensure_sub_layers():
             spine_preview_layer = Ix1SpinePreviewDraw.new()
             spine_preview_layer.name = "Ix1SpinePreview"
             spine_preview_layer.z_as_relative = false
-            spine_preview_layer.z_index = SPINE_ABOVE_UNIT_COUNTERS_Z
+            spine_preview_layer.z_index = SPINE_BELOW_UNITS_Z
             add_child(spine_preview_layer)
     if spine_preview_layer != null:
         spine_preview_layer.z_as_relative = false
-        spine_preview_layer.z_index = SPINE_ABOVE_UNIT_COUNTERS_Z
+        spine_preview_layer.z_index = SPINE_BELOW_UNITS_Z
 
 func _apply_layer_visibilities():
     _update_sub_layer_visibilities()
@@ -575,10 +576,10 @@ func _rebuild_road_layer_inner() -> void:
                 # Explicit IX-1 spines stay readable on political at Home zoom.
                 # Inferred high-infra dust only when Infra mapmode (show_roads) is on.
                 if has_explicit:
-                    line.default_color = Color(0.50, 0.36, 0.14, 0.92)
+                    line.default_color = ROAD_EXPLICIT_COLOR
                     line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
                     line.z_as_relative = false
-                    line.z_index = ROAD_ABOVE_UNIT_COUNTERS_Z
+                    line.z_index = ROAD_BELOW_UNITS_Z
                 elif tier >= 2:
                     line.default_color = Color(0.40, 0.34, 0.22, 0.38)
                     line.width = 2.0
@@ -631,10 +632,10 @@ func _paint_explicit_ix1_spine_if_missing(provinces: Dictionary, drawn: Dictiona
             var line := Line2D.new()
             line.points = [c1, c2]
             line.antialiased = true
-            line.default_color = Color(0.50, 0.36, 0.14, 0.92)
+            line.default_color = ROAD_EXPLICIT_COLOR
             line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
             line.z_as_relative = false
-            line.z_index = ROAD_ABOVE_UNIT_COUNTERS_Z
+            line.z_index = ROAD_BELOW_UNITS_Z
             line.set_meta("p1", pid)
             line.set_meta("p2", nid)
             line.set_meta("explicit", true)

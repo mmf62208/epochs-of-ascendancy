@@ -34,6 +34,7 @@ from rx1_rhine_crossing_product import (  # noqa: E402
     shared_border_guard,
     visibility_order,
     panel_state_scope,
+    units_view_toggle,
 )
 
 
@@ -97,15 +98,24 @@ class TestRx1RhineCrossingProduct(unittest.TestCase):
         names = {int(e[0]) for e in listed_edges(spec)} | {int(e[1]) for e in listed_edges(spec)}
         self.assertTrue(theater & names)
 
-    def test_visibility_order_above_unit_counters(self) -> None:
+    def test_visibility_order_units_on_top(self) -> None:
         vis = visibility_order()
         self.assertTrue(vis.get("ok"), msg=vis)
-        self.assertGreater(int(vis.get("rhine_z", -1)), int(vis.get("unit_z", 99)))
-        self.assertGreater(int(vis.get("road_z", -1)), int(vis.get("unit_z", 99)))
-        self.assertGreater(int(vis.get("rhine_z", -1)), 40)
+        self.assertTrue(vis.get("units_on_top"), msg=vis)
+        self.assertLess(int(vis.get("rhine_z", 99)), int(vis.get("unit_z", 0)))
+        self.assertLess(int(vis.get("road_z", 99)), int(vis.get("unit_z", 0)))
+        self.assertGreater(int(vis.get("rhine_z", -1)), int(vis.get("label_z", 99)))
+        self.assertGreater(int(vis.get("road_z", -1)), int(vis.get("label_z", 99)))
         self.assertTrue(vis.get("spine_ok"), msg=vis)
         self.assertTrue(vis.get("screen_space"), msg=vis)
         self.assertTrue(vis.get("labels_close"), msg=vis)
+
+    def test_units_view_toggle(self) -> None:
+        units = units_view_toggle()
+        self.assertTrue(units.get("ok"), msg=units)
+        self.assertTrue(units.get("api_ok"), msg=units)
+        self.assertTrue(units.get("hud_ok"), msg=units)
+        self.assertTrue(units.get("direct_hide_816cdc9"), msg=units)
 
     def test_panel_state_scope(self) -> None:
         panel = panel_state_scope()

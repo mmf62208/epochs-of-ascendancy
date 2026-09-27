@@ -8,8 +8,14 @@ extends SceneTree
 ##   tools/eoa_rx1_pixel_guard.sh
 ##   xvfb-run -a tools/run_godot.sh -s res://scripts/core/WindowedRx1RhinePixelGuard.gd
 ##
-## Must FAIL on 816cdc9 (world-width stroke under nation Labels; Köln re-offer;
-## Neuss bridge row leaked onto Köln) and PASS on the FIX2 tip.
+## Scope-change FIX2: units stay on top (z=28). River/road sit below.
+## (a) Units OFF — Rhine + gold spine must be visible at mid/close.
+##     FAIL on 816cdc9 / PASS on tip. 816cdc9 has no U toggle: hide
+##     DemoUnitIcon_*/StackBadge/PinFocusPulse/LandBattleBubbleLayer nodes
+##     directly via _hide_unit_nodes_direct (documented in RX1_RHINE_CROSSING.md).
+## (b) Units ON — sample a counter over the river; counter pixels must win.
+## (c) U hides, U restores, sim fingerprint unchanged. Button stays in sync.
+## Panel-state checks (Köln built / no re-offer / no leak) stay.
 ## Smoke harness is not the product. Artifacts are real viewport captures.
 
 const KOELN := 710417
@@ -23,6 +29,7 @@ const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 48
 const RIVER_MIN_HIT := 0.18
 const ROAD_MIN_HIT := 0.20
+const UNIT_MIN_HIT := 0.22
 const SAMPLE_RADIUS := 3
 const LOCAL_RIVER_WORLD := 120.0
 
@@ -32,6 +39,8 @@ enum Phase {
 	DO_MID,
 	DO_CLOSE,
 	DO_ROADS,
+	DO_UNITS_ON,
+	DO_TOGGLE,
 	DO_PANEL_KOLN,
 	DO_PANEL_NEUSS,
 	DONE,
@@ -46,10 +55,16 @@ var _out_dir: String = ""
 var _mid_river_hit: float = 0.0
 var _close_river_hit: float = 0.0
 var _road_hit: float = 0.0
+var _units_on_hit: float = 0.0
+var _units_on_river_under: float = 0.0
+var _toggle_ok: bool = false
+var _used_direct_unit_hide: bool = false
 var _koln_panel: Dictionary = {}
 var _neuss_panel: Dictionary = {}
 var _captures: PackedStringArray = PackedStringArray()
 var _last_wait_log: int = -1
+var _parked_unit: Node2D = null
+var _parked_unit_pos: Vector2 = Vector2.ZERO
 
 
 func _init() -> void:
@@ -101,6 +116,10 @@ func _on_process() -> void:
 			_do_close()
 		Phase.DO_ROADS:
 			_do_roads()
+		Phase.DO_UNITS_ON:
+			_do_units_on()
+		Phase.DO_TOGGLE:
+			_do_toggle()
 		Phase.DO_PANEL_KOLN:
 			_do_panel_koln()
 		Phase.DO_PANEL_NEUSS:
@@ -140,16 +159,19 @@ func _tick_wait_map() -> void:
 		return
 	_log("EOA_RX1_PIXEL_GUARD who=guard.frame_start elapsed=%d n=%d" % [elapsed, _province_count()])
 	_freeze_boot_camera_fighters()
+	_set_units_view(false)
 	_frame_over_koln(MID_ZOOM, true)
 	_go_settle(Phase.DO_MID)
 
 
 func _do_mid() -> void:
 	_reassert_camera()
-	var img := _capture("rx1_pixel_mid_koeln")
+	var img := _capture("rx1_pixel_mid_koeln_units_off")
 	var layer := _rhine_layer()
 	_mid_river_hit = _sample_polyline(img, _local_course_pts(), layer, "river")
-	_log("EOA_RX1_PIXEL_GUARD who=guard.mid_river hit=%.3f need>=%.2f" % [_mid_river_hit, RIVER_MIN_HIT])
+	_log("EOA_RX1_PIXEL_GUARD who=guard.mid_river units=off hit=%.3f need>=%.2f direct_hide=%s" % [
+		_mid_river_hit, RIVER_MIN_HIT, str(_used_direct_unit_hide)
+	])
 	if _mid_river_hit < RIVER_MIN_HIT:
 		_fail_reasons.append("mid_river_hit")
 	_frame_over_koln(CLOSE_ZOOM, true)
@@ -158,10 +180,10 @@ func _do_mid() -> void:
 
 func _do_close() -> void:
 	_reassert_camera()
-	var img := _capture("rx1_pixel_close_koeln")
+	var img := _capture("rx1_pixel_close_koeln_units_off")
 	var layer := _rhine_layer()
 	_close_river_hit = _sample_polyline(img, _local_course_pts(), layer, "river")
-	_log("EOA_RX1_PIXEL_GUARD who=guard.close_river hit=%.3f need>=%.2f" % [_close_river_hit, RIVER_MIN_HIT])
+	_log("EOA_RX1_PIXEL_GUARD who=guard.close_river units=off hit=%.3f need>=%.2f" % [_close_river_hit, RIVER_MIN_HIT])
 	if _close_river_hit < RIVER_MIN_HIT:
 		_fail_reasons.append("close_river_hit")
 	_ensure_spine_built()
@@ -171,18 +193,75 @@ func _do_close() -> void:
 
 func _do_roads() -> void:
 	_reassert_camera()
-	var img := _capture("rx1_pixel_road_spine")
+	var img := _capture("rx1_pixel_road_spine_units_off")
 	var layer := _road_layer()
 	if layer == null:
 		layer = _rhine_layer()
 	_road_hit = _sample_polyline(img, _spine_pts(), layer, "road")
-	_log("EOA_RX1_PIXEL_GUARD who=guard.road_spine hit=%.3f need>=%.2f" % [_road_hit, ROAD_MIN_HIT])
+	_log("EOA_RX1_PIXEL_GUARD who=guard.road_spine units=off hit=%.3f need>=%.2f gold_matcher=1" % [_road_hit, ROAD_MIN_HIT])
 	if _road_hit < ROAD_MIN_HIT:
 		_fail_reasons.append("road_hit")
-	# Reproduce Play MIXED 816cdc9: leftover Neuss bridge chrome must not stick on Köln.
+	_set_units_view(true)
+	_park_unit_over_river()
+	_frame_over_koln(CLOSE_ZOOM, true)
+	_go_settle(Phase.DO_UNITS_ON)
+
+
+func _do_units_on() -> void:
+	_reassert_camera()
+	var img := _capture("rx1_pixel_close_koeln_units_on")
+	var sample := _sample_parked_unit(img)
+	_units_on_hit = float(sample.get("chip", 0.0))
+	_units_on_river_under = float(sample.get("river", 0.0))
+	_log(
+		"EOA_RX1_PIXEL_GUARD who=guard.units_on chip=%.3f river=%.3f need_chip>=%.2f and chip>river"
+		% [_units_on_hit, _units_on_river_under, UNIT_MIN_HIT]
+	)
+	if _units_on_hit < UNIT_MIN_HIT or _units_on_hit <= _units_on_river_under:
+		_fail_reasons.append("units_do_not_win")
+	_restore_parked_unit()
+	_set_units_view(true)
+	_go_settle(Phase.DO_TOGGLE)
+
+
+func _do_toggle() -> void:
+	_reassert_camera()
+	var before := _sim_fingerprint()
 	var mr := _map_renderer()
-	if mr != null and mr.has_method("set_rx1_bridge_preview"):
-		mr.call("set_rx1_bridge_preview", "built", NEUSS, 100.0)
+	var default_on := true
+	if mr != null and "show_unit_counters" in mr:
+		default_on = bool(mr.get("show_unit_counters"))
+	if not default_on:
+		_fail_reasons.append("units_default_hidden")
+	_set_units_view(true)
+	var vis0 := _visible_icon_count()
+	_log("EOA_RX1_PIXEL_GUARD who=guard.toggle default_on=%s vis0=%d" % [str(default_on), vis0])
+	_press_units_hotkey()
+	var hidden := _units_are_hidden()
+	var after_hide := _sim_fingerprint()
+	if not hidden:
+		_fail_reasons.append("u_did_not_hide")
+	if after_hide != before:
+		_fail_reasons.append("toggle_hide_mutated_sim")
+	_press_units_hotkey()
+	var restored := not _units_are_hidden()
+	var after_restore := _sim_fingerprint()
+	if not restored:
+		_fail_reasons.append("u_did_not_restore")
+	if after_restore != before:
+		_fail_reasons.append("toggle_restore_mutated_sim")
+	_toggle_ok = hidden and restored and after_hide == before and after_restore == before
+	if mr != null and mr.has_method("units_view_report"):
+		var rep: Dictionary = mr.call("units_view_report") as Dictionary
+		if not bool(rep.get("button_matches", false)):
+			_fail_reasons.append("button_desync")
+			_toggle_ok = false
+		_log("EOA_RX1_PIXEL_GUARD who=guard.toggle report=%s" % str(rep))
+	_capture("rx1_pixel_units_restored")
+	_log("EOA_RX1_PIXEL_GUARD who=guard.toggle ok=%s hide=%s restore=%s" % [str(_toggle_ok), str(hidden), str(restored)])
+	var mr2 := _map_renderer()
+	if mr2 != null and mr2.has_method("set_rx1_bridge_preview"):
+		mr2.call("set_rx1_bridge_preview", "built", NEUSS, 100.0)
 	_open_inspector(KOELN)
 	_go_settle(Phase.DO_PANEL_KOLN)
 
@@ -427,7 +506,7 @@ func _capture(name: String) -> Image:
 			"EOA_RX1_PIXEL_GUARD who=guard.cam pos=%.1f,%.1f zoom=%.3f koln_dist=%.1f"
 			% [cam.global_position.x, cam.global_position.y, cam.zoom.x, d]
 		)
-		if name.begins_with("rx1_pixel_mid") or name.begins_with("rx1_pixel_close") or name.begins_with("rx1_pixel_road"):
+		if name.begins_with("rx1_pixel_mid") or name.begins_with("rx1_pixel_close") or name.begins_with("rx1_pixel_road") or name.begins_with("rx1_pixel_units"):
 			if d > 520.0:
 				_fail_reasons.append("camera_not_on_koln")
 	var vp := root.get_viewport()
@@ -496,6 +575,8 @@ func _neighborhood_hit(img: Image, x: int, y: int, kind: String) -> bool:
 				return true
 			if kind == "road" and _is_road_color(c):
 				return true
+			if kind == "unit" and _is_unit_chip_color(c):
+				return true
 	return false
 
 
@@ -518,13 +599,38 @@ func _is_river_color(c: Color) -> bool:
 
 
 func _is_road_color(c: Color) -> bool:
+	# Gold ROAD_EXPLICIT_COLOR Color(0.92, 0.62, 0.08) ≈ (235, 158, 20).
+	# Must not match tan land / old tan road (128, 92, 36) so 816cdc9 fails.
 	var r := c.r * 255.0
 	var g := c.g * 255.0
 	var b := c.b * 255.0
-	var d := absf(r - 128.0) + absf(g - 92.0) + absf(b - 36.0)
-	if d < 120.0:
+	var gold_d := absf(r - 235.0) + absf(g - 158.0) + absf(b - 20.0)
+	if gold_d < 90.0:
 		return true
-	if r > 90.0 and r < 190.0 and g > 50.0 and g < 150.0 and b < 90.0 and r > g and g > b + 8.0:
+	if r > 200.0 and g > 120.0 and g < 200.0 and b < 70.0 and r > g + 40.0:
+		return true
+	return false
+
+
+func _is_unit_chip_color(c: Color) -> bool:
+	if _is_river_color(c):
+		return false
+	if _is_road_color(c):
+		return false
+	var r := c.r * 255.0
+	var g := c.g * 255.0
+	var b := c.b * 255.0
+	# Parchment / tan land
+	if r > 160.0 and g > 130.0 and b > 80.0 and b < 170.0 and absf(r - g) < 55.0:
+		return false
+	# Open sea
+	if b > 180.0 and g > 160.0 and r < 120.0:
+		return false
+	var chroma := maxf(r, maxf(g, b)) - minf(r, minf(g, b))
+	var lum := (r + g + b) / 3.0
+	if chroma > 35.0 and lum < 210.0:
+		return true
+	if lum > 20.0 and lum < 150.0 and chroma > 12.0:
 		return true
 	return false
 
@@ -643,6 +749,200 @@ func _inspect_panel_nodes(pid: int) -> Dictionary:
 	}
 
 
+func _set_units_view(on: bool) -> void:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("set_unit_counters_visible"):
+		mr.call("set_unit_counters_visible", on)
+		_used_direct_unit_hide = false
+		return
+	# 816cdc9 baseline: no view-only Units toggle. Hide painted nodes
+	# directly so units-OFF river/road samples are not covered by chips.
+	# Walks DemoUnitIcon_*, StackBadge, PinFocusPulse, LandBattleBubbleLayer,
+	# SelectedFrame. Documented in docs/RX1_RHINE_CROSSING.md.
+	_hide_unit_nodes_direct(not on)
+	_used_direct_unit_hide = true
+
+
+func _hide_unit_nodes_direct(hide: bool) -> void:
+	if root == null:
+		return
+	_walk_hide_units(root, hide)
+
+
+func _walk_hide_units(n: Node, hide: bool) -> void:
+	if n == null:
+		return
+	var nm := str(n.name)
+	if (
+		nm.begins_with("DemoUnitIcon_")
+		or nm == "StackBadge"
+		or nm == "PinFocusPulse"
+		or nm == "LandBattleBubbleLayer"
+		or nm == "SelectedFrame"
+	):
+		if n is CanvasItem:
+			(n as CanvasItem).visible = not hide
+	for c in n.get_children():
+		_walk_hide_units(c, hide)
+
+
+func _visible_icon_count() -> int:
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("units_view_report"):
+		var rep: Dictionary = mr.call("units_view_report") as Dictionary
+		return int(rep.get("visible_icon_count", 0))
+	return _count_named_visible(root, "DemoUnitIcon_")
+
+
+func _count_named_visible(n: Node, prefix: String) -> int:
+	if n == null:
+		return 0
+	var ctn := 0
+	if str(n.name).begins_with(prefix) and n is CanvasItem and (n as CanvasItem).visible:
+		ctn += 1
+	for c in n.get_children():
+		ctn += _count_named_visible(c, prefix)
+	return ctn
+
+
+func _units_are_hidden() -> bool:
+	var mr := _map_renderer()
+	if mr != null and "show_unit_counters" in mr:
+		if bool(mr.get("show_unit_counters")):
+			return false
+		return _visible_icon_count() <= 0
+	return _visible_icon_count() <= 0
+
+
+func _press_units_hotkey() -> void:
+	var mr := _map_renderer()
+	if mr == null:
+		_fail_reasons.append("no_hotkey_path")
+		return
+	var ev := InputEventKey.new()
+	ev.keycode = KEY_U
+	ev.physical_keycode = KEY_U
+	ev.pressed = true
+	ev.echo = false
+	ev.shift_pressed = false
+	ev.ctrl_pressed = false
+	ev.alt_pressed = false
+	if mr.has_method("_input"):
+		mr.call("_input", ev)
+	elif mr.has_method("_unhandled_input"):
+		mr.call("_unhandled_input", ev)
+	else:
+		_fail_reasons.append("no_hotkey_path")
+
+
+func _sim_fingerprint() -> Dictionary:
+	var days := -1
+	var owner := ""
+	var sel_fid := ""
+	var sel_pid := -1
+	var tm: Node = root.get_node_or_null("TimeManager") if root != null else null
+	if tm == null:
+		tm = _find_named("TimeManager")
+	if tm != null:
+		if "total_days_elapsed" in tm:
+			days = int(tm.get("total_days_elapsed"))
+		elif tm.has_method("get_total_days_elapsed"):
+			days = int(tm.call("get_total_days_elapsed"))
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_province_owner"):
+		owner = str(mm.call("get_province_owner", KOELN))
+	var mr := _map_renderer()
+	if mr != null:
+		if "selected_formation_id" in mr:
+			sel_fid = str(mr.get("selected_formation_id"))
+		if "selected_province_id" in mr:
+			sel_pid = int(mr.get("selected_province_id"))
+	return {
+		"days": days,
+		"koln_owner": owner,
+		"selected_formation_id": sel_fid,
+		"selected_province_id": sel_pid,
+	}
+
+
+func _find_unit_icon() -> Node2D:
+	if root == null:
+		return null
+	return _find_named_prefix(root, "DemoUnitIcon_") as Node2D
+
+
+func _find_named_prefix(n: Node, prefix: String) -> Node:
+	if n == null:
+		return null
+	if str(n.name).begins_with(prefix) and n is Node2D:
+		return n
+	for c in n.get_children():
+		var hit := _find_named_prefix(c, prefix)
+		if hit != null:
+			return hit
+	return null
+
+
+func _park_unit_over_river() -> void:
+	_restore_parked_unit()
+	var icon := _find_unit_icon()
+	if icon == null:
+		_log("EOA_RX1_PIXEL_GUARD who=guard.park no DemoUnitIcon (units-on sample may fail)")
+		return
+	var pts := _local_course_pts()
+	var dest := _koln_world()
+	if pts.size() > 0:
+		dest = pts[int(pts.size() / 2)]
+	_parked_unit = icon
+	_parked_unit_pos = icon.global_position
+	icon.global_position = dest
+	_log("EOA_RX1_PIXEL_GUARD who=guard.park unit=%s to=%.1f,%.1f (visual only)" % [str(icon.name), dest.x, dest.y])
+
+
+func _restore_parked_unit() -> void:
+	if _parked_unit != null and is_instance_valid(_parked_unit):
+		_parked_unit.global_position = _parked_unit_pos
+	_parked_unit = null
+	_parked_unit_pos = Vector2.ZERO
+
+
+func _sample_parked_unit(img: Image) -> Dictionary:
+	if img == null:
+		return {"chip": 0.0, "river": 0.0}
+	var icon := _parked_unit
+	if icon == null or not is_instance_valid(icon):
+		icon = _find_unit_icon()
+	if icon == null:
+		_log("EOA_RX1_PIXEL_GUARD who=guard.sample_unit no icon")
+		return {"chip": 0.0, "river": 0.0}
+	var xform := icon.get_global_transform_with_canvas()
+	var center: Vector2 = xform * Vector2.ZERO
+	var w := img.get_width()
+	var h := img.get_height()
+	var chip := 0
+	var river := 0
+	var total := 0
+	var rad := 10
+	for dy in range(-rad, rad + 1):
+		for dx in range(-rad, rad + 1):
+			var xx := int(round(center.x)) + dx
+			var yy := int(round(center.y)) + dy
+			if xx < 0 or yy < 0 or xx >= w or yy >= h:
+				continue
+			total += 1
+			var c := img.get_pixel(xx, yy)
+			if _is_unit_chip_color(c):
+				chip += 1
+			if _is_river_color(c):
+				river += 1
+	if total <= 0:
+		return {"chip": 0.0, "river": 0.0}
+	_log("EOA_RX1_PIXEL_GUARD who=guard.sample_unit chip=%d river=%d total=%d at=%.1f,%.1f" % [
+		chip, river, total, center.x, center.y
+	])
+	return {"chip": float(chip) / float(total), "river": float(river) / float(total)}
+
+
 func _log(msg: String) -> void:
 	print(msg)
 	if OS.has_method("flush_stdout"):
@@ -655,11 +955,15 @@ func _finish(ok: bool) -> void:
 		process_frame.disconnect(_on_process)
 	var verdict := "PASS" if ok else "FAIL"
 	_log(
-		"EOA_RX1_PIXEL_GUARD mid_river=%.3f close_river=%.3f road=%.3f koln_offer=%s koln_built=%s koln_bridge_leak=%s neuss_spine_leak=%s %s"
+		"EOA_RX1_PIXEL_GUARD mid_river=%.3f close_river=%.3f road=%.3f units_on_chip=%.3f units_on_river=%.3f toggle=%s direct_hide=%s koln_offer=%s koln_built=%s koln_bridge_leak=%s neuss_spine_leak=%s %s"
 		% [
 			_mid_river_hit,
 			_close_river_hit,
 			_road_hit,
+			_units_on_hit,
+			_units_on_river_under,
+			str(_toggle_ok),
+			str(_used_direct_unit_hide),
 			str(_koln_panel.get("offers_build_road_spine", "?")),
 			str(_koln_panel.get("shows_spine_built", "?")),
 			str(_koln_panel.get("leaks_bridge_on_spine_pid", "?")),
