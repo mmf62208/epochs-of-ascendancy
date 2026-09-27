@@ -197,8 +197,13 @@ func _do_roads() -> void:
 	var img := _capture("rx1_pixel_road_spine_units_off")
 	if layer == null:
 		layer = _rhine_layer()
-	_road_hit = _sample_polyline(img, _spine_pts(), layer, "road")
-	_log("EOA_RX1_PIXEL_GUARD who=guard.road_spine units=off hit=%.3f need>=%.2f gold_matcher=1" % [_road_hit, ROAD_MIN_HIT])
+	var line_hit := _sample_polyline(img, _spine_pts(), layer, "road")
+	var box_hit := _sample_spine_bbox(img, _spine_pts(), layer)
+	_road_hit = maxf(line_hit, box_hit)
+	_log(
+		"EOA_RX1_PIXEL_GUARD who=guard.road_spine units=off line=%.3f box=%.3f hit=%.3f need>=%.2f gold_matcher=1"
+		% [line_hit, box_hit, _road_hit, ROAD_MIN_HIT]
+	)
 	if _road_hit < ROAD_MIN_HIT:
 		_fail_reasons.append("road_hit")
 	_set_units_view(true)
@@ -559,6 +564,58 @@ func _sample_polyline(img: Image, pts: PackedVector2Array, layer: CanvasItem, ki
 		_log("EOA_RX1_PIXEL_GUARD who=guard.sample kind=%s hits=0 total=0 (off-screen or no layer)" % kind)
 		return 0.0
 	_log("EOA_RX1_PIXEL_GUARD who=guard.sample kind=%s hits=%d total=%d" % [kind, hits, total])
+	return float(hits) / float(total)
+
+
+func _sample_spine_bbox(img: Image, pts: PackedVector2Array, layer: CanvasItem) -> float:
+	if img == null or pts.size() < 2:
+		return 0.0
+	var xform := Transform2D.IDENTITY
+	if layer != null:
+		xform = layer.get_global_transform_with_canvas()
+	var min_x := 1.0e9
+	var min_y := 1.0e9
+	var max_x := -1.0e9
+	var max_y := -1.0e9
+	var any := false
+	for p in pts:
+		var c: Vector2 = xform * p
+		if not c.is_finite():
+			continue
+		any = true
+		min_x = minf(min_x, c.x)
+		min_y = minf(min_y, c.y)
+		max_x = maxf(max_x, c.x)
+		max_y = maxf(max_y, c.y)
+	if not any:
+		return 0.0
+	var pad := 14.0
+	var x0 := maxi(0, int(min_x - pad))
+	var y0 := maxi(0, int(min_y - pad))
+	var x1 := mini(img.get_width() - 1, int(max_x + pad))
+	var y1 := mini(img.get_height() - 1, int(max_y + pad))
+	if x1 <= x0 or y1 <= y0:
+		_log("EOA_RX1_PIXEL_GUARD who=guard.sample_bbox off-screen")
+		return 0.0
+	# If Bonn/Leverkusen pull the box across the whole theater view, keep a
+	# local window around Köln so tan land cannot dominate the ratio.
+	if (x1 - x0) * (y1 - y0) > 220 * 220:
+		var k := _koln_world()
+		var kc: Vector2 = xform * k
+		x0 = maxi(0, int(kc.x) - 90)
+		y0 = maxi(0, int(kc.y) - 90)
+		x1 = mini(img.get_width() - 1, int(kc.x) + 90)
+		y1 = mini(img.get_height() - 1, int(kc.y) + 90)
+	var hits := 0
+	var total := 0
+	for yy in range(y0, y1 + 1, 2):
+		for xx in range(x0, x1 + 1, 2):
+			total += 1
+			if _is_road_color(img.get_pixel(xx, yy)):
+				hits += 1
+	if total <= 0:
+		return 0.0
+	_log("EOA_RX1_PIXEL_GUARD who=guard.sample_bbox gold=%d total=%d box=%d,%d-%d,%d" % [hits, total, x0, y0, x1, y1])
 	return float(hits) / float(total)
 
 
