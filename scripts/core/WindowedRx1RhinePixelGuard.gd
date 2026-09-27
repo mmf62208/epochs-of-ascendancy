@@ -17,13 +17,14 @@ const BONN := 710416
 const LEV := 710418
 const NEUSS := 710413
 const METTMANN := 710412
-const MID_ZOOM := 0.48
-const CLOSE_ZOOM := 1.20
+const MID_ZOOM := 0.95
+const CLOSE_ZOOM := 2.10
 const WAIT_MAP_SECS := 420
 const SETTLE_FRAMES := 48
 const RIVER_MIN_HIT := 0.18
-const ROAD_MIN_HIT := 0.14
+const ROAD_MIN_HIT := 0.20
 const SAMPLE_RADIUS := 3
+const LOCAL_RIVER_WORLD := 120.0
 
 enum Phase {
 	WAIT_MAP,
@@ -147,7 +148,7 @@ func _do_mid() -> void:
 	_reassert_camera()
 	var img := _capture("rx1_pixel_mid_koeln")
 	var layer := _rhine_layer()
-	_mid_river_hit = _sample_polyline(img, _course_pts(), layer, "river")
+	_mid_river_hit = _sample_polyline(img, _local_course_pts(), layer, "river")
 	_log("EOA_RX1_PIXEL_GUARD who=guard.mid_river hit=%.3f need>=%.2f" % [_mid_river_hit, RIVER_MIN_HIT])
 	if _mid_river_hit < RIVER_MIN_HIT:
 		_fail_reasons.append("mid_river_hit")
@@ -159,7 +160,7 @@ func _do_close() -> void:
 	_reassert_camera()
 	var img := _capture("rx1_pixel_close_koeln")
 	var layer := _rhine_layer()
-	_close_river_hit = _sample_polyline(img, _course_pts(), layer, "river")
+	_close_river_hit = _sample_polyline(img, _local_course_pts(), layer, "river")
 	_log("EOA_RX1_PIXEL_GUARD who=guard.close_river hit=%.3f need>=%.2f" % [_close_river_hit, RIVER_MIN_HIT])
 	if _close_river_hit < RIVER_MIN_HIT:
 		_fail_reasons.append("close_river_hit")
@@ -343,6 +344,9 @@ func _freeze_boot_camera_fighters() -> void:
 		if "enable_zoom" in cc:
 			cc.set("enable_zoom", false)
 		cc.set_process(false)
+	if mr != null and mr.has_method("set_process"):
+		# Stop _handle_camera_input / theater auto-fit from fighting the frame.
+		mr.set_process(false)
 	_log("EOA_RX1_PIXEL_GUARD who=guard.lock_camera (NOT product Home/Close)")
 
 
@@ -376,8 +380,15 @@ func _apply_camera(pos: Vector2, zoom: float) -> void:
 	var cam := _camera()
 	if cam != null:
 		cam.zoom = Vector2(zoom, zoom)
+		var parent := cam.get_parent() as Node2D
+		if parent != null:
+			cam.position = parent.to_local(pos)
+		else:
+			cam.position = pos
 		cam.global_position = pos
 		cam.reset_smoothing()
+		if cam.has_method("force_update_scroll"):
+			cam.call("force_update_scroll")
 		cam.enabled = true
 		cam.make_current()
 	# GIS boards lock ProvinceContainers at identity. Do not scale it.
@@ -489,18 +500,19 @@ func _neighborhood_hit(img: Image, x: int, y: int, kind: String) -> bool:
 
 
 func _is_river_color(c: Color) -> bool:
+	# Stroke is Color(0.22, 0.58, 0.92). Do not count North Sea, Mediterranean,
+	# or unit-chip cyan bars — those false-passed 816cdc9 at Home/theater zoom.
 	var r := c.r * 255.0
 	var g := c.g * 255.0
 	var b := c.b * 255.0
+	if r + g + b < 80.0:
+		return false
+	if g > 200.0 and b > 200.0 and r < 80.0:
+		return false
 	var river_d := absf(r - 56.0) + absf(g - 148.0) + absf(b - 235.0)
-	var halo_d := absf(r - 10.0) + absf(g - 26.0) + absf(b - 51.0)
-	if river_d < 140.0:
+	if river_d < 110.0:
 		return true
-	if halo_d < 90.0 and b > r + 8.0:
-		return true
-	if b > 150.0 and b > r + 40.0 and b > g + 10.0:
-		return true
-	if b > 90.0 and g > 70.0 and b > r + 25.0 and r < 120.0:
+	if b > 170.0 and b > g + 35.0 and b > r + 70.0 and r < 110.0 and g > 70.0 and g < 190.0:
 		return true
 	return false
 
@@ -515,6 +527,18 @@ func _is_road_color(c: Color) -> bool:
 	if r > 90.0 and r < 190.0 and g > 50.0 and g < 150.0 and b < 90.0 and r > g and g > b + 8.0:
 		return true
 	return false
+
+
+func _local_course_pts() -> PackedVector2Array:
+	var all := _course_pts()
+	var k := _koln_world()
+	var out := PackedVector2Array()
+	for p in all:
+		if p.distance_to(k) <= LOCAL_RIVER_WORLD:
+			out.append(p)
+	if out.size() >= 2:
+		return out
+	return all
 
 
 func _course_pts() -> PackedVector2Array:
