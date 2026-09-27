@@ -76,9 +76,31 @@ Must **FAIL** on `816cdc9` (pixels + Köln re-offer + bridge leak) and **PASS** 
 
 ## FIX2 (Play MIXED `816cdc9`)
 
-Root cause of the empty screen: (1) spec course points are **8192-space**; the live `world_accurate` board is × `THEATER_SCALE` 1.728, so the polyline sat near 4254,944 while Köln is 7351,1631 — off the framed Rhineland; (2) `draw_line` / Line2D widths were **world units**, so at mid Camera2D.zoom a 2.8u stroke is ~1 screen pixel; (3) `MapPoliticalLabelsLayer` nation Labels use `z_as_relative=false` **z=40**, which paints over Rhine z=36 and RoadLayer z=32 — "Netherlands" / "Belgium" / "Luxembourg" bury Köln at close zoom. FIX1's z-order guard only compared 36>28, so it passed while the pixels failed.
+Root cause of the empty screen:
+
+1. Spec course points are **8192-space**; the live `world_accurate` board is × `THEATER_SCALE` 1.728, so the polyline sat near 4254,944 while Köln is 7351,1631 — off the framed Rhineland.
+2. `draw_line` / Line2D widths were **world units**, so at mid Camera2D.zoom a 2.8u stroke is ~1 screen pixel.
+3. `MapPoliticalLabelsLayer` nation Labels use `z_as_relative=false` **z=40**, which paints over Rhine z=36 and RoadLayer z=32 — "Netherlands" / "Belgium" / "Luxembourg" bury Köln at close zoom.
+
+FIX1's z-order guard only compared 36>28, so it passed while the pixels failed. A first windowed capture also stayed on Europe Home until the guard locked MapCamera (TestRunner deferred `center_europe_in_world_view`).
 
 Köln after `state=built` re-offered **Build Road Spine** because `should_show_road_spine_button` ignored built edges and `_ix1_should_show_spine_button` fell through after a false. The Köln panel also kept Neuss's `Rhine bridge 100% · ETA 0 days` because `_update_rhine_bridge_button` returned early without hiding `_label_rx1_progress`.
+
+### Windowed pixel guard (real captures, not mocks)
+
+`tools/eoa_rx1_pixel_guard.sh` — xvfb + `tools/run_godot.sh` + live `TestScenario` (`world_accurate`). Never `EOA_SKIP_TITLE`. Smoke harness is **not** the product.
+
+| Check | `816cdc9` | tip |
+|-------|-----------|-----|
+| mid river hit (need ≥0.18) | **0.174 FAIL** | **0.944 PASS** |
+| close river hit | **0.138 FAIL** | **0.915 PASS** |
+| road spine hit (need ≥0.20) | 1.000 (tan/land; not the fail) | **0.667 PASS** |
+| Köln offers Build Road Spine after built | **true FAIL** | **false PASS** |
+| Köln shows built state | **false FAIL** | **true PASS** |
+| `HeadlessRx1RhinePanelStateTest` | **RESULT=FAIL** | **RESULT=PASS** |
+| `WindowedRx1RhinePixelGuard` | **RESULT=FAIL** | **RESULT=PASS** |
+
+PNGs: `/tmp/eoa-rx1-pixel-816cdc9/` and `/tmp/eoa-rx1-pixel-tip/` (also `/opt/cursor/artifacts/rx1-pixel/`). Close-on-tip shows the blue Rhine over the chips and country names hidden. Close-on-`816cdc9` matches Play: huge Netherlands/Belgium/Luxembourg, no river.
 
 ## Fresh checkout (FIX1)
 
