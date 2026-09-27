@@ -198,12 +198,17 @@ func _do_panel_neuss() -> void:
 	_finish(_fail_reasons.is_empty())
 
 
+func _map_manager() -> Node:
+	if root == null:
+		return null
+	return root.get_node_or_null("MapManager")
+
+
 func _map_is_ready() -> bool:
-	if typeof(MapManager) == TYPE_NIL:
+	var mm := _map_manager()
+	if mm == null or not mm.has_method("get_province"):
 		return false
-	if not MapManager.has_method("get_province"):
-		return false
-	if MapManager.get_province(KOELN) == null:
+	if mm.call("get_province", KOELN) == null:
 		return false
 	if _map_renderer() == null:
 		return false
@@ -277,8 +282,9 @@ func _camera() -> Camera2D:
 
 
 func _koln_world() -> Vector2:
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
-		var c: Vector2 = MapManager.get_province_centroid(KOELN)
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_province_centroid"):
+		var c: Vector2 = mm.call("get_province_centroid", KOELN)
 		if c != Vector2.ZERO:
 			return c
 	return Vector2(4254.32, 944.10)
@@ -407,10 +413,11 @@ func _road_layer() -> CanvasItem:
 
 func _spine_pts() -> PackedVector2Array:
 	var out := PackedVector2Array()
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province_centroid"):
-		var b: Vector2 = MapManager.get_province_centroid(BONN)
-		var k: Vector2 = MapManager.get_province_centroid(KOELN)
-		var l: Vector2 = MapManager.get_province_centroid(LEV)
+	var mm := _map_manager()
+	if mm != null and mm.has_method("get_province_centroid"):
+		var b: Vector2 = mm.call("get_province_centroid", BONN)
+		var k: Vector2 = mm.call("get_province_centroid", KOELN)
+		var l: Vector2 = mm.call("get_province_centroid", LEV)
 		if b != Vector2.ZERO and k != Vector2.ZERO and l != Vector2.ZERO:
 			out.append(b)
 			out.append(k)

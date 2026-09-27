@@ -94,8 +94,9 @@ func _test_runtime_scope() -> void:
 		_fail("should_show_road_spine_button missing")
 		return
 	# Day-0 Köln still offers the button when the corridor is not built.
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
-		var koln: Variant = MapManager.get_province(KOELN_ID)
+	var mm: Node = root.get_node_or_null("MapManager")
+	if mm != null and mm.has_method("get_province"):
+		var koln: Variant = mm.call("get_province", KOELN_ID)
 		if koln != null and not bool(idm.call("is_ix1_road_spine_built", KOELN_ID)):
 			if not bool(idm.call("should_show_road_spine_button", KOELN_ID, "GER")):
 				_fail("day-0 Köln must still offer Build Road Spine")
@@ -105,8 +106,8 @@ func _test_runtime_scope() -> void:
 		return
 	if idm.has_method("link_ix1_road_spine_edges"):
 		idm.call("link_ix1_road_spine_edges", KOELN_ID, [BONN_ID, LEV_ID])
-	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("get_province"):
-		if MapManager.get_province(KOELN_ID) != null:
+	if mm != null and mm.has_method("get_province"):
+		if mm.call("get_province", KOELN_ID) != null:
 			if not bool(idm.call("is_ix1_road_spine_built", KOELN_ID)):
 				_fail("is_ix1_road_spine_built(710417) false after link")
 				return
