@@ -565,8 +565,9 @@ func _sample_polyline(img: Image, pts: PackedVector2Array, layer: CanvasItem, ki
 func _neighborhood_hit(img: Image, x: int, y: int, kind: String) -> bool:
 	var w := img.get_width()
 	var h := img.get_height()
-	for dy in range(-SAMPLE_RADIUS, SAMPLE_RADIUS + 1):
-		for dx in range(-SAMPLE_RADIUS, SAMPLE_RADIUS + 1):
+	var rad := 8 if kind == "road" else SAMPLE_RADIUS
+	for dy in range(-rad, rad + 1):
+		for dx in range(-rad, rad + 1):
 			var xx := x + dx
 			var yy := y + dy
 			if xx < 0 or yy < 0 or xx >= w or yy >= h:
@@ -601,14 +602,18 @@ func _is_river_color(c: Color) -> bool:
 
 func _is_road_color(c: Color) -> bool:
 	# Gold ROAD_EXPLICIT_COLOR Color(0.92, 0.62, 0.08) ≈ (235, 158, 20).
-	# Must not match tan land / old tan road (128, 92, 36) so 816cdc9 fails.
+	# Over GER red the stroke composites to ~ (245, 103, 9). Must not match
+	# tan land (~200,170,120) or old tan road (128, 92, 36) so 816cdc9 fails.
 	var r := c.r * 255.0
 	var g := c.g * 255.0
 	var b := c.b * 255.0
 	var gold_d := absf(r - 235.0) + absf(g - 158.0) + absf(b - 20.0)
-	if gold_d < 90.0:
+	if gold_d < 110.0:
 		return true
-	if r > 200.0 and g > 120.0 and g < 200.0 and b < 70.0 and r > g + 40.0:
+	var over_red_d := absf(r - 245.0) + absf(g - 103.0) + absf(b - 9.0)
+	if over_red_d < 80.0:
+		return true
+	if r > 185.0 and g > 65.0 and g < 210.0 and b < 70.0 and r > g + 30.0 and r > b + 90.0:
 		return true
 	return false
 
