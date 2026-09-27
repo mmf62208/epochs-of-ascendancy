@@ -90,6 +90,16 @@ var _layer_provs_cache: Dictionary = {}
 var _layer_provs_cache_msec: int = 0
 const LAYER_PROV_CACHE_MS := 400
 
+## DemoUnitIcon_* is z=28 z_as_relative=false. Owner: units stay on top.
+## Roads sit above nation labels (18) and below counters. Gold stroke is
+## distinct from GER red fill and tan land so the pixel guard can fail 816cdc9.
+const UNIT_COUNTER_Z := 28
+const ROAD_BELOW_UNITS_Z := 21
+const SPINE_BELOW_UNITS_Z := 21
+const ROAD_EXPLICIT_SCREEN_PX := 7.0
+const ROAD_INFERRED_SCREEN_PX := 4.0
+const ROAD_EXPLICIT_COLOR := Color(0.92, 0.62, 0.08, 0.96)
+
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
     special_site_manager = get_node_or_null("/root/SpecialSiteManager")
@@ -127,8 +137,12 @@ func _ensure_sub_layers():
         if road_layer == null:
             road_layer = Node2D.new()
             road_layer.name = "RoadLayer"
-            road_layer.z_index = 1
+            road_layer.z_as_relative = false
+            road_layer.z_index = ROAD_BELOW_UNITS_Z
             add_child(road_layer)
+    if road_layer != null:
+        road_layer.z_as_relative = false
+        road_layer.z_index = ROAD_BELOW_UNITS_Z
     if rail_layer == null:
         rail_layer = get_node_or_null("RailLayer")
         if rail_layer == null:
@@ -162,8 +176,12 @@ func _ensure_sub_layers():
         if spine_preview_layer == null:
             spine_preview_layer = Ix1SpinePreviewDraw.new()
             spine_preview_layer.name = "Ix1SpinePreview"
-            spine_preview_layer.z_index = 6
+            spine_preview_layer.z_as_relative = false
+            spine_preview_layer.z_index = SPINE_BELOW_UNITS_Z
             add_child(spine_preview_layer)
+    if spine_preview_layer != null:
+        spine_preview_layer.z_as_relative = false
+        spine_preview_layer.z_index = SPINE_BELOW_UNITS_Z
 
 func _apply_layer_visibilities():
     _update_sub_layer_visibilities()
@@ -184,6 +202,7 @@ func _update_sub_layer_visibilities() -> void:
     if road_layer:
         # IX-1: player-built explicit spines stay visible at playable mid-zoom (not F10-only).
         road_layer.visible = (show_roads or _road_layer_has_explicit_lines()) and z > 0.10
+        _apply_screen_space_road_widths()
     if spine_preview_layer:
         # Visibility only — never rebuild/create nodes on zoom (silent-exit class).
         var prev_state := str(spine_preview_layer.get("state"))
@@ -557,9 +576,10 @@ func _rebuild_road_layer_inner() -> void:
                 # Explicit IX-1 spines stay readable on political at Home zoom.
                 # Inferred high-infra dust only when Infra mapmode (show_roads) is on.
                 if has_explicit:
-                    line.default_color = Color(0.50, 0.36, 0.14, 0.82)
-                    line.width = 2.8
-                    line.z_index = 3
+                    line.default_color = ROAD_EXPLICIT_COLOR
+                    line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+                    line.z_as_relative = false
+                    line.z_index = ROAD_BELOW_UNITS_Z
                 elif tier >= 2:
                     line.default_color = Color(0.40, 0.34, 0.22, 0.38)
                     line.width = 2.0
@@ -612,15 +632,59 @@ func _paint_explicit_ix1_spine_if_missing(provinces: Dictionary, drawn: Dictiona
             var line := Line2D.new()
             line.points = [c1, c2]
             line.antialiased = true
-            line.default_color = Color(0.50, 0.36, 0.14, 0.82)
-            line.width = 2.8
-            line.z_index = 3
+            line.default_color = ROAD_EXPLICIT_COLOR
+            line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+            line.z_as_relative = false
+            line.z_index = ROAD_BELOW_UNITS_Z
             line.set_meta("p1", pid)
             line.set_meta("p2", nid)
             line.set_meta("explicit", true)
             line.set_meta("tier", 2)
             line.set_meta("corridor", false)
             road_layer.add_child(line)
+
+
+## Pixel-guard / inspector: paint the built Bonn–Köln–Leverkusen gold spine
+## even if the layer cull missed the edges. View-only; does not change sim.
+func force_paint_ix1_gold_spine() -> int:
+    _ensure_sub_layers()
+    if road_layer == null or map_manager == null:
+        return 0
+    var pairs: Array = [[710416, 710417], [710417, 710418]]
+    var painted := 0
+    for pair in pairs:
+        var a := int(pair[0])
+        var b := int(pair[1])
+        var c1: Vector2 = map_manager.get_province_centroid(a)
+        var c2: Vector2 = map_manager.get_province_centroid(b)
+        if c1 == Vector2.ZERO or c2 == Vector2.ZERO:
+            continue
+        var existing := road_layer.get_node_or_null("Rx1GoldSpine_%d_%d" % [a, b])
+        if existing is Line2D:
+            var el := existing as Line2D
+            el.points = PackedVector2Array([c1, c2])
+            el.default_color = ROAD_EXPLICIT_COLOR
+            el.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+            el.visible = true
+            el.z_as_relative = false
+            el.z_index = ROAD_BELOW_UNITS_Z
+            painted += 1
+            continue
+        var line := Line2D.new()
+        line.name = "Rx1GoldSpine_%d_%d" % [a, b]
+        line.points = PackedVector2Array([c1, c2])
+        line.antialiased = true
+        line.default_color = ROAD_EXPLICIT_COLOR
+        line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+        line.z_as_relative = false
+        line.z_index = ROAD_BELOW_UNITS_Z
+        line.set_meta("explicit", true)
+        line.set_meta("rx1_gold_spine", true)
+        road_layer.add_child(line)
+        painted += 1
+    road_layer.visible = true
+    _apply_screen_space_road_widths()
+    return painted
 
 ## Similar for rails - higher threshold, distinct style (e.g. dashed via multiple segments or color)
 func rebuild_rail_layer():
@@ -1820,6 +1884,25 @@ func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
         var font := ThemeDB.fallback_font
         if font:
             draw_string(font, icon_pos + Vector2(-5, 4), symbol, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color(1, 1, 1, 0.92))
+
+
+func _road_world_width(screen_px: float) -> float:
+    return screen_px / maxf(_get_current_zoom(), 0.04)
+
+
+func _apply_screen_space_road_widths() -> void:
+    if road_layer == null:
+        return
+    var explicit_w := _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+    var inferred_w := _road_world_width(ROAD_INFERRED_SCREEN_PX)
+    for child in road_layer.get_children():
+        if not (child is Line2D):
+            continue
+        var line := child as Line2D
+        if bool(line.get_meta("explicit", false)):
+            line.width = explicit_w
+        elif show_roads:
+            line.width = inferred_w
 
 
 func _get_current_zoom() -> float:

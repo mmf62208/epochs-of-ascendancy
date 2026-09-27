@@ -1725,7 +1725,10 @@ static func build_inspector_conflict_section(province: Province) -> String:
 			lines.append("Naval in sea (orders): " + ", ".join(naval_info))
 	# River natural border note (layers/demo) - shows defense/supply bonus in effects/combat
 	if typeof(MapManager) != TYPE_NIL and MapManager.has_method("has_river_border") and MapManager.has_river_border(province.id):
-		lines.append("River natural border (demo/layers): +supply/defense (see effects, BM assaults)")
+		if not Rx1RhineCrossing.is_crossing_province(province.id):
+			lines.append("River natural border (demo/layers): +supply/defense (see effects, BM assaults)")
+	for rhine_line in Rx1RhineCrossing.inspector_lines(province.id):
+		lines.append(rhine_line)
 	lines.append(build_conflict_status_bbcode(province))
 	lines.append(
 		"%sMap: diagonal stripes mark owner ≠ controller provinces.[/color]" % COLOR_MUTED
@@ -9488,6 +9491,13 @@ static func get_battle_preview(attacker: Province, defender: Province) -> Dictio
 				wm = tree.root.get_node_or_null("/root/WeatherManager")
 		if wm and wm.has_method("get_province_snow"):
 			preview["snow_coverage"] = float(wm.get_province_snow(defender.id))
+	var rhine_line := Rx1RhineCrossing.battle_penalty_line(attacker.id, defender.id)
+	if not rhine_line.is_empty():
+		preview["rhine_crossing"] = "bridged" if Rx1RhineCrossing.is_bridged(attacker.id, defender.id) else "unbridged"
+		preview["rhine_attack_malus"] = Rx1RhineCrossing.attack_malus(attacker.id, defender.id)
+		preview["river_penalty_line"] = rhine_line
+		att_pow *= (1.0 - float(preview["rhine_attack_malus"]))
+		odds = clampf((att_pow / maxf(1.0, att_pow + def_pow)) * 100.0, 15.0, 85.0)
 	if float(preview.get("snow_coverage", 0.0)) > 0.1 or float(preview.get("snow_potential", 0.0)) > 0.1:
 		preview["snow_note"] = "❄ Snow cov %.0f%% (layer pot %.0f%%) - attack/mobility hit" % [float(preview["snow_coverage"])*100, float(preview["snow_potential"])*100]
 	preview["odds_attacker_win"] = odds

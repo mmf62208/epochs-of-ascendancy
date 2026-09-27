@@ -2,6 +2,9 @@ extends Node
 
 ## Global design/production data. Loaded once at startup.
 
+## Preload (not bare class_name) so a stale .godot class cache cannot blank the map.
+const _Rx1Rhine := preload("res://scripts/map/Rx1RhineCrossing.gd")
+
 var design_data: DesignDataLoader = DesignDataLoader.new()
 
 
@@ -12327,6 +12330,7 @@ func get_save_data() -> Dictionary:
 		"hierarchy_membership_live": {} if skip_hier else _export_hierarchy_membership_live(),
 		"membership_live_mutation_count": int(peace_state.get("membership_live_mutation_count", 0)),
 		"membership_live_log": peace_state.get("membership_live_log", []).duplicate(true) if peace_state.get("membership_live_log") is Array else [],
+		"rx1_bridged": _Rx1Rhine.export_bridged(),
 		"version": 1
 	}
 
@@ -12461,6 +12465,9 @@ func apply_save_data(data: Dictionary) -> void:
 	if data.has("membership_live_log") and data["membership_live_log"] is Array:
 		peace_state["membership_live_log"] = data["membership_live_log"].duplicate(true)
 	peace_state["membership_reapply_on_year_tick"] = false
+	if data.has("rx1_bridged") and data["rx1_bridged"] is Dictionary:
+		_Rx1Rhine.apply_bridged(data["rx1_bridged"])
+		peace_state["rx1_bridged"] = data["rx1_bridged"].duplicate(true)
 	print("GameData: Demographic/policy state (policies, erosion, manpower, settlements) restored from save.")
 
 func clear_for_load() -> void:
@@ -12510,6 +12517,8 @@ func clear_for_load() -> void:
 	peace_state["biotech_intel"] = {}
 	peace_state["biotech_sabotage_log"] = {}
 	peace_state["scanner_intel_flags"] = {}
+	peace_state.erase("rx1_bridged")
+	_Rx1Rhine.reset_to_1936()
 
 
 ## === Playtest Harness Convenience (added by tester_enhancer.py) ===

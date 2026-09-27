@@ -1,0 +1,653 @@
+{
+  "slice": "RX-1 Rhine Crossing",
+  "theater": "lower_rhine_bonn_duisburg",
+  "owner_tag": "GER",
+  "id_base": 710000,
+  "constants": {
+    "RHINE_UNBRIDGED_MOVE_MULT": 2.0,
+    "RHINE_BRIDGED_MOVE_MULT": 1.15,
+    "RHINE_UNBRIDGED_ATTACK_MALUS": 0.3,
+    "RHINE_BRIDGED_ATTACK_MALUS": 0.1,
+    "first_session_mandate_cost": 0
+  },
+  "face_bank_convention": "The Rhine flows north (downstream toward the Netherlands) on this stretch. Bank sign is the 2D cross product of the downstream tangent with the vector from the nearest Rhine point to the NUTS3 centroid. Negative = left/west bank, positive = right/east bank. Cities that span both banks (Köln, Bonn, Düsseldorf, Duisburg) use their NUTS3 centroid bank — never a dual-bank special case. A listed crossing is left-bank centroid against right-bank centroid.",
+  "alignment": {
+    "stored_rivers_world_projection": "mercator_y (build_real_world_map_layers world_full use_mercator_y=True)",
+    "nuts3_projection": "ne_full_geometry_align.lonlat_to_canvas equirectangular WORLD_BBOX=(-180,-56,180,83) 8192x4096",
+    "action": "invert Rhine id 321 via pixel_to_lonlat mercator_y, reproject with lonlat_to_canvas",
+    "city_distances_canvas": {
+      "Köln": {
+        "lonlat": [
+          6.9603,
+          50.9375
+        ],
+        "canvas": [
+          4253.87,
+          944.58
+        ],
+        "rhine_dist": 0.051
+      },
+      "Bonn": {
+        "lonlat": [
+          7.099,
+          50.7374
+        ],
+        "canvas": [
+          4257.02,
+          950.47
+        ],
+        "rhine_dist": 0.446
+      },
+      "Düsseldorf": {
+        "lonlat": [
+          6.7735,
+          51.2277
+        ],
+        "canvas": [
+          4249.62,
+          936.03
+        ],
+        "rhine_dist": 0.355
+      },
+      "Duisburg": {
+        "lonlat": [
+          6.7623,
+          51.4344
+        ],
+        "canvas": [
+          4249.36,
+          929.94
+        ],
+        "rhine_dist": 1.361
+      },
+      "Essen": {
+        "lonlat": [
+          7.0116,
+          51.4556
+        ],
+        "canvas": [
+          4255.03,
+          929.31
+        ],
+        "rhine_dist": 7.033
+      },
+      "Leverkusen": {
+        "lonlat": [
+          6.9849,
+          51.0459
+        ],
+        "canvas": [
+          4254.43,
+          941.38
+        ],
+        "rhine_dist": 0.45
+      }
+    },
+    "essen_off_river": true,
+    "cities_on_banks": true,
+    "note": "Stored canvas Y of Rhine 321 (~1781–1864) is the mercator bake; equirect Köln is ~4254,945. After invert+reproject the line sits on the NUTS3 cities."
+  },
+  "course": {
+    "source": "data/map/rivers_world.json Rhine id 321 (Natural Earth ne_10m_rivers_lake_centerlines)",
+    "reprojected": true,
+    "points": [
+      [
+        4269.0,
+        963.358
+      ],
+      [
+        4268.0,
+        963.358
+      ],
+      [
+        4268.0,
+        962.311
+      ],
+      [
+        4268.0,
+        961.264
+      ],
+      [
+        4268.0,
+        960.219
+      ],
+      [
+        4267.0,
+        959.174
+      ],
+      [
+        4266.0,
+        959.174
+      ],
+      [
+        4265.0,
+        959.174
+      ],
+      [
+        4263.0,
+        958.129
+      ],
+      [
+        4262.0,
+        957.086
+      ],
+      [
+        4260.0,
+        955.001
+      ],
+      [
+        4259.0,
+        953.96
+      ],
+      [
+        4259.0,
+        952.92
+      ],
+      [
+        4259.0,
+        951.88
+      ],
+      [
+        4258.0,
+        951.88
+      ],
+      [
+        4258.0,
+        950.842
+      ],
+      [
+        4257.0,
+        949.804
+      ],
+      [
+        4256.0,
+        948.766
+      ],
+      [
+        4255.0,
+        948.766
+      ],
+      [
+        4255.0,
+        947.73
+      ],
+      [
+        4254.0,
+        947.73
+      ],
+      [
+        4254.0,
+        946.694
+      ],
+      [
+        4255.0,
+        945.66
+      ],
+      [
+        4254.0,
+        944.626
+      ],
+      [
+        4253.0,
+        944.626
+      ],
+      [
+        4253.0,
+        943.592
+      ],
+      [
+        4254.0,
+        943.592
+      ],
+      [
+        4254.0,
+        942.56
+      ],
+      [
+        4253.0,
+        942.56
+      ],
+      [
+        4254.0,
+        941.528
+      ],
+      [
+        4253.0,
+        941.528
+      ],
+      [
+        4252.0,
+        940.497
+      ],
+      [
+        4251.0,
+        940.497
+      ],
+      [
+        4251.0,
+        939.467
+      ],
+      [
+        4251.0,
+        938.438
+      ],
+      [
+        4251.0,
+        937.409
+      ],
+      [
+        4250.0,
+        937.409
+      ],
+      [
+        4250.0,
+        936.381
+      ],
+      [
+        4249.0,
+        936.381
+      ],
+      [
+        4248.0,
+        936.381
+      ],
+      [
+        4248.0,
+        935.354
+      ],
+      [
+        4249.0,
+        935.354
+      ],
+      [
+        4249.0,
+        934.328
+      ],
+      [
+        4248.0,
+        934.328
+      ],
+      [
+        4248.0,
+        933.302
+      ],
+      [
+        4248.0,
+        932.278
+      ],
+      [
+        4247.0,
+        932.278
+      ],
+      [
+        4246.0,
+        931.254
+      ],
+      [
+        4247.0,
+        931.254
+      ],
+      [
+        4248.0,
+        931.254
+      ],
+      [
+        4248.0,
+        930.23
+      ],
+      [
+        4248.0,
+        929.208
+      ],
+      [
+        4248.0,
+        928.186
+      ],
+      [
+        4247.0,
+        928.186
+      ],
+      [
+        4247.0,
+        927.166
+      ],
+      [
+        4248.0,
+        927.166
+      ],
+      [
+        4247.0,
+        926.146
+      ],
+      [
+        4247.0,
+        925.126
+      ],
+      [
+        4246.0,
+        925.126
+      ],
+      [
+        4245.0,
+        925.126
+      ],
+      [
+        4245.0,
+        924.108
+      ],
+      [
+        4245.0,
+        923.09
+      ],
+      [
+        4244.0,
+        923.09
+      ],
+      [
+        4243.0,
+        923.09
+      ],
+      [
+        4243.0,
+        922.073
+      ],
+      [
+        4242.0,
+        922.073
+      ],
+      [
+        4242.0,
+        921.057
+      ],
+      [
+        4241.0,
+        921.057
+      ],
+      [
+        4241.0,
+        920.042
+      ],
+      [
+        4240.0,
+        920.042
+      ],
+      [
+        4239.0,
+        920.042
+      ],
+      [
+        4239.0,
+        919.027
+      ],
+      [
+        4238.0,
+        918.013
+      ],
+      [
+        4233.0,
+        917.0
+      ],
+      [
+        4231.0,
+        917.0
+      ],
+      [
+        4230.0,
+        917.0
+      ],
+      [
+        4229.0,
+        917.0
+      ],
+      [
+        4228.0,
+        917.0
+      ],
+      [
+        4227.0,
+        917.0
+      ],
+      [
+        4217.0,
+        918.013
+      ],
+      [
+        4216.0,
+        918.013
+      ],
+      [
+        4215.0,
+        918.013
+      ],
+      [
+        4213.0,
+        918.013
+      ],
+      [
+        4212.0,
+        918.013
+      ],
+      [
+        4211.0,
+        918.013
+      ],
+      [
+        4208.0,
+        918.013
+      ]
+    ]
+  },
+  "control_off_river_id": 710403,
+  "unbridged_build_target": [
+    710413,
+    710412
+  ],
+  "edges": [
+    {
+      "ok": true,
+      "a": 710413,
+      "b": 710412,
+      "names": [
+        "Rhein-Kreis Neuss",
+        "Mettmann"
+      ],
+      "shared_border_length": 2.4,
+      "rhine_dist_shared": 0.096,
+      "rhine_hits": 5,
+      "banks": [
+        "left_west",
+        "right_east"
+      ],
+      "bank_signs": [
+        -1.834,
+        2.639
+      ],
+      "opposite_center_banks": true,
+      "midpoint": [
+        4250.2,
+        937.18
+      ],
+      "real_shared_border": true,
+      "on_rhine": true,
+      "edge": [
+        710412,
+        710413
+      ],
+      "bridged_1936": false,
+      "historical": "1936 UNBRIDGED (Build Bridge target): Neuss–Mettmann / Monheim-am-Rhein stretch. No road Rhine bridge in 1936; ferry only. Autobahn bridges here are postwar."
+    },
+    {
+      "ok": true,
+      "a": 710413,
+      "b": 710401,
+      "names": [
+        "Rhein-Kreis Neuss",
+        "Düsseldorf, Kreisfreie Stadt"
+      ],
+      "shared_border_length": 8.842,
+      "rhine_dist_shared": 0.084,
+      "rhine_hits": 10,
+      "banks": [
+        "left_west",
+        "right_east"
+      ],
+      "bank_signs": [
+        -1.834,
+        0.295
+      ],
+      "opposite_center_banks": true,
+      "midpoint": [
+        4248.57,
+        936.83
+      ],
+      "real_shared_border": true,
+      "on_rhine": true,
+      "edge": [
+        710401,
+        710413
+      ],
+      "bridged_1936": true,
+      "historical": "1936 seed BRIDGED: Oberkasseler Brücke (1898), road/tram Rhine bridge at Düsseldorf. Rheinkniebrücke (1969) is out of era."
+    },
+    {
+      "ok": true,
+      "a": 710417,
+      "b": 710418,
+      "names": [
+        "Köln, Kreisfreie Stadt",
+        "Leverkusen, Kreisfreie Stadt"
+      ],
+      "shared_border_length": 6.345,
+      "rhine_dist_shared": 0.096,
+      "rhine_hits": 8,
+      "banks": [
+        "left_west",
+        "right_east"
+      ],
+      "bank_signs": [
+        -0.361,
+        0.381
+      ],
+      "opposite_center_banks": true,
+      "midpoint": [
+        4254.19,
+        942.05
+      ],
+      "real_shared_border": true,
+      "on_rhine": true,
+      "edge": [
+        710417,
+        710418
+      ],
+      "bridged_1936": true,
+      "historical": "1936 seed BRIDGED: Köln road Rhine bridges — Deutzer Brücke (1915) and Mülheimer Brücke (1929). Hohenzollernbrücke (1911) is rail+pedestrian. The A1 Leverkusen Autobahn bridge is 1965 and is not this seed."
+    },
+    {
+      "ok": true,
+      "a": 710417,
+      "b": 710424,
+      "names": [
+        "Köln, Kreisfreie Stadt",
+        "Rheinisch-Bergischer Kreis"
+      ],
+      "shared_border_length": 4.942,
+      "rhine_dist_shared": 1.593,
+      "rhine_hits": 5,
+      "banks": [
+        "left_west",
+        "right_east"
+      ],
+      "bank_signs": [
+        -0.361,
+        4.11
+      ],
+      "opposite_center_banks": true,
+      "midpoint": [
+        4255.87,
+        942.18
+      ],
+      "real_shared_border": true,
+      "on_rhine": true,
+      "edge": [
+        710417,
+        710424
+      ],
+      "bridged_1936": true,
+      "historical": "1936 seed BRIDGED: same Köln city road bridges (Deutz 1915 / Mülheim 1929) serve the eastern face. Face-bank: Köln centroid is left/west; Rheinisch-Bergischer Kreis is right/east."
+    },
+    {
+      "ok": true,
+      "a": 710416,
+      "b": 710425,
+      "names": [
+        "Bonn, Kreisfreie Stadt",
+        "Rhein-Sieg-Kreis"
+      ],
+      "shared_border_length": 2.551,
+      "rhine_dist_shared": 0.289,
+      "rhine_hits": 3,
+      "banks": [
+        "left_west",
+        "right_east"
+      ],
+      "bank_signs": [
+        -0.889,
+        2.34
+      ],
+      "opposite_center_banks": true,
+      "midpoint": [
+        4258.7,
+        950.24
+      ],
+      "real_shared_border": true,
+      "on_rhine": true,
+      "edge": [
+        710416,
+        710425
+      ],
+      "bridged_1936": true,
+      "historical": "1936 seed BRIDGED: Bonn Rhine bridge (opened 1898; later Friedrich-Ebert-Brücke). Destroyed 1945 — standing in 1936."
+    },
+    {
+      "ok": true,
+      "a": 710402,
+      "b": 710415,
+      "names": [
+        "Duisburg, Kreisfreie Stadt",
+        "Wesel"
+      ],
+      "shared_border_length": 6.115,
+      "rhine_dist_shared": 0.097,
+      "rhine_hits": 6,
+      "banks": [
+        "right_east",
+        "left_west"
+      ],
+      "bank_signs": [
+        1.03,
+        -0.246
+      ],
+      "opposite_center_banks": true,
+      "midpoint": [
+        4247.88,
+        928.12
+      ],
+      "real_shared_border": true,
+      "on_rhine": true,
+      "edge": [
+        710402,
+        710415
+      ],
+      "bridged_1936": true,
+      "historical": "1936 seed BRIDGED: Friedrich-Ebert-Brücke Duisburg (Homberg–Ruhrort, 1907), road Rhine crossing at the city. Duisburg centroid is right/east; Wesel is left/west here."
+    }
+  ],
+  "parked": [
+    "bridge blow/capture",
+    "rail bridges / pontoons",
+    "Mosel / Main / Ruhr / Sieg",
+    "hills/relief RL-1",
+    "road tiers",
+    "Dig2 / Maginot / Hampshire"
+  ]
+}

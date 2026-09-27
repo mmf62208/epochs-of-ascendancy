@@ -14,10 +14,18 @@ var _current_map_mode: String = "political"
 var _hover_region_id: int = -1
 var _viewport_rect: Rect2 = Rect2()
 var _viewport_culling_active: bool = false
+var _camera_zoom: float = 1.0
+
+## Play MIXED 816cdc9: nation Labels (z=40 absolute) buried the Rhine at close
+## zoom over Köln. Keep them under river/road overlays and hide/fade when close.
+const NATION_LABEL_Z := 18
+const CLOSE_FADE_START_ZOOM := 0.62
+const CLOSE_HIDE_ZOOM := 0.88
 
 
 func _ready() -> void:
 	z_index = 12
+	z_as_relative = false
 	set_process(false)
 
 
@@ -45,11 +53,21 @@ func sync_tier(tier: int) -> void:
 	if tier == _current_tier and _built:
 		_apply_region_label_visibility()
 		_apply_state_label_visibility()
+		_apply_nation_close_zoom()
 		return
 	_current_tier = tier
 	if not _built:
 		return
 	_apply_tier_visibility(tier)
+
+
+func sync_camera_zoom(z: float) -> void:
+	var nz := maxf(z, 0.01)
+	if absf(nz - _camera_zoom) < 0.008 and _built:
+		return
+	_camera_zoom = nz
+	if _built:
+		_apply_nation_close_zoom()
 
 
 func set_hovered_region(region_id: int, tier: int = -1) -> void:
@@ -724,7 +742,7 @@ func _make_label(text: String, pos: Vector2, font_px: int, col: Color) -> Label:
 	lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	lbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	lbl.z_as_relative = false
-	lbl.z_index = 40
+	lbl.z_index = NATION_LABEL_Z
 	lbl.clip_text = false
 	lbl.text_overrun_behavior = TextServer.OVERRUN_NO_TRIMMING
 	lbl.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -753,7 +771,7 @@ func force_nation_label_at(tag: String, world_pos: Vector2, display_name: String
 	lbl.set_meta("label_anchor", world_pos)
 	lbl.set_meta("force_visible", true)
 	lbl.visible = true
-	lbl.z_index = 22
+	lbl.z_index = NATION_LABEL_Z
 	lbl.add_theme_font_size_override("font_size", 26)
 	lbl.modulate = Color(1.0, 1.0, 1.0, 1.0)
 	_fit_and_center_label(lbl)
@@ -792,11 +810,11 @@ func _apply_tier_visibility(tier: int) -> void:
 				or _viewport_rect.has_point(anchor)
 				or _viewport_rect.has_point(l.position)
 			)
-			l.visible = (show_n or force) and in_view
-			if show_n:
-				l.add_theme_font_size_override("font_size", nation_px)
+			l.visible = (show_n or force) and in_view and not _nation_labels_hidden_by_close_zoom()
+			if l.visible:
+				l.add_theme_font_size_override("font_size", _nation_font_px_for_zoom(nation_px))
 				var c := l.get_theme_color("font_color")
-				c.a = 0.96
+				c.a = _nation_alpha_for_zoom()
 				l.add_theme_color_override("font_color", c)
 				_fit_and_center_label(l)
 	for rid_var in _region_labels.keys():
@@ -846,4 +864,50 @@ func _apply_state_label_visibility() -> void:
 			var c3 := l.get_theme_color("font_color")
 			c3.a = MapZoomLODScript.label_alpha_for_tier(_current_tier, "region")
 			l.add_theme_color_override("font_color", c3)
+			_fit_and_center_label(l)
+
+
+func _nation_labels_hidden_by_close_zoom() -> bool:
+	return _camera_zoom >= CLOSE_HIDE_ZOOM
+
+
+func _nation_alpha_for_zoom() -> float:
+	if _camera_zoom < CLOSE_FADE_START_ZOOM:
+		return 0.96
+	if _camera_zoom >= CLOSE_HIDE_ZOOM:
+		return 0.0
+	var t := (_camera_zoom - CLOSE_FADE_START_ZOOM) / maxf(CLOSE_HIDE_ZOOM - CLOSE_FADE_START_ZOOM, 0.01)
+	return clampf(0.96 * (1.0 - t), 0.0, 0.96)
+
+
+func _nation_font_px_for_zoom(base_px: int) -> int:
+	# Labels live in world space — shrink as Camera2D.zoom grows so "Netherlands"
+	# does not cover Köln at close zoom.
+	if _camera_zoom <= 0.55:
+		return base_px
+	return maxi(12, int(round(float(base_px) * 0.55 / _camera_zoom)))
+
+
+func _apply_nation_close_zoom() -> void:
+	if not _built:
+		return
+	var nation_px: int = MapZoomLODScript.nation_label_font_px(_current_tier)
+	var hide := _nation_labels_hidden_by_close_zoom()
+	var alpha := _nation_alpha_for_zoom()
+	var px := _nation_font_px_for_zoom(nation_px)
+	for lbl in _nation_labels.values():
+		if not (lbl is Label):
+			continue
+		var l := lbl as Label
+		var force := l.has_meta("force_visible") and bool(l.get_meta("force_visible"))
+		if hide and not force:
+			l.visible = false
+			continue
+		if not l.visible and hide:
+			continue
+		l.add_theme_font_size_override("font_size", px)
+		var c := l.get_theme_color("font_color")
+		c.a = alpha
+		l.add_theme_color_override("font_color", c)
+		if l.visible:
 			_fit_and_center_label(l)

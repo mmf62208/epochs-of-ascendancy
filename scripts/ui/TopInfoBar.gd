@@ -73,6 +73,8 @@ const WIDTH_SHOW_ALL_SPEEDS := 900
 
 var _nav_overflow: MenuButton = null  # "More ▾" — secondary screens
 var _speed_overflow: MenuButton = null  # collapses 2x/3x/4x on narrow widths
+## View-only Units toggle (hotkey U). Syncs with MapRenderer.show_unit_counters.
+var units_view_button: Button = null
 
 
 func _ready() -> void:
@@ -666,6 +668,7 @@ func _apply_theme() -> void:
 			RetrowaveTheme.style_secondary_button(btn)
 
 	_setup_compact_menu()
+	_ensure_units_view_button()
 	# Hide secondary flat buttons immediately (layout re-applied deferred).
 	if trade_button:
 		trade_button.visible = false
@@ -811,6 +814,52 @@ func _deferred_precreate_debug() -> void:
 	# Static precreate (never toggle/show — that steals map/UI input).
 	if typeof(DebugOverlay) != TYPE_NIL:
 		DebugOverlay.precreate_hidden()
+
+
+func _ensure_units_view_button() -> void:
+	if units_view_button != null and is_instance_valid(units_view_button):
+		return
+	if _time_speed_container == null:
+		return
+	var btn := Button.new()
+	btn.name = "BtnUnitsView"
+	btn.text = "Units"
+	btn.toggle_mode = true
+	btn.button_pressed = true
+	btn.tooltip_text = "Show or hide unit counters (U). View only — does not change orders or the sim."
+	btn.custom_minimum_size = Vector2(64, 28)
+	btn.focus_mode = Control.FOCUS_NONE
+	btn.process_mode = Node.PROCESS_MODE_ALWAYS
+	btn.mouse_filter = Control.MOUSE_FILTER_STOP
+	btn.action_mode = BaseButton.ACTION_MODE_BUTTON_PRESS
+	_time_speed_container.add_child(btn)
+	if typeof(RetrowaveTheme) != TYPE_NIL:
+		RetrowaveTheme.style_secondary_button(btn)
+	btn.toggled.connect(_on_units_view_toggled)
+	units_view_button = btn
+	sync_units_view_button(true)
+
+
+func sync_units_view_button(shown: bool) -> void:
+	if units_view_button == null or not is_instance_valid(units_view_button):
+		return
+	units_view_button.set_pressed_no_signal(shown)
+	units_view_button.text = "Units" if shown else "Units off"
+	units_view_button.tooltip_text = (
+		"Hide unit counters (U). View only." if shown else "Show unit counters (U). View only."
+	)
+
+
+func _on_units_view_toggled(pressed: bool) -> void:
+	var mr: Node = get_tree().get_first_node_in_group("map_renderer") if get_tree() else null
+	if mr == null and get_tree() != null and get_tree().current_scene != null:
+		mr = get_tree().current_scene.find_child("MapRenderer", true, false)
+	if mr != null and mr.has_method("set_unit_counters_visible"):
+		mr.call("set_unit_counters_visible", pressed)
+		if "show_unit_counters" in mr:
+			sync_units_view_button(bool(mr.get("show_unit_counters")))
+		return
+	sync_units_view_button(pressed)
 
 
 func _connect_buttons() -> void:

@@ -725,7 +725,7 @@ func _quit_logged(code: int, reason: String) -> void:
 	var stay := false
 	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("smoke_advance_should_stay_alive"):
 		stay = bool(TimeManager.call("smoke_advance_should_stay_alive"))
-	if stay and not reason.begins_with("ui_smoke") and reason != "unit_order_qa" and not reason.begins_with("feb_clock") and not reason.begins_with("ix1_frame_guard") and not reason.begins_with("ix1_live_progress"):
+	if stay and not reason.begins_with("ui_smoke") and reason != "unit_order_qa" and not reason.begins_with("feb_clock") and not reason.begins_with("ix1_frame_guard") and not reason.begins_with("ix1_live_progress") and not reason.begins_with("rx1_live_progress"):
 		print("EOA_HARNESS_QUIT who=TestRunner suppressed stay_alive=1 reason=%s (Search/spine window; NOT product clock PASS)" % reason)
 		if OS.has_method("flush_stdout"):
 			OS.call("flush_stdout")
@@ -1071,13 +1071,17 @@ func _smoke_frame_guard_wanted() -> bool:
 
 
 func _maybe_start_ix1_frame_guard() -> void:
-	if not _smoke_frame_guard_wanted() and not _smoke_live_progress_wanted():
+	if not _smoke_frame_guard_wanted() and not _smoke_live_progress_wanted() and not _smoke_rx1_live_progress_wanted():
 		return
 	if has_meta("eoa_smoke_frame_guard_started"):
 		return
 	if not has_meta("eoa_smoke_advance_done"):
 		return
 	set_meta("eoa_smoke_frame_guard_started", true)
+	if _smoke_rx1_live_progress_wanted():
+		_eoa_flush("EOA_SMOKE_RX1_LIVE_PROGRESS who=TestRunner.start_after_stayalive (Play launch + viewport mouse; NOT product Begin/Esc/clock PASS)")
+		call_deferred("_smoke_rx1_live_open_and_press")
+		return
 	_eoa_flush("EOA_SMOKE_FRAME_GUARD who=TestRunner.start_after_stayalive (Play launch + viewport mouse; NOT product Begin/Esc/clock PASS)")
 	call_deferred("_smoke_ix1_frame_guard_open_and_press")
 
@@ -1115,11 +1119,18 @@ func _smoke_live_progress_wanted() -> bool:
 	return OS.get_environment("EOA_SMOKE_SPINE_LIVE_PROGRESS").strip_edges() == "1"
 
 
+func _smoke_rx1_live_progress_wanted() -> bool:
+	return OS.get_environment("EOA_SMOKE_RX1_LIVE_PROGRESS").strip_edges() == "1"
+
+
 func _tick_smoke_ix1_frame_guard(_delta: float) -> void:
-	if not _smoke_frame_guard_wanted() and not _smoke_live_progress_wanted():
+	if not _smoke_frame_guard_wanted() and not _smoke_live_progress_wanted() and not _smoke_rx1_live_progress_wanted():
 		return
 	if not bool(get_meta("eoa_smoke_frame_guard_active", false)):
 		_maybe_start_ix1_frame_guard()
+		return
+	if _smoke_rx1_live_progress_wanted():
+		_tick_smoke_rx1_live_progress()
 		return
 	if _smoke_live_progress_wanted():
 		_tick_smoke_ix1_live_progress()
@@ -1384,6 +1395,144 @@ func _ix1_live_progress_status() -> Dictionary:
 			if int(out["pct"]) >= 99 or bool(out["complete"]):
 				out["complete"] = true
 				out["pct"] = 100
+	return out
+
+
+func _smoke_rx1_live_open_and_press() -> void:
+	# Real inspector + viewport mouse on Build Bridge (Neuss 710413).
+	_eoa_flush("EOA_SMOKE_RX1_LIVE_PROGRESS who=TestRunner.open_neuss pid=710413")
+	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("open_province_inspector_from_search"):
+		map_renderer.call("open_province_inspector_from_search", 710413)
+	_eoa_flush("EOA_SMOKE_RX1_LIVE_PROGRESS who=TestRunner.neuss_open")
+	call_deferred("_smoke_rx1_live_press")
+
+
+func _smoke_rx1_live_press() -> void:
+	_eoa_flush("EOA_SMOKE_RX1_LIVE_PROGRESS who=TestRunner.mouse_press")
+	var report: Dictionary = {}
+	if map_renderer != null and is_instance_valid(map_renderer) and map_renderer.has_method("deliver_rx1_bridge_button_mouse_press"):
+		report = map_renderer.call("deliver_rx1_bridge_button_mouse_press") as Dictionary
+	_eoa_flush(
+		"EOA_SMOKE_RX1_LIVE_PROGRESS who=TestRunner.mouse_press_returned ok=%s reason=%s"
+		% [str(bool(report.get("ok", false))), str(report.get("reason", ""))]
+	)
+	set_meta("eoa_smoke_frame_guard_t0", Time.get_ticks_msec())
+	set_meta("eoa_smoke_frame_guard_frames", 0)
+	set_meta("eoa_smoke_frame_guard_rss0", _read_godot_rss_mb())
+	set_meta("eoa_smoke_frame_guard_last_sec", -1)
+	set_meta("eoa_smoke_frame_guard_active", true)
+	_arm_smoke_rx1_live_progress()
+
+
+func _arm_smoke_rx1_live_progress() -> void:
+	set_meta("eoa_smoke_rx1_live_progress_armed", true)
+	set_meta("eoa_smoke_rx1_live_progress_saw_pct", 0)
+	set_meta("eoa_smoke_rx1_live_progress_complete", false)
+	if typeof(TimeManager) != TYPE_NIL:
+		if TimeManager.has_method("set_paused"):
+			TimeManager.set_paused(false)
+		if TimeManager.has_method("set_time_scale"):
+			TimeManager.set_time_scale(4.0)
+	_eoa_flush(
+		"EOA_SMOKE_RX1_LIVE_PROGRESS who=TestRunner.arm stay_alive=%s paused=0 scale=4 (live advance_real_time; NOT IDM shortcut)"
+		% str(
+			TimeManager.call("smoke_stay_alive_active")
+			if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("smoke_stay_alive_active")
+			else "?"
+		)
+	)
+
+
+func _tick_smoke_rx1_live_progress() -> void:
+	if bool(get_meta("eoa_smoke_rx1_live_progress_done", false)):
+		return
+	if not bool(get_meta("eoa_smoke_rx1_live_progress_armed", false)):
+		return
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("is_paused"):
+		if bool(TimeManager.is_paused()) and TimeManager.has_method("set_paused"):
+			TimeManager.set_paused(false)
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("advance_real_time"):
+		TimeManager.advance_real_time(1.0)
+	var frames: int = int(get_meta("eoa_smoke_frame_guard_frames", 0)) + 1
+	set_meta("eoa_smoke_frame_guard_frames", frames)
+	var status: Dictionary = _rx1_live_progress_status()
+	var pct: int = int(status.get("pct", 0))
+	var eta: int = int(status.get("eta", 0))
+	var elapsed_days: int = int(status.get("elapsed", 0))
+	var done := bool(status.get("complete", false))
+	if pct > int(get_meta("eoa_smoke_rx1_live_progress_saw_pct", 0)):
+		set_meta("eoa_smoke_rx1_live_progress_saw_pct", pct)
+	if done:
+		set_meta("eoa_smoke_rx1_live_progress_complete", true)
+	var rss: int = _read_godot_rss_mb()
+	if frames % 6 == 0 or done or pct >= 100:
+		_eoa_flush(
+			"EOA_SMOKE_RX1_LIVE_PROGRESS who=TestRunner.tick days=%d pct=%d eta=%d rss_mb=%d complete=%d (advance_real_time; NOT product Begin/Esc/clock PASS)"
+			% [elapsed_days, pct, eta, rss, 1 if done else 0]
+		)
+	if rss >= 3072:
+		set_meta("eoa_smoke_rx1_live_progress_done", true)
+		_eoa_flush("EOA_SMOKE_RX1_LIVE_PROGRESS RESULT=FAIL rss_mb=%d" % rss)
+		_quit_logged(1, "rx1_live_progress_rss")
+		return
+	var saw := int(get_meta("eoa_smoke_rx1_live_progress_saw_pct", 0))
+	if elapsed_days >= 5 and saw <= 0 and not done:
+		set_meta("eoa_smoke_rx1_live_progress_done", true)
+		_eoa_flush(
+			"EOA_SMOKE_RX1_LIVE_PROGRESS RESULT=FAIL days=%d pct=0 (stay-alive day_emit drop; live calendar did not tick IDM)"
+			% elapsed_days
+		)
+		_quit_logged(1, "rx1_live_progress_stuck_zero")
+		return
+	if done or pct >= 100:
+		set_meta("eoa_smoke_rx1_live_progress_done", true)
+		_eoa_flush(
+			"EOA_SMOKE_RX1_LIVE_PROGRESS RESULT=PASS days=%d pct=%d rss_mb=%d (live path COMPLETE)"
+			% [elapsed_days, pct, rss]
+		)
+		_quit_logged(0, "rx1_live_progress_pass")
+		return
+	if elapsed_days >= 45:
+		set_meta("eoa_smoke_rx1_live_progress_done", true)
+		_eoa_flush(
+			"EOA_SMOKE_RX1_LIVE_PROGRESS RESULT=FAIL days=%d pct=%d never COMPLETE"
+			% [elapsed_days, pct]
+		)
+		_quit_logged(1, "rx1_live_progress_no_complete")
+
+
+func _rx1_live_progress_status() -> Dictionary:
+	var out := {"pct": 0, "eta": 0, "elapsed": 0, "complete": false}
+	if typeof(TimeManager) != TYPE_NIL and TimeManager.has_method("get_total_days_elapsed"):
+		out["elapsed"] = int(TimeManager.get_total_days_elapsed())
+	var start_elapsed := 0
+	if has_meta("eoa_smoke_rx1_live_progress_start_elapsed"):
+		start_elapsed = int(get_meta("eoa_smoke_rx1_live_progress_start_elapsed"))
+	else:
+		start_elapsed = int(out["elapsed"])
+		set_meta("eoa_smoke_rx1_live_progress_start_elapsed", start_elapsed)
+	out["elapsed"] = maxi(0, int(out["elapsed"]) - start_elapsed)
+	if typeof(InfrastructureDevelopmentManager) == TYPE_NIL:
+		return out
+	if InfrastructureDevelopmentManager.has_method("get_rx1_bridge_visual_state"):
+		if str(InfrastructureDevelopmentManager.call("get_rx1_bridge_visual_state")) == "built":
+			out["complete"] = true
+			out["pct"] = 100
+	if InfrastructureDevelopmentManager.has_method("get_project_status"):
+		var st: Dictionary = InfrastructureDevelopmentManager.call("get_project_status", 710413) as Dictionary
+		out["pct"] = int(round(float(st.get("progress", 0.0))))
+		out["eta"] = int(st.get("eta_days", 0))
+		if not bool(st.get("active", false)) and bool(out["complete"]):
+			out["pct"] = 100
+	if InfrastructureDevelopmentManager.has_method("has_active_project"):
+		if not bool(InfrastructureDevelopmentManager.call("has_active_project", 710413)):
+			if int(out["pct"]) >= 99 or bool(out["complete"]):
+				out["complete"] = true
+				out["pct"] = 100
+	if typeof(Rx1RhineCrossing) != TYPE_NIL and Rx1RhineCrossing.is_bridged(710413, 710412):
+		if not InfrastructureDevelopmentManager.has_method("has_active_project") or not bool(InfrastructureDevelopmentManager.call("has_active_project", 710413)):
+			out["complete"] = true
+			out["pct"] = 100
 	return out
 
 
