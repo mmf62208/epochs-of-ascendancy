@@ -14318,6 +14318,9 @@ func _refresh_province_detail_visibility() -> void:
 		return
 
 	var current_zoom := _get_camera_zoom()
+	if _political_labels_layer != null and is_instance_valid(_political_labels_layer):
+		if _political_labels_layer.has_method("sync_camera_zoom"):
+			_political_labels_layer.call("sync_camera_zoom", current_zoom)
 	var tier: int = MapZoomLODScript.tier_for_zoom(current_zoom)
 	if tier != _map_lod_tier:
 		_map_lod_tier = tier
@@ -20313,6 +20316,56 @@ func inspector_should_show_spine_status(province_id: int) -> bool:
 	return province_id == 710416 or province_id == 710417 or province_id == 710418
 
 
+func inspector_should_show_bridge_status(province_id: int) -> bool:
+	# FIX2: Rhine-bridge chrome only on Neuss / Mettmann — never Köln 710417.
+	return province_id == 710413 or province_id == 710412
+
+
+func rx1_panel_state_report(province_id: int) -> Dictionary:
+	# Pixel-guard / panel-state: live inspector chrome for one pid.
+	var btn_spine := ""
+	var spine_btn_vis := false
+	var spine_progress := ""
+	var spine_progress_vis := false
+	var btn_bridge := ""
+	var bridge_btn_vis := false
+	var bridge_progress := ""
+	var bridge_progress_vis := false
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
+		btn_spine = str(_btn_build_road_spine.text)
+		spine_btn_vis = bool(_btn_build_road_spine.visible)
+	if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+		spine_progress = str(_label_spine_progress.text)
+		spine_progress_vis = bool(_label_spine_progress.visible)
+	if _btn_build_rhine_bridge != null and is_instance_valid(_btn_build_rhine_bridge):
+		btn_bridge = str(_btn_build_rhine_bridge.text)
+		bridge_btn_vis = bool(_btn_build_rhine_bridge.visible)
+	if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+		bridge_progress = str(_label_rx1_progress.text)
+		bridge_progress_vis = bool(_label_rx1_progress.visible)
+	var offers_build := spine_btn_vis and ("Build Road Spine" in btn_spine)
+	var shows_built := spine_progress_vis and ("built" in spine_progress.to_lower() or "complete" in spine_progress.to_lower())
+	var leak_bridge_on_koln := inspector_should_show_spine_status(province_id) and bridge_progress_vis and ("Rhine bridge" in bridge_progress or "bridge" in bridge_progress.to_lower())
+	var leak_spine_on_neuss := inspector_should_show_bridge_status(province_id) and (spine_btn_vis or (spine_progress_vis and "spine" in spine_progress.to_lower()))
+	return {
+		"pid": province_id,
+		"spine_btn": btn_spine,
+		"spine_btn_visible": spine_btn_vis,
+		"spine_progress": spine_progress,
+		"spine_progress_visible": spine_progress_vis,
+		"bridge_btn": btn_bridge,
+		"bridge_btn_visible": bridge_btn_vis,
+		"bridge_progress": bridge_progress,
+		"bridge_progress_visible": bridge_progress_vis,
+		"offers_build_road_spine": offers_build,
+		"shows_spine_built": shows_built,
+		"leaks_bridge_on_spine_pid": leak_bridge_on_koln,
+		"leaks_spine_on_bridge_pid": leak_spine_on_neuss,
+		"show_spine_status": inspector_should_show_spine_status(province_id),
+		"show_bridge_status": inspector_should_show_bridge_status(province_id),
+	}
+
+
 func _hide_ix1_spine_inspector_chrome() -> void:
 	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
 		_btn_build_road_spine.visible = false
@@ -20326,6 +20379,42 @@ func _hide_ix1_spine_inspector_chrome() -> void:
 			stale.visible = false
 
 
+func _ix1_spine_is_built_for(province_id: int) -> bool:
+	var mgr = _get_infra_manager()
+	if mgr != null and mgr.has_method("is_ix1_road_spine_built"):
+		return bool(mgr.is_ix1_road_spine_built(province_id))
+	return false
+
+
+func _show_ix1_spine_built_state(province: Province) -> void:
+	if province == null or not inspector_should_show_spine_status(province.id):
+		_hide_ix1_spine_inspector_chrome()
+		return
+	if _btn_build_road_spine != null and is_instance_valid(_btn_build_road_spine):
+		_btn_build_road_spine.visible = false
+		_btn_build_road_spine.disabled = true
+		_btn_build_road_spine.text = "Road spine built"
+	_ensure_spine_progress_label()
+	if _label_spine_progress != null and is_instance_valid(_label_spine_progress):
+		_label_spine_progress.visible = true
+		_label_spine_progress.text = "Road spine built · Bonn–Köln–Leverkusen"
+	if _label_spine_start_notice != null and is_instance_valid(_label_spine_start_notice):
+		_label_spine_start_notice.visible = false
+	_ensure_special_sites_ui()
+	if _special_sites_container != null and is_instance_valid(_special_sites_container):
+		var row: Node = _special_sites_container.get_node_or_null("Ix1SpineBuildRow")
+		if row != null:
+			var list_btn: Button = row.find_child("BtnBuildRoadSpineInList", true, false) as Button
+			if list_btn != null:
+				list_btn.visible = false
+				list_btn.disabled = true
+			var list_lab: Label = row.find_child("Ix1SpineBuildInfo", true, false) as Label
+			if list_lab != null:
+				list_lab.text = "Road spine built · Bonn–Köln–Leverkusen"
+			row.visible = true
+	_layout_spine_progress_label()
+
+
 func _ix1_should_show_spine_button(province: Province) -> bool:
 	if province == null:
 		return false
@@ -20333,9 +20422,12 @@ func _ix1_should_show_spine_button(province: Province) -> bool:
 		return false
 	var mgr = _get_infra_manager()
 	if mgr != null and mgr.has_method("should_show_road_spine_button"):
-		if bool(mgr.should_show_road_spine_button(province.id, _player_tag())):
-			return true
+		# Do not fall through after a false — that re-offered Build after built (816cdc9).
+		return bool(mgr.should_show_road_spine_button(province.id, _player_tag()))
 	# Search/Go fallback: MapManager cache can miss while the live Province is already in hand.
+	if mgr != null and mgr.has_method("is_ix1_road_spine_built"):
+		if bool(mgr.is_ix1_road_spine_built(province.id)):
+			return false
 	if mgr != null and mgr.has_method("is_ix1_road_spine_province"):
 		if not bool(mgr.is_ix1_road_spine_province(province.id)):
 			return false
@@ -20361,8 +20453,13 @@ func _reveal_ix1_road_spine_on_inspector(province: Province, reset_scroll: bool 
 	_ix1_spine_inspector_pid = province.id
 	_ensure_road_spine_button()
 	_update_road_spine_button(province)
+	if not inspector_should_show_bridge_status(province.id):
+		if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+			_label_rx1_progress.visible = false
 	if _ix1_should_show_spine_button(province):
 		_prepend_ix1_spine_build_row(province)
+	elif inspector_should_show_spine_status(province.id) and _ix1_spine_is_built_for(province.id):
+		_show_ix1_spine_built_state(province)
 	if reset_scroll and info_panel is Control:
 		var scroll := (info_panel as Control).get_node_or_null("InfoScroll") as ScrollContainer
 		if scroll != null:
@@ -20429,6 +20526,10 @@ func _update_road_spine_button(province: Province) -> void:
 	_btn_build_road_spine.visible = show_btn
 	_pin_road_spine_button_to_inspector_chrome()
 	if not show_btn:
+		# Built corridor: show a built row, never re-offer Build Road Spine.
+		if inspector_should_show_spine_status(province.id) and _ix1_spine_is_built_for(province.id):
+			_show_ix1_spine_built_state(province)
+			return
 		# Play MIXED 9750f3d: leftover Köln chrome leaked onto Neuss 710413.
 		_hide_ix1_spine_inspector_chrome()
 		return
@@ -20747,7 +20848,7 @@ func _setup_rx1_rhine_layer() -> void:
 	if existing != null and is_instance_valid(existing):
 		_rx1_rhine_layer = existing
 		existing.z_as_relative = false
-		existing.z_index = 36
+		existing.z_index = 90
 		if existing.has_method("refresh"):
 			existing.call("refresh")
 		return
@@ -20757,12 +20858,12 @@ func _setup_rx1_rhine_layer() -> void:
 	var layer: Node = LayerScript.new() if LayerScript is GDScript else null
 	if layer == null:
 		return
-	# z=36 sits above DemoUnitIcon z=28. Layer also sets ABOVE_UNIT_COUNTERS_Z in _ready.
-	add_overlay_layer("Rx1RhineLayer", layer as Node2D, 36)
+	# z=90 sits above DemoUnitIcon 28 and nation Labels 40. Layer also sets this in _ready.
+	add_overlay_layer("Rx1RhineLayer", layer as Node2D, 90)
 	_rx1_rhine_layer = layer as Node2D
 	if _rx1_rhine_layer != null:
 		_rx1_rhine_layer.z_as_relative = false
-		_rx1_rhine_layer.z_index = 36
+		_rx1_rhine_layer.z_index = 90
 	Rx1RhineCrossing.ensure_loaded()
 
 
@@ -20776,6 +20877,15 @@ func refresh_rx1_rhine_layer() -> void:
 func set_rx1_bridge_preview(state: String, _pid: int, _pct: float) -> void:
 	# Three visual states: queued / under construction / built. _draw only.
 	refresh_rx1_rhine_layer()
+	var open_pid := selected_province_id if selected_province_id >= 0 else _rx1_inspector_pid
+	if not inspector_should_show_bridge_status(open_pid) and not inspector_should_show_bridge_status(_pid):
+		if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+			_label_rx1_progress.visible = false
+		return
+	if not inspector_should_show_bridge_status(open_pid):
+		if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+			_label_rx1_progress.visible = false
+		return
 	if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
 		if state == "construction":
 			_label_rx1_progress.visible = true
@@ -20884,10 +20994,17 @@ func _update_rhine_bridge_button(province: Province) -> void:
 		if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
 			_label_rx1_progress.visible = false
 		return
+	if not inspector_should_show_bridge_status(province.id):
+		_btn_build_rhine_bridge.visible = false
+		if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+			_label_rx1_progress.visible = false
+		return
 	var show_btn := _rx1_should_show_bridge_button(province)
 	_btn_build_rhine_bridge.visible = show_btn
 	_pin_rhine_bridge_button_to_inspector_chrome()
 	if not show_btn:
+		if _label_rx1_progress != null and is_instance_valid(_label_rx1_progress):
+			_label_rx1_progress.visible = false
 		return
 	var mgr = _get_infra_manager()
 	var status: Dictionary = {}

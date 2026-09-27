@@ -86,16 +86,25 @@ func _test_z_order() -> void:
 	if rhine_z <= unit_z:
 		_fail("Rhine ABOVE_UNIT_COUNTERS_Z=%d must be > unit %d" % [rhine_z, unit_z])
 		return
+	if rhine_z <= 40:
+		_fail("Rhine z=%d must sit above nation Labels z=40 (Play MIXED 816cdc9)" % rhine_z)
+		return
 	if road_z <= 28:
 		_fail("RoadLayer ROAD_ABOVE_UNIT_COUNTERS_Z=%d must be > 28" % road_z)
 		return
-	if "add_overlay_layer(\"Rx1RhineLayer\"" in ren and "36" not in ren:
-		_fail("MapRenderer must spawn Rx1RhineLayer at z=36")
+	if road_z <= 40:
+		_fail("RoadLayer z=%d must sit above nation Labels z=40" % road_z)
 		return
-	if "HALO_WIDTH" not in layer:
-		_fail("Rx1RhineLayer missing halo (readability through plates)")
+	if "add_overlay_layer(\"Rx1RhineLayer\"" in ren and "90" not in ren:
+		_fail("MapRenderer must spawn Rx1RhineLayer at z=90")
 		return
-	_pass("Rhine z=%d and Road z=%d sit above DemoUnitIcon z=%d" % [rhine_z, road_z, unit_z])
+	if "RIVER_SCREEN_PX" not in layer:
+		_fail("Rx1RhineLayer missing screen-space river width")
+		return
+	if "ROAD_EXPLICIT_SCREEN_PX" not in infra:
+		_fail("InfrastructureOverlayLayer missing screen-space road width")
+		return
+	_pass("Rhine z=%d and Road z=%d sit above units 28 and nation Labels 40" % [rhine_z, road_z])
 
 
 func _test_spine_chrome_scope() -> void:

@@ -90,10 +90,14 @@ var _layer_provs_cache: Dictionary = {}
 var _layer_provs_cache_msec: int = 0
 const LAYER_PROV_CACHE_MS := 400
 
-## DemoUnitIcon_* is z=28 z_as_relative=false. Built IX-1 roads must read above those plates.
+## DemoUnitIcon_* is z=28 z_as_relative=false. Built IX-1 roads must read above
+## those plates AND above nation Labels (z=40). Play MIXED 816cdc9: world-width
+## 2.8 Line2Ds sat under "Netherlands"/"Belgium" and vanished at mid zoom.
 const UNIT_COUNTER_Z := 28
-const ROAD_ABOVE_UNIT_COUNTERS_Z := 32
-const SPINE_ABOVE_UNIT_COUNTERS_Z := 33
+const ROAD_ABOVE_UNIT_COUNTERS_Z := 88
+const SPINE_ABOVE_UNIT_COUNTERS_Z := 89
+const ROAD_EXPLICIT_SCREEN_PX := 7.0
+const ROAD_INFERRED_SCREEN_PX := 4.0
 
 func _ready():
     infrastructure_manager = get_node_or_null("/root/InfrastructureDevelopmentManager")
@@ -197,6 +201,7 @@ func _update_sub_layer_visibilities() -> void:
     if road_layer:
         # IX-1: player-built explicit spines stay visible at playable mid-zoom (not F10-only).
         road_layer.visible = (show_roads or _road_layer_has_explicit_lines()) and z > 0.10
+        _apply_screen_space_road_widths()
     if spine_preview_layer:
         # Visibility only — never rebuild/create nodes on zoom (silent-exit class).
         var prev_state := str(spine_preview_layer.get("state"))
@@ -570,9 +575,10 @@ func _rebuild_road_layer_inner() -> void:
                 # Explicit IX-1 spines stay readable on political at Home zoom.
                 # Inferred high-infra dust only when Infra mapmode (show_roads) is on.
                 if has_explicit:
-                    line.default_color = Color(0.50, 0.36, 0.14, 0.82)
-                    line.width = 2.8
-                    line.z_index = 3
+                    line.default_color = Color(0.50, 0.36, 0.14, 0.92)
+                    line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+                    line.z_as_relative = false
+                    line.z_index = ROAD_ABOVE_UNIT_COUNTERS_Z
                 elif tier >= 2:
                     line.default_color = Color(0.40, 0.34, 0.22, 0.38)
                     line.width = 2.0
@@ -625,9 +631,10 @@ func _paint_explicit_ix1_spine_if_missing(provinces: Dictionary, drawn: Dictiona
             var line := Line2D.new()
             line.points = [c1, c2]
             line.antialiased = true
-            line.default_color = Color(0.50, 0.36, 0.14, 0.82)
-            line.width = 2.8
-            line.z_index = 3
+            line.default_color = Color(0.50, 0.36, 0.14, 0.92)
+            line.width = _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+            line.z_as_relative = false
+            line.z_index = ROAD_ABOVE_UNIT_COUNTERS_Z
             line.set_meta("p1", pid)
             line.set_meta("p2", nid)
             line.set_meta("explicit", true)
@@ -1833,6 +1840,25 @@ func _draw_resource_icons_culled(zoom: float, provinces: Dictionary) -> void:
         var font := ThemeDB.fallback_font
         if font:
             draw_string(font, icon_pos + Vector2(-5, 4), symbol, HORIZONTAL_ALIGNMENT_CENTER, -1, 11, Color(1, 1, 1, 0.92))
+
+
+func _road_world_width(screen_px: float) -> float:
+    return screen_px / maxf(_get_current_zoom(), 0.04)
+
+
+func _apply_screen_space_road_widths() -> void:
+    if road_layer == null:
+        return
+    var explicit_w := _road_world_width(ROAD_EXPLICIT_SCREEN_PX)
+    var inferred_w := _road_world_width(ROAD_INFERRED_SCREEN_PX)
+    for child in road_layer.get_children():
+        if not (child is Line2D):
+            continue
+        var line := child as Line2D
+        if bool(line.get_meta("explicit", false)):
+            line.width = explicit_w
+        elif show_roads:
+            line.width = inferred_w
 
 
 func _get_current_zoom() -> float:

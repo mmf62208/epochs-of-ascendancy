@@ -33,6 +33,7 @@ from rx1_rhine_crossing_product import (  # noqa: E402
     move_mult,
     shared_border_guard,
     visibility_order,
+    panel_state_scope,
 )
 
 
@@ -101,7 +102,17 @@ class TestRx1RhineCrossingProduct(unittest.TestCase):
         self.assertTrue(vis.get("ok"), msg=vis)
         self.assertGreater(int(vis.get("rhine_z", -1)), int(vis.get("unit_z", 99)))
         self.assertGreater(int(vis.get("road_z", -1)), int(vis.get("unit_z", 99)))
+        self.assertGreater(int(vis.get("rhine_z", -1)), 40)
         self.assertTrue(vis.get("spine_ok"), msg=vis)
+        self.assertTrue(vis.get("screen_space"), msg=vis)
+        self.assertTrue(vis.get("labels_close"), msg=vis)
+
+    def test_panel_state_scope(self) -> None:
+        panel = panel_state_scope()
+        self.assertTrue(panel.get("ok"), msg=panel)
+        self.assertTrue(panel.get("built_helper"), msg=panel)
+        self.assertTrue(panel.get("no_reoffer"), msg=panel)
+        self.assertTrue(panel.get("bridge_scope"), msg=panel)
 
     def test_fresh_checkout_launch_imports_class_cache(self) -> None:
         fresh = fresh_checkout_launch()

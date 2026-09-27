@@ -29,7 +29,7 @@ Every Cursor / Grok / human session on this tree:
 | **Human** | Not required for units. When you do open the map: Maginot chips sit on the hex (centroid), player is GER. M6 20d/60d still open. |
 | **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS** (organize/train/priority included). Soft 30fps still FAIL honest. |
 | **GitHub** | `origin/main` @ `1d092a14` (IX-1 Road Spine). RX-1 Rhine Crossing is a **draft** slice on `cursor/rx1-rhine-crossing-e117` — **HOLD merge**. Do not force-push over June Cursor history. |
-| **RX-1 Rhine Crossing (draft)** | Vector Rhine Bonn→Köln→Düsseldorf→Duisburg. **FIX1 (same PR 57):** river + IX-1 RoadLayer z above DemoUnitIcon 28; spine chrome only on Bonn/Köln/Leverkusen; `run_godot.sh` one-time import when class cache lacks `Rx1RhineCrossing`. HOLD merge. Smoke harness is not the product. |
+| **RX-1 Rhine Crossing (draft)** | Vector Rhine Bonn→Köln→Düsseldorf→Duisburg. **FIX2 (same PR 57, from Play MIXED `816cdc9`):** screen-space Rhine/road strokes (not world-width 2.8); z above nation Labels 40; close-zoom fade/hide of oversized country names; Köln built state never re-offers Build Road Spine; bridge status scoped to Neuss/Mettmann. Windowed pixel screenshot guard. HOLD merge. Smoke harness is not the product. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
 

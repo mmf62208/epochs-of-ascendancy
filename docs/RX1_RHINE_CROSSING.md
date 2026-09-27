@@ -8,7 +8,7 @@
 
 | | Before (tip `1d092a14`) | After (this slice) |
 |--|-------------------------|--------------------|
-| Rhine look | Raster river bake; stored `rivers_world.json` Rhine 321 Y is mercator (~1781–1864), so it does **not** sit on NUTS3 Köln. Play MIXED `9750f3d`: vector sat at z=7 under DemoUnitIcon z=28. | Vector polyline, invert mercator-Y then `lonlat_to_canvas`. Köln d≈0.05, Bonn 0.45, Düsseldorf 0.36, Duisburg 1.36; Essen 7.03 **off**. `_draw` only — no rebuild on zoom. **FIX1:** `ABOVE_UNIT_COUNTERS_Z=36` + halo; RoadLayer `ROAD_ABOVE_UNIT_COUNTERS_Z=32`. |
+| Rhine look | Raster river bake; stored `rivers_world.json` Rhine 321 Y is mercator (~1781–1864), so it does **not** sit on NUTS3 Köln. Play MIXED `9750f3d`: vector sat at z=7 under DemoUnitIcon z=28. Play MIXED `816cdc9`: z=36 still sat under nation Labels (z=40) and `draw_line` 2.8 was world-space (sub-pixel at mid zoom). | Vector polyline, invert mercator-Y then `lonlat_to_canvas`. Köln d≈0.05, Bonn 0.45, Düsseldorf 0.36, Duisburg 1.36; Essen 7.03 **off**. `_draw` only — no rebuild on zoom. **FIX2:** screen-space `RIVER_SCREEN_PX=7` / halo 14; `ABOVE_UNIT_COUNTERS_Z=90` (above Labels 40); nation names fade/hide at close zoom. RoadLayer explicit spines use `ROAD_EXPLICIT_SCREEN_PX` at z=88. |
 | Crossings | `has_river_border` + flat **0.97** per-province. `province_adjacency.json` is shared-edge + kNN (non-touching pairs). | Six **GISCO shared-border** edges the Rhine actually sits on. Guard fails if a listed edge is not a real shared border. Köln–Essen is **not** a crossing. |
 | Bridges | None as a named 1936 fact. | Historical road bridges at the cities. Neuss–Mettmann left **unbridged** so Build Bridge has a target. |
 | Player order | Invest / IX-1 spine only. | One **Build Bridge** order on the IX-1 IDM project + FIX3 `_tick_live_construction_on_calendar_day`. |
@@ -68,9 +68,17 @@ Stored Rhine 321 canvas Y ~1781–1864 is the world_full mercator bake (`use_mer
 | `HeadlessRx1RhineCrossingTest` | Edge penalties, bridged vs unbridged, no Köln–Essen, Build Bridge complete. |
 | `HeadlessRx1RhineLiveStayAliveTickTest` | Real `advance_real_time` under stay-alive: 0% → >0 in ~5d → COMPLETE. |
 | `tools/eoa_rx1_bridge_live_progress_guard.sh` | Windowed smoke: viewport mouse on Build Bridge. **Not the product.** |
-| `HeadlessRx1RhineVisibilityTest` | Rhine/road z > DemoUnitIcon 28; spine chrome absent on Neuss 710413; `run_godot.sh` import-if-needed. |
+| `HeadlessRx1RhineVisibilityTest` | Rhine/road z > DemoUnitIcon 28 **and** nation Labels 40; screen-space widths; spine chrome absent on Neuss 710413; `run_godot.sh` import-if-needed. |
+| `HeadlessRx1RhinePanelStateTest` | Köln never re-offers Build Road Spine after built; bridge chrome only on Neuss 710413 / Mettmann 710412. |
+| `tools/eoa_rx1_pixel_guard.sh` | **WINDOWED** (xvfb) live `TestScenario` captures. Samples Rhine + built-spine pixels with a hit-ratio floor. Real PNGs, not mocks. Smoke harness is **not** the product. |
 
-Must **FAIL** on `1d092a14` / `9750f3d` (visibility) and **PASS** on this tip. IX-1 headless + python stay green.
+Must **FAIL** on `816cdc9` (pixels + Köln re-offer + bridge leak) and **PASS** on this tip. IX-1 headless + python stay green. The FIX1 z-order check alone is not evidence — Play MIXED `816cdc9` passed it while the screen stayed empty.
+
+## FIX2 (Play MIXED `816cdc9`)
+
+Root cause of the empty screen: (1) `draw_line` / Line2D widths were **world units**, so at mid Camera2D.zoom (~0.4) a 2.8u stroke is ~1 screen pixel; (2) `MapPoliticalLabelsLayer` nation Labels use `z_as_relative=false` **z=40**, which paints over Rhine z=36 and RoadLayer z=32 — "Netherlands" / "Belgium" / "Luxembourg" bury Köln at close zoom. FIX1's z-order guard only compared 36>28, so it passed while the pixels failed.
+
+Köln after `state=built` re-offered **Build Road Spine** because `should_show_road_spine_button` ignored built edges and `_ix1_should_show_spine_button` fell through after a false. The Köln panel also kept Neuss's `Rhine bridge 100% · ETA 0 days` because `_update_rhine_bridge_button` returned early without hiding `_label_rx1_progress`.
 
 ## Fresh checkout (FIX1)
 

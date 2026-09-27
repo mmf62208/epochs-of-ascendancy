@@ -1092,11 +1092,34 @@ func link_ix1_road_spine_edges(province_id: int, neighbor_ids: Array = []) -> Di
 	}
 
 
+func is_ix1_road_spine_built(province_id: int = 710417) -> bool:
+	# Corridor is built when both Bonn–Köln and Köln–Leverkusen edges exist.
+	if typeof(MapManager) == TYPE_NIL:
+		return false
+	var koln: Province = MapManager.get_province(710417)
+	var bonn: Province = MapManager.get_province(710416)
+	var lev: Province = MapManager.get_province(710418)
+	if koln == null or bonn == null or lev == null:
+		return false
+	var edge_bonn := (710416 in koln.built_road_neighbors) and (710417 in bonn.built_road_neighbors)
+	var edge_lev := (710418 in koln.built_road_neighbors) and (710417 in lev.built_road_neighbors)
+	if not (edge_bonn and edge_lev):
+		return false
+	# Scope: only the three corridor provinces report built.
+	if province_id != 710416 and province_id != 710417 and province_id != 710418:
+		return false
+	return true
+
+
 func should_show_road_spine_button(province_id: int, player_tag: String) -> bool:
 	if not is_ix1_road_spine_province(province_id):
 		return false
 	if has_active_project(province_id):
-		return true
+		var live: ProvincialProject = get_active_project(province_id)
+		return live != null and bool(live.build_road_spine)
+	# Play MIXED 816cdc9: after state=built the button came back. Never re-offer.
+	if is_ix1_road_spine_built(province_id):
+		return false
 	var p: Province = null
 	if typeof(MapManager) != TYPE_NIL:
 		p = MapManager.get_province(province_id)

@@ -240,6 +240,12 @@ else
   run_step launch_rx1_visibility \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineVisibilityTest.gd || fail
 
+  run_step launch_rx1_panel_state \
+    tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhinePanelStateTest.gd || fail
+
+  run_step launch_rx1_pixel \
+    tools/eoa_rx1_pixel_guard.sh || fail
+
   run_step launch_rx1_live_stay_alive_tick \
     tools/run_godot.sh --headless -s res://scripts/core/HeadlessRx1RhineLiveStayAliveTickTest.gd || fail
 

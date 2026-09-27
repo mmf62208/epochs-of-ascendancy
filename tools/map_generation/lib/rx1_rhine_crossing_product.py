@@ -46,6 +46,10 @@ GATES_SH = ROOT / "tools" / "eoa_full_test_gates.sh"
 HEADLESS_GD = ROOT / "scripts" / "core" / "HeadlessRx1RhineCrossingTest.gd"
 LIVE_HARNESS = ROOT / "scripts" / "core" / "HeadlessRx1RhineLiveStayAliveTickTest.gd"
 VIS_HARNESS = ROOT / "scripts" / "core" / "HeadlessRx1RhineVisibilityTest.gd"
+PANEL_HARNESS = ROOT / "scripts" / "core" / "HeadlessRx1RhinePanelStateTest.gd"
+PIXEL_GUARD_GD = ROOT / "scripts" / "core" / "WindowedRx1RhinePixelGuard.gd"
+PIXEL_GUARD_SH = ROOT / "tools" / "eoa_rx1_pixel_guard.sh"
+LABELS_GD = ROOT / "scripts" / "map" / "MapPoliticalLabelsLayer.gd"
 LIVE_GUARD_SH = ROOT / "tools" / "eoa_rx1_bridge_live_progress_guard.sh"
 RUN_GODOT_SH = ROOT / "tools" / "run_godot.sh"
 
@@ -144,8 +148,13 @@ SHIPPED_API_NEEDLES: Tuple[Tuple[Path, str], ...] = (
     (LAYER_GD, "class_name Rx1RhineLayer"),
     (LAYER_GD, "func _draw"),
     (LAYER_GD, "ABOVE_UNIT_COUNTERS_Z"),
+    (LAYER_GD, "RIVER_SCREEN_PX"),
     (INFRA_OVERLAY_GD, "ROAD_ABOVE_UNIT_COUNTERS_Z"),
+    (INFRA_OVERLAY_GD, "ROAD_EXPLICIT_SCREEN_PX"),
     (RENDERER_GD, "inspector_should_show_spine_status"),
+    (RENDERER_GD, "inspector_should_show_bridge_status"),
+    (IDM_GD, "is_ix1_road_spine_built"),
+    (PIXEL_GUARD_SH, "xvfb-run"),
     (RENDERER_GD, "_hide_ix1_spine_inspector_chrome"),
     (RUN_GODOT_SH, "class cache missing Rx1RhineCrossing"),
     (GAMEDATA_GD, 'preload("res://scripts/map/Rx1RhineCrossing.gd")'),
@@ -601,10 +610,11 @@ def _const_int(src: str, name: str) -> int:
 
 
 def visibility_order() -> Dict[str, Any]:
-    """FIX1: Rhine + built road z above DemoUnitIcon 28; spine chrome not on Neuss."""
+    """FIX1+FIX2: z above units/labels; screen-space stroke; nation labels fade at close."""
     layer = _read(LAYER_GD)
     infra = _read(INFRA_OVERLAY_GD)
     ren = _read(RENDERER_GD)
+    labels = _read(LABELS_GD)
     rhine_z = _const_int(layer, "ABOVE_UNIT_COUNTERS_Z")
     unit_z = _const_int(layer, "UNIT_COUNTER_Z")
     road_z = _const_int(infra, "ROAD_ABOVE_UNIT_COUNTERS_Z")
@@ -615,13 +625,18 @@ def visibility_order() -> Dict[str, Any]:
         and "710413" in ren
         and "710417" in ren
     )
+    screen_ok = "RIVER_SCREEN_PX" in layer and "ROAD_EXPLICIT_SCREEN_PX" in infra
+    labels_ok = "CLOSE_HIDE_ZOOM" in labels and "sync_camera_zoom" in labels
     ok = (
         unit_z == 28
         and overlay_unit == 28
         and rhine_z > unit_z
+        and rhine_z > 40
         and road_z > overlay_unit
+        and road_z > 40
         and spine_ok
-        and "HALO_WIDTH" in layer
+        and screen_ok
+        and labels_ok
     )
     return {
         "ok": ok,
@@ -629,6 +644,28 @@ def visibility_order() -> Dict[str, Any]:
         "road_z": road_z,
         "unit_z": unit_z,
         "spine_ok": spine_ok,
+        "screen_space": screen_ok,
+        "labels_close": labels_ok,
+    }
+
+
+def panel_state_scope() -> Dict[str, Any]:
+    """FIX2: Köln built state (no re-offer); bridge status only Neuss/Mettmann."""
+    idm = _read(IDM_GD)
+    ren = _read(RENDERER_GD)
+    built = "is_ix1_road_spine_built" in idm
+    no_reoffer = "is_ix1_road_spine_built" in idm and "Never re-offer" in idm
+    bridge_scope = (
+        "inspector_should_show_bridge_status" in ren
+        and "710413" in ren
+        and "710412" in ren
+        and "_show_ix1_spine_built_state" in ren
+    )
+    return {
+        "ok": built and no_reoffer and bridge_scope,
+        "built_helper": built,
+        "no_reoffer": no_reoffer,
+        "bridge_scope": bridge_scope,
     }
 
 
@@ -766,6 +803,12 @@ def build_rx1_rhine_crossing_product() -> Dict[str, Any]:
     else:
         fails.append("visibility_order")
 
+    panel = panel_state_scope()
+    if panel.get("ok"):
+        passes.append("panel_state_scope")
+    else:
+        fails.append("panel_state_scope")
+
     fresh = fresh_checkout_launch()
     if fresh.get("ok"):
         passes.append("fresh_checkout_launch")
@@ -786,6 +829,7 @@ def build_rx1_rhine_crossing_product() -> Dict[str, Any]:
         "shipped": api,
         "ix1_unchanged": ix1,
         "visibility_order": vis,
+        "panel_state_scope": panel,
         "fresh_checkout_launch": fresh,
         "move_unbridged": move_mult(ua, ub, False, spec),
         "move_bridged": move_mult(ba, bb, True, spec),
