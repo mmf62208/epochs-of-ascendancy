@@ -15745,6 +15745,8 @@ func _apply_world_terrain_layers() -> void:
 ## Reset camera + bounds to Europe grand theater (for quick return after world/NA pan or chunk loads).
 ## Keeps Europe polys and data as the testable focus.
 func reset_camera_to_europe() -> void:
+	if _pixel_guard_camera_locked():
+		return
 	_current_theater_bounds = GRAND_THEATER_CANONICAL_BOUNDS
 	set_meta("full_world_underlay_active", false)
 	var cam := get_viewport().get_camera_2d() if get_viewport() else null
@@ -15946,7 +15948,37 @@ func debug_focus_coarse_territory(terr_name: String = "Africa") -> void:
 ## Center camera on Europe within the full world canvas.
 ## world_accurate GIS: use live province centroids (GER/FRA capitals), not legacy Europe-theater rect
 ## (legacy BASE_EU_* was for old 471-prov overlay and mis-aimed the GIS board).
+func _pixel_guard_camera_locked() -> bool:
+	# WindowedRx1RhinePixelGuard: TestRunner deferred Home-recenter must not
+	# steal the Köln/Neuss frame. Smoke harness only — not product Home.
+	var tree := get_tree()
+	if tree == null or tree.root == null:
+		return false
+	return bool(tree.root.get_meta("eoa_rx1_pixel_lock_camera", false))
+
+
+func lock_pixel_guard_camera(pos: Vector2, zoom: float) -> void:
+	# Smoke harness: pin MapCamera so process_frame captures are Köln, not Europe Home.
+	var z := maxf(zoom, 0.04)
+	var cam := get_node_or_null("MapCamera") as Camera2D
+	if cam == null and get_viewport():
+		cam = get_viewport().get_camera_2d()
+	if cam != null:
+		cam.zoom = Vector2(z, z)
+		cam.global_position = pos
+		cam.reset_smoothing()
+		cam.enabled = true
+		cam.make_current()
+	_close_camera_lock_pos = pos
+	_close_camera_lock_zoom = Vector2(z, z)
+	_close_camera_locked = true
+	_europe_focus_retry = 99
+	_hold_camera_until_msec = Time.get_ticks_msec() + 120000
+
+
 func center_europe_in_world_view() -> void:
+	if _pixel_guard_camera_locked():
+		return
 	_sync_theater_bounds_to_map_data()
 	set_meta("full_world_underlay_active", true)
 	var frame := _resolve_europe_focus_rect(Vector2.ZERO)

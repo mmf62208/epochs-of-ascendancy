@@ -20,7 +20,7 @@ const METTMANN := 710412
 const MID_ZOOM := 0.48
 const CLOSE_ZOOM := 1.20
 const WAIT_MAP_SECS := 420
-const SETTLE_FRAMES := 24
+const SETTLE_FRAMES := 48
 const RIVER_MIN_HIT := 0.18
 const ROAD_MIN_HIT := 0.14
 const SAMPLE_RADIUS := 3
@@ -84,6 +84,8 @@ func _start() -> void:
 
 
 func _on_process() -> void:
+	if _phase != Phase.WAIT_MAP and _phase != Phase.DONE:
+		_reassert_camera()
 	match _phase:
 		Phase.WAIT_MAP:
 			_tick_wait_map()
@@ -136,6 +138,7 @@ func _tick_wait_map() -> void:
 	if Time.get_ticks_msec() - int(root.get_meta("rx1_ready_msec", 0)) < 2000:
 		return
 	_log("EOA_RX1_PIXEL_GUARD who=guard.frame_start elapsed=%d n=%d" % [elapsed, _province_count()])
+	_freeze_boot_camera_fighters()
 	_frame_over_koln(MID_ZOOM, true)
 	_go_settle(Phase.DO_MID)
 
@@ -316,7 +319,45 @@ var _cam_pos: Vector2 = Vector2.ZERO
 var _cam_zoom: float = MID_ZOOM
 
 
+func _freeze_boot_camera_fighters() -> void:
+	# Play MIXED 816cdc9 pixel run framed Europe Home: TestRunner deferred
+	# center_europe_in_world_view / LivingTitle _center_on_player won the camera.
+	if root != null:
+		root.set_meta("eoa_rx1_pixel_lock_camera", true)
+	var mr := _map_renderer()
+	if mr != null:
+		mr.set("_europe_focus_retry", 99)
+		mr.set("_close_camera_locked", true)
+		mr.set("_hold_camera_until_msec", Time.get_ticks_msec() + 120000)
+		if mr.has_method("set_process"):
+			# Keep MapRenderer alive for inspector chrome; lock pose instead of disabling.
+			pass
+	var tr := _test_runner()
+	if tr != null and tr.has_method("set_process"):
+		# Title already closed. Stop TestRunner from re-queuing Europe Home.
+		tr.set_process(false)
+	var cc := _find_named("CameraController")
+	if cc != null:
+		if "enable_pan" in cc:
+			cc.set("enable_pan", false)
+		if "enable_zoom" in cc:
+			cc.set("enable_zoom", false)
+		cc.set_process(false)
+	_log("EOA_RX1_PIXEL_GUARD who=guard.lock_camera (NOT product Home/Close)")
+
+
 func _reassert_camera() -> void:
+	if _cam_pos == Vector2.ZERO:
+		return
+	_apply_camera(_cam_pos, _cam_zoom)
+	if root != null and not bool(root.get_meta("rx1_cam_deferred", false)):
+		root.set_meta("rx1_cam_deferred", true)
+		call_deferred("_apply_camera_deferred")
+
+
+func _apply_camera_deferred() -> void:
+	if root != null:
+		root.set_meta("rx1_cam_deferred", false)
 	if _cam_pos != Vector2.ZERO:
 		_apply_camera(_cam_pos, _cam_zoom)
 
@@ -324,11 +365,21 @@ func _reassert_camera() -> void:
 func _apply_camera(pos: Vector2, zoom: float) -> void:
 	_cam_pos = pos
 	_cam_zoom = zoom
+	var mr := _map_renderer()
+	if mr != null and mr.has_method("lock_pixel_guard_camera"):
+		mr.call("lock_pixel_guard_camera", pos, zoom)
+		return
+	if mr != null:
+		mr.set("_close_camera_lock_pos", pos)
+		mr.set("_close_camera_lock_zoom", Vector2(zoom, zoom))
+		mr.set("_close_camera_locked", true)
 	var cam := _camera()
 	if cam != null:
 		cam.zoom = Vector2(zoom, zoom)
 		cam.global_position = pos
 		cam.reset_smoothing()
+		cam.enabled = true
+		cam.make_current()
 	# GIS boards lock ProvinceContainers at identity. Do not scale it.
 
 
@@ -354,7 +405,20 @@ func _koln_world() -> Vector2:
 
 
 func _capture(name: String) -> Image:
+	_reassert_camera()
 	RenderingServer.force_draw()
+	_reassert_camera()
+	RenderingServer.force_draw()
+	var cam := _camera()
+	if cam != null:
+		var d := cam.global_position.distance_to(_koln_world())
+		_log(
+			"EOA_RX1_PIXEL_GUARD who=guard.cam pos=%.1f,%.1f zoom=%.3f koln_dist=%.1f"
+			% [cam.global_position.x, cam.global_position.y, cam.zoom.x, d]
+		)
+		if name.begins_with("rx1_pixel_mid") or name.begins_with("rx1_pixel_close") or name.begins_with("rx1_pixel_road"):
+			if d > 520.0:
+				_fail_reasons.append("camera_not_on_koln")
 	var vp := root.get_viewport()
 	if vp == null:
 		return null
