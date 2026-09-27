@@ -10,7 +10,7 @@
 | **Play MIXED base** | `816cdc921c8072928d24a90a71a0d4088e9cde05` |
 | **Implementation** | `88de600c` (units on top + U + HUD) + `2932180c` (gold spine paint) |
 | **Pixel floors** | `c46ac26e` (gold 0.15) + `8a13a394` (river 0.28) |
-| **HEAD** | `8a13a3942a47133a81f866a735022f4f5faf4d80` |
+| **HEAD** | `6b6576fd7dc08f6b7cb953f8599e11858192902f` |
 
 ## Scope change
 
