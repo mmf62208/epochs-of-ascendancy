@@ -29,7 +29,7 @@ Every Cursor / Grok / human session on this tree:
 | **Human** | Not required for units. When you do open the map: Maginot chips sit on the hex (centroid), player is GER. M6 20d/60d still open. |
 | **Machine** | `--quick` **PASS** + `HeadlessWorldAccurateUnitOrderLoopTest` **RESULT=PASS** (organize/train/priority included). Soft 30fps still FAIL honest. |
 | **GitHub** | `origin/main` @ `1d092a14` (IX-1 Road Spine). RX-1 Rhine Crossing is a **draft** slice on `cursor/rx1-rhine-crossing-e117` — **HOLD merge**. Do not force-push over June Cursor history. |
-| **RX-1 Rhine Crossing (draft)** | Vector Rhine Bonn→Köln→Düsseldorf→Duisburg. **FIX2 scope change (same PR 57, from `911dd0ca`):** units stay on top (labels 18 < river 22 / roads 21 < counters 28); theater-scale + screen-space widths kept; close-zoom nation labels still do not bury the river; gold spine; Köln built state; status-leak scoping. View-only **Units** HUD + **U** (Shift+U = supply flow). Pixel guard: units OFF river/spine **FAIL** `816cdc9` / **PASS** tip; units ON counters win; U hide/restore. HOLD merge. Smoke harness is not the product. |
+| **RX-1 Rhine Crossing (draft)** | Vector Rhine Bonn→Köln→Düsseldorf→Duisburg. **FIX2 scope change (PR 57, HEAD `8a13a394`):** units on top (labels 18 < river 22 / roads 21 < counters 28); theater-scale + screen-space kept; close-zoom labels do not bury the river; gold spine; Köln built; leak scoping. View-only **Units** HUD + **U**. Pixel guard xvfb: units OFF river/gold **FAIL** `816cdc9` / **PASS** tip; units ON counters win; U hide/restore. HOLD merge. |
 
 **This DAG (PR 1–3 under `505d91d`; this file is PR 4 — not the only PR):**
 

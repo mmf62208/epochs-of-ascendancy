@@ -101,19 +101,24 @@ Owner: undo the FIX1 raise that put Rhine z=90 / roads z=88 above DemoUnitIcon z
 
 **816cdc9 has no Units toggle.** The guard hides `DemoUnitIcon_*`, `StackBadge`, `PinFocusPulse`, `LandBattleBubbleLayer`, and `SelectedFrame` by walking the tree (`_hide_unit_nodes_direct`) so units-OFF river/road samples are not covered by chips. Tip uses `set_unit_counters_visible` (view-only API).
 
-Guard table (filled after xvfb runs):
+Guard table — real xvfb, `tools/run_godot.sh`, never `EOA_SKIP_TITLE`. Official pair: `/tmp/eoa-rx1-pixel-816cdc9-final/` vs `/tmp/eoa-rx1-pixel-tip-final/` (copies under `/tmp/eoa-rx1-pixel-816cdc9/`, `/tmp/eoa-rx1-pixel-tip/`, `/opt/cursor/artifacts/rx1-pixel/`).
 
-| Check | `816cdc9` | tip |
-|-------|-----------|-----|
-| mid river, units OFF (need ≥0.18) | pending xvfb | pending xvfb |
-| close river, units OFF | pending xvfb | pending xvfb |
-| gold spine, units OFF (need ≥0.20) | pending xvfb | pending xvfb |
-| units ON: counter pixels win over river | pending xvfb | pending xvfb |
-| U hide → U restore, sim unchanged | pending xvfb | pending xvfb |
-| Köln offers Build Road Spine after built | **true FAIL** (prior) | **false PASS** (prior) |
-| Köln shows built state | **false FAIL** (prior) | **true PASS** (prior) |
+| Check | `816cdc9` (direct node hide) | tip `8a13a394` |
+|-------|------------------------------|----------------|
+| mid river, units OFF (need ≥0.28) | **0.230 FAIL** | **1.000 PASS** |
+| close river, units OFF | **0.172 FAIL** | **0.977 PASS** |
+| gold spine, units OFF (need ≥0.15) | **0.000 FAIL** | **0.192 PASS** |
+| units ON: counter pixels win over river | **1.000 PASS** (already z=28 over Rhine z=7) | **1.000 PASS** |
+| U hide → U restore, sim unchanged | **FAIL** (`u_did_not_hide`; no Units toggle) | **PASS** (BtnUnitsView in sync) |
+| Köln offers Build Road Spine after built | **true FAIL** | **false PASS** |
+| Köln shows built state | **false FAIL** | **true PASS** |
+| `WindowedRx1RhinePixelGuard` | **RESULT=FAIL** | **RESULT=PASS** |
 
-PNGs go to `/tmp/eoa-rx1-pixel-816cdc9/` and `/tmp/eoa-rx1-pixel-tip/` (also `/opt/cursor/artifacts/rx1-pixel/`).
+**816cdc9 hide method:** the Play MIXED tip has no `set_unit_counters_visible`. The copied guard walks the tree and sets `visible=false` on `DemoUnitIcon_*`, `StackBadge`, `PinFocusPulse`, `LandBattleBubbleLayer`, and `SelectedFrame` (`_hide_unit_nodes_direct`). Log line: `direct_hide=true`.
+
+**Gold spine:** `ROAD_EXPLICIT_COLOR` (0.92, 0.62, 0.08) composites to ~(245, 103, 9) on GER red. The matcher accepts that and rejects tan land / old tan road (128, 92, 36). 816cdc9 road hit is **0.000** — the tan false-pass is gone. Tip 0.192 is a thin gold-over-GER stroke (honest; floor 0.15).
+
+**Gaps:** framed captures still read as a wide theater view even when MapCamera reports Köln at zoom 2.10 (same class as the earlier Home fight). River/gold samples use canvas transforms + local course, not a claim that the whole PNG is a street-level Köln close-up. Köln bridge-status leak was **false** on this 816cdc9 run (panel node inspect); the re-offer / missing-built fails still stand.
 
 ## Fresh checkout (FIX1)
 

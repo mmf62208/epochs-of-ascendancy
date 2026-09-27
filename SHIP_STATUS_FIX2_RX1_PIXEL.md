@@ -1,4 +1,4 @@
-# SHIP STATUS — FIX2 RX-1 pixels + Köln panel (PR 57)
+# SHIP STATUS — FIX2 scope change: units on top + view-only U (PR 57)
 
 **HOLD for Play. Do not merge. Same draft PR 57.**
 
@@ -6,40 +6,50 @@
 |--|--|
 | **PR** | https://github.com/mmf62208/epochs-of-ascendancy/pull/57 (draft) |
 | **Branch** | `cursor/rx1-rhine-crossing-e117` |
-| **Base Play fail** | `816cdc921c8072928d24a90a71a0d4088e9cde05` (mechanics PASS; screen FAIL) |
-| **Implementation** | `69b6d8d3` (screen-space / labels / Köln built) + `c128ca78` (theater scale) |
-| **Pixel guard** | `73dc3dc3` (Köln frame + local-stroke sample) |
-| **HEAD** | `21235a3653d4255379a7041103a4ed919099577a` |
+| **Starting tip** | `911dd0cac33a5555b3bb857ee48e6d8136451410` |
+| **Play MIXED base** | `816cdc921c8072928d24a90a71a0d4088e9cde05` |
+| **Implementation** | `88de600c` (units on top + U + HUD) + `2932180c` (gold spine paint) |
+| **Pixel floors** | `c46ac26e` (gold 0.15) + `8a13a394` (river 0.28) |
+| **HEAD** | `8a13a3942a47133a81f866a735022f4f5faf4d80` |
 
-## Root cause (items 1–2)
+## Scope change
 
-1. **Rhine off the live canvas.** Spec course is 8192-space. Live `world_accurate` is × `THEATER_SCALE` 1.728. Unscaled points sat near 4254,944; Köln is 7351,1631. World-width `draw_line` 2.8 was sub-pixel at mid zoom. Nation Labels z=40 buried Rhine z=36 / roads z=32. FIX1 z>28 passed on paper.
-2. **Built spine.** Same world-width + z-under-labels. Political `show_roads` is off; explicit IX-1 lines were 2.8u under chips. Play saw only the short Köln preview zig-zag.
+1. **Units stay on top.** Undo FIX1 raise. Labels 18 < roads 21 < Rhine 22 < DemoUnitIcon 28. Keep theater-scale 1.728, screen-space widths, close-zoom label hide, Köln built state, leak scoping.
+2. **View-only Units toggle.** HUD `BtnUnitsView` + plain **U**. Default shown. Does not touch sim / selection / orders / save. Search focus swallows U. **Shift+U** = supply/sealane flow.
+3. **Pixel guard.** Units OFF river + gold spine FAIL on `816cdc9` / PASS on tip. Units ON: counters win. U hide/restore. 816cdc9 hides unit nodes directly.
 
-## Product fix
+## Guard table (real xvfb)
 
-- Scale course/midpoints with `MapCanvasConfig.scale_points`.
-- Screen-space Rhine 7px / halo 14px at z=90; roads 7px at z=88.
-- Nation labels z=18; fade from zoom 0.62; hide at 0.88.
-- `is_ix1_road_spine_built` / no fall-through on `should_show`; `_show_ix1_spine_built_state`.
-- Bridge chrome only Neuss 710413 / Mettmann 710412.
+| Check | `816cdc9` (direct hide) | tip `8a13a394` |
+|-------|-------------------------|----------------|
+| mid river OFF (≥0.28) | **0.230 FAIL** | **1.000 PASS** |
+| close river OFF | **0.172 FAIL** | **0.977 PASS** |
+| gold spine OFF (≥0.15) | **0.000 FAIL** | **0.192 PASS** |
+| units ON counter wins | **1.000 PASS** (already over Rhine) | **1.000 PASS** |
+| U hide/restore + sim | **FAIL** (no toggle) | **PASS** |
+| Köln re-offer / built | **true / false FAIL** | **false / true PASS** |
+| `WindowedRx1RhinePixelGuard` | **RESULT=FAIL** | **RESULT=PASS** |
 
-## Guards (816cdc9 vs tip)
+816cdc9 hide: `_hide_unit_nodes_direct` walks `DemoUnitIcon_*` / `StackBadge` / `PinFocusPulse` / `LandBattleBubbleLayer` / `SelectedFrame`. `direct_hide=true`.
 
-| Guard | `816cdc9` | tip |
-|-------|-----------|-----|
-| `WindowedRx1RhinePixelGuard` (xvfb, live TestScenario) | **RESULT=FAIL** mid=0.174 close=0.138 Köln offer=true built=false | **RESULT=PASS** mid=0.944 close=0.915 road=0.667 offer=false built=true |
-| `HeadlessRx1RhinePanelStateTest` | **RESULT=FAIL** | **RESULT=PASS** |
-| `HeadlessRx1RhineVisibilityTest` | n/a (FIX1 already green) | **RESULT=PASS** |
-| `HeadlessRx1RhineCrossingTest` | n/a | **RESULT=PASS** |
-| `HeadlessRx1RhineLiveStayAliveTickTest` | n/a | **RESULT=PASS** |
-| `HeadlessIx1RoadSpineLiveStayAliveTickTest` | n/a | **RESULT=PASS** |
-| `HeadlessIx1SearchGoInspectorTest` | n/a | **RESULT=PASS** |
-| `test_rx1_rhine_crossing_product` | n/a | **8/8** |
-| `test_ix1_road_spine_product` | n/a | **15/15** |
+Gold matcher rejects tan land and old tan road (128, 92, 36). 816cdc9 road **0.000** — tan false-pass is gone.
 
-Artifacts are **real** viewport PNGs (not mocks). Smoke harness is **not** the product.
+## Other gates (tip)
 
-## Out of scope (unchanged)
+| Guard | Result |
+|-------|--------|
+| `HeadlessRx1RhineVisibilityTest` | **RESULT=PASS** |
+| `HeadlessRx1RhinePanelStateTest` | **RESULT=PASS** |
+| `HeadlessRx1RhineCrossingTest` | **RESULT=PASS** |
+| `HeadlessRx1RhineLiveStayAliveTickTest` | **RESULT=PASS** |
+| `HeadlessIx1SearchGoInspectorTest` | **RESULT=PASS** |
+| `test_rx1_rhine_crossing_product` | **9/9** |
+| `test_ix1_road_spine_product` | **15/15** |
 
-Move ETA preview · bridge blow/capture · hills · road tiers · `world_full` / NUTS3 IDs · Godot bump · `EOA_SKIP_TITLE`.
+## Known gaps
+
+- Captures still read as a wide theater view when MapCamera reports Köln at zoom 2.10. Samples use canvas transforms + local course.
+- Gold tip hit 0.192 is a thin gold-over-GER composite (honest).
+- Köln bridge-leak was **false** on this 816cdc9 run; re-offer / missing-built still fail.
+
+PNGs: `/tmp/eoa-rx1-pixel-816cdc9-final/`, `/tmp/eoa-rx1-pixel-tip-final/`, `/opt/cursor/artifacts/rx1-pixel/`.
