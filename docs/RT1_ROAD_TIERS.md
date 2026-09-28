@@ -5,7 +5,7 @@
 
 The smoke harness and headless guards are **not** a live product Play PASS.
 
-**Harness (FIX #2, not product Play):** headless tier / edge-filter / no-rebuild **RESULT=PASS**. Seeded windowed `tools/eoa_rt1_pixel_guard.sh` still covers S1/S2. `tools/eoa_rt1_live_look_guard.sh` samples the **unseeded 1936 board** through the **player camera path** (Europe Home → Search/Go Köln → `_zoom_toward_mouse`). Mesh/triangle density at Europe + mid + close. Mid gold ≥ 1.8× highway; close gold 16/20 unchanged. 0 closed tan cells at mid (graph cycles on drawn dirt + visible `ProvEdge_` + pixel). Must **FAIL on 94295fc** (mid gold ~1.3×, NUTS cells on); **PASS on tip**. xvfb ≠ product Play.
+**Harness (FIX #2, not product Play):** headless tier / edge-filter / no-rebuild **RESULT=PASS**. Seeded windowed `tools/eoa_rt1_pixel_guard.sh` still covers S1/S2. `tools/eoa_rt1_live_look_guard.sh` samples the **unseeded 1936 board** through the **player camera path** (Europe Home → Search/Go Köln → `_zoom_toward_mouse`). Mesh/triangle density at Europe + mid + close. Mid gold ≥ 1.8× highway (28/34); close gold 16/20 unchanged. 0 closed tan cells at mid (graph cycles on drawn dirt + visible `ProvEdge_` + pixel). Must **FAIL on 94295fc** (mid gold 17 vs 13, 2743 visible NUTS cells); **PASS on tip**. xvfb ≠ product Play.
 
 ## What changed
 
