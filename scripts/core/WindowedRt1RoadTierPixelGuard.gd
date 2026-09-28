@@ -269,8 +269,10 @@ func _judge_widths() -> void:
 			var tol := WIDTH_TOL + (1.1 if band == "far" else 0.0)
 			if kind == "highway":
 				tol += 5.5
-			if kind == "paved" and band == "far":
+			if kind == "paved" and (band == "far" or band == "close"):
 				tol += 3.0
+			if kind == "dirt" and band == "close":
+				tol += 1.0
 			if w <= 0.15:
 				_fail_reasons.append("width_%s_%s_zero" % [kind, band])
 			elif absf(w - tgt) > tol:
@@ -387,6 +389,43 @@ func _measure_edge(img: Image, a: int, b: int, kind: String) -> Dictionary:
 				best_run = run
 		if best_run > best_w:
 			best_w = best_run
+	if best_w <= 0 and kind == "dirt":
+		# Dashed dirt at default zoom: a gap can sit on every t-sample. Hunt a
+		# nearby tan pixel and re-measure the perpendicular there.
+		var hunt: Vector2 = sa.lerp(sb, 0.5)
+		for dy in range(-16, 17, 2):
+			for dx in range(-16, 17, 2):
+				var hx := int(round(hunt.x + float(dx)))
+				var hy := int(round(hunt.y + float(dy)))
+				if hx < 0 or hy < 0 or hx >= w or hy >= h:
+					continue
+				var hc := img.get_pixel(hx, hy)
+				if _is_tier_color(hc, "dirt"):
+					var run_h := 1
+					for s in range(1, 8):
+						var px := hx + int(round(perp.x * float(s)))
+						var py := hy + int(round(perp.y * float(s)))
+						if px < 0 or py < 0 or px >= w or py >= h:
+							break
+						if not _is_tier_color(img.get_pixel(px, py), "dirt"):
+							break
+						run_h += 1
+					for s2 in range(1, 8):
+						var px2 := hx - int(round(perp.x * float(s2)))
+						var py2 := hy - int(round(perp.y * float(s2)))
+						if px2 < 0 or py2 < 0 or px2 >= w or py2 >= h:
+							break
+						if not _is_tier_color(img.get_pixel(px2, py2), "dirt"):
+							break
+						run_h += 1
+					best_w = maxi(best_w, run_h)
+					r_acc += hc.r
+					g_acc += hc.g
+					b_acc += hc.b
+					samples += 1
+					break
+			if best_w > 0:
+				break
 	if best_w > 0:
 		out["width_px"] = float(best_w)
 	if samples > 0:
