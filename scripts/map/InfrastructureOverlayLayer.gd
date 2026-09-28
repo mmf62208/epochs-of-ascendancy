@@ -2713,7 +2713,7 @@ class RoadTierDraw extends Node2D:
 
 ## Built IX-1 gold spine: ONE joined Bonn→Köln→Leverkusen polyline.
 ## Non-AA filled quads. Close/far = GOLD_SPINE_SCREEN_PX (16) / halo 20.
-## Mid lod only = 24 / halo 30 so gold ≥ 1.8× highway. Never draw_line(..., true).
+## Mid lod only = 24 / halo 30 so gold ≥ 1.8× highway. Never antialiased draw_line (IX-1 windowed OOM).
 ## Widths are precomputed per band; _draw reuses packed buffers (no alloc).
 ## S2 labels live on a CanvasLayer (screen space), not Node2D-child Controls.
 class Ix1GoldSpineDraw extends Node2D:
